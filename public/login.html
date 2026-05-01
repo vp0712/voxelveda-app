@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Voxel Veda Admin Login</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="container">
+    <div class="card" style="max-width: 450px; margin: 80px auto;">
+      <h1>Voxel Veda Admin Login</h1>
+      <div id="loginStatus" class="status"></div>
+
+      <input type="email" id="email" placeholder="Email" value="admin@voxelveda.com" />
+      <input type="password" id="password" placeholder="Password" value="Admin@123" />
+      <button onclick="login()">Login</button>
+    </div>
+  </div>
+<script src="/login.js"></script>
+  <script>
+
+    
+    async function login() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      const status = document.getElementById('loginStatus');
+
+      status.innerText = 'Logging in...';
+
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          status.innerText = data.message || 'Login failed';
+          return;
+        }
+
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        const user = data.user;
+const role = user.role;
+
+// save user
+localStorage.setItem('token', data.token);
+localStorage.setItem('user', JSON.stringify(user));
+
+// redirect based on role
+if (role === 'admin') {
+  window.location.href = '/dashboard.html';
+} else {
+  window.location.href = '/staff-dashboard.html';
+}
+      } catch (err) {
+        status.innerText = 'Server error';
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Staff Dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="dashboard-container">
+    <header class="top-bar">
+      <h1>Voxel Veda Staff Dashboard</h1>
+      <button onclick="logout()" class="small-btn">Logout</button>
+    </header>
+
+    <section class="card">
+      <h2>Staff Info</h2>
+      <p id="staffInfo">Loading...</p>
+    </section>
+
+    <section class="card">
+      <h2>Assigned / Approved Jobs</h2>
+      <p id="jobStatus">Loading jobs...</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>RFQ ID</th>
+            <th>Customer</th>
+            <th>Material</th>
+            <th>Quantity</th>
+            <th>Application</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="jobTableBody"></tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>Invoices View</h2>
+      <p id="invoiceStatus">Loading invoices...</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Invoice No</th>
+            <th>RFQ ID</th>
+            <th>Total</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="invoiceTableBody"></tbody>
+      </table>
+    </section>
+  </div>
+
+  <script src="/staff.js"></script>
+</body>
+</html>

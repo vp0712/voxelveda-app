@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Admin Dashboard</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="/logo.png" alt="Voxel Veda Logo" class="brand-logo" />
+        <div>
+          <h2>Voxel Veda</h2>
+          <p>Admin Portal</p>
+        </div>
+      </div>
+
+      <nav class="side-nav">
+        <button class="nav-btn active" data-section="overview">Dashboard</button>
+        <button class="nav-btn" data-section="rfqs">RFQ Management</button>
+        <button class="nav-btn" data-section="invoices">Invoice Management</button>
+        <button class="nav-btn" data-section="staff">Staff Management</button>
+        <button class="nav-btn" data-section="payments">Payment Flow</button>
+        <button class="nav-btn" data-section="reports">Reports</button>
+        <button class="nav-btn" data-section="settings">Settings</button>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <h1>Admin Dashboard</h1>
+          <p>Manage RFQs, invoices, staff, approvals and payments.</p>
+        </div>
+        <button onclick="logout()" class="logout-btn">Logout</button>
+      </header>
+
+      <section id="overview" class="page-section">
+        <div class="stats-grid">
+          <div class="stat-card"><span>Admin</span><strong id="adminInfo">Loading...</strong></div>
+          <div class="stat-card"><span>RFQs</span><strong id="rfqStatus">Loading...</strong></div>
+          <div class="stat-card"><span>Invoices</span><strong id="invoiceStatus">Loading...</strong></div>
+        </div>
+      </section>
+
+      <div class="charts-grid">
+  <div class="chart-card">
+    <h3>RFQ Status Overview</h3>
+    <canvas id="rfqChart"></canvas>
+  </div>
+
+  <div class="chart-card">
+    <h3>Invoice Status Overview</h3>
+    <canvas id="invoiceChart"></canvas>
+  </div>
+</div>
+
+      <section id="rfqs" class="page-section hidden-section panel">
+        <div class="panel-header">
+          <div>
+            <h2>RFQ Management</h2>
+            <p>Review, approve and convert customer RFQs into invoices.</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Customer</th>
+                <th>Email</th>
+                <th>Material</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="rfqTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="invoices" class="page-section hidden-section panel">
+        <div class="panel-header">
+          <div>
+            <h2>Invoice Management</h2>
+            <p>Approve, send and track invoice payment status.</p>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Invoice No</th>
+                <th>RFQ ID</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="staff" class="page-section hidden-section panel staff-bg">
+  <div class="panel-header">
+    <div>
+      <h2>Staff Management</h2>
+      <p>Create staff accounts, assign roles, and manage access.</p>
+    </div>
+    <button class="small-btn" onclick="openAddStaff()">Add Staff</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+        </tr>
+      </thead>
+      <tbody id="staffTableBody"></tbody>
+    </table>
+  </div>
+</section>
+
+      <section id="payments" class="page-section hidden-section panel">
+        <div class="panel-header">
+          <div>
+            <h2>Payment Flow</h2>
+            <p>Track invoices from draft to paid.</p>
+          </div>
+        </div>
+
+        <div class="flow-row">
+          <span>Draft</span>
+          <span>Approved</span>
+          <span>Sent</span>
+          <span>Paid</span>
+        </div>
+      </section>
+
+      <section id="reports" class="page-section hidden-section panel">
+        <div class="panel-header">
+          <div>
+            <h2>Reports</h2>
+            <p>Revenue, RFQ conversion, paid invoices and pending invoices.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="settings" class="page-section hidden-section panel">
+        <div class="panel-header">
+          <div>
+            <h2>Settings</h2>
+            <p>Company details, email setup, invoice terms and system configuration.</p>
+          </div>
+        </div>
+
+        <div class="settings-grid">
+          <div class="setting-card">
+            <h3>Company Details</h3>
+            <label>Email</label>
+            <input id="settingEmail" value="info@voxelveda.com" />
+            <label>ABN</label>
+            <input id="settingAbn" value="52 683 871 767" />
+            <button class="small-btn" onclick="saveSettings()">Save Settings</button>
+          </div>
+
+          <div class="setting-card">
+            <h3>Invoice Settings</h3>
+            <label>Payment Terms</label>
+            <input id="settingTerms" value="7 days" />
+            <label>Bank Name</label>
+            <input id="settingBank" value="Your Bank Name" />
+            <button class="small-btn" onclick="saveSettings()">Save Invoice Settings</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="/app.js"></script>
+</body>
+</html>
