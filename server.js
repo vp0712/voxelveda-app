@@ -18,6 +18,7 @@ console.log("DB_PASSWORD:", process.env.DB_PASSWORD);
 console.log('JWT SECRET LOADED:', !!process.env.JWT_SECRET);
 console.log('DB PORT:', process.env.DB_PORT);
 const app = require('./app');
+require('./utils/seedAdmin')();
 
 const PORT = process.env.PORT || 5001;
 
