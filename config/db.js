@@ -21,6 +21,15 @@ async function testConnection() {
   }
 }
 
+pool.getConnection()
+  .then(conn => {
+    console.log("✅ MySQL CONNECTED SUCCESSFULLY");
+    conn.release();
+  })
+  .catch(err => {
+    console.error("❌ MySQL connection failed:", err.message);
+  });
+
 testConnection();
 
 module.exports = pool;
