@@ -27,6 +27,7 @@ app.use('/api/invoice', invoiceRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/attendance', require('./routes/attendanceRoutes'));
 
 app.get('/', (req, res) => {
   res.redirect('/login.html');

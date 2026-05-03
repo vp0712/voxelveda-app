@@ -171,6 +171,62 @@ async function loadInvoices() {
   }
 }
 
+const token = localStorage.getItem('token');
+
+function authHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${token}`
+  };
+}
+
+async function clockIn() {
+  const res = await fetch('/api/attendance/clock-in', {
+    method: 'POST',
+    headers: authHeaders()
+  });
+
+  const data = await res.json();
+  alert(data.message || 'Clock in response');
+  loadMyAttendance();
+}
+
+async function clockOut() {
+  const res = await fetch('/api/attendance/clock-out', {
+    method: 'POST',
+    headers: authHeaders()
+  });
+
+  const data = await res.json();
+  alert(data.message || 'Clock out response');
+  loadMyAttendance();
+}
+
+async function loadMyAttendance() {
+  const tbody = document.getElementById('attendanceTableBody');
+  if (!tbody) return;
+
+  const res = await fetch('/api/attendance/my', {
+    headers: authHeaders()
+  });
+
+  const data = await res.json();
+
+  tbody.innerHTML = '';
+
+  (data.attendance || []).forEach(row => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${row.clock_in || '-'}</td>
+        <td>${row.clock_out || '-'}</td>
+        <td>${row.total_minutes || 0}</td>
+      </tr>
+    `;
+  });
+}
+
+document.addEventListener('DOMContentLoaded', loadMyAttendance);
+
 document.addEventListener('DOMContentLoaded', () => {
   loadStaffInfo();
   loadJobs();

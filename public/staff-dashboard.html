@@ -13,6 +13,22 @@
       <button onclick="logout()" class="small-btn">Logout</button>
     </header>
 
+    <h2>Staff Attendance</h2>
+
+<button onclick="clockIn()">Clock In</button>
+<button onclick="clockOut()">Clock Out</button>
+
+<table>
+  <thead>
+    <tr>
+      <th>Clock In</th>
+      <th>Clock Out</th>
+      <th>Total Minutes</th>
+    </tr>
+  </thead>
+  <tbody id="attendanceTableBody"></tbody>
+</table>
+
     <section class="card">
       <h2>Staff Info</h2>
       <p id="staffInfo">Loading...</p>
