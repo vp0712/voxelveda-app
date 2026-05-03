@@ -4,12 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Staff Dashboard</title>
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=10" />
 </head>
 <body>
   <div class="dashboard-container">
+
     <header class="top-bar">
-      <h1>Voxel Veda Staff Dashboard</h1>
+      <div class="brand-row">
+        <img src="/logo.png" class="dashboard-logo" alt="Voxel Veda Logo">
+        <div>
+          <h1>Voxel Veda Staff Dashboard</h1>
+          <p>Staff attendance, jobs and invoice access</p>
+        </div>
+      </div>
+
       <button onclick="logout()" class="small-btn">Logout</button>
     </header>
 
@@ -18,13 +26,15 @@
       <p id="staffInfo">Loading...</p>
     </section>
 
-    <section class="card">
-      <h2>Attendance</h2>
+    <section class="card attendance-card">
+      <h2>Attendance Clock</h2>
 
-      <button onclick="clockIn()" class="small-btn">Clock In</button>
-      <button onclick="clockOut()" class="small-btn">Clock Out</button>
+      <div class="button-row">
+        <button onclick="clockIn()" class="small-btn">Clock In</button>
+        <button onclick="clockOut()" class="small-btn">Clock Out</button>
+      </div>
 
-      <p id="attendanceStatus">Loading attendance...</p>
+      <p id="attendanceStatus">Your attendance history will show below.</p>
 
       <table>
         <thead>
@@ -74,8 +84,9 @@
         <tbody id="invoiceTableBody"></tbody>
       </table>
     </section>
+
   </div>
 
-  <script src="/staff.js"></script>
+  <script src="/staff.js?v=10"></script>
 </body>
 </html>
