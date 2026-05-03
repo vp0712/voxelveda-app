@@ -26,6 +26,24 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
+    exports.register = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    const bcrypt = require('bcryptjs');
+    const hash = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
+      [name, email, hash, role || 'staff']
+    );
+
+    res.json({ message: 'User created' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
     const user = rows[0];
 console.log('LOGIN USER FOUND:', user.email);
 console.log('DB PASSWORD:', user.password);

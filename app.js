@@ -7,6 +7,11 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const userRoutes = require('./routes/userRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const auth = require('./middleware/auth');
+
+app.use('/api/users', auth);
+app.use('/api/rfq', auth);
+app.use('/api/invoice', auth);
 
 const app = express();
 

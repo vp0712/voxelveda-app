@@ -1,0 +1,24 @@
+<form id="regForm">
+  <input id="name" placeholder="Name" />
+  <input id="email" placeholder="Email" />
+  <input id="password" placeholder="Password" />
+  <button>Register</button>
+</form>
+
+<script>
+document.getElementById('regForm').onsubmit = async (e) => {
+  e.preventDefault();
+
+  await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name: name.value,
+      email: email.value,
+      password: password.value
+    })
+  });
+
+  alert('User created');
+};
+</script>
