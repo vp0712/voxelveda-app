@@ -493,7 +493,7 @@ async function markInvoicePaid(invoiceId) {
 }
 
 async function manualCreateInvoice() {
-  const rfqId = prompt('Enter Approved RFQ ID:');
+  const rfqId = prompt('Enter approved RFQ ID to create invoice:');
 
   if (!rfqId) return;
 
@@ -507,7 +507,7 @@ async function manualCreateInvoice() {
     const data = await safeJson(res);
 
     if (!res.ok) {
-      alert(data.message || 'Invoice creation failed');
+      alert(`${data.message || 'Invoice creation failed'}\n${data.error || ''}`);
       return;
     }
 
@@ -516,6 +516,7 @@ async function manualCreateInvoice() {
     await loadInvoices();
     await loadDashboardStats();
   } catch (err) {
+    console.error('Manual invoice error:', err);
     alert('Server error creating invoice');
   }
 }

@@ -83,30 +83,28 @@
         </div>
       </section>
 
-      <section id="invoices" class="page-section hidden-section panel">
-        <div class="panel-header">
-          <div>
-            <h2>Invoice Management</h2>
-            <p>Approve, send and track invoice payment status.</p>
-          </div>
-        </div>
-<button class="small-btn" onclick="manualCreateInvoice()">+ Create Invoice</button>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Invoice No</th>
-                <th>RFQ ID</th>
-                <th>Total</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="invoiceTableBody"></tbody>
-          </table>
-        </div>
-      </section>
+      <section id="invoice-management" class="page-section card">
+  <h2>Invoice Management</h2>
+  <p>Approve, send and track invoice payment status.</p>
+
+  <button class="small-btn" onclick="manualCreateInvoice()">
+    + Create Invoice
+  </button>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Invoice No</th>
+        <th>RFQ ID</th>
+        <th>Total</th>
+        <th>Status</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="invoiceTableBody"></tbody>
+  </table>
+</section>
 
       <section id="staff" class="page-section hidden-section panel staff-bg">
   <div class="panel-header">
