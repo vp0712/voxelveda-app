@@ -417,9 +417,8 @@ async function loadInvoices() {
   }
 }
 
-function viewInvoice(invoiceId, invoiceNo = '') {
-  const fileName = invoiceNo ? `${invoiceNo}.pdf` : `INV-${invoiceId}.pdf`;
-  window.open(`/invoices/${fileName}`, '_blank');
+function viewInvoice(invoiceId) {
+  window.open(`/api/invoice/${invoiceId}/pdf`, '_blank');
 }
 
 async function approveInvoice(invoiceId) {
