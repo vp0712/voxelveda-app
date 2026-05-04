@@ -289,7 +289,7 @@ async function loadRFQs() {
 
       tr.innerHTML = `
         <td>${escapeHtml(rfq.id)}</td>
-        <td>${escapeHtml(rfq.full_name)}</td>
+        <td>${escapeHtml(rfq.customer_name)}</td>
         <td>${escapeHtml(rfq.email)}</td>
         <td>${escapeHtml(rfq.material)}</td>
         <td>${escapeHtml(rfq.quantity)}</td>
@@ -323,6 +323,31 @@ async function approveRFQ(rfqId) {
     }
   } catch {
     alert('Error approving RFQ');
+  }
+}
+
+async function submitRFQ() {
+  const body = {
+    customer_name: document.getElementById('rfqCustomerName').value,
+    email: document.getElementById('rfqEmail').value,
+    phone: document.getElementById('rfqPhone').value,
+    material: document.getElementById('rfqMaterial').value,
+    quantity: document.getElementById('rfqQuantity').value,
+    application: document.getElementById('rfqApplication').value
+  };
+
+  const res = await fetch('/api/rfq', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+
+  const data = await safeJson(res);
+  alert(data.message || 'RFQ response');
+
+  if (res.ok) {
+    loadRFQs();
+    loadDashboardStats();
   }
 }
 
