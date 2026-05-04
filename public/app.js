@@ -492,6 +492,34 @@ async function markInvoicePaid(invoiceId) {
   }
 }
 
+async function manualCreateInvoice() {
+  const rfqId = prompt('Enter Approved RFQ ID:');
+
+  if (!rfqId) return;
+
+  try {
+    const res = await fetch('/api/invoice', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ rfq_id: rfqId })
+    });
+
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      alert(data.message || 'Invoice creation failed');
+      return;
+    }
+
+    alert(data.message || 'Invoice created successfully');
+
+    await loadInvoices();
+    await loadDashboardStats();
+  } catch (err) {
+    alert('Server error creating invoice');
+  }
+}
+
 /* ================= SETTINGS ================= */
 
 async function loadSettings() {
