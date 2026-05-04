@@ -351,6 +351,30 @@ async function submitRFQ() {
   }
 }
 
+async function uploadRFQFile() {
+  const rfqId = document.getElementById('uploadRfqId').value;
+  const file = document.getElementById('rfqFile').files[0];
+
+  if (!rfqId || !file) {
+    alert('RFQ ID and file required');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const res = await fetch(`/api/upload/rfq/${rfqId}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`
+    },
+    body: formData
+  });
+
+  const data = await safeJson(res);
+  alert(data.message || 'Upload response');
+}
+
 async function createInvoice(rfqId) {
   if (!confirm(`Create invoice for RFQ #${rfqId}?`)) return;
 

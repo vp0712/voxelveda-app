@@ -20,7 +20,8 @@ app.use(express.urlencoded({ extended: true }));
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/invoices', express.static(path.join(__dirname, 'invoices')));
-
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/auth', authRoutes);
 app.use('/api/rfq', rfqRoutes);
 app.use('/api/invoice', invoiceRoutes);
