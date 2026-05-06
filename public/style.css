@@ -386,3 +386,43 @@ body {
 .attendance-card {
   border: 1px solid #22d3ee;
 }
+
+@media (max-width: 768px) {
+  .dashboard-layout,
+  .dashboard-container,
+  .main-content {
+    display: block !important;
+    width: 100% !important;
+    padding: 12px !important;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    position: relative !important;
+    height: auto !important;
+    padding: 12px !important;
+  }
+
+  .content,
+  main {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding: 12px !important;
+  }
+
+  .card,
+  .page-section {
+    width: 100% !important;
+    margin: 12px 0 !important;
+    overflow-x: auto !important;
+  }
+
+  table {
+    min-width: 760px;
+  }
+
+  .nav-btn {
+    width: 100%;
+    margin-bottom: 8px;
+  }
+}
