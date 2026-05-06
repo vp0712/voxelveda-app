@@ -426,3 +426,53 @@ body {
     margin-bottom: 8px;
   }
 }
+
+@media (max-width: 768px) {
+  body {
+    overflow-y: auto !important;
+  }
+
+  .dashboard-container,
+  .dashboard-layout,
+  .main-content,
+  .content {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow-y: auto !important;
+    padding: 12px !important;
+  }
+
+  .sidebar {
+    width: 100% !important;
+    height: auto !important;
+    position: relative !important;
+  }
+
+  .page-section,
+  .card {
+    display: block;
+    width: 100% !important;
+    margin: 12px 0 !important;
+    overflow-x: auto !important;
+  }
+
+  table {
+    min-width: 760px;
+  }
+
+  input,
+  textarea,
+  button {
+    width: 100%;
+    margin: 6px 0;
+  }
+
+  .hidden-section {
+    display: none !important;
+  }
+
+  .page-section:not(.hidden-section) {
+    display: block !important;
+  }
+}
