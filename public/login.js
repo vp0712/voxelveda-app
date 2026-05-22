@@ -7,6 +7,20 @@ async function pageExists(path) {
   }
 }
 
+function showLoginMessageFromUrl() {
+  const loginStatus = document.getElementById('loginStatus');
+  if (!loginStatus) return;
+
+  const message = new URLSearchParams(window.location.search).get('message');
+  if (!message) return;
+
+  loginStatus.innerText = message;
+  loginStatus.style.color = '#facc15';
+
+  const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
+  window.history.replaceState({}, document.title, cleanUrl);
+}
+
 async function login() {
   const loginStatus = document.getElementById('loginStatus');
   const email = document.getElementById('email')?.value.trim();
@@ -73,3 +87,5 @@ document.addEventListener('keydown', (event) => {
     login();
   }
 });
+
+document.addEventListener('DOMContentLoaded', showLoginMessageFromUrl);

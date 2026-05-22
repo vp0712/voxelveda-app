@@ -2,9 +2,9 @@ const token = localStorage.getItem('token');
 const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 const currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
 
-if (!token) window.location.href = '/login.html';
+if (!token) redirectToLogin('Please login to continue.');
 
-if (currentRole !== 'admin') {
+if (currentRole && currentRole !== 'admin') {
   alert('Access denied. Admin only.');
   window.location.href = '/staff-dashboard.html';
 }
@@ -43,13 +43,31 @@ function authHeaders() {
   };
 }
 
+function redirectToLogin(message = 'Your session expired. Please login again.') {
+  localStorage.clear();
+  const params = new URLSearchParams({ message });
+  window.location.replace(`/login.html?${params.toString()}`);
+}
+
 function logout() {
   localStorage.clear();
   window.location.href = '/login.html';
 }
 
 async function safeJson(res) {
-  try { return await res.json(); } catch { return {}; }
+  let data = {};
+
+  try {
+    data = await res.json();
+  } catch {
+    data = {};
+  }
+
+  if (res.status === 401) {
+    redirectToLogin(data.message || 'Your session expired. Please login again.');
+  }
+
+  return data;
 }
 
 function escapeHtml(value) {
