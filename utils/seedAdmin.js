@@ -5,18 +5,32 @@ async function seedAdmin() {
   try {
     await pool.query(`ALTER TABLE users MODIFY password VARCHAR(255) NOT NULL`);
     await pool.query(`ALTER TABLE users ADD COLUMN name VARCHAR(100) NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN username VARCHAR(120) NULL`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN role VARCHAR(50) NOT NULL DEFAULT 'admin'`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN permissions LONGTEXT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN password_reset_required TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN last_password_reset_at DATETIME NULL`).catch(() => {});
 
-    const hash = await bcrypt.hash('123456', 10);
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@test.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || '123456';
+
+    const [existing] = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
+      [adminEmail]
+    );
+
+    if (existing.length) {
+      console.log('Admin user already exists; seed skipped');
+      return;
+    }
+
+    const hash = await bcrypt.hash(adminPassword, 10);
 
     await pool.query(`
-      DELETE FROM users WHERE email = ?
-    `, ['admin@test.com']);
-
-    await pool.query(`
-      INSERT INTO users (name, email, password, role)
-      VALUES (?, ?, ?, ?)
-    `, ['Admin', 'admin@test.com', hash, 'admin']);
+      INSERT INTO users (name, username, email, password, role, permissions, active)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `, ['Admin', 'admin', adminEmail, hash, 'admin', JSON.stringify(['dashboard', 'rfqs', 'invoices', 'tasks', 'attendance', 'staff', 'settings', 'stock'])]);
 
     console.log('✅ Admin user seeded successfully');
   } catch (err) {

@@ -1,24 +1,27 @@
-<form id="regForm">
-  <input id="name" placeholder="Name" />
-  <input id="email" placeholder="Email" />
-  <input id="password" placeholder="Password" />
-  <button>Register</button>
-</form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Account Access</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
 
-<script>
-document.getElementById('regForm').onsubmit = async (e) => {
-  e.preventDefault();
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-card">
+      <div class="login-logo-box">
+        <img src="/Frame 1.png" alt="Voxel Veda Logo" class="login-logo" />
+      </div>
 
-  await fetch('/api/auth/register', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({
-      name: name.value,
-      email: email.value,
-      password: password.value
-    })
-  });
+      <h1>Account Creation Is Admin Only</h1>
+      <p>
+        Staff login IDs and passwords are created by an administrator from the
+        Staff Management section.
+      </p>
 
-  alert('User created');
-};
-</script>
+      <a class="login-btn secondary-link" href="/login.html">Back to Login</a>
+    </section>
+  </main>
+</body>
+</html>

@@ -1,35 +1,62 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
-const authMiddleware = require('../middleware/authMiddleware');
+const fs = require('fs');
 const pool = require('../config/db');
 
 const router = express.Router();
 
+const uploadDir = path.join(__dirname, '..', 'uploads', 'rfqs');
+
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
   },
-  filename: (req, file, cb) => {
-    const unique = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, unique + path.extname(file.originalname));
+  filename: function (req, file, cb) {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    cb(null, `rfq_${req.params.id}_${Date.now()}_${safeName}`);
   }
 });
 
 const upload = multer({ storage });
 
-router.post('/rfq/:rfq_id', authMiddleware, upload.single('file'), async (req, res) => {
+router.post('/rfq/:id', upload.single('file'), async (req, res) => {
   try {
-    const { rfq_id } = req.params;
+    const rfqId = req.params.id;
 
-    await pool.query(
-      'INSERT INTO rfq_files (rfq_id, file_name, file_path) VALUES (?, ?, ?)',
-      [rfq_id, req.file.originalname, `/uploads/${req.file.filename}`]
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const [rfqRows] = await pool.query(
+      'SELECT id FROM rfqs WHERE id = ? LIMIT 1',
+      [rfqId]
     );
 
-    res.json({ message: 'File uploaded successfully' });
+    if (!rfqRows.length) {
+      return res.status(404).json({
+        message: `RFQ #${rfqId} not found. Use a real RFQ ID.`
+      });
+    }
+
+    res.json({
+      message: 'File uploaded successfully',
+      file: {
+        original_name: req.file.originalname,
+        filename: req.file.filename,
+        path: `/uploads/rfqs/${req.file.filename}`
+      }
+    });
   } catch (err) {
-    res.status(500).json({ message: 'Upload failed', error: err.message });
+    console.error('UPLOAD RFQ FILE ERROR:', err);
+    res.status(500).json({
+      message: 'Upload failed',
+      error: err.message
+    });
   }
 });
 

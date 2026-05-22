@@ -2,64 +2,54 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Voxel Veda Admin Login</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Secure Portal</title>
   <link rel="stylesheet" href="/style.css" />
 </head>
-<body>
-  <div class="container">
-    <div class="card" style="max-width: 450px; margin: 80px auto;">
-      <h1>Voxel Veda Admin Login</h1>
+
+<body class="login-page">
+  <main class="login-shell">
+    <section class="login-card">
+      <div class="login-logo-box">
+        <img src="/Frame 1.png" alt="Voxel Veda Logo" class="login-logo" />
+      </div>
+
+      <h1>Voxel Veda Secure Portal</h1>
+      <p>Engineering operations access for RFQs, invoices, staff tasks and timesheets.</p>
+
       <div id="loginStatus" class="status"></div>
 
-      <input type="email" id="email" placeholder="Email" value="admin@voxelveda.com" />
-      <input type="password" id="password" placeholder="Password" value="Admin@123" />
-      <button onclick="login()">Login</button>
-    </div>
-  </div>
-<script src="/login.js"></script>
-  <script>
+      <div class="login-field">
+        <label for="email">Email Address</label>
+        <input
+          type="email"
+          id="email"
+          placeholder="Enter authorised email"
+          autocomplete="email"
+        />
+      </div>
 
-    
-    async function login() {
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
-      const status = document.getElementById('loginStatus');
+      <div class="login-field">
+        <label for="password">Password</label>
+        <input
+          type="password"
+          id="password"
+          placeholder="Enter secure password"
+          autocomplete="current-password"
+        />
+      </div>
 
-      status.innerText = 'Logging in...';
+      <button type="button" class="login-btn" onclick="login()">Access Portal</button>
 
-      try {
-        const res = await fetch('https://voxelveda-app-production.up.railway.app/api/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
-        });
+      <div class="portal-links">
+        <a href="/customer.html">Customer RFQ</a>
+        <a href="/privacy-policy.html">Privacy Policy</a>
+      </div>
 
-        const data = await res.json();
+      <p class="login-footnote">Role-based access | Admin | Staff | Operations</p>
+    </section>
+  </main>
 
-        if (!res.ok) {
-          status.innerText = data.message || 'Login failed';
-          return;
-        }
-
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
-        const user = data.user;
-const role = user.role;
-
-// save user
-localStorage.setItem('token', data.token);
-localStorage.setItem('user', JSON.stringify(user));
-
-// redirect based on role
-if (role === 'admin') {
-  window.location.href = '/dashboard.html';
-} else {
-  window.location.href = '/staff-dashboard.html';
-}
-      } catch (err) {
-        status.innerText = 'Server error';
-      }
-    }
-  </script>
+  <script src="/login.js"></script>
 </body>
 </html>

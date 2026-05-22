@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Voxel Veda Operations Control</title>
+  <link rel="stylesheet" href="/style.css"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <div class="app-shell">
+
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="/Frame 1.png" class="logo-img" alt="Voxel Veda Logo">
+        <div>
+          <h1>VOXEL VEDA</h1>
+          <p>Operations Control</p>
+        </div>
+      </div>
+
+      <button class="nav-btn active" data-section="dashboardSection">Overview</button>
+      <button class="nav-btn" data-section="rfqSection">RFQs</button>
+      <button class="nav-btn" data-section="invoiceSection">Invoices</button>
+      <button class="nav-btn" data-section="customerSection">Customers</button>
+      <button class="nav-btn" data-section="stockSection">Stock Input</button>
+      <button class="nav-btn" data-section="stockUsageSection">Stock Usage</button>
+      <button class="nav-btn" data-section="rawMaterialSection">Raw Material</button>
+      <button class="nav-btn" data-section="packagingSection">Packaging</button>
+      <button class="nav-btn" data-section="taskSection">Task Control</button>
+      <button class="nav-btn" data-section="attendanceSection">Workforce</button>
+      <button class="nav-btn" data-section="staffSection">Staff</button>
+      <button class="nav-btn" data-section="settingsSection">Settings</button>
+
+      <button class="logout-btn" onclick="logout()">Logout</button>
+    </aside>
+
+    <main class="main">
+
+      <header class="topbar">
+        <div>
+          <h2>Operational Dashboard</h2>
+          <p id="adminInfo">Loading user...</p>
+        </div>
+        <span class="live-pill">System Active</span>
+      </header>
+
+      <!-- OVERVIEW -->
+      <section id="dashboardSection" class="page-section">
+        <div class="dashboard-action-row">
+          <button class="quick-pill" onclick="goSection('invoiceSection')">Invoices</button>
+          <button class="quick-pill" onclick="goSection('rfqSection')">RFQs</button>
+          <button class="quick-pill" onclick="goSection('stockSection')">Stock</button>
+          <button class="quick-pill" onclick="goSection('rawMaterialSection')">Raw Material</button>
+          <button class="quick-pill" onclick="goSection('customerSection')">Customers</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card">
+            <h3>RFQs</h3>
+            <p id="rfqStatus">Loading...</p>
+          </div>
+
+          <div class="card">
+            <h3>Invoices</h3>
+            <p id="invoiceStatus">Loading...</p>
+          </div>
+
+          <div class="card">
+            <h3>Pipeline</h3>
+            <p>RFQ → Approval → Invoice → Payment</p>
+          </div>
+        </div>
+
+        <div class="metric-grid dashboard-kpis">
+          <div class="card kpi-teal">
+            <h3>Invoice Value</h3>
+            <p><strong id="dashboardInvoiceValue">$0.00</strong></p>
+            <span>This month / register value</span>
+          </div>
+          <div class="card kpi-blue">
+            <h3>Stock Worth</h3>
+            <p><strong id="dashboardStockWorth">$0.00</strong></p>
+            <span>Finished inventory left</span>
+          </div>
+          <div class="card kpi-green">
+            <h3>Raw + Packaging</h3>
+            <p><strong id="dashboardMaterialWorth">$0.00</strong></p>
+            <span>Material value left</span>
+          </div>
+        </div>
+
+        <div class="chart-grid">
+          <div class="card">
+            <h3>RFQ Status</h3>
+            <canvas id="rfqChart"></canvas>
+          </div>
+
+          <div class="card">
+            <h3>Invoice Status</h3>
+            <canvas id="invoiceChart"></canvas>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- RFQ -->
+      <section id="rfqSection" class="page-section hidden-section">
+        <div class="section-head">
+          <h2>RFQ Management</h2>
+          <button onclick="submitRFQ()" class="primary-btn">Create RFQ</button>
+        </div>
+
+        <div class="card">
+          <h3>Create RFQ</h3>
+          <div class="form-grid">
+            <input id="rfqCustomerName" placeholder="Customer Name">
+            <input id="rfqEmail" placeholder="Email">
+            <input id="rfqPhone" placeholder="Phone">
+            <input id="rfqMaterial" placeholder="Material">
+            <input id="rfqQuantity" type="number" placeholder="Quantity">
+            <input id="rfqApplication" placeholder="Application">
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <h3>RFQ Register</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Customer</th>
+                <th>Email</th>
+                <th>Material</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="rfqTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- INVOICES -->
+      <section id="invoiceSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Invoice Tracking</h2>
+            <p>Newest invoices are added at the bottom of the register</p>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button onclick="manualCreateInvoice()" class="secondary-btn">Create From RFQ</button>
+            <button onclick="openManualInvoiceDialog()" class="primary-btn">Manual Invoice</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card">
+            <h3>Total Invoice Value</h3>
+            <p><strong id="invoiceTotalValue">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Unpaid Value</h3>
+            <p><strong id="invoiceUnpaidValue">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Sent / Paid</h3>
+            <p><strong id="invoiceSentPaidCount">0 / 0</strong></p>
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <h3>Invoice Register</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Invoice No</th>
+                <th>Customer</th>
+                <th>RFQ ID</th>
+                <th>Total AUD</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="invoiceTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CUSTOMERS -->
+      <section id="customerSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Customer Details</h2>
+            <p>Contacts, files, notes, and order history signals</p>
+          </div>
+          <button onclick="openCustomerDialog()" class="primary-btn">Add Customer</button>
+        </div>
+
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Customer</th>
+                <th>Contact</th>
+                <th>Email / Phone</th>
+                <th>Orders</th>
+                <th>Total Spend</th>
+                <th>Files / Notes</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="customerTableBody">
+              <tr><td colspan="7">Loading customers...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- STOCK INPUT -->
+      <section id="stockSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Stock Input</h2>
+            <p>Home • Inventory • Stock</p>
+          </div>
+          <button onclick="openStockDialog()" class="primary-btn">Add Stock</button>
+        </div>
+
+        <div class="stock-toolbar">
+          <input id="stockSearch" placeholder="Search stock" oninput="loadStock()" />
+        </div>
+
+        <div class="card table-wrap stock-table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Product / Category</th>
+                <th>Reference</th>
+                <th>Input Qty</th>
+                <th>Available Qty</th>
+                <th>Unit Price</th>
+                <th>Inventory Value</th>
+                <th>Created / Updated By</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody">
+              <tr><td colspan="9">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- STOCK USAGE -->
+      <section id="stockUsageSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Stock Usage</h2>
+            <p>Sold, issued, or allocated parts from available stock</p>
+          </div>
+          <button onclick="openIssueStockDialog()" class="primary-btn">Minus Stock</button>
+        </div>
+
+        <div class="card table-wrap stock-table-card">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Product</th>
+                <th>Qty Out</th>
+                <th>Unit Price</th>
+                <th>Total Value</th>
+                <th>Sold / Issued To</th>
+                <th>Notes</th>
+                <th>Created By</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="stockUsageTableBody">
+              <tr><td colspan="9">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RAW MATERIAL -->
+      <section id="rawMaterialSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Raw Material Control</h2>
+            <p>Material on hand, reorder levels, and total worth</p>
+          </div>
+          <button onclick="openMaterialDialog('raw_material')" class="primary-btn">Add Raw Material</button>
+        </div>
+        <div class="metric-grid">
+          <div class="card"><h3>Raw Material Value</h3><p><strong id="rawMaterialValue">$0.00</strong></p></div>
+          <div class="card"><h3>Raw Units Left</h3><p><strong id="rawMaterialUnits">0</strong></p></div>
+          <div class="card"><h3>Reorder Alerts</h3><p><strong id="rawMaterialAlerts">0</strong></p></div>
+        </div>
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Material</th>
+                <th>Supplier / Ref</th>
+                <th>Input</th>
+                <th>Left</th>
+                <th>Unit Price</th>
+                <th>Worth Left</th>
+                <th>Reorder</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="rawMaterialTableBody"><tr><td colspan="8">Loading raw materials...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PACKAGING -->
+      <section id="packagingSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Packaging Control</h2>
+            <p>Boxes, inserts, bags, labels, and remaining value</p>
+          </div>
+          <button onclick="openMaterialDialog('packaging')" class="primary-btn">Add Packaging</button>
+        </div>
+        <div class="metric-grid">
+          <div class="card"><h3>Packaging Value</h3><p><strong id="packagingValue">$0.00</strong></p></div>
+          <div class="card"><h3>Packaging Units Left</h3><p><strong id="packagingUnits">0</strong></p></div>
+          <div class="card"><h3>Reorder Alerts</h3><p><strong id="packagingAlerts">0</strong></p></div>
+        </div>
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Packaging Item</th>
+                <th>Supplier / Ref</th>
+                <th>Input</th>
+                <th>Left</th>
+                <th>Unit Price</th>
+                <th>Worth Left</th>
+                <th>Reorder</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="packagingTableBody"><tr><td colspan="8">Loading packaging...</td></tr></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TASKS -->
+      <section id="taskSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Task & Announcement Control</h2>
+            <p>Assign work and broadcast important updates to selected staff</p>
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button onclick="openAnnouncementDialog()" class="secondary-btn">New Announcement</button>
+            <button onclick="submitTask()" class="primary-btn">Assign Task</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="form-grid">
+            <input id="taskTitle" placeholder="Task Title">
+            <input id="taskDueDate" type="date">
+            <select id="taskAssignedTo">
+              <option value="">Select Staff</option>
+            </select>
+            <select id="taskPriority">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+            <textarea id="taskDescription" placeholder="Task Instructions"></textarea>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card"><h3>Today</h3><p id="taskTodayCount">0</p></div>
+          <div class="card"><h3>Tomorrow</h3><p id="taskTomorrowCount">0</p></div>
+          <div class="card"><h3>Overdue</h3><p id="taskOverdueCount">0</p></div>
+        </div>
+
+        <div class="card table-wrap">
+          <h3>Task Register</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Task</th>
+                <th>Staff</th>
+                <th>Priority</th>
+                <th>Due</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="taskTableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head">
+            <div>
+              <h3>Announcement Register</h3>
+              <p>Announcements automatically disappear from staff dashboards after expiry.</p>
+            </div>
+            <button onclick="loadAnnouncements()" class="secondary-btn">Refresh</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>News</th>
+                <th>Priority</th>
+                <th>Audience</th>
+                <th>Visible From</th>
+                <th>Expires</th>
+                <th>Created By</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="announcementTableBody">
+              <tr><td colspan="7">Loading announcements...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- WORKFORCE -->
+      <section id="attendanceSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Workforce Monitoring</h2>
+            <p>Live clock-ins, clock-outs and staff timesheet corrections</p>
+          </div>
+          <button onclick="openAttendanceDialog()" class="primary-btn">Add / Fix Timesheet</button>
+        </div>
+
+        <div class="card table-wrap">
+          <h3>Every Staff Timesheet</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+                <th>Hours</th>
+                <th>Date</th>
+                <th>Notes</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="attendanceTableBody">
+              <tr><td colspan="8">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head">
+            <div>
+              <h3>Weekly Timesheets</h3>
+              <p>All staff weekly summary</p>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Staff</th>
+                <th>Week Start</th>
+                <th>Week End</th>
+                <th>Total Hours</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="timesheetAdminBody">
+              <tr><td colspan="5">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head">
+            <div>
+              <h3>Staff Timesheet Lookup</h3>
+              <p>Select a staff member and view their full weekly or monthly timesheet history.</p>
+            </div>
+            <button onclick="loadSelectedStaffTimesheets()" class="primary-btn">View Timesheet</button>
+          </div>
+
+          <div class="form-grid">
+            <select id="timesheetStaffSelect">
+              <option value="">Select staff</option>
+            </select>
+            <select id="timesheetPeriodSelect">
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+          </div>
+
+          <h3 id="selectedTimesheetTitle">Selected Staff Timesheet</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Period Start</th>
+                <th>Period End</th>
+                <th>Shifts</th>
+                <th>Total Hours</th>
+                <th>First Shift</th>
+                <th>Last Shift</th>
+              </tr>
+            </thead>
+            <tbody id="selectedTimesheetSummaryBody">
+              <tr><td colspan="6">Select staff to view their timesheet.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Shift Records</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Clock In</th>
+                <th>Clock Out</th>
+                <th>Hours</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="selectedTimesheetRecordsBody">
+              <tr><td colspan="5">Select staff to view shift records.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- STAFF -->
+      <section id="staffSection" class="page-section hidden-section">
+        <div class="section-head">
+          <h2>Staff Management</h2>
+          <button onclick="openAddStaff()" class="primary-btn">Add Staff</button>
+        </div>
+
+        <div class="card table-wrap">
+          <h3>Staff Users</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Access</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="staffTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section id="settingsSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>System Settings</h2>
+            <p>Company controls, system data and quick operations</p>
+          </div>
+          <button onclick="saveSettings()" class="primary-btn">Save Company Settings</button>
+        </div>
+
+        <div class="settings-grid">
+          <div class="card">
+            <h3>Company & Invoice Data</h3>
+            <div class="form-grid">
+              <input id="settingEmail" placeholder="Company Email">
+              <input id="settingAbn" placeholder="ABN">
+              <input id="settingTerms" placeholder="Payment Terms">
+              <input id="settingBank" placeholder="Bank Name">
+              <input id="settingWebsite" placeholder="Website">
+              <input id="settingSupportPhone" placeholder="Support Phone">
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>System Actions</h3>
+            <div class="system-action-grid">
+              <button class="system-action" onclick="refreshAllSystemData()">
+                <strong>Refresh System</strong>
+                <span>Reload dashboard, users, stock, invoices and attendance.</span>
+              </button>
+              <button class="system-action" onclick="openSystemPage('/customer.html')">
+                <strong>Customer RFQ Page</strong>
+                <span>Open the public quote request page.</span>
+              </button>
+              <button class="system-action" onclick="openSystemPage('/privacy-policy.html')">
+                <strong>Privacy Policy</strong>
+                <span>View the customer privacy policy.</span>
+              </button>
+              <button class="system-action" onclick="downloadCsv('users')">
+                <strong>Export Staff</strong>
+                <span>Download staff and access data as CSV.</span>
+              </button>
+              <button class="system-action" onclick="downloadCsv('stock')">
+                <strong>Export Stock</strong>
+                <span>Download stock batch data as CSV.</span>
+              </button>
+              <button class="system-action" onclick="downloadCsv('invoices')">
+                <strong>Export Invoices</strong>
+                <span>Download invoice register data as CSV.</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="dialogBackdrop" class="dialog-backdrop" onclick="closeDialog(event)">
+    <section class="dialog-panel" onclick="event.stopPropagation()">
+      <h3 id="dialogTitle">Action</h3>
+      <div id="dialogBody"></div>
+      <div class="dialog-actions">
+        <button type="button" class="secondary-btn" onclick="hideDialog()">Cancel</button>
+        <button type="button" class="primary-btn" id="dialogPrimaryBtn">Save</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="/admin-dashboard.js"></script>
+</body>
+</html>

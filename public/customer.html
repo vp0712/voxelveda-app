@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Customer RFQ</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+
+<body>
+  <main class="public-shell">
+    <section class="public-hero">
+      <img src="/Frame 1.png" alt="Voxel Veda Logo" class="public-logo" />
+      <div>
+        <p class="eyebrow">Customer Request Portal</p>
+        <h1>Request a quote for advanced manufacturing work</h1>
+        <p>
+          Send your project details to Voxel Veda. Our team will review your
+          request and follow up with the right next step.
+        </p>
+      </div>
+    </section>
+
+    <section class="card public-card">
+      <h2>RFQ Details</h2>
+      <p id="customerStatus" class="status-note">All fields marked with contact details help us respond faster.</p>
+
+      <div class="form-grid">
+        <input id="customerName" placeholder="Customer or company name" autocomplete="organization" />
+        <input id="customerEmail" type="email" placeholder="Email address" autocomplete="email" />
+        <input id="customerPhone" placeholder="Phone number" autocomplete="tel" />
+        <input id="customerMaterial" placeholder="Material or technology" />
+        <input id="customerQuantity" type="number" min="1" placeholder="Quantity" />
+        <input id="customerApplication" placeholder="Application or project summary" />
+      </div>
+
+      <label class="privacy-check">
+        <input id="privacyAccepted" type="checkbox" />
+        <span>I have read and accept the <a href="/privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
+      </label>
+
+      <div class="public-actions">
+        <button type="button" class="primary-btn" onclick="submitCustomerRFQ()">Submit RFQ</button>
+        <a class="secondary-link" href="/login.html">Staff login</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="/customer.js"></script>
+</body>
+</html>

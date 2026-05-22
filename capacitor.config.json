@@ -1,0 +1,9 @@
+{
+  "appId": "com.voxelveda.app",
+  "appName": "VoxelVeda",
+  "webDir": "public",
+  "server": {
+  "url": "https://voxelveda-app-production.up.railway.app",
+  "cleartext": true
+}
+}

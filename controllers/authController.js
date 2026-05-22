@@ -1,93 +1,178 @@
-const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const pool = require('../config/db');
+
+function normalizeRole(role) {
+  return String(role || 'staff').trim().toLowerCase();
+}
+
+function parsePermissions(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function createToken(user) {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is missing in .env');
+  }
+
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+      username: user.username,
+      role: normalizeRole(user.role),
+      permissions: parsePermissions(user.permissions)
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+}
 
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password required' });
     }
 
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({
-        message: 'Login failed',
-        error: 'JWT_SECRET is missing'
-      });
-    }
-
     const [rows] = await pool.query(
-      'SELECT * FROM users WHERE email = ? LIMIT 1',
-      [email]
+      `SELECT id, name, username, email, password, role, permissions, active
+       FROM users
+       WHERE LOWER(email) = ? OR LOWER(username) = ?
+       LIMIT 1`,
+      [email, email]
     );
 
     if (!rows.length) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    exports.register = async (req, res) => {
-  try {
-    const { name, email, password, role } = req.body;
-
-    const bcrypt = require('bcryptjs');
-    const hash = await bcrypt.hash(password, 10);
-
-    await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-      [name, email, hash, role || 'staff']
-    );
-
-    res.json({ message: 'User created' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
     const user = rows[0];
-console.log('LOGIN USER FOUND:', user.email);
-console.log('DB PASSWORD:', user.password);
-console.log('INPUT PASSWORD:', password);
+
+    if (Number(user.active) === 0) {
+      return res.status(403).json({ message: 'Account disabled. Contact admin.' });
+    }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
-    console.log('PASSWORD MATCH:', passwordMatch);
 
     if (!passwordMatch) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const token = jwt.sign(
-      {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: '8h' }
-    );
+    const cleanUser = {
+      id: user.id,
+      name: user.name || 'User',
+      username: user.username || user.email,
+      email: user.email,
+      role: normalizeRole(user.role),
+      permissions: parsePermissions(user.permissions)
+    };
+
+    const token = createToken(cleanUser);
 
     res.json({
       message: 'Login successful',
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role
-      }
+      user: cleanUser
     });
-  } catch (error) {
-    console.error('login error:', error);
+  } catch (err) {
+    console.error('LOGIN ERROR:', err);
     res.status(500).json({
       message: 'Login failed',
-      error: error.message
+      error: err.message
+    });
+  }
+};
+
+exports.register = async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const role = normalizeRole(req.body.role || 'staff');
+    const username = String(req.body.username || email.split('@')[0] || '').trim().toLowerCase();
+    const permissions = parsePermissions(req.body.permissions);
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email and password required' });
+    }
+
+    const allowedRoles = ['admin', 'staff', 'sales', 'production', 'viewer'];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    const [existing] = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1',
+      [email]
+    );
+
+    if (existing.length) {
+      return res.status(409).json({ message: 'Email already registered' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    await pool.query(
+      `INSERT INTO users (name, username, email, password, role, permissions, active)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [name, username, email, hashedPassword, role, JSON.stringify(permissions)]
+    );
+
+    res.json({ message: 'User registered successfully' });
+  } catch (err) {
+    console.error('REGISTER ERROR:', err);
+    res.status(500).json({
+      message: 'Registration failed',
+      error: err.message
     });
   }
 };
 
 exports.me = async (req, res) => {
-  res.json({
-    user: req.user
-  });
+  try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({ message: 'Unauthorized' });
+    }
+
+    const [rows] = await pool.query(
+      'SELECT id, name, username, email, role, permissions, active FROM users WHERE id = ? LIMIT 1',
+      [req.user.id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const user = rows[0];
+
+    res.json({
+      user: {
+        id: user.id,
+        name: user.name || 'User',
+        username: user.username || user.email,
+        email: user.email,
+        role: normalizeRole(user.role),
+        permissions: parsePermissions(user.permissions),
+        active: Number(user.active) !== 0
+      }
+    });
+  } catch (err) {
+    console.error('ME ERROR:', err);
+    res.status(500).json({
+      message: 'Failed to load user',
+      error: err.message
+    });
+  }
 };

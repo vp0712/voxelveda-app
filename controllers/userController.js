@@ -1,12 +1,35 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 
+const ALL_PERMISSIONS = ['dashboard', 'rfqs', 'invoices', 'tasks', 'attendance', 'staff', 'settings', 'stock'];
+
+function parsePermissions(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.filter((item) => ALL_PERMISSIONS.includes(item));
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((item) => ALL_PERMISSIONS.includes(item)) : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeRole(role) {
+  return String(role || 'staff').trim().toLowerCase();
+}
+
 exports.createUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const name = String(req.body.name || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const role = normalizeRole(req.body.role || 'staff');
+    const username = String(req.body.username || email.split('@')[0] || '').trim().toLowerCase();
+    const permissions = parsePermissions(req.body.permissions);
 
-    if (!name || !email || !password || !role) {
-      return res.status(400).json({ message: 'Name, email, password and role are required' });
+    if (!name || !username || !email || !password || !role) {
+      return res.status(400).json({ message: 'Name, username, email, password and role are required' });
     }
 
     const allowedRoles = ['admin', 'sales', 'production', 'viewer', 'staff'];
@@ -16,8 +39,8 @@ exports.createUser = async (req, res) => {
     }
 
     const [existing] = await pool.query(
-      'SELECT id FROM users WHERE email = ? LIMIT 1',
-      [email]
+      'SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1',
+      [email, username]
     );
 
     if (existing.length) {
@@ -27,8 +50,10 @@ exports.createUser = async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const [result] = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)',
-      [name, email, hashedPassword, role]
+      `INSERT INTO users
+       (name, username, email, password, role, permissions, active, password_reset_required)
+       VALUES (?, ?, ?, ?, ?, ?, 1, 1)`,
+      [name, username, email, hashedPassword, role, JSON.stringify(permissions)]
     );
 
     res.json({
@@ -47,14 +72,113 @@ exports.createUser = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, name, email, role FROM users ORDER BY id DESC'
+      `SELECT
+        id,
+        name,
+        username,
+        email,
+        role,
+        permissions,
+        active,
+        password_reset_required,
+        last_password_reset_at
+      FROM users
+      ORDER BY id DESC`
     );
 
-    res.json({ users: rows });
+    res.json({
+      users: rows.map((row) => ({
+        ...row,
+        active: Number(row.active) !== 0,
+        permissions: parsePermissions(row.permissions)
+      }))
+    });
   } catch (error) {
     console.error('getUsers error:', error);
     res.status(500).json({
       message: 'Failed to load users',
+      error: error.message
+    });
+  }
+};
+
+exports.updateUserAccess = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const role = normalizeRole(req.body.role || 'staff');
+    const active = req.body.active === undefined ? true : Boolean(req.body.active);
+    const permissions = parsePermissions(req.body.permissions);
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    if (Number(req.user.id) === userId && active === false) {
+      return res.status(400).json({ message: 'You cannot disable your own account' });
+    }
+
+    const allowedRoles = ['admin', 'sales', 'production', 'viewer', 'staff'];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    const [result] = await pool.query(
+      `UPDATE users
+       SET role = ?, permissions = ?, active = ?
+       WHERE id = ?`,
+      [role, JSON.stringify(permissions), active ? 1 : 0, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'User access updated successfully' });
+  } catch (error) {
+    console.error('updateUserAccess error:', error);
+    res.status(500).json({
+      message: 'Failed to update access',
+      error: error.message
+    });
+  }
+};
+
+exports.resetUserPassword = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const newPassword = String(req.body.password || '').trim();
+
+    if (!userId || !newPassword) {
+      return res.status(400).json({ message: 'User ID and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    const [result] = await pool.query(
+      `UPDATE users
+       SET password = ?,
+           password_reset_required = 1,
+           last_password_reset_at = NOW()
+       WHERE id = ?`,
+      [hashedPassword, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      message: 'Password reset successfully. Share the new temporary password with the staff member.'
+    });
+  } catch (error) {
+    console.error('resetUserPassword error:', error);
+    res.status(500).json({
+      message: 'Failed to reset password',
       error: error.message
     });
   }
