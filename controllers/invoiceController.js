@@ -5,11 +5,70 @@ const fs = require('fs');
 const nodemailer = require('nodemailer');
 
 async function ensureInvoiceColumns() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invoices (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_no VARCHAR(80) NULL,
+      rfq_id INT NULL,
+      customer_name VARCHAR(255) NULL,
+      customer_email VARCHAR(255) NULL,
+      description TEXT NULL,
+      quantity DECIMAL(12,3) NOT NULL DEFAULT 1,
+      unit_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+      gst_rate DECIMAL(5,2) NOT NULL DEFAULT 10,
+      total DECIMAL(12,2) NOT NULL DEFAULT 0,
+      status VARCHAR(40) NOT NULL DEFAULT 'draft',
+      deleted TINYINT(1) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invoice_items (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id INT NOT NULL,
+      product_name VARCHAR(255) NULL,
+      description TEXT NULL,
+      qty DECIMAL(12,3) NULL,
+      quantity DECIMAL(12,3) NOT NULL DEFAULT 1,
+      unit_price DECIMAL(12,2) NOT NULL DEFAULT 0,
+      total DECIMAL(12,2) NULL,
+      amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_invoice_items_invoice_id (invoice_id)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invoice_activity (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id INT NOT NULL,
+      action_type VARCHAR(60) NOT NULL,
+      notes TEXT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_invoice_activity_invoice_id (invoice_id)
+    )
+  `);
+
+  await pool.query(`ALTER TABLE invoices ADD COLUMN invoice_no VARCHAR(80) NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE invoices ADD COLUMN rfq_id INT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE invoices ADD COLUMN customer_name VARCHAR(255) NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE invoices ADD COLUMN customer_email VARCHAR(255) NULL`).catch(() => {});
   await pool.query(`ALTER TABLE invoices ADD COLUMN description TEXT NULL`).catch(() => {});
   await pool.query(`ALTER TABLE invoices ADD COLUMN quantity DECIMAL(12,3) NOT NULL DEFAULT 1`).catch(() => {});
   await pool.query(`ALTER TABLE invoices ADD COLUMN unit_price DECIMAL(12,2) NOT NULL DEFAULT 0`).catch(() => {});
   await pool.query(`ALTER TABLE invoices ADD COLUMN gst_rate DECIMAL(5,2) NOT NULL DEFAULT 10`).catch(() => {});
+  await pool.query(`ALTER TABLE invoices ADD COLUMN total DECIMAL(12,2) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE invoices ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'draft'`).catch(() => {});
   await pool.query(`ALTER TABLE invoices ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE invoices ADD COLUMN created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE invoices ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`).catch(() => {});
+
+  await pool.query(`ALTER TABLE invoice_items ADD COLUMN product_name VARCHAR(255) NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE invoice_items ADD COLUMN qty DECIMAL(12,3) NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE invoice_items ADD COLUMN unit_price DECIMAL(12,2) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE invoice_items ADD COLUMN total DECIMAL(12,2) NULL`).catch(() => {});
   await pool.query(`ALTER TABLE invoice_items ADD COLUMN description TEXT NULL`).catch(() => {});
   await pool.query(`ALTER TABLE invoice_items ADD COLUMN quantity DECIMAL(12,3) NOT NULL DEFAULT 1`).catch(() => {});
   await pool.query(`ALTER TABLE invoice_items ADD COLUMN amount DECIMAL(12,2) NOT NULL DEFAULT 0`).catch(() => {});
