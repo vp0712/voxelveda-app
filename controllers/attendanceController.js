@@ -42,7 +42,72 @@ function isAdmin(req) {
   return String(req.user?.role || '').trim().toLowerCase() === 'admin';
 }
 
+async function ensureAttendanceTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS staff_attendance (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      clock_in DATETIME NOT NULL,
+      clock_out DATETIME NULL,
+      total_minutes INT NOT NULL DEFAULT 0,
+      total_hours DECIMAL(8,2) NOT NULL DEFAULT 0,
+      work_date DATE NOT NULL,
+      notes TEXT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_staff_attendance_user_date (user_id, work_date)
+    )
+  `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS weekly_timesheets (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      week_start DATE NOT NULL,
+      week_end DATE NOT NULL,
+      total_hours DECIMAL(8,2) NOT NULL DEFAULT 0,
+      status VARCHAR(40) NOT NULL DEFAULT 'open',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_weekly_timesheet (user_id, week_start, week_end)
+    )
+  `);
+
+  await pool.query(`ALTER TABLE staff_attendance ADD COLUMN total_minutes INT NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_attendance ADD COLUMN total_hours DECIMAL(8,2) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_attendance ADD COLUMN work_date DATE NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_attendance ADD COLUMN notes TEXT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_attendance ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_attendance ADD COLUMN updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN user_id INT NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN week_start DATE NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN week_end DATE NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN total_hours DECIMAL(8,2) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'open'`).catch(() => {});
+  await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`
+    UPDATE staff_attendance
+    SET work_date = DATE(clock_in)
+    WHERE work_date IS NULL
+  `).catch(() => {});
+  await pool.query(`
+    UPDATE staff_attendance
+    SET
+      total_minutes = CASE
+        WHEN clock_out IS NULL THEN total_minutes
+        ELSE TIMESTAMPDIFF(MINUTE, clock_in, clock_out)
+      END,
+      total_hours = CASE
+        WHEN clock_out IS NULL THEN total_hours
+        ELSE ROUND(TIMESTAMPDIFF(MINUTE, clock_in, clock_out) / 60, 2)
+      END
+  `).catch(() => {});
+}
+
 async function autoClockOutExpiredShifts(userId = null) {
+  await ensureAttendanceTables();
+
   const params = [];
   let userFilter = '';
 
@@ -92,6 +157,8 @@ async function autoClockOutExpiredShifts(userId = null) {
 
 exports.clockIn = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     const userId = Number(req.user?.id);
     const workDate = todayDate();
 
@@ -146,6 +213,8 @@ exports.clockIn = async (req, res) => {
 
 exports.clockOut = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     const userId = Number(req.user?.id);
 
     if (!userId) {
@@ -222,6 +291,8 @@ exports.clockOut = async (req, res) => {
 
 exports.todayAttendance = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     const userId = Number(req.user?.id);
     const workDate = todayDate();
 
@@ -268,6 +339,8 @@ exports.todayAttendance = async (req, res) => {
 
 exports.weekAttendance = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     const userId = Number(req.user?.id);
 
     if (!userId) {
@@ -302,6 +375,8 @@ exports.weekAttendance = async (req, res) => {
 
 exports.myAttendance = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     const userId = Number(req.user?.id);
 
     if (!userId) {
@@ -345,6 +420,8 @@ exports.myAttendance = async (req, res) => {
 
 exports.allAttendance = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }
@@ -388,6 +465,8 @@ exports.allAttendance = async (req, res) => {
 
 exports.allWeeklyTimesheets = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }
@@ -424,6 +503,8 @@ exports.allWeeklyTimesheets = async (req, res) => {
 
 exports.userTimesheets = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }
@@ -499,6 +580,8 @@ exports.userTimesheets = async (req, res) => {
 
 exports.saveAttendance = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }
@@ -607,6 +690,8 @@ exports.saveAttendance = async (req, res) => {
 
 exports.deleteAttendance = async (req, res) => {
   try {
+    await ensureAttendanceTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }

@@ -23,6 +23,40 @@ async function ensureAnnouncementTable() {
   `);
 }
 
+async function ensureTaskTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tasks (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      title VARCHAR(180) NOT NULL,
+      description TEXT NULL,
+      assigned_to INT NULL,
+      assigned_by INT NULL,
+      priority VARCHAR(40) NOT NULL DEFAULT 'medium',
+      status VARCHAR(40) NOT NULL DEFAULT 'pending',
+      due_date DATE NULL,
+      deleted TINYINT(1) NOT NULL DEFAULT 0,
+      started_at DATETIME NULL,
+      completed_at DATETIME NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_tasks_assigned_to (assigned_to)
+    )
+  `);
+
+  await pool.query(`ALTER TABLE tasks ADD COLUMN title VARCHAR(180) NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN description TEXT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN assigned_to INT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN assigned_by INT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN priority VARCHAR(40) NOT NULL DEFAULT 'medium'`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'pending'`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN due_date DATE NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN started_at DATETIME NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN completed_at DATETIME NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE tasks ADD COLUMN updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`).catch(() => {});
+}
+
 function parseTargetUsers(value) {
   if (!value) return [];
   if (Array.isArray(value)) return value.map(Number).filter(Boolean);
@@ -39,6 +73,8 @@ function parseTargetUsers(value) {
 
 exports.getTasks = async (req, res) => {
   try {
+    await ensureTaskTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }
@@ -68,6 +104,8 @@ exports.getTasks = async (req, res) => {
 
 exports.getMyTasks = async (req, res) => {
   try {
+    await ensureTaskTables();
+
     const userId = Number(req.user?.id);
 
     if (!userId) {
@@ -99,6 +137,8 @@ exports.getMyTasks = async (req, res) => {
 
 exports.createTask = async (req, res) => {
   try {
+    await ensureTaskTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }
@@ -192,6 +232,8 @@ exports.createTask = async (req, res) => {
 
 exports.updateTaskStatus = async (req, res) => {
   try {
+    await ensureTaskTables();
+
     const taskId = Number(req.body.task_id);
     const status = String(req.body.status || '').trim().toLowerCase();
 
@@ -270,6 +312,8 @@ exports.updateTaskStatus = async (req, res) => {
 
 exports.deleteTask = async (req, res) => {
   try {
+    await ensureTaskTables();
+
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin only' });
     }

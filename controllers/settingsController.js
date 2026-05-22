@@ -1,7 +1,19 @@
 const pool = require('../config/db');
 
+async function ensureSettingsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      setting_key VARCHAR(120) PRIMARY KEY,
+      setting_value TEXT NULL,
+      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+}
+
 exports.getSettings = async (req, res) => {
   try {
+    await ensureSettingsTable();
+
     const [rows] = await pool.query('SELECT setting_key, setting_value FROM app_settings');
 
     const settings = {};
@@ -18,6 +30,8 @@ exports.getSettings = async (req, res) => {
 
 exports.updateSettings = async (req, res) => {
   try {
+    await ensureSettingsTable();
+
     const settings = req.body;
 
     for (const key of Object.keys(settings)) {
