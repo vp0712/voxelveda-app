@@ -1,6 +1,7 @@
 const token = localStorage.getItem('token');
-const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-const currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
+let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+let currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
+let redirectingToLogin = false;
 
 if (!token) redirectToLogin('Please login to continue.');
 
@@ -44,9 +45,12 @@ function authHeaders() {
 }
 
 function redirectToLogin(message = 'Your session expired. Please login again.') {
+  if (redirectingToLogin) return;
+  redirectingToLogin = true;
   localStorage.clear();
   const params = new URLSearchParams({ message });
   window.location.replace(`/login.html?${params.toString()}`);
+  throw new Error('Redirecting to login');
 }
 
 function logout() {
@@ -168,7 +172,30 @@ async function loadMe() {
   });
 
   const data = await safeJson(res);
-  el.innerText = res.ok ? `${data.user.name} | ${data.user.email} | ${data.user.role}` : data.message || 'User error';
+
+  if (!res.ok || !data.user) {
+    el.innerText = data.message || 'User error';
+    return null;
+  }
+
+  const role = String(data.user.role || '').trim().toLowerCase();
+
+  if (role !== 'admin') {
+    currentUser = { ...data.user, role };
+    currentRole = role;
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    localStorage.setItem('role', role);
+    alert('Access denied. Admin only.');
+    window.location.replace('/staff-dashboard.html');
+    return null;
+  }
+
+  currentUser = { ...data.user, role };
+  currentRole = role;
+  localStorage.setItem('user', JSON.stringify(currentUser));
+  localStorage.setItem('role', role);
+  el.innerText = `${data.user.name} | ${data.user.email} | ${role}`;
+  return data.user;
 }
 
 async function loadDashboardStats() {
@@ -2406,22 +2433,37 @@ async function loadSelectedStaffTimesheets() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  setupNavigation();
-  loadMe();
-  loadDashboardStats();
-  loadRFQs();
-  loadInvoices();
-  loadTasks();
-  loadAnnouncements();
-  loadStaff();
-  loadCustomers();
-  loadStock();
-  loadStockUsage();
-  loadMaterials('raw_material');
-  loadMaterials('packaging');
-  loadAttendance();
-  loadTimesheets();
-  loadSettings();
-  setInterval(loadAttendance, 15000);
-});
+async function bootAdminDashboard() {
+  try {
+    setupNavigation();
+
+    const user = await loadMe();
+    if (!user || redirectingToLogin) return;
+
+    await Promise.all([
+      loadDashboardStats(),
+      loadRFQs(),
+      loadInvoices(),
+      loadTasks(),
+      loadAnnouncements(),
+      loadStaff(),
+      loadCustomers(),
+      loadStock(),
+      loadStockUsage(),
+      loadMaterials('raw_material'),
+      loadMaterials('packaging'),
+      loadAttendance(),
+      loadTimesheets(),
+      loadSettings()
+    ]);
+
+    setInterval(loadAttendance, 15000);
+  } catch (err) {
+    if (!redirectingToLogin) {
+      console.error('ADMIN DASHBOARD STARTUP ERROR:', err);
+      showToast('Dashboard could not load. Please refresh or login again.');
+    }
+  }
+}
+
+document.addEventListener('DOMContentLoaded', bootAdminDashboard);

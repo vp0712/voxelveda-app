@@ -1,10 +1,9 @@
 const token = localStorage.getItem('token');
-const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-const currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
+let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+let currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
+let redirectingToLogin = false;
 
-if (!token || !currentRole) {
-  window.location.href = '/login.html';
-}
+if (!token) redirectToLogin('Please login to continue.');
 
 if (currentRole === 'admin') {
   window.location.href = '/admin-dashboard.html';
@@ -29,7 +28,7 @@ const clockOutMessages = [
   'Shift complete. Thank you for the work, care, and effort you put in today.',
   'You are clocked out. Rest well knowing today moved the team forward.',
   'Good work today. Every finished task adds strength to the whole operation.',
-  'Shift ended. Recharge well, and carry today’s wins into tomorrow.'
+  "Shift ended. Recharge well, and carry today's wins into tomorrow."
 ];
 
 function authHeaders() {
@@ -37,6 +36,15 @@ function authHeaders() {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${token}`
   };
+}
+
+function redirectToLogin(message = 'Your session expired. Please login again.') {
+  if (redirectingToLogin) return;
+  redirectingToLogin = true;
+  localStorage.clear();
+  const params = new URLSearchParams({ message });
+  window.location.replace(`/login.html?${params.toString()}`);
+  throw new Error('Redirecting to login');
 }
 
 function logout() {
@@ -47,11 +55,19 @@ function logout() {
 }
 
 async function safeJson(res) {
+  let data = {};
+
   try {
-    return await res.json();
+    data = await res.json();
   } catch {
-    return {};
+    data = {};
   }
+
+  if (res.status === 401) {
+    redirectToLogin(data.message || 'Your session expired. Please login again.');
+  }
+
+  return data;
 }
 
 function escapeHtml(value) {
@@ -485,17 +501,21 @@ async function loadStaffInfo() {
     if (!res.ok) {
       staffInfo.innerText = data.message || 'Failed to load user';
       if (sidebarStaffName) sidebarStaffName.innerText = 'Staff';
-      return;
+      return null;
     }
 
-    const user = data.user;
+    const role = String(data.user.role || '').trim().toLowerCase();
+    const user = { ...data.user, role };
+
+    currentUser = user;
+    currentRole = role;
     localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('role', role);
     applyPermissionUI();
-    const role = String(user.role || '').trim().toLowerCase();
 
     if (role === 'admin') {
       window.location.href = '/admin-dashboard.html';
-      return;
+      return null;
     }
 
     staffInfo.innerText = `${user.name} | ${user.email} | ${role}`;
@@ -508,9 +528,14 @@ async function loadStaffInfo() {
       await loadStaffStock();
       await loadStaffStockOut();
     }
+
+    return user;
   } catch {
-    staffInfo.innerText = 'Server error loading staff info';
-    if (sidebarStaffName) sidebarStaffName.innerText = 'Staff';
+    if (!redirectingToLogin) {
+      staffInfo.innerText = 'Server error loading staff info';
+      if (sidebarStaffName) sidebarStaffName.innerText = 'Staff';
+    }
+    return null;
   }
 }
 
@@ -1042,7 +1067,7 @@ async function clockOut() {
       const message = pickMessage(clockOutMessages);
       const subtext = 'Your shift is closed. Thank you for your contribution today.';
       showShiftDialog('Shift Complete', message, subtext);
-      await sendShiftNotification('Your shift is complete', 'You are clocked out now. Thank you for today’s work.');
+      await sendShiftNotification('Your shift is complete', "You are clocked out now. Thank you for today's work.");
     }
 
     await loadAttendanceStatus();
@@ -1163,17 +1188,33 @@ function startAutoRefresh() {
 
 /* ================= STARTUP ================= */
 
-document.addEventListener('DOMContentLoaded', () => {
-  applyPermissionUI();
-  setupStaffNavigation();
-  loadStaffInfo();
-  loadMyTasks();
-  loadAnnouncements();
-  loadAttendanceStatus();
-  loadTimesheet();
-  if (hasPermission('stock')) {
-    loadStaffStock();
-    loadStaffStockOut();
+async function bootStaffDashboard() {
+  try {
+    setupStaffNavigation();
+
+    const user = await loadStaffInfo();
+    if (!user || redirectingToLogin) return;
+
+    applyPermissionUI();
+
+    await Promise.all([
+      loadMyTasks(),
+      loadAnnouncements(),
+      loadAttendanceStatus(),
+      loadTimesheet()
+    ]);
+
+    if (hasPermission('stock')) {
+      await loadStaffStock();
+      await loadStaffStockOut();
+    }
+
+    startAutoRefresh();
+  } catch (err) {
+    if (!redirectingToLogin) {
+      console.error('STAFF DASHBOARD STARTUP ERROR:', err);
+    }
   }
-  startAutoRefresh();
-});
+}
+
+document.addEventListener('DOMContentLoaded', bootStaffDashboard);
