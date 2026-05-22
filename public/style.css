@@ -42,6 +42,11 @@ body::before {
   display: flex;
 }
 
+.mobile-menu-btn,
+.mobile-sidebar-backdrop {
+  display: none;
+}
+
 .sidebar {
   width: 280px;
   min-height: 100vh;
@@ -812,12 +817,75 @@ tr:hover td {
 
 @media (max-width: 900px) {
   .app-shell {
-    flex-direction: column;
+    display: block;
+  }
+
+  body.mobile-menu-open {
+    overflow: hidden;
+  }
+
+  .mobile-menu-btn {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 10001;
+    display: grid;
+    gap: 5px;
+    width: 46px;
+    height: 44px;
+    padding: 10px;
+    border: 1px solid rgba(45, 212, 191, 0.38);
+    border-radius: 12px;
+    background: rgba(2, 6, 23, 0.92);
+    box-shadow: 0 14px 36px rgba(0, 0, 0, 0.36);
+  }
+
+  .mobile-menu-btn span {
+    display: block;
+    width: 100%;
+    height: 2px;
+    border-radius: 999px;
+    background: var(--accent);
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 9998;
+    background: rgba(2, 6, 23, 0.68);
+    backdrop-filter: blur(5px);
+  }
+
+  body.mobile-menu-open .mobile-sidebar-backdrop {
+    display: block;
   }
 
   .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 9999;
+    width: min(84vw, 310px);
+    min-height: 100vh;
+    max-height: 100vh;
+    overflow-y: auto;
+    padding: 76px 18px 22px;
+    transform: translateX(-104%);
+    transition: transform 180ms ease;
+    border-right: 1px solid rgba(45, 212, 191, 0.32);
+    box-shadow: 24px 0 60px rgba(0, 0, 0, 0.45);
+  }
+
+  body.mobile-menu-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .brand {
+    margin-bottom: 24px;
+  }
+
+  .main {
     width: 100%;
-    min-height: auto;
+    padding: 76px 14px 24px;
   }
 
   .metric-grid,
@@ -832,6 +900,27 @@ tr:hover td {
   .section-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .topbar {
+    padding-right: 0;
+  }
+
+  .live-pill {
+    align-self: flex-start;
+  }
+
+  .dashboard-action-row {
+    justify-content: flex-start;
+  }
+
+  .quick-pill {
+    padding: 9px 12px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 14px;
   }
 
   .chart-grid .card {

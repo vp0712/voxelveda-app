@@ -9,6 +9,13 @@
 </head>
 
 <body>
+  <button class="mobile-menu-btn" type="button" aria-label="Open menu" onclick="toggleMobileMenu(true)">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+  <div class="mobile-sidebar-backdrop" onclick="toggleMobileMenu(false)"></div>
+
   <div class="app-shell">
 
     <aside class="sidebar">
@@ -641,6 +648,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260522-session-fix"></script>
+  <script src="/admin-dashboard.js?v=20260522-mobile-menu"></script>
 </body>
 </html>

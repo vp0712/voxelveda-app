@@ -58,6 +58,13 @@ function logout() {
   window.location.href = '/login.html';
 }
 
+function toggleMobileMenu(open) {
+  const shouldOpen = typeof open === 'boolean'
+    ? open
+    : !document.body.classList.contains('mobile-menu-open');
+  document.body.classList.toggle('mobile-menu-open', shouldOpen);
+}
+
 async function safeJson(res) {
   let data = {};
 
@@ -155,6 +162,7 @@ function setupNavigation() {
       if (btn.dataset.section === 'packagingSection') loadMaterials('packaging');
       if (btn.dataset.section === 'invoiceSection') loadInvoices();
       if (btn.dataset.section === 'taskSection') loadAnnouncements();
+      toggleMobileMenu(false);
     };
   });
 }

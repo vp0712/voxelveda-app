@@ -54,6 +54,13 @@ function logout() {
   window.location.href = '/login.html';
 }
 
+function toggleMobileMenu(open) {
+  const shouldOpen = typeof open === 'boolean'
+    ? open
+    : !document.body.classList.contains('mobile-menu-open');
+  document.body.classList.toggle('mobile-menu-open', shouldOpen);
+}
+
 async function safeJson(res) {
   let data = {};
 
@@ -479,6 +486,7 @@ function setupStaffNavigation() {
 
       if (target === 'stockInSection') loadStaffStock();
       if (target === 'stockOutSection') loadStaffStockOut();
+      toggleMobileMenu(false);
     });
   });
 }
