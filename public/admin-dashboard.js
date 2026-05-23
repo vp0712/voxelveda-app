@@ -754,8 +754,40 @@ function updateInvoiceMetrics(invoices) {
   if (sentPaidEl) sentPaidEl.innerText = `${sent} / ${paid}`;
 }
 
-function openInvoicePdf(invoiceId) {
-  window.open(`/api/invoice/${invoiceId}/pdf?token=${encodeURIComponent(token)}`, '_blank');
+async function openInvoicePdf(invoiceId) {
+  try {
+    showToast('Opening invoice PDF...');
+
+    const res = await fetch(`/api/invoice/${invoiceId}/pdf`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      const data = await safeJson(res);
+      showToast(data.message || 'Invoice PDF failed');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const opened = window.open(url, '_blank', 'noopener');
+
+    if (!opened) {
+      const link = document.createElement('a');
+      link.href = url;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.download = `invoice-${invoiceId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch (err) {
+    console.error('OPEN INVOICE PDF ERROR:', err);
+    showToast('Invoice PDF could not open');
+  }
 }
 
 async function openEditInvoiceDialog(invoiceId) {
@@ -888,6 +920,7 @@ async function invoiceAction(invoiceId, action) {
     return;
   }
 
+  showToast(data.message || 'Invoice updated');
   await loadInvoices();
   await loadDashboardStats();
 }
