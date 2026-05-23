@@ -673,8 +673,9 @@ exports.viewInvoicePdf = async (req, res) => {
           amount: Number(invoice.quantity || 1) * Number(invoice.unit_price || 0)
         }];
 
+    const disposition = req.query.download ? 'attachment' : 'inline';
     res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `inline; filename="${invoice.invoice_no || 'invoice'}.pdf"`);
+    res.setHeader('Content-Disposition', `${disposition}; filename="${invoice.invoice_no || 'invoice'}.pdf"`);
 
     const doc = createInvoicePdfDocument(invoice, invoiceItems, id);
     doc.pipe(res);

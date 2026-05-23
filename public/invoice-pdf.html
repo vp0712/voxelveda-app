@@ -3,18 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Invoice PDF | Voxel Veda</title>
+  <title>Invoice | Voxel Veda</title>
   <link rel="stylesheet" href="/style.css?v=20260523-mobile-native" />
   <style>
-    .pdf-viewer-shell {
+    .invoice-view-shell {
       min-height: 100vh;
-      padding: 18px;
+      padding: 16px;
       display: grid;
-      grid-template-rows: auto 1fr;
       gap: 14px;
+      background: linear-gradient(180deg, #07111f, #020617);
     }
 
-    .pdf-viewer-top {
+    .invoice-view-top {
+      position: sticky;
+      top: 0;
+      z-index: 5;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -22,94 +25,277 @@
       padding: 14px;
       border: 1px solid rgba(45, 212, 191, 0.22);
       border-radius: 16px;
-      background: rgba(15, 23, 42, 0.9);
+      background: rgba(15, 23, 42, 0.96);
+      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
     }
 
-    .pdf-viewer-top h1 {
+    .invoice-view-top h1 {
       margin: 0;
       font-size: 20px;
     }
 
-    .pdf-viewer-actions {
+    .invoice-view-actions {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
     }
 
-    .pdf-frame-card {
-      min-height: 70vh;
-      padding: 0;
+    .invoice-document {
+      width: min(920px, 100%);
+      margin: 0 auto;
       overflow: hidden;
-    }
-
-    .pdf-frame {
-      width: 100%;
-      height: calc(100vh - 126px);
-      min-height: 640px;
-      border: 0;
+      border-radius: 20px;
       background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
     }
 
-    .pdf-fallback {
-      display: none;
-      padding: 18px;
+    .invoice-document-head {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      padding: 26px;
+      background: #07111f;
+      color: #ffffff;
+      border-bottom: 4px solid #12b3c7;
+    }
+
+    .invoice-document-head img {
+      width: 130px;
+      max-width: 100%;
+      height: auto;
+      margin-bottom: 10px;
+    }
+
+    .invoice-title {
+      text-align: right;
+    }
+
+    .invoice-title h2 {
+      margin: 0;
+      font-size: 34px;
+      letter-spacing: 0;
+    }
+
+    .invoice-title p,
+    .invoice-company p,
+    .invoice-meta p,
+    .invoice-bill p {
+      margin: 4px 0;
+    }
+
+    .invoice-document-body {
+      padding: 26px;
+      display: grid;
+      gap: 22px;
+    }
+
+    .invoice-info-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 18px;
+    }
+
+    .invoice-panel {
+      border: 1px solid #d7dee8;
+      border-radius: 14px;
+      padding: 16px;
+      background: #f8fafc;
+    }
+
+    .invoice-panel h3 {
+      margin: 0 0 10px;
+      color: #0b4f6c;
+      font-size: 13px;
+      text-transform: uppercase;
+    }
+
+    .invoice-meta-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+      border-bottom: 1px solid #e5eaf0;
+    }
+
+    .invoice-meta-row:last-child {
+      border-bottom: 0;
+    }
+
+    .invoice-items {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 0;
+    }
+
+    .invoice-items th {
+      background: #07111f;
+      color: #ffffff;
+      border: 0;
+      padding: 12px;
+      font-size: 12px;
+    }
+
+    .invoice-items td {
+      color: #0f172a;
+      border-bottom: 1px solid #e5eaf0;
+      padding: 12px;
+    }
+
+    .invoice-items td:nth-child(n+2),
+    .invoice-items th:nth-child(n+2) {
+      text-align: right;
+    }
+
+    .invoice-total-card {
+      justify-self: end;
+      width: min(320px, 100%);
+      border: 1px solid #d7dee8;
+      border-radius: 14px;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+
+    .invoice-total-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 16px;
+    }
+
+    .invoice-total-row.final {
+      background: #07111f;
+      color: #ffffff;
+      font-size: 18px;
+      font-weight: 900;
+    }
+
+    .invoice-footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      color: #64748b;
+      font-size: 13px;
+    }
+
+    .invoice-loading {
+      padding: 28px;
+      text-align: center;
+      color: #cbd5e1;
+      font-weight: 900;
     }
 
     @media (max-width: 700px) {
-      .pdf-viewer-shell {
+      .invoice-view-shell {
         padding: 10px;
       }
 
-      .pdf-viewer-top {
-        align-items: stretch;
-        flex-direction: column;
+      .invoice-view-top,
+      .invoice-document-head,
+      .invoice-info-grid,
+      .invoice-footer {
+        grid-template-columns: 1fr;
       }
 
-      .pdf-viewer-actions {
+      .invoice-view-top {
+        align-items: stretch;
+      }
+
+      .invoice-view-actions {
         display: grid;
         grid-template-columns: 1fr;
       }
 
-      .pdf-frame {
-        height: calc(100vh - 190px);
-        min-height: 520px;
+      .invoice-title {
+        text-align: left;
+      }
+
+      .invoice-title h2 {
+        font-size: 28px;
+      }
+
+      .invoice-document-body,
+      .invoice-document-head {
+        padding: 18px;
+      }
+
+      .invoice-items thead {
+        display: none;
+      }
+
+      .invoice-items,
+      .invoice-items tbody,
+      .invoice-items tr {
+        display: block;
+      }
+
+      .invoice-items tr {
+        border: 1px solid #e5eaf0;
+        border-radius: 12px;
+        margin-bottom: 10px;
+        overflow: hidden;
+      }
+
+      .invoice-items td {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 4px;
+        text-align: left !important;
+      }
+
+      .invoice-items td::before {
+        content: attr(data-label);
+        color: #0b4f6c;
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
       }
     }
   </style>
 </head>
 <body>
-  <div class="pdf-viewer-shell">
-    <header class="pdf-viewer-top">
+  <div class="invoice-view-shell">
+    <header class="invoice-view-top">
       <div>
-        <h1>Invoice PDF</h1>
+        <h1>Invoice Preview</h1>
         <p id="pdfStatus" class="muted-text">Loading invoice...</p>
       </div>
-      <div class="pdf-viewer-actions">
+      <div class="invoice-view-actions">
         <button class="secondary-btn" type="button" onclick="goBack()">Back</button>
         <button class="primary-btn" type="button" onclick="openDirectPdf()">Open PDF</button>
-        <button class="secondary-btn" type="button" onclick="downloadPdf()">Download</button>
+        <button class="secondary-btn" type="button" onclick="downloadPdf()">Download PDF</button>
       </div>
     </header>
 
-    <main class="card pdf-frame-card">
-      <iframe id="pdfFrame" class="pdf-frame" title="Invoice PDF"></iframe>
-      <div id="pdfFallback" class="pdf-fallback">
-        <h2>PDF preview is blocked on this device</h2>
-        <p class="status-note">Tap Open PDF or Download to view the invoice file.</p>
-      </div>
-    </main>
+    <main id="invoicePreview" class="invoice-loading">Loading invoice preview...</main>
   </div>
 
   <script>
     const params = new URLSearchParams(window.location.search);
     const invoiceId = params.get('id');
-    const token = localStorage.getItem('token');
+    const token = params.get('token') || localStorage.getItem('token') || '';
     const statusEl = document.getElementById('pdfStatus');
-    const frame = document.getElementById('pdfFrame');
-    const fallback = document.getElementById('pdfFallback');
+    const previewEl = document.getElementById('invoicePreview');
 
-    function pdfUrl() {
-      return `/api/invoice/${encodeURIComponent(invoiceId)}/pdf?token=${encodeURIComponent(token || '')}`;
+    function money(value) {
+      return `$${Number(value || 0).toFixed(2)}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function pdfUrl(download = false) {
+      const extra = download ? '&download=1' : '';
+      return `/api/invoice/${encodeURIComponent(invoiceId)}/pdf?token=${encodeURIComponent(token)}${extra}`;
+    }
+
+    function detailUrl() {
+      return `/api/invoice/${encodeURIComponent(invoiceId)}?token=${encodeURIComponent(token)}`;
     }
 
     function goBack() {
@@ -121,31 +307,115 @@
     }
 
     function openDirectPdf() {
-      window.location.href = pdfUrl();
+      window.location.href = pdfUrl(false);
     }
 
     function downloadPdf() {
-      const link = document.createElement('a');
-      link.href = pdfUrl();
-      link.download = `invoice-${invoiceId || 'file'}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
+      window.location.href = pdfUrl(true);
     }
 
-    if (!invoiceId || !token) {
-      statusEl.textContent = 'Login again, then open the invoice PDF.';
-      frame.style.display = 'none';
-      fallback.style.display = 'block';
-    } else {
-      statusEl.textContent = `Invoice #${invoiceId}`;
-      frame.src = pdfUrl();
-      setTimeout(() => {
-        if (!frame.contentWindow) {
-          fallback.style.display = 'block';
-        }
-      }, 1600);
+    async function loadInvoicePreview() {
+      if (!invoiceId || !token) {
+        statusEl.textContent = 'Login again, then open the invoice.';
+        previewEl.textContent = 'Invoice cannot load because the secure session is missing.';
+        return;
+      }
+
+      const res = await fetch(detailUrl());
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        statusEl.textContent = data.message || 'Invoice failed to load';
+        previewEl.textContent = data.message || 'Invoice failed to load.';
+        return;
+      }
+
+      const invoice = data.invoice || {};
+      const items = data.items?.length
+        ? data.items
+        : [{ description: invoice.description, quantity: invoice.quantity, unit_price: invoice.unit_price, amount: Number(invoice.quantity || 0) * Number(invoice.unit_price || 0) }];
+      const gstRate = Number(invoice.gst_rate || 10);
+      const subtotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
+      const gst = subtotal * (gstRate / 100);
+      const total = subtotal + gst;
+      const invoiceDate = invoice.created_at ? new Date(invoice.created_at).toLocaleDateString('en-AU') : new Date().toLocaleDateString('en-AU');
+      const dueDate = new Date(invoice.created_at || Date.now());
+      dueDate.setDate(dueDate.getDate() + 7);
+
+      statusEl.textContent = invoice.invoice_no || `Invoice #${invoiceId}`;
+
+      previewEl.className = 'invoice-document';
+      previewEl.innerHTML = `
+        <section class="invoice-document-head">
+          <div class="invoice-company">
+            <img src="/Frame 1.png" alt="Voxel Veda" />
+            <p>Voxel Veda Pty Ltd</p>
+            <p>Advanced manufacturing and engineering services</p>
+          </div>
+          <div class="invoice-title">
+            <h2>INVOICE</h2>
+            <p>Engineering Operations</p>
+          </div>
+        </section>
+        <section class="invoice-document-body">
+          <div class="invoice-info-grid">
+            <div class="invoice-panel invoice-bill">
+              <h3>Bill To</h3>
+              <p><strong>${escapeHtml(invoice.customer_name || 'Customer')}</strong></p>
+              <p>${escapeHtml(invoice.customer_email || '-')}</p>
+            </div>
+            <div class="invoice-panel invoice-meta">
+              <h3>Invoice Details</h3>
+              <div class="invoice-meta-row"><span>Invoice No</span><strong>${escapeHtml(invoice.invoice_no || `INV-${invoiceId}`)}</strong></div>
+              <div class="invoice-meta-row"><span>Date</span><strong>${escapeHtml(invoiceDate)}</strong></div>
+              <div class="invoice-meta-row"><span>Due Date</span><strong>${escapeHtml(dueDate.toLocaleDateString('en-AU'))}</strong></div>
+            </div>
+          </div>
+
+          <table class="invoice-items">
+            <thead>
+              <tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr>
+            </thead>
+            <tbody>
+              ${items.map((item) => `
+                <tr>
+                  <td data-label="Description">${escapeHtml(item.description || 'Item')}</td>
+                  <td data-label="Qty">${escapeHtml(Number(item.quantity || 0))}</td>
+                  <td data-label="Unit">${escapeHtml(money(item.unit_price))}</td>
+                  <td data-label="Amount">${escapeHtml(money(item.amount))}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+
+          <div class="invoice-total-card">
+            <div class="invoice-total-row"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
+            <div class="invoice-total-row"><span>GST (${gstRate}%)</span><strong>${money(gst)}</strong></div>
+            <div class="invoice-total-row final"><span>Total AUD</span><strong>${money(total)}</strong></div>
+          </div>
+
+          <div class="invoice-footer">
+            <div>
+              <strong>Payment details</strong>
+              <p>Bank: Commonwealth Bank</p>
+              <p>Account name: Voxel Veda Pty Ltd</p>
+              <p>BSB / Account: Add your details</p>
+              <p>Reference: ${escapeHtml(invoice.invoice_no || `INV-${invoiceId}`)}</p>
+            </div>
+            <div>
+              <strong>Authorized Signatory</strong>
+              <p>Voxel Veda Pty Ltd</p>
+            </div>
+          </div>
+        </section>
+      `;
     }
+
+    loadInvoicePreview().catch((err) => {
+      console.error(err);
+      statusEl.textContent = 'Invoice failed to load';
+      previewEl.textContent = 'Invoice failed to load.';
+    });
   </script>
 </body>
 </html>

@@ -755,7 +755,7 @@ function updateInvoiceMetrics(invoices) {
 }
 
 function openInvoicePdf(invoiceId) {
-  const url = `/invoice-pdf.html?id=${encodeURIComponent(invoiceId)}`;
+  const url = `/invoice-pdf.html?id=${encodeURIComponent(invoiceId)}&token=${encodeURIComponent(token)}`;
   const opened = window.open(url, '_blank', 'noopener');
 
   if (!opened) {
