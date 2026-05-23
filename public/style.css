@@ -15,6 +15,17 @@
   --success: #22c55e;
 }
 
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   margin: 0;
   font-family: Inter, Arial, sans-serif;
@@ -127,6 +138,7 @@ body::before {
   flex: 1;
   padding: 30px;
   overflow-x: hidden;
+  min-width: 0;
 }
 
 .topbar,
@@ -322,11 +334,14 @@ textarea {
 
 .table-wrap {
   overflow-x: auto;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
+  min-width: 720px;
 }
 
 th,
@@ -349,6 +364,7 @@ th {
 
 .page-section {
   display: block;
+  min-width: 0;
 }
 
 .mobile-card {
@@ -816,8 +832,14 @@ tr:hover td {
 }
 
 @media (max-width: 900px) {
+  body {
+    min-width: 0;
+  }
+
   .app-shell {
     display: block;
+    width: 100%;
+    max-width: 100vw;
   }
 
   body.mobile-menu-open {
@@ -885,21 +907,39 @@ tr:hover td {
 
   .main {
     width: 100%;
-    padding: 76px 14px 24px;
+    max-width: 100vw;
+    padding: calc(64px + env(safe-area-inset-top, 0px)) 12px 24px;
   }
 
   .metric-grid,
   .chart-grid,
   .form-grid,
   .settings-grid,
-  .system-action-grid {
+  .system-action-grid,
+  .invoice-item-row {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .topbar,
   .section-head {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+
+  .topbar h2,
+  .section-head h2 {
+    font-size: 22px;
+    line-height: 1.2;
+  }
+
+  .topbar p,
+  .section-head p {
+    margin: 6px 0 0;
+    font-size: 14px;
+    line-height: 1.35;
   }
 
   .topbar {
@@ -912,23 +952,98 @@ tr:hover td {
 
   .dashboard-action-row {
     justify-content: flex-start;
+    gap: 8px;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+    margin-left: -2px;
+    margin-right: -2px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .quick-pill {
+    flex: 0 0 auto;
     padding: 9px 12px;
+    font-size: 13px;
+    white-space: nowrap;
   }
 
   .card {
-    padding: 16px;
+    width: 100%;
+    max-width: 100%;
+    padding: 14px;
     border-radius: 14px;
+    margin-bottom: 14px;
+    overflow: hidden;
+  }
+
+  .card h3 {
+    font-size: 18px;
+    line-height: 1.25;
+  }
+
+  .dashboard-kpis p {
+    font-size: 22px;
+  }
+
+  .form-grid {
+    width: 100%;
+  }
+
+  input,
+  select,
+  textarea {
+    min-width: 0;
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  .primary-btn,
+  .small-btn,
+  .secondary-btn,
+  .danger-btn,
+  .logout-btn,
+  .nav-btn {
+    min-height: 44px;
+  }
+
+  .section-head .primary-btn,
+  .section-head .secondary-btn,
+  .section-head .danger-btn {
+    width: 100%;
+  }
+
+  .table-wrap {
+    width: 100%;
+    max-width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-bottom: 6px;
+  }
+
+  table {
+    min-width: 640px;
+  }
+
+  th,
+  td {
+    padding: 10px;
+    font-size: 13px;
+  }
+
+  .stock-table-card table,
+  .stock-table-card {
+    min-width: 0;
   }
 
   .chart-grid .card {
-    height: 320px;
+    height: auto;
+    min-height: 300px;
   }
 
   .chart-grid canvas {
-    height: 240px !important;
+    height: 230px !important;
+    max-height: 230px !important;
   }
 
   .stock-dialog-grid,
@@ -937,11 +1052,101 @@ tr:hover td {
     grid-template-columns: 1fr;
   }
 
+  .invoice-item-row {
+    margin-bottom: 14px;
+  }
+
+  .invoice-remove-btn {
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .dialog-backdrop {
+    align-items: start;
+    padding: 10px;
+    overflow-y: auto;
+  }
+
+  .dialog-panel,
+  .dialog-panel.wide-dialog {
+    width: 100%;
+    max-width: 100%;
+    max-height: none;
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .dialog-actions {
+    flex-direction: column-reverse;
+  }
+
+  .dialog-actions button {
+    width: 100%;
+  }
+
+  .rank-item,
+  .timesheet-group-head {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .timesheet-group-head {
+    flex-direction: column;
+  }
+
+  .toast {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    text-align: center;
+  }
+
   .public-hero {
     grid-template-columns: 1fr;
   }
 
   .public-hero h1 {
     font-size: 32px;
+  }
+}
+
+@media (max-width: 520px) {
+  .mobile-menu-btn {
+    top: 10px;
+    left: 10px;
+  }
+
+  .main {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .brand h1 {
+    font-size: 16px;
+  }
+
+  .logo-img {
+    width: 44px;
+  }
+
+  .metric-grid {
+    gap: 12px;
+  }
+
+  .dashboard-action-row {
+    margin-bottom: 12px;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  table {
+    min-width: 560px;
+  }
+
+  .chart-grid canvas {
+    height: 210px !important;
+    max-height: 210px !important;
   }
 }
