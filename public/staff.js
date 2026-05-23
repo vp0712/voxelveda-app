@@ -61,6 +61,33 @@ function toggleMobileMenu(open) {
   document.body.classList.toggle('mobile-menu-open', shouldOpen);
 }
 
+function enhanceResponsiveTables() {
+  document.querySelectorAll('table').forEach((table) => {
+    const headers = Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent.trim());
+    if (!headers.length) return;
+
+    table.classList.add('responsive-table');
+    table.querySelectorAll('tbody tr').forEach((row) => {
+      Array.from(row.children).forEach((cell, index) => {
+        if (headers[index]) cell.setAttribute('data-label', headers[index]);
+      });
+    });
+  });
+}
+
+function startResponsiveTableObserver() {
+  enhanceResponsiveTables();
+
+  const observer = new MutationObserver(() => {
+    window.requestAnimationFrame(enhanceResponsiveTables);
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+}
+
 async function safeJson(res) {
   let data = {};
 
@@ -1199,6 +1226,7 @@ function startAutoRefresh() {
 async function bootStaffDashboard() {
   try {
     setupStaffNavigation();
+    startResponsiveTableObserver();
 
     const user = await loadStaffInfo();
     if (!user || redirectingToLogin) return;
