@@ -673,163 +673,11 @@ exports.viewInvoicePdf = async (req, res) => {
           amount: Number(invoice.quantity || 1) * Number(invoice.unit_price || 0)
         }];
 
-    const doc = new PDFDocument({ size: 'A4', margin: 0 });
-
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="${invoice.invoice_no || 'invoice'}.pdf"`);
 
+    const doc = createInvoicePdfDocument(invoice, invoiceItems, id);
     doc.pipe(res);
-
-    const W = doc.page.width;
-    const H = doc.page.height;
-
-    const blue = '#0057C2';
-    const darkBlue = '#06224A';
-    const lightBlue = '#EAF3FF';
-    const text = '#111827';
-    const line = '#D9E2EF';
-
-    const gstRate = Number(invoice.gst_rate || 10);
-    const subtotal = invoiceItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
-    const gst = subtotal * (gstRate / 100);
-    const total = subtotal + gst;
-
-    const invoiceDate = invoice.created_at
-      ? new Date(invoice.created_at).toLocaleDateString('en-AU')
-      : new Date().toLocaleDateString('en-AU');
-
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 7);
-
-    doc.rect(0, 0, W, H).fill('#F8FBFF');
-
-    doc.moveTo(W - 90, 0).lineTo(W, 90).strokeColor('#D7E8FA').lineWidth(2).stroke();
-    doc.moveTo(W - 65, 0).lineTo(W, 65).strokeColor('#EEF5FF').lineWidth(2).stroke();
-
-    doc.polygon([0, H - 170], [0, H], [120, H], [0, H - 90]).fill(darkBlue);
-    doc.polygon([0, H - 135], [0, H], [85, H], [0, H - 75]).fill(blue);
-    doc.polygon([0, H - 105], [0, H], [55, H], [0, H - 55]).fill('#111827');
-
-    const logoPath = path.join(__dirname, '..', 'public', 'Frame 1.png');
-
-    if (fs.existsSync(logoPath)) {
-      try {
-        doc.image(logoPath, 45, 38, { width: 130 });
-      } catch {
-        doc.fillColor(darkBlue).fontSize(26).text('VOXEL', 45, 45);
-        doc.fillColor(blue).text('VEDA', 45, 75);
-      }
-    } else {
-      doc.fillColor(darkBlue).fontSize(26).text('VOXEL', 45, 45);
-      doc.fillColor(blue).text('VEDA', 45, 75);
-    }
-
-    doc.fillColor(text).fontSize(34).text('INVOICE', 405, 75, {
-      width: 140,
-      align: 'center'
-    });
-
-    doc.moveTo(445, 125).lineTo(525, 125).strokeColor(blue).lineWidth(3).stroke();
-
-    doc.roundedRect(45, 175, 38, 38, 6).fill(blue);
-    doc.fillColor('#FFFFFF').fontSize(14).text('B', 58, 187);
-
-    doc.fillColor(blue).fontSize(12).text('BILL TO:', 95, 178);
-    doc.fillColor(text).fontSize(11);
-    doc.text(invoice.customer_name || 'Client Name Pty. Ltd.', 95, 203);
-    doc.text(invoice.customer_email || 'client@example.com', 95, 222);
-    doc.text('Australia', 95, 241);
-
-    doc.roundedRect(330, 175, 38, 38, 6).fill(blue);
-    doc.fillColor('#FFFFFF').fontSize(14).text('I', 344, 187);
-
-    const infoX = 385;
-    doc.fillColor(text).fontSize(10);
-    doc.text('Invoice No', infoX, 178);
-    doc.text(':', infoX + 95, 178);
-    doc.text(invoice.invoice_no || `INV-${id}`, infoX + 110, 178);
-
-    doc.text('Invoice Date', infoX, 200);
-    doc.text(':', infoX + 95, 200);
-    doc.text(invoiceDate, infoX + 110, 200);
-
-    doc.text('Due Date', infoX, 222);
-    doc.text(':', infoX + 95, 222);
-    doc.text(dueDate.toLocaleDateString('en-AU'), infoX + 110, 222);
-
-    doc.text('RFQ ID', infoX, 244);
-    doc.text(':', infoX + 95, 244);
-    doc.text(invoice.rfq_id || 'Manual Invoice', infoX + 110, 244);
-
-    doc.text('Status', infoX, 266);
-    doc.text(':', infoX + 95, 266);
-    doc.text(invoice.status || 'draft', infoX + 110, 266);
-
-    const tableX = 45;
-    const tableY = 320;
-    const tableW = 505;
-    const headerH = 42;
-    const rowH = 48;
-
-    doc.rect(tableX, tableY, tableW, headerH).fill(blue);
-
-    doc.fillColor('#FFFFFF').fontSize(10);
-    doc.text('DESCRIPTION', tableX + 20, tableY + 15);
-    doc.text('QTY', tableX + 260, tableY + 15);
-    doc.text('UNIT PRICE (AUD)', tableX + 330, tableY + 15);
-    doc.text('AMOUNT (AUD)', tableX + 430, tableY + 15);
-
-    invoiceItems.slice(0, 6).forEach((item, index) => {
-      const rowY = tableY + headerH + index * rowH;
-
-      doc.rect(tableX, rowY, tableW, rowH).fill('#FFFFFF');
-      doc.rect(tableX, rowY, tableW, rowH).strokeColor(line).stroke();
-
-      doc.roundedRect(tableX + 12, rowY + 9, 30, 30, 6).fill(lightBlue);
-      doc.fillColor(blue).fontSize(9).text(String(index + 1), tableX + 24, rowY + 18);
-
-      doc.fillColor(text).fontSize(9);
-      doc.text(item.description || 'Item', tableX + 55, rowY + 16, { width: 185 });
-      doc.text(String(Number(item.quantity || 0)), tableX + 267, rowY + 16);
-      doc.text(`$${Number(item.unit_price || 0).toFixed(2)}`, tableX + 335, rowY + 16);
-      doc.text(`$${Number(item.amount || 0).toFixed(2)}`, tableX + 435, rowY + 16);
-    });
-
-    const totalX = 340;
-    const totalY = tableY + headerH + invoiceItems.slice(0, 6).length * rowH + 28;
-
-    doc.rect(totalX, totalY, 210, 36).fill('#FFFFFF').strokeColor(line).stroke();
-    doc.fillColor(text).fontSize(10).text('SUBTOTAL', totalX + 20, totalY + 13);
-    doc.text(`$${subtotal.toFixed(2)}`, totalX + 125, totalY + 13);
-
-    doc.rect(totalX, totalY + 36, 210, 36).fill('#FFFFFF').strokeColor(line).stroke();
-    doc.text(`GST (${gstRate}%)`, totalX + 20, totalY + 49);
-    doc.text(`$${gst.toFixed(2)}`, totalX + 125, totalY + 49);
-
-    doc.rect(totalX, totalY + 72, 210, 42).fill(blue);
-    doc.fillColor('#FFFFFF').fontSize(14).text('TOTAL', totalX + 20, totalY + 86);
-    doc.text(`$${total.toFixed(2)}`, totalX + 115, totalY + 86);
-
-    doc.roundedRect(65, 610, 28, 28, 5).fill(blue);
-    doc.fillColor('#FFFFFF').fontSize(14).text('$', 75, 616);
-
-    doc.fillColor(blue).fontSize(11).text('Payment Information', 105, 613);
-    doc.fillColor(text).fontSize(9);
-    doc.text('Bank Name        : Commonwealth Bank', 105, 635);
-    doc.text('Account Name     : Voxel Veda Pty Ltd', 105, 651);
-    doc.text('BSB / Account    : Add your details', 105, 667);
-    doc.text('Reference        : ' + (invoice.invoice_no || `INV-${id}`), 105, 683);
-
-    doc.fillColor(blue).fontSize(12).text('Thank you for your business!', 105, 730);
-    doc.fillColor(text).fontSize(9);
-    doc.text('For any queries, contact us at', 105, 753);
-    doc.text('info@voxelveda.com | www.voxelveda.com', 105, 770);
-
-    doc.moveTo(350, 720).lineTo(350, 790).strokeColor('#9CA3AF').lineWidth(1).stroke();
-
-    doc.fillColor(text).fontSize(10).text('Authorized Signatory', 405, 750);
-    doc.fontSize(9).text('Voxel Veda Pty Ltd', 405, 767);
-
     doc.end();
   } catch (err) {
     console.error('PDF ERROR FULL:', err);
@@ -863,7 +711,7 @@ async function buildInvoicePdfBuffer(id) {
 }
 
 function createInvoicePdfDocument(invoice, items, id) {
-  const doc = new PDFDocument({ size: 'A4', margin: 50 });
+  const doc = new PDFDocument({ size: 'A4', margin: 0 });
   renderInvoicePdf(doc, invoice, items, id);
   return doc;
 }
@@ -885,67 +733,105 @@ function renderInvoicePdf(doc, invoice, items, id) {
   const invoiceDate = invoice.created_at
     ? new Date(invoice.created_at).toLocaleDateString('en-AU')
     : new Date().toLocaleDateString('en-AU');
+  const dueDate = new Date(invoice.created_at || Date.now());
+  dueDate.setDate(dueDate.getDate() + 7);
 
   const logoPath = path.join(__dirname, '..', 'public', 'Frame 1.png');
-  const teal = '#2dd4bf';
-  const blue = '#38bdf8';
-  const dark = '#0f172a';
+  const W = doc.page.width;
+  const H = doc.page.height;
+  const navy = '#07111f';
+  const ink = '#0f172a';
+  const muted = '#64748b';
+  const line = '#d7dee8';
+  const panel = '#f8fafc';
+  const accent = '#12b3c7';
+  const accentDark = '#0b4f6c';
 
-  doc.rect(0, 0, doc.page.width, 96).fill(dark);
+  doc.rect(0, 0, W, H).fill('#ffffff');
+  doc.rect(0, 0, W, 116).fill(navy);
+  doc.rect(0, 116, W, 3).fill(accent);
+  doc.polygon([W - 155, 0], [W, 0], [W, 116], [W - 92, 116]).fill('#0c223b');
+  doc.polygon([W - 76, 0], [W, 0], [W, 58]).fill(accentDark);
 
   if (fs.existsSync(logoPath)) {
     try {
-      doc.image(logoPath, 50, 28, { width: 82 });
+      doc.image(logoPath, 48, 28, { width: 118 });
     } catch {
-      doc.fillColor('#ffffff').fontSize(18).text('VOXEL VEDA', 50, 35);
+      doc.fillColor('#ffffff').fontSize(22).text('VOXEL VEDA', 48, 42);
     }
   } else {
-    doc.fillColor('#ffffff').fontSize(18).text('VOXEL VEDA', 50, 35);
+    doc.fillColor('#ffffff').fontSize(22).text('VOXEL VEDA', 48, 42);
   }
 
-  doc.fillColor(teal).fontSize(26).text('INVOICE', 395, 34, { width: 150, align: 'right' });
-  doc.fillColor('#111827');
-  doc.fontSize(11).text(`Invoice No: ${invoice.invoice_no || `INV-${id}`}`, 50, 130);
-  doc.text(`Date: ${invoiceDate}`, 50, 148);
-  doc.text(`Status: ${invoice.status || 'draft'}`, 50, 166);
-  doc.text(`RFQ: ${invoice.rfq_id || 'Manual'}`, 50, 184);
+  doc.fillColor('#ffffff').fontSize(30).text('INVOICE', 386, 34, { width: 160, align: 'right' });
+  doc.fillColor('#b6f4ff').fontSize(9).text('ENGINEERING OPERATIONS', 386, 72, { width: 160, align: 'right' });
 
-  doc.fontSize(13).fillColor(blue).text('Bill To', 350, 130);
-  doc.fillColor('#111827').fontSize(11);
-  doc.text(invoice.customer_name || 'Customer', 350, 152);
-  doc.text(invoice.customer_email || '-', 350, 170);
+  doc.fillColor(ink).fontSize(9).text('Issued by', 48, 145);
+  doc.fillColor(ink).fontSize(16).text('Voxel Veda Pty Ltd', 48, 161);
+  doc.fillColor(muted).fontSize(9);
+  doc.text('Advanced manufacturing and engineering services', 48, 184);
+  doc.text('info@voxelveda.com | www.voxelveda.com', 48, 199);
 
-  const tableY = 245;
-  doc.roundedRect(50, tableY, 495, 34, 6).fill(dark);
-  doc.fillColor('#ffffff').fontSize(10);
-  doc.text('Description', 65, tableY + 12);
-  doc.text('Qty', 300, tableY + 12);
-  doc.text('Unit', 365, tableY + 12);
-  doc.text('Amount', 455, tableY + 12);
+  const metaX = 366;
+  doc.roundedRect(metaX, 142, 182, 94, 8).fill(panel).strokeColor(line).stroke();
+  doc.fillColor(muted).fontSize(8).text('INVOICE NO', metaX + 16, 158);
+  doc.fillColor(ink).fontSize(12).text(invoice.invoice_no || `INV-${id}`, metaX + 16, 172);
+  doc.fillColor(muted).fontSize(8).text('INVOICE DATE', metaX + 16, 196);
+  doc.fillColor(ink).fontSize(10).text(invoiceDate, metaX + 16, 210);
+  doc.fillColor(muted).fontSize(8).text('DUE DATE', metaX + 106, 196);
+  doc.fillColor(ink).fontSize(10).text(dueDate.toLocaleDateString('en-AU'), metaX + 106, 210);
 
-  let y = tableY + 44;
-  invoiceItems.slice(0, 12).forEach((item, index) => {
-    doc.fillColor(index % 2 === 0 ? '#f8fafc' : '#eef6ff').rect(50, y - 8, 495, 34).fill();
-    doc.fillColor('#111827').fontSize(10);
-    doc.text(item.description || 'Item', 65, y, { width: 220 });
-    doc.text(String(Number(item.quantity || 0)), 300, y);
-    doc.text(`$${Number(item.unit_price || 0).toFixed(2)}`, 365, y);
-    doc.text(`$${Number(item.amount || 0).toFixed(2)}`, 455, y);
-    y += 34;
+  doc.roundedRect(48, 262, 500, 76, 10).fill(panel).strokeColor(line).stroke();
+  doc.fillColor(accentDark).fontSize(9).text('BILL TO', 68, 282);
+  doc.fillColor(ink).fontSize(14).text(invoice.customer_name || 'Customer', 68, 299, { width: 300 });
+  doc.fillColor(muted).fontSize(10).text(invoice.customer_email || '-', 68, 318, { width: 300 });
+
+  const tableX = 48;
+  const tableY = 376;
+  const tableW = 500;
+  const rowH = 42;
+
+  doc.roundedRect(tableX, tableY, tableW, 36, 8).fill(navy);
+  doc.fillColor('#ffffff').fontSize(9);
+  doc.text('DESCRIPTION', tableX + 18, tableY + 13, { width: 230 });
+  doc.text('QTY', tableX + 280, tableY + 13, { width: 42, align: 'right' });
+  doc.text('UNIT', tableX + 350, tableY + 13, { width: 56, align: 'right' });
+  doc.text('AMOUNT', tableX + 424, tableY + 13, { width: 58, align: 'right' });
+
+  let y = tableY + 48;
+  invoiceItems.slice(0, 10).forEach((item, index) => {
+    doc.roundedRect(tableX, y - 8, tableW, rowH, 6)
+      .fill(index % 2 === 0 ? '#ffffff' : '#f8fafc')
+      .strokeColor('#e5eaf0')
+      .stroke();
+    doc.fillColor(ink).fontSize(10).text(item.description || 'Item', tableX + 18, y + 6, { width: 230 });
+    doc.fillColor(muted).fontSize(9).text(String(Number(item.quantity || 0)), tableX + 280, y + 6, { width: 42, align: 'right' });
+    doc.text(`$${Number(item.unit_price || 0).toFixed(2)}`, tableX + 350, y + 6, { width: 56, align: 'right' });
+    doc.fillColor(ink).fontSize(10).text(`$${Number(item.amount || 0).toFixed(2)}`, tableX + 424, y + 6, { width: 58, align: 'right' });
+    y += rowH;
   });
 
-  y += 20;
-  doc.fillColor('#111827').fontSize(11);
-  doc.text('Subtotal', 365, y);
-  doc.text(`$${subtotal.toFixed(2)}`, 455, y);
-  y += 24;
-  doc.text(`GST (${gstRate}%)`, 365, y);
-  doc.text(`$${gst.toFixed(2)}`, 455, y);
-  y += 28;
-  doc.roundedRect(350, y - 10, 195, 38, 6).fill(teal);
-  doc.fillColor('#07111f').fontSize(14).text('Total', 365, y);
-  doc.text(`$${total.toFixed(2)}`, 455, y);
+  const totalsX = 338;
+  const totalsY = Math.min(y + 20, 610);
+  doc.roundedRect(totalsX, totalsY, 210, 110, 10).fill(panel).strokeColor(line).stroke();
+  doc.fillColor(muted).fontSize(10).text('Subtotal', totalsX + 18, totalsY + 18);
+  doc.fillColor(ink).text(`$${subtotal.toFixed(2)}`, totalsX + 120, totalsY + 18, { width: 70, align: 'right' });
+  doc.fillColor(muted).text(`GST (${gstRate}%)`, totalsX + 18, totalsY + 43);
+  doc.fillColor(ink).text(`$${gst.toFixed(2)}`, totalsX + 120, totalsY + 43, { width: 70, align: 'right' });
+  doc.roundedRect(totalsX, totalsY + 68, 210, 42, 8).fill(navy);
+  doc.fillColor('#ffffff').fontSize(12).text('TOTAL AUD', totalsX + 18, totalsY + 82);
+  doc.fontSize(15).text(`$${total.toFixed(2)}`, totalsX + 108, totalsY + 80, { width: 82, align: 'right' });
 
-  doc.fillColor('#111827').fontSize(10).text('Thank you for your business.', 50, 720);
-  doc.fillColor('#64748b').fontSize(9).text('Voxel Veda Pty Ltd | Advanced manufacturing and engineering operations', 50, 740);
+  const payY = 672;
+  doc.fillColor(accentDark).fontSize(11).text('Payment details', 48, payY);
+  doc.fillColor(muted).fontSize(9);
+  doc.text('Bank: Commonwealth Bank', 48, payY + 22);
+  doc.text('Account name: Voxel Veda Pty Ltd', 48, payY + 38);
+  doc.text('BSB / Account: Add your details', 48, payY + 54);
+  doc.text(`Reference: ${invoice.invoice_no || `INV-${id}`}`, 48, payY + 70);
+
+  doc.fillColor(ink).fontSize(10).text('Thank you for your business.', 48, 782);
+  doc.fillColor(muted).fontSize(8).text('This document was generated electronically by Voxel Veda. Please use the invoice number as payment reference.', 48, 802, { width: 360 });
+  doc.fillColor(ink).fontSize(9).text('Authorized Signatory', 416, 782);
+  doc.fillColor(muted).fontSize(8).text('Voxel Veda Pty Ltd', 416, 800);
 }
