@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Invoice PDF | Voxel Veda</title>
+  <link rel="stylesheet" href="/style.css?v=20260523-mobile-native" />
+  <style>
+    .pdf-viewer-shell {
+      min-height: 100vh;
+      padding: 18px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+    }
+
+    .pdf-viewer-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 14px;
+      border: 1px solid rgba(45, 212, 191, 0.22);
+      border-radius: 16px;
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .pdf-viewer-top h1 {
+      margin: 0;
+      font-size: 20px;
+    }
+
+    .pdf-viewer-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .pdf-frame-card {
+      min-height: 70vh;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .pdf-frame {
+      width: 100%;
+      height: calc(100vh - 126px);
+      min-height: 640px;
+      border: 0;
+      background: #ffffff;
+    }
+
+    .pdf-fallback {
+      display: none;
+      padding: 18px;
+    }
+
+    @media (max-width: 700px) {
+      .pdf-viewer-shell {
+        padding: 10px;
+      }
+
+      .pdf-viewer-top {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .pdf-viewer-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+      }
+
+      .pdf-frame {
+        height: calc(100vh - 190px);
+        min-height: 520px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="pdf-viewer-shell">
+    <header class="pdf-viewer-top">
+      <div>
+        <h1>Invoice PDF</h1>
+        <p id="pdfStatus" class="muted-text">Loading invoice...</p>
+      </div>
+      <div class="pdf-viewer-actions">
+        <button class="secondary-btn" type="button" onclick="goBack()">Back</button>
+        <button class="primary-btn" type="button" onclick="openDirectPdf()">Open PDF</button>
+        <button class="secondary-btn" type="button" onclick="downloadPdf()">Download</button>
+      </div>
+    </header>
+
+    <main class="card pdf-frame-card">
+      <iframe id="pdfFrame" class="pdf-frame" title="Invoice PDF"></iframe>
+      <div id="pdfFallback" class="pdf-fallback">
+        <h2>PDF preview is blocked on this device</h2>
+        <p class="status-note">Tap Open PDF or Download to view the invoice file.</p>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const invoiceId = params.get('id');
+    const token = localStorage.getItem('token');
+    const statusEl = document.getElementById('pdfStatus');
+    const frame = document.getElementById('pdfFrame');
+    const fallback = document.getElementById('pdfFallback');
+
+    function pdfUrl() {
+      return `/api/invoice/${encodeURIComponent(invoiceId)}/pdf?token=${encodeURIComponent(token || '')}`;
+    }
+
+    function goBack() {
+      if (history.length > 1) {
+        history.back();
+        return;
+      }
+      window.location.href = '/admin-dashboard.html';
+    }
+
+    function openDirectPdf() {
+      window.location.href = pdfUrl();
+    }
+
+    function downloadPdf() {
+      const link = document.createElement('a');
+      link.href = pdfUrl();
+      link.download = `invoice-${invoiceId || 'file'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    if (!invoiceId || !token) {
+      statusEl.textContent = 'Login again, then open the invoice PDF.';
+      frame.style.display = 'none';
+      fallback.style.display = 'block';
+    } else {
+      statusEl.textContent = `Invoice #${invoiceId}`;
+      frame.src = pdfUrl();
+      setTimeout(() => {
+        if (!frame.contentWindow) {
+          fallback.style.display = 'block';
+        }
+      }, 1600);
+    }
+  </script>
+</body>
+</html>
