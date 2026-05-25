@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-  <link rel="stylesheet" href="/style.css?v=20260525-stock-menu"/>
+  <link rel="stylesheet" href="/style.css?v=20260525-workforce-menu"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -43,9 +43,25 @@
       </details>
       <button class="nav-btn" data-section="rawMaterialSection">Raw Material</button>
       <button class="nav-btn" data-section="packagingSection">Packaging</button>
-      <button class="nav-btn" data-section="taskSection">Task Control</button>
-      <button class="nav-btn" data-section="attendanceSection">Workforce</button>
-      <button class="nav-btn" data-section="staffSection">Staff</button>
+      <details class="nav-group" open>
+        <summary class="nav-group-toggle">
+          <span>Task Control</span>
+          <span class="nav-group-caret">v</span>
+        </summary>
+        <div class="nav-submenu">
+          <button class="nav-btn nav-sub-btn" data-section="taskSection">Announcements & Tasks</button>
+        </div>
+      </details>
+      <details class="nav-group" open>
+        <summary class="nav-group-toggle">
+          <span>Workforce</span>
+          <span class="nav-group-caret">v</span>
+        </summary>
+        <div class="nav-submenu">
+          <button class="nav-btn nav-sub-btn" data-section="attendanceSection">Timesheets</button>
+          <button class="nav-btn nav-sub-btn" data-section="staffSection">Staff</button>
+        </div>
+      </details>
       <button class="nav-btn" data-section="settingsSection">Settings</button>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
@@ -656,6 +672,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260525-stock-menu"></script>
+  <script src="/admin-dashboard.js?v=20260525-workforce-menu"></script>
 </body>
 </html>
