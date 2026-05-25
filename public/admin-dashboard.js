@@ -154,12 +154,14 @@ async function sendAdminNotification(title, body) {
 
 function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   const backdrop = document.getElementById('dialogBackdrop');
+  const panel = document.querySelector('.dialog-panel');
   const titleEl = document.getElementById('dialogTitle');
   const bodyEl = document.getElementById('dialogBody');
   const primaryBtn = document.getElementById('dialogPrimaryBtn');
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
+  panel?.classList.remove('wide-dialog', 'material-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -1700,6 +1702,10 @@ function updateMaterialMetrics(type, rows) {
 function openMaterialDialog(type, id = null) {
   const item = (materialCache[type] || []).find((row) => Number(row.id) === Number(id)) || {};
   const sheet = getProcessSheet(item);
+  const inputQty = Number(item.input_qty || 0);
+  const currentQty = Number(item.current_qty ?? item.input_qty ?? 0);
+  const unitPrice = Number(item.unit_price || 0);
+  const reorderLevel = Number(item.reorder_level || 0);
 
   showDialog(
     id ? `Edit ${materialLabel(type)}` : `Add ${materialLabel(type)}`,
@@ -1714,15 +1720,44 @@ function openMaterialDialog(type, id = null) {
         </div>
         <div class="dialog-card">
           <h4>Quantity & Worth</h4>
-          <div class="split-grid">
-            <input id="materialInputQty" type="number" min="0" step="0.001" placeholder="Input quantity" value="${escapeHtml(item.input_qty || 0)}" />
-            <input id="materialCurrentQty" type="number" min="0" step="0.001" placeholder="Current quantity" value="${escapeHtml(item.current_qty ?? item.input_qty ?? 0)}" />
+          <div class="split-grid labelled-grid">
+            <label class="form-field">
+              <span>Opening / received quantity</span>
+              <input id="materialInputQty" type="number" min="0" step="0.001" placeholder="Example: 500" value="${escapeHtml(inputQty)}" />
+            </label>
+            <label class="form-field">
+              <span>Current quantity left</span>
+              <input id="materialCurrentQty" type="number" min="0" step="0.001" placeholder="Example: 430" value="${escapeHtml(currentQty)}" />
+            </label>
           </div>
-          <div class="split-grid">
-            <input id="materialUnitLabel" placeholder="Unit (kg, roll, pcs)" value="${escapeHtml(item.unit_label || 'pcs')}" />
-            <input id="materialUnitPrice" type="number" min="0" step="0.01" placeholder="Unit price" value="${escapeHtml(item.unit_price || 0)}" />
+          <div class="split-grid labelled-grid">
+            <label class="form-field">
+              <span>Unit type</span>
+              <input id="materialUnitLabel" placeholder="kg, roll, pcs, sheet" value="${escapeHtml(item.unit_label || 'pcs')}" />
+            </label>
+            <label class="form-field">
+              <span>Unit price</span>
+              <input id="materialUnitPrice" type="number" min="0" step="0.01" placeholder="Price per unit" value="${escapeHtml(unitPrice)}" />
+            </label>
           </div>
-          <input id="materialReorderLevel" type="number" min="0" step="0.001" placeholder="Reorder level" value="${escapeHtml(item.reorder_level || 0)}" />
+          <label class="form-field">
+            <span>Reorder alert level</span>
+            <input id="materialReorderLevel" type="number" min="0" step="0.001" placeholder="Minimum stock before reorder" value="${escapeHtml(reorderLevel)}" />
+          </label>
+          <div class="material-live-summary">
+            <div>
+              <span>Total worth left</span>
+              <strong id="materialWorthPreview">${escapeHtml(formatMoney(currentQty * unitPrice))}</strong>
+            </div>
+            <div>
+              <span>Used quantity</span>
+              <strong id="materialUsedPreview">${escapeHtml(Math.max(inputQty - currentQty, 0).toFixed(3).replace(/\.?0+$/, ''))}</strong>
+            </div>
+            <div>
+              <span>Stock status</span>
+              <strong id="materialStatusPreview">${currentQty <= reorderLevel ? 'Reorder needed' : 'Healthy'}</strong>
+            </div>
+          </div>
         </div>
         <div class="dialog-card">
           <h4>Mandatory Process Sheet</h4>
@@ -1818,6 +1853,34 @@ function openMaterialDialog(type, id = null) {
     },
     id ? 'Update Item' : 'Save Item'
   );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'material-dialog');
+  setupMaterialWorthPreview();
+}
+
+function setupMaterialWorthPreview() {
+  const ids = ['materialInputQty', 'materialCurrentQty', 'materialUnitPrice', 'materialReorderLevel'];
+  const recalculate = () => {
+    const inputQty = Number(document.getElementById('materialInputQty')?.value || 0);
+    const currentQty = Number(document.getElementById('materialCurrentQty')?.value || 0);
+    const unitPrice = Number(document.getElementById('materialUnitPrice')?.value || 0);
+    const reorderLevel = Number(document.getElementById('materialReorderLevel')?.value || 0);
+    const worthEl = document.getElementById('materialWorthPreview');
+    const usedEl = document.getElementById('materialUsedPreview');
+    const statusEl = document.getElementById('materialStatusPreview');
+
+    if (worthEl) worthEl.innerText = formatMoney(currentQty * unitPrice);
+    if (usedEl) usedEl.innerText = Math.max(inputQty - currentQty, 0).toFixed(3).replace(/\.?0+$/, '');
+    if (statusEl) {
+      statusEl.innerText = currentQty <= reorderLevel ? 'Reorder needed' : 'Healthy';
+      statusEl.classList.toggle('danger-text', currentQty <= reorderLevel);
+    }
+  };
+
+  ids.forEach((id) => {
+    document.getElementById(id)?.addEventListener('input', recalculate);
+  });
+  recalculate();
 }
 
 function processSelect(id, label, value) {

@@ -688,6 +688,68 @@ tr:hover td {
   resize: vertical;
 }
 
+.form-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.form-field span {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1.25;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea,
+.dialog-card .form-field input {
+  margin-bottom: 0;
+}
+
+.labelled-grid {
+  align-items: end;
+  margin-bottom: 12px;
+}
+
+.material-live-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.material-live-summary div {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.48);
+}
+
+.material-live-summary span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.material-live-summary strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.danger-text {
+  color: var(--warning) !important;
+}
+
 .split-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -806,6 +868,10 @@ tr:hover td {
   width: min(1120px, calc(100vw - 32px));
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.dialog-panel.material-dialog {
+  width: min(1320px, calc(100vw - 32px));
 }
 
 .dialog-panel h3 {
@@ -1196,7 +1262,8 @@ tr:hover td {
 
   .stock-dialog-grid,
   .split-grid,
-  .access-grid {
+  .access-grid,
+  .material-live-summary {
     grid-template-columns: 1fr;
   }
 
