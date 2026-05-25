@@ -167,6 +167,10 @@ function applyPermissionUI() {
     el.classList.toggle('hidden-section', !canUseStock);
   });
 
+  document.querySelectorAll('.nav-group.permission-stock').forEach((el) => {
+    el.classList.toggle('hidden-section', !canUseStock);
+  });
+
   if (!canUseStock) {
     document.querySelectorAll('section.permission-stock').forEach((el) => {
       el.classList.add('hidden-section');

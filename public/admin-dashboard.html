@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-  <link rel="stylesheet" href="/style.css?v=20260523-mobile-native"/>
+  <link rel="stylesheet" href="/style.css?v=20260525-stock-menu"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -31,8 +31,16 @@
       <button class="nav-btn" data-section="rfqSection">RFQs</button>
       <button class="nav-btn" data-section="invoiceSection">Invoices</button>
       <button class="nav-btn" data-section="customerSection">Customers</button>
-      <button class="nav-btn" data-section="stockSection">Stock Input</button>
-      <button class="nav-btn" data-section="stockUsageSection">Stock Usage</button>
+      <details class="nav-group" open>
+        <summary class="nav-group-toggle">
+          <span>Stock Management</span>
+          <span class="nav-group-caret">v</span>
+        </summary>
+        <div class="nav-submenu">
+          <button class="nav-btn nav-sub-btn" data-section="stockSection">Stock In</button>
+          <button class="nav-btn nav-sub-btn" data-section="stockUsageSection">Stock Out</button>
+        </div>
+      </details>
       <button class="nav-btn" data-section="rawMaterialSection">Raw Material</button>
       <button class="nav-btn" data-section="packagingSection">Packaging</button>
       <button class="nav-btn" data-section="taskSection">Task Control</button>
@@ -231,7 +239,7 @@
       <section id="stockSection" class="page-section hidden-section">
         <div class="section-head">
           <div>
-            <h2>Stock Input</h2>
+            <h2>Stock In</h2>
             <p>Home • Inventory • Stock</p>
           </div>
           <button onclick="openStockDialog()" class="primary-btn">Add Stock</button>
@@ -267,7 +275,7 @@
       <section id="stockUsageSection" class="page-section hidden-section">
         <div class="section-head">
           <div>
-            <h2>Stock Usage</h2>
+            <h2>Stock Out</h2>
             <p>Sold, issued, or allocated parts from available stock</p>
           </div>
           <button onclick="openIssueStockDialog()" class="primary-btn">Minus Stock</button>
@@ -648,6 +656,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260523-pdf-viewer"></script>
+  <script src="/admin-dashboard.js?v=20260525-stock-menu"></script>
 </body>
 </html>

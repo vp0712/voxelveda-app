@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-  <link rel="stylesheet" href="/style.css?v=20260523-mobile-native" />
+  <link rel="stylesheet" href="/style.css?v=20260525-stock-menu" />
 </head>
 
 <body>
@@ -30,8 +30,16 @@
 
       <button class="nav-btn active" data-section="dashboardSection">Overview</button>
       <button class="nav-btn" data-section="tasksSection">Task Board</button>
-      <button class="nav-btn permission-stock hidden-section" data-section="stockInSection">Stock In</button>
-      <button class="nav-btn permission-stock hidden-section" data-section="stockOutSection">Stock Out</button>
+      <details class="nav-group permission-stock hidden-section" open>
+        <summary class="nav-group-toggle">
+          <span>Stock Management</span>
+          <span class="nav-group-caret">v</span>
+        </summary>
+        <div class="nav-submenu">
+          <button class="nav-btn nav-sub-btn permission-stock hidden-section" data-section="stockInSection">Stock In</button>
+          <button class="nav-btn nav-sub-btn permission-stock hidden-section" data-section="stockOutSection">Stock Out</button>
+        </div>
+      </details>
       <button class="nav-btn" data-section="timesheetSection">Timesheet</button>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
@@ -304,6 +312,6 @@
     </section>
   </div>
 
-  <script src="/staff.js?v=20260523-mobile-native"></script>
+  <script src="/staff.js?v=20260525-stock-menu"></script>
 </body>
 </html>

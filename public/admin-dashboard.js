@@ -34,7 +34,7 @@ const ACCESS_OPTIONS = [
   { id: 'attendance', label: 'Attendance' },
   { id: 'staff', label: 'Staff' },
   { id: 'settings', label: 'Settings' },
-  { id: 'stock', label: 'Stock Input & Usage' }
+  { id: 'stock', label: 'Stock Management' }
 ];
 
 function authHeaders() {
