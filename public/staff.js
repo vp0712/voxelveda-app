@@ -364,13 +364,16 @@ function announcementBadgeClass(priority) {
 
 function renderAnnouncements(rows) {
   const list = document.getElementById('announcementList');
+  const panel = document.getElementById('announcementPanel');
   if (!list) return;
 
   if (!rows.length) {
-    list.innerHTML = `<div class="empty-state">No active announcements right now.</div>`;
+    panel?.classList.add('hidden-section');
+    list.innerHTML = '';
     return;
   }
 
+  panel?.classList.remove('hidden-section');
   list.innerHTML = rows.map((item) => `
     <div class="mobile-card announcement-card">
       <div class="section-head">
@@ -412,7 +415,8 @@ async function loadAnnouncements() {
     const data = await safeJson(res);
 
     if (!res.ok) {
-      list.innerHTML = `<div class="empty-state">${escapeHtml(data.message || 'Failed to load announcements')}</div>`;
+      document.getElementById('announcementPanel')?.classList.add('hidden-section');
+      list.innerHTML = '';
       return;
     }
 
@@ -420,7 +424,8 @@ async function loadAnnouncements() {
     renderAnnouncements(rows);
     await notifyNewAnnouncements(rows);
   } catch {
-    list.innerHTML = `<div class="empty-state">Server error loading announcements.</div>`;
+    document.getElementById('announcementPanel')?.classList.add('hidden-section');
+    list.innerHTML = '';
   }
 }
 
