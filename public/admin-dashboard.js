@@ -23,6 +23,7 @@ let materialCache = {
 let staffCache = [];
 let attendanceCache = [];
 let announcementCache = [];
+let meetingCache = [];
 let attendanceSnapshot = new Map();
 let attendanceFirstLoad = true;
 
@@ -39,6 +40,7 @@ const ACCESS_OPTIONS = [
   { id: 'stock_out', label: 'Stock Out' },
   { id: 'raw_material', label: 'Raw Material' },
   { id: 'packaging', label: 'Packaging' },
+  { id: 'meetings', label: 'Meetings & Inspections' },
   { id: 'settings', label: 'Settings' }
 ];
 
@@ -196,6 +198,7 @@ function setupNavigation() {
       if (btn.dataset.section === 'packagingSection') loadMaterials('packaging');
       if (btn.dataset.section === 'invoiceSection') loadInvoices();
       if (btn.dataset.section === 'taskSection') loadAnnouncements();
+      if (btn.dataset.section === 'meetingSection') loadMeetings();
       toggleMobileMenu(false);
     };
   });
@@ -1660,6 +1663,7 @@ async function refreshAllSystemData() {
     loadStockUsage(),
     loadMaterials('raw_material'),
     loadMaterials('packaging'),
+    loadMeetings(),
     loadAttendance(),
     loadTimesheets(),
     loadSettings()
@@ -2411,7 +2415,7 @@ async function loadAttendance() {
         <strong>${escapeHtml(a.name || '-')}</strong>
         <span class="cell-subtext">${escapeHtml(a.email || '-')}</span>
       </td>
-      <td>${escapeHtml(formatShortDate(a.work_date || a.clock_in))}</td>
+      <td>${escapeHtml(formatDate(a.work_date || a.clock_in))}</td>
       <td>
         <div class="time-pair">
           <span>In: ${escapeHtml(formatClockTime(a.clock_in))}</span>
@@ -2569,6 +2573,211 @@ async function deleteAttendance(id) {
   await loadTimesheets();
 }
 
+function meetingTypeLabel(value) {
+  const labels = {
+    internal: 'Internal',
+    client: 'Client / Customer',
+    council: 'Council',
+    government: 'Government Body',
+    inspection: 'Inspection',
+    supplier: 'Supplier',
+    conference: 'Conference'
+  };
+  return labels[value] || value || '-';
+}
+
+function meetingStatusClass(status) {
+  const clean = String(status || 'scheduled').toLowerCase();
+  if (clean === 'cancelled') return 'badge danger-badge';
+  if (clean === 'completed') return 'badge active-badge';
+  return 'badge';
+}
+
+function meetingAttendeeNames(ids = []) {
+  const selected = new Set((ids || []).map(Number));
+  const names = staffCache
+    .filter((user) => selected.has(Number(user.id)))
+    .map((user) => user.name || user.email);
+  return names.length ? names.join(', ') : '-';
+}
+
+function meetingAttendeeCheckboxes(selected = []) {
+  const selectedIds = new Set((selected || []).map(Number));
+  const users = staffCache.filter((user) => String(user.role || '').toLowerCase() !== 'admin');
+
+  if (!users.length) return '<p class="muted-text">No staff users found yet.</p>';
+
+  return users.map((user) => `
+    <label class="access-check">
+      <input type="checkbox" data-meeting-attendee value="${user.id}" ${selectedIds.has(Number(user.id)) ? 'checked' : ''}>
+      <span>${escapeHtml(user.name || user.email)} (${escapeHtml(user.email || '-')})</span>
+    </label>
+  `).join('');
+}
+
+function collectMeetingAttendees() {
+  return Array.from(document.querySelectorAll('[data-meeting-attendee]:checked'))
+    .map((input) => Number(input.value))
+    .filter(Boolean);
+}
+
+async function loadMeetings() {
+  const tbody = document.getElementById('meetingTableBody');
+  if (!tbody) return;
+
+  const res = await fetch('/api/meetings', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    tbody.innerHTML = `<tr><td colspan="6">${escapeHtml(data.message || 'Failed to load meetings')}</td></tr>`;
+    return;
+  }
+
+  const rows = data.meetings || [];
+  meetingCache = rows;
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="6">No meetings or inspections scheduled yet.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map((meeting) => `
+    <tr>
+      <td>
+        <strong>${escapeHtml(meeting.title)}</strong>
+        <span class="cell-subtext">${escapeHtml(meetingTypeLabel(meeting.meeting_type))}${meeting.organisation ? ` - ${escapeHtml(meeting.organisation)}` : ''}</span>
+      </td>
+      <td>
+        <strong>${escapeHtml(formatDate(meeting.meeting_date))}</strong>
+        <span class="cell-subtext">${escapeHtml(String(meeting.meeting_time || '').slice(0, 5))}</span>
+      </td>
+      <td>
+        <strong>${escapeHtml(meeting.location_type || '-')}</strong>
+        <span class="cell-subtext">${escapeHtml(meeting.location_details || '-')}</span>
+      </td>
+      <td>${escapeHtml(meetingAttendeeNames(meeting.assigned_user_ids))}</td>
+      <td><span class="${meetingStatusClass(meeting.status)}">${escapeHtml(meeting.status || 'scheduled')}</span></td>
+      <td>
+        <div class="table-action-stack">
+          <button class="small-btn" onclick="openMeetingDialog(${meeting.id})">Edit</button>
+          <button class="danger-btn" onclick="deleteMeeting(${meeting.id})">Delete</button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function openMeetingDialog(id = null) {
+  if (!staffCache.length) await loadStaff();
+  const meeting = meetingCache.find((item) => Number(item.id) === Number(id)) || {};
+
+  showDialog(
+    id ? `Edit Meeting: ${meeting.title}` : 'Schedule Meeting / Inspection',
+    `
+      <div class="stock-dialog-grid">
+        <div class="dialog-card">
+          <h4>Meeting Details</h4>
+          <input id="meetingTitle" placeholder="Meeting / inspection title" value="${escapeHtml(meeting.title || '')}" />
+          <select id="meetingType">
+            ${['internal', 'client', 'council', 'government', 'inspection', 'supplier', 'conference'].map((type) => `
+              <option value="${type}" ${meeting.meeting_type === type ? 'selected' : ''}>${meetingTypeLabel(type)}</option>
+            `).join('')}
+          </select>
+          <input id="meetingOrganisation" placeholder="Organisation / body / company" value="${escapeHtml(meeting.organisation || '')}" />
+          <input id="meetingContactPerson" placeholder="Contact person / officer / inspector" value="${escapeHtml(meeting.contact_person || '')}" />
+          <input id="meetingContactDetails" placeholder="Contact phone / email / reference" value="${escapeHtml(meeting.contact_details || '')}" />
+        </div>
+        <div class="dialog-card">
+          <h4>When & Where</h4>
+          <div class="split-grid">
+            <input id="meetingDate" type="date" value="${escapeHtml(formatDate(meeting.meeting_date) === '-' ? todayISO() : formatDate(meeting.meeting_date))}" />
+            <input id="meetingTime" type="time" value="${escapeHtml(String(meeting.meeting_time || '09:00').slice(0, 5))}" />
+          </div>
+          <select id="meetingLocationType">
+            ${['site', 'office', 'client_site', 'council_office', 'government_office', 'online', 'conference'].map((type) => `
+              <option value="${type}" ${meeting.location_type === type ? 'selected' : ''}>${type.replace(/_/g, ' ')}</option>
+            `).join('')}
+          </select>
+          <textarea id="meetingLocationDetails" rows="3" placeholder="Address, room, online link, booth, conference hall">${escapeHtml(meeting.location_details || '')}</textarea>
+          <select id="meetingStatus">
+            ${['scheduled', 'confirmed', 'completed', 'cancelled'].map((status) => `
+              <option value="${status}" ${meeting.status === status ? 'selected' : ''}>${status}</option>
+            `).join('')}
+          </select>
+        </div>
+        <div class="dialog-card">
+          <h4>Agenda & Preparation</h4>
+          <textarea id="meetingAgenda" rows="4" placeholder="Purpose, agenda, inspection scope, topics to discuss">${escapeHtml(meeting.agenda || '')}</textarea>
+          <textarea id="meetingPreparation" rows="4" placeholder="Documents, samples, drawings, reports, compliance records to prepare">${escapeHtml(meeting.required_preparation || '')}</textarea>
+        </div>
+        <div class="dialog-card">
+          <h4>Who Must Attend</h4>
+          <p class="muted-text">Selected staff will see this in their portal and receive reminders from 3 days before the meeting.</p>
+          <div class="access-grid">${meetingAttendeeCheckboxes(meeting.assigned_user_ids)}</div>
+        </div>
+      </div>
+    `,
+    async () => {
+      const body = {
+        id: meeting.id,
+        title: document.getElementById('meetingTitle')?.value.trim(),
+        meeting_type: document.getElementById('meetingType')?.value,
+        organisation: document.getElementById('meetingOrganisation')?.value.trim(),
+        contact_person: document.getElementById('meetingContactPerson')?.value.trim(),
+        contact_details: document.getElementById('meetingContactDetails')?.value.trim(),
+        location_type: document.getElementById('meetingLocationType')?.value,
+        location_details: document.getElementById('meetingLocationDetails')?.value.trim(),
+        meeting_date: document.getElementById('meetingDate')?.value,
+        meeting_time: document.getElementById('meetingTime')?.value,
+        agenda: document.getElementById('meetingAgenda')?.value.trim(),
+        required_preparation: document.getElementById('meetingPreparation')?.value.trim(),
+        assigned_user_ids: collectMeetingAttendees(),
+        status: document.getElementById('meetingStatus')?.value
+      };
+
+      const saveRes = await fetch('/api/meetings', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const saveData = await safeJson(saveRes);
+
+      if (!saveRes.ok) {
+        showToast(saveData.message || 'Meeting save failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(saveData.message || 'Meeting saved');
+      await loadMeetings();
+    },
+    id ? 'Update Meeting' : 'Schedule Meeting'
+  );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+async function deleteMeeting(id) {
+  if (!confirm('Delete this meeting / inspection?')) return;
+
+  const res = await fetch('/api/meetings/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Meeting delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Meeting removed');
+  await loadMeetings();
+}
+
 async function loadTimesheets() {
   const tbody = document.getElementById('timesheetAdminBody');
   if (!tbody) return;
@@ -2692,6 +2901,7 @@ async function bootAdminDashboard() {
       loadStockUsage(),
       loadMaterials('raw_material'),
       loadMaterials('packaging'),
+      loadMeetings(),
       loadAttendance(),
       loadTimesheets(),
       loadSettings()

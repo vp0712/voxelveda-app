@@ -62,6 +62,7 @@
           <button class="nav-btn nav-sub-btn" data-section="staffSection">Staff</button>
         </div>
       </details>
+      <button class="nav-btn" data-section="meetingSection">Meetings & Inspections</button>
       <button class="nav-btn" data-section="settingsSection">Settings</button>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
@@ -600,6 +601,42 @@
               </tr>
             </thead>
             <tbody id="staffTableBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- MEETINGS -->
+      <section id="meetingSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Meetings & Inspections</h2>
+            <p>Council, government body, customer, supplier, conference and internal engineering appointments.</p>
+          </div>
+          <button onclick="openMeetingDialog()" class="primary-btn">Schedule Meeting</button>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head">
+            <div>
+              <h3>Meeting Register</h3>
+              <p>Assigned attendees receive dashboard reminders for the 3 days before the meeting.</p>
+            </div>
+            <button onclick="loadMeetings()" class="secondary-btn">Refresh</button>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Meeting</th>
+                <th>When</th>
+                <th>Where</th>
+                <th>Attendees</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="meetingTableBody">
+              <tr><td colspan="6">Loading meetings...</td></tr>
+            </tbody>
           </table>
         </div>
       </section>

@@ -57,6 +57,7 @@
           <button class="nav-btn nav-sub-btn permission-attendance hidden-section" data-section="timesheetSection">Timesheet</button>
         </div>
       </details>
+      <button class="nav-btn permission-meetings hidden-section" data-section="meetingsSection">Meetings & Inspections</button>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
     </aside>
@@ -96,6 +97,11 @@
             <span>Workforce</span>
             <strong>Timesheet</strong>
             <small>Check weekly and monthly shift history.</small>
+          </button>
+          <button class="staff-action-card permission-meetings hidden-section" type="button" onclick="goStaffSection('meetingsSection')">
+            <span>Meetings & Inspections</span>
+            <strong>Upcoming Events</strong>
+            <small>Review council, government, customer and conference appointments.</small>
           </button>
         </div>
 
@@ -177,6 +183,22 @@
 
         </div>
 
+      </section>
+
+      <!-- MEETINGS -->
+      <section id="meetingsSection" class="page-section hidden-section permission-meetings">
+        <div class="card table-wrap">
+          <div class="section-head">
+            <div>
+              <h2>Meetings & Inspections</h2>
+              <p>Your assigned meetings, site inspections and official appointments.</p>
+            </div>
+            <button class="secondary-btn" onclick="loadMyMeetings()">Refresh</button>
+          </div>
+          <div id="staffMeetingList" class="card-list">
+            <div class="empty-state">Loading meetings...</div>
+          </div>
+        </div>
       </section>
 
       <!-- STOCK IN -->

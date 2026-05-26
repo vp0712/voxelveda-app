@@ -14,6 +14,7 @@ let firstTaskLoad = true;
 let tenHourReminderShown = false;
 let staffStockCache = [];
 let staffStockOutCache = [];
+let staffMeetingCache = [];
 let lastAnnouncementIds = new Set();
 let firstAnnouncementLoad = true;
 
@@ -169,6 +170,7 @@ function hasPermission(permission) {
 function applyPermissionUI() {
   const canUseTasks = hasPermission('tasks');
   const canUseAttendance = hasPermission('attendance');
+  const canUseMeetings = hasPermission('meetings');
   const canUseStockIn = hasPermission('stock_in');
   const canUseStockOut = hasPermission('stock_out');
   const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut;
@@ -179,6 +181,10 @@ function applyPermissionUI() {
 
   document.querySelectorAll('.permission-attendance').forEach((el) => {
     el.classList.toggle('hidden-section', !canUseAttendance);
+  });
+
+  document.querySelectorAll('.permission-meetings').forEach((el) => {
+    el.classList.toggle('hidden-section', !canUseMeetings);
   });
 
   document.querySelectorAll('.nav-btn.permission-stock').forEach((el) => {
@@ -552,6 +558,7 @@ function setupStaffNavigation() {
 
       if (target === 'stockInSection') loadStaffStock();
       if (target === 'stockOutSection') loadStaffStockOut();
+      if (target === 'meetingsSection') loadMyMeetings();
       toggleMobileMenu(false);
     });
   });
@@ -1065,6 +1072,103 @@ async function deleteStaffStockOut(id) {
   await loadStaffStockOut();
 }
 
+function meetingDaysUntil(dateValue) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${toDateOnly(dateValue)}T00:00:00`);
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+}
+
+function meetingTypeLabel(value) {
+  const labels = {
+    internal: 'Internal',
+    client: 'Client / Customer',
+    council: 'Council',
+    government: 'Government Body',
+    inspection: 'Inspection',
+    supplier: 'Supplier',
+    conference: 'Conference'
+  };
+  return labels[value] || value || '-';
+}
+
+function renderMyMeetings(rows) {
+  const list = document.getElementById('staffMeetingList');
+  if (!list) return;
+
+  if (!rows.length) {
+    list.innerHTML = `<div class="empty-state">No upcoming meetings or inspections assigned to you.</div>`;
+    return;
+  }
+
+  list.innerHTML = rows.map((meeting) => {
+    const days = meetingDaysUntil(meeting.meeting_date);
+    const reminder = days >= 0 && days <= 3
+      ? `<span class="badge active-badge">${days === 0 ? 'Today' : `${days} day${days === 1 ? '' : 's'} left`}</span>`
+      : `<span class="badge">${escapeHtml(meeting.status || 'scheduled')}</span>`;
+
+    return `
+      <div class="mobile-card announcement-card">
+        <div class="section-head">
+          <div>
+            <h3>${escapeHtml(meeting.title)}</h3>
+            <p>${escapeHtml(meetingTypeLabel(meeting.meeting_type))}${meeting.organisation ? ` - ${escapeHtml(meeting.organisation)}` : ''}</p>
+          </div>
+          ${reminder}
+        </div>
+        <p><strong>When:</strong> ${escapeHtml(formatShortDate(meeting.meeting_date))} at ${escapeHtml(String(meeting.meeting_time || '').slice(0, 5))}</p>
+        <p><strong>Where:</strong> ${escapeHtml(meeting.location_details || meeting.location_type || '-')}</p>
+        <p><strong>Who to meet:</strong> ${escapeHtml(meeting.contact_person || '-')} ${meeting.contact_details ? `(${escapeHtml(meeting.contact_details)})` : ''}</p>
+        <p><strong>Agenda:</strong> ${escapeHtml(meeting.agenda || '-')}</p>
+        <p><strong>Prepare:</strong> ${escapeHtml(meeting.required_preparation || '-')}</p>
+      </div>
+    `;
+  }).join('');
+}
+
+async function notifyMeetingReminders(rows) {
+  for (const meeting of rows) {
+    const days = meetingDaysUntil(meeting.meeting_date);
+    if (days < 0 || days > 3) continue;
+
+    const todayKey = new Date().toISOString().slice(0, 10);
+    const reminderKey = `meetingReminder:${meeting.id}:${todayKey}`;
+    if (localStorage.getItem(reminderKey)) continue;
+
+    localStorage.setItem(reminderKey, '1');
+    const when = days === 0 ? 'today' : `in ${days} day${days === 1 ? '' : 's'}`;
+    const message = `${meeting.title} is ${when}. Please prepare required documents and details.`;
+    showToast(message);
+    await sendStaffNotification('Meeting / inspection reminder', message);
+  }
+}
+
+async function loadMyMeetings() {
+  if (!hasPermission('meetings')) return;
+
+  const list = document.getElementById('staffMeetingList');
+  if (!list) return;
+
+  try {
+    const res = await fetch('/api/meetings/my', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      list.innerHTML = `<div class="empty-state">${escapeHtml(data.message || 'Failed to load meetings')}</div>`;
+      return;
+    }
+
+    const rows = data.meetings || [];
+    staffMeetingCache = rows;
+    renderMyMeetings(rows);
+    await notifyMeetingReminders(rows);
+  } catch {
+    list.innerHTML = `<div class="empty-state">Server error loading meetings.</div>`;
+  }
+}
+
 /* ================= ATTENDANCE ================= */
 
 async function loadAttendanceStatus() {
@@ -1261,6 +1365,9 @@ function startAutoRefresh() {
       await loadStaffStock();
       await loadStaffStockOut();
     }
+    if (hasPermission('meetings')) {
+      await loadMyMeetings();
+    }
   }, 10000);
 }
 
@@ -1286,6 +1393,9 @@ async function bootStaffDashboard() {
     if (hasPermission('stock')) {
       await loadStaffStock();
       await loadStaffStockOut();
+    }
+    if (hasPermission('meetings')) {
+      await loadMyMeetings();
     }
 
     startAutoRefresh();

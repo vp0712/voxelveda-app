@@ -14,6 +14,7 @@ const rfqController = require('./controllers/rfqController');
 const stockRoutes = require('./routes/stockRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const materialRoutes = require('./routes/materialRoutes');
+const meetingRoutes = require('./routes/meetingRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 
 const auth = require('./middleware/auth');
@@ -42,6 +43,7 @@ app.use('/api/tasks', auth, taskRoutes);
 app.use('/api/stock', auth, requirePermission('stock'), stockRoutes);
 app.use('/api/customers', auth, requirePermission('invoices'), customerRoutes);
 app.use('/api/materials', auth, requirePermission('stock'), materialRoutes);
+app.use('/api/meetings', auth, requirePermission('meetings'), meetingRoutes);
 
 try {
   app.use('/api/attendance', auth, require('./routes/attendanceRoutes'));
