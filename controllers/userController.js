@@ -1,7 +1,21 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 
-const ALL_PERMISSIONS = ['dashboard', 'rfqs', 'invoices', 'tasks', 'attendance', 'staff', 'settings', 'stock'];
+const ALL_PERMISSIONS = [
+  'dashboard',
+  'rfqs',
+  'invoices',
+  'customers',
+  'tasks',
+  'attendance',
+  'staff',
+  'settings',
+  'stock',
+  'stock_in',
+  'stock_out',
+  'raw_material',
+  'packaging'
+];
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -139,6 +153,69 @@ exports.updateUserAccess = async (req, res) => {
     console.error('updateUserAccess error:', error);
     res.status(500).json({
       message: 'Failed to update access',
+      error: error.message
+    });
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const name = String(req.body.name || '').trim();
+    const username = String(req.body.username || '').trim().toLowerCase();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const role = normalizeRole(req.body.role || 'staff');
+    const active = req.body.active === undefined ? true : Boolean(req.body.active);
+    const permissions = parsePermissions(req.body.permissions);
+
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required' });
+    }
+
+    if (!name || !username || !email || !role) {
+      return res.status(400).json({ message: 'Name, username, email and role are required' });
+    }
+
+    if (Number(req.user.id) === userId && active === false) {
+      return res.status(400).json({ message: 'You cannot disable your own account' });
+    }
+
+    const allowedRoles = ['admin', 'sales', 'production', 'viewer', 'staff'];
+
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    const [existing] = await pool.query(
+      'SELECT id FROM users WHERE (LOWER(email) = ? OR LOWER(username) = ?) AND id <> ? LIMIT 1',
+      [email, username, userId]
+    );
+
+    if (existing.length) {
+      return res.status(400).json({ message: 'Email or username is already used by another staff member' });
+    }
+
+    const [result] = await pool.query(
+      `UPDATE users
+       SET name = ?,
+           username = ?,
+           email = ?,
+           role = ?,
+           permissions = ?,
+           active = ?
+       WHERE id = ?`,
+      [name, username, email, role, JSON.stringify(permissions), active ? 1 : 0, userId]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({ message: 'Staff details updated successfully' });
+  } catch (error) {
+    console.error('updateUser error:', error);
+    res.status(500).json({
+      message: 'Failed to update staff details',
       error: error.message
     });
   }

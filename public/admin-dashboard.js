@@ -1314,6 +1314,7 @@ async function loadStaff() {
         <td>${escapeHtml(String(u.role).toLowerCase() === 'admin' ? 'All sections' : accessLabels(parseAccess(u.permissions)).join(', ') || 'No extra access')}</td>
         <td>${statusBadge(u.active ? 'active' : 'disabled')}</td>
         <td>
+          <button class="small-btn" onclick="openEditStaffDialog(${u.id})">Edit</button>
           <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
           <button class="secondary-btn" onclick="openPasswordResetDialog(${u.id})">Reset Password</button>
         </td>
@@ -1394,6 +1395,97 @@ async function openAddStaff() {
     },
     'Create Staff'
   );
+}
+
+async function openEditStaffDialog(userId) {
+  const res = await fetch('/api/users', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+
+  const data = await safeJson(res);
+  const user = (data.users || []).find((item) => Number(item.id) === Number(userId));
+
+  if (!user) {
+    showToast('User not found');
+    return;
+  }
+
+  showDialog(
+    `Edit Staff: ${user.name}`,
+    `
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+        <label class="form-field">
+          <span>System ID</span>
+          <input value="${escapeHtml(user.id)}" readonly />
+        </label>
+        <label class="form-field">
+          <span>Full name</span>
+          <input id="editStaffName" value="${escapeHtml(user.name || '')}" />
+        </label>
+        <label class="form-field">
+          <span>Username</span>
+          <input id="editStaffUsername" value="${escapeHtml(user.username || '')}" />
+        </label>
+        <label class="form-field">
+          <span>Email address</span>
+          <input id="editStaffEmail" type="email" value="${escapeHtml(user.email || '')}" />
+        </label>
+        <label class="form-field">
+          <span>Role</span>
+          <select id="editStaffRole">
+            <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
+            <option value="sales" ${user.role === 'sales' ? 'selected' : ''}>Sales</option>
+            <option value="production" ${user.role === 'production' ? 'selected' : ''}>Production</option>
+            <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+          </select>
+        </label>
+        <label class="form-field">
+          <span>Status</span>
+          <select id="editStaffActive">
+            <option value="1" ${user.active ? 'selected' : ''}>Active</option>
+            <option value="0" ${!user.active ? 'selected' : ''}>Disabled</option>
+          </select>
+        </label>
+      </div>
+      <h4>Allowed Sections</h4>
+      ${accessCheckboxes(parseAccess(user.permissions), 'editAccess')}
+      <p class="status-note">System ID is fixed so existing timesheets, tasks, stock records and audit history stay connected.</p>
+    `,
+    async () => {
+      const name = document.getElementById('editStaffName')?.value.trim();
+      const username = document.getElementById('editStaffUsername')?.value.trim();
+      const email = document.getElementById('editStaffEmail')?.value.trim();
+      const role = document.getElementById('editStaffRole')?.value || 'staff';
+      const active = document.getElementById('editStaffActive')?.value === '1';
+      const permissions = collectAccess();
+
+      if (!name || !username || !email || !role) {
+        showToast('Name, username, email and role are required');
+        return;
+      }
+
+      const updateRes = await fetch(`/api/users/${userId}`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ name, username, email, role, active, permissions })
+      });
+
+      const updateData = await safeJson(updateRes);
+
+      if (!updateRes.ok) {
+        showToast(updateData.message || 'Staff update failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(updateData.message || 'Staff details updated');
+      await loadStaff();
+    },
+    'Update Staff'
+  );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
 }
 
 async function openAccessDialog(userId) {
