@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-  <link rel="stylesheet" href="/style.css?v=20260526-access-sections" />
+  <link rel="stylesheet" href="/style.css?v=20260526-clean-workforce" />
 </head>
 
 <body>
@@ -75,6 +75,29 @@
 
       <!-- DASHBOARD -->
       <section id="dashboardSection" class="page-section">
+
+        <div id="staffActionHub" class="staff-action-hub">
+          <button class="staff-action-card permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')">
+            <span>Task Control</span>
+            <strong>Task Board</strong>
+            <small>View assigned work and update progress.</small>
+          </button>
+          <button class="staff-action-card permission-stock permission-stock-in hidden-section" type="button" onclick="goStaffSection('stockInSection')">
+            <span>Stock Management</span>
+            <strong>Stock In</strong>
+            <small>Add received inventory and batch details.</small>
+          </button>
+          <button class="staff-action-card permission-stock permission-stock-out hidden-section" type="button" onclick="goStaffSection('stockOutSection')">
+            <span>Stock Management</span>
+            <strong>Stock Out</strong>
+            <small>Issue stock and record usage.</small>
+          </button>
+          <button class="staff-action-card permission-attendance hidden-section" type="button" onclick="goStaffSection('timesheetSection')">
+            <span>Workforce</span>
+            <strong>Timesheet</strong>
+            <small>Check weekly and monthly shift history.</small>
+          </button>
+        </div>
 
         <div class="metric-grid">
 
@@ -328,6 +351,6 @@
     </section>
   </div>
 
-  <script src="/staff.js?v=20260526-access-sections"></script>
+  <script src="/staff.js?v=20260526-clean-workforce"></script>
 </body>
 </html>

@@ -557,6 +557,10 @@ function setupStaffNavigation() {
   });
 }
 
+function goStaffSection(sectionId) {
+  document.querySelector(`[data-section="${sectionId}"]`)?.click();
+}
+
 /* ================= STAFF INFO ================= */
 
 async function loadStaffInfo() {

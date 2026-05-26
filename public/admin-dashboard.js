@@ -423,6 +423,19 @@ function formatMoney(value) {
   return `$${Number(value || 0).toFixed(2)}`;
 }
 
+function formatClockTime(value) {
+  if (!value) return '-';
+
+  try {
+    return new Date(value).toLocaleTimeString('en-AU', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return String(value);
+  }
+}
+
 function statusBadge(status) {
   const clean = String(status || '-').toLowerCase();
   const extra = ['rejected', 'deleted', 'disabled'].includes(clean)
@@ -2379,7 +2392,7 @@ async function loadAttendance() {
   const data = await safeJson(res);
 
   if (!res.ok) {
-    tbody.innerHTML = `<tr><td colspan="8">Failed to load attendance</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">Failed to load attendance</td></tr>`;
     return;
   }
 
@@ -2388,22 +2401,30 @@ async function loadAttendance() {
   attendanceCache = rows;
 
   if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8">No attendance records yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6">No attendance records yet.</td></tr>`;
     return;
   }
 
   tbody.innerHTML = rows.map((a) => `
     <tr>
-      <td>${escapeHtml(a.name || '-')}</td>
-      <td>${escapeHtml(a.email || '-')}</td>
-      <td>${escapeHtml(a.clock_in || '-')}</td>
-      <td>${escapeHtml(a.clock_out || '-')}</td>
-      <td>${escapeHtml(Number(a.total_hours || 0).toFixed(2))}</td>
-      <td>${escapeHtml(String(a.work_date || '').slice(0, 10))}</td>
+      <td>
+        <strong>${escapeHtml(a.name || '-')}</strong>
+        <span class="cell-subtext">${escapeHtml(a.email || '-')}</span>
+      </td>
+      <td>${escapeHtml(formatShortDate(a.work_date || a.clock_in))}</td>
+      <td>
+        <div class="time-pair">
+          <span>In: ${escapeHtml(formatClockTime(a.clock_in))}</span>
+          <span>Out: ${escapeHtml(formatClockTime(a.clock_out))}</span>
+        </div>
+      </td>
+      <td><strong>${escapeHtml(Number(a.total_hours || 0).toFixed(2))}</strong></td>
       <td>${escapeHtml(a.notes || '-')}</td>
       <td>
-        <button class="small-btn" onclick="openAttendanceDialog(${a.id})">Edit</button>
-        <button class="danger-btn" onclick="deleteAttendance(${a.id})">Delete</button>
+        <div class="table-action-stack">
+          <button class="small-btn" onclick="openAttendanceDialog(${a.id})">Edit</button>
+          <button class="danger-btn" onclick="deleteAttendance(${a.id})">Delete</button>
+        </div>
       </td>
     </tr>
   `).join('');
