@@ -157,14 +157,40 @@ function hasPermission(permission) {
   if (role === 'admin') return true;
 
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+  if (permission === 'stock') {
+    return permissions.includes('stock') || permissions.includes('stock_in') || permissions.includes('stock_out');
+  }
+  if (permission === 'stock_in' || permission === 'stock_out') {
+    return permissions.includes(permission) || permissions.includes('stock');
+  }
   return permissions.includes(permission);
 }
 
 function applyPermissionUI() {
-  const canUseStock = hasPermission('stock');
+  const canUseTasks = hasPermission('tasks');
+  const canUseAttendance = hasPermission('attendance');
+  const canUseStockIn = hasPermission('stock_in');
+  const canUseStockOut = hasPermission('stock_out');
+  const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut;
+
+  document.querySelectorAll('.permission-tasks').forEach((el) => {
+    el.classList.toggle('hidden-section', !canUseTasks);
+  });
+
+  document.querySelectorAll('.permission-attendance').forEach((el) => {
+    el.classList.toggle('hidden-section', !canUseAttendance);
+  });
 
   document.querySelectorAll('.nav-btn.permission-stock').forEach((el) => {
     el.classList.toggle('hidden-section', !canUseStock);
+  });
+
+  document.querySelectorAll('.permission-stock-in').forEach((el) => {
+    el.classList.toggle('hidden-section', !canUseStockIn);
+  });
+
+  document.querySelectorAll('.permission-stock-out').forEach((el) => {
+    el.classList.toggle('hidden-section', !canUseStockOut);
   });
 
   document.querySelectorAll('.nav-group.permission-stock').forEach((el) => {
@@ -177,6 +203,10 @@ function applyPermissionUI() {
     });
     const activeStockNav = document.querySelector('.nav-btn.permission-stock.active');
     if (activeStockNav) document.querySelector('[data-section="dashboardSection"]')?.click();
+  }
+
+  if (document.querySelector('.nav-btn.active.hidden-section')) {
+    document.querySelector('[data-section="dashboardSection"]')?.click();
   }
 }
 
@@ -750,7 +780,7 @@ function updateStaffStockMetrics(rows) {
 }
 
 async function loadStaffStock() {
-  if (!hasPermission('stock')) return;
+  if (!hasPermission('stock_in')) return;
 
   const tbody = document.getElementById('staffStockTableBody');
   if (!tbody) return;
@@ -874,7 +904,7 @@ function updateStaffStockTotalPreview() {
 }
 
 async function loadStaffStockOut() {
-  if (!hasPermission('stock')) return;
+  if (!hasPermission('stock_out')) return;
 
   const tbody = document.getElementById('staffStockOutTableBody');
   if (!tbody) return;

@@ -30,11 +30,16 @@ const ACCESS_OPTIONS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'rfqs', label: 'RFQs' },
   { id: 'invoices', label: 'Invoices' },
+  { id: 'customers', label: 'Customers' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'staff', label: 'Staff' },
-  { id: 'settings', label: 'Settings' },
-  { id: 'stock', label: 'Stock Management' }
+  { id: 'stock', label: 'Stock Management' },
+  { id: 'stock_in', label: 'Stock In' },
+  { id: 'stock_out', label: 'Stock Out' },
+  { id: 'raw_material', label: 'Raw Material' },
+  { id: 'packaging', label: 'Packaging' },
+  { id: 'settings', label: 'Settings' }
 ];
 
 function authHeaders() {
@@ -458,10 +463,27 @@ function accessCheckboxes(selected = [], prefix = 'access') {
   `;
 }
 
+function accessLabels(selected = []) {
+  const labels = new Map(ACCESS_OPTIONS.map((item) => [item.id, item.label]));
+  return selected.map((id) => labels.get(id) || id);
+}
+
 function collectAccess() {
-  return Array.from(document.querySelectorAll('[data-access]:checked'))
+  const selected = new Set(
+    Array.from(document.querySelectorAll('[data-access]:checked'))
     .map((input) => input.dataset.access)
-    .filter(Boolean);
+      .filter(Boolean)
+  );
+
+  if (selected.has('stock_in') || selected.has('stock_out')) selected.add('stock');
+  if (selected.has('stock')) {
+    selected.add('stock_in');
+    selected.add('stock_out');
+  }
+
+  return ACCESS_OPTIONS
+    .map((item) => item.id)
+    .filter((id) => selected.has(id));
 }
 
 async function submitRFQ() {
@@ -1289,7 +1311,7 @@ async function loadStaff() {
         <td>${escapeHtml(u.username || '-')}</td>
         <td>${escapeHtml(u.email)}</td>
         <td>${escapeHtml(u.role)}</td>
-        <td>${escapeHtml(String(u.role).toLowerCase() === 'admin' ? 'All sections' : parseAccess(u.permissions).join(', ') || 'No extra access')}</td>
+        <td>${escapeHtml(String(u.role).toLowerCase() === 'admin' ? 'All sections' : accessLabels(parseAccess(u.permissions)).join(', ') || 'No extra access')}</td>
         <td>${statusBadge(u.active ? 'active' : 'disabled')}</td>
         <td>
           <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
