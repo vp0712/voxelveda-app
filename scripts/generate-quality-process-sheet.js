@@ -9,128 +9,142 @@ const logoPath = path.join(root, 'public', 'Frame 1.png');
 
 fs.mkdirSync(outputDir, { recursive: true });
 
-const doc = new PDFDocument({ size: 'A4', margin: 34 });
+const doc = new PDFDocument({ size: 'A4', margin: 30 });
 const stream = fs.createWriteStream(outputPath);
 doc.pipe(stream);
 
-const W = doc.page.width;
+const pageW = doc.page.width;
+const left = 30;
+const right = pageW - 30;
+const contentW = right - left;
 const navy = '#07111f';
-const cyan = '#18d6d0';
+const panel = '#f8fafc';
+const cyan = '#16d4cf';
 const ink = '#111827';
-const muted = '#475569';
-const line = '#cbd5e1';
+const muted = '#64748b';
+const border = '#cbd5e1';
+const soft = '#e2e8f0';
 
-function text(value, x, y, options = {}) {
-  doc.fillColor(options.color || ink)
+function t(value, x, y, options = {}) {
+  doc
+    .fillColor(options.color || ink)
     .font(options.bold ? 'Helvetica-Bold' : 'Helvetica')
-    .fontSize(options.size || 8.5)
+    .fontSize(options.size || 8)
     .text(value, x, y, options);
 }
 
-function box(x, y, w, h, label, value = '') {
-  doc.lineWidth(0.7).strokeColor(line).roundedRect(x, y, w, h, 5).stroke();
-  text(label, x + 8, y + 7, { size: 7.5, color: muted, bold: true });
-  if (value) text(value, x + 8, y + 21, { size: 8.2 });
+function header(title, subtitle) {
+  doc.fillColor(navy).rect(0, 0, pageW, 72).fill();
+  if (fs.existsSync(logoPath)) doc.image(logoPath, left, 16, { width: 88 });
+  t(title, 185, 17, { color: '#ffffff', bold: true, size: 20 });
+  t(subtitle, 185, 43, { color: cyan, bold: true, size: 9.5 });
+  t('Document No: VV-QA-PS-001   Revision: 1.1   Controlled internal quality record', left, 80, { color: muted, size: 7.5 });
 }
 
-function check(x, y, label) {
-  doc.strokeColor(line).rect(x, y, 9, 9).stroke();
-  text(label, x + 14, y - 1, { size: 7.6 });
+function section(y, title) {
+  doc.fillColor(navy).roundedRect(left, y, contentW, 16, 4).fill();
+  t(title, left + 8, y + 4.5, { color: '#ffffff', bold: true, size: 8 });
+  return y + 22;
 }
 
-function section(title, y) {
-  doc.fillColor(navy).roundedRect(34, y, W - 68, 18, 4).fill();
-  text(title, 42, y + 5, { color: '#ffffff', bold: true, size: 8.5 });
+function field(x, y, w, h, label) {
+  doc.fillColor('#ffffff').roundedRect(x, y, w, h, 4).fill();
+  doc.strokeColor(border).lineWidth(0.65).roundedRect(x, y, w, h, 4).stroke();
+  t(label, x + 6, y + 5, { color: muted, bold: true, size: 6.8 });
 }
 
-doc.fillColor(navy).rect(0, 0, W, 78).fill();
-if (fs.existsSync(logoPath)) {
-  doc.image(logoPath, 36, 17, { width: 96 });
-}
-text('QUALITY PROCESS SHEET', 214, 19, { color: '#ffffff', bold: true, size: 19 });
-text('Production Traceability, Inspection & Release Record', 214, 45, { color: cyan, bold: true, size: 10 });
-text('Document No: VV-QA-PS-001 | Revision: 1.0 | Controlled internal form', 36, 86, { color: muted, size: 8 });
-
-let y = 104;
-section('1. Job & Customer Details', y);
-y += 26;
-box(34, y, 126, 42, 'Job / Work Order No');
-box(168, y, 126, 42, 'Customer / Project');
-box(302, y, 126, 42, 'Part / Product Name');
-box(436, y, 125, 42, 'Drawing / Revision');
-y += 50;
-box(34, y, 126, 42, 'Purchase Order / RFQ');
-box(168, y, 126, 42, 'Quantity Required');
-box(302, y, 126, 42, 'Due Date');
-box(436, y, 125, 42, 'Prepared By / Date');
-
-y += 58;
-section('2. Material, Batch & Supplier Traceability', y);
-y += 26;
-box(34, y, 160, 42, 'Material / Resin / Component');
-box(202, y, 126, 42, 'Supplier');
-box(336, y, 108, 42, 'Batch / Lot / Heat');
-box(452, y, 109, 42, 'COA / SDS Ref');
-y += 50;
-box(34, y, 160, 42, 'Machine / Equipment Used');
-box(202, y, 126, 42, 'Operator');
-box(336, y, 108, 42, 'Program / Setting Ref');
-box(452, y, 109, 42, 'Material Accepted By');
-
-y += 58;
-section('3. Process Controls & In-Process Checks', y);
-y += 28;
-text('Record actual settings and verification results. Attach photos, inspection reports, calibration evidence or process logs where required.', 42, y - 5, { size: 7.8, color: muted });
-y += 12;
-const tableX = 34;
-const col = [0, 92, 196, 300, 404];
-['Process Step', 'Required Setting / Criteria', 'Actual Result', 'Checked By / Time', 'Pass / Hold / Fail'].forEach((h, i) => {
-  box(tableX + col[i], y, i === 4 ? 123 : 96, 22, h);
-});
-y += 22;
-for (let i = 0; i < 5; i += 1) {
-  doc.strokeColor(line).rect(tableX, y, 527, 26).stroke();
-  doc.moveTo(tableX + 92, y).lineTo(tableX + 92, y + 26).stroke();
-  doc.moveTo(tableX + 196, y).lineTo(tableX + 196, y + 26).stroke();
-  doc.moveTo(tableX + 300, y).lineTo(tableX + 300, y + 26).stroke();
-  doc.moveTo(tableX + 404, y).lineTo(tableX + 404, y + 26).stroke();
-  y += 26;
+function rowFields(y, fields, h = 34) {
+  const gap = 7;
+  const totalGap = gap * (fields.length - 1);
+  const unit = (contentW - totalGap) / fields.length;
+  fields.forEach((label, index) => field(left + index * (unit + gap), y, unit, h, label));
+  return y + h + 8;
 }
 
-y += 16;
-section('4. Final Quality Inspection & Release Criteria', y);
-y += 26;
-check(42, y, 'Visual condition accepted');
-check(190, y, 'Dimensions verified against drawing/specification');
-check(420, y, 'Quantity verified');
-y += 18;
-check(42, y, 'No contamination, damage or foreign material');
-check(300, y, 'Packaging/labelling accepted');
-y += 18;
-check(42, y, 'Customer or regulatory requirements reviewed');
-check(300, y, 'Process sheet and attachments complete');
-y += 24;
-box(34, y, 170, 38, 'Inspection Method / Gauge ID');
-box(212, y, 170, 38, 'Final Result');
-box(390, y, 171, 38, 'Released By / Date');
+function sectionPanel(y, h) {
+  doc.fillColor(panel).roundedRect(left, y, contentW, h, 7).fill();
+  doc.strokeColor(soft).lineWidth(0.7).roundedRect(left, y, contentW, h, 7).stroke();
+}
 
-y += 54;
-section('5. Non-Conformance, Hold, Rework & Corrective Action', y);
-y += 26;
-box(34, y, 527, 56, 'Issue, risk, hold reason, rework details, root cause and corrective action');
-y += 66;
-box(34, y, 170, 38, 'NCR / CAPA Reference');
-box(212, y, 170, 38, 'Disposition');
-box(390, y, 171, 38, 'Approved By / Date');
+function checkbox(x, y, label, w = 156) {
+  doc.strokeColor(border).lineWidth(0.7).rect(x, y, 8, 8).stroke();
+  t(label, x + 13, y - 0.5, { size: 7.2, width: w });
+}
 
-doc.addPage({ margin: 34 });
-doc.fillColor(navy).rect(0, 0, W, 58).fill();
-if (fs.existsSync(logoPath)) doc.image(logoPath, 36, 14, { width: 78 });
-text('QUALITY PROCESS SHEET - CONTINUATION', 186, 20, { color: '#ffffff', bold: true, size: 15 });
+function table(y, headers, widths, rows, rowH = 23) {
+  const tableW = widths.reduce((sum, w) => sum + w, 0);
+  doc.fillColor(navy).roundedRect(left, y, tableW, 18, 4).fill();
+  let x = left;
+  headers.forEach((h, i) => {
+    t(h, x + 5, y + 5, { color: '#ffffff', bold: true, size: 7 });
+    x += widths[i];
+  });
+  y += 18;
+  for (let r = 0; r < rows; r += 1) {
+    doc.strokeColor(border).lineWidth(0.6).rect(left, y, tableW, rowH).stroke();
+    x = left;
+    widths.slice(0, -1).forEach((w) => {
+      x += w;
+      doc.moveTo(x, y).lineTo(x, y + rowH).stroke();
+    });
+    y += rowH;
+  }
+  return y;
+}
 
-y = 76;
-section('6. Attachments & Evidence Checklist', y);
-y += 28;
+header('QUALITY PROCESS SHEET', 'Production Traceability, Inspection & Release Record');
+
+let y = 98;
+y = section(y, '1. Job & Customer Details');
+sectionPanel(y - 3, 80);
+y = rowFields(y + 6, ['Job / Work Order No', 'Customer / Project', 'Part / Product Name', 'Drawing / Revision'], 30);
+y = rowFields(y, ['Purchase Order / RFQ', 'Quantity Required', 'Due Date', 'Prepared By / Date'], 30);
+
+y += 8;
+y = section(y, '2. Material, Batch & Supplier Traceability');
+sectionPanel(y - 3, 80);
+y = rowFields(y + 6, ['Material / Resin / Component', 'Supplier', 'Batch / Lot / Heat', 'COA / SDS Ref'], 30);
+y = rowFields(y, ['Machine / Equipment Used', 'Operator', 'Program / Setting Ref', 'Material Accepted By'], 30);
+
+y += 8;
+y = section(y, '3. Process Controls & In-Process Checks');
+t('Record actual settings and verification results. Attach photos, calibration evidence, inspection reports or machine logs where required.', left + 2, y, { color: muted, size: 7.3 });
+y += 14;
+y = table(
+  y,
+  ['Process Step', 'Required Setting / Criteria', 'Actual Result', 'Checked By / Time', 'Pass / Hold / Fail'],
+  [88, 132, 112, 108, 100],
+  6,
+  22
+);
+
+y += 11;
+y = section(y, '4. Final Quality Inspection & Release Criteria');
+sectionPanel(y - 3, 92);
+checkbox(left + 12, y + 10, 'Visual condition accepted');
+checkbox(left + 190, y + 10, 'Dimensions verified against drawing/specification', 220);
+checkbox(left + 430, y + 10, 'Quantity verified', 90);
+checkbox(left + 12, y + 30, 'No contamination, damage or foreign material', 230);
+checkbox(left + 280, y + 30, 'Packaging / labelling accepted', 180);
+checkbox(left + 12, y + 50, 'Customer or regulatory requirements reviewed', 230);
+checkbox(left + 280, y + 50, 'Process sheet and attachments complete', 200);
+y += 70;
+y = rowFields(y, ['Inspection Method / Gauge ID', 'Final Result', 'Released By / Date'], 28);
+
+y += 5;
+y = section(y, '5. Non-Conformance, Hold, Rework & Corrective Action');
+sectionPanel(y - 3, 96);
+field(left + 8, y + 6, contentW - 16, 44, 'Issue, risk, hold reason, rework details, root cause and corrective action');
+field(left + 8, y + 58, 170, 28, 'NCR / CAPA Reference');
+field(left + 188, y + 58, 170, 28, 'Disposition');
+field(left + 368, y + 58, contentW - 376, 28, 'Approved By / Date');
+
+doc.addPage({ margin: 30 });
+header('QUALITY PROCESS SHEET', 'Continuation, Evidence & Close-Out');
+y = 98;
+
+y = section(y, '6. Attachments & Evidence Checklist');
+sectionPanel(y - 3, 96);
 [
   'Drawing / specification / customer approval',
   'Material certificate, COA, SDS or supplier document',
@@ -141,35 +155,33 @@ y += 28;
   'Customer communication / concession approval',
   'NCR, rework or corrective action record'
 ].forEach((label, index) => {
-  check(42 + (index % 2) * 260, y + Math.floor(index / 2) * 22, label);
+  checkbox(left + 12 + (index % 2) * 265, y + 10 + Math.floor(index / 2) * 20, label, 238);
 });
 
-y += 104;
-section('7. Job Close-Out Declaration', y);
-y += 28;
-text('I confirm the job record has been reviewed, mandatory evidence is attached, deviations have been recorded, and released product is traceable to material, process and inspection records.', 42, y, { size: 8.3, width: 500 });
-y += 34;
-box(34, y, 160, 42, 'Prepared By / Signature');
-box(206, y, 160, 42, 'Quality Approval / Signature');
-box(378, y, 183, 42, 'Date / Time');
+y += 112;
+y = section(y, '7. Job Close-Out Declaration');
+sectionPanel(y - 3, 78);
+t('I confirm the job record has been reviewed, mandatory evidence is attached, deviations have been recorded, and released product is traceable to material, process and inspection records.', left + 10, y + 9, { size: 8, width: contentW - 20 });
+y += 35;
+y = rowFields(y, ['Prepared By / Signature', 'Quality Approval / Signature', 'Date / Time'], 30);
 
-y += 60;
-section('8. Use Instructions', y);
-y += 28;
+y += 8;
+y = section(y, '8. Use Instructions');
+sectionPanel(y - 3, 158);
 [
-  'Fill this form for production jobs requiring traceability, inspection evidence, customer review, council review, government body review, complaint investigation, product failure investigation or internal quality release.',
-  'Complete Sections 1-4 before release. Complete Section 5 if any hold, defect, rework, concession or corrective action occurs.',
+  'Use for production jobs requiring traceability, inspection evidence, customer review, council review, government body review, complaint investigation, product failure investigation or internal quality release.',
+  'Complete Sections 1-4 before release. Complete Section 5 for any hold, defect, rework, concession or corrective action.',
   'Upload the completed PDF or scanned copy into Compliance & Licences under Quality / Process Sheet, or attach it to the related raw material, packaging or job record.',
-  'Keep original supporting evidence with the job record: photos, drawings, material certificates, inspection results, approval emails and delivery documents.',
-  'This is an internal controlled evidence template. Confirm any site-specific statutory form with your local council, regulator, customer contract or certifier.'
+  'Keep supporting evidence with the job record: photos, drawings, material certificates, inspection results, approval emails, delivery documents and NCR/CAPA records.',
+  'This is an internal controlled evidence template. Confirm site-specific statutory forms with your local council, regulator, customer contract or certifier.'
 ].forEach((item, index) => {
-  text(`${index + 1}. ${item}`, 46, y + index * 28, { size: 8.5, width: 500 });
+  t(`${index + 1}. ${item}`, left + 12, y + 10 + index * 26, { size: 8, width: contentW - 24 });
 });
 
-y += 168;
-doc.strokeColor(line).roundedRect(34, y, 527, 78, 8).stroke();
-text('Controlled Document Notice', 46, y + 12, { bold: true, size: 9 });
-text('Voxel Veda Pty Ltd should review this form when process, product, customer, site, council or regulatory requirements change. Retain completed copies according to company record-retention policy and applicable contract or statutory requirements.', 46, y + 30, { size: 8.2, color: muted, width: 500 });
+y += 174;
+doc.strokeColor(border).lineWidth(0.8).roundedRect(left, y, contentW, 62, 7).stroke();
+t('Controlled Document Notice', left + 12, y + 10, { bold: true, size: 8.5 });
+t('Voxel Veda Pty Ltd should review this form when process, product, customer, site, council or regulatory requirements change. Retain completed copies according to company record-retention policy and applicable contract or statutory requirements.', left + 12, y + 27, { size: 7.8, color: muted, width: contentW - 24 });
 
 doc.end();
 
