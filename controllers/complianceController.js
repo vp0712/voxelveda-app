@@ -99,9 +99,9 @@ const DEFAULT_ENTRIES = [
     authority: 'Internal QA',
     requirement_type: 'Mandatory job record',
     status: 'active',
-    official_link: '',
+    official_link: '/forms/voxel-veda-quality-process-sheet.pdf',
     process_sheet_required: 1,
-    notes: 'Attach the completed process sheet for every production job requiring traceability, inspection, batch, material and approval evidence.'
+    notes: 'Use this Voxel Veda controlled form for every production job requiring traceability, inspection evidence, customer review, council review, government body review, complaint investigation, product failure investigation or internal quality release. Fill it during production and before job release. Upload the completed PDF or scanned copy back into this entry or the related job/material record.'
   }
 ];
 
@@ -167,6 +167,32 @@ async function ensureComplianceTables() {
           entry.official_link,
           entry.process_sheet_required ? 1 : 0,
           entry.notes
+        ]
+      );
+    } else {
+      await pool.query(
+        `
+        UPDATE compliance_entries
+        SET official_link = CASE
+              WHEN (official_link IS NULL OR official_link = '') AND ? <> '' THEN ?
+              ELSE official_link
+            END,
+            process_sheet_required = CASE
+              WHEN ? = 1 THEN 1
+              ELSE process_sheet_required
+            END,
+            notes = CASE
+              WHEN notes IS NULL OR notes = '' OR notes = 'Attach the completed process sheet for every production job requiring traceability, inspection, batch, material and approval evidence.' THEN ?
+              ELSE notes
+            END
+        WHERE id = ?
+        `,
+        [
+          entry.official_link || '',
+          entry.official_link || '',
+          entry.process_sheet_required ? 1 : 0,
+          entry.notes || '',
+          existing[0].id
         ]
       );
     }
