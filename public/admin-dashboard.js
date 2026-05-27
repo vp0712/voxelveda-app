@@ -170,7 +170,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
-  panel?.classList.remove('wide-dialog', 'material-dialog');
+  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -1233,6 +1233,7 @@ function openSupplierDialog(id = null) {
     },
     id ? 'Update Supplier' : 'Save Supplier'
   );
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'supplier-dialog');
 }
 
 function openSupplierFileDialog(supplierId) {

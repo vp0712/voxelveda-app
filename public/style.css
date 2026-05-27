@@ -1104,6 +1104,29 @@ tr:hover td {
   width: min(1320px, calc(100vw - 32px));
 }
 
+.dialog-panel.supplier-dialog {
+  width: min(980px, calc(100vw - 32px));
+}
+
+.dialog-panel.supplier-dialog .stock-dialog-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 22px;
+}
+
+.dialog-panel.supplier-dialog .dialog-card {
+  padding: 20px;
+}
+
+.dialog-panel.supplier-dialog input,
+.dialog-panel.supplier-dialog select,
+.dialog-panel.supplier-dialog textarea {
+  min-height: 46px;
+}
+
+.dialog-panel.supplier-dialog textarea {
+  min-height: 120px;
+}
+
 .dialog-panel h3 {
   margin: 0 0 14px;
 }
@@ -1637,6 +1660,15 @@ tr:hover td {
 
   .dialog-card {
     padding: 12px;
+  }
+
+  .dialog-panel.supplier-dialog .stock-dialog-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .dialog-panel.supplier-dialog .dialog-card {
+    padding: 14px;
   }
 
   .stock-toolbar {
