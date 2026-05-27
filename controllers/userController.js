@@ -34,6 +34,10 @@ function normalizeRole(role) {
   return String(role || 'staff').trim().toLowerCase();
 }
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
 exports.createUser = async (req, res) => {
   try {
     const name = String(req.body.name || '').trim();
@@ -45,6 +49,14 @@ exports.createUser = async (req, res) => {
 
     if (!name || !username || !email || !password || !role) {
       return res.status(400).json({ message: 'Name, username, email, password and role are required' });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Valid email address is required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
     const allowedRoles = ['admin', 'sales', 'production', 'viewer', 'staff'];
@@ -175,6 +187,10 @@ exports.updateUser = async (req, res) => {
 
     if (!name || !username || !email || !role) {
       return res.status(400).json({ message: 'Name, username, email and role are required' });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Valid email address is required' });
     }
 
     if (Number(req.user.id) === userId && active === false) {

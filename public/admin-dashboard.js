@@ -484,6 +484,18 @@ function accessLabels(selected = []) {
   return selected.map((id) => labels.get(id) || id);
 }
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function suggestUsernameFromEmail(value) {
+  return String(value || '')
+    .split('@')[0]
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '_');
+}
+
 function collectAccess() {
   const selected = new Set(
     Array.from(document.querySelectorAll('[data-access]:checked'))
@@ -1364,20 +1376,36 @@ async function openAddStaff() {
   showDialog(
     'Add Staff Member',
     `
-      <div class="form-grid" style="grid-template-columns:1fr;">
-        <input id="dialogStaffName" placeholder="Full name" />
-        <input id="dialogStaffUsername" placeholder="Login username" />
-        <input id="dialogStaffEmail" type="email" placeholder="Email address" />
-        <input id="dialogStaffPassword" type="password" placeholder="Temporary password" />
-        <select id="dialogStaffRole">
-          <option value="staff">Staff</option>
-          <option value="sales">Sales</option>
-          <option value="production">Production</option>
-          <option value="viewer">Viewer</option>
-        </select>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr;">
+        <label class="form-field">
+          <span>Full name</span>
+          <input id="dialogStaffName" placeholder="Example: Neel Patel" autocomplete="name" />
+        </label>
+        <label class="form-field">
+          <span>Email address</span>
+          <input id="dialogStaffEmail" type="email" placeholder="name@company.com" autocomplete="email" />
+        </label>
+        <label class="form-field">
+          <span>Login username</span>
+          <input id="dialogStaffUsername" placeholder="Example: neel_17" autocomplete="username" />
+        </label>
+        <label class="form-field">
+          <span>Temporary password</span>
+          <input id="dialogStaffPassword" type="text" placeholder="Minimum 6 characters" autocomplete="new-password" />
+        </label>
+        <label class="form-field">
+          <span>Role</span>
+          <select id="dialogStaffRole">
+            <option value="staff">Staff</option>
+            <option value="sales">Sales</option>
+            <option value="production">Production</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        </label>
       </div>
       <h4>Section Access</h4>
       ${accessCheckboxes(['dashboard', 'tasks', 'attendance'])}
+      <p class="status-note">Email and username are separate login options. Staff can sign in with either one.</p>
     `,
     async () => {
       const name = document.getElementById('dialogStaffName')?.value.trim();
@@ -1389,6 +1417,16 @@ async function openAddStaff() {
 
       if (!name || !username || !email || !password || !role) {
         showToast('Name, username, email, password and role are required');
+        return;
+      }
+
+      if (!isValidEmail(email)) {
+        showToast('Please enter a valid email address');
+        return;
+      }
+
+      if (password.length < 6) {
+        showToast('Temporary password must be at least 6 characters');
         return;
       }
 
@@ -1411,6 +1449,14 @@ async function openAddStaff() {
     },
     'Create Staff'
   );
+
+  const emailInput = document.getElementById('dialogStaffEmail');
+  const usernameInput = document.getElementById('dialogStaffUsername');
+  emailInput?.addEventListener('blur', () => {
+    if (usernameInput && !usernameInput.value.trim()) {
+      usernameInput.value = suggestUsernameFromEmail(emailInput.value);
+    }
+  });
 }
 
 async function openEditStaffDialog(userId) {
