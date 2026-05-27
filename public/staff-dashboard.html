@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-  <link rel="stylesheet" href="/style.css?v=20260526-clean-workforce" />
+  <link rel="stylesheet" href="/style.css?v=20260527-staff-profile" />
 </head>
 
-<body>
+<body class="staff-portal">
   <button class="mobile-menu-btn" type="button" aria-label="Open menu" onclick="toggleMobileMenu(true)">
     <span></span>
     <span></span>
@@ -28,7 +28,17 @@
         </div>
       </div>
 
+      <div class="staff-sidebar-profile">
+        <div id="sidebarAvatar" class="staff-avatar small">V</div>
+        <div>
+          <strong id="sidebarProfileName">Loading...</strong>
+          <span id="sidebarProfileUsername">@staff</span>
+          <small id="sidebarProfileRole">Staff</small>
+        </div>
+      </div>
+
       <button class="nav-btn active" data-section="dashboardSection">Overview</button>
+      <button class="nav-btn" data-section="profileSection">Profile</button>
       <details class="nav-group permission-tasks hidden-section" open>
         <summary class="nav-group-toggle">
           <span>Task Control</span>
@@ -73,6 +83,89 @@
         </div>
         <span class="live-pill">Active Session</span>
       </header>
+
+      <!-- PROFILE -->
+      <section id="profileSection" class="page-section hidden-section">
+        <div class="staff-profile-shell">
+          <div class="staff-profile-hero">
+            <div id="profileAvatar" class="staff-avatar">V</div>
+            <h2 id="profileName">Staff Member</h2>
+            <span id="profileRoleBadge" class="staff-role-pill">Staff</span>
+          </div>
+
+          <div class="profile-block">
+            <h3>Account Info</h3>
+            <div class="profile-list">
+              <div class="profile-row">
+                <span>Full Name</span>
+                <strong id="profileFullName">-</strong>
+              </div>
+              <div class="profile-row">
+                <span>Username</span>
+                <strong id="profileUsername">-</strong>
+              </div>
+              <div class="profile-row">
+                <span>Email</span>
+                <strong id="profileEmail">-</strong>
+              </div>
+              <div class="profile-row">
+                <span>Role</span>
+                <strong id="profileRole">-</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-block">
+            <h3>App Info</h3>
+            <div class="profile-list">
+              <div class="profile-row">
+                <span>Version</span>
+                <strong>1.3</strong>
+              </div>
+              <div class="profile-row">
+                <span>System</span>
+                <strong>Voxel Veda Workforce</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="profile-block">
+            <h3>Quick Actions</h3>
+            <div class="profile-list">
+              <button class="profile-action permission-attendance hidden-section" type="button" onclick="goStaffSection('timesheetSection')">
+                <span>My Attendance</span>
+                <strong>Open</strong>
+              </button>
+              <button class="profile-action permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')">
+                <span>My Tasks</span>
+                <strong>Open</strong>
+              </button>
+              <button class="profile-action permission-meetings hidden-section" type="button" onclick="goStaffSection('meetingsSection')">
+                <span>Meetings & Inspections</span>
+                <strong>Open</strong>
+              </button>
+              <button class="profile-action permission-stock permission-stock-in hidden-section" type="button" onclick="goStaffSection('stockInSection')">
+                <span>Stock In</span>
+                <strong>Open</strong>
+              </button>
+              <button class="profile-action permission-stock permission-stock-out hidden-section" type="button" onclick="goStaffSection('stockOutSection')">
+                <span>Stock Out</span>
+                <strong>Open</strong>
+              </button>
+            </div>
+          </div>
+
+          <div class="profile-block">
+            <h3>Account</h3>
+            <div class="profile-list">
+              <button class="profile-action danger-link" type="button" onclick="logout()">
+                <span>Logout</span>
+                <strong>Exit</strong>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- DASHBOARD -->
       <section id="dashboardSection" class="page-section">
@@ -373,6 +466,6 @@
     </section>
   </div>
 
-  <script src="/staff.js?v=20260526-clean-workforce"></script>
+  <script src="/staff.js?v=20260527-staff-profile"></script>
 </body>
 </html>

@@ -360,6 +360,18 @@ function pickMessage(messages) {
   return messages[Math.floor(Math.random() * messages.length)];
 }
 
+function initialsFromName(name, fallback = 'V') {
+  const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return fallback;
+  return parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+}
+
+function titleCase(value) {
+  return String(value || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 async function requestNotificationPermission() {
   if (!('Notification' in window)) return false;
 
@@ -609,6 +621,8 @@ async function loadStaffInfo() {
       sidebarStaffName.innerText = user.name || 'Staff User';
     }
 
+    renderStaffProfile(user);
+
     if (hasPermission('stock')) {
       await loadStaffStock();
       await loadStaffStockOut();
@@ -622,6 +636,34 @@ async function loadStaffInfo() {
     }
     return null;
   }
+}
+
+function renderStaffProfile(user) {
+  const displayName = user.name || 'Staff User';
+  const username = user.username || user.email || 'staff';
+  const roleLabel = titleCase(user.role || 'staff');
+  const initials = initialsFromName(displayName);
+
+  const mappings = {
+    profileName: displayName,
+    profileFullName: displayName,
+    profileUsername: `@${username}`,
+    profileEmail: user.email || '-',
+    profileRole: roleLabel,
+    profileRoleBadge: roleLabel,
+    sidebarProfileName: displayName,
+    sidebarProfileUsername: `@${username}`,
+    sidebarProfileRole: roleLabel
+  };
+
+  Object.entries(mappings).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+  });
+
+  document.querySelectorAll('#profileAvatar, #sidebarAvatar').forEach((el) => {
+    el.textContent = initials;
+  });
 }
 
 /* ================= TASKS ================= */
