@@ -1127,6 +1127,18 @@ tr:hover td {
   min-height: 120px;
 }
 
+.dialog-panel.compliance-dialog {
+  width: min(1180px, calc(100vw - 32px));
+}
+
+.compliance-dialog-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.full-span {
+  grid-column: 1 / -1;
+}
+
 .dialog-panel h3 {
   margin: 0 0 14px;
 }
@@ -1159,6 +1171,85 @@ tr:hover td {
   color: var(--text);
   cursor: pointer;
   text-align: left;
+}
+
+.compact-head {
+  margin-bottom: 12px;
+}
+
+.compliance-register {
+  display: grid;
+  gap: 18px;
+}
+
+.compliance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.compliance-card {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.compliance-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.compliance-card h4 {
+  margin: 0 0 4px;
+}
+
+.compliance-card p {
+  margin: 0;
+}
+
+.status-chip {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(45, 212, 191, 0.28);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.compliance-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.warning-strip {
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: #fde68a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.compliance-files {
+  display: grid;
+  gap: 4px;
+}
+
+.inline-actions {
+  justify-content: flex-start;
+  margin-top: 4px;
 }
 
 .system-action strong {
@@ -1669,6 +1760,16 @@ tr:hover td {
 
   .dialog-panel.supplier-dialog .dialog-card {
     padding: 14px;
+  }
+
+  .compliance-grid,
+  .compliance-dialog-grid,
+  .compliance-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .compliance-card-top {
+    display: grid;
   }
 
   .stock-toolbar {

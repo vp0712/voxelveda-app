@@ -17,6 +17,7 @@ let stockCache = [];
 let stockUsageCache = [];
 let customerCache = [];
 let supplierCache = [];
+let complianceCache = [];
 let materialCache = {
   raw_material: [],
   packaging: []
@@ -34,6 +35,7 @@ const ACCESS_OPTIONS = [
   { id: 'invoices', label: 'Invoices' },
   { id: 'customers', label: 'Customers' },
   { id: 'suppliers', label: 'Suppliers' },
+  { id: 'compliance', label: 'Compliance & Licences' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'staff', label: 'Staff' },
@@ -170,7 +172,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
-  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog');
+  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -197,6 +199,7 @@ function setupNavigation() {
 
       if (btn.dataset.section === 'customerSection') loadCustomers();
       if (btn.dataset.section === 'supplierSection') loadSuppliers();
+      if (btn.dataset.section === 'complianceSection') loadComplianceEntries();
       if (btn.dataset.section === 'rawMaterialSection') loadMaterials('raw_material');
       if (btn.dataset.section === 'packagingSection') loadMaterials('packaging');
       if (btn.dataset.section === 'invoiceSection') loadInvoices();
@@ -1330,6 +1333,322 @@ async function deleteSupplierFile(id) {
   await loadSuppliers();
 }
 
+async function loadComplianceEntries() {
+  const panel = document.getElementById('complianceRegister');
+  if (!panel) return;
+
+  const res = await fetch('/api/compliance', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    panel.innerHTML = `<div class="card">${escapeHtml(data.message || 'Failed to load compliance register')}</div>`;
+    return;
+  }
+
+  complianceCache = data.entries || [];
+  renderComplianceEntries();
+}
+
+function complianceStatusLabel(status) {
+  const labels = {
+    review_required: 'Review required',
+    active: 'Active',
+    submitted: 'Submitted',
+    approved: 'Approved',
+    expired: 'Expired',
+    not_applicable: 'Not applicable'
+  };
+
+  return labels[status] || 'Review required';
+}
+
+function complianceFileTypeLabel(type) {
+  const labels = {
+    form: 'Blank form',
+    filled_form: 'Filled form',
+    licence: 'Licence / Permit',
+    process_sheet: 'Process sheet',
+    council_record: 'Council record',
+    export_import: 'Import / Export',
+    evidence: 'Evidence / Photo'
+  };
+
+  return labels[type] || 'File';
+}
+
+function renderComplianceEntries() {
+  const panel = document.getElementById('complianceRegister');
+  if (!panel) return;
+
+  const category = String(document.getElementById('complianceCategoryFilter')?.value || '').trim();
+  const query = String(document.getElementById('complianceSearch')?.value || '').trim().toLowerCase();
+  const rows = complianceCache.filter((entry) => {
+    if (category && entry.category !== category) return false;
+    if (!query) return true;
+    return [
+      entry.category,
+      entry.title,
+      entry.authority,
+      entry.requirement_type,
+      entry.status,
+      entry.form_number,
+      entry.notes,
+      entry.filled_notes
+    ].some((value) => String(value || '').toLowerCase().includes(query));
+  });
+
+  const reviewCount = complianceCache.filter((entry) => ['review_required', 'expired'].includes(entry.status)).length;
+  const processCount = complianceCache.filter((entry) => entry.process_sheet_required).length;
+  const fileCount = complianceCache.reduce((sum, entry) => sum + (entry.files || []).length, 0);
+  const reviewEl = document.getElementById('complianceReviewCount');
+  const processEl = document.getElementById('complianceProcessCount');
+  const fileEl = document.getElementById('complianceFileCount');
+  if (reviewEl) reviewEl.innerText = reviewCount;
+  if (processEl) processEl.innerText = processCount;
+  if (fileEl) fileEl.innerText = fileCount;
+
+  if (!rows.length) {
+    panel.innerHTML = '<div class="card">No compliance entries found.</div>';
+    return;
+  }
+
+  const grouped = rows.reduce((acc, entry) => {
+    acc[entry.category] = acc[entry.category] || [];
+    acc[entry.category].push(entry);
+    return acc;
+  }, {});
+
+  panel.innerHTML = Object.entries(grouped).map(([groupName, entries]) => `
+    <div class="card compliance-group">
+      <div class="section-head compact-head">
+        <h3>${escapeHtml(groupName)}</h3>
+        <span class="live-pill">${entries.length} entries</span>
+      </div>
+      <div class="compliance-grid">
+        ${entries.map((entry) => renderComplianceCard(entry)).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderComplianceCard(entry) {
+  const files = entry.files || [];
+  const fileList = files.map((file) => `
+    <div class="file-row">
+      <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.file_label || file.original_name)}</a>
+      <button class="mini-danger" onclick="deleteComplianceFile(${file.id})">Delete</button>
+    </div>
+    <small>${escapeHtml(complianceFileTypeLabel(file.file_type))} - ${escapeHtml(file.uploaded_by_name || '-')}</small>
+  `).join('');
+
+  return `
+    <article class="compliance-card">
+      <div class="compliance-card-top">
+        <div>
+          <h4>${escapeHtml(entry.title)}</h4>
+          <p>${escapeHtml(entry.authority || '-')}</p>
+        </div>
+        <span class="status-chip">${escapeHtml(complianceStatusLabel(entry.status))}</span>
+      </div>
+      <div class="compliance-meta">
+        <span>Type: ${escapeHtml(entry.requirement_type || '-')}</span>
+        <span>Form: ${escapeHtml(entry.form_number || '-')}</span>
+        <span>Due: ${escapeHtml(formatDate(entry.due_date))}</span>
+        <span>Renewal: ${escapeHtml(formatDate(entry.renewal_date))}</span>
+      </div>
+      ${entry.process_sheet_required ? '<div class="warning-strip">Process sheet required for related jobs</div>' : ''}
+      <p class="muted-text">${escapeHtml(entry.notes || '-')}</p>
+      ${entry.filled_notes ? `<p>${escapeHtml(entry.filled_notes)}</p>` : ''}
+      ${entry.official_link ? `<a class="secondary-link" href="${escapeHtml(entry.official_link)}" target="_blank" rel="noopener">Official form / guidance</a>` : ''}
+      <div class="compliance-files">${fileList || '<span class="muted-text">No uploaded forms yet.</span>'}</div>
+      <div class="dialog-actions inline-actions">
+        <button class="icon-btn" onclick="openComplianceDialog(${entry.id})">Edit / Fill</button>
+        <button class="icon-btn" onclick="openComplianceFileDialog(${entry.id})">Upload</button>
+        <button class="icon-btn danger-icon" onclick="deleteComplianceEntry(${entry.id})">Delete</button>
+      </div>
+    </article>
+  `;
+}
+
+function openComplianceDialog(id = null) {
+  const entry = complianceCache.find((row) => Number(row.id) === Number(id)) || {};
+
+  showDialog(
+    id ? 'Edit / Fill Compliance Entry' : 'Add Compliance Entry',
+    `
+      <div class="stock-dialog-grid compliance-dialog-grid">
+        <div class="dialog-card">
+          <h4>Requirement Details</h4>
+          <input id="complianceTitle" placeholder="Form, licence, permit or process sheet name" value="${escapeHtml(entry.title || '')}" />
+          <div class="split-grid">
+            <input id="complianceCategory" placeholder="Category" value="${escapeHtml(entry.category || 'Business Licences')}" />
+            <input id="complianceAuthority" placeholder="Authority / Government body / Council" value="${escapeHtml(entry.authority || '')}" />
+          </div>
+          <div class="split-grid">
+            <input id="complianceType" placeholder="Requirement type" value="${escapeHtml(entry.requirement_type || '')}" />
+            <input id="complianceFormNumber" placeholder="Form / Licence number" value="${escapeHtml(entry.form_number || '')}" />
+          </div>
+          <input id="complianceOfficialLink" placeholder="Official link or reference URL" value="${escapeHtml(entry.official_link || '')}" />
+        </div>
+        <div class="dialog-card">
+          <h4>Status & Dates</h4>
+          <div class="split-grid">
+            <select id="complianceStatus">
+              ${['review_required', 'active', 'submitted', 'approved', 'expired', 'not_applicable'].map((status) => (
+                `<option value="${status}" ${entry.status === status ? 'selected' : ''}>${complianceStatusLabel(status)}</option>`
+              )).join('')}
+            </select>
+            <label class="access-check">
+              <input id="complianceProcessRequired" type="checkbox" ${entry.process_sheet_required ? 'checked' : ''} />
+              <span>Process sheet required</span>
+            </label>
+          </div>
+          <div class="split-grid">
+            <input id="complianceDueDate" type="date" value="${escapeHtml((entry.due_date || '').slice(0, 10))}" />
+            <input id="complianceRenewalDate" type="date" value="${escapeHtml((entry.renewal_date || '').slice(0, 10))}" />
+          </div>
+          <textarea id="complianceNotes" rows="4" placeholder="Step-by-step requirements, government/council notes, documents needed">${escapeHtml(entry.notes || '')}</textarea>
+        </div>
+        <div class="dialog-card full-span">
+          <h4>Fill / Internal Record</h4>
+          <textarea id="complianceFilledNotes" rows="6" placeholder="Write the filled details here: reference numbers, submitted dates, approval notes, inspector comments, job process sheet details">${escapeHtml(entry.filled_notes || '')}</textarea>
+        </div>
+      </div>
+    `,
+    async () => {
+      const body = {
+        id: entry.id,
+        title: document.getElementById('complianceTitle')?.value.trim(),
+        category: document.getElementById('complianceCategory')?.value.trim(),
+        authority: document.getElementById('complianceAuthority')?.value.trim(),
+        requirement_type: document.getElementById('complianceType')?.value.trim(),
+        form_number: document.getElementById('complianceFormNumber')?.value.trim(),
+        official_link: document.getElementById('complianceOfficialLink')?.value.trim(),
+        status: document.getElementById('complianceStatus')?.value,
+        process_sheet_required: document.getElementById('complianceProcessRequired')?.checked,
+        due_date: document.getElementById('complianceDueDate')?.value || null,
+        renewal_date: document.getElementById('complianceRenewalDate')?.value || null,
+        notes: document.getElementById('complianceNotes')?.value.trim(),
+        filled_notes: document.getElementById('complianceFilledNotes')?.value.trim()
+      };
+
+      const res = await fetch('/api/compliance', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Compliance entry save failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Compliance entry saved');
+      await loadComplianceEntries();
+    },
+    id ? 'Update Entry' : 'Save Entry'
+  );
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'compliance-dialog');
+}
+
+function openComplianceFileDialog(entryId) {
+  const entry = complianceCache.find((row) => Number(row.id) === Number(entryId));
+  if (!entry) return;
+
+  showDialog(
+    'Upload Compliance File',
+    `
+      <div class="stock-dialog-grid single-dialog-grid">
+        <div class="dialog-card">
+          <h4>${escapeHtml(entry.title)}</h4>
+          <select id="complianceFileType">
+            <option value="form">Blank form</option>
+            <option value="filled_form">Filled form</option>
+            <option value="licence">Licence / Permit</option>
+            <option value="process_sheet">Process sheet</option>
+            <option value="council_record">Council record</option>
+            <option value="export_import">Import / Export</option>
+            <option value="evidence">Evidence / Photo</option>
+          </select>
+          <input id="complianceFileLabel" placeholder="File label / licence number / job number" />
+          <input id="complianceFileInput" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
+        </div>
+      </div>
+    `,
+    async () => {
+      const fileInput = document.getElementById('complianceFileInput');
+      if (!fileInput?.files?.length) {
+        showToast('Choose a form, licence, process sheet or photo first');
+        return;
+      }
+
+      const form = new FormData();
+      form.append('file', fileInput.files[0]);
+      form.append('file_type', document.getElementById('complianceFileType')?.value || 'form');
+      form.append('file_label', document.getElementById('complianceFileLabel')?.value.trim() || fileInput.files[0].name);
+
+      const res = await fetch(`/api/compliance/${entryId}/files`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Compliance file upload failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Compliance file uploaded');
+      await loadComplianceEntries();
+    },
+    'Upload File'
+  );
+}
+
+async function deleteComplianceEntry(id) {
+  if (!confirm('Delete this compliance entry?')) return;
+
+  const res = await fetch('/api/compliance/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Compliance delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Compliance entry deleted');
+  await loadComplianceEntries();
+}
+
+async function deleteComplianceFile(id) {
+  if (!confirm('Delete this uploaded compliance file?')) return;
+
+  const res = await fetch('/api/compliance/files/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Compliance file delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Compliance file deleted');
+  await loadComplianceEntries();
+}
+
 async function submitTask() {
   const body = {
     title: document.getElementById('taskTitle')?.value.trim(),
@@ -1965,6 +2284,7 @@ async function refreshAllSystemData() {
     loadStaff(),
     loadCustomers(),
     loadSuppliers(),
+    loadComplianceEntries(),
     loadStock(),
     loadStockUsage(),
     loadMaterials('raw_material'),
@@ -3204,6 +3524,7 @@ async function bootAdminDashboard() {
       loadStaff(),
       loadCustomers(),
       loadSuppliers(),
+      loadComplianceEntries(),
       loadStock(),
       loadStockUsage(),
       loadMaterials('raw_material'),

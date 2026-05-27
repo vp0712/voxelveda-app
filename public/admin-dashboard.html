@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-  <link rel="stylesheet" href="/style.css?v=20260527-supplier-wide"/>
+  <link rel="stylesheet" href="/style.css?v=20260527-compliance"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -64,6 +64,7 @@
         </div>
       </details>
       <button class="nav-btn" data-section="meetingSection">Meetings & Inspections</button>
+      <button class="nav-btn" data-section="complianceSection">Compliance & Licences</button>
       <button class="nav-btn" data-section="settingsSection">Settings</button>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
@@ -680,6 +681,53 @@
         </div>
       </section>
 
+      <!-- COMPLIANCE -->
+      <section id="complianceSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Compliance & Licences</h2>
+            <p>Business licences, council records, import/export forms, process sheets and audit evidence.</p>
+          </div>
+          <button onclick="openComplianceDialog()" class="primary-btn">Add Compliance Entry</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card">
+            <h3>Open Reviews</h3>
+            <p><strong id="complianceReviewCount">0</strong></p>
+          </div>
+          <div class="card">
+            <h3>Process Sheets</h3>
+            <p><strong id="complianceProcessCount">0</strong></p>
+          </div>
+          <div class="card">
+            <h3>Attached Files</h3>
+            <p><strong id="complianceFileCount">0</strong></p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="form-grid">
+            <select id="complianceCategoryFilter" onchange="renderComplianceEntries()">
+              <option value="">All categories</option>
+              <option>Business Licences</option>
+              <option>Manufacturing</option>
+              <option>Council / Local</option>
+              <option>Import / Export</option>
+              <option>Environment / Safety</option>
+              <option>Quality / Process Sheet</option>
+              <option>Insurance / Finance</option>
+              <option>Staff / WHS</option>
+            </select>
+            <input id="complianceSearch" placeholder="Search form, licence, authority, notes or status" oninput="renderComplianceEntries()" />
+          </div>
+        </div>
+
+        <div id="complianceRegister" class="compliance-register">
+          <div class="card">Loading compliance register...</div>
+        </div>
+      </section>
+
       <!-- SETTINGS -->
       <section id="settingsSection" class="page-section hidden-section">
         <div class="section-head">
@@ -751,6 +799,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260527-supplier-wide"></script>
+  <script src="/admin-dashboard.js?v=20260527-compliance"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@ const customerRoutes = require('./routes/customerRoutes');
 const materialRoutes = require('./routes/materialRoutes');
 const meetingRoutes = require('./routes/meetingRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
+const complianceRoutes = require('./routes/complianceRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 
 const auth = require('./middleware/auth');
@@ -46,6 +47,7 @@ app.use('/api/customers', auth, requirePermission('invoices'), customerRoutes);
 app.use('/api/materials', auth, requirePermission('stock'), materialRoutes);
 app.use('/api/meetings', auth, requirePermission('meetings'), meetingRoutes);
 app.use('/api/suppliers', auth, requirePermission('suppliers'), supplierRoutes);
+app.use('/api/compliance', auth, requirePermission('compliance'), complianceRoutes);
 
 try {
   app.use('/api/attendance', auth, require('./routes/attendanceRoutes'));
