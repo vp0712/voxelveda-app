@@ -23,21 +23,39 @@ const DEFAULT_ENTRIES = [
   },
   {
     category: 'Import / Export',
-    title: 'Import goods requirements',
+    title: 'ABF import requirements check',
     authority: 'Australian Border Force',
     requirement_type: 'Import checklist',
     status: 'review_required',
     official_link: 'https://www.abf.gov.au/imports/Pages/How-to-import/Requirements.aspx',
-    notes: 'ABF states there is no general import licence for most importers, but some goods need permits and correct tariff classification.'
+    notes: 'Use before importing any machinery, parts, resin, raw material, packaging or equipment. Check whether the goods are restricted, need a permit, correct tariff classification, labelling or duty/GST assessment.'
   },
   {
     category: 'Import / Export',
-    title: 'Export declaration / permit check',
+    title: 'ABF Import Declaration N10 - B650',
     authority: 'Australian Border Force',
-    requirement_type: 'Export form',
+    requirement_type: 'Original import form',
+    status: 'review_required',
+    official_link: 'https://www.abf.gov.au/form-listing/forms/b650.pdf',
+    notes: 'Use when imported goods over AUD 1,000 are cleared into home consumption and a paper import declaration is lodged at an ABF counter. Fill before customs clearance, usually with your customs broker, then submit through ICS or at an ABF counter as required.'
+  },
+  {
+    category: 'Import / Export',
+    title: 'ABF Export Declaration - B957',
+    authority: 'Australian Border Force',
+    requirement_type: 'Original export form',
     status: 'review_required',
     official_link: 'https://www.abf.gov.au/form-listing/forms/b957.pdf',
-    notes: 'Use where an export declaration or application is required. Check controlled exports before shipping.'
+    notes: 'Use for export consignments where an export declaration is required. Fill before goods leave Australia, one declaration per consignment, then lodge electronically through ICS or at an ABF counter if paper lodgement is permitted.'
+  },
+  {
+    category: 'Import / Export',
+    title: 'Export declaration guidance',
+    authority: 'Australian Border Force',
+    requirement_type: 'Submission guidance',
+    status: 'review_required',
+    official_link: 'https://www.abf.gov.au/importing-exporting-and-manufacturing/exporting/how-to-export/export-declaration',
+    notes: 'Use this guidance before export dispatch to confirm when B957 is required, how to lodge it, and what export evidence must be kept for audit.'
   },
   {
     category: 'Council / Local',
@@ -49,6 +67,15 @@ const DEFAULT_ENTRIES = [
     notes: 'Store planning approvals, waste, signage, operating hours, fire safety, trade waste and inspection records for your site.'
   },
   {
+    category: 'Council / Local',
+    title: 'NSW Development Application record',
+    authority: 'Service NSW / NSW Planning Portal',
+    requirement_type: 'Council planning application',
+    status: 'review_required',
+    official_link: 'https://www.service.nsw.gov.au/transaction/apply-for-a-development-application',
+    notes: 'Use before construction, change of use, building works or site changes. Discuss requirements with council first, then lodge online through the NSW Planning Portal with plans, owner consent, environmental effects and fee payment.'
+  },
+  {
     category: 'Environment / Safety',
     title: 'NSW EPA licence check',
     authority: 'NSW EPA',
@@ -56,6 +83,15 @@ const DEFAULT_ENTRIES = [
     status: 'review_required',
     official_link: 'https://www.epa.nsw.gov.au/licensing-and-regulation/licensing',
     notes: 'Check whether your processes, chemicals, waste, emissions, radiation or dangerous goods activities need EPA licensing.'
+  },
+  {
+    category: 'Environment / Safety',
+    title: 'Hazardous chemical register template',
+    authority: 'Safe Work Australia',
+    requirement_type: 'Original WHS template',
+    status: 'review_required',
+    official_link: 'https://www.safeworkaustralia.gov.au/system/files/documents/1909/hazardous_chemical_register_template.pdf',
+    notes: 'Use if chemicals, resins, solvents, adhesives, gases or dangerous goods are stored or used. Fill when a hazardous chemical is first introduced and update whenever chemicals or SDS details change. Keep onsite for workers and inspectors.'
   },
   {
     category: 'Quality / Process Sheet',
@@ -109,9 +145,13 @@ async function ensureComplianceTables() {
     )
   `);
 
-  const [rows] = await pool.query('SELECT COUNT(*) AS total FROM compliance_entries WHERE deleted = 0');
-  if (Number(rows[0]?.total || 0) === 0) {
-    for (const entry of DEFAULT_ENTRIES) {
+  for (const entry of DEFAULT_ENTRIES) {
+    const [existing] = await pool.query(
+      'SELECT id FROM compliance_entries WHERE category = ? AND title = ? AND deleted = 0 LIMIT 1',
+      [entry.category, entry.title]
+    );
+
+    if (!existing.length) {
       await pool.query(
         `
         INSERT INTO compliance_entries

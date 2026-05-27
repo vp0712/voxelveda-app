@@ -1138,7 +1138,7 @@ function renderSuppliers() {
         <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.title || file.original_name)}</a>
         <button class="mini-danger" onclick="deleteSupplierFile(${file.id})">Delete</button>
       </div>
-      <small>${escapeHtml(supplierFileTypeLabel(file.file_type))}${file.notes ? ` - ${escapeHtml(file.notes)}` : ''}</small>
+      <small>${escapeHtml(supplierFileTypeLabel(file.file_type))} - Uploaded ${escapeHtml(formatDateTime(file.created_at))}${file.notes ? ` - ${escapeHtml(file.notes)}` : ''}</small>
     `).join('');
 
     return `
@@ -1440,7 +1440,7 @@ function renderComplianceCard(entry) {
       <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.file_label || file.original_name)}</a>
       <button class="mini-danger" onclick="deleteComplianceFile(${file.id})">Delete</button>
     </div>
-    <small>${escapeHtml(complianceFileTypeLabel(file.file_type))} - ${escapeHtml(file.uploaded_by_name || '-')}</small>
+    <small>${escapeHtml(complianceFileTypeLabel(file.file_type))} - Uploaded ${escapeHtml(formatDateTime(file.created_at))} by ${escapeHtml(file.uploaded_by_name || '-')}</small>
   `).join('');
 
   return `
@@ -1461,7 +1461,7 @@ function renderComplianceCard(entry) {
       ${entry.process_sheet_required ? '<div class="warning-strip">Process sheet required for related jobs</div>' : ''}
       <p class="muted-text">${escapeHtml(entry.notes || '-')}</p>
       ${entry.filled_notes ? `<p>${escapeHtml(entry.filled_notes)}</p>` : ''}
-      ${entry.official_link ? `<a class="secondary-link" href="${escapeHtml(entry.official_link)}" target="_blank" rel="noopener">Official form / guidance</a>` : ''}
+      ${entry.official_link ? `<a class="secondary-link" href="${escapeHtml(entry.official_link)}" target="_blank" rel="noopener">Preview original form / guidance</a>` : ''}
       <div class="compliance-files">${fileList || '<span class="muted-text">No uploaded forms yet.</span>'}</div>
       <div class="dialog-actions inline-actions">
         <button class="icon-btn" onclick="openComplianceDialog(${entry.id})">Edit / Fill</button>
