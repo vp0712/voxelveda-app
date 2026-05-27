@@ -16,6 +16,7 @@ let invoiceCache = [];
 let stockCache = [];
 let stockUsageCache = [];
 let customerCache = [];
+let supplierCache = [];
 let materialCache = {
   raw_material: [],
   packaging: []
@@ -32,6 +33,7 @@ const ACCESS_OPTIONS = [
   { id: 'rfqs', label: 'RFQs' },
   { id: 'invoices', label: 'Invoices' },
   { id: 'customers', label: 'Customers' },
+  { id: 'suppliers', label: 'Suppliers' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'staff', label: 'Staff' },
@@ -194,6 +196,7 @@ function setupNavigation() {
       document.getElementById(btn.dataset.section)?.classList.remove('hidden-section');
 
       if (btn.dataset.section === 'customerSection') loadCustomers();
+      if (btn.dataset.section === 'supplierSection') loadSuppliers();
       if (btn.dataset.section === 'rawMaterialSection') loadMaterials('raw_material');
       if (btn.dataset.section === 'packagingSection') loadMaterials('packaging');
       if (btn.dataset.section === 'invoiceSection') loadInvoices();
@@ -1071,6 +1074,261 @@ async function deleteCustomer(id) {
   await loadCustomers();
 }
 
+async function loadSuppliers() {
+  const tbody = document.getElementById('supplierTableBody');
+  if (!tbody) return;
+
+  const res = await fetch('/api/suppliers', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load suppliers')}</td></tr>`;
+    return;
+  }
+
+  supplierCache = data.suppliers || [];
+  renderSuppliers();
+}
+
+function supplierFileTypeLabel(type) {
+  const labels = {
+    bill_invoice: 'Bill / Invoice',
+    delivery_photo: 'Delivery Photo',
+    delivery_invoice: 'Delivery Invoice',
+    account_document: 'Account Document',
+    note_attachment: 'Note Attachment'
+  };
+
+  return labels[type] || 'Supplier File';
+}
+
+function renderSuppliers() {
+  const tbody = document.getElementById('supplierTableBody');
+  if (!tbody) return;
+
+  const query = String(document.getElementById('supplierSearch')?.value || '').trim().toLowerCase();
+  const rows = supplierCache.filter((supplier) => {
+    if (!query) return true;
+    return [
+      supplier.supplier_name,
+      supplier.contact_name,
+      supplier.email,
+      supplier.phone,
+      supplier.category,
+      supplier.payment_terms,
+      supplier.abn_acn,
+      supplier.notes
+    ].some((value) => String(value || '').toLowerCase().includes(query));
+  });
+
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="7">No suppliers found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map((supplier) => {
+    const files = supplier.files || [];
+    const filePreview = files.slice(0, 3).map((file) => `
+      <div class="file-row">
+        <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.title || file.original_name)}</a>
+        <button class="mini-danger" onclick="deleteSupplierFile(${file.id})">Delete</button>
+      </div>
+      <small>${escapeHtml(supplierFileTypeLabel(file.file_type))}${file.notes ? ` - ${escapeHtml(file.notes)}` : ''}</small>
+    `).join('');
+
+    return `
+      <tr>
+        <td>
+          <strong>${escapeHtml(supplier.supplier_name)}</strong><br>
+          <span class="muted-text">${escapeHtml(supplier.address || '-')}</span>
+        </td>
+        <td>
+          ${escapeHtml(supplier.contact_name || '-')}<br>
+          <span class="muted-text">${escapeHtml(supplier.email || '-')}</span><br>
+          <span class="muted-text">${escapeHtml(supplier.phone || '-')}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(supplier.category || '-')}</strong><br>
+          <span class="muted-text">${escapeHtml(supplier.payment_terms || '-')}</span><br>
+          <span class="muted-text">${escapeHtml(supplier.abn_acn || '')}</span>
+        </td>
+        <td>
+          ${filePreview || '<span class="muted-text">No files yet</span>'}
+          ${files.length > 3 ? `<small>+${files.length - 3} more files</small>` : ''}
+        </td>
+        <td>${escapeHtml(supplier.notes || '-')}</td>
+        <td>
+          <span class="muted-text">Created: ${escapeHtml(supplier.created_by_name || '-')}</span><br>
+          <span class="muted-text">Updated: ${escapeHtml(supplier.updated_by_name || '-')}</span>
+        </td>
+        <td>
+          <button class="icon-btn" onclick="openSupplierDialog(${supplier.id})">Edit</button>
+          <button class="icon-btn" onclick="openSupplierFileDialog(${supplier.id})">Upload</button>
+          <button class="icon-btn danger-icon" onclick="deleteSupplier(${supplier.id})">Delete</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  enhanceResponsiveTables();
+}
+
+function openSupplierDialog(id = null) {
+  const supplier = supplierCache.find((row) => Number(row.id) === Number(id)) || {};
+
+  showDialog(
+    id ? 'Edit Supplier Profile' : 'Add Supplier Profile',
+    `
+      <div class="stock-dialog-grid">
+        <div class="dialog-card">
+          <h4>Supplier Identity</h4>
+          <input id="supplierName" placeholder="Supplier / Company Name" value="${escapeHtml(supplier.supplier_name || '')}" />
+          <input id="supplierContact" placeholder="Contact Person" value="${escapeHtml(supplier.contact_name || '')}" />
+          <div class="split-grid">
+            <input id="supplierEmail" type="email" placeholder="Email" value="${escapeHtml(supplier.email || '')}" />
+            <input id="supplierPhone" placeholder="Phone / Mobile" value="${escapeHtml(supplier.phone || '')}" />
+          </div>
+          <textarea id="supplierAddress" rows="3" placeholder="Address">${escapeHtml(supplier.address || '')}</textarea>
+        </div>
+        <div class="dialog-card">
+          <h4>Commercial Details</h4>
+          <input id="supplierCategory" placeholder="Category: raw material, packaging, machine parts..." value="${escapeHtml(supplier.category || '')}" />
+          <input id="supplierPaymentTerms" placeholder="Payment terms / account terms" value="${escapeHtml(supplier.payment_terms || '')}" />
+          <input id="supplierAbnAcn" placeholder="ABN / ACN / Supplier ID" value="${escapeHtml(supplier.abn_acn || '')}" />
+          <textarea id="supplierNotes" rows="4" placeholder="Notes, preferred delivery process, quality notes, payment notes">${escapeHtml(supplier.notes || '')}</textarea>
+        </div>
+      </div>
+    `,
+    async () => {
+      const body = {
+        id: supplier.id,
+        supplier_name: document.getElementById('supplierName')?.value.trim(),
+        contact_name: document.getElementById('supplierContact')?.value.trim(),
+        email: document.getElementById('supplierEmail')?.value.trim(),
+        phone: document.getElementById('supplierPhone')?.value.trim(),
+        address: document.getElementById('supplierAddress')?.value.trim(),
+        category: document.getElementById('supplierCategory')?.value.trim(),
+        payment_terms: document.getElementById('supplierPaymentTerms')?.value.trim(),
+        abn_acn: document.getElementById('supplierAbnAcn')?.value.trim(),
+        notes: document.getElementById('supplierNotes')?.value.trim()
+      };
+
+      const res = await fetch('/api/suppliers', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Supplier save failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Supplier saved');
+      await loadSuppliers();
+    },
+    id ? 'Update Supplier' : 'Save Supplier'
+  );
+}
+
+function openSupplierFileDialog(supplierId) {
+  const supplier = supplierCache.find((row) => Number(row.id) === Number(supplierId));
+  if (!supplier) return;
+
+  showDialog(
+    `Upload Supplier File`,
+    `
+      <div class="stock-dialog-grid single-dialog-grid">
+        <div class="dialog-card">
+          <h4>${escapeHtml(supplier.supplier_name)}</h4>
+          <select id="supplierFileType">
+            <option value="bill_invoice">Paying Bill / Supplier Invoice</option>
+            <option value="delivery_photo">Delivery Photo</option>
+            <option value="delivery_invoice">Delivery Invoice / Docket</option>
+            <option value="account_document">Account / Contract Document</option>
+            <option value="note_attachment">Note Attachment</option>
+          </select>
+          <input id="supplierFileTitle" placeholder="File title / invoice number / delivery reference" />
+          <input id="supplierFileInput" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx" />
+          <textarea id="supplierFileNotes" rows="4" placeholder="Notes about this bill, delivery invoice, photo, payment or issue"></textarea>
+        </div>
+      </div>
+    `,
+    async () => {
+      const fileInput = document.getElementById('supplierFileInput');
+      if (!fileInput?.files?.length) {
+        showToast('Choose a bill, invoice, photo or document first');
+        return;
+      }
+
+      const form = new FormData();
+      form.append('file', fileInput.files[0]);
+      form.append('file_type', document.getElementById('supplierFileType')?.value || 'bill_invoice');
+      form.append('title', document.getElementById('supplierFileTitle')?.value.trim() || fileInput.files[0].name);
+      form.append('notes', document.getElementById('supplierFileNotes')?.value.trim() || '');
+
+      const res = await fetch(`/api/suppliers/${supplierId}/files`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Supplier file upload failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Supplier file uploaded');
+      await loadSuppliers();
+    },
+    'Upload File'
+  );
+}
+
+async function deleteSupplier(id) {
+  if (!confirm('Delete this supplier profile and hide its files?')) return;
+
+  const res = await fetch('/api/suppliers/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Supplier delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Supplier deleted');
+  await loadSuppliers();
+}
+
+async function deleteSupplierFile(id) {
+  if (!confirm('Delete this supplier file/photo?')) return;
+
+  const res = await fetch('/api/suppliers/files/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Supplier file delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Supplier file deleted');
+  await loadSuppliers();
+}
+
 async function submitTask() {
   const body = {
     title: document.getElementById('taskTitle')?.value.trim(),
@@ -1705,6 +1963,7 @@ async function refreshAllSystemData() {
     loadAnnouncements(),
     loadStaff(),
     loadCustomers(),
+    loadSuppliers(),
     loadStock(),
     loadStockUsage(),
     loadMaterials('raw_material'),
@@ -2943,6 +3202,7 @@ async function bootAdminDashboard() {
       loadAnnouncements(),
       loadStaff(),
       loadCustomers(),
+      loadSuppliers(),
       loadStock(),
       loadStockUsage(),
       loadMaterials('raw_material'),

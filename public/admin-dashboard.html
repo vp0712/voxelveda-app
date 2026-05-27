@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-  <link rel="stylesheet" href="/style.css?v=20260525-workforce-menu"/>
+  <link rel="stylesheet" href="/style.css?v=20260527-suppliers"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -31,6 +31,7 @@
       <button class="nav-btn" data-section="rfqSection">RFQs</button>
       <button class="nav-btn" data-section="invoiceSection">Invoices</button>
       <button class="nav-btn" data-section="customerSection">Customers</button>
+      <button class="nav-btn" data-section="supplierSection">Suppliers</button>
       <details class="nav-group" open>
         <summary class="nav-group-toggle">
           <span>Stock Management</span>
@@ -86,6 +87,7 @@
           <button class="quick-pill" onclick="goSection('stockSection')">Stock</button>
           <button class="quick-pill" onclick="goSection('rawMaterialSection')">Raw Material</button>
           <button class="quick-pill" onclick="goSection('customerSection')">Customers</button>
+          <button class="quick-pill" onclick="goSection('supplierSection')">Suppliers</button>
         </div>
 
         <div class="metric-grid">
@@ -247,6 +249,43 @@
             </thead>
             <tbody id="customerTableBody">
               <tr><td colspan="7">Loading customers...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SUPPLIERS -->
+      <section id="supplierSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Supplier Directory</h2>
+            <p>Supplier profiles, contacts, bills, delivery invoices, photos and internal notes.</p>
+          </div>
+          <button onclick="openSupplierDialog()" class="primary-btn">Add Supplier</button>
+        </div>
+
+        <div class="card">
+          <div class="form-grid">
+            <input id="supplierSearch" placeholder="Search supplier, contact, phone, email, category or notes" oninput="renderSuppliers()" />
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <h3>Supplier Register</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Supplier</th>
+                <th>Contact</th>
+                <th>Category / Terms</th>
+                <th>Files</th>
+                <th>Notes</th>
+                <th>Created / Updated</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="supplierTableBody">
+              <tr><td colspan="7">Loading suppliers...</td></tr>
             </tbody>
           </table>
         </div>
@@ -712,6 +751,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260525-workforce-menu"></script>
+  <script src="/admin-dashboard.js?v=20260527-suppliers"></script>
 </body>
 </html>
