@@ -175,45 +175,27 @@ function applyPermissionUI() {
   const canUseStockOut = hasPermission('stock_out');
   const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut;
 
-  document.querySelectorAll('.permission-tasks').forEach((el) => {
-    el.classList.toggle('hidden-section', !canUseTasks);
-  });
-
-  document.querySelectorAll('.permission-attendance').forEach((el) => {
-    el.classList.toggle('hidden-section', !canUseAttendance);
-  });
-
-  document.querySelectorAll('.permission-meetings').forEach((el) => {
-    el.classList.toggle('hidden-section', !canUseMeetings);
-  });
-
-  document.querySelectorAll('.nav-btn.permission-stock').forEach((el) => {
-    el.classList.toggle('hidden-section', !canUseStock);
-  });
-
-  document.querySelectorAll('.permission-stock-in').forEach((el) => {
-    el.classList.toggle('hidden-section', !canUseStockIn);
-  });
-
-  document.querySelectorAll('.permission-stock-out').forEach((el) => {
-    el.classList.toggle('hidden-section', !canUseStockOut);
-  });
-
-  document.querySelectorAll('.nav-group.permission-stock').forEach((el) => {
-    el.classList.toggle('hidden-section', !canUseStock);
-  });
-
-  if (!canUseStock) {
-    document.querySelectorAll('section.permission-stock').forEach((el) => {
-      el.classList.add('hidden-section');
-    });
-    const activeStockNav = document.querySelector('.nav-btn.permission-stock.active');
-    if (activeStockNav) document.querySelector('[data-section="dashboardSection"]')?.click();
-  }
+  setPermissionVisibility('.permission-tasks', canUseTasks);
+  setPermissionVisibility('.permission-attendance', canUseAttendance);
+  setPermissionVisibility('.permission-meetings', canUseMeetings);
+  setPermissionVisibility('.permission-stock', canUseStock);
+  setPermissionVisibility('.permission-stock-in', canUseStockIn);
+  setPermissionVisibility('.permission-stock-out', canUseStockOut);
 
   if (document.querySelector('.nav-btn.active.hidden-section')) {
     document.querySelector('[data-section="dashboardSection"]')?.click();
   }
+}
+
+function setPermissionVisibility(selector, allowed) {
+  document.querySelectorAll(selector).forEach((el) => {
+    if (el.classList.contains('page-section')) {
+      if (!allowed) el.classList.add('hidden-section');
+      return;
+    }
+
+    el.classList.toggle('hidden-section', !allowed);
+  });
 }
 
 function toDateOnly(value) {
