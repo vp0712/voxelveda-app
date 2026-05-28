@@ -4,6 +4,22 @@ function isAdmin(req) {
   return String(req.user?.role || '').trim().toLowerCase() === 'admin';
 }
 
+function parsePermissions(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function canManageTasks(req) {
+  return isAdmin(req) || parsePermissions(req.user?.permissions).includes('tasks');
+}
+
 async function ensureAnnouncementTable() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS announcements (
@@ -75,8 +91,8 @@ exports.getTasks = async (req, res) => {
   try {
     await ensureTaskTables();
 
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin only' });
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
     const [rows] = await pool.query(`
@@ -139,8 +155,8 @@ exports.createTask = async (req, res) => {
   try {
     await ensureTaskTables();
 
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin only' });
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
     const title = String(req.body.title || '').trim();
@@ -225,6 +241,94 @@ exports.createTask = async (req, res) => {
   } catch (err) {
     console.error('CREATE TASK ERROR FULL:', err);
     res.status(500).json({ message: 'Task creation failed', error: err.message });
+  }
+};
+
+exports.getAssignableStaff = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+
+    const [rows] = await pool.query(
+      `
+      SELECT id, name, username, email, role, active
+      FROM users
+      WHERE LOWER(role) <> 'admin'
+      AND IFNULL(active, 1) = 1
+      ORDER BY name ASC, email ASC
+      `
+    );
+
+    res.json({ users: rows });
+  } catch (err) {
+    console.error('GET ASSIGNABLE STAFF ERROR FULL:', err);
+    res.status(500).json({ message: 'Failed to load assignable staff', error: err.message });
+  }
+};
+
+/* ================= UPDATE TASK DETAILS ================= */
+
+exports.updateTask = async (req, res) => {
+  try {
+    await ensureTaskTables();
+
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+
+    const taskId = Number(req.body.task_id || req.body.id || 0);
+    const title = String(req.body.title || '').trim();
+    const description = String(req.body.description || '').trim();
+    const assignedTo = Number(req.body.assigned_to);
+    const priority = String(req.body.priority || 'medium').trim().toLowerCase();
+    const dueDate = String(req.body.due_date || '').slice(0, 10);
+    const status = String(req.body.status || 'pending').trim().toLowerCase();
+
+    if (!taskId || !title || !description || !assignedTo || !dueDate) {
+      return res.status(400).json({ message: 'Task ID, title, description, staff and due date are required' });
+    }
+
+    if (!['low', 'medium', 'high', 'urgent'].includes(priority)) {
+      return res.status(400).json({ message: 'Invalid task priority' });
+    }
+
+    if (!['pending', 'in_progress', 'done'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid task status' });
+    }
+
+    const [staffRows] = await pool.query('SELECT id, role FROM users WHERE id = ? LIMIT 1', [assignedTo]);
+    if (!staffRows.length) return res.status(404).json({ message: 'Assigned staff user not found' });
+
+    if (String(staffRows[0].role || '').toLowerCase() === 'admin') {
+      return res.status(400).json({ message: 'Cannot assign staff task to admin user' });
+    }
+
+    const startedAtSql = status === 'pending' ? 'NULL' : 'IFNULL(started_at, NOW())';
+    const completedAtSql = status === 'done' ? 'NOW()' : 'NULL';
+
+    const [result] = await pool.query(
+      `
+      UPDATE tasks
+      SET title = ?,
+          description = ?,
+          assigned_to = ?,
+          priority = ?,
+          due_date = ?,
+          status = ?,
+          started_at = ${startedAtSql},
+          completed_at = ${completedAtSql}
+      WHERE id = ?
+      AND IFNULL(deleted, 0) = 0
+      `,
+      [title, description, assignedTo, priority, dueDate, status, taskId]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Task not found' });
+    res.json({ message: 'Task updated successfully' });
+  } catch (err) {
+    console.error('UPDATE TASK DETAILS ERROR FULL:', err);
+    res.status(500).json({ message: 'Task update failed', error: err.message });
   }
 };
 
@@ -314,8 +418,8 @@ exports.deleteTask = async (req, res) => {
   try {
     await ensureTaskTables();
 
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin only' });
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
     const taskId = Number(req.body.task_id);
@@ -348,8 +452,8 @@ exports.deleteTask = async (req, res) => {
 
 exports.getAnnouncements = async (req, res) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin only' });
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
     await ensureAnnouncementTable();
@@ -419,8 +523,8 @@ exports.getMyAnnouncements = async (req, res) => {
 
 exports.createAnnouncement = async (req, res) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin only' });
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
     await ensureAnnouncementTable();
@@ -474,10 +578,67 @@ exports.createAnnouncement = async (req, res) => {
   }
 };
 
+exports.updateAnnouncement = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+
+    await ensureAnnouncementTable();
+
+    const id = Number(req.body.id || 0);
+    const title = String(req.body.title || '').trim();
+    const message = String(req.body.message || '').trim();
+    const priority = String(req.body.priority || 'normal').trim().toLowerCase();
+    const startsAt = String(req.body.starts_at || '').slice(0, 10);
+    const expiresAt = String(req.body.expires_at || '').slice(0, 10);
+    const audienceType = String(req.body.audience_type || 'selected').trim().toLowerCase() === 'all' ? 'all' : 'selected';
+    const targetUserIds = parseTargetUsers(req.body.target_user_ids);
+
+    if (!id || !title || !message || !startsAt || !expiresAt) {
+      return res.status(400).json({ message: 'ID, title, message, start date, and expiry date are required' });
+    }
+
+    if (!['normal', 'high', 'urgent'].includes(priority)) {
+      return res.status(400).json({ message: 'Invalid announcement priority' });
+    }
+
+    if (expiresAt < startsAt) {
+      return res.status(400).json({ message: 'Expiry date cannot be before start date' });
+    }
+
+    if (audienceType === 'selected' && targetUserIds.length === 0) {
+      return res.status(400).json({ message: 'Select at least one staff member or choose everyone' });
+    }
+
+    const [result] = await pool.query(
+      `
+      UPDATE announcements
+      SET title = ?,
+          message = ?,
+          priority = ?,
+          starts_at = ?,
+          expires_at = ?,
+          audience_type = ?,
+          target_user_ids = ?
+      WHERE id = ?
+      AND deleted = 0
+      `,
+      [title, message, priority, startsAt, expiresAt, audienceType, JSON.stringify(targetUserIds), id]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Announcement not found' });
+    res.json({ message: 'Announcement updated successfully' });
+  } catch (err) {
+    console.error('UPDATE ANNOUNCEMENT ERROR FULL:', err);
+    res.status(500).json({ message: 'Announcement update failed', error: err.message });
+  }
+};
+
 exports.deleteAnnouncement = async (req, res) => {
   try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin only' });
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
     await ensureAnnouncementTable();

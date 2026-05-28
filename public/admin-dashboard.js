@@ -25,6 +25,7 @@ let materialCache = {
 let staffCache = [];
 let attendanceCache = [];
 let announcementCache = [];
+let taskCache = [];
 let meetingCache = [];
 let attendanceSnapshot = new Map();
 let attendanceFirstLoad = true;
@@ -203,7 +204,10 @@ function setupNavigation() {
       if (btn.dataset.section === 'rawMaterialSection') loadMaterials('raw_material');
       if (btn.dataset.section === 'packagingSection') loadMaterials('packaging');
       if (btn.dataset.section === 'invoiceSection') loadInvoices();
-      if (btn.dataset.section === 'taskSection') loadAnnouncements();
+      if (btn.dataset.section === 'taskSection') {
+        loadTasks();
+        loadAnnouncements();
+      }
       if (btn.dataset.section === 'meetingSection') loadMeetings();
       toggleMobileMenu(false);
     };
@@ -212,6 +216,27 @@ function setupNavigation() {
 
 function goSection(sectionId) {
   document.querySelector(`[data-section="${sectionId}"]`)?.click();
+}
+
+function hasCurrentPermission(permission) {
+  const permissions = Array.isArray(currentUser.permissions) ? currentUser.permissions : [];
+  return currentRole === 'admin' || permissions.includes(permission);
+}
+
+function configureTaskManagerView() {
+  if (currentRole === 'admin') return;
+
+  document.querySelectorAll('.nav-btn').forEach((btn) => {
+    btn.classList.toggle('hidden-section', btn.dataset.section !== 'taskSection');
+  });
+  document.querySelectorAll('.nav-group').forEach((group) => {
+    const hasTaskButton = group.querySelector('[data-section="taskSection"]');
+    group.classList.toggle('hidden-section', !hasTaskButton);
+  });
+  document.querySelectorAll('.page-section').forEach((section) => {
+    section.classList.toggle('hidden-section', section.id !== 'taskSection');
+  });
+  document.querySelector('[data-section="taskSection"]')?.classList.add('active');
 }
 
 async function loadMe() {
@@ -236,9 +261,15 @@ async function loadMe() {
     currentRole = role;
     localStorage.setItem('user', JSON.stringify(currentUser));
     localStorage.setItem('role', role);
-    alert('Access denied. Admin only.');
-    window.location.replace('/staff-dashboard.html');
-    return null;
+    if (!hasCurrentPermission('tasks')) {
+      alert('Access denied. Admin only.');
+      window.location.replace('/staff-dashboard.html');
+      return null;
+    }
+
+    el.innerText = `${data.user.name} | ${data.user.email} | task control`;
+    configureTaskManagerView();
+    return data.user;
   }
 
   currentUser = { ...data.user, role };
@@ -1692,6 +1723,7 @@ async function loadTasks() {
   }
 
   const tasks = data.tasks || [];
+  taskCache = tasks;
 
   if (!tasks.length) {
     tbody.innerHTML = `<tr><td colspan="7">No tasks assigned yet.</td></tr>`;
@@ -1709,6 +1741,8 @@ async function loadTasks() {
       <td>
         <button class="small-btn" onclick="updateTask(${t.id}, 'in_progress')">Start</button>
         <button class="small-btn" onclick="updateTask(${t.id}, 'done')">Done</button>
+        <button class="small-btn" onclick="openTaskDialog(${t.id})">Edit</button>
+        <button class="small-btn danger-icon" onclick="deleteTask(${t.id})">Delete</button>
       </td>
     </tr>
   `).join('');
@@ -1737,12 +1771,100 @@ function updateAdminTaskCounters(tasks) {
 }
 
 async function updateTask(id, status) {
-  await fetch('/api/tasks/status', {
+  const res = await fetch('/api/tasks/status', {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ task_id: id, status })
   });
+  const data = await safeJson(res);
 
+  if (!res.ok) {
+    showToast(data.message || 'Task update failed');
+    return;
+  }
+
+  await loadTasks();
+}
+
+function openTaskDialog(id) {
+  const task = taskCache.find((row) => Number(row.id) === Number(id));
+  if (!task) return;
+
+  const staffOptions = staffCache
+    .filter((u) => String(u.role || '').toLowerCase() !== 'admin')
+    .map((u) => `<option value="${u.id}" ${Number(task.assigned_to) === Number(u.id) ? 'selected' : ''}>${escapeHtml(u.name || u.email)}</option>`)
+    .join('');
+
+  showDialog(
+    'Edit Task',
+    `
+      <div class="stock-dialog-grid single-dialog-grid">
+        <div class="dialog-card">
+          <h4>Task Details</h4>
+          <input id="editTaskTitle" placeholder="Task title" value="${escapeHtml(task.title || '')}" />
+          <textarea id="editTaskDescription" rows="4" placeholder="Task instructions">${escapeHtml(task.description || '')}</textarea>
+          <div class="split-grid">
+            <select id="editTaskAssignedTo">${staffOptions}</select>
+            <select id="editTaskPriority">
+              ${['low', 'medium', 'high', 'urgent'].map((priority) => `<option value="${priority}" ${task.priority === priority ? 'selected' : ''}>${priority}</option>`).join('')}
+            </select>
+          </div>
+          <div class="split-grid">
+            <input id="editTaskDueDate" type="date" value="${escapeHtml(String(task.due_date || '').slice(0, 10))}" />
+            <select id="editTaskStatus">
+              ${['pending', 'in_progress', 'done'].map((status) => `<option value="${status}" ${task.status === status ? 'selected' : ''}>${status}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+      </div>
+    `,
+    async () => {
+      const body = {
+        task_id: task.id,
+        title: document.getElementById('editTaskTitle')?.value.trim(),
+        description: document.getElementById('editTaskDescription')?.value.trim(),
+        assigned_to: Number(document.getElementById('editTaskAssignedTo')?.value),
+        priority: document.getElementById('editTaskPriority')?.value,
+        due_date: document.getElementById('editTaskDueDate')?.value,
+        status: document.getElementById('editTaskStatus')?.value
+      };
+
+      const res = await fetch('/api/tasks/update', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Task update failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Task updated');
+      await loadTasks();
+    },
+    'Update Task'
+  );
+}
+
+async function deleteTask(id) {
+  if (!confirm('Delete this task from the register?')) return;
+
+  const res = await fetch('/api/tasks/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ task_id: id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Task delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Task deleted');
   await loadTasks();
 }
 
@@ -1781,44 +1903,47 @@ async function loadAnnouncements() {
         <td>${escapeHtml(formatDate(item.starts_at))}</td>
         <td>${escapeHtml(formatDate(item.expires_at))}</td>
         <td>${escapeHtml(item.created_by_name || '-')}</td>
-        <td><button class="icon-btn danger-icon" onclick="deleteAnnouncement(${item.id})">Delete</button></td>
+        <td>
+          <button class="icon-btn" onclick="openAnnouncementDialog(${item.id})">Edit</button>
+          <button class="icon-btn danger-icon" onclick="deleteAnnouncement(${item.id})">Delete</button>
+        </td>
       </tr>
     `;
   }).join('');
 }
 
-function openAnnouncementDialog() {
+function openAnnouncementDialog(id = null) {
+  const item = announcementCache.find((row) => Number(row.id) === Number(id)) || {};
+  const targets = Array.isArray(item.target_user_ids) ? item.target_user_ids.map(Number) : [];
   const staffOptions = staffCache
     .filter((u) => String(u.role || '').toLowerCase() !== 'admin')
     .map((u) => `
       <label class="access-check">
-        <input type="checkbox" class="announcement-target" value="${u.id}" />
+        <input type="checkbox" class="announcement-target" value="${u.id}" ${targets.includes(Number(u.id)) ? 'checked' : ''} />
         <span>${escapeHtml(u.name || u.email)} (${escapeHtml(u.email || u.username || '')})</span>
       </label>
     `).join('');
 
   showDialog(
-    'New Announcement',
+    id ? 'Edit Announcement' : 'New Announcement',
     `
       <div class="stock-dialog-grid">
         <div class="dialog-card">
           <h4>News Details</h4>
-          <input id="announcementTitle" placeholder="Announcement title" />
-          <textarea id="announcementMessage" rows="4" placeholder="Important message or news"></textarea>
+          <input id="announcementTitle" placeholder="Announcement title" value="${escapeHtml(item.title || '')}" />
+          <textarea id="announcementMessage" rows="4" placeholder="Important message or news">${escapeHtml(item.message || '')}</textarea>
           <div class="split-grid">
             <select id="announcementPriority">
-              <option value="normal">Normal</option>
-              <option value="high">High</option>
-              <option value="urgent">Urgent</option>
+              ${['normal', 'high', 'urgent'].map((priority) => `<option value="${priority}" ${item.priority === priority ? 'selected' : ''}>${priority}</option>`).join('')}
             </select>
             <select id="announcementAudience">
-              <option value="selected">Selected Staff</option>
-              <option value="all">Everyone</option>
+              <option value="selected" ${item.audience_type !== 'all' ? 'selected' : ''}>Selected Staff</option>
+              <option value="all" ${item.audience_type === 'all' ? 'selected' : ''}>Everyone</option>
             </select>
           </div>
           <div class="split-grid">
-            <input id="announcementStartsAt" type="date" value="${todayISO()}" />
-            <input id="announcementExpiresAt" type="date" value="${todayISO(7)}" />
+            <input id="announcementStartsAt" type="date" value="${escapeHtml(String(item.starts_at || todayISO()).slice(0, 10))}" />
+            <input id="announcementExpiresAt" type="date" value="${escapeHtml(String(item.expires_at || todayISO(7)).slice(0, 10))}" />
           </div>
         </div>
         <div class="dialog-card">
@@ -1835,6 +1960,7 @@ function openAnnouncementDialog() {
         .filter(Boolean);
 
       const body = {
+        id: item.id,
         title: document.getElementById('announcementTitle')?.value.trim(),
         message: document.getElementById('announcementMessage')?.value.trim(),
         priority: document.getElementById('announcementPriority')?.value,
@@ -1844,7 +1970,7 @@ function openAnnouncementDialog() {
         expires_at: document.getElementById('announcementExpiresAt')?.value
       };
 
-      const res = await fetch('/api/tasks/announcements', {
+      const res = await fetch(id ? '/api/tasks/announcements/update' : '/api/tasks/announcements', {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify(body)
@@ -1858,10 +1984,10 @@ function openAnnouncementDialog() {
       }
 
       hideDialog();
-      showToast(data.message || 'Announcement published');
+      showToast(data.message || (id ? 'Announcement updated' : 'Announcement published'));
       await loadAnnouncements();
     },
-    'Publish'
+    id ? 'Update' : 'Publish'
   );
 }
 
@@ -1889,11 +2015,17 @@ async function loadStaff() {
   const select = document.getElementById('taskAssignedTo');
   const tbody = document.getElementById('staffTableBody');
 
-  const res = await fetch('/api/users', {
+  let res = await fetch('/api/users', {
     headers: { Authorization: `Bearer ${token}` }
   });
 
-  const data = await safeJson(res);
+  let data = await safeJson(res);
+  if (!res.ok && hasCurrentPermission('tasks')) {
+    res = await fetch('/api/tasks/staff', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    data = await safeJson(res);
+  }
   if (!res.ok) return;
 
   const users = data.users || [];
@@ -3514,6 +3646,15 @@ async function bootAdminDashboard() {
 
     const user = await loadMe();
     if (!user || redirectingToLogin) return;
+
+    if (currentRole !== 'admin' && hasCurrentPermission('tasks')) {
+      await Promise.all([
+        loadStaff(),
+        loadTasks(),
+        loadAnnouncements()
+      ]);
+      return;
+    }
 
     await Promise.all([
       loadDashboardStats(),

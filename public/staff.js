@@ -732,6 +732,8 @@ function notifyNewTasks(tasks) {
 
     if (newTasks.length > 0) {
       showToast(`${newTasks.length} new task assigned`);
+      const firstTask = newTasks[0];
+      sendStaffNotification('New task assigned', firstTask.title || 'A new task has been assigned to you.');
     }
   }
 

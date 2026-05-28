@@ -7,15 +7,21 @@ const taskController = require('../controllers/taskController');
 
 router.get('/', taskController.getTasks);
 
+router.get('/staff', taskController.getAssignableStaff);
+
 router.get('/announcements', taskController.getAnnouncements);
 
 router.get('/announcements/my', taskController.getMyAnnouncements);
 
 router.post('/announcements', taskController.createAnnouncement);
 
+router.post('/announcements/update', taskController.updateAnnouncement);
+
 router.post('/announcements/delete', taskController.deleteAnnouncement);
 
 router.post('/', taskController.createTask);
+
+router.post('/update', taskController.updateTask);
 
 router.post('/delete', taskController.deleteTask);
 
