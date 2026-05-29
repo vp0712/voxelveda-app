@@ -1464,24 +1464,72 @@ tr:hover td {
 }
 
 .competitor-card-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
 }
 
 .competitor-card {
-  min-height: 360px;
+  align-content: stretch;
+  min-height: 0;
+  gap: 14px;
+}
+
+.competitor-card-head {
+  display: grid;
+  gap: 10px;
 }
 
 .competitor-card h4 {
+  margin: 0;
   color: #ecfeff;
   font-size: 18px;
+  line-height: 1.25;
 }
 
-.competitor-card p strong {
+.competitor-info-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.competitor-info-row {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 9px 10px;
+  border: 1px solid rgba(45, 212, 191, 0.12);
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.34);
+}
+
+.competitor-info-row span {
   color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.35;
+  text-transform: uppercase;
 }
 
-.competitor-card .inline-actions {
+.competitor-info-row strong {
+  min-width: 0;
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.competitor-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 8px;
   align-self: end;
+  margin-top: 4px;
+}
+
+.competitor-actions button {
+  width: 100%;
+  min-height: 38px;
+  margin: 0;
 }
 
 .system-action strong {
@@ -2491,5 +2539,14 @@ tr:hover td {
   table.responsive-table td {
     grid-template-columns: 1fr;
     gap: 5px;
+  }
+
+  .competitor-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .competitor-info-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
   }
 }

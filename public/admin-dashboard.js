@@ -1541,14 +1541,33 @@ function renderCompetitors() {
           const onlineQuery = encodeURIComponent(`${company.company_name || ''} ${company.country || ''} engineering manufacturing 3D printing`);
           return `
             <article class="form-card competitor-card">
-              <span class="status-chip">${escapeHtml(company.country || 'Worldwide')}</span>
-              <h4>${escapeHtml(company.company_name)}</h4>
-              <p><strong>Location:</strong> ${escapeHtml([company.city, company.country].filter(Boolean).join(', ') || '-')}</p>
-              <p><strong>Capabilities:</strong> ${escapeHtml(company.capabilities || '-')}</p>
-              <p><strong>Materials:</strong> ${escapeHtml(company.materials || '-')}</p>
-              <p><strong>Market:</strong> ${escapeHtml(company.target_market || '-')}</p>
-              <p><strong>Why track:</strong> ${escapeHtml(company.strength || company.notes || '-')}</p>
-              <div class="dialog-actions inline-actions">
+              <div class="competitor-card-head">
+                <span class="status-chip">${escapeHtml(company.country || 'Worldwide')}</span>
+                <h4>${escapeHtml(company.company_name)}</h4>
+              </div>
+              <div class="competitor-info-grid">
+                <div class="competitor-info-row">
+                  <span>Location</span>
+                  <strong>${escapeHtml([company.city, company.country].filter(Boolean).join(', ') || '-')}</strong>
+                </div>
+                <div class="competitor-info-row">
+                  <span>Capabilities</span>
+                  <strong>${escapeHtml(company.capabilities || '-')}</strong>
+                </div>
+                <div class="competitor-info-row">
+                  <span>Materials</span>
+                  <strong>${escapeHtml(company.materials || '-')}</strong>
+                </div>
+                <div class="competitor-info-row">
+                  <span>Market</span>
+                  <strong>${escapeHtml(company.target_market || '-')}</strong>
+                </div>
+                <div class="competitor-info-row">
+                  <span>Why track</span>
+                  <strong>${escapeHtml(company.strength || company.notes || '-')}</strong>
+                </div>
+              </div>
+              <div class="competitor-actions">
                 ${website ? `<button class="icon-btn" onclick="window.open('${escapeHtml(website)}', '_blank', 'noopener')">Website</button>` : ''}
                 ${sourceUrl ? `<button class="icon-btn" onclick="window.open('${escapeHtml(sourceUrl)}', '_blank', 'noopener')">Source</button>` : ''}
                 <button class="icon-btn" onclick="window.open('https://www.google.com/search?q=${onlineQuery}', '_blank', 'noopener')">Search Online</button>
