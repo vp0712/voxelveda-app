@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-  <link rel="stylesheet" href="/style.css?v=20260528-task-register"/>
+  <link rel="stylesheet" href="/style.css?v=20260529-company-forms"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -65,6 +65,7 @@
       </details>
       <button class="nav-btn" data-section="meetingSection">Meetings & Inspections</button>
       <button class="nav-btn" data-section="complianceSection">Compliance & Licences</button>
+      <button class="nav-btn" data-section="companyFormsSection">Company Forms</button>
       <button class="nav-btn" data-section="settingsSection">Settings</button>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
@@ -728,6 +729,37 @@
         </div>
       </section>
 
+      <!-- COMPANY FORMS -->
+      <section id="companyFormsSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Company Forms</h2>
+            <p>Voxel Veda branded forms, safety charts, handling rules and operational templates.</p>
+          </div>
+          <button onclick="renderCompanyForms()" class="secondary-btn">Refresh Library</button>
+        </div>
+
+        <div class="card">
+          <div class="form-grid">
+            <select id="companyFormCategory" onchange="renderCompanyForms()">
+              <option value="">All form categories</option>
+              <option>Operations</option>
+              <option>HR</option>
+              <option>Safety</option>
+              <option>Client</option>
+              <option>Contract</option>
+              <option>Machinery</option>
+              <option>Charts</option>
+            </select>
+            <input id="companyFormSearch" placeholder="Search delivery, staff, safety, client, contract, machinery, hazard..." oninput="renderCompanyForms()" />
+          </div>
+        </div>
+
+        <div id="companyFormsLibrary" class="forms-library">
+          <div class="card">Loading company forms...</div>
+        </div>
+      </section>
+
       <!-- SETTINGS -->
       <section id="settingsSection" class="page-section hidden-section">
         <div class="section-head">
@@ -799,6 +831,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260528-task-register"></script>
+  <script src="/admin-dashboard.js?v=20260529-company-forms"></script>
 </body>
 </html>

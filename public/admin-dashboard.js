@@ -49,6 +49,22 @@ const ACCESS_OPTIONS = [
   { id: 'settings', label: 'Settings' }
 ];
 
+const COMPANY_FORMS = [
+  { category: 'Operations', title: 'Delivery Docket / Dispatch Form', file: '/forms/company/delivery-docket-form.pdf', note: 'Use when finished goods, samples or job items leave the workshop.' },
+  { category: 'HR', title: 'Staff Joining Form', file: '/forms/company/staff-joining-form.pdf', note: 'Use for onboarding, access approval, emergency contact and PPE issue records.' },
+  { category: 'Safety', title: 'Safety Induction Form', file: '/forms/company/safety-induction-form.pdf', note: 'Use before staff, contractors or visitors work around production areas.' },
+  { category: 'Client', title: 'Client / Project Intake Form', file: '/forms/company/client-intake-form.pdf', note: 'Use before quote or job start to record customer, technical and quality requirements.' },
+  { category: 'Contract', title: 'Job Contract / Work Agreement', file: '/forms/company/job-contract-agreement.pdf', note: 'Use when scope, payment, delivery and variation terms need written acceptance.' },
+  { category: 'Safety', title: 'Incident / Near Miss Report', file: '/forms/company/incident-near-miss-report.pdf', note: 'Use immediately after a near miss, injury, machine event, spill or property damage.' },
+  { category: 'Machinery', title: 'Machinery Pre-Start Checklist', file: '/forms/company/machinery-prestart-checklist.pdf', note: 'Use before operating machinery, printers, tools, compressors or workshop equipment.' },
+  { category: 'Safety', title: 'Hazard & Risk Assessment Form', file: '/forms/company/hazard-risk-assessment.pdf', note: 'Use before high-risk, changed, unfamiliar or non-routine work.' },
+  { category: 'Charts', title: 'Workshop Hygiene & Housekeeping Chart', file: '/forms/company/hygiene-housekeeping-chart.pdf', note: 'Display for clean, organised and inspection-ready work areas.' },
+  { category: 'Charts', title: 'PPE & Safety Handling Rules Chart', file: '/forms/company/ppe-safety-rules-chart.pdf', note: 'Display at entry or production areas for minimum PPE and handling rules.' },
+  { category: 'Charts', title: 'Machinery Safety Chart', file: '/forms/company/machinery-safety-chart.pdf', note: 'Display near machines for guarding, isolation and safe operation rules.' },
+  { category: 'Charts', title: 'Hazard & Chemical Handling Chart', file: '/forms/company/hazard-chemical-handling-chart.pdf', note: 'Display near chemical, resin, solvent and material storage areas.' },
+  { category: 'Safety', title: 'Visitor / Contractor Induction', file: '/forms/company/visitor-contractor-induction.pdf', note: 'Use before visitors or contractors enter production, storage or machinery areas.' }
+];
+
 function authHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -209,6 +225,7 @@ function setupNavigation() {
         loadAnnouncements();
       }
       if (btn.dataset.section === 'meetingSection') loadMeetings();
+      if (btn.dataset.section === 'companyFormsSection') renderCompanyForms();
       toggleMobileMenu(false);
     };
   });
@@ -216,6 +233,53 @@ function setupNavigation() {
 
 function goSection(sectionId) {
   document.querySelector(`[data-section="${sectionId}"]`)?.click();
+}
+
+function renderCompanyForms() {
+  const panel = document.getElementById('companyFormsLibrary');
+  if (!panel) return;
+
+  const category = String(document.getElementById('companyFormCategory')?.value || '').trim();
+  const query = String(document.getElementById('companyFormSearch')?.value || '').trim().toLowerCase();
+
+  const rows = COMPANY_FORMS.filter((form) => {
+    if (category && form.category !== category) return false;
+    if (!query) return true;
+    return [form.title, form.category, form.note].some((value) => value.toLowerCase().includes(query));
+  });
+
+  if (!rows.length) {
+    panel.innerHTML = '<div class="card">No matching company forms found.</div>';
+    return;
+  }
+
+  const grouped = rows.reduce((acc, form) => {
+    acc[form.category] = acc[form.category] || [];
+    acc[form.category].push(form);
+    return acc;
+  }, {});
+
+  panel.innerHTML = Object.entries(grouped).map(([groupName, forms]) => `
+    <div class="card form-group">
+      <div class="section-head compact-head">
+        <h3>${escapeHtml(groupName)}</h3>
+        <span class="live-pill">${forms.length} forms</span>
+      </div>
+      <div class="form-card-grid">
+        ${forms.map((form) => `
+          <article class="form-card">
+            <span class="status-chip">${escapeHtml(form.category)}</span>
+            <h4>${escapeHtml(form.title)}</h4>
+            <p>${escapeHtml(form.note)}</p>
+            <div class="dialog-actions inline-actions">
+              <button class="icon-btn" onclick="window.open('${escapeHtml(form.file)}', '_blank', 'noopener')">Preview PDF</button>
+              <a class="icon-btn" href="${escapeHtml(form.file)}" download>Download</a>
+            </div>
+          </article>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
 }
 
 function hasCurrentPermission(permission) {

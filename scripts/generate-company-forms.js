@@ -1,0 +1,282 @@
+const fs = require('fs');
+const path = require('path');
+const PDFDocument = require('pdfkit');
+
+const root = path.join(__dirname, '..');
+const outputDir = path.join(root, 'public', 'forms', 'company');
+const logoPath = path.join(root, 'public', 'Frame 1.png');
+
+fs.mkdirSync(outputDir, { recursive: true });
+
+const colors = {
+  navy: '#07111f',
+  cyan: '#16d4cf',
+  ink: '#111827',
+  muted: '#64748b',
+  border: '#cbd5e1',
+  panel: '#f8fafc',
+  warn: '#f59e0b'
+};
+
+const forms = [
+  {
+    file: 'delivery-docket-form.pdf',
+    title: 'Delivery Docket / Dispatch Form',
+    category: 'Operations',
+    subtitle: 'Dispatch, handover and delivery evidence',
+    note: 'Use when goods, parts, samples or finished jobs leave the workshop. Keep a signed copy with the job or invoice record.',
+    sections: [
+      ['Delivery Details', ['Docket No', 'Date', 'Customer / Receiver', 'Contact Number', 'Delivery Address', 'Carrier / Driver']],
+      ['Item Register', ['Item / Part Description', 'Job / Invoice Ref', 'Qty', 'Condition', 'Packed By', 'Checked By']],
+      ['Handover Confirmation', ['Receiver Name', 'Signature', 'Delivery Time', 'Notes / Damage / Shortage']]
+    ],
+    checklist: ['Goods checked against order', 'Packaging acceptable', 'Photos taken if required', 'Customer notified', 'Signed proof retained']
+  },
+  {
+    file: 'staff-joining-form.pdf',
+    title: 'Staff Joining Form',
+    category: 'HR',
+    subtitle: 'New staff onboarding and access setup',
+    note: 'Use before a new staff member starts. Store with employment, training and system access records.',
+    sections: [
+      ['Personal Details', ['Full Name', 'Preferred Name', 'Email', 'Mobile', 'Emergency Contact', 'Address']],
+      ['Employment Details', ['Role', 'Department', 'Start Date', 'Manager', 'Pay / Award Reference', 'Probation Review Date']],
+      ['Access & Equipment', ['Portal Username', 'Allowed Sections', 'Keys / Devices Issued', 'PPE Issued', 'Induction Completed', 'Signed By']]
+    ],
+    checklist: ['Identity checked', 'Tax/super paperwork received', 'WHS induction booked', 'Portal access approved', 'Policies acknowledged']
+  },
+  {
+    file: 'safety-induction-form.pdf',
+    title: 'Safety Induction Form',
+    category: 'Safety',
+    subtitle: 'Workshop safety briefing and sign-off',
+    note: 'Use for staff, contractors and visitors before working around machinery, chemicals, tools or production areas.',
+    sections: [
+      ['Inductee', ['Name', 'Company', 'Role / Purpose', 'Date', 'Inducted By', 'Site Area']],
+      ['Topics Covered', ['Emergency exits', 'PPE', 'Machine isolation', 'Manual handling', 'Chemical/SDS access', 'Incident reporting']],
+      ['Declaration', ['Inductee Signature', 'Inductor Signature', 'Restrictions / Supervision Required']]
+    ],
+    checklist: ['PPE explained', 'No-go zones explained', 'Emergency process explained', 'Hazards explained', 'Questions answered']
+  },
+  {
+    file: 'client-intake-form.pdf',
+    title: 'Client / Project Intake Form',
+    category: 'Client',
+    subtitle: 'New customer requirement capture',
+    note: 'Use before quoting or starting a job so technical, quality and delivery expectations are recorded.',
+    sections: [
+      ['Client Details', ['Company', 'Contact Name', 'Email', 'Phone', 'Billing Address', 'Delivery Address']],
+      ['Project Details', ['Part / Product', 'Material', 'Quantity', 'Application', 'Drawing / File Ref', 'Target Date']],
+      ['Quality Requirements', ['Tolerance / Finish', 'Certification Needed', 'Inspection Requirement', 'Packaging Requirement', 'Special Notes']]
+    ],
+    checklist: ['Drawing received', 'Material confirmed', 'Use/application understood', 'Risk reviewed', 'Quote approval captured']
+  },
+  {
+    file: 'job-contract-agreement.pdf',
+    title: 'Job Contract / Work Agreement',
+    category: 'Contract',
+    subtitle: 'Scope, commercial terms and acceptance',
+    note: 'Use before commencing custom work where scope, payment, delivery or variation terms need written acceptance.',
+    sections: [
+      ['Parties', ['Customer / Company', 'Contact', 'Voxel Veda Representative', 'Date', 'Quote / RFQ Ref']],
+      ['Scope', ['Work Description', 'Files / Drawings', 'Materials', 'Quantity', 'Delivery Method', 'Exclusions']],
+      ['Commercial Terms', ['Price / Rate', 'Deposit', 'Payment Terms', 'Lead Time', 'Variation Approval', 'Acceptance Signature']]
+    ],
+    checklist: ['Scope confirmed', 'Payment terms accepted', 'Variation rule accepted', 'Customer approval signed', 'Files archived']
+  },
+  {
+    file: 'incident-near-miss-report.pdf',
+    title: 'Incident / Near Miss Report',
+    category: 'Safety',
+    subtitle: 'Safety event, injury, damage or near-miss record',
+    note: 'Use immediately after any injury, near miss, machine event, chemical spill, property damage or safety concern.',
+    sections: [
+      ['Event Details', ['Date / Time', 'Reported By', 'Location', 'People Involved', 'Witnesses', 'Immediate Action']],
+      ['Description', ['What happened', 'Potential cause', 'Injury / Damage', 'Photos / Evidence', 'Supervisor Notified']],
+      ['Corrective Action', ['Action Required', 'Owner', 'Due Date', 'Completed Date', 'Manager Sign-off']]
+    ],
+    checklist: ['Area made safe', 'First aid offered', 'Evidence captured', 'Root cause reviewed', 'Corrective action assigned']
+  },
+  {
+    file: 'machinery-prestart-checklist.pdf',
+    title: 'Machinery Pre-Start Checklist',
+    category: 'Machinery',
+    subtitle: 'Daily machine safety and readiness check',
+    note: 'Use before operating printers, CNC, compressors, cutting tools, handling equipment or workshop machinery.',
+    sections: [
+      ['Machine Details', ['Machine ID', 'Operator', 'Date', 'Start Time', 'Job / Program', 'Supervisor']],
+      ['Checks', ['Guards in place', 'Emergency stop tested', 'Cables/hoses safe', 'Tooling secure', 'Ventilation/area clear', 'Abnormal noise/leak']],
+      ['Outcome', ['Safe to operate?', 'Faults found', 'Maintenance required', 'Operator Signature']]
+    ],
+    checklist: ['PPE worn', 'Emergency stop tested', 'Area clean', 'No visible defects', 'Faults reported before use']
+  },
+  {
+    file: 'hazard-risk-assessment.pdf',
+    title: 'Hazard & Risk Assessment Form',
+    category: 'Safety',
+    subtitle: 'Job hazard analysis and control record',
+    note: 'Use before high-risk, unfamiliar, changed or non-routine work. Keep with job record and review after changes.',
+    sections: [
+      ['Task Details', ['Task / Job', 'Location', 'Assessor', 'Date', 'People Consulted', 'Review Date']],
+      ['Hazard Table', ['Hazard', 'Risk', 'Existing Controls', 'Risk Rating', 'Additional Controls', 'Responsible Person']],
+      ['Approval', ['Work approved by', 'Controls verified by', 'Review notes']]
+    ],
+    checklist: ['Workers consulted', 'Controls selected', 'PPE defined', 'Residual risk acceptable', 'Review date set']
+  },
+  {
+    file: 'hygiene-housekeeping-chart.pdf',
+    title: 'Workshop Hygiene & Housekeeping Chart',
+    category: 'Charts',
+    subtitle: 'Clean, organised and inspection-ready workspace rules',
+    note: 'Display in work areas and use during internal inspections or council/customer visits.',
+    chart: ['Keep walkways clear', 'Clean spills immediately', 'Store materials in labelled areas', 'Remove dust and waste daily', 'Separate clean/dirty work zones', 'Wash hands before handling finished goods', 'Keep bins closed and emptied', 'Report pests, leaks or contamination'],
+    checklist: ['Daily floor check', 'Waste removed', 'Tools returned', 'Benches cleared', 'Photos taken if required']
+  },
+  {
+    file: 'ppe-safety-rules-chart.pdf',
+    title: 'PPE & Safety Handling Rules Chart',
+    category: 'Charts',
+    subtitle: 'Minimum safety expectations for workshop operations',
+    note: 'Display near entry and machines. Use during induction, audits and incident review.',
+    chart: ['Safety glasses in production areas', 'Closed footwear required', 'Gloves for sharp/hot/chemical handling', 'Hearing protection where required', 'Tie hair and loose clothing', 'Never bypass machine guards', 'Use extraction/ventilation', 'Stop work if unsafe'],
+    checklist: ['PPE available', 'Damaged PPE replaced', 'Visitors briefed', 'Unsafe work stopped', 'Supervisor notified']
+  },
+  {
+    file: 'machinery-safety-chart.pdf',
+    title: 'Machinery Safety Chart',
+    category: 'Charts',
+    subtitle: 'Machine guarding, isolation and safe operation rules',
+    note: 'Display near machinery and use in staff training. Update if machines or guarding change.',
+    chart: ['Only trained users operate machines', 'Complete pre-start check', 'Keep guards/interlocks active', 'Use lockout/isolation before maintenance', 'Keep hands clear of moving parts', 'Do not leave running machines unattended', 'Report faults immediately', 'Record maintenance actions'],
+    checklist: ['Training current', 'Pre-start complete', 'Guards checked', 'Faults tagged out', 'Maintenance logged']
+  },
+  {
+    file: 'hazard-chemical-handling-chart.pdf',
+    title: 'Hazard & Chemical Handling Chart',
+    category: 'Charts',
+    subtitle: 'Chemical, resin, solvent and hazardous material control',
+    note: 'Display near chemical/material storage. Use with SDS and hazardous chemical register.',
+    chart: ['Read SDS before use', 'Label every container', 'Store incompatible chemicals separately', 'Use ventilation', 'Wear correct PPE', 'Clean spills using approved method', 'Dispose waste correctly', 'Report exposure or uncontrolled spills'],
+    checklist: ['SDS available', 'Containers labelled', 'Spill kit stocked', 'Waste labelled', 'Register updated']
+  },
+  {
+    file: 'visitor-contractor-induction.pdf',
+    title: 'Visitor / Contractor Induction',
+    category: 'Safety',
+    subtitle: 'Site entry, supervision and safety acknowledgement',
+    note: 'Use before visitors or contractors enter production, machinery, storage or inspection areas.',
+    sections: [
+      ['Visitor Details', ['Name', 'Company', 'Purpose', 'Host', 'Arrival Time', 'Departure Time']],
+      ['Safety Briefing', ['PPE Required', 'Restricted Areas', 'Emergency Assembly', 'Photos Allowed?', 'Supervision Required']],
+      ['Acknowledgement', ['Visitor Signature', 'Host Signature', 'Notes / Restrictions']]
+    ],
+    checklist: ['Signed in', 'PPE issued', 'Emergency process explained', 'Supervision assigned', 'Signed out']
+  }
+];
+
+function writeText(doc, value, x, y, options = {}) {
+  doc
+    .fillColor(options.color || colors.ink)
+    .font(options.bold ? 'Helvetica-Bold' : 'Helvetica')
+    .fontSize(options.size || 8)
+    .text(value, x, y, options);
+}
+
+function header(doc, form) {
+  const pageW = doc.page.width;
+  doc.fillColor(colors.navy).rect(0, 0, pageW, 74).fill();
+  if (fs.existsSync(logoPath)) doc.image(logoPath, 32, 16, { width: 86 });
+  writeText(doc, form.title, 172, 18, { color: '#ffffff', bold: true, size: 17, width: 380 });
+  writeText(doc, form.subtitle, 172, 44, { color: colors.cyan, bold: true, size: 9.2, width: 380 });
+  writeText(doc, `VOXEL VEDA | ${form.category} | Controlled internal form`, 32, 82, { color: colors.muted, size: 7.5 });
+}
+
+function sectionBar(doc, y, title) {
+  doc.fillColor(colors.navy).roundedRect(32, y, 531, 17, 4).fill();
+  writeText(doc, title, 40, y + 5, { color: '#ffffff', bold: true, size: 8 });
+  return y + 24;
+}
+
+function field(doc, x, y, w, h, label) {
+  doc.fillColor('#ffffff').roundedRect(x, y, w, h, 4).fill();
+  doc.strokeColor(colors.border).lineWidth(0.6).roundedRect(x, y, w, h, 4).stroke();
+  writeText(doc, label, x + 6, y + 5, { color: colors.muted, bold: true, size: 6.7 });
+}
+
+function drawFields(doc, y, labels, columns = 3) {
+  const left = 32;
+  const gap = 8;
+  const w = (531 - gap * (columns - 1)) / columns;
+  labels.forEach((label, index) => {
+    const col = index % columns;
+    const row = Math.floor(index / columns);
+    field(doc, left + col * (w + gap), y + row * 38, w, 30, label);
+  });
+  return y + Math.ceil(labels.length / columns) * 38 + 8;
+}
+
+function drawChecklist(doc, y, checklist = []) {
+  y = sectionBar(doc, y, 'Checklist / Confirmation');
+  checklist.forEach((item, index) => {
+    const x = 42 + (index % 2) * 260;
+    const yy = y + Math.floor(index / 2) * 20;
+    doc.strokeColor(colors.border).rect(x, yy, 9, 9).stroke();
+    writeText(doc, item, x + 15, yy - 1, { size: 7.5, width: 220 });
+  });
+  return y + Math.ceil(checklist.length / 2) * 20 + 18;
+}
+
+function drawChart(doc, y, items) {
+  y = sectionBar(doc, y, 'Display Chart');
+  items.forEach((item, index) => {
+    const row = Math.floor(index / 2);
+    const col = index % 2;
+    const x = 36 + col * 264;
+    const yy = y + row * 48;
+    doc.fillColor(colors.panel).roundedRect(x, yy, 255, 38, 7).fill();
+    doc.strokeColor(colors.border).roundedRect(x, yy, 255, 38, 7).stroke();
+    doc.fillColor(colors.cyan).circle(x + 17, yy + 19, 9).fill();
+    writeText(doc, String(index + 1), x + 14, yy + 14.5, { color: colors.navy, bold: true, size: 8 });
+    writeText(doc, item, x + 34, yy + 10, { bold: true, size: 8.5, width: 205 });
+  });
+  return y + Math.ceil(items.length / 2) * 48 + 10;
+}
+
+function drawForm(form) {
+  const outputPath = path.join(outputDir, form.file);
+  const doc = new PDFDocument({ size: 'A4', margin: 32 });
+  doc.pipe(fs.createWriteStream(outputPath));
+  header(doc, form);
+
+  let y = 104;
+  doc.fillColor(colors.panel).roundedRect(32, y, 531, 50, 8).fill();
+  doc.strokeColor(colors.border).roundedRect(32, y, 531, 50, 8).stroke();
+  writeText(doc, 'When to use this form', 44, y + 10, { bold: true, size: 9 });
+  writeText(doc, form.note, 44, y + 26, { color: colors.muted, size: 8, width: 500 });
+  y += 66;
+
+  if (form.chart) {
+    y = drawChart(doc, y, form.chart);
+  } else {
+    form.sections.forEach(([title, fields]) => {
+      y = sectionBar(doc, y, title);
+      y = drawFields(doc, y, fields, fields.length >= 6 ? 3 : 2);
+    });
+  }
+
+  y = Math.min(y + 4, 640);
+  y = drawChecklist(doc, y, form.checklist);
+
+  if (y < 716) {
+    y = 716;
+  }
+  doc.strokeColor(colors.border).roundedRect(32, y, 531, 54, 8).stroke();
+  writeText(doc, 'Controlled Form Notice', 44, y + 10, { bold: true, size: 8.5 });
+  writeText(doc, 'This Voxel Veda internal form supports operational traceability, training, review and audit evidence. Confirm statutory or customer-specific requirements before relying on it as a mandatory external form.', 44, y + 27, { color: colors.muted, size: 7.5, width: 500 });
+
+  doc.end();
+  return outputPath;
+}
+
+forms.forEach(drawForm);
+console.log(`Generated ${forms.length} company forms in ${outputDir}`);

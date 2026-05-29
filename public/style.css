@@ -1252,6 +1252,39 @@ tr:hover td {
   margin-top: 4px;
 }
 
+.forms-library {
+  display: grid;
+  gap: 18px;
+}
+
+.form-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.form-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.form-card h4 {
+  margin: 0;
+}
+
+.form-card p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .system-action strong {
   display: block;
   color: var(--accent);
@@ -1763,6 +1796,7 @@ tr:hover td {
   }
 
   .compliance-grid,
+  .form-card-grid,
   .compliance-dialog-grid,
   .compliance-meta {
     grid-template-columns: 1fr;
