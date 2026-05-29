@@ -65,7 +65,7 @@ const COMPANY_FORMS = [
   { category: 'Safety', title: 'Visitor / Contractor Induction', file: '/forms/company/visitor-contractor-induction.pdf', visual: 'visitor', note: 'Use before visitors or contractors enter production, storage or machinery areas.' }
 ];
 
-const COMPANY_FORM_VERSION = '20260529-picture-guides';
+const COMPANY_FORM_VERSION = '20260529-picture-guides-v2';
 
 function authHeaders() {
   return {

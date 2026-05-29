@@ -220,7 +220,7 @@ function visualPanel(doc, x, y, w, h, type) {
   doc.save();
   doc.fillColor('#eefcff').roundedRect(x, y, w, h, 10).fill();
   doc.strokeColor('#9bdcf0').lineWidth(0.8).roundedRect(x, y, w, h, 10).stroke();
-  doc.fillColor('#dff7fb').rect(x + 10, y + 10, w - 20, h - 20).fillOpacity(0.7).fill();
+  doc.fillColor('#dff7fb').roundedRect(x + 10, y + 10, w - 20, h - 28, 7).fillOpacity(0.7).fill();
   doc.fillOpacity(1);
 
   const cx = x + w / 2;
@@ -245,45 +245,45 @@ function visualPanel(doc, x, y, w, h, type) {
   }[type] || 'CONTROL';
 
   if (type === 'dispatch') {
-    doc.fillColor(dark).roundedRect(x + 20, cy - 7, 58, 24, 5).fill();
-    doc.fillColor(accent).roundedRect(x + 78, cy - 1, 28, 18, 4).fill();
-    doc.fillColor('#ffffff').rect(x + 28, cy - 1, 22, 8).fill();
-    doc.fillColor(dark).circle(x + 36, cy + 20, 6).fill().circle(x + 88, cy + 20, 6).fill();
-    doc.strokeColor(accent).lineWidth(2).moveTo(x + 112, cy + 6).lineTo(x + 134, cy + 6).lineTo(x + 127, cy - 1).stroke();
+    doc.fillColor(dark).roundedRect(x + 19, cy - 13, 58, 24, 5).fill();
+    doc.fillColor(accent).roundedRect(x + 77, cy - 7, 28, 18, 4).fill();
+    doc.fillColor('#ffffff').rect(x + 27, cy - 7, 22, 8).fill();
+    doc.fillColor(dark).circle(x + 35, cy + 15, 6).fill().circle(x + 87, cy + 15, 6).fill();
+    doc.strokeColor(accent).lineWidth(2).moveTo(x + 112, cy).lineTo(x + 134, cy).lineTo(x + 127, cy - 7).stroke();
   } else if (type === 'staff' || type === 'visitor') {
-    doc.fillColor(accent).circle(cx - 24, cy - 14, 13).fill();
-    doc.fillColor(dark).roundedRect(cx - 43, cy + 4, 38, 27, 10).fill();
-    doc.strokeColor(dark).lineWidth(2).roundedRect(cx + 6, cy - 22, 50, 48, 5).stroke();
-    doc.fillColor(accent).rect(cx + 17, cy - 8, 28, 4).fill().rect(cx + 17, cy + 4, 22, 4).fill();
+    doc.fillColor(accent).circle(cx - 24, cy - 18, 13).fill();
+    doc.fillColor(dark).roundedRect(cx - 43, cy, 38, 27, 10).fill();
+    doc.strokeColor(dark).lineWidth(2).roundedRect(cx + 6, cy - 25, 50, 48, 5).stroke();
+    doc.fillColor(accent).rect(cx + 17, cy - 11, 28, 4).fill().rect(cx + 17, cy + 1, 22, 4).fill();
   } else if (type === 'safety') {
-    doc.fillColor(accent).moveTo(cx, y + 18).lineTo(x + w - 38, y + 32).lineTo(x + w - 48, y + h - 22).lineTo(cx, y + h - 10).lineTo(x + 38, y + h - 22).lineTo(x + 28, y + 32).closePath().fill();
-    doc.strokeColor(dark).lineWidth(4).moveTo(cx - 22, cy + 2).lineTo(cx - 6, cy + 18).lineTo(cx + 28, cy - 18).stroke();
+    doc.fillColor(accent).moveTo(cx, y + 14).lineTo(x + w - 38, y + 28).lineTo(x + w - 48, y + h - 26).lineTo(cx, y + h - 16).lineTo(x + 38, y + h - 26).lineTo(x + 28, y + 28).closePath().fill();
+    doc.strokeColor(dark).lineWidth(4).moveTo(cx - 22, cy - 1).lineTo(cx - 6, cy + 15).lineTo(cx + 28, cy - 21).stroke();
   } else if (type === 'client' || type === 'contract') {
-    doc.fillColor('#ffffff').roundedRect(cx - 42, y + 17, 84, 58, 5).fill();
-    doc.strokeColor(dark).roundedRect(cx - 42, y + 17, 84, 58, 5).stroke();
-    doc.fillColor(accent).rect(cx - 30, y + 31, 58, 5).fill().rect(cx - 30, y + 44, 46, 5).fill().rect(cx - 30, y + 57, 54, 5).fill();
-    if (type === 'contract') doc.strokeColor(dark).lineWidth(2).moveTo(cx + 8, y + 66).lineTo(cx + 30, y + 55).stroke();
+    doc.fillColor('#ffffff').roundedRect(cx - 42, y + 14, 84, 54, 5).fill();
+    doc.strokeColor(dark).roundedRect(cx - 42, y + 14, 84, 54, 5).stroke();
+    doc.fillColor(accent).rect(cx - 30, y + 27, 58, 5).fill().rect(cx - 30, y + 39, 46, 5).fill().rect(cx - 30, y + 51, 54, 5).fill();
+    if (type === 'contract') doc.strokeColor(dark).lineWidth(2).moveTo(cx + 8, y + 61).lineTo(cx + 30, y + 50).stroke();
   } else if (type === 'incident' || type === 'risk' || type === 'hazard') {
-    doc.fillColor(colors.warn).moveTo(cx, y + 16).lineTo(x + w - 36, y + h - 18).lineTo(x + 36, y + h - 18).closePath().fill();
-    doc.strokeColor(dark).lineWidth(2).moveTo(cx, y + 16).lineTo(x + w - 36, y + h - 18).lineTo(x + 36, y + h - 18).closePath().stroke();
-    doc.fillColor(dark).rect(cx - 3, cy - 6, 6, 23).fill().circle(cx, cy + 25, 3.8).fill();
+    doc.fillColor(colors.warn).moveTo(cx, y + 14).lineTo(x + w - 38, y + h - 24).lineTo(x + 38, y + h - 24).closePath().fill();
+    doc.strokeColor(dark).lineWidth(2).moveTo(cx, y + 14).lineTo(x + w - 38, y + h - 24).lineTo(x + 38, y + h - 24).closePath().stroke();
+    doc.fillColor(dark).rect(cx - 3, cy - 9, 6, 22).fill().circle(cx, cy + 19, 3.8).fill();
   } else if (type === 'machine' || type === 'machinery') {
-    doc.fillColor(dark).roundedRect(cx - 48, cy - 21, 96, 42, 7).fill();
-    doc.fillColor(accent).circle(cx - 22, cy, 12).fill().circle(cx + 22, cy, 12).fill();
-    doc.strokeColor('#ffffff').lineWidth(2).moveTo(cx - 22, cy - 17).lineTo(cx - 22, cy + 17).moveTo(cx + 22, cy - 17).lineTo(cx + 22, cy + 17).stroke();
-    doc.fillColor(colors.warn).roundedRect(cx - 14, cy + 28, 28, 10, 3).fill();
+    doc.fillColor(dark).roundedRect(cx - 48, cy - 25, 96, 42, 7).fill();
+    doc.fillColor(accent).circle(cx - 22, cy - 4, 12).fill().circle(cx + 22, cy - 4, 12).fill();
+    doc.strokeColor('#ffffff').lineWidth(2).moveTo(cx - 22, cy - 20).lineTo(cx - 22, cy + 12).moveTo(cx + 22, cy - 20).lineTo(cx + 22, cy + 12).stroke();
+    doc.fillColor(colors.warn).roundedRect(cx - 14, cy + 21, 28, 10, 3).fill();
   } else if (type === 'hygiene') {
-    doc.strokeColor(accent).lineWidth(3).moveTo(x + 32, cy + 12).lineTo(x + 62, cy + 28).lineTo(x + 116, cy - 28).stroke();
-    doc.fillColor(dark).roundedRect(x + 28, y + 22, 34, 42, 8).fill();
-    doc.fillColor(accent).rect(x + 36, y + 28, 18, 5).fill().rect(x + 36, y + 39, 18, 5).fill();
+    doc.strokeColor(accent).lineWidth(3).moveTo(x + 32, cy + 8).lineTo(x + 62, cy + 24).lineTo(x + 116, cy - 32).stroke();
+    doc.fillColor(dark).roundedRect(x + 28, y + 18, 34, 38, 8).fill();
+    doc.fillColor(accent).rect(x + 36, y + 24, 18, 5).fill().rect(x + 36, y + 35, 18, 5).fill();
   } else if (type === 'ppe') {
-    doc.fillColor(colors.warn).circle(cx - 26, cy - 4, 18).fill();
-    doc.fillColor(accent).roundedRect(cx + 7, cy - 25, 38, 36, 16).fill();
-    doc.strokeColor(dark).lineWidth(3).moveTo(cx - 43, cy - 3).lineTo(cx - 10, cy - 3).moveTo(cx + 14, cy - 5).lineTo(cx + 38, cy - 5).stroke();
-    doc.fillColor(dark).roundedRect(cx - 36, cy + 22, 72, 9, 4).fill();
+    doc.fillColor(colors.warn).circle(cx - 26, cy - 8, 18).fill();
+    doc.fillColor(accent).roundedRect(cx + 7, cy - 29, 38, 36, 16).fill();
+    doc.strokeColor(dark).lineWidth(3).moveTo(cx - 43, cy - 7).lineTo(cx - 10, cy - 7).moveTo(cx + 14, cy - 9).lineTo(cx + 38, cy - 9).stroke();
+    doc.fillColor(dark).roundedRect(cx - 36, cy + 17, 72, 9, 4).fill();
   } else {
-    doc.fillColor(accent).roundedRect(cx - 42, cy - 24, 84, 48, 8).fill();
-    doc.fillColor(dark).rect(cx - 26, cy - 8, 52, 7).fill().rect(cx - 26, cy + 7, 36, 7).fill();
+    doc.fillColor(accent).roundedRect(cx - 42, cy - 28, 84, 48, 8).fill();
+    doc.fillColor(dark).rect(cx - 26, cy - 12, 52, 7).fill().rect(cx - 26, cy + 3, 36, 7).fill();
   }
 
   writeText(doc, label, x + 12, y + h - 15, { color: dark, bold: true, size: 7.2, width: w - 24, align: 'center' });
@@ -350,13 +350,13 @@ function drawForm(form) {
   header(doc, form);
 
   let y = 104;
-  doc.fillColor(colors.panel).roundedRect(32, y, 531, 88, 8).fill();
-  doc.strokeColor(colors.border).roundedRect(32, y, 531, 88, 8).stroke();
+  doc.fillColor(colors.panel).roundedRect(32, y, 531, 116, 8).fill();
+  doc.strokeColor(colors.border).roundedRect(32, y, 531, 116, 8).stroke();
   writeText(doc, 'When to use this form', 44, y + 10, { bold: true, size: 9 });
-  writeText(doc, form.note, 44, y + 27, { color: colors.muted, size: 8, width: 320 });
-  writeText(doc, 'Picture guide', 402, y + 10, { color: colors.muted, bold: true, size: 6.8, width: 120, align: 'center' });
-  visualPanel(doc, 386, y + 24, 150, 52, form.visual);
-  y += 104;
+  writeText(doc, form.note, 44, y + 29, { color: colors.muted, size: 8, width: 292, lineGap: 1.2 });
+  writeText(doc, 'Picture guide', 390, y + 10, { color: colors.muted, bold: true, size: 6.8, width: 140, align: 'center' });
+  visualPanel(doc, 378, y + 25, 166, 78, form.visual);
+  y += 132;
 
   if (form.chart) {
     y = drawChart(doc, y, form.chart, form.visual);
