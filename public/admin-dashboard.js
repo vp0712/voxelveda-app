@@ -65,6 +65,8 @@ const COMPANY_FORMS = [
   { category: 'Safety', title: 'Visitor / Contractor Induction', file: '/forms/company/visitor-contractor-induction.pdf', visual: 'visitor', note: 'Use before visitors or contractors enter production, storage or machinery areas.' }
 ];
 
+const COMPANY_FORM_VERSION = '20260529-picture-guides';
+
 function authHeaders() {
   return {
     'Content-Type': 'application/json',
@@ -266,7 +268,9 @@ function renderCompanyForms() {
         <span class="live-pill">${forms.length} forms</span>
       </div>
       <div class="form-card-grid">
-        ${forms.map((form) => `
+        ${forms.map((form) => {
+          const fileUrl = `${form.file}?v=${COMPANY_FORM_VERSION}`;
+          return `
           <article class="form-card ${form.category === 'Charts' ? 'chart-form-card' : ''}">
             <div class="form-visual form-visual-${escapeHtml(form.visual || form.category.toLowerCase())}">
               <div class="form-visual-screen">
@@ -280,11 +284,11 @@ function renderCompanyForms() {
             <h4>${escapeHtml(form.title)}</h4>
             <p>${escapeHtml(form.note)}</p>
             <div class="dialog-actions inline-actions">
-              <button class="icon-btn" onclick="window.open('${escapeHtml(form.file)}', '_blank', 'noopener')">Preview PDF</button>
-              <a class="icon-btn" href="${escapeHtml(form.file)}" download>Download</a>
+              <button class="icon-btn" onclick="window.open('${escapeHtml(fileUrl)}', '_blank', 'noopener')">Preview PDF</button>
+              <a class="icon-btn" href="${escapeHtml(fileUrl)}" download>Download</a>
             </div>
           </article>
-        `).join('')}
+        `}).join('')}
       </div>
     </div>
   `).join('');
