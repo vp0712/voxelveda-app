@@ -1463,6 +1463,27 @@ tr:hover td {
   line-height: 1.45;
 }
 
+.competitor-card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.competitor-card {
+  min-height: 360px;
+}
+
+.competitor-card h4 {
+  color: #ecfeff;
+  font-size: 18px;
+}
+
+.competitor-card p strong {
+  color: var(--accent);
+}
+
+.competitor-card .inline-actions {
+  align-self: end;
+}
+
 .system-action strong {
   display: block;
   color: var(--accent);

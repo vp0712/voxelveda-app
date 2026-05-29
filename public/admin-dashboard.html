@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-  <link rel="stylesheet" href="/style.css?v=20260529-company-form-visuals"/>
+  <link rel="stylesheet" href="/style.css?v=20260529-competitors"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -32,6 +32,7 @@
       <button class="nav-btn" data-section="invoiceSection">Invoices</button>
       <button class="nav-btn" data-section="customerSection">Customers</button>
       <button class="nav-btn" data-section="supplierSection">Suppliers</button>
+      <button class="nav-btn" data-section="competitorSection">Competitors</button>
       <details class="nav-group" open>
         <summary class="nav-group-toggle">
           <span>Stock Management</span>
@@ -90,6 +91,7 @@
           <button class="quick-pill" onclick="goSection('rawMaterialSection')">Raw Material</button>
           <button class="quick-pill" onclick="goSection('customerSection')">Customers</button>
           <button class="quick-pill" onclick="goSection('supplierSection')">Suppliers</button>
+          <button class="quick-pill" onclick="goSection('competitorSection')">Competitors</button>
         </div>
 
         <div class="metric-grid">
@@ -682,6 +684,52 @@
         </div>
       </section>
 
+      <!-- COMPETITORS -->
+      <section id="competitorSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Competitors & Industry Directory</h2>
+            <p>Track similar engineering, 3D printing, CNC, prototyping and manufacturing companies by category and location.</p>
+          </div>
+          <div class="card-actions">
+            <button onclick="seedIndustryCompetitors()" class="secondary-btn">Load Researched List</button>
+            <button onclick="openCompetitorDialog()" class="primary-btn">Add Company</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card">
+            <h3>Total Companies</h3>
+            <p><strong id="competitorTotal">0</strong></p>
+          </div>
+          <div class="card">
+            <h3>Countries / Regions</h3>
+            <p><strong id="competitorCountries">0</strong></p>
+          </div>
+          <div class="card">
+            <h3>Categories</h3>
+            <p><strong id="competitorCategories">0</strong></p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="form-grid">
+            <select id="competitorCategoryFilter" onchange="renderCompetitors()">
+              <option value="">All categories</option>
+            </select>
+            <select id="competitorCountryFilter" onchange="renderCompetitors()">
+              <option value="">All countries / regions</option>
+            </select>
+            <input id="competitorSearch" placeholder="Search company, capability, material, country, website..." oninput="renderCompetitors()" />
+          </div>
+          <p class="status-note">Live automatic web discovery needs a search provider API key later. This directory stores researched and manual records safely in your database.</p>
+        </div>
+
+        <div id="competitorRegister" class="forms-library">
+          <div class="card">Loading competitors...</div>
+        </div>
+      </section>
+
       <!-- COMPLIANCE -->
       <section id="complianceSection" class="page-section hidden-section">
         <div class="section-head">
@@ -810,6 +858,10 @@
                 <strong>Export Invoices</strong>
                 <span>Download invoice register data as CSV.</span>
               </button>
+              <button class="system-action" onclick="downloadCsv('competitors')">
+                <strong>Export Competitors</strong>
+                <span>Download competitor and industry directory data as CSV.</span>
+              </button>
             </div>
           </div>
         </div>
@@ -831,6 +883,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260529-picture-guides-v2"></script>
+  <script src="/admin-dashboard.js?v=20260529-competitors"></script>
 </body>
 </html>

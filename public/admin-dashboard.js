@@ -18,6 +18,7 @@ let stockUsageCache = [];
 let customerCache = [];
 let supplierCache = [];
 let complianceCache = [];
+let competitorCache = [];
 let materialCache = {
   raw_material: [],
   packaging: []
@@ -37,6 +38,7 @@ const ACCESS_OPTIONS = [
   { id: 'customers', label: 'Customers' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'compliance', label: 'Compliance & Licences' },
+  { id: 'competitors', label: 'Competitors & Industry' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'staff', label: 'Staff' },
@@ -147,6 +149,11 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = value;
+}
+
 function showToast(message) {
   const toast = document.getElementById('toast');
 
@@ -218,6 +225,7 @@ function setupNavigation() {
 
       if (btn.dataset.section === 'customerSection') loadCustomers();
       if (btn.dataset.section === 'supplierSection') loadSuppliers();
+      if (btn.dataset.section === 'competitorSection') loadCompetitors();
       if (btn.dataset.section === 'complianceSection') loadComplianceEntries();
       if (btn.dataset.section === 'rawMaterialSection') loadMaterials('raw_material');
       if (btn.dataset.section === 'packagingSection') loadMaterials('packaging');
@@ -1440,6 +1448,229 @@ async function deleteSupplierFile(id) {
   await loadSuppliers();
 }
 
+async function loadCompetitors() {
+  const panel = document.getElementById('competitorRegister');
+  if (panel) panel.innerHTML = '<div class="card">Loading competitors...</div>';
+
+  const res = await fetch('/api/competitors', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    if (panel) panel.innerHTML = `<div class="card">${escapeHtml(data.message || 'Failed to load competitors')}</div>`;
+    return;
+  }
+
+  competitorCache = data.competitors || [];
+  populateCompetitorFilters();
+  renderCompetitors();
+}
+
+function populateCompetitorFilters() {
+  const categorySelect = document.getElementById('competitorCategoryFilter');
+  const countrySelect = document.getElementById('competitorCountryFilter');
+  if (!categorySelect || !countrySelect) return;
+
+  const currentCategory = categorySelect.value;
+  const currentCountry = countrySelect.value;
+  const categories = [...new Set(competitorCache.map((item) => item.category).filter(Boolean))].sort();
+  const countries = [...new Set(competitorCache.map((item) => item.country).filter(Boolean))].sort();
+
+  categorySelect.innerHTML = '<option value="">All categories</option>' + categories.map((item) => `<option>${escapeHtml(item)}</option>`).join('');
+  countrySelect.innerHTML = '<option value="">All countries / regions</option>' + countries.map((item) => `<option>${escapeHtml(item)}</option>`).join('');
+
+  if (categories.includes(currentCategory)) categorySelect.value = currentCategory;
+  if (countries.includes(currentCountry)) countrySelect.value = currentCountry;
+}
+
+function renderCompetitors() {
+  const panel = document.getElementById('competitorRegister');
+  if (!panel) return;
+
+  const category = String(document.getElementById('competitorCategoryFilter')?.value || '').trim();
+  const country = String(document.getElementById('competitorCountryFilter')?.value || '').trim();
+  const query = String(document.getElementById('competitorSearch')?.value || '').trim().toLowerCase();
+
+  const rows = competitorCache.filter((item) => {
+    if (category && item.category !== category) return false;
+    if (country && item.country !== country) return false;
+    if (!query) return true;
+    return [
+      item.company_name,
+      item.category,
+      item.country,
+      item.city,
+      item.website,
+      item.capabilities,
+      item.materials,
+      item.target_market,
+      item.strength,
+      item.notes
+    ].some((value) => String(value || '').toLowerCase().includes(query));
+  });
+
+  const categories = new Set(competitorCache.map((item) => item.category).filter(Boolean));
+  const countries = new Set(competitorCache.map((item) => item.country).filter(Boolean));
+  setText('competitorTotal', competitorCache.length);
+  setText('competitorCountries', countries.size);
+  setText('competitorCategories', categories.size);
+
+  if (!rows.length) {
+    panel.innerHTML = '<div class="card">No competitor records found.</div>';
+    return;
+  }
+
+  const grouped = rows.reduce((acc, item) => {
+    const key = item.category || 'Uncategorised';
+    acc[key] = acc[key] || [];
+    acc[key].push(item);
+    return acc;
+  }, {});
+
+  panel.innerHTML = Object.entries(grouped).map(([groupName, companies]) => `
+    <div class="card form-group">
+      <div class="section-head compact-head">
+        <h3>${escapeHtml(groupName)}</h3>
+        <span class="live-pill">${companies.length} companies</span>
+      </div>
+      <div class="form-card-grid competitor-card-grid">
+        ${companies.map((company) => {
+          const website = String(company.website || '').trim();
+          const sourceUrl = String(company.source_url || website || '').trim();
+          const onlineQuery = encodeURIComponent(`${company.company_name || ''} ${company.country || ''} engineering manufacturing 3D printing`);
+          return `
+            <article class="form-card competitor-card">
+              <span class="status-chip">${escapeHtml(company.country || 'Worldwide')}</span>
+              <h4>${escapeHtml(company.company_name)}</h4>
+              <p><strong>Location:</strong> ${escapeHtml([company.city, company.country].filter(Boolean).join(', ') || '-')}</p>
+              <p><strong>Capabilities:</strong> ${escapeHtml(company.capabilities || '-')}</p>
+              <p><strong>Materials:</strong> ${escapeHtml(company.materials || '-')}</p>
+              <p><strong>Market:</strong> ${escapeHtml(company.target_market || '-')}</p>
+              <p><strong>Why track:</strong> ${escapeHtml(company.strength || company.notes || '-')}</p>
+              <div class="dialog-actions inline-actions">
+                ${website ? `<button class="icon-btn" onclick="window.open('${escapeHtml(website)}', '_blank', 'noopener')">Website</button>` : ''}
+                ${sourceUrl ? `<button class="icon-btn" onclick="window.open('${escapeHtml(sourceUrl)}', '_blank', 'noopener')">Source</button>` : ''}
+                <button class="icon-btn" onclick="window.open('https://www.google.com/search?q=${onlineQuery}', '_blank', 'noopener')">Search Online</button>
+                <button class="icon-btn" onclick="openCompetitorDialog(${company.id})">Edit</button>
+                <button class="danger-btn" onclick="deleteCompetitor(${company.id})">Delete</button>
+              </div>
+            </article>
+          `;
+        }).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function openCompetitorDialog(id = null) {
+  const item = competitorCache.find((entry) => Number(entry.id) === Number(id)) || {};
+
+  showDialog(
+    id ? `Edit Competitor: ${item.company_name}` : 'Add Competitor / Industry Company',
+    `
+      <div class="stock-dialog-grid">
+        <div class="dialog-card">
+          <h4>Company Identity</h4>
+          <input id="competitorName" placeholder="Company name" value="${escapeHtml(item.company_name || '')}" />
+          <input id="competitorCategory" placeholder="Category, e.g. CNC, 3D Printing, Prototyping" value="${escapeHtml(item.category || '')}" />
+          <div class="split-grid">
+            <input id="competitorCountry" placeholder="Country / region" value="${escapeHtml(item.country || '')}" />
+            <input id="competitorCity" placeholder="City / location" value="${escapeHtml(item.city || '')}" />
+          </div>
+          <input id="competitorWebsite" placeholder="Website" value="${escapeHtml(item.website || '')}" />
+          <input id="competitorSourceUrl" placeholder="Source / listing URL" value="${escapeHtml(item.source_url || '')}" />
+        </div>
+        <div class="dialog-card">
+          <h4>Industry Intelligence</h4>
+          <textarea id="competitorCapabilities" rows="3" placeholder="What they do: 3D printing, CNC, design, production...">${escapeHtml(item.capabilities || '')}</textarea>
+          <textarea id="competitorMaterials" rows="2" placeholder="Materials, technologies, equipment or services">${escapeHtml(item.materials || '')}</textarea>
+          <textarea id="competitorTargetMarket" rows="2" placeholder="Customer type / target market">${escapeHtml(item.target_market || '')}</textarea>
+          <textarea id="competitorStrength" rows="2" placeholder="What makes them strong or why to track them">${escapeHtml(item.strength || '')}</textarea>
+          <textarea id="competitorNotes" rows="3" placeholder="Notes, pricing clues, delivery, quality, marketing, weakness...">${escapeHtml(item.notes || '')}</textarea>
+        </div>
+      </div>
+    `,
+    async () => {
+      const body = {
+        id: item.id,
+        company_name: document.getElementById('competitorName')?.value.trim(),
+        category: document.getElementById('competitorCategory')?.value.trim(),
+        country: document.getElementById('competitorCountry')?.value.trim(),
+        city: document.getElementById('competitorCity')?.value.trim(),
+        website: document.getElementById('competitorWebsite')?.value.trim(),
+        source_url: document.getElementById('competitorSourceUrl')?.value.trim(),
+        source_type: item.source_type || 'manual',
+        capabilities: document.getElementById('competitorCapabilities')?.value.trim(),
+        materials: document.getElementById('competitorMaterials')?.value.trim(),
+        target_market: document.getElementById('competitorTargetMarket')?.value.trim(),
+        strength: document.getElementById('competitorStrength')?.value.trim(),
+        notes: document.getElementById('competitorNotes')?.value.trim()
+      };
+
+      if (!body.company_name) {
+        showToast('Company name is required');
+        return;
+      }
+
+      const res = await fetch('/api/competitors', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Competitor save failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Competitor saved');
+      await loadCompetitors();
+    },
+    id ? 'Update Company' : 'Save Company'
+  );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+async function seedIndustryCompetitors() {
+  const res = await fetch('/api/competitors/seed', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({})
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Industry list load failed');
+    return;
+  }
+
+  showToast(data.message || 'Industry list loaded');
+  await loadCompetitors();
+}
+
+async function deleteCompetitor(id) {
+  if (!confirm('Delete this competitor record?')) return;
+
+  const res = await fetch('/api/competitors/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Competitor delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Competitor deleted');
+  await loadCompetitors();
+}
+
 async function loadComplianceEntries() {
   const panel = document.getElementById('complianceRegister');
   if (!panel) return;
@@ -2492,6 +2723,7 @@ async function refreshAllSystemData() {
     loadStaff(),
     loadCustomers(),
     loadSuppliers(),
+    loadCompetitors(),
     loadComplianceEntries(),
     loadStock(),
     loadStockUsage(),
@@ -2544,7 +2776,8 @@ async function downloadCsv(type) {
   const endpoints = {
     users: '/api/users',
     stock: '/api/stock',
-    invoices: '/api/invoice'
+    invoices: '/api/invoice',
+    competitors: '/api/competitors'
   };
 
   const res = await fetch(endpoints[type], {
@@ -2562,7 +2795,9 @@ async function downloadCsv(type) {
     ? data.users || []
     : type === 'stock'
       ? data.stock || []
-      : data.invoices || [];
+      : type === 'competitors'
+        ? data.competitors || []
+        : data.invoices || [];
 
   saveCsv(`voxelveda-${type}-${todayISO()}.csv`, rows);
   showToast(`${type} export ready`);
@@ -3741,6 +3976,7 @@ async function bootAdminDashboard() {
       loadStaff(),
       loadCustomers(),
       loadSuppliers(),
+      loadCompetitors(),
       loadComplianceEntries(),
       loadStock(),
       loadStockUsage(),

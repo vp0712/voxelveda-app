@@ -17,7 +17,8 @@ const ALL_PERMISSIONS = [
   'packaging',
   'meetings',
   'suppliers',
-  'compliance'
+  'compliance',
+  'competitors'
 ];
 
 function parsePermissions(value) {
