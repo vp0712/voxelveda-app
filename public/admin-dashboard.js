@@ -50,19 +50,19 @@ const ACCESS_OPTIONS = [
 ];
 
 const COMPANY_FORMS = [
-  { category: 'Operations', title: 'Delivery Docket / Dispatch Form', file: '/forms/company/delivery-docket-form.pdf', note: 'Use when finished goods, samples or job items leave the workshop.' },
-  { category: 'HR', title: 'Staff Joining Form', file: '/forms/company/staff-joining-form.pdf', note: 'Use for onboarding, access approval, emergency contact and PPE issue records.' },
-  { category: 'Safety', title: 'Safety Induction Form', file: '/forms/company/safety-induction-form.pdf', note: 'Use before staff, contractors or visitors work around production areas.' },
-  { category: 'Client', title: 'Client / Project Intake Form', file: '/forms/company/client-intake-form.pdf', note: 'Use before quote or job start to record customer, technical and quality requirements.' },
-  { category: 'Contract', title: 'Job Contract / Work Agreement', file: '/forms/company/job-contract-agreement.pdf', note: 'Use when scope, payment, delivery and variation terms need written acceptance.' },
-  { category: 'Safety', title: 'Incident / Near Miss Report', file: '/forms/company/incident-near-miss-report.pdf', note: 'Use immediately after a near miss, injury, machine event, spill or property damage.' },
-  { category: 'Machinery', title: 'Machinery Pre-Start Checklist', file: '/forms/company/machinery-prestart-checklist.pdf', note: 'Use before operating machinery, printers, tools, compressors or workshop equipment.' },
-  { category: 'Safety', title: 'Hazard & Risk Assessment Form', file: '/forms/company/hazard-risk-assessment.pdf', note: 'Use before high-risk, changed, unfamiliar or non-routine work.' },
-  { category: 'Charts', title: 'Workshop Hygiene & Housekeeping Chart', file: '/forms/company/hygiene-housekeeping-chart.pdf', note: 'Display for clean, organised and inspection-ready work areas.' },
-  { category: 'Charts', title: 'PPE & Safety Handling Rules Chart', file: '/forms/company/ppe-safety-rules-chart.pdf', note: 'Display at entry or production areas for minimum PPE and handling rules.' },
-  { category: 'Charts', title: 'Machinery Safety Chart', file: '/forms/company/machinery-safety-chart.pdf', note: 'Display near machines for guarding, isolation and safe operation rules.' },
-  { category: 'Charts', title: 'Hazard & Chemical Handling Chart', file: '/forms/company/hazard-chemical-handling-chart.pdf', note: 'Display near chemical, resin, solvent and material storage areas.' },
-  { category: 'Safety', title: 'Visitor / Contractor Induction', file: '/forms/company/visitor-contractor-induction.pdf', note: 'Use before visitors or contractors enter production, storage or machinery areas.' }
+  { category: 'Operations', title: 'Delivery Docket / Dispatch Form', file: '/forms/company/delivery-docket-form.pdf', visual: 'dispatch', note: 'Use when finished goods, samples or job items leave the workshop.' },
+  { category: 'HR', title: 'Staff Joining Form', file: '/forms/company/staff-joining-form.pdf', visual: 'staff', note: 'Use for onboarding, access approval, emergency contact and PPE issue records.' },
+  { category: 'Safety', title: 'Safety Induction Form', file: '/forms/company/safety-induction-form.pdf', visual: 'safety', note: 'Use before staff, contractors or visitors work around production areas.' },
+  { category: 'Client', title: 'Client / Project Intake Form', file: '/forms/company/client-intake-form.pdf', visual: 'client', note: 'Use before quote or job start to record customer, technical and quality requirements.' },
+  { category: 'Contract', title: 'Job Contract / Work Agreement', file: '/forms/company/job-contract-agreement.pdf', visual: 'contract', note: 'Use when scope, payment, delivery and variation terms need written acceptance.' },
+  { category: 'Safety', title: 'Incident / Near Miss Report', file: '/forms/company/incident-near-miss-report.pdf', visual: 'incident', note: 'Use immediately after a near miss, injury, machine event, spill or property damage.' },
+  { category: 'Machinery', title: 'Machinery Pre-Start Checklist', file: '/forms/company/machinery-prestart-checklist.pdf', visual: 'machine', note: 'Use before operating machinery, printers, tools, compressors or workshop equipment.' },
+  { category: 'Safety', title: 'Hazard & Risk Assessment Form', file: '/forms/company/hazard-risk-assessment.pdf', visual: 'risk', note: 'Use before high-risk, changed, unfamiliar or non-routine work.' },
+  { category: 'Charts', title: 'Workshop Hygiene & Housekeeping Chart', file: '/forms/company/hygiene-housekeeping-chart.pdf', visual: 'hygiene', note: 'Display for clean, organised and inspection-ready work areas.' },
+  { category: 'Charts', title: 'PPE & Safety Handling Rules Chart', file: '/forms/company/ppe-safety-rules-chart.pdf', visual: 'ppe', note: 'Display at entry or production areas for minimum PPE and handling rules.' },
+  { category: 'Charts', title: 'Machinery Safety Chart', file: '/forms/company/machinery-safety-chart.pdf', visual: 'machinery-chart', note: 'Display near machines for guarding, isolation and safe operation rules.' },
+  { category: 'Charts', title: 'Hazard & Chemical Handling Chart', file: '/forms/company/hazard-chemical-handling-chart.pdf', visual: 'hazard-chart', note: 'Display near chemical, resin, solvent and material storage areas.' },
+  { category: 'Safety', title: 'Visitor / Contractor Induction', file: '/forms/company/visitor-contractor-induction.pdf', visual: 'visitor', note: 'Use before visitors or contractors enter production, storage or machinery areas.' }
 ];
 
 function authHeaders() {
@@ -267,7 +267,15 @@ function renderCompanyForms() {
       </div>
       <div class="form-card-grid">
         ${forms.map((form) => `
-          <article class="form-card">
+          <article class="form-card ${form.category === 'Charts' ? 'chart-form-card' : ''}">
+            <div class="form-visual form-visual-${escapeHtml(form.visual || form.category.toLowerCase())}">
+              <div class="form-visual-screen">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+              <div class="form-visual-badge">${escapeHtml(form.category)}</div>
+            </div>
             <span class="status-chip">${escapeHtml(form.category)}</span>
             <h4>${escapeHtml(form.title)}</h4>
             <p>${escapeHtml(form.note)}</p>

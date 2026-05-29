@@ -1274,6 +1274,184 @@ tr:hover td {
   background: rgba(2, 6, 23, 0.42);
 }
 
+.form-card.chart-form-card {
+  border-color: rgba(56, 189, 248, 0.32);
+  background:
+    linear-gradient(145deg, rgba(8, 47, 73, 0.58), rgba(2, 6, 23, 0.64)),
+    linear-gradient(135deg, rgba(45, 212, 191, 0.1), transparent);
+}
+
+.form-visual {
+  position: relative;
+  display: grid;
+  min-height: 126px;
+  margin-bottom: 2px;
+  padding: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(45, 212, 191, 0.08)),
+    rgba(2, 6, 23, 0.5);
+}
+
+.form-visual::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 20px 20px;
+  opacity: 0.46;
+}
+
+.form-visual::after {
+  content: "";
+  position: absolute;
+  right: -24px;
+  bottom: -32px;
+  width: 104px;
+  height: 104px;
+  border: 16px solid rgba(45, 212, 191, 0.16);
+  border-radius: 50%;
+}
+
+.form-visual-screen {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: end;
+  gap: 8px;
+  width: min(156px, 72%);
+  min-height: 84px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 14px;
+  background: rgba(2, 6, 23, 0.58);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.form-visual-screen span {
+  display: block;
+  border-radius: 999px 999px 5px 5px;
+  background: linear-gradient(180deg, var(--accent-2), var(--accent));
+  box-shadow: 0 0 18px rgba(45, 212, 191, 0.26);
+}
+
+.form-visual-screen span:nth-child(1) {
+  height: 44%;
+}
+
+.form-visual-screen span:nth-child(2) {
+  height: 78%;
+}
+
+.form-visual-screen span:nth-child(3) {
+  height: 58%;
+}
+
+.form-visual-badge {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: 1;
+  padding: 7px 10px;
+  border: 1px solid rgba(45, 212, 191, 0.3);
+  border-radius: 999px;
+  color: #ecfeff;
+  background: rgba(2, 6, 23, 0.64);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.form-visual-hygiene .form-visual-screen,
+.form-visual-ppe .form-visual-screen,
+.form-visual-machinery-chart .form-visual-screen,
+.form-visual-hazard-chart .form-visual-screen {
+  width: min(180px, 78%);
+}
+
+.form-visual-hygiene .form-visual-screen span {
+  border-radius: 8px;
+}
+
+.form-visual-hygiene .form-visual-screen span:nth-child(1),
+.form-visual-hygiene .form-visual-screen span:nth-child(3) {
+  height: 54%;
+  background: linear-gradient(180deg, #67e8f9, #22c55e);
+}
+
+.form-visual-ppe .form-visual-screen {
+  grid-template-columns: 1fr 1fr;
+}
+
+.form-visual-ppe .form-visual-screen span {
+  height: 54px;
+  border-radius: 50% 50% 14px 14px;
+  background: linear-gradient(180deg, #facc15, #2dd4bf);
+}
+
+.form-visual-ppe .form-visual-screen span:nth-child(3) {
+  grid-column: 1 / -1;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.82);
+}
+
+.form-visual-machinery-chart .form-visual-screen {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.form-visual-machinery-chart .form-visual-screen span {
+  height: 34px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #94a3b8, #38bdf8);
+}
+
+.form-visual-machinery-chart .form-visual-screen span:nth-child(2) {
+  height: 66px;
+}
+
+.form-visual-hazard-chart {
+  border-color: rgba(245, 158, 11, 0.36);
+}
+
+.form-visual-hazard-chart .form-visual-screen {
+  grid-template-columns: 1fr;
+  place-items: center;
+}
+
+.form-visual-hazard-chart .form-visual-screen span {
+  width: 62px;
+  height: 62px;
+  clip-path: polygon(50% 0, 100% 90%, 0 90%);
+  border-radius: 0;
+  background: linear-gradient(180deg, #facc15, #ef4444);
+}
+
+.form-visual-hazard-chart .form-visual-screen span:nth-child(2),
+.form-visual-hazard-chart .form-visual-screen span:nth-child(3) {
+  display: none;
+}
+
+.form-visual-safety .form-visual-screen span,
+.form-visual-incident .form-visual-screen span,
+.form-visual-risk .form-visual-screen span,
+.form-visual-visitor .form-visual-screen span {
+  background: linear-gradient(180deg, #facc15, #22c55e);
+}
+
+.form-visual-dispatch .form-visual-screen span,
+.form-visual-client .form-visual-screen span,
+.form-visual-contract .form-visual-screen span,
+.form-visual-staff .form-visual-screen span {
+  border-radius: 7px;
+  background: linear-gradient(180deg, #38bdf8, #2dd4bf);
+}
+
 .form-card h4 {
   margin: 0;
 }
