@@ -1934,3 +1934,363 @@ tr:hover td {
     font-size: 12px;
   }
 }
+
+@media (max-width: 900px) {
+  :root {
+    --mobile-card-radius: 22px;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at 50% -10%, rgba(45, 212, 191, 0.18), transparent 42%),
+      linear-gradient(180deg, #030712 0%, #07111f 48%, #020617 100%);
+  }
+
+  body::before {
+    background-size: 30px 30px;
+    opacity: 0.65;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 72%);
+  }
+
+  .mobile-menu-btn {
+    top: max(12px, env(safe-area-inset-top, 0px));
+    left: 12px;
+    width: 52px;
+    height: 52px;
+    gap: 6px;
+    padding: 13px;
+    border-radius: 17px;
+    background:
+      linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(8, 47, 73, 0.92));
+    border-color: rgba(45, 212, 191, 0.5);
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  }
+
+  .mobile-menu-btn span {
+    height: 2px;
+    transition: transform 180ms ease, opacity 180ms ease;
+  }
+
+  body.mobile-menu-open .mobile-menu-btn {
+    background: linear-gradient(145deg, rgba(4, 47, 46, 0.98), rgba(8, 47, 73, 0.95));
+  }
+
+  body.mobile-menu-open .mobile-menu-btn span:nth-child(1) {
+    transform: translateY(8px) rotate(45deg);
+  }
+
+  body.mobile-menu-open .mobile-menu-btn span:nth-child(2) {
+    opacity: 0;
+  }
+
+  body.mobile-menu-open .mobile-menu-btn span:nth-child(3) {
+    transform: translateY(-8px) rotate(-45deg);
+  }
+
+  .mobile-sidebar-backdrop {
+    background: rgba(2, 6, 23, 0.74);
+    backdrop-filter: blur(8px);
+  }
+
+  .sidebar {
+    width: min(88vw, 360px);
+    padding: calc(78px + env(safe-area-inset-top, 0px)) 14px calc(22px + env(safe-area-inset-bottom, 0px));
+    border-right-color: rgba(45, 212, 191, 0.36);
+    border-radius: 0 26px 26px 0;
+    background:
+      linear-gradient(180deg, rgba(2, 6, 23, 0.99), rgba(8, 18, 33, 0.99)),
+      linear-gradient(135deg, rgba(45, 212, 191, 0.12), transparent);
+    box-shadow: 28px 0 70px rgba(0, 0, 0, 0.58), inset -1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .brand {
+    margin: 0 2px 18px;
+    padding: 13px;
+    border: 1px solid rgba(45, 212, 191, 0.2);
+    border-radius: 20px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.78), rgba(8, 47, 73, 0.28));
+  }
+
+  .brand h1 {
+    font-size: 17px;
+  }
+
+  .nav-btn,
+  .logout-btn,
+  .nav-group {
+    border-radius: 17px;
+  }
+
+  .nav-btn,
+  .logout-btn {
+    min-height: 50px;
+    margin-bottom: 9px;
+    padding: 13px 14px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.86), rgba(2, 6, 23, 0.7));
+    border-color: rgba(45, 212, 191, 0.22);
+  }
+
+  .nav-btn.active,
+  .nav-btn:hover {
+    border-color: transparent;
+    box-shadow: 0 14px 34px rgba(45, 212, 191, 0.2);
+  }
+
+  .nav-group {
+    background: rgba(15, 23, 42, 0.58);
+  }
+
+  .nav-group-toggle {
+    min-height: 52px;
+    padding: 14px;
+  }
+
+  .nav-submenu {
+    padding: 0 10px 10px;
+  }
+
+  .nav-sub-btn {
+    padding-left: 26px;
+    border-radius: 14px;
+  }
+
+  .logout-btn {
+    margin-top: 22px;
+    background: linear-gradient(135deg, rgba(127, 29, 29, 0.8), rgba(69, 10, 10, 0.72));
+  }
+
+  .main {
+    padding: calc(78px + env(safe-area-inset-top, 0px)) 14px calc(34px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .topbar {
+    position: relative;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 24px;
+    border-color: rgba(45, 212, 191, 0.26);
+    background:
+      linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(8, 47, 73, 0.44)),
+      linear-gradient(90deg, rgba(45, 212, 191, 0.12), transparent);
+    box-shadow: 0 22px 54px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+  }
+
+  .topbar h2,
+  .section-head h2 {
+    font-size: 23px;
+  }
+
+  .topbar p,
+  .section-head p {
+    color: #cbd5e1;
+  }
+
+  .live-pill {
+    padding: 9px 12px;
+    background: rgba(34, 197, 94, 0.12);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .dashboard-action-row {
+    padding: 2px 2px 8px;
+    scrollbar-width: none;
+  }
+
+  .dashboard-action-row::-webkit-scrollbar {
+    display: none;
+  }
+
+  .quick-pill {
+    min-height: 42px;
+    border-color: rgba(45, 212, 191, 0.28);
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.88), rgba(8, 47, 73, 0.34));
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .card,
+  .mobile-card,
+  .form-card,
+  .compliance-card,
+  .staff-action-card,
+  .profile-list,
+  .dialog-card {
+    border-radius: var(--mobile-card-radius);
+    border-color: rgba(45, 212, 191, 0.24);
+    background:
+      linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(8, 18, 33, 0.9)),
+      linear-gradient(135deg, rgba(45, 212, 191, 0.08), transparent);
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.26), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .metric-grid .card {
+    min-height: 112px;
+  }
+
+  .card h3 {
+    font-size: 17px;
+  }
+
+  .card p {
+    line-height: 1.42;
+  }
+
+  .staff-portal .topbar {
+    min-height: 132px;
+    border-radius: 0 0 28px 28px;
+    margin: calc(-78px - env(safe-area-inset-top, 0px)) -14px 18px;
+    padding: calc(84px + env(safe-area-inset-top, 0px)) 18px 20px;
+    background:
+      linear-gradient(135deg, rgba(8, 47, 73, 0.98), rgba(4, 47, 46, 0.82)),
+      linear-gradient(90deg, rgba(45, 212, 191, 0.2), transparent);
+  }
+
+  .staff-portal .main {
+    padding-top: calc(78px + env(safe-area-inset-top, 0px));
+  }
+
+  .staff-action-hub {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-action-card {
+    min-height: 112px;
+  }
+
+  .staff-profile-hero {
+    border-radius: 26px;
+    background:
+      radial-gradient(circle at center, rgba(45, 212, 191, 0.22), transparent 58%),
+      linear-gradient(145deg, rgba(2, 6, 23, 0.92), rgba(8, 47, 73, 0.3));
+  }
+
+  .staff-avatar {
+    background: linear-gradient(135deg, #2dd4bf, #38bdf8);
+    color: #020617;
+  }
+
+  .profile-row,
+  .profile-action {
+    min-height: 68px;
+  }
+
+  table.responsive-table tbody {
+    gap: 14px;
+  }
+
+  table.responsive-table tr {
+    padding: 14px;
+    border-radius: 20px;
+    border-color: rgba(45, 212, 191, 0.24);
+    background:
+      linear-gradient(145deg, rgba(15, 23, 42, 0.95), rgba(8, 18, 33, 0.86)),
+      linear-gradient(135deg, rgba(56, 189, 248, 0.08), transparent);
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  table.responsive-table td {
+    grid-template-columns: minmax(118px, 36%) minmax(0, 1fr);
+    min-height: 40px;
+    padding: 10px 0;
+  }
+
+  table.responsive-table td::before {
+    color: #67e8f9;
+  }
+
+  table.responsive-table td button,
+  table.responsive-table td .small-btn,
+  table.responsive-table td .danger-btn,
+  table.responsive-table td .secondary-btn,
+  table.responsive-table td .icon-btn {
+    min-height: 42px;
+    border-radius: 14px;
+  }
+
+  .dialog-backdrop {
+    padding: 12px;
+  }
+
+  .dialog-panel,
+  .dialog-panel.wide-dialog {
+    padding: 18px;
+    border-radius: 24px;
+    background:
+      linear-gradient(145deg, rgba(15, 23, 42, 0.98), rgba(8, 18, 33, 0.96)),
+      linear-gradient(135deg, rgba(45, 212, 191, 0.1), transparent);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .dialog-panel h3 {
+    font-size: 21px;
+  }
+
+  .dialog-actions {
+    gap: 10px;
+    padding-top: 6px;
+  }
+
+  .dialog-actions button {
+    min-height: 48px;
+    border-radius: 15px;
+  }
+
+  input,
+  select,
+  textarea {
+    border-radius: 15px;
+    border-color: rgba(45, 212, 191, 0.3);
+    background: rgba(2, 6, 23, 0.72);
+  }
+
+  input:focus,
+  select:focus,
+  textarea:focus {
+    outline: 2px solid rgba(45, 212, 191, 0.26);
+    border-color: rgba(45, 212, 191, 0.72);
+  }
+}
+
+@media (max-width: 520px) {
+  .mobile-menu-btn {
+    width: 50px;
+    height: 50px;
+  }
+
+  .main {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .topbar {
+    padding: 16px;
+  }
+
+  .topbar h2,
+  .section-head h2 {
+    font-size: 21px;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-portal .metric-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .card,
+  .mobile-card,
+  .form-card,
+  .compliance-card,
+  .staff-action-card,
+  .profile-list,
+  .dialog-card {
+    border-radius: 20px;
+  }
+
+  table.responsive-table td {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+}
