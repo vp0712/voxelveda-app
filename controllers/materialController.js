@@ -202,6 +202,8 @@ exports.viewProcessSheetPdf = async (req, res) => {
 
     const sheet = parseProcessSheet(item.process_sheet);
     const doc = new PDFDocument({ size: 'A4', margin: 44 });
+    const privacyQrPath = path.join(__dirname, '..', 'public', 'privacy-qr.png');
+    const privacyPolicyUrl = 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="process-sheet-${item.id}.pdf"`);
@@ -255,12 +257,24 @@ exports.viewProcessSheetPdf = async (req, res) => {
       y += 28;
     });
 
-    doc.fillColor(blue).fontSize(11).text('Company Rule', 44, 730);
+    doc.fillColor(blue).fontSize(11).text('Company Rule', 44, 710);
     doc.fillColor('#111827').fontSize(9).text(
       'This record must be completed before inventory acceptance. It supports traceability, quality review, quarantine decisions, and audit response if a customer, council, regulator, or government body raises a concern.',
       44,
-      750,
-      { width: 508 }
+      728,
+      { width: 420 }
+    );
+    if (fs.existsSync(privacyQrPath)) {
+      doc.image(privacyQrPath, 500, 710, { width: 42 });
+      doc.link(500, 710, 42, 42, privacyPolicyUrl);
+    }
+    doc.strokeColor('#cbd5e1').roundedRect(44, 774, 508, 44, 6).stroke();
+    doc.fillColor('#0f172a').fontSize(8.5).text('Privacy & Confidentiality Notice', 58, 786);
+    doc.fillColor('#475569').fontSize(7.4).text(
+      'This process sheet may contain confidential supplier, material, batch, quality, safety or corrective-action information. Use only for authorised company, audit, regulator, council or customer review purposes. Scan the QR code for the live Voxel Veda privacy policy.',
+      58,
+      800,
+      { width: 470 }
     );
 
     doc.end();

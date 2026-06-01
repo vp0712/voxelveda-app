@@ -6,6 +6,8 @@ const root = path.join(__dirname, '..');
 const outputDir = path.join(root, 'public', 'forms');
 const outputPath = path.join(outputDir, 'voxel-veda-quality-process-sheet.pdf');
 const logoPath = path.join(root, 'public', 'Frame 1.png');
+const privacyQrPath = path.join(root, 'public', 'privacy-qr.png');
+const privacyPolicyUrl = 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
 
 fs.mkdirSync(outputDir, { recursive: true });
 
@@ -179,9 +181,19 @@ sectionPanel(y - 3, 158);
 });
 
 y += 174;
-doc.strokeColor(border).lineWidth(0.8).roundedRect(left, y, contentW, 62, 7).stroke();
-t('Controlled Document Notice', left + 12, y + 10, { bold: true, size: 8.5 });
-t('Voxel Veda Pty Ltd should review this form when process, product, customer, site, council or regulatory requirements change. Retain completed copies according to company record-retention policy and applicable contract or statutory requirements.', left + 12, y + 27, { size: 7.8, color: muted, width: contentW - 24 });
+doc.strokeColor(border).lineWidth(0.8).roundedRect(left, y, contentW, 76, 7).stroke();
+t('Controlled Document, Privacy & Confidentiality Notice', left + 12, y + 10, { bold: true, size: 8.5 });
+t(
+  'This process sheet may contain confidential customer, supplier, material, inspection, production or corrective-action information. Use only for authorised quality, audit, council, regulator, customer or compliance purposes. Retain completed copies according to company record-retention policy and applicable contract or statutory requirements.',
+  left + 12,
+  y + 27,
+  { size: 7.5, color: muted, width: contentW - 88, lineGap: 1 }
+);
+if (fs.existsSync(privacyQrPath)) {
+  doc.image(privacyQrPath, right - 52, y + 15, { width: 38 });
+  doc.link(right - 52, y + 15, 38, 38, privacyPolicyUrl);
+  t('Policy QR', right - 58, y + 57, { color: muted, bold: true, size: 6.3, width: 50, align: 'center' });
+}
 
 doc.end();
 

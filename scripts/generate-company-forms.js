@@ -5,6 +5,8 @@ const PDFDocument = require('pdfkit');
 const root = path.join(__dirname, '..');
 const outputDir = path.join(root, 'public', 'forms', 'company');
 const logoPath = path.join(root, 'public', 'Frame 1.png');
+const privacyQrPath = path.join(root, 'public', 'privacy-qr.png');
+const privacyPolicyUrl = 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
 
 fs.mkdirSync(outputDir, { recursive: true });
 
@@ -19,6 +21,20 @@ const colors = {
 };
 
 const forms = [
+  {
+    file: 'privacy-confidentiality-policy.pdf',
+    title: 'Privacy, Confidentiality & Data Handling',
+    category: 'Policy',
+    subtitle: 'Strict information access, disclosure and document handling acknowledgement',
+    visual: 'contract',
+    note: 'Use for staff, contractors, suppliers, customers or visitors who access company, customer, supplier, invoice, production, quality, safety or inspection information.',
+    sections: [
+      ['Recipient Details', ['Name / Company', 'Role / Relationship', 'Email', 'Phone', 'Date Issued', 'Issued By']],
+      ['Information Covered', ['Customer / RFQ data', 'Invoices / payments', 'Supplier records', 'Staff records', 'Drawings / designs', 'Quality / process evidence']],
+      ['Acknowledgement', ['Access purpose', 'Restrictions explained', 'No unauthorised sharing', 'Return/delete requirement', 'Recipient signature', 'Company sign-off']]
+    ],
+    checklist: ['Identity verified', 'Access need confirmed', 'Policy explained', 'QR policy link provided', 'Signed acknowledgement retained']
+  },
   {
     file: 'delivery-docket-form.pdf',
     title: 'Delivery Docket / Dispatch Form',
@@ -370,12 +386,23 @@ function drawForm(form) {
   y = Math.min(y + 4, 640);
   y = drawChecklist(doc, y, form.checklist);
 
-  if (y < 716) {
-    y = 716;
+  if (y < 704) {
+    y = 704;
   }
-  doc.strokeColor(colors.border).roundedRect(32, y, 531, 54, 8).stroke();
-  writeText(doc, 'Controlled Form Notice', 44, y + 10, { bold: true, size: 8.5 });
-  writeText(doc, 'This Voxel Veda internal form supports operational traceability, training, review and audit evidence. Confirm statutory or customer-specific requirements before relying on it as a mandatory external form.', 44, y + 27, { color: colors.muted, size: 7.5, width: 500 });
+  doc.strokeColor(colors.border).roundedRect(32, y, 531, 78, 8).stroke();
+  writeText(doc, 'Controlled Form, Privacy & Confidentiality Notice', 44, y + 10, { bold: true, size: 8.5 });
+  writeText(
+    doc,
+    'This Voxel Veda form may contain confidential customer, supplier, staff, safety, quality, pricing or operational information. Use only for authorised business, audit, council, regulator, customer or compliance purposes. Confirm statutory or customer-specific requirements before relying on it as a mandatory external form.',
+    44,
+    y + 27,
+    { color: colors.muted, size: 7.1, width: 440, lineGap: 1 }
+  );
+  if (fs.existsSync(privacyQrPath)) {
+    doc.image(privacyQrPath, 510, y + 16, { width: 38 });
+    doc.link(510, y + 16, 38, 38, privacyPolicyUrl);
+    writeText(doc, 'Policy QR', 500, y + 58, { color: colors.muted, bold: true, size: 6.5, width: 58, align: 'center' });
+  }
 
   doc.end();
   return outputPath;

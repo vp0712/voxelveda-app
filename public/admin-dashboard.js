@@ -52,6 +52,7 @@ const ACCESS_OPTIONS = [
 ];
 
 const COMPANY_FORMS = [
+  { category: 'Policy', title: 'Privacy, Confidentiality & Data Handling', file: '/forms/company/privacy-confidentiality-policy.pdf', visual: 'contract', note: 'Use for staff, contractors, suppliers, customers or visitors who access protected company information.' },
   { category: 'Operations', title: 'Delivery Docket / Dispatch Form', file: '/forms/company/delivery-docket-form.pdf', visual: 'dispatch', note: 'Use when finished goods, samples or job items leave the workshop.' },
   { category: 'HR', title: 'Staff Joining Form', file: '/forms/company/staff-joining-form.pdf', visual: 'staff', note: 'Use for onboarding, access approval, emergency contact and PPE issue records.' },
   { category: 'Safety', title: 'Safety Induction Form', file: '/forms/company/safety-induction-form.pdf', visual: 'safety', note: 'Use before staff, contractors or visitors work around production areas.' },
@@ -67,7 +68,7 @@ const COMPANY_FORMS = [
   { category: 'Safety', title: 'Visitor / Contractor Induction', file: '/forms/company/visitor-contractor-induction.pdf', visual: 'visitor', note: 'Use before visitors or contractors enter production, storage or machinery areas.' }
 ];
 
-const COMPANY_FORM_VERSION = '20260529-picture-guides-v2';
+const COMPANY_FORM_VERSION = '20260602-privacy-policy';
 
 function authHeaders() {
   return {
@@ -2746,6 +2747,10 @@ function getRfqUrl() {
   return `${window.location.origin}/customer.html`;
 }
 
+function getPrivacyPolicyUrl() {
+  return `${window.location.origin}/privacy-policy.html`;
+}
+
 function updateQrTargetFromType() {
   const type = document.getElementById('qrTargetType')?.value || 'rfq';
   const input = document.getElementById('qrTargetUrl');
@@ -2753,6 +2758,8 @@ function updateQrTargetFromType() {
 
   if (type === 'rfq') {
     input.value = getRfqUrl();
+  } else if (type === 'privacy') {
+    input.value = getPrivacyPolicyUrl();
   } else if (type === 'website') {
     input.value = normalizeQrUrl(document.getElementById('settingWebsite')?.value || 'www.voxelveda.com');
   }
@@ -2770,7 +2777,13 @@ function renderQrCode() {
 
   if (!image || !download || !target) return;
 
-  const label = type === 'website' ? 'Company Website' : type === 'custom' ? 'Custom QR Link' : 'Customer RFQ Form';
+  const label = type === 'website'
+    ? 'Company Website'
+    : type === 'privacy'
+      ? 'Privacy Policy'
+      : type === 'custom'
+        ? 'Custom QR Link'
+        : 'Customer RFQ Form';
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=16&data=${encodeURIComponent(target)}`;
   image.src = qrSrc;
   download.href = qrSrc;

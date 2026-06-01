@@ -178,6 +178,34 @@
       font-size: 13px;
     }
 
+    .invoice-privacy-card {
+      display: grid;
+      grid-template-columns: 1fr 78px;
+      gap: 16px;
+      align-items: center;
+      border: 1px solid #d7dee8;
+      border-radius: 14px;
+      padding: 14px;
+      background: #f8fafc;
+      color: #475569;
+      font-size: 12px;
+    }
+
+    .invoice-privacy-card strong {
+      color: #0b4f6c;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .invoice-privacy-card img {
+      width: 78px;
+      height: 78px;
+      object-fit: contain;
+      background: #ffffff;
+      border-radius: 10px;
+      padding: 4px;
+    }
+
     .invoice-loading {
       padding: 28px;
       text-align: center;
@@ -193,7 +221,8 @@
       .invoice-view-top,
       .invoice-document-head,
       .invoice-info-grid,
-      .invoice-footer {
+      .invoice-footer,
+      .invoice-privacy-card {
         grid-template-columns: 1fr;
       }
 
@@ -393,6 +422,14 @@
             <div class="invoice-total-row"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
             <div class="invoice-total-row"><span>GST (${gstRate}%)</span><strong>${money(gst)}</strong></div>
             <div class="invoice-total-row final"><span>Total AUD</span><strong>${money(total)}</strong></div>
+          </div>
+
+          <div class="invoice-privacy-card">
+            <div>
+              <strong>Privacy, confidentiality & document handling</strong>
+              <p>This invoice and any attached documents may contain confidential customer, supplier, pricing, production or payment information. Scan the QR code to view the live Voxel Veda privacy policy.</p>
+            </div>
+            <img src="/privacy-qr.png?v=20260602-privacy-policy" alt="Privacy Policy QR Code" />
           </div>
 
           <div class="invoice-footer">
