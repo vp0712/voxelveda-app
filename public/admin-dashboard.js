@@ -185,7 +185,7 @@ async function sendAdminNotification(title, body) {
 
   new Notification(title, {
     body,
-    icon: '/Frame 1.png?v=20260601-new-logo'
+    icon: '/Frame 1.png?v=20260601-clean-logo'
   });
 }
 
