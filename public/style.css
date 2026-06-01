@@ -1538,6 +1538,46 @@ tr:hover td {
   margin-bottom: 6px;
 }
 
+.qr-tool-card {
+  border-color: rgba(56, 189, 248, 0.3);
+}
+
+.qr-preview-panel {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.48);
+}
+
+.qr-preview-panel img {
+  width: 180px;
+  height: 180px;
+  padding: 10px;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.qr-preview-panel strong {
+  display: block;
+  color: var(--accent);
+  font-size: 18px;
+  margin-bottom: 8px;
+}
+
+.qr-preview-panel p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
 .system-action span {
   color: var(--muted);
   font-size: 12px;
@@ -2480,6 +2520,12 @@ tr:hover td {
   .dialog-actions button {
     min-height: 48px;
     border-radius: 15px;
+  }
+
+  .qr-preview-panel {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
   }
 
   input,

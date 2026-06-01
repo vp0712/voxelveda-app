@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-  <link rel="stylesheet" href="/style.css?v=20260530-competitor-layout"/>
+  <link rel="stylesheet" href="/style.css?v=20260601-qr-tool"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -831,6 +831,30 @@
             </div>
           </div>
 
+          <div class="card qr-tool-card">
+            <h3>QR Code Generator</h3>
+            <p class="status-note">Create a QR code for the company website, customer RFQ form, or any custom link.</p>
+            <div class="form-grid">
+              <select id="qrTargetType" onchange="updateQrTargetFromType()">
+                <option value="rfq">Customer RFQ Form</option>
+                <option value="website">Company Website</option>
+                <option value="custom">Custom Link</option>
+              </select>
+              <input id="qrTargetUrl" placeholder="QR redirect URL" oninput="renderQrCode()" />
+            </div>
+            <div class="qr-preview-panel">
+              <img id="qrPreviewImage" alt="Voxel Veda QR Code" />
+              <div>
+                <strong id="qrPreviewTitle">Customer RFQ Form</strong>
+                <p id="qrPreviewUrl">-</p>
+                <div class="card-actions">
+                  <button class="secondary-btn" onclick="openQrTarget()">Open Link</button>
+                  <a id="qrDownloadLink" class="primary-btn" href="#" download="voxel-veda-qr.png">Download QR</a>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div class="card">
             <h3>System Actions</h3>
             <div class="system-action-grid">
@@ -883,6 +907,6 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260530-competitor-layout"></script>
+  <script src="/admin-dashboard.js?v=20260601-qr-tool"></script>
 </body>
 </html>

@@ -2705,6 +2705,8 @@ async function loadSettings() {
     const el = document.getElementById(id);
     if (el && settings[key] !== undefined) el.value = settings[key];
   });
+
+  updateQrTargetFromType();
 }
 
 async function saveSettings() {
@@ -2725,10 +2727,61 @@ async function saveSettings() {
 
   const data = await safeJson(res);
   showToast(data.message || (res.ok ? 'Settings saved' : 'Settings save failed'));
+  updateQrTargetFromType();
 }
 
 function openSystemPage(path) {
   window.open(path, '_blank', 'noopener');
+}
+
+function normalizeQrUrl(value) {
+  const url = String(value || '').trim();
+  if (!url) return '';
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith('/')) return `${window.location.origin}${url}`;
+  return `https://${url}`;
+}
+
+function getRfqUrl() {
+  return `${window.location.origin}/customer.html`;
+}
+
+function updateQrTargetFromType() {
+  const type = document.getElementById('qrTargetType')?.value || 'rfq';
+  const input = document.getElementById('qrTargetUrl');
+  if (!input) return;
+
+  if (type === 'rfq') {
+    input.value = getRfqUrl();
+  } else if (type === 'website') {
+    input.value = normalizeQrUrl(document.getElementById('settingWebsite')?.value || 'www.voxelveda.com');
+  }
+
+  renderQrCode();
+}
+
+function renderQrCode() {
+  const type = document.getElementById('qrTargetType')?.value || 'rfq';
+  const target = normalizeQrUrl(document.getElementById('qrTargetUrl')?.value || getRfqUrl());
+  const image = document.getElementById('qrPreviewImage');
+  const download = document.getElementById('qrDownloadLink');
+  const title = document.getElementById('qrPreviewTitle');
+  const urlText = document.getElementById('qrPreviewUrl');
+
+  if (!image || !download || !target) return;
+
+  const label = type === 'website' ? 'Company Website' : type === 'custom' ? 'Custom QR Link' : 'Customer RFQ Form';
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=16&data=${encodeURIComponent(target)}`;
+  image.src = qrSrc;
+  download.href = qrSrc;
+  download.download = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-qr.png`;
+  if (title) title.innerText = label;
+  if (urlText) urlText.innerText = target;
+}
+
+function openQrTarget() {
+  const target = normalizeQrUrl(document.getElementById('qrTargetUrl')?.value || getRfqUrl());
+  if (target) window.open(target, '_blank', 'noopener');
 }
 
 async function refreshAllSystemData() {
