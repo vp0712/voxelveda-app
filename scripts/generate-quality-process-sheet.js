@@ -35,9 +35,9 @@ function t(value, x, y, options = {}) {
 
 function header(title, subtitle) {
   doc.fillColor(navy).rect(0, 0, pageW, 72).fill();
-  if (fs.existsSync(logoPath)) doc.image(logoPath, left, 16, { width: 88 });
-  t(title, 185, 17, { color: '#ffffff', bold: true, size: 20 });
-  t(subtitle, 185, 43, { color: cyan, bold: true, size: 9.5 });
+  if (fs.existsSync(logoPath)) doc.image(logoPath, left, 6, { width: 62 });
+  t(title, 116, 17, { color: '#ffffff', bold: true, size: 20 });
+  t(subtitle, 116, 43, { color: cyan, bold: true, size: 9.5 });
   t('Document No: VV-QA-PS-001   Revision: 1.1   Controlled internal quality record', left, 80, { color: muted, size: 7.5 });
 }
 

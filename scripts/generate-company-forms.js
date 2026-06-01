@@ -198,9 +198,9 @@ function writeText(doc, value, x, y, options = {}) {
 function header(doc, form) {
   const pageW = doc.page.width;
   doc.fillColor(colors.navy).rect(0, 0, pageW, 74).fill();
-  if (fs.existsSync(logoPath)) doc.image(logoPath, 32, 16, { width: 86 });
-  writeText(doc, form.title, 172, 18, { color: '#ffffff', bold: true, size: 17, width: 380 });
-  writeText(doc, form.subtitle, 172, 44, { color: colors.cyan, bold: true, size: 9.2, width: 380 });
+  if (fs.existsSync(logoPath)) doc.image(logoPath, 32, 6, { width: 62 });
+  writeText(doc, form.title, 118, 18, { color: '#ffffff', bold: true, size: 17, width: 434 });
+  writeText(doc, form.subtitle, 118, 44, { color: colors.cyan, bold: true, size: 9.2, width: 434 });
   writeText(doc, `VOXEL VEDA | ${form.category} | Controlled internal form`, 32, 82, { color: colors.muted, size: 7.5 });
 }
 

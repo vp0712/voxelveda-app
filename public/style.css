@@ -87,9 +87,10 @@ body::before {
 }
 
 .logo-img {
-  width: 52px;
-  height: auto;
+  width: 70px;
+  height: 70px;
   object-fit: contain;
+  flex: 0 0 70px;
 }
 
 .brand-mark .logo-img {
@@ -746,19 +747,19 @@ th {
 }
 
 .login-logo-box {
-  width: 160px;
-  height: 92px;
-  margin: 0 auto 20px;
+  width: 176px;
+  height: 176px;
+  margin: 0 auto 22px;
   display: grid;
   place-items: center;
   overflow: hidden;
 }
 
 .login-logo {
-  width: 160px !important;
-  max-width: 160px !important;
+  width: 176px !important;
+  max-width: 176px !important;
   height: auto !important;
-  max-height: 92px !important;
+  max-height: 176px !important;
   object-fit: contain !important;
 }
 
@@ -1020,14 +1021,14 @@ tr:hover td {
 .public-hero {
   min-height: 34vh;
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-columns: 210px minmax(0, 1fr);
   align-items: center;
   gap: 34px;
   padding: 22px 0 28px;
 }
 
 .public-logo {
-  width: 170px;
+  width: 196px;
   max-width: 100%;
   height: auto;
 }
@@ -2156,7 +2157,9 @@ tr:hover td {
   }
 
   .logo-img {
-    width: 44px;
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
   }
 
   .metric-grid {

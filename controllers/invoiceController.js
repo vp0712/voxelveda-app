@@ -756,7 +756,7 @@ function renderInvoicePdf(doc, invoice, items, id) {
 
   if (fs.existsSync(logoPath)) {
     try {
-      doc.image(logoPath, 48, 28, { width: 118 });
+      doc.image(logoPath, 48, 12, { width: 92 });
     } catch {
       doc.fillColor('#ffffff').fontSize(22).text('VOXEL VEDA', 48, 42);
     }
