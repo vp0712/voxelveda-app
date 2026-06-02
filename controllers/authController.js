@@ -18,6 +18,20 @@ function parsePermissions(value) {
   }
 }
 
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
+function publicUsernameFromEmail(email) {
+  const base = String(email || '')
+    .split('@')[0]
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, '_')
+    .slice(0, 42) || 'customer';
+  return `${base}_${String(Date.now()).slice(-5)}`;
+}
+
 function createToken(user) {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET is missing in .env');
@@ -172,6 +186,61 @@ exports.me = async (req, res) => {
     console.error('ME ERROR:', err);
     res.status(500).json({
       message: 'Failed to load user',
+      error: err.message
+    });
+  }
+};
+
+exports.customerRegister = async (req, res) => {
+  try {
+    const name = String(req.body.name || '').trim();
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const confirmPrivacy = Boolean(req.body.confirm_privacy);
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email and password are required' });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Valid email address is required' });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    if (!confirmPrivacy) {
+      return res.status(400).json({ message: 'Please accept the privacy policy before creating an account' });
+    }
+
+    const [existing] = await pool.query(
+      'SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1',
+      [email]
+    );
+
+    if (existing.length) {
+      return res.status(409).json({ message: 'An account already exists for this email. Please login or contact admin.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const username = publicUsernameFromEmail(email);
+    const role = 'viewer';
+    const permissions = [];
+
+    await pool.query(
+      `INSERT INTO users (name, username, email, password, role, permissions, active, password_reset_required)
+       VALUES (?, ?, ?, ?, ?, ?, 1, 0)`,
+      [name, username, email, hashedPassword, role, JSON.stringify(permissions)]
+    );
+
+    res.json({
+      message: 'Customer account created successfully. You can login now. Admin can add extra access if needed.'
+    });
+  } catch (err) {
+    console.error('CUSTOMER REGISTER ERROR:', err);
+    res.status(500).json({
+      message: 'Customer account registration failed',
       error: err.message
     });
   }

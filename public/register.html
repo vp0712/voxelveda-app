@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Voxel Veda Account Access</title>
+  <title>Create Customer Account | Voxel Veda</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260601-logo-sizing" />
+  <link rel="stylesheet" href="/style.css?v=20260603-customer-register" />
 </head>
 
 <body class="login-page">
@@ -15,14 +15,40 @@
         <img src="/Frame 1.png?v=20260601-clean-logo" alt="Voxel Veda Logo" class="login-logo" />
       </div>
 
-      <h1>Account Creation Is Admin Only</h1>
-      <p>
-        Staff login IDs and passwords are created by an administrator from the
-        Staff Management section.
-      </p>
+      <h1>Create Customer Account</h1>
+      <p class="login-footnote">Create a basic customer login. Admin controls any extra access such as invoices, forms, stock, tasks or input/edit rights.</p>
 
-      <a class="login-btn secondary-link" href="/login.html">Back to Login</a>
+      <div id="registerStatus" class="status"></div>
+
+      <div class="login-field">
+        <label for="name">Full Name / Company Contact</label>
+        <input id="name" type="text" placeholder="Enter your name" autocomplete="name" />
+      </div>
+
+      <div class="login-field">
+        <label for="email">Email Address</label>
+        <input id="email" type="email" placeholder="Enter your email" autocomplete="email" />
+      </div>
+
+      <div class="login-field">
+        <label for="password">Password</label>
+        <input id="password" type="password" placeholder="Minimum 6 characters" autocomplete="new-password" />
+      </div>
+
+      <label class="privacy-check register-privacy">
+        <input id="privacyAccepted" type="checkbox" />
+        <span>I have read and accept the <a href="/privacy-policy.html" target="_blank" rel="noopener">Privacy Policy</a>.</span>
+      </label>
+
+      <button type="button" class="login-btn" onclick="createCustomerAccount()">Create Account</button>
+
+      <div class="portal-links">
+        <a href="/login.html">Back to Login</a>
+        <a href="/customer.html">Customer RFQ</a>
+      </div>
     </section>
   </main>
+
+  <script src="/register.js?v=20260603-customer-register"></script>
 </body>
 </html>

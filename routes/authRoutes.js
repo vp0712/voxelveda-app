@@ -11,6 +11,8 @@ router.post('/login', authController.login);
 
 router.post('/register', auth, requireRole('admin'), authController.register);
 
+router.post('/customer-register', authController.customerRegister);
+
 router.get('/me', auth, authController.me);
 
 module.exports = router;
