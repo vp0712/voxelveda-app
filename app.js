@@ -19,6 +19,7 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const complianceRoutes = require('./routes/complianceRoutes');
 const competitorRoutes = require('./routes/competitorRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
+const requireInputPermission = require('./middleware/inputPermissionMiddleware');
 
 const auth = require('./middleware/auth');
 
@@ -44,15 +45,16 @@ app.use('/api/dashboard', auth, dashboardRoutes);
 app.use('/api/upload', auth, uploadRoutes);
 app.use('/api/tasks', auth, taskRoutes);
 app.use('/api/stock', auth, requirePermission('stock'), stockRoutes);
-app.use('/api/customers', auth, requirePermission('invoices'), customerRoutes);
+app.use('/api/customers', auth, requirePermission('customers'), requireInputPermission('customers_input'), customerRoutes);
 app.use('/api/materials', auth, requirePermission('stock'), materialRoutes);
 app.use('/api/meetings', auth, requirePermission('meetings'), meetingRoutes);
-app.use('/api/suppliers', auth, requirePermission('suppliers'), supplierRoutes);
-app.use('/api/compliance', auth, requirePermission('compliance'), complianceRoutes);
-app.use('/api/competitors', auth, requirePermission('competitors'), competitorRoutes);
+app.use('/api/suppliers', auth, requirePermission('suppliers'), requireInputPermission('suppliers_input'), supplierRoutes);
+app.use('/api/compliance', auth, requirePermission('compliance'), requireInputPermission('compliance_input'), complianceRoutes);
+app.use('/api/competitors', auth, requirePermission('competitors'), requireInputPermission('competitors_input'), competitorRoutes);
+app.use('/api/access-attempts', auth, require('./routes/accessAttemptRoutes'));
 
 try {
-  app.use('/api/attendance', auth, require('./routes/attendanceRoutes'));
+  app.use('/api/attendance', auth, requirePermission('attendance'), require('./routes/attendanceRoutes'));
 } catch {
   console.log('Attendance routes not loaded.');
 }

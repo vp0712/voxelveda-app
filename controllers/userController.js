@@ -4,21 +4,33 @@ const bcrypt = require('bcryptjs');
 const ALL_PERMISSIONS = [
   'dashboard',
   'rfqs',
+  'rfqs_input',
   'invoices',
   'customers',
+  'customers_input',
   'tasks',
+  'tasks_input',
   'attendance',
+  'attendance_input',
   'staff',
   'settings',
   'stock',
   'stock_in',
+  'stock_in_input',
   'stock_out',
+  'stock_out_input',
   'raw_material',
+  'raw_material_input',
   'packaging',
+  'packaging_input',
   'meetings',
+  'meetings_input',
   'suppliers',
+  'suppliers_input',
   'compliance',
-  'competitors'
+  'compliance_input',
+  'competitors',
+  'competitors_input'
 ];
 
 function parsePermissions(value) {

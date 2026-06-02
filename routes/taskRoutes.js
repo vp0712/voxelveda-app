@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const taskController = require('../controllers/taskController');
+const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 
 /* ================= ADMIN TASKS ================= */
 
@@ -13,17 +14,17 @@ router.get('/announcements', taskController.getAnnouncements);
 
 router.get('/announcements/my', taskController.getMyAnnouncements);
 
-router.post('/announcements', taskController.createAnnouncement);
+router.post('/announcements', requireInputPermission('tasks_input'), taskController.createAnnouncement);
 
-router.post('/announcements/update', taskController.updateAnnouncement);
+router.post('/announcements/update', requireInputPermission('tasks_input'), taskController.updateAnnouncement);
 
-router.post('/announcements/delete', taskController.deleteAnnouncement);
+router.post('/announcements/delete', requireInputPermission('tasks_input'), taskController.deleteAnnouncement);
 
-router.post('/', taskController.createTask);
+router.post('/', requireInputPermission('tasks_input'), taskController.createTask);
 
-router.post('/update', taskController.updateTask);
+router.post('/update', requireInputPermission('tasks_input'), taskController.updateTask);
 
-router.post('/delete', taskController.deleteTask);
+router.post('/delete', requireInputPermission('tasks_input'), taskController.deleteTask);
 
 /* ================= SHARED TASK STATUS ================= */
 /* Admin and assigned staff can update task status */

@@ -34,20 +34,33 @@ let attendanceFirstLoad = true;
 const ACCESS_OPTIONS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'rfqs', label: 'RFQs' },
+  { id: 'rfqs_input', label: 'RFQs Input/Edit' },
   { id: 'invoices', label: 'Invoices' },
+  { id: 'invoices_input', label: 'Invoices Input/Edit' },
   { id: 'customers', label: 'Customers' },
+  { id: 'customers_input', label: 'Customers Input/Edit' },
   { id: 'suppliers', label: 'Suppliers' },
+  { id: 'suppliers_input', label: 'Suppliers Input/Edit' },
   { id: 'compliance', label: 'Compliance & Licences' },
+  { id: 'compliance_input', label: 'Compliance Input/Edit' },
   { id: 'competitors', label: 'Competitors & Industry' },
+  { id: 'competitors_input', label: 'Competitors Input/Edit' },
   { id: 'tasks', label: 'Tasks' },
+  { id: 'tasks_input', label: 'Tasks/Announcements Input/Edit' },
   { id: 'attendance', label: 'Attendance' },
+  { id: 'attendance_input', label: 'Attendance Input/Edit' },
   { id: 'staff', label: 'Staff' },
   { id: 'stock', label: 'Stock Management' },
   { id: 'stock_in', label: 'Stock In' },
+  { id: 'stock_in_input', label: 'Stock In Input/Edit' },
   { id: 'stock_out', label: 'Stock Out' },
+  { id: 'stock_out_input', label: 'Stock Out Input/Edit' },
   { id: 'raw_material', label: 'Raw Material' },
+  { id: 'raw_material_input', label: 'Raw Material Input/Edit' },
   { id: 'packaging', label: 'Packaging' },
+  { id: 'packaging_input', label: 'Packaging Input/Edit' },
   { id: 'meetings', label: 'Meetings & Inspections' },
+  { id: 'meetings_input', label: 'Meetings Input/Edit' },
   { id: 'settings', label: 'Settings' }
 ];
 
@@ -187,6 +200,67 @@ async function sendAdminNotification(title, body) {
   new Notification(title, {
     body,
     icon: '/Frame 1.png?v=20260601-clean-logo'
+  });
+}
+
+function installAccessDeniedHandler() {
+  if (window.__voxelAccessDeniedInstalled) return;
+  window.__voxelAccessDeniedInstalled = true;
+  const nativeFetch = window.fetch.bind(window);
+
+  window.fetch = async (...args) => {
+    const res = await nativeFetch(...args);
+    if (res.status === 403) {
+      res.clone().json().then((data) => {
+        if (data?.accessDenied) {
+          const message = data.message || "You don't have access to input or change data. Please contact admin.";
+          showToast(message);
+          alert(message);
+        }
+      }).catch(() => {});
+    }
+    return res;
+  };
+}
+
+function accessAttemptSeenKey() {
+  return 'voxel-admin-seen-access-attempts';
+}
+
+function getSeenAccessAttempts() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(accessAttemptSeenKey()) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSeenAccessAttempts(ids) {
+  localStorage.setItem(accessAttemptSeenKey(), JSON.stringify(Array.from(ids).slice(-200)));
+}
+
+async function loadAccessAttempts() {
+  if (currentRole !== 'admin') return;
+
+  const res = await fetch('/api/access-attempts', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+  if (!res.ok) return;
+
+  const attempts = data.attempts || [];
+  const seen = getSeenAccessAttempts();
+  const fresh = attempts.filter((attempt) => !seen.has(Number(attempt.id)));
+
+  attempts.forEach((attempt) => seen.add(Number(attempt.id)));
+  saveSeenAccessAttempts(seen);
+
+  fresh.reverse().forEach((attempt) => {
+    const who = attempt.user_name || attempt.user_email || 'A user';
+    const section = String(attempt.section || 'restricted input');
+    const message = `${who} tried to input/change data without access: ${section}`;
+    showToast(message);
+    sendAdminNotification('Restricted access attempt', message);
   });
 }
 
@@ -625,7 +699,27 @@ function collectAccess() {
       .filter(Boolean)
   );
 
-  if (selected.has('stock_in') || selected.has('stock_out')) selected.add('stock');
+  const inputParents = {
+    rfqs_input: ['rfqs'],
+    invoices_input: ['invoices'],
+    customers_input: ['customers'],
+    suppliers_input: ['suppliers'],
+    compliance_input: ['compliance'],
+    competitors_input: ['competitors'],
+    tasks_input: ['tasks'],
+    attendance_input: ['attendance'],
+    stock_in_input: ['stock', 'stock_in'],
+    stock_out_input: ['stock', 'stock_out'],
+    raw_material_input: ['stock', 'raw_material'],
+    packaging_input: ['stock', 'packaging'],
+    meetings_input: ['meetings']
+  };
+
+  Object.entries(inputParents).forEach(([inputPermission, parents]) => {
+    if (selected.has(inputPermission)) parents.forEach((parent) => selected.add(parent));
+  });
+
+  if (selected.has('stock_in') || selected.has('stock_out') || selected.has('raw_material') || selected.has('packaging')) selected.add('stock');
   if (selected.has('stock')) {
     selected.add('stock_in');
     selected.add('stock_out');
@@ -4037,6 +4131,7 @@ async function loadSelectedStaffTimesheets() {
 
 async function bootAdminDashboard() {
   try {
+    installAccessDeniedHandler();
     setupNavigation();
     startResponsiveTableObserver();
 
@@ -4073,7 +4168,9 @@ async function bootAdminDashboard() {
       loadSettings()
     ]);
 
+    await loadAccessAttempts();
     setInterval(loadAttendance, 15000);
+    setInterval(loadAccessAttempts, 20000);
   } catch (err) {
     if (!redirectingToLogin) {
       console.error('ADMIN DASHBOARD STARTUP ERROR:', err);

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const invoiceController = require('../controllers/invoiceController');
+const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 
 /* ================= GET ================= */
 
@@ -10,25 +11,25 @@ router.get('/:id', invoiceController.getInvoiceDetails);
 
 /* ================= CREATE ================= */
 
-router.post('/', invoiceController.createInvoice);
+router.post('/', requireInputPermission('invoices_input'), invoiceController.createInvoice);
 
 /* ================= MANUAL INVOICE ================= */
 
-router.post('/manual', invoiceController.createManualInvoice);
+router.post('/manual', requireInputPermission('invoices_input'), invoiceController.createManualInvoice);
 
 /* ================= STATUS ACTIONS ================= */
 
-router.post('/approve', invoiceController.approveInvoice);
+router.post('/approve', requireInputPermission('invoices_input'), invoiceController.approveInvoice);
 
-router.post('/send', invoiceController.sendInvoice);
+router.post('/send', requireInputPermission('invoices_input'), invoiceController.sendInvoice);
 
-router.post('/paid', invoiceController.markInvoicePaid);
+router.post('/paid', requireInputPermission('invoices_input'), invoiceController.markInvoicePaid);
 
-router.post('/reject', invoiceController.rejectInvoice);
+router.post('/reject', requireInputPermission('invoices_input'), invoiceController.rejectInvoice);
 
-router.post('/delete', invoiceController.deleteInvoice);
+router.post('/delete', requireInputPermission('invoices_input'), invoiceController.deleteInvoice);
 
-router.post('/edit', invoiceController.editInvoice);
+router.post('/edit', requireInputPermission('invoices_input'), invoiceController.editInvoice);
 
 /* ================= PDF ================= */
 

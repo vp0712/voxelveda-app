@@ -385,6 +385,27 @@ async function sendStaffNotification(title, body) {
   });
 }
 
+function installAccessDeniedHandler() {
+  if (window.__voxelAccessDeniedInstalled) return;
+  window.__voxelAccessDeniedInstalled = true;
+  const nativeFetch = window.fetch.bind(window);
+
+  window.fetch = async (...args) => {
+    const res = await nativeFetch(...args);
+    if (res.status === 403) {
+      res.clone().json().then((data) => {
+        if (data?.accessDenied) {
+          const message = data.message || "You don't have access to input or change data in this section. Please contact admin.";
+          showToast(message);
+          alert(message);
+          sendStaffNotification('Access not enabled', message);
+        }
+      }).catch(() => {});
+    }
+    return res;
+  };
+}
+
 function announcementBadgeClass(priority) {
   const clean = String(priority || 'normal').toLowerCase();
   if (clean === 'urgent') return 'badge danger-badge';
@@ -1401,6 +1422,7 @@ function startAutoRefresh() {
 
 async function bootStaffDashboard() {
   try {
+    installAccessDeniedHandler();
     setupStaffNavigation();
     startResponsiveTableObserver();
 

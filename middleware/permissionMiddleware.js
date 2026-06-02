@@ -20,7 +20,10 @@ module.exports = function requirePermission(permission) {
 
     const permissions = parsePermissions(req.user?.permissions);
 
-    if (!permissions.includes(permission)) {
+    const groupAllowed = permission === 'stock'
+      && ['stock', 'stock_in', 'stock_out', 'raw_material', 'packaging'].some((item) => permissions.includes(item));
+
+    if (!permissions.includes(permission) && !groupAllowed) {
       return res.status(403).json({
         message: 'Access denied: this section is not enabled for your account'
       });
