@@ -25,6 +25,10 @@ router.post('/send', requireInputPermission('invoices_input'), invoiceController
 
 router.post('/paid', requireInputPermission('invoices_input'), invoiceController.markInvoicePaid);
 
+router.post('/payment', requireInputPermission('invoices_input'), invoiceController.recordInvoicePayment);
+
+router.post('/payment/delete', requireInputPermission('invoices_input'), invoiceController.deleteInvoicePayment);
+
 router.post('/reject', requireInputPermission('invoices_input'), invoiceController.rejectInvoice);
 
 router.post('/delete', requireInputPermission('invoices_input'), invoiceController.deleteInvoice);

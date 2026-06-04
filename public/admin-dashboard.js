@@ -972,7 +972,7 @@ async function loadInvoices() {
   const data = await safeJson(res);
 
   if (!res.ok) {
-    tbody.innerHTML = `<tr><td colspan="7">Failed to load invoices</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9">Failed to load invoices</td></tr>`;
     return;
   }
 
@@ -981,7 +981,7 @@ async function loadInvoices() {
   updateInvoiceMetrics(invoices);
 
   if (!invoices.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No invoices yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9">No invoices yet.</td></tr>`;
     return;
   }
 
@@ -992,10 +992,13 @@ async function loadInvoices() {
       <td>${escapeHtml(invoice.customer_name || '-')}</td>
       <td>${escapeHtml(invoice.rfq_id || 'Manual')}</td>
       <td>${escapeHtml(formatMoney(invoice.total))}</td>
+      <td class="money-positive">${escapeHtml(formatMoney(invoice.paid_amount))}</td>
+      <td class="${Number(invoice.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(invoice.balance_due))}</td>
       <td>${statusBadge(invoice.status)}</td>
       <td>
         <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'approve')">Approve</button>
         <button class="small-btn" onclick="openSendInvoiceDialog(${invoice.id})">Send</button>
+        <button class="small-btn" onclick="openInvoicePaymentDialog(${invoice.id})">Payment</button>
         <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'paid')">Paid</button>
         <button class="secondary-btn" onclick="openEditInvoiceDialog(${invoice.id})">Edit</button>
         <button class="secondary-btn" onclick="openInvoicePdf(${invoice.id})">PDF</button>
@@ -1011,15 +1014,165 @@ function updateInvoiceMetrics(invoices) {
   const sentPaidEl = document.getElementById('invoiceSentPaidCount');
 
   const total = invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-  const unpaid = invoices
-    .filter((invoice) => String(invoice.status || '').toLowerCase() !== 'paid')
-    .reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-  const sent = invoices.filter((invoice) => String(invoice.status || '').toLowerCase() === 'sent').length;
+  const paidValue = invoices.reduce((sum, invoice) => sum + Number(invoice.paid_amount || 0), 0);
+  const unpaid = invoices.reduce((sum, invoice) => sum + Number(invoice.balance_due || 0), 0);
   const paid = invoices.filter((invoice) => String(invoice.status || '').toLowerCase() === 'paid').length;
 
   if (totalEl) totalEl.innerText = formatMoney(total);
   if (unpaidEl) unpaidEl.innerText = formatMoney(unpaid);
-  if (sentPaidEl) sentPaidEl.innerText = `${sent} / ${paid}`;
+  if (sentPaidEl) sentPaidEl.innerText = `${formatMoney(paidValue)} / ${paid}`;
+}
+
+function paymentHistoryRows(payments, invoiceId) {
+  if (!payments.length) {
+    return '<tr><td colspan="6">No payments recorded yet.</td></tr>';
+  }
+
+  return payments.map((payment) => `
+    <tr>
+      <td>${escapeHtml(payment.payment_date || '-')}</td>
+      <td>${escapeHtml(formatMoney(payment.amount))}</td>
+      <td>${escapeHtml(payment.method || '-')}</td>
+      <td>${escapeHtml(payment.reference || '-')}</td>
+      <td>${escapeHtml(payment.notes || '-')}</td>
+      <td><button class="danger-btn" onclick="deleteInvoicePayment(${invoiceId}, ${payment.id})">Delete</button></td>
+    </tr>
+  `).join('');
+}
+
+async function openInvoicePaymentDialog(invoiceId) {
+  const res = await fetch(`/api/invoice/${invoiceId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Failed to load invoice payment details');
+    return;
+  }
+
+  const invoice = data.invoice || {};
+  const payments = data.payments || [];
+  const balanceDue = Number(invoice.balance_due || 0);
+
+  showDialog(
+    `Payments: ${invoice.invoice_no || 'Invoice'}`,
+    `
+      <div class="payment-summary-grid">
+        <div class="payment-summary-card">
+          <span>Invoice Total</span>
+          <strong>${escapeHtml(formatMoney(invoice.total))}</strong>
+        </div>
+        <div class="payment-summary-card">
+          <span>Payment Taken</span>
+          <strong class="money-positive">${escapeHtml(formatMoney(invoice.paid_amount))}</strong>
+        </div>
+        <div class="payment-summary-card">
+          <span>Debt / Balance Left</span>
+          <strong class="${balanceDue > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(balanceDue))}</strong>
+        </div>
+      </div>
+
+      <div class="stock-dialog-grid payment-dialog-grid">
+        <div class="dialog-card">
+          <h4>Record Payment</h4>
+          <label class="field-label">Amount received</label>
+          <input id="paymentAmount" type="number" min="0.01" max="${escapeHtml(balanceDue)}" step="0.01" value="${escapeHtml(balanceDue || '')}" placeholder="Payment amount" />
+          <label class="field-label">Payment date</label>
+          <input id="paymentDate" type="date" value="${todayISO()}" />
+          <label class="field-label">Payment method</label>
+          <select id="paymentMethod">
+            <option>Bank transfer</option>
+            <option>Card</option>
+            <option>Cash</option>
+            <option>Online payment</option>
+            <option>Cheque</option>
+            <option>Other</option>
+          </select>
+          <label class="field-label">Reference / receipt number</label>
+          <input id="paymentReference" placeholder="Bank reference, receipt, transaction ID" />
+          <label class="field-label">Accounts note</label>
+          <textarea id="paymentNotes" rows="3" placeholder="Deposit, partial payment, follow-up note"></textarea>
+        </div>
+        <div class="dialog-card">
+          <h4>Payment History</h4>
+          <div class="mini-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Reference</th>
+                  <th>Notes</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>${paymentHistoryRows(payments, invoiceId)}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    `,
+    async () => {
+      const amount = Number(document.getElementById('paymentAmount')?.value || 0);
+      const body = {
+        invoice_id: invoiceId,
+        amount,
+        payment_date: document.getElementById('paymentDate')?.value,
+        method: document.getElementById('paymentMethod')?.value,
+        reference: document.getElementById('paymentReference')?.value.trim(),
+        notes: document.getElementById('paymentNotes')?.value.trim()
+      };
+
+      if (amount <= 0) {
+        showToast('Enter payment amount');
+        return;
+      }
+
+      const payRes = await fetch('/api/invoice/payment', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const payData = await safeJson(payRes);
+
+      if (!payRes.ok) {
+        showToast(payData.message || 'Payment save failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(payData.message || 'Payment saved');
+      await loadInvoices();
+      await loadDashboardStats();
+    },
+    'Save Payment'
+  );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+async function deleteInvoicePayment(invoiceId, paymentId) {
+  if (!confirm('Delete this payment entry?')) return;
+
+  const res = await fetch('/api/invoice/payment/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ invoice_id: invoiceId, payment_id: paymentId })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Payment delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Payment deleted');
+  hideDialog();
+  await loadInvoices();
+  await loadDashboardStats();
+  await openInvoicePaymentDialog(invoiceId);
 }
 
 function openInvoicePdf(invoiceId) {

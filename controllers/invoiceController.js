@@ -51,6 +51,21 @@ async function ensureInvoiceColumns() {
     )
   `);
 
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS invoice_payments (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      invoice_id INT NOT NULL,
+      amount DECIMAL(12,2) NOT NULL DEFAULT 0,
+      payment_date DATE NULL,
+      method VARCHAR(80) NULL,
+      reference VARCHAR(120) NULL,
+      notes TEXT NULL,
+      created_by INT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_invoice_payments_invoice_id (invoice_id)
+    )
+  `);
+
   await pool.query(`ALTER TABLE invoices ADD COLUMN invoice_no VARCHAR(80) NULL`).catch(() => {});
   await pool.query(`ALTER TABLE invoices ADD COLUMN rfq_id INT NULL`).catch(() => {});
   await pool.query(`ALTER TABLE invoices ADD COLUMN customer_name VARCHAR(255) NULL`).catch(() => {});
@@ -78,6 +93,35 @@ async function ensureInvoiceColumns() {
         quantity = CASE WHEN quantity = 1 AND qty IS NOT NULL THEN qty ELSE quantity END,
         amount = CASE WHEN amount = 0 AND total IS NOT NULL THEN total ELSE amount END
   `).catch(() => {});
+}
+
+function invoiceReceivableSelect(whereClause = 'WHERE i.deleted = 0 OR i.deleted IS NULL') {
+  return `
+    SELECT
+      i.*,
+      COALESCE(p.paid_amount, 0) AS paid_amount,
+      GREATEST(COALESCE(i.total, 0) - COALESCE(p.paid_amount, 0), 0) AS balance_due,
+      CASE
+        WHEN COALESCE(p.paid_amount, 0) <= 0 THEN 'unpaid'
+        WHEN COALESCE(p.paid_amount, 0) >= COALESCE(i.total, 0) THEN 'paid'
+        ELSE 'partial'
+      END AS payment_state
+    FROM invoices i
+    LEFT JOIN (
+      SELECT invoice_id, SUM(amount) AS paid_amount
+      FROM invoice_payments
+      GROUP BY invoice_id
+    ) p ON p.invoice_id = i.id
+    ${whereClause}
+  `;
+}
+
+async function getInvoiceWithReceivables(invoiceId) {
+  const [[invoice]] = await pool.query(
+    `${invoiceReceivableSelect('WHERE i.id = ? AND (i.deleted = 0 OR i.deleted IS NULL)')} LIMIT 1`,
+    [invoiceId]
+  );
+  return invoice;
 }
 
 /* ================= CREATE FROM RFQ ================= */
@@ -282,10 +326,8 @@ exports.getInvoices = async (req, res) => {
     await ensureInvoiceColumns();
 
     const [rows] = await pool.query(`
-      SELECT *
-      FROM invoices
-      WHERE deleted = 0 OR deleted IS NULL
-      ORDER BY id ASC
+      ${invoiceReceivableSelect()}
+      ORDER BY i.id ASC
     `);
 
     res.json({ invoices: rows });
@@ -302,10 +344,7 @@ exports.getInvoiceDetails = async (req, res) => {
     const id = Number(req.params.id || 0);
     if (!id) return res.status(400).json({ message: 'Invoice ID required' });
 
-    const [[invoice]] = await pool.query(
-      'SELECT * FROM invoices WHERE id = ? AND (deleted = 0 OR deleted IS NULL) LIMIT 1',
-      [id]
-    );
+    const invoice = await getInvoiceWithReceivables(id);
 
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
@@ -314,7 +353,12 @@ exports.getInvoiceDetails = async (req, res) => {
       [id]
     );
 
-    res.json({ invoice, items });
+    const [payments] = await pool.query(
+      'SELECT * FROM invoice_payments WHERE invoice_id = ? ORDER BY payment_date DESC, id DESC',
+      [id]
+    );
+
+    res.json({ invoice, items, payments });
   } catch (err) {
     console.error('GET INVOICE DETAILS ERROR FULL:', err);
     res.status(500).json({ message: 'Failed to load invoice details', error: err.message });
@@ -446,23 +490,147 @@ exports.sendInvoice = async (req, res) => {
 
 exports.markInvoicePaid = async (req, res) => {
   try {
+    await ensureInvoiceColumns();
+
     const { invoice_id } = req.body;
 
     if (!invoice_id) return res.status(400).json({ message: 'Invoice ID required' });
 
+    const invoice = await getInvoiceWithReceivables(invoice_id);
+    if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+    const balanceDue = Number(invoice.balance_due || 0);
+
+    if (balanceDue > 0) {
+      await pool.query(
+        `
+        INSERT INTO invoice_payments
+        (invoice_id, amount, payment_date, method, reference, notes, created_by)
+        VALUES (?, ?, CURDATE(), ?, ?, ?, ?)
+        `,
+        [
+          invoice_id,
+          balanceDue,
+          'Marked paid',
+          invoice.invoice_no || '',
+          'Full remaining balance marked as paid',
+          req.user?.id || null
+        ]
+      );
+    }
+
     const [result] = await pool.query(
-      "UPDATE invoices SET status = 'paid' WHERE id = ?",
+      "UPDATE invoices SET status = 'paid' WHERE id = ? AND (deleted = 0 OR deleted IS NULL)",
       [invoice_id]
     );
 
     if (result.affectedRows === 0) return res.status(404).json({ message: 'Invoice not found' });
 
-    await logInvoiceActivity(invoice_id, 'paid', 'Invoice marked as paid');
+    await logInvoiceActivity(invoice_id, 'paid', `Invoice marked as paid. Payment captured: ${balanceDue.toFixed(2)}`);
 
     res.json({ message: 'Invoice marked as paid' });
   } catch (err) {
     console.error('MARK INVOICE PAID ERROR FULL:', err);
     res.status(500).json({ message: 'Invoice paid update failed', error: err.message });
+  }
+};
+
+exports.recordInvoicePayment = async (req, res) => {
+  try {
+    await ensureInvoiceColumns();
+
+    const invoiceId = Number(req.body.invoice_id || 0);
+    const amount = Number(req.body.amount || 0);
+    const paymentDate = String(req.body.payment_date || '').trim() || new Date().toISOString().slice(0, 10);
+    const method = String(req.body.method || 'Bank transfer').trim();
+    const reference = String(req.body.reference || '').trim();
+    const notes = String(req.body.notes || '').trim();
+
+    if (!invoiceId) return res.status(400).json({ message: 'Invoice ID required' });
+    if (!Number.isFinite(amount) || amount <= 0) {
+      return res.status(400).json({ message: 'Payment amount must be greater than zero' });
+    }
+
+    const invoice = await getInvoiceWithReceivables(invoiceId);
+    if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+
+    const balanceDue = Number(invoice.balance_due || 0);
+    if (balanceDue <= 0) {
+      return res.status(400).json({ message: 'This invoice is already fully paid' });
+    }
+
+    if (amount > balanceDue + 0.009) {
+      return res.status(400).json({
+        message: `Payment cannot exceed balance due of $${balanceDue.toFixed(2)}`
+      });
+    }
+
+    await pool.query(
+      `
+      INSERT INTO invoice_payments
+      (invoice_id, amount, payment_date, method, reference, notes, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+      `,
+      [invoiceId, amount, paymentDate, method, reference, notes, req.user?.id || null]
+    );
+
+    const refreshed = await getInvoiceWithReceivables(invoiceId);
+    const fullyPaid = Number(refreshed.balance_due || 0) <= 0.009;
+
+    if (fullyPaid) {
+      await pool.query("UPDATE invoices SET status = 'paid' WHERE id = ?", [invoiceId]);
+    } else if (String(invoice.status || '').toLowerCase() === 'draft') {
+      await pool.query("UPDATE invoices SET status = 'sent' WHERE id = ?", [invoiceId]);
+    }
+
+    await logInvoiceActivity(
+      invoiceId,
+      'payment',
+      `Payment received: $${amount.toFixed(2)} via ${method}${reference ? ` | Ref: ${reference}` : ''}`
+    );
+
+    const finalInvoice = await getInvoiceWithReceivables(invoiceId);
+    res.json({
+      message: fullyPaid ? 'Payment saved. Invoice is fully paid.' : 'Payment saved. Balance updated.',
+      invoice: finalInvoice
+    });
+  } catch (err) {
+    console.error('RECORD INVOICE PAYMENT ERROR FULL:', err);
+    res.status(500).json({ message: 'Invoice payment failed', error: err.message });
+  }
+};
+
+exports.deleteInvoicePayment = async (req, res) => {
+  try {
+    await ensureInvoiceColumns();
+
+    const invoiceId = Number(req.body.invoice_id || 0);
+    const paymentId = Number(req.body.payment_id || 0);
+
+    if (!invoiceId || !paymentId) {
+      return res.status(400).json({ message: 'Invoice ID and payment ID are required' });
+    }
+
+    const [[payment]] = await pool.query(
+      'SELECT * FROM invoice_payments WHERE id = ? AND invoice_id = ? LIMIT 1',
+      [paymentId, invoiceId]
+    );
+
+    if (!payment) return res.status(404).json({ message: 'Payment entry not found' });
+
+    await pool.query('DELETE FROM invoice_payments WHERE id = ? AND invoice_id = ?', [paymentId, invoiceId]);
+
+    const invoice = await getInvoiceWithReceivables(invoiceId);
+    if (invoice && Number(invoice.balance_due || 0) > 0 && String(invoice.status || '').toLowerCase() === 'paid') {
+      await pool.query("UPDATE invoices SET status = 'sent' WHERE id = ?", [invoiceId]);
+    }
+
+    await logInvoiceActivity(invoiceId, 'payment_deleted', `Payment deleted: $${Number(payment.amount || 0).toFixed(2)}`);
+
+    res.json({ message: 'Payment entry deleted' });
+  } catch (err) {
+    console.error('DELETE INVOICE PAYMENT ERROR FULL:', err);
+    res.status(500).json({ message: 'Invoice payment delete failed', error: err.message });
   }
 };
 
@@ -653,9 +821,11 @@ async function logInvoiceActivity(invoiceId, actionType, notes) {
 
 exports.viewInvoicePdf = async (req, res) => {
   try {
+    await ensureInvoiceColumns();
+
     const { id } = req.params;
 
-    const [[invoice]] = await pool.query('SELECT * FROM invoices WHERE id = ? LIMIT 1', [id]);
+    const invoice = await getInvoiceWithReceivables(id);
 
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
 
@@ -690,7 +860,9 @@ exports.viewInvoicePdf = async (req, res) => {
 };
 
 async function buildInvoicePdfBuffer(id) {
-  const [[invoice]] = await pool.query('SELECT * FROM invoices WHERE id = ? LIMIT 1', [id]);
+  await ensureInvoiceColumns();
+
+  const invoice = await getInvoiceWithReceivables(id);
 
   if (!invoice) {
     throw new Error('Invoice not found');
@@ -731,6 +903,8 @@ function renderInvoicePdf(doc, invoice, items, id) {
   const subtotal = invoiceItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const gst = subtotal * (gstRate / 100);
   const total = subtotal + gst;
+  const paidAmount = Number(invoice.paid_amount || 0);
+  const balanceDue = Math.max(total - paidAmount, 0);
   const invoiceDate = invoice.created_at
     ? new Date(invoice.created_at).toLocaleDateString('en-AU')
     : new Date().toLocaleDateString('en-AU');
@@ -816,14 +990,18 @@ function renderInvoicePdf(doc, invoice, items, id) {
 
   const totalsX = 338;
   const totalsY = Math.min(y + 20, 610);
-  doc.roundedRect(totalsX, totalsY, 210, 110, 10).fill(panel).strokeColor(line).stroke();
-  doc.fillColor(muted).fontSize(10).text('Subtotal', totalsX + 18, totalsY + 18);
-  doc.fillColor(ink).text(`$${subtotal.toFixed(2)}`, totalsX + 120, totalsY + 18, { width: 70, align: 'right' });
-  doc.fillColor(muted).text(`GST (${gstRate}%)`, totalsX + 18, totalsY + 43);
-  doc.fillColor(ink).text(`$${gst.toFixed(2)}`, totalsX + 120, totalsY + 43, { width: 70, align: 'right' });
-  doc.roundedRect(totalsX, totalsY + 68, 210, 42, 8).fill(navy);
-  doc.fillColor('#ffffff').fontSize(12).text('TOTAL AUD', totalsX + 18, totalsY + 82);
-  doc.fontSize(15).text(`$${total.toFixed(2)}`, totalsX + 108, totalsY + 80, { width: 82, align: 'right' });
+  doc.roundedRect(totalsX, totalsY, 210, 118, 10).fill(panel).strokeColor(line).stroke();
+  doc.fillColor(muted).fontSize(9).text('Subtotal', totalsX + 18, totalsY + 14);
+  doc.fillColor(ink).text(`$${subtotal.toFixed(2)}`, totalsX + 120, totalsY + 14, { width: 70, align: 'right' });
+  doc.fillColor(muted).text(`GST (${gstRate}%)`, totalsX + 18, totalsY + 34);
+  doc.fillColor(ink).text(`$${gst.toFixed(2)}`, totalsX + 120, totalsY + 34, { width: 70, align: 'right' });
+  doc.fillColor(muted).text('Total', totalsX + 18, totalsY + 54);
+  doc.fillColor(ink).text(`$${total.toFixed(2)}`, totalsX + 120, totalsY + 54, { width: 70, align: 'right' });
+  doc.fillColor(muted).text('Paid', totalsX + 18, totalsY + 74);
+  doc.fillColor(ink).text(`$${paidAmount.toFixed(2)}`, totalsX + 120, totalsY + 74, { width: 70, align: 'right' });
+  doc.roundedRect(totalsX, totalsY + 92, 210, 42, 8).fill(navy);
+  doc.fillColor('#ffffff').fontSize(11).text('BALANCE DUE', totalsX + 18, totalsY + 106);
+  doc.fontSize(14).text(`$${balanceDue.toFixed(2)}`, totalsX + 108, totalsY + 104, { width: 82, align: 'right' });
 
   const payY = 642;
   doc.fillColor(accentDark).fontSize(11).text('Payment details', 48, payY);

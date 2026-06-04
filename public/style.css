@@ -689,6 +689,16 @@ th {
   border-color: rgba(34, 197, 94, 0.35);
 }
 
+.money-positive {
+  color: var(--success);
+  font-weight: 900;
+}
+
+.money-danger {
+  color: #f87171;
+  font-weight: 900;
+}
+
 .empty-state,
 .status-note {
   color: var(--muted);
@@ -912,6 +922,50 @@ tr:hover td {
 
 .single-dialog-grid {
   grid-template-columns: 1fr;
+}
+
+.payment-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.payment-summary-card {
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  border-radius: 14px;
+  padding: 14px;
+  background:
+    linear-gradient(145deg, rgba(45, 212, 191, 0.12), rgba(14, 165, 233, 0.08)),
+    rgba(2, 6, 23, 0.62);
+}
+
+.payment-summary-card span,
+.field-label {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 7px;
+}
+
+.payment-summary-card strong {
+  display: block;
+  font-size: clamp(20px, 2.2vw, 28px);
+}
+
+.payment-dialog-grid {
+  grid-template-columns: minmax(300px, 0.75fr) minmax(460px, 1.25fr);
+}
+
+.mini-table-wrap {
+  overflow-x: auto;
+  border: 1px solid rgba(45, 212, 191, 0.16);
+  border-radius: 12px;
+}
+
+.mini-table-wrap table {
+  min-width: 680px;
 }
 
 .dialog-card {
@@ -2057,6 +2111,8 @@ tr:hover td {
   }
 
   .stock-dialog-grid,
+  .payment-summary-grid,
+  .payment-dialog-grid,
   .split-grid,
   .access-grid,
   .material-live-summary {
