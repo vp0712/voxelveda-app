@@ -844,7 +844,7 @@ th {
 
 .chart-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 20px;
 }
 
@@ -860,6 +860,10 @@ th {
 }
 
 .expense-chart-grid .card {
+  min-height: 360px;
+}
+
+.finance-chart-card {
   min-height: 360px;
 }
 
@@ -2295,12 +2299,25 @@ tr:hover td {
 
   .chart-grid .card {
     height: auto;
-    min-height: 300px;
+    min-height: 320px;
+    overflow: visible;
   }
 
   .chart-grid canvas {
-    height: 230px !important;
-    max-height: 230px !important;
+    width: 100% !important;
+    height: 240px !important;
+    max-height: 240px !important;
+  }
+
+  .expense-chart-grid .card {
+    min-height: 320px;
+    overflow: visible;
+  }
+
+  .expense-chart-grid canvas {
+    width: 100% !important;
+    height: 240px !important;
+    max-height: 240px !important;
   }
 
   .stock-dialog-grid,
@@ -2468,8 +2485,8 @@ tr:hover td {
   }
 
   .chart-grid canvas {
-    height: 210px !important;
-    max-height: 210px !important;
+    height: 240px !important;
+    max-height: 240px !important;
   }
 
   table.responsive-table td {

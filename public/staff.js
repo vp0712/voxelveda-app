@@ -174,6 +174,7 @@ function applyPermissionUI() {
   const canUseStockIn = hasPermission('stock_in');
   const canUseStockOut = hasPermission('stock_out');
   const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut;
+  const canUseFinance = hasPermission('invoices') || hasPermission('expenses');
 
   setPermissionVisibility('.permission-tasks', canUseTasks);
   setPermissionVisibility('.permission-attendance', canUseAttendance);
@@ -181,10 +182,31 @@ function applyPermissionUI() {
   setPermissionVisibility('.permission-stock', canUseStock);
   setPermissionVisibility('.permission-stock-in', canUseStockIn);
   setPermissionVisibility('.permission-stock-out', canUseStockOut);
+  setPermissionVisibility('.permission-finance', canUseFinance);
 
   if (document.querySelector('.nav-btn.active.hidden-section')) {
     document.querySelector('[data-section="dashboardSection"]')?.click();
   }
+}
+
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.innerText = value;
+}
+
+async function loadStaffFinanceOverview() {
+  if (!hasPermission('invoices') && !hasPermission('expenses')) return;
+
+  const res = await fetch('/api/dashboard/stats', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) return;
+
+  setText('staffRevenueValue', formatMoney(data.finance?.revenue));
+  setText('staffExpenseValue', formatMoney(data.finance?.expenses));
+  setText('staffNetWorthValue', formatMoney(data.finance?.net_worth));
 }
 
 function setPermissionVisibility(selector, allowed) {
@@ -1408,6 +1430,7 @@ function startAutoRefresh() {
     await loadAnnouncements();
     await loadAttendanceStatus();
     await loadTimesheet();
+    await loadStaffFinanceOverview();
     if (hasPermission('stock')) {
       await loadStaffStock();
       await loadStaffStockOut();
@@ -1435,7 +1458,8 @@ async function bootStaffDashboard() {
       loadMyTasks(),
       loadAnnouncements(),
       loadAttendanceStatus(),
-      loadTimesheet()
+      loadTimesheet(),
+      loadStaffFinanceOverview()
     ]);
 
     if (hasPermission('stock')) {

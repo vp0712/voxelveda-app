@@ -130,6 +130,21 @@
             <p><strong id="dashboardMaterialWorth">$0.00</strong></p>
             <span>Material value left</span>
           </div>
+          <div class="card kpi-blue">
+            <h3>Revenue</h3>
+            <p><strong id="dashboardRevenueValue">$0.00</strong></p>
+            <span>Collected this financial year</span>
+          </div>
+          <div class="card kpi-teal">
+            <h3>Expenses</h3>
+            <p><strong id="dashboardExpenseValue">$0.00</strong></p>
+            <span>Paid / recorded this financial year</span>
+          </div>
+          <div class="card kpi-green">
+            <h3>Net Worth</h3>
+            <p><strong id="dashboardNetWorthValue">$0.00</strong></p>
+            <span>Revenue minus expenses</span>
+          </div>
         </div>
 
         <div class="chart-grid">
@@ -141,6 +156,10 @@
           <div class="card">
             <h3>Invoice Status</h3>
             <canvas id="invoiceChart"></canvas>
+          </div>
+          <div class="card finance-chart-card">
+            <h3>Revenue vs Expenses</h3>
+            <canvas id="financeChart"></canvas>
           </div>
         </div>
 

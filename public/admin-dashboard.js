@@ -12,6 +12,7 @@ if (currentRole && currentRole !== 'admin') {
 
 let rfqChartInstance = null;
 let invoiceChartInstance = null;
+let financeChartInstance = null;
 let expenseCategoryChartInstance = null;
 let expenseMonthChartInstance = null;
 let invoiceCache = [];
@@ -468,6 +469,10 @@ async function loadDashboardStats() {
       `${data.invoices.total_invoices || 0} total | $${Number(data.invoices.paid_revenue || 0).toFixed(2)} paid`;
   }
 
+  setText('dashboardRevenueValue', formatMoney(data.finance?.revenue));
+  setText('dashboardExpenseValue', formatMoney(data.finance?.expenses));
+  setText('dashboardNetWorthValue', formatMoney(data.finance?.net_worth));
+
   renderCharts(data);
   await loadDashboardWidgets();
 }
@@ -559,11 +564,13 @@ function renderLastOrders(invoices) {
 function renderCharts(data) {
   const rfqCanvas = document.getElementById('rfqChart');
   const invoiceCanvas = document.getElementById('invoiceChart');
+  const financeCanvas = document.getElementById('financeChart');
 
   if (!rfqCanvas || !invoiceCanvas || typeof Chart === 'undefined') return;
 
   if (rfqChartInstance) rfqChartInstance.destroy();
   if (invoiceChartInstance) invoiceChartInstance.destroy();
+  if (financeChartInstance) financeChartInstance.destroy();
 
   rfqChartInstance = new Chart(rfqCanvas, {
     type: 'doughnut',
@@ -618,6 +625,42 @@ function renderCharts(data) {
       }
     }
   });
+
+  if (financeCanvas) {
+    const months = data.finance?.months || [];
+    financeChartInstance = new Chart(financeCanvas, {
+      type: 'bar',
+      data: {
+        labels: months.map((row) => row.month_key),
+        datasets: [
+          {
+            label: 'Revenue',
+            data: months.map((row) => Number(row.revenue || 0)),
+            backgroundColor: '#2dd4bf'
+          },
+          {
+            label: 'Expenses',
+            data: months.map((row) => Number(row.expenses || 0)),
+            backgroundColor: '#f87171'
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#f8fafc' }
+          }
+        },
+        scales: {
+          x: { ticks: { color: '#f8fafc' } },
+          y: { beginAtZero: true, ticks: { color: '#f8fafc' } }
+        }
+      }
+    });
+  }
 }
 
 function todayISO(offsetDays = 0) {
