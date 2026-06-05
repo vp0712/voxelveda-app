@@ -190,6 +190,7 @@
             <p>Newest invoices are added at the bottom of the register</p>
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button onclick="openCustomerStatementDialog()" class="secondary-btn">Customer Statement</button>
             <button onclick="manualCreateInvoice()" class="secondary-btn">Create From RFQ</button>
             <button onclick="openManualInvoiceDialog()" class="primary-btn">Manual Invoice</button>
           </div>
@@ -847,7 +848,10 @@
               <input id="qrTargetUrl" placeholder="QR redirect URL" oninput="renderQrCode()" />
             </div>
             <div class="qr-preview-panel">
-              <img id="qrPreviewImage" alt="Voxel Veda QR Code" />
+              <div class="branded-qr-frame settings-qr-frame">
+                <img id="qrPreviewImage" alt="Voxel Veda QR Code" />
+                <span class="branded-qr-logo"><img src="/Frame 1.png?v=20260601-clean-logo" alt="Voxel Veda" /></span>
+              </div>
               <div>
                 <strong id="qrPreviewTitle">Customer RFQ Form</strong>
                 <p id="qrPreviewUrl">-</p>
@@ -911,6 +915,7 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260602-input-permissions"></script>
+  <script src="/qr-widget.js?v=20260605-global-qr"></script>
+  <script src="/admin-dashboard.js?v=20260605-statements-qr"></script>
 </body>
 </html>

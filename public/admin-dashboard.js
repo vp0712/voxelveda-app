@@ -1175,6 +1175,159 @@ async function deleteInvoicePayment(invoiceId, paymentId) {
   await openInvoicePaymentDialog(invoiceId);
 }
 
+function customerStatementPdfUrl(match, download = false) {
+  const params = new URLSearchParams({
+    token,
+    customer_name: match.customer_name || '',
+    customer_email: match.customer_email || ''
+  });
+  if (download) params.set('download', '1');
+  return `/api/invoice/statement/pdf?${params.toString()}`;
+}
+
+function statementMatchCards(matches) {
+  if (!matches.length) {
+    return '<div class="empty-state">Search customer name, email, or invoice number to build a full account statement.</div>';
+  }
+
+  return matches.map((match, index) => `
+    <article class="statement-result-card">
+      <div>
+        <strong>${escapeHtml(match.customer_name || 'Customer')}</strong>
+        <span>${escapeHtml(match.customer_email || '-')}</span>
+      </div>
+      <div class="statement-result-metrics">
+        <span>${escapeHtml(match.invoice_count || 0)} invoices</span>
+        <span>Paid ${escapeHtml(formatMoney(match.paid_amount))}</span>
+        <span class="${Number(match.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">Debt ${escapeHtml(formatMoney(match.balance_due))}</span>
+      </div>
+      <div class="card-actions">
+        <button class="small-btn" onclick="openCustomerStatementPdf(${index}, false)">Open PDF</button>
+        <button class="secondary-btn" onclick="openCustomerStatementPdf(${index}, true)">Download</button>
+        <button class="primary-btn" onclick="openCustomerStatementSendDialog(${index})">Send</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+async function runCustomerStatementSearch() {
+  const input = document.getElementById('statementSearchInput');
+  const results = document.getElementById('statementSearchResults');
+  const search = input?.value.trim() || '';
+
+  if (!results) return;
+  if (search.length < 2) {
+    results.innerHTML = '<div class="empty-state">Type at least 2 letters.</div>';
+    return;
+  }
+
+  results.innerHTML = '<div class="empty-state">Searching account history...</div>';
+  const res = await fetch(`/api/invoice/statement/search?search=${encodeURIComponent(search)}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    results.innerHTML = `<div class="empty-state">${escapeHtml(data.message || 'Statement search failed')}</div>`;
+    return;
+  }
+
+  window.__statementMatches = data.matches || [];
+  results.innerHTML = statementMatchCards(window.__statementMatches);
+}
+
+function openCustomerStatementPdf(index, download = false) {
+  const match = (window.__statementMatches || [])[index];
+  if (!match) {
+    showToast('Choose a customer first');
+    return;
+  }
+  window.open(customerStatementPdfUrl(match, download), '_blank', 'noopener');
+}
+
+function openCustomerStatementDialog() {
+  window.__statementMatches = [];
+  showDialog(
+    'Customer Payment Statement',
+    `
+      <p class="status-note">Search once to see the customer whole invoice, payment and debt history. Then open PDF, download it, email it, or prepare a WhatsApp message.</p>
+      <div class="statement-search-bar">
+        <input id="statementSearchInput" placeholder="Search customer name, email or invoice number" onkeydown="if(event.key === 'Enter') runCustomerStatementSearch()" />
+        <button class="primary-btn" type="button" onclick="runCustomerStatementSearch()">Search</button>
+      </div>
+      <div id="statementSearchResults" class="statement-results">
+        <div class="empty-state">Search customer name, email, or invoice number to build a full account statement.</div>
+      </div>
+    `,
+    () => hideDialog(),
+    'Close'
+  );
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+function openCustomerStatementSendDialog(index) {
+  const match = (window.__statementMatches || [])[index];
+  if (!match) {
+    showToast('Choose a customer first');
+    return;
+  }
+
+  showDialog(
+    `Send Statement: ${match.customer_name || 'Customer'}`,
+    `
+      <div class="payment-summary-grid">
+        <div class="payment-summary-card"><span>Invoice Value</span><strong>${escapeHtml(formatMoney(match.invoice_value))}</strong></div>
+        <div class="payment-summary-card"><span>Payments Taken</span><strong class="money-positive">${escapeHtml(formatMoney(match.paid_amount))}</strong></div>
+        <div class="payment-summary-card"><span>Debt Left</span><strong class="${Number(match.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(match.balance_due))}</strong></div>
+      </div>
+      <div class="stock-dialog-grid">
+        <div class="dialog-card">
+          <h4>Email PDF Statement</h4>
+          <label class="field-label">Email address</label>
+          <input id="statementEmail" type="email" value="${escapeHtml(match.customer_email || '')}" placeholder="customer@email.com" />
+        </div>
+        <div class="dialog-card">
+          <h4>WhatsApp Summary</h4>
+          <label class="field-label">Mobile number with country code</label>
+          <input id="statementMobile" placeholder="614xxxxxxxx" />
+          <p class="status-note">WhatsApp opens with the payment summary. Attach the downloaded PDF if required.</p>
+        </div>
+      </div>
+    `,
+    async () => {
+      const body = {
+        customer_name: match.customer_name || '',
+        customer_email: match.customer_email || '',
+        email: document.getElementById('statementEmail')?.value.trim(),
+        mobile: document.getElementById('statementMobile')?.value.trim()
+      };
+
+      if (!body.email && !body.mobile) {
+        showToast('Enter email or mobile number');
+        return;
+      }
+
+      const res = await fetch('/api/invoice/statement/send', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Statement send failed');
+        return;
+      }
+
+      showToast(data.message || 'Statement ready');
+      if (data.whatsapp_url) window.open(data.whatsapp_url, '_blank', 'noopener');
+      hideDialog();
+    },
+    'Send Statement'
+  );
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
 function openInvoicePdf(invoiceId) {
   const url = `/invoice-pdf.html?id=${encodeURIComponent(invoiceId)}&token=${encodeURIComponent(token)}`;
   const opened = window.open(url, '_blank', 'noopener');

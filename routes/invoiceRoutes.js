@@ -7,6 +7,11 @@ const requireInputPermission = require('../middleware/inputPermissionMiddleware'
 /* ================= GET ================= */
 
 router.get('/', invoiceController.getInvoices);
+
+router.get('/statement/search', invoiceController.searchCustomerStatements);
+router.get('/statement/pdf', invoiceController.viewCustomerStatementPdf);
+router.post('/statement/send', requireInputPermission('invoices_input'), invoiceController.sendCustomerStatement);
+
 router.get('/:id', invoiceController.getInvoiceDetails);
 
 /* ================= CREATE ================= */

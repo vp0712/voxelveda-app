@@ -124,6 +124,80 @@ async function getInvoiceWithReceivables(invoiceId) {
   return invoice;
 }
 
+function cleanPhoneForWhatsApp(value) {
+  return String(value || '').replace(/[^\d]/g, '');
+}
+
+async function buildCustomerStatementData({ search = '', customer_email = '', customer_name = '' }) {
+  await ensureInvoiceColumns();
+
+  const where = [];
+  const params = [];
+
+  if (customer_email) {
+    where.push('LOWER(customer_email) = LOWER(?)');
+    params.push(customer_email);
+  } else if (customer_name) {
+    where.push('LOWER(customer_name) = LOWER(?)');
+    params.push(customer_name);
+  }
+
+  if (!where.length && search) {
+    where.push('(customer_name LIKE ? OR customer_email LIKE ? OR invoice_no LIKE ?)');
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+
+  if (!where.length) {
+    throw new Error('Customer name, email, or search text is required');
+  }
+
+  const [invoices] = await pool.query(
+    `
+    SELECT *
+    FROM (${invoiceReceivableSelect()}) receivables
+    WHERE ${where.join(' OR ')}
+    ORDER BY created_at ASC, id ASC
+    `,
+    params
+  );
+
+  const invoiceIds = invoices.map((invoice) => Number(invoice.id)).filter(Boolean);
+  let payments = [];
+
+  if (invoiceIds.length) {
+    const placeholders = invoiceIds.map(() => '?').join(',');
+    const [rows] = await pool.query(
+      `
+      SELECT p.*, i.invoice_no, i.customer_name, i.customer_email
+      FROM invoice_payments p
+      JOIN invoices i ON i.id = p.invoice_id
+      WHERE p.invoice_id IN (${placeholders})
+      ORDER BY p.payment_date ASC, p.id ASC
+      `,
+      invoiceIds
+    );
+    payments = rows;
+  }
+
+  const totals = invoices.reduce((acc, invoice) => {
+    acc.invoice_value += Number(invoice.total || 0);
+    acc.paid += Number(invoice.paid_amount || 0);
+    acc.balance_due += Number(invoice.balance_due || 0);
+    return acc;
+  }, { invoice_value: 0, paid: 0, balance_due: 0 });
+
+  const first = invoices[0] || {};
+  return {
+    customer: {
+      name: customer_name || first.customer_name || search || 'Customer',
+      email: customer_email || first.customer_email || ''
+    },
+    invoices,
+    payments,
+    totals
+  };
+}
+
 /* ================= CREATE FROM RFQ ================= */
 
 exports.createInvoice = async (req, res) => {
@@ -362,6 +436,145 @@ exports.getInvoiceDetails = async (req, res) => {
   } catch (err) {
     console.error('GET INVOICE DETAILS ERROR FULL:', err);
     res.status(500).json({ message: 'Failed to load invoice details', error: err.message });
+  }
+};
+
+exports.searchCustomerStatements = async (req, res) => {
+  try {
+    await ensureInvoiceColumns();
+
+    const search = String(req.query.search || '').trim();
+    if (search.length < 2) {
+      return res.json({ matches: [] });
+    }
+
+    const [matches] = await pool.query(
+      `
+      SELECT
+        COALESCE(NULLIF(customer_email, ''), CONCAT('name:', customer_name)) AS customer_key,
+        COALESCE(NULLIF(customer_name, ''), 'Customer') AS customer_name,
+        COALESCE(customer_email, '') AS customer_email,
+        COUNT(*) AS invoice_count,
+        COALESCE(SUM(total), 0) AS invoice_value,
+        COALESCE(SUM(paid_amount), 0) AS paid_amount,
+        COALESCE(SUM(balance_due), 0) AS balance_due
+      FROM (${invoiceReceivableSelect()}) receivables
+      WHERE customer_name LIKE ? OR customer_email LIKE ? OR invoice_no LIKE ?
+      GROUP BY customer_key, customer_name, customer_email
+      ORDER BY balance_due DESC, customer_name ASC
+      LIMIT 20
+      `,
+      [`%${search}%`, `%${search}%`, `%${search}%`]
+    );
+
+    res.json({ matches });
+  } catch (err) {
+    console.error('SEARCH CUSTOMER STATEMENTS ERROR FULL:', err);
+    res.status(500).json({ message: 'Failed to search customer statements', error: err.message });
+  }
+};
+
+exports.viewCustomerStatementPdf = async (req, res) => {
+  try {
+    const statement = await buildCustomerStatementData({
+      search: String(req.query.search || '').trim(),
+      customer_email: String(req.query.customer_email || '').trim(),
+      customer_name: String(req.query.customer_name || '').trim()
+    });
+
+    if (!statement.invoices.length) {
+      return res.status(404).json({ message: 'No invoice history found for this customer' });
+    }
+
+    const disposition = req.query.download ? 'attachment' : 'inline';
+    const safeName = String(statement.customer.name || 'customer').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `${disposition}; filename="${safeName}-statement.pdf"`);
+
+    const doc = createCustomerStatementPdfDocument(statement);
+    doc.pipe(res);
+    doc.end();
+  } catch (err) {
+    console.error('CUSTOMER STATEMENT PDF ERROR FULL:', err);
+    res.status(500).json({ message: 'Statement PDF generation failed', error: err.message });
+  }
+};
+
+exports.sendCustomerStatement = async (req, res) => {
+  try {
+    const statement = await buildCustomerStatementData({
+      search: String(req.body.search || '').trim(),
+      customer_email: String(req.body.customer_email || '').trim(),
+      customer_name: String(req.body.customer_name || '').trim()
+    });
+
+    if (!statement.invoices.length) {
+      return res.status(404).json({ message: 'No invoice history found for this customer' });
+    }
+
+    const email = String(req.body.email || statement.customer.email || '').trim();
+    const mobile = String(req.body.mobile || '').trim();
+    let emailSent = false;
+    let whatsappUrl = '';
+
+    if (email) {
+      const required = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL'];
+      const missing = required.filter((key) => !process.env[key]);
+
+      if (missing.length) {
+        return res.status(500).json({
+          message: `Email is not configured. Missing: ${missing.join(', ')}`
+        });
+      }
+
+      const pdfBuffer = await buildCustomerStatementPdfBuffer(statement);
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: Number(process.env.SMTP_PORT),
+        secure: String(process.env.SMTP_SECURE || 'true') === 'true',
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      await transporter.sendMail({
+        from: `"${process.env.FROM_NAME || 'Voxel Veda'}" <${process.env.FROM_EMAIL}>`,
+        to: email,
+        subject: `Voxel Veda account statement - ${statement.customer.name}`,
+        text: `Hello ${statement.customer.name},\n\nPlease find attached your Voxel Veda account statement.\n\nInvoice value: $${statement.totals.invoice_value.toFixed(2)}\nPayment received: $${statement.totals.paid.toFixed(2)}\nBalance due: $${statement.totals.balance_due.toFixed(2)}\n\nThank you,\nVoxel Veda`,
+        attachments: [{
+          filename: 'voxel-veda-account-statement.pdf',
+          content: pdfBuffer,
+          contentType: 'application/pdf'
+        }]
+      });
+
+      emailSent = true;
+    }
+
+    if (mobile) {
+      const phone = cleanPhoneForWhatsApp(mobile);
+      const message = [
+        `Voxel Veda account statement for ${statement.customer.name}`,
+        `Invoice value: $${statement.totals.invoice_value.toFixed(2)}`,
+        `Payment received: $${statement.totals.paid.toFixed(2)}`,
+        `Balance due: $${statement.totals.balance_due.toFixed(2)}`,
+        'Please contact Voxel Veda accounts for any queries.'
+      ].join('\n');
+      whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+    }
+
+    res.json({
+      message: emailSent
+        ? (whatsappUrl ? 'Statement emailed. WhatsApp message is ready.' : 'Statement emailed successfully.')
+        : (whatsappUrl ? 'WhatsApp message is ready.' : 'Choose email or mobile to send the statement.'),
+      email_sent: emailSent,
+      whatsapp_url: whatsappUrl
+    });
+  } catch (err) {
+    console.error('SEND CUSTOMER STATEMENT ERROR FULL:', err);
+    res.status(500).json({ message: 'Statement send failed', error: err.message });
   }
 };
 
@@ -883,10 +1096,188 @@ async function buildInvoicePdfBuffer(id) {
   });
 }
 
+async function buildCustomerStatementPdfBuffer(statement) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    const doc = createCustomerStatementPdfDocument(statement);
+    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    doc.end();
+  });
+}
+
 function createInvoicePdfDocument(invoice, items, id) {
   const doc = new PDFDocument({ size: 'A4', margin: 0 });
   renderInvoicePdf(doc, invoice, items, id);
   return doc;
+}
+
+function createCustomerStatementPdfDocument(statement) {
+  const doc = new PDFDocument({ size: 'A4', margin: 36 });
+  renderCustomerStatementPdf(doc, statement);
+  return doc;
+}
+
+function drawStatementHeader(doc, title, subtitle = '') {
+  const logoPath = path.join(__dirname, '..', 'public', 'Frame 1.png');
+  const W = doc.page.width;
+  const navy = '#07111f';
+  const accent = '#12b3c7';
+
+  doc.rect(0, 0, W, 104).fill(navy);
+  doc.rect(0, 104, W, 3).fill(accent);
+
+  if (fs.existsSync(logoPath)) {
+    try {
+      doc.image(logoPath, 44, 18, { width: 74 });
+    } catch {
+      doc.fillColor('#ffffff').fontSize(18).text('VOXEL VEDA', 44, 38);
+    }
+  }
+
+  doc.fillColor('#ffffff').fontSize(22).text(title, 148, 30, { width: 370, align: 'right' });
+  doc.fillColor('#b6f4ff').fontSize(9).text(subtitle, 148, 62, { width: 370, align: 'right' });
+}
+
+function statementMoney(value) {
+  return `$${Number(value || 0).toFixed(2)}`;
+}
+
+function renderCustomerStatementPdf(doc, statement) {
+  const ink = '#0f172a';
+  const muted = '#64748b';
+  const line = '#d7dee8';
+  const panel = '#f8fafc';
+  const navy = '#07111f';
+  const accent = '#12b3c7';
+  const privacyQrPath = path.join(__dirname, '..', 'public', 'privacy-qr.png');
+
+  drawStatementHeader(doc, 'ACCOUNT STATEMENT', 'Payment record, invoice history and balance due');
+
+  let y = 132;
+  doc.fillColor(ink).fontSize(10).text('Customer', 44, y);
+  doc.fillColor(ink).fontSize(17).text(statement.customer.name || 'Customer', 44, y + 16);
+  doc.fillColor(muted).fontSize(9).text(statement.customer.email || '-', 44, y + 38);
+  doc.fillColor(muted).fontSize(9).text(`Generated: ${new Date().toLocaleDateString('en-AU')}`, 380, y + 16, { width: 160, align: 'right' });
+
+  y += 78;
+  const summary = [
+    ['Invoice Value', statement.totals.invoice_value],
+    ['Payments Taken', statement.totals.paid],
+    ['Debt / Balance Left', statement.totals.balance_due]
+  ];
+
+  summary.forEach(([label, value], index) => {
+    const x = 44 + (index * 170);
+    doc.roundedRect(x, y, 154, 72, 10).fill(panel).strokeColor(line).stroke();
+    doc.fillColor(muted).fontSize(8).text(label.toUpperCase(), x + 14, y + 14);
+    doc.fillColor(index === 2 && Number(value) > 0 ? '#dc2626' : ink).fontSize(16).text(statementMoney(value), x + 14, y + 34);
+  });
+
+  y += 104;
+  doc.fillColor(ink).fontSize(14).text('Invoice History', 44, y);
+  y += 22;
+  doc.roundedRect(44, y, 508, 28, 7).fill(navy);
+  doc.fillColor('#ffffff').fontSize(8);
+  doc.text('DATE', 58, y + 10, { width: 64 });
+  doc.text('INVOICE', 124, y + 10, { width: 72 });
+  doc.text('STATUS', 202, y + 10, { width: 58 });
+  doc.text('TOTAL', 286, y + 10, { width: 70, align: 'right' });
+  doc.text('PAID', 372, y + 10, { width: 70, align: 'right' });
+  doc.text('BALANCE', 458, y + 10, { width: 70, align: 'right' });
+
+  y += 34;
+  statement.invoices.slice(0, 18).forEach((invoice, index) => {
+    if (y > 700) {
+      doc.addPage();
+      drawStatementHeader(doc, 'ACCOUNT STATEMENT', 'Continued invoice history');
+      y = 132;
+    }
+
+    doc.roundedRect(44, y, 508, 28, 5)
+      .fill(index % 2 ? '#ffffff' : panel)
+      .strokeColor('#e5eaf0')
+      .stroke();
+    const date = invoice.created_at ? new Date(invoice.created_at).toLocaleDateString('en-AU') : '-';
+    doc.fillColor(ink).fontSize(8);
+    doc.text(date, 58, y + 9, { width: 64 });
+    doc.text(invoice.invoice_no || `#${invoice.id}`, 124, y + 9, { width: 72 });
+    doc.text(String(invoice.status || '-'), 202, y + 9, { width: 58 });
+    doc.text(statementMoney(invoice.total), 286, y + 9, { width: 70, align: 'right' });
+    doc.text(statementMoney(invoice.paid_amount), 372, y + 9, { width: 70, align: 'right' });
+    doc.text(statementMoney(invoice.balance_due), 458, y + 9, { width: 70, align: 'right' });
+    y += 32;
+  });
+
+  y += 18;
+  if (y > 650) {
+    doc.addPage();
+    drawStatementHeader(doc, 'ACCOUNT STATEMENT', 'Payment ledger');
+    y = 132;
+  }
+
+  doc.fillColor(ink).fontSize(14).text('Payment Ledger', 44, y);
+  y += 22;
+
+  if (!statement.payments.length) {
+    doc.roundedRect(44, y, 508, 36, 8).fill(panel).strokeColor(line).stroke();
+    doc.fillColor(muted).fontSize(9).text('No payments have been recorded for this customer yet.', 58, y + 13);
+    y += 52;
+  } else {
+    doc.roundedRect(44, y, 508, 28, 7).fill(navy);
+    doc.fillColor('#ffffff').fontSize(8);
+    doc.text('DATE', 58, y + 10, { width: 70 });
+    doc.text('INVOICE', 132, y + 10, { width: 80 });
+    doc.text('METHOD', 220, y + 10, { width: 90 });
+    doc.text('REFERENCE', 318, y + 10, { width: 92 });
+    doc.text('AMOUNT', 458, y + 10, { width: 70, align: 'right' });
+    y += 34;
+
+    statement.payments.slice(0, 22).forEach((payment, index) => {
+      if (y > 710) {
+        doc.addPage();
+        drawStatementHeader(doc, 'ACCOUNT STATEMENT', 'Continued payment ledger');
+        y = 132;
+      }
+
+      doc.roundedRect(44, y, 508, 28, 5)
+        .fill(index % 2 ? '#ffffff' : panel)
+        .strokeColor('#e5eaf0')
+        .stroke();
+      doc.fillColor(ink).fontSize(8);
+      doc.text(payment.payment_date ? new Date(payment.payment_date).toLocaleDateString('en-AU') : '-', 58, y + 9, { width: 70 });
+      doc.text(payment.invoice_no || `#${payment.invoice_id}`, 132, y + 9, { width: 80 });
+      doc.text(payment.method || '-', 220, y + 9, { width: 90 });
+      doc.text(payment.reference || '-', 318, y + 9, { width: 92 });
+      doc.text(statementMoney(payment.amount), 458, y + 9, { width: 70, align: 'right' });
+      y += 32;
+    });
+  }
+
+  if (y > 690) {
+    doc.addPage();
+    drawStatementHeader(doc, 'ACCOUNT STATEMENT', 'Privacy and payment notes');
+    y = 132;
+  }
+
+  doc.roundedRect(44, y, 508, 58, 8).fill(panel).strokeColor(line).stroke();
+  doc.fillColor('#0b4f6c').fontSize(9).text('Privacy, confidentiality & payment handling', 58, y + 10);
+  doc.fillColor(muted).fontSize(7.5).text(
+    'This statement may contain confidential customer, invoice, pricing and payment information. Scan the QR code to view the live Voxel Veda privacy policy.',
+    58,
+    y + 26,
+    { width: 390, lineGap: 1 }
+  );
+  if (fs.existsSync(privacyQrPath)) {
+    doc.image(privacyQrPath, 498, y + 10, { width: 38 });
+  }
+
+  y += 78;
+  doc.fillColor(ink).fontSize(10).text('Payment reference', 44, y);
+  doc.fillColor(muted).fontSize(8).text('Please use the invoice number as payment reference. Contact Voxel Veda accounts for corrections or questions.', 44, y + 16, { width: 360 });
+  doc.fillColor(ink).fontSize(9).text('Voxel Veda Pty Ltd', 420, y);
+  doc.fillColor(muted).fontSize(8).text('Innovation in Motion', 420, y + 16);
 }
 
 function renderInvoicePdf(doc, invoice, items, id) {
