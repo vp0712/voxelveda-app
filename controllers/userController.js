@@ -27,6 +27,8 @@ const ALL_PERMISSIONS = [
   'meetings_input',
   'suppliers',
   'suppliers_input',
+  'expenses',
+  'expenses_input',
   'compliance',
   'compliance_input',
   'competitors',

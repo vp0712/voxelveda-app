@@ -859,6 +859,23 @@ th {
   max-height: 280px !important;
 }
 
+.expense-chart-grid .card {
+  min-height: 360px;
+}
+
+.compact-head {
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.compact-head h3 {
+  margin: 0 0 4px;
+}
+
+.compact-head p {
+  margin: 0;
+}
+
 .login-page {
   display: grid;
   place-items: center;

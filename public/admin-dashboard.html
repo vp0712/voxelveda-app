@@ -33,6 +33,7 @@
       <button class="nav-btn" data-section="invoiceSection">Invoices</button>
       <button class="nav-btn" data-section="customerSection">Customers</button>
       <button class="nav-btn" data-section="supplierSection">Suppliers</button>
+      <button class="nav-btn" data-section="expenseSection">Expenses</button>
       <button class="nav-btn" data-section="competitorSection">Competitors</button>
       <details class="nav-group" open>
         <summary class="nav-group-toggle">
@@ -90,9 +91,10 @@
           <button class="quick-pill" onclick="goSection('rfqSection')">RFQs</button>
           <button class="quick-pill" onclick="goSection('stockSection')">Stock</button>
           <button class="quick-pill" onclick="goSection('rawMaterialSection')">Raw Material</button>
-          <button class="quick-pill" onclick="goSection('customerSection')">Customers</button>
-          <button class="quick-pill" onclick="goSection('supplierSection')">Suppliers</button>
-          <button class="quick-pill" onclick="goSection('competitorSection')">Competitors</button>
+      <button class="quick-pill" onclick="goSection('customerSection')">Customers</button>
+      <button class="quick-pill" onclick="goSection('supplierSection')">Suppliers</button>
+      <button class="quick-pill" onclick="goSection('expenseSection')">Expenses</button>
+      <button class="quick-pill" onclick="goSection('competitorSection')">Competitors</button>
         </div>
 
         <div class="metric-grid">
@@ -731,6 +733,93 @@
 
         <div id="competitorRegister" class="forms-library">
           <div class="card">Loading competitors...</div>
+        </div>
+      </section>
+
+      <!-- EXPENSES -->
+      <section id="expenseSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Company Expenses</h2>
+            <p>Bill history, GST position, financial-year expense analysis and payable control.</p>
+          </div>
+          <button onclick="openExpenseDialog()" class="primary-btn">Add Expense</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card">
+            <h3>Total Expenses</h3>
+            <p><strong id="expenseTotalValue">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>GST Paid</h3>
+            <p><strong id="expenseGstPaid">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>GST Collected</h3>
+            <p><strong id="expenseGstCollected">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>GST Position</h3>
+            <p><strong id="expenseGstPosition">$0.00</strong></p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="form-grid">
+            <select id="expenseFinancialYear" onchange="loadExpenses(1)">
+              <option value="">Current financial year</option>
+            </select>
+            <select id="expensePageSize" onchange="setExpensePageSize()">
+              <option value="10">Show 10 entries</option>
+              <option value="25" selected>Show 25 entries</option>
+              <option value="50">Show 50 entries</option>
+              <option value="100">Show 100 entries</option>
+              <option value="200">Show 200 entries</option>
+            </select>
+            <input id="expenseSearch" placeholder="Search supplier, invoice, category, description..." oninput="loadExpenses(1)" />
+          </div>
+        </div>
+
+        <div class="chart-grid expense-chart-grid">
+          <div class="card">
+            <h3>Expense By Category</h3>
+            <canvas id="expenseCategoryChart"></canvas>
+          </div>
+          <div class="card">
+            <h3>Monthly Expense Trend</h3>
+            <canvas id="expenseMonthChart"></canvas>
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head compact-head">
+            <div>
+              <h3>Expense Register</h3>
+              <p id="expensePageInfo">Loading expenses...</p>
+            </div>
+            <div class="card-actions">
+              <button class="secondary-btn" onclick="changeExpensePage(-1)">Previous</button>
+              <button class="secondary-btn" onclick="changeExpensePage(1)">Next</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Category</th>
+                <th>Invoice / Bill</th>
+                <th>Ex GST</th>
+                <th>GST</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Bill</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="expenseTableBody"></tbody>
+          </table>
         </div>
       </section>
 

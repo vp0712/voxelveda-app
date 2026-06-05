@@ -12,11 +12,16 @@ if (currentRole && currentRole !== 'admin') {
 
 let rfqChartInstance = null;
 let invoiceChartInstance = null;
+let expenseCategoryChartInstance = null;
+let expenseMonthChartInstance = null;
 let invoiceCache = [];
 let stockCache = [];
 let stockUsageCache = [];
 let customerCache = [];
 let supplierCache = [];
+let expenseCache = [];
+let expensePage = 1;
+let expenseLimit = 25;
 let complianceCache = [];
 let competitorCache = [];
 let materialCache = {
@@ -41,6 +46,8 @@ const ACCESS_OPTIONS = [
   { id: 'customers_input', label: 'Customers Input/Edit' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'suppliers_input', label: 'Suppliers Input/Edit' },
+  { id: 'expenses', label: 'Expenses' },
+  { id: 'expenses_input', label: 'Expenses Input/Edit' },
   { id: 'compliance', label: 'Compliance & Licences' },
   { id: 'compliance_input', label: 'Compliance Input/Edit' },
   { id: 'competitors', label: 'Competitors & Industry' },
@@ -300,6 +307,7 @@ function setupNavigation() {
 
       if (btn.dataset.section === 'customerSection') loadCustomers();
       if (btn.dataset.section === 'supplierSection') loadSuppliers();
+      if (btn.dataset.section === 'expenseSection') loadExpenses();
       if (btn.dataset.section === 'competitorSection') loadCompetitors();
       if (btn.dataset.section === 'complianceSection') loadComplianceEntries();
       if (btn.dataset.section === 'rawMaterialSection') loadMaterials('raw_material');
@@ -1849,6 +1857,322 @@ async function deleteSupplierFile(id) {
   await loadSuppliers();
 }
 
+function setExpenseFinancialYearOptions() {
+  const select = document.getElementById('expenseFinancialYear');
+  if (!select || select.dataset.ready) return;
+
+  const now = new Date();
+  const currentStart = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
+  select.innerHTML = Array.from({ length: 7 }, (_, index) => currentStart - index).map((year, index) => `
+    <option value="${year}" ${index === 0 ? 'selected' : ''}>FY ${year}-${year + 1}</option>
+  `).join('');
+  select.dataset.ready = '1';
+}
+
+function setExpensePageSize() {
+  expenseLimit = Number(document.getElementById('expensePageSize')?.value || 25);
+  loadExpenses(1);
+}
+
+function changeExpensePage(delta) {
+  loadExpenses(Math.max(1, expensePage + delta));
+}
+
+async function loadExpenses(page = expensePage) {
+  const tbody = document.getElementById('expenseTableBody');
+  if (!tbody) return;
+
+  setExpenseFinancialYearOptions();
+  expensePage = page;
+
+  const params = new URLSearchParams({
+    page: expensePage,
+    limit: expenseLimit,
+    fy: document.getElementById('expenseFinancialYear')?.value || '',
+    search: document.getElementById('expenseSearch')?.value.trim() || ''
+  });
+
+  const res = await fetch(`/api/expenses?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    tbody.innerHTML = `<tr><td colspan="10">${escapeHtml(data.message || 'Failed to load expenses')}</td></tr>`;
+    return;
+  }
+
+  expenseCache = data.expenses || [];
+  renderExpenseSummary(data.summary || {}, data.total || 0, data.page || 1, data.limit || expenseLimit);
+  renderExpenseCharts(data.summary || {});
+
+  if (!expenseCache.length) {
+    tbody.innerHTML = `<tr><td colspan="10">No expenses found for this view.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = expenseCache.map((expense) => `
+    <tr>
+      <td>${escapeHtml(formatDate(expense.expense_date))}</td>
+      <td>
+        <strong>${escapeHtml(expense.supplier_name || '-')}</strong><br>
+        <span class="muted-text">${escapeHtml(expense.description || '-')}</span>
+      </td>
+      <td>${escapeHtml(expense.category || '-')}</td>
+      <td>${escapeHtml(expense.invoice_no || '-')}</td>
+      <td>${escapeHtml(formatMoney(expense.amount_ex_gst))}</td>
+      <td>${escapeHtml(formatMoney(expense.gst_amount))}</td>
+      <td><strong>${escapeHtml(formatMoney(expense.total_amount))}</strong></td>
+      <td>${statusBadge(expense.status)}</td>
+      <td>${Number(expense.file_count || 0) ? `<span class="badge active-badge">${escapeHtml(expense.file_count)} file${Number(expense.file_count) === 1 ? '' : 's'}</span>` : '<span class="muted-text">No bill</span>'}</td>
+      <td>
+        <button class="icon-btn" onclick="openExpenseDialog(${expense.id})">Edit</button>
+        <button class="icon-btn" onclick="openExpenseFileDialog(${expense.id})">Bill</button>
+        <button class="icon-btn danger-icon" onclick="deleteExpense(${expense.id})">Delete</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+function renderExpenseSummary(summary, totalRows, page, limit) {
+  setText('expenseTotalValue', formatMoney(summary.total_expense));
+  setText('expenseGstPaid', formatMoney(summary.gst_paid));
+  setText('expenseGstCollected', formatMoney(summary.gst_collected));
+  setText('expenseGstPosition', formatMoney(summary.gst_position));
+
+  const info = document.getElementById('expensePageInfo');
+  if (info) {
+    const start = totalRows ? ((page - 1) * limit) + 1 : 0;
+    const end = Math.min(page * limit, totalRows);
+    info.innerText = `FY ${summary.financial_year || '-'} | Showing ${start}-${end} of ${totalRows} entries`;
+  }
+}
+
+function renderExpenseCharts(summary) {
+  if (typeof Chart === 'undefined') return;
+
+  const categoryCanvas = document.getElementById('expenseCategoryChart');
+  const monthCanvas = document.getElementById('expenseMonthChart');
+  if (!categoryCanvas || !monthCanvas) return;
+
+  if (expenseCategoryChartInstance) expenseCategoryChartInstance.destroy();
+  if (expenseMonthChartInstance) expenseMonthChartInstance.destroy();
+
+  const categories = summary.categories || [];
+  const months = summary.months || [];
+
+  expenseCategoryChartInstance = new Chart(categoryCanvas, {
+    type: 'doughnut',
+    data: {
+      labels: categories.map((row) => row.category),
+      datasets: [{
+        data: categories.map((row) => Number(row.total_amount || 0)),
+        backgroundColor: ['#2dd4bf', '#38bdf8', '#818cf8', '#f59e0b', '#ef4444', '#22c55e', '#a78bfa', '#14b8a6']
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#f8fafc' } } }
+    }
+  });
+
+  expenseMonthChartInstance = new Chart(monthCanvas, {
+    type: 'bar',
+    data: {
+      labels: months.map((row) => row.month),
+      datasets: [{
+        label: 'Expenses',
+        data: months.map((row) => Number(row.total_amount || 0)),
+        backgroundColor: '#38bdf8'
+      }]
+    },
+    options: {
+      maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#f8fafc' } } },
+      scales: {
+        x: { ticks: { color: '#f8fafc' } },
+        y: { beginAtZero: true, ticks: { color: '#f8fafc' } }
+      }
+    }
+  });
+}
+
+function openExpenseDialog(id = null) {
+  const expense = expenseCache.find((row) => Number(row.id) === Number(id)) || {};
+  const amountExGst = Number(expense.amount_ex_gst || 0);
+  const gstRate = Number(expense.gst_rate ?? 10);
+
+  showDialog(
+    id ? 'Edit Expense' : 'Add Expense',
+    `
+      <div class="stock-dialog-grid">
+        <div class="dialog-card">
+          <h4>Expense Details</h4>
+          <label class="field-label">Expense date</label>
+          <input id="expenseDate" type="date" value="${escapeHtml(expense.expense_date || todayISO())}" />
+          <label class="field-label">Supplier / Company</label>
+          <input id="expenseSupplier" placeholder="Supplier or company name" value="${escapeHtml(expense.supplier_name || '')}" />
+          <label class="field-label">Category</label>
+          <select id="expenseCategory">
+            ${['Materials', 'Packaging', 'Tools', 'Machinery', 'Software', 'Rent', 'Utilities', 'Freight', 'Professional Services', 'Insurance', 'Marketing', 'Other'].map((cat) => `
+              <option value="${cat}" ${String(expense.category || '') === cat ? 'selected' : ''}>${cat}</option>
+            `).join('')}
+          </select>
+          <label class="field-label">Description</label>
+          <textarea id="expenseDescription" rows="3" placeholder="What was purchased or paid for">${escapeHtml(expense.description || '')}</textarea>
+        </div>
+        <div class="dialog-card">
+          <h4>Amount & GST</h4>
+          <label class="field-label">Invoice / bill number</label>
+          <input id="expenseInvoiceNo" placeholder="Invoice or bill reference" value="${escapeHtml(expense.invoice_no || '')}" />
+          <label class="field-label">Payment method</label>
+          <input id="expensePaymentMethod" placeholder="Bank, card, cash, account" value="${escapeHtml(expense.payment_method || '')}" />
+          <div class="split-grid">
+            <div class="form-field">
+              <span>Amount ex GST</span>
+              <input id="expenseAmountExGst" type="number" min="0" step="0.01" value="${escapeHtml(amountExGst)}" oninput="calculateExpenseGst()" />
+            </div>
+            <div class="form-field">
+              <span>GST rate %</span>
+              <input id="expenseGstRate" type="number" min="0" step="0.01" value="${escapeHtml(gstRate)}" oninput="calculateExpenseGst()" />
+            </div>
+          </div>
+          <div class="split-grid">
+            <div class="form-field">
+              <span>GST amount</span>
+              <input id="expenseGstAmount" type="number" min="0" step="0.01" value="${escapeHtml(expense.gst_amount || (amountExGst * gstRate / 100).toFixed(2))}" />
+            </div>
+            <div class="form-field">
+              <span>Total paid</span>
+              <input id="expenseTotalAmount" type="number" min="0" step="0.01" value="${escapeHtml(expense.total_amount || (amountExGst + (amountExGst * gstRate / 100)).toFixed(2))}" />
+            </div>
+          </div>
+          <select id="expenseStatus">
+            ${['paid', 'unpaid', 'reimbursed', 'disputed'].map((status) => `
+              <option value="${status}" ${String(expense.status || 'paid') === status ? 'selected' : ''}>${status}</option>
+            `).join('')}
+          </select>
+          <textarea id="expenseNotes" rows="3" placeholder="Notes, approval, GST reminder">${escapeHtml(expense.notes || '')}</textarea>
+        </div>
+      </div>
+      <p class="status-note">Bill photo upload is available after saving the expense. Use the Bill button in the register.</p>
+    `,
+    async () => {
+      const body = {
+        id: expense.id,
+        expense_date: document.getElementById('expenseDate')?.value,
+        supplier_name: document.getElementById('expenseSupplier')?.value.trim(),
+        category: document.getElementById('expenseCategory')?.value,
+        description: document.getElementById('expenseDescription')?.value.trim(),
+        invoice_no: document.getElementById('expenseInvoiceNo')?.value.trim(),
+        payment_method: document.getElementById('expensePaymentMethod')?.value.trim(),
+        amount_ex_gst: Number(document.getElementById('expenseAmountExGst')?.value || 0),
+        gst_rate: Number(document.getElementById('expenseGstRate')?.value || 0),
+        gst_amount: Number(document.getElementById('expenseGstAmount')?.value || 0),
+        total_amount: Number(document.getElementById('expenseTotalAmount')?.value || 0),
+        status: document.getElementById('expenseStatus')?.value,
+        notes: document.getElementById('expenseNotes')?.value.trim()
+      };
+
+      const res = await fetch('/api/expenses', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Expense save failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Expense saved');
+      await loadExpenses(expensePage);
+    },
+    id ? 'Update Expense' : 'Save Expense'
+  );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+function calculateExpenseGst() {
+  const amount = Number(document.getElementById('expenseAmountExGst')?.value || 0);
+  const rate = Number(document.getElementById('expenseGstRate')?.value || 0);
+  const gst = amount * (rate / 100);
+  const total = amount + gst;
+  const gstEl = document.getElementById('expenseGstAmount');
+  const totalEl = document.getElementById('expenseTotalAmount');
+  if (gstEl) gstEl.value = gst.toFixed(2);
+  if (totalEl) totalEl.value = total.toFixed(2);
+}
+
+function openExpenseFileDialog(id) {
+  const expense = expenseCache.find((row) => Number(row.id) === Number(id)) || {};
+
+  showDialog(
+    'Upload Bill / Expense Photo',
+    `
+      <div class="stock-dialog-grid single-dialog-grid">
+        <div class="dialog-card">
+          <h4>${escapeHtml(expense.supplier_name || 'Expense Bill')}</h4>
+          <p class="status-note">Take a bill photo from your phone or upload a PDF/image. The file is stored with this expense for audit and GST records.</p>
+          <input id="expenseBillFile" type="file" accept="image/*,.pdf" capture="environment" />
+          <p class="status-note">Automatic bill reading/OCR can be connected later with a dedicated OCR provider. Confirm the amount fields manually for accounting accuracy.</p>
+        </div>
+      </div>
+    `,
+    async () => {
+      const file = document.getElementById('expenseBillFile')?.files?.[0];
+      if (!file) {
+        showToast('Choose a bill photo or file');
+        return;
+      }
+
+      const form = new FormData();
+      form.append('file', file);
+
+      const res = await fetch(`/api/expenses/${id}/files`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Bill upload failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Bill uploaded');
+      await loadExpenses(expensePage);
+    },
+    'Upload Bill'
+  );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+async function deleteExpense(id) {
+  if (!confirm('Delete this expense entry?')) return;
+
+  const res = await fetch('/api/expenses/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Expense delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Expense deleted');
+  await loadExpenses(expensePage);
+}
+
 async function loadCompetitors() {
   const panel = document.getElementById('competitorRegister');
   if (panel) panel.innerHTML = '<div class="card">Loading competitors...</div>';
@@ -3208,6 +3532,7 @@ async function refreshAllSystemData() {
     loadStaff(),
     loadCustomers(),
     loadSuppliers(),
+    loadExpenses(),
     loadCompetitors(),
     loadComplianceEntries(),
     loadStock(),
@@ -4462,6 +4787,7 @@ async function bootAdminDashboard() {
       loadStaff(),
       loadCustomers(),
       loadSuppliers(),
+      loadExpenses(),
       loadCompetitors(),
       loadComplianceEntries(),
       loadStock(),
