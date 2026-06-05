@@ -2,7 +2,7 @@ const pool = require('../config/db');
 
 exports.getRFQs = async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM rfqs ORDER BY id DESC');
+    const [rows] = await pool.query('SELECT * FROM rfqs ORDER BY id ASC');
     res.json({ rfqs: rows });
   } catch (err) {
     console.error('GET RFQS ERROR FULL:', err);

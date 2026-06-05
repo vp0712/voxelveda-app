@@ -78,7 +78,7 @@ exports.getStock = async (req, res) => {
       LEFT JOIN users cu ON cu.id = s.created_by
       LEFT JOIN users uu ON uu.id = s.updated_by
       ${where}
-      ORDER BY s.created_at DESC, s.id DESC
+      ORDER BY s.created_at ASC, s.id ASC
       `,
       params
     );
@@ -433,7 +433,7 @@ exports.getStockMovements = async (req, res) => {
       FROM stock_movements m
       LEFT JOIN stock_batches s ON s.id = m.stock_id
       LEFT JOIN users u ON u.id = m.created_by
-      ORDER BY m.created_at DESC, m.id DESC
+      ORDER BY m.created_at ASC, m.id ASC
       `
     );
 

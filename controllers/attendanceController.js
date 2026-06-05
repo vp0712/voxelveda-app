@@ -399,7 +399,7 @@ exports.myAttendance = async (req, res) => {
         created_at
       FROM staff_attendance
       WHERE user_id = ?
-      ORDER BY work_date DESC, clock_in DESC
+      ORDER BY work_date ASC, clock_in ASC
       `,
       [userId]
     );
@@ -445,7 +445,7 @@ exports.allAttendance = async (req, res) => {
         a.created_at
       FROM staff_attendance a
       LEFT JOIN users u ON a.user_id = u.id
-      ORDER BY a.work_date DESC, a.clock_in DESC
+      ORDER BY a.work_date ASC, a.clock_in ASC
       `
     );
 
@@ -485,7 +485,7 @@ exports.allWeeklyTimesheets = async (req, res) => {
         wt.created_at
       FROM weekly_timesheets wt
       LEFT JOIN users u ON u.id = wt.user_id
-      ORDER BY wt.week_start DESC, u.name ASC
+      ORDER BY wt.week_start ASC, u.name ASC
       `
     );
 
@@ -537,7 +537,7 @@ exports.userTimesheets = async (req, res) => {
       FROM staff_attendance a
       WHERE a.user_id = ?
       GROUP BY period_start, period_end
-      ORDER BY period_start DESC
+      ORDER BY period_start ASC
       `,
       [userId]
     );
@@ -557,7 +557,7 @@ exports.userTimesheets = async (req, res) => {
       FROM staff_attendance a
       LEFT JOIN users u ON u.id = a.user_id
       WHERE a.user_id = ?
-      ORDER BY a.work_date DESC, a.clock_in DESC
+      ORDER BY a.work_date ASC, a.clock_in ASC
       `,
       [userId]
     );

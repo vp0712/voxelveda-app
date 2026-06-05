@@ -103,7 +103,7 @@ exports.getMaterials = async (req, res) => {
       LEFT JOIN users uu ON uu.id = m.updated_by
       WHERE m.deleted = 0
       AND m.inventory_type = ?
-      ORDER BY m.item_name ASC
+      ORDER BY m.id ASC
       `,
       [type]
     );

@@ -39,7 +39,7 @@ exports.getCustomers = async (req, res) => {
         GROUP BY customer_email
       ) i ON i.customer_email = c.email
       WHERE c.deleted = 0
-      ORDER BY c.company_name ASC
+      ORDER BY c.id ASC
     `);
 
     res.json({ customers: rows });

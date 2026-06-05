@@ -61,7 +61,7 @@ exports.getSuppliers = async (req, res) => {
         GROUP BY supplier_id
       ) f ON f.supplier_id = s.id
       WHERE s.deleted = 0
-      ORDER BY s.supplier_name ASC
+      ORDER BY s.id ASC
     `);
 
     const [files] = await pool.query(`
@@ -69,7 +69,7 @@ exports.getSuppliers = async (req, res) => {
       FROM supplier_files sf
       LEFT JOIN users u ON u.id = sf.uploaded_by
       WHERE sf.deleted = 0
-      ORDER BY sf.created_at DESC
+      ORDER BY sf.created_at ASC, sf.id ASC
     `);
 
     const filesBySupplier = files.reduce((acc, file) => {

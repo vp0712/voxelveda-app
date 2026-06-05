@@ -36,6 +36,8 @@ let taskCache = [];
 let meetingCache = [];
 let attendanceSnapshot = new Map();
 let attendanceFirstLoad = true;
+const registerPagerState = {};
+const REGISTER_PAGE_SIZES = [10, 25, 50, 100, 200];
 
 const ACCESS_OPTIONS = [
   { id: 'dashboard', label: 'Dashboard' },
@@ -174,6 +176,104 @@ function escapeHtml(value) {
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.innerText = value;
+}
+
+function chronologicalRows(rows = []) {
+  return [...rows].sort((a, b) => {
+    const aId = Number(a.id || 0);
+    const bId = Number(b.id || 0);
+    if (aId && bId && aId !== bId) return aId - bId;
+
+    const aTime = new Date(a.created_at || a.updated_at || a.work_date || a.meeting_date || 0).getTime() || 0;
+    const bTime = new Date(b.created_at || b.updated_at || b.work_date || b.meeting_date || 0).getTime() || 0;
+    return aTime - bTime;
+  });
+}
+
+function ensureRegisterControls(key, tbody, onChange) {
+  const tableCard = tbody.closest('.table-wrap') || tbody.closest('.card');
+  if (!tableCard || tableCard.querySelector(`[data-register-controls="${key}"]`)) return;
+
+  const controls = document.createElement('div');
+  controls.className = 'register-control-panel';
+  controls.dataset.registerControls = key;
+  controls.innerHTML = `
+    <div>
+      <strong>Register view</strong>
+      <span data-register-info="${key}">Loading entries...</span>
+    </div>
+    <div class="register-control-actions">
+      <label>
+        <span>Rows</span>
+        <select data-register-size="${key}">
+          ${REGISTER_PAGE_SIZES.map((size) => `<option value="${size}">${size}</option>`).join('')}
+        </select>
+      </label>
+      <button type="button" class="secondary-btn" data-register-prev="${key}">Previous</button>
+      <button type="button" class="secondary-btn" data-register-next="${key}">Next</button>
+    </div>
+  `;
+
+  const table = tbody.closest('table');
+  tableCard.insertBefore(controls, table || tableCard.firstChild);
+
+  controls.querySelector(`[data-register-size="${key}"]`)?.addEventListener('change', (event) => {
+    registerPagerState[key] = {
+      ...(registerPagerState[key] || {}),
+      page: 1,
+      pageSize: Number(event.target.value || 25)
+    };
+    onChange();
+  });
+  controls.querySelector(`[data-register-prev="${key}"]`)?.addEventListener('click', () => {
+    const state = registerPagerState[key] || {};
+    registerPagerState[key] = { ...state, page: Math.max(1, Number(state.page || 1) - 1) };
+    onChange();
+  });
+  controls.querySelector(`[data-register-next="${key}"]`)?.addEventListener('click', () => {
+    const state = registerPagerState[key] || {};
+    registerPagerState[key] = { ...state, page: Number(state.page || 1) + 1 };
+    onChange();
+  });
+}
+
+function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRenderer, onChange }) {
+  const orderedRows = chronologicalRows(rows || []);
+  registerPagerState[key] = {
+    page: Number(registerPagerState[key]?.page || 1),
+    pageSize: Number(registerPagerState[key]?.pageSize || 25)
+  };
+
+  ensureRegisterControls(key, tbody, onChange || (() => {}));
+
+  const state = registerPagerState[key];
+  const totalPages = Math.max(1, Math.ceil(orderedRows.length / state.pageSize));
+  state.page = Math.min(Math.max(1, state.page), totalPages);
+
+  const start = (state.page - 1) * state.pageSize;
+  const pageRows = orderedRows.slice(start, start + state.pageSize);
+
+  const infoEl = document.querySelector(`[data-register-info="${key}"]`);
+  const sizeEl = document.querySelector(`[data-register-size="${key}"]`);
+  const prevBtn = document.querySelector(`[data-register-prev="${key}"]`);
+  const nextBtn = document.querySelector(`[data-register-next="${key}"]`);
+
+  if (sizeEl) sizeEl.value = String(state.pageSize);
+  if (infoEl) {
+    const from = orderedRows.length ? start + 1 : 0;
+    const to = Math.min(start + state.pageSize, orderedRows.length);
+    infoEl.textContent = `${from}-${to} of ${orderedRows.length} entries | oldest first, newest at bottom`;
+  }
+  if (prevBtn) prevBtn.disabled = state.page <= 1;
+  if (nextBtn) nextBtn.disabled = state.page >= totalPages;
+
+  if (!orderedRows.length) {
+    tbody.innerHTML = `<tr><td colspan="${colspan}">${escapeHtml(emptyMessage)}</td></tr>`;
+    return orderedRows;
+  }
+
+  tbody.innerHTML = pageRows.map((row, index) => rowRenderer(row, start + index)).join('');
+  return orderedRows;
 }
 
 function showToast(message) {
@@ -830,14 +930,14 @@ async function loadRFQs() {
     return;
   }
 
-  const rfqs = data.rfqs || [];
-
-  if (!rfqs.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No RFQs yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rfqs.map((r) => {
+  renderRegisterPage({
+    key: 'rfqs',
+    tbody,
+    rows: data.rfqs || [],
+    colspan: 7,
+    emptyMessage: 'No RFQs yet.',
+    onChange: loadRFQs,
+    rowRenderer: (r) => {
     const status = String(r.status || '').toLowerCase();
     const canInvoice = status === 'approved' || status === 'quoted';
 
@@ -857,7 +957,8 @@ async function loadRFQs() {
         </td>
       </tr>
     `;
-  }).join('');
+    }
+  });
 }
 
 async function updateRFQ(rfqId, action) {
@@ -1027,36 +1128,39 @@ async function loadInvoices() {
     return;
   }
 
-  const invoices = data.invoices || [];
+  const invoices = chronologicalRows(data.invoices || []);
   invoiceCache = invoices;
   updateInvoiceMetrics(invoices);
 
-  if (!invoices.length) {
-    tbody.innerHTML = `<tr><td colspan="9">No invoices yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = invoices.map((invoice, index) => `
-    <tr>
-      <td>${escapeHtml(index + 1)}</td>
-      <td>${escapeHtml(invoice.invoice_no || '-')}</td>
-      <td>${escapeHtml(invoice.customer_name || '-')}</td>
-      <td>${escapeHtml(invoice.rfq_id || 'Manual')}</td>
-      <td>${escapeHtml(formatMoney(invoice.total))}</td>
-      <td class="money-positive">${escapeHtml(formatMoney(invoice.paid_amount))}</td>
-      <td class="${Number(invoice.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(invoice.balance_due))}</td>
-      <td>${statusBadge(invoice.status)}</td>
-      <td>
-        <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'approve')">Approve</button>
-        <button class="small-btn" onclick="openSendInvoiceDialog(${invoice.id})">Send</button>
-        <button class="small-btn" onclick="openInvoicePaymentDialog(${invoice.id})">Payment</button>
-        <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'paid')">Paid</button>
-        <button class="secondary-btn" onclick="openEditInvoiceDialog(${invoice.id})">Edit</button>
-        <button class="secondary-btn" onclick="openInvoicePdf(${invoice.id})">PDF</button>
-        <button class="danger-btn" onclick="invoiceAction(${invoice.id}, 'delete')">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'invoices',
+    tbody,
+    rows: invoices,
+    colspan: 9,
+    emptyMessage: 'No invoices yet.',
+    onChange: loadInvoices,
+    rowRenderer: (invoice, index) => `
+      <tr>
+        <td>${escapeHtml(index + 1)}</td>
+        <td>${escapeHtml(invoice.invoice_no || '-')}</td>
+        <td>${escapeHtml(invoice.customer_name || '-')}</td>
+        <td>${escapeHtml(invoice.rfq_id || 'Manual')}</td>
+        <td>${escapeHtml(formatMoney(invoice.total))}</td>
+        <td class="money-positive">${escapeHtml(formatMoney(invoice.paid_amount))}</td>
+        <td class="${Number(invoice.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(invoice.balance_due))}</td>
+        <td>${statusBadge(invoice.status)}</td>
+        <td>
+          <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'approve')">Approve</button>
+          <button class="small-btn" onclick="openSendInvoiceDialog(${invoice.id})">Send</button>
+          <button class="small-btn" onclick="openInvoicePaymentDialog(${invoice.id})">Payment</button>
+          <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'paid')">Paid</button>
+          <button class="secondary-btn" onclick="openEditInvoiceDialog(${invoice.id})">Edit</button>
+          <button class="secondary-btn" onclick="openInvoicePdf(${invoice.id})">PDF</button>
+          <button class="danger-btn" onclick="invoiceAction(${invoice.id}, 'delete')">Delete</button>
+        </td>
+      </tr>
+    `
+  });
 }
 
 function updateInvoiceMetrics(invoices) {
@@ -1537,36 +1641,39 @@ async function loadCustomers() {
     return;
   }
 
-  customerCache = data.customers || [];
+  customerCache = chronologicalRows(data.customers || []);
 
-  if (!customerCache.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No customers saved yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = customerCache.map((customer) => `
-    <tr>
-      <td>
-        <strong>${escapeHtml(customer.company_name)}</strong><br>
-        <span class="muted-text">${escapeHtml(customer.address || '-')}</span>
-      </td>
-      <td>${escapeHtml(customer.contact_name || '-')}</td>
-      <td>
-        ${escapeHtml(customer.email || '-')}<br>
-        <span class="muted-text">${escapeHtml(customer.phone || '-')}</span>
-      </td>
-      <td><strong>${escapeHtml(customer.order_count || 0)}</strong></td>
-      <td><strong>${escapeHtml(formatMoney(customer.total_spend))}</strong></td>
-      <td>
-        ${customer.file_link ? `<a href="${escapeHtml(customer.file_link)}" target="_blank" rel="noopener">Open file</a><br>` : ''}
-        <span class="muted-text">${escapeHtml(customer.notes || '-')}</span>
-      </td>
-      <td>
-        <button class="icon-btn" onclick="openCustomerDialog(${customer.id})">Edit</button>
-        <button class="icon-btn danger-icon" onclick="deleteCustomer(${customer.id})">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'customers',
+    tbody,
+    rows: customerCache,
+    colspan: 7,
+    emptyMessage: 'No customers saved yet.',
+    onChange: loadCustomers,
+    rowRenderer: (customer) => `
+      <tr>
+        <td>
+          <strong>${escapeHtml(customer.company_name)}</strong><br>
+          <span class="muted-text">${escapeHtml(customer.address || '-')}</span>
+        </td>
+        <td>${escapeHtml(customer.contact_name || '-')}</td>
+        <td>
+          ${escapeHtml(customer.email || '-')}<br>
+          <span class="muted-text">${escapeHtml(customer.phone || '-')}</span>
+        </td>
+        <td><strong>${escapeHtml(customer.order_count || 0)}</strong></td>
+        <td><strong>${escapeHtml(formatMoney(customer.total_spend))}</strong></td>
+        <td>
+          ${customer.file_link ? `<a href="${escapeHtml(customer.file_link)}" target="_blank" rel="noopener">Open file</a><br>` : ''}
+          <span class="muted-text">${escapeHtml(customer.notes || '-')}</span>
+        </td>
+        <td>
+          <button class="icon-btn" onclick="openCustomerDialog(${customer.id})">Edit</button>
+          <button class="icon-btn danger-icon" onclick="deleteCustomer(${customer.id})">Delete</button>
+        </td>
+      </tr>
+    `
+  });
 }
 
 function openCustomerDialog(id = null) {
@@ -1658,7 +1765,7 @@ async function loadSuppliers() {
     return;
   }
 
-  supplierCache = data.suppliers || [];
+  supplierCache = chronologicalRows(data.suppliers || []);
   renderSuppliers();
 }
 
@@ -1693,12 +1800,14 @@ function renderSuppliers() {
     ].some((value) => String(value || '').toLowerCase().includes(query));
   });
 
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No suppliers found.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map((supplier) => {
+  renderRegisterPage({
+    key: 'suppliers',
+    tbody,
+    rows,
+    colspan: 7,
+    emptyMessage: 'No suppliers found.',
+    onChange: renderSuppliers,
+    rowRenderer: (supplier) => {
     const files = supplier.files || [];
     const filePreview = files.slice(0, 3).map((file) => `
       <div class="file-row">
@@ -1740,7 +1849,8 @@ function renderSuppliers() {
         </td>
       </tr>
     `;
-  }).join('');
+    }
+  });
 
   enhanceResponsiveTables();
 }
@@ -2816,30 +2926,33 @@ async function loadTasks() {
     return;
   }
 
-  const tasks = data.tasks || [];
+  const tasks = chronologicalRows(data.tasks || []);
   taskCache = tasks;
 
-  if (!tasks.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No tasks assigned yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = tasks.map((t) => `
-    <tr>
-      <td>${escapeHtml(t.id)}</td>
-      <td>${escapeHtml(t.title)}</td>
-      <td>${escapeHtml(t.staff_name || '-')}</td>
-      <td>${escapeHtml(t.priority || '-')}</td>
-      <td>${escapeHtml(String(t.due_date || '').slice(0, 10))}</td>
-      <td>${escapeHtml(t.status || '-')}</td>
-      <td>
-        <button class="small-btn" onclick="updateTask(${t.id}, 'in_progress')">Start</button>
-        <button class="small-btn" onclick="updateTask(${t.id}, 'done')">Done</button>
-        <button class="small-btn" onclick="openTaskDialog(${t.id})">Edit</button>
-        <button class="small-btn danger-icon" onclick="deleteTask(${t.id})">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'tasks',
+    tbody,
+    rows: tasks,
+    colspan: 7,
+    emptyMessage: 'No tasks assigned yet.',
+    onChange: loadTasks,
+    rowRenderer: (t) => `
+      <tr>
+        <td>${escapeHtml(t.id)}</td>
+        <td>${escapeHtml(t.title)}</td>
+        <td>${escapeHtml(t.staff_name || '-')}</td>
+        <td>${escapeHtml(t.priority || '-')}</td>
+        <td>${escapeHtml(String(t.due_date || '').slice(0, 10))}</td>
+        <td>${escapeHtml(t.status || '-')}</td>
+        <td>
+          <button class="small-btn" onclick="updateTask(${t.id}, 'in_progress')">Start</button>
+          <button class="small-btn" onclick="updateTask(${t.id}, 'done')">Done</button>
+          <button class="small-btn" onclick="openTaskDialog(${t.id})">Edit</button>
+          <button class="small-btn danger-icon" onclick="deleteTask(${t.id})">Delete</button>
+        </td>
+      </tr>
+    `
+  });
 
   updateAdminTaskCounters(tasks);
 }
@@ -2977,14 +3090,16 @@ async function loadAnnouncements() {
     return;
   }
 
-  announcementCache = data.announcements || [];
+  announcementCache = chronologicalRows(data.announcements || []);
 
-  if (!announcementCache.length) {
-    tbody.innerHTML = `<tr><td colspan="7">No announcements yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = announcementCache.map((item) => {
+  renderRegisterPage({
+    key: 'announcements',
+    tbody,
+    rows: announcementCache,
+    colspan: 7,
+    emptyMessage: 'No announcements yet.',
+    onChange: loadAnnouncements,
+    rowRenderer: (item) => {
     const targetCount = Array.isArray(item.target_user_ids) ? item.target_user_ids.length : 0;
     return `
       <tr>
@@ -3003,7 +3118,8 @@ async function loadAnnouncements() {
         </td>
       </tr>
     `;
-  }).join('');
+    }
+  });
 }
 
 function openAnnouncementDialog(id = null) {
@@ -3122,7 +3238,7 @@ async function loadStaff() {
   }
   if (!res.ok) return;
 
-  const users = data.users || [];
+  const users = chronologicalRows(data.users || []);
   staffCache = users;
   populateTimesheetStaffSelect(users);
 
@@ -3136,22 +3252,30 @@ async function loadStaff() {
   }
 
   if (tbody) {
-    tbody.innerHTML = users.map((u) => `
-      <tr>
-        <td>${escapeHtml(u.id)}</td>
-        <td>${escapeHtml(u.name)}</td>
-        <td>${escapeHtml(u.username || '-')}</td>
-        <td>${escapeHtml(u.email)}</td>
-        <td>${escapeHtml(u.role)}</td>
-        <td>${escapeHtml(String(u.role).toLowerCase() === 'admin' ? 'All sections' : accessLabels(parseAccess(u.permissions)).join(', ') || 'No extra access')}</td>
-        <td>${statusBadge(u.active ? 'active' : 'disabled')}</td>
-        <td>
-          <button class="small-btn" onclick="openEditStaffDialog(${u.id})">Edit</button>
-          <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
-          <button class="secondary-btn" onclick="openPasswordResetDialog(${u.id})">Reset Password</button>
-        </td>
-      </tr>
-    `).join('');
+    renderRegisterPage({
+      key: 'staff',
+      tbody,
+      rows: users,
+      colspan: 8,
+      emptyMessage: 'No staff users found.',
+      onChange: loadStaff,
+      rowRenderer: (u) => `
+        <tr>
+          <td>${escapeHtml(u.id)}</td>
+          <td>${escapeHtml(u.name)}</td>
+          <td>${escapeHtml(u.username || '-')}</td>
+          <td>${escapeHtml(u.email)}</td>
+          <td>${escapeHtml(u.role)}</td>
+          <td>${escapeHtml(String(u.role).toLowerCase() === 'admin' ? 'All sections' : accessLabels(parseAccess(u.permissions)).join(', ') || 'No extra access')}</td>
+          <td>${statusBadge(u.active ? 'active' : 'disabled')}</td>
+          <td>
+            <button class="small-btn" onclick="openEditStaffDialog(${u.id})">Edit</button>
+            <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
+            <button class="secondary-btn" onclick="openPasswordResetDialog(${u.id})">Reset Password</button>
+          </td>
+        </tr>
+      `
+    });
   }
 }
 
@@ -3701,40 +3825,43 @@ async function loadMaterials(type) {
     return;
   }
 
-  const rows = data.materials || [];
+  const rows = chronologicalRows(data.materials || []);
   materialCache[type] = rows;
   updateMaterialMetrics(type, rows);
 
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="8">No ${escapeHtml(materialLabel(type).toLowerCase())} items yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map((item) => {
-    const isLow = Number(item.current_qty || 0) <= Number(item.reorder_level || 0);
-    return `
-      <tr>
-        <td>
-          <strong>${escapeHtml(item.item_name)}</strong><br>
-          <span class="muted-text">${escapeHtml(item.notes || '-')}</span>
-        </td>
-        <td>
-          ${escapeHtml(item.supplier || '-')}<br>
-          <span class="muted-text">${escapeHtml(item.reference_code || '-')}</span>
-        </td>
-        <td>${escapeHtml(item.input_qty || 0)} ${escapeHtml(item.unit_label || '')}</td>
-        <td><strong>${escapeHtml(item.current_qty || 0)} ${escapeHtml(item.unit_label || '')}</strong></td>
-        <td>${escapeHtml(formatMoney(item.unit_price))}</td>
-        <td><strong>${escapeHtml(formatMoney(item.current_value))}</strong></td>
-        <td><span class="${isLow ? 'badge danger-badge' : 'badge active-badge'}">${isLow ? 'Reorder' : 'OK'}</span></td>
-        <td>
-          <button class="icon-btn" onclick="openMaterialDialog('${type}', ${item.id})">Edit</button>
-          <button class="icon-btn" onclick="openProcessSheetPdf(${item.id})">Process PDF</button>
-          <button class="icon-btn danger-icon" onclick="deleteMaterial('${type}', ${item.id})">Delete</button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  renderRegisterPage({
+    key: type,
+    tbody,
+    rows,
+    colspan: 8,
+    emptyMessage: `No ${materialLabel(type).toLowerCase()} items yet.`,
+    onChange: () => loadMaterials(type),
+    rowRenderer: (item) => {
+      const isLow = Number(item.current_qty || 0) <= Number(item.reorder_level || 0);
+      return `
+        <tr>
+          <td>
+            <strong>${escapeHtml(item.item_name)}</strong><br>
+            <span class="muted-text">${escapeHtml(item.notes || '-')}</span>
+          </td>
+          <td>
+            ${escapeHtml(item.supplier || '-')}<br>
+            <span class="muted-text">${escapeHtml(item.reference_code || '-')}</span>
+          </td>
+          <td>${escapeHtml(item.input_qty || 0)} ${escapeHtml(item.unit_label || '')}</td>
+          <td><strong>${escapeHtml(item.current_qty || 0)} ${escapeHtml(item.unit_label || '')}</strong></td>
+          <td>${escapeHtml(formatMoney(item.unit_price))}</td>
+          <td><strong>${escapeHtml(formatMoney(item.current_value))}</strong></td>
+          <td><span class="${isLow ? 'badge danger-badge' : 'badge active-badge'}">${isLow ? 'Reorder' : 'OK'}</span></td>
+          <td>
+            <button class="icon-btn" onclick="openMaterialDialog('${type}', ${item.id})">Edit</button>
+            <button class="icon-btn" onclick="openProcessSheetPdf(${item.id})">Process PDF</button>
+            <button class="icon-btn danger-icon" onclick="deleteMaterial('${type}', ${item.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    }
+  });
 }
 
 function updateMaterialMetrics(type, rows) {
@@ -4008,52 +4135,55 @@ async function loadStock() {
     return;
   }
 
-  const rows = data.stock || [];
+  const rows = chronologicalRows(data.stock || []);
   stockCache = rows;
 
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="9">No stock items yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map((item) => `
-    <tr>
-      <td>${escapeHtml(formatDate(item.created_at))}</td>
-      <td>
-        <strong>${escapeHtml(item.product_name)}</strong><br>
-        <span class="muted-text">${escapeHtml(item.category || '-')}</span>
-      </td>
-      <td>
-        <strong>${escapeHtml(item.batch_code || '-')}</strong><br>
-        <span>Received: ${escapeHtml(formatDate(item.manufacture_date))}</span>
-      </td>
-      <td>
-        <strong>${escapeHtml(item.unit_qty || 0)} pcs</strong><br>
-        <span class="muted-text">Original input</span>
-      </td>
-      <td>
-        <strong>${escapeHtml(item.current_unit_qty || 0)} pcs</strong><br>
-        <span class="success-text">Issued: ${escapeHtml(item.issued_unit_qty || 0)}</span>
-      </td>
-      <td>
-        <strong>${escapeHtml(formatMoney(item.unit_price))}</strong><br>
-        <span class="muted-text">Per unit</span>
-      </td>
-      <td>
-        <strong>${escapeHtml(formatMoney(item.current_value))}</strong><br>
-        <span class="muted-text">Input: ${escapeHtml(formatMoney(item.total_input_value))}</span>
-      </td>
-      <td>
-        <strong>Created: ${escapeHtml(item.created_by_name || '-')}</strong><br>
-        <span>Updated: ${escapeHtml(item.updated_by_name || '-')}</span>
-      </td>
-      <td>
-        <button class="icon-btn" title="Edit stock" onclick="openStockDialogById(${item.id})">Edit</button>
-        <button class="icon-btn" title="Minus stock" onclick="openIssueStockDialog(${item.id})">Issue</button>
-        <button class="icon-btn danger-icon" title="Delete stock" onclick="deleteStock(${item.id})">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'stock',
+    tbody,
+    rows,
+    colspan: 9,
+    emptyMessage: 'No stock items yet.',
+    onChange: loadStock,
+    rowRenderer: (item) => `
+      <tr>
+        <td>${escapeHtml(formatDate(item.created_at))}</td>
+        <td>
+          <strong>${escapeHtml(item.product_name)}</strong><br>
+          <span class="muted-text">${escapeHtml(item.category || '-')}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(item.batch_code || '-')}</strong><br>
+          <span>Received: ${escapeHtml(formatDate(item.manufacture_date))}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(item.unit_qty || 0)} pcs</strong><br>
+          <span class="muted-text">Original input</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(item.current_unit_qty || 0)} pcs</strong><br>
+          <span class="success-text">Issued: ${escapeHtml(item.issued_unit_qty || 0)}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(formatMoney(item.unit_price))}</strong><br>
+          <span class="muted-text">Per unit</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(formatMoney(item.current_value))}</strong><br>
+          <span class="muted-text">Input: ${escapeHtml(formatMoney(item.total_input_value))}</span>
+        </td>
+        <td>
+          <strong>Created: ${escapeHtml(item.created_by_name || '-')}</strong><br>
+          <span>Updated: ${escapeHtml(item.updated_by_name || '-')}</span>
+        </td>
+        <td>
+          <button class="icon-btn" title="Edit stock" onclick="openStockDialogById(${item.id})">Edit</button>
+          <button class="icon-btn" title="Minus stock" onclick="openIssueStockDialog(${item.id})">Issue</button>
+          <button class="icon-btn danger-icon" title="Delete stock" onclick="deleteStock(${item.id})">Delete</button>
+        </td>
+      </tr>
+    `
+  });
 }
 
 function openStockDialogById(id) {
@@ -4236,33 +4366,36 @@ async function loadStockUsage() {
     return;
   }
 
-  const rows = data.movements || [];
+  const rows = chronologicalRows(data.movements || []);
   stockUsageCache = rows;
 
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="9">No stock usage recorded yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map((item) => `
-    <tr>
-      <td>${escapeHtml(formatDate(item.created_at))}</td>
-      <td>
-        <strong>${escapeHtml(item.product_name || '-')}</strong><br>
-        <span class="muted-text">${escapeHtml(item.category || '-')}</span>
-      </td>
-      <td><strong>${escapeHtml(item.quantity || 0)} pcs</strong></td>
-      <td>${escapeHtml(formatMoney(item.unit_price))}</td>
-      <td><strong>${escapeHtml(formatMoney(item.total_price))}</strong></td>
-      <td>${escapeHtml(item.issued_to || '-')}</td>
-      <td>${escapeHtml(item.notes || '-')}</td>
-      <td>${escapeHtml(item.created_by_name || '-')}</td>
-      <td>
-        <button class="icon-btn" title="Edit stock out" onclick="openStockUsageDialogById(${item.id})">Edit</button>
-        <button class="icon-btn danger-icon" title="Delete stock out" onclick="deleteStockUsage(${item.id})">Delete</button>
-      </td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'stockUsage',
+    tbody,
+    rows,
+    colspan: 9,
+    emptyMessage: 'No stock usage recorded yet.',
+    onChange: loadStockUsage,
+    rowRenderer: (item) => `
+      <tr>
+        <td>${escapeHtml(formatDate(item.created_at))}</td>
+        <td>
+          <strong>${escapeHtml(item.product_name || '-')}</strong><br>
+          <span class="muted-text">${escapeHtml(item.category || '-')}</span>
+        </td>
+        <td><strong>${escapeHtml(item.quantity || 0)} pcs</strong></td>
+        <td>${escapeHtml(formatMoney(item.unit_price))}</td>
+        <td><strong>${escapeHtml(formatMoney(item.total_price))}</strong></td>
+        <td>${escapeHtml(item.issued_to || '-')}</td>
+        <td>${escapeHtml(item.notes || '-')}</td>
+        <td>${escapeHtml(item.created_by_name || '-')}</td>
+        <td>
+          <button class="icon-btn" title="Edit stock out" onclick="openStockUsageDialogById(${item.id})">Edit</button>
+          <button class="icon-btn danger-icon" title="Delete stock out" onclick="deleteStockUsage(${item.id})">Delete</button>
+        </td>
+      </tr>
+    `
+  });
 }
 
 async function deleteStockUsage(id) {
@@ -4322,38 +4455,41 @@ async function loadAttendance() {
     return;
   }
 
-  const rows = data.attendance || [];
+  const rows = chronologicalRows(data.attendance || []);
   notifyAttendanceChanges(rows);
   attendanceCache = rows;
 
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6">No attendance records yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map((a) => `
-    <tr>
-      <td>
-        <strong>${escapeHtml(a.name || '-')}</strong>
-        <span class="cell-subtext">${escapeHtml(a.email || '-')}</span>
-      </td>
-      <td>${escapeHtml(formatDate(a.work_date || a.clock_in))}</td>
-      <td>
-        <div class="time-pair">
-          <span>In: ${escapeHtml(formatClockTime(a.clock_in))}</span>
-          <span>Out: ${escapeHtml(formatClockTime(a.clock_out))}</span>
-        </div>
-      </td>
-      <td><strong>${escapeHtml(Number(a.total_hours || 0).toFixed(2))}</strong></td>
-      <td>${escapeHtml(a.notes || '-')}</td>
-      <td>
-        <div class="table-action-stack">
-          <button class="small-btn" onclick="openAttendanceDialog(${a.id})">Edit</button>
-          <button class="danger-btn" onclick="deleteAttendance(${a.id})">Delete</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'attendance',
+    tbody,
+    rows,
+    colspan: 6,
+    emptyMessage: 'No attendance records yet.',
+    onChange: loadAttendance,
+    rowRenderer: (a) => `
+      <tr>
+        <td>
+          <strong>${escapeHtml(a.name || '-')}</strong>
+          <span class="cell-subtext">${escapeHtml(a.email || '-')}</span>
+        </td>
+        <td>${escapeHtml(formatDate(a.work_date || a.clock_in))}</td>
+        <td>
+          <div class="time-pair">
+            <span>In: ${escapeHtml(formatClockTime(a.clock_in))}</span>
+            <span>Out: ${escapeHtml(formatClockTime(a.clock_out))}</span>
+          </div>
+        </td>
+        <td><strong>${escapeHtml(Number(a.total_hours || 0).toFixed(2))}</strong></td>
+        <td>${escapeHtml(a.notes || '-')}</td>
+        <td>
+          <div class="table-action-stack">
+            <button class="small-btn" onclick="openAttendanceDialog(${a.id})">Edit</button>
+            <button class="danger-btn" onclick="deleteAttendance(${a.id})">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `
+  });
 }
 
 function notifyAttendanceChanges(rows) {
@@ -4557,38 +4693,41 @@ async function loadMeetings() {
     return;
   }
 
-  const rows = data.meetings || [];
+  const rows = chronologicalRows(data.meetings || []);
   meetingCache = rows;
 
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="6">No meetings or inspections scheduled yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map((meeting) => `
-    <tr>
-      <td>
-        <strong>${escapeHtml(meeting.title)}</strong>
-        <span class="cell-subtext">${escapeHtml(meetingTypeLabel(meeting.meeting_type))}${meeting.organisation ? ` - ${escapeHtml(meeting.organisation)}` : ''}</span>
-      </td>
-      <td>
-        <strong>${escapeHtml(formatDate(meeting.meeting_date))}</strong>
-        <span class="cell-subtext">${escapeHtml(String(meeting.meeting_time || '').slice(0, 5))}</span>
-      </td>
-      <td>
-        <strong>${escapeHtml(meeting.location_type || '-')}</strong>
-        <span class="cell-subtext">${escapeHtml(meeting.location_details || '-')}</span>
-      </td>
-      <td>${escapeHtml(meetingAttendeeNames(meeting.assigned_user_ids))}</td>
-      <td><span class="${meetingStatusClass(meeting.status)}">${escapeHtml(meeting.status || 'scheduled')}</span></td>
-      <td>
-        <div class="table-action-stack">
-          <button class="small-btn" onclick="openMeetingDialog(${meeting.id})">Edit</button>
-          <button class="danger-btn" onclick="deleteMeeting(${meeting.id})">Delete</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'meetings',
+    tbody,
+    rows,
+    colspan: 6,
+    emptyMessage: 'No meetings or inspections scheduled yet.',
+    onChange: loadMeetings,
+    rowRenderer: (meeting) => `
+      <tr>
+        <td>
+          <strong>${escapeHtml(meeting.title)}</strong>
+          <span class="cell-subtext">${escapeHtml(meetingTypeLabel(meeting.meeting_type))}${meeting.organisation ? ` - ${escapeHtml(meeting.organisation)}` : ''}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(formatDate(meeting.meeting_date))}</strong>
+          <span class="cell-subtext">${escapeHtml(String(meeting.meeting_time || '').slice(0, 5))}</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(meeting.location_type || '-')}</strong>
+          <span class="cell-subtext">${escapeHtml(meeting.location_details || '-')}</span>
+        </td>
+        <td>${escapeHtml(meetingAttendeeNames(meeting.assigned_user_ids))}</td>
+        <td><span class="${meetingStatusClass(meeting.status)}">${escapeHtml(meeting.status || 'scheduled')}</span></td>
+        <td>
+          <div class="table-action-stack">
+            <button class="small-btn" onclick="openMeetingDialog(${meeting.id})">Edit</button>
+            <button class="danger-btn" onclick="deleteMeeting(${meeting.id})">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `
+  });
 }
 
 async function openMeetingDialog(id = null) {
@@ -4715,22 +4854,23 @@ async function loadTimesheets() {
     return;
   }
 
-  const rows = data.timesheets || [];
-
-  if (!rows.length) {
-    tbody.innerHTML = `<tr><td colspan="5">No weekly timesheets yet.</td></tr>`;
-    return;
-  }
-
-  tbody.innerHTML = rows.map((t) => `
-    <tr>
-      <td>${escapeHtml(t.name || '-')}</td>
-      <td>${escapeHtml(String(t.week_start || '').slice(0, 10))}</td>
-      <td>${escapeHtml(String(t.week_end || '').slice(0, 10))}</td>
-      <td>${escapeHtml(Number(t.total_hours || 0).toFixed(2))}</td>
-      <td>${escapeHtml(t.status || 'open')}</td>
-    </tr>
-  `).join('');
+  renderRegisterPage({
+    key: 'timesheets',
+    tbody,
+    rows: data.timesheets || [],
+    colspan: 5,
+    emptyMessage: 'No weekly timesheets yet.',
+    onChange: loadTimesheets,
+    rowRenderer: (t) => `
+      <tr>
+        <td>${escapeHtml(t.name || '-')}</td>
+        <td>${escapeHtml(String(t.week_start || '').slice(0, 10))}</td>
+        <td>${escapeHtml(String(t.week_end || '').slice(0, 10))}</td>
+        <td>${escapeHtml(Number(t.total_hours || 0).toFixed(2))}</td>
+        <td>${escapeHtml(t.status || 'open')}</td>
+      </tr>
+    `
+  });
 }
 
 async function loadSelectedStaffTimesheets() {

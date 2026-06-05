@@ -209,7 +209,7 @@ exports.getComplianceEntries = async (req, res) => {
       LEFT JOIN users cu ON cu.id = e.created_by
       LEFT JOIN users uu ON uu.id = e.updated_by
       WHERE e.deleted = 0
-      ORDER BY e.category ASC, e.title ASC
+      ORDER BY e.id ASC
     `);
 
     const [files] = await pool.query(`
@@ -217,7 +217,7 @@ exports.getComplianceEntries = async (req, res) => {
       FROM compliance_files cf
       LEFT JOIN users u ON u.id = cf.uploaded_by
       WHERE cf.deleted = 0
-      ORDER BY cf.created_at DESC
+      ORDER BY cf.created_at ASC, cf.id ASC
     `);
 
     const filesByEntry = files.reduce((acc, file) => {

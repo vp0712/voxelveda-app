@@ -428,7 +428,7 @@ exports.getInvoiceDetails = async (req, res) => {
     );
 
     const [payments] = await pool.query(
-      'SELECT * FROM invoice_payments WHERE invoice_id = ? ORDER BY payment_date DESC, id DESC',
+      'SELECT * FROM invoice_payments WHERE invoice_id = ? ORDER BY payment_date ASC, id ASC',
       [id]
     );
 

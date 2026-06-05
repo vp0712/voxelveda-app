@@ -127,7 +127,7 @@ exports.getUsers = async (req, res) => {
         password_reset_required,
         last_password_reset_at
       FROM users
-      ORDER BY id DESC`
+      ORDER BY id ASC`
     );
 
     res.json({

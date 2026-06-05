@@ -106,7 +106,7 @@ exports.getTasks = async (req, res) => {
       ORDER BY
         CASE WHEN LOWER(t.status) = 'done' THEN 2 ELSE 1 END,
         t.due_date ASC,
-        t.id DESC
+        t.id ASC
     `);
 
     res.json({ tasks: rows });
@@ -137,7 +137,7 @@ exports.getMyTasks = async (req, res) => {
       ORDER BY
         CASE WHEN LOWER(status) = 'done' THEN 2 ELSE 1 END,
         due_date ASC,
-        id DESC
+        id ASC
       `,
       [userId]
     );
@@ -465,7 +465,7 @@ exports.getAnnouncements = async (req, res) => {
       FROM announcements a
       LEFT JOIN users u ON u.id = a.created_by
       WHERE a.deleted = 0
-      ORDER BY a.expires_at DESC, a.id DESC
+      ORDER BY a.expires_at ASC, a.id ASC
     `);
 
     res.json({
@@ -505,7 +505,7 @@ exports.getMyAnnouncements = async (req, res) => {
           ELSE 4
         END,
         a.expires_at ASC,
-        a.id DESC
+        a.id ASC
       `,
       [today, today]
     );

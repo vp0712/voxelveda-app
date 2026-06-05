@@ -620,7 +620,7 @@ exports.getCompetitors = async (req, res) => {
       LEFT JOIN users cu ON cu.id = c.created_by
       LEFT JOIN users uu ON uu.id = c.updated_by
       WHERE c.deleted = 0
-      ORDER BY c.category ASC, c.company_name ASC
+      ORDER BY c.id ASC
     `);
 
     res.json({ competitors: rows });
