@@ -544,6 +544,32 @@ body::before {
   margin-top: 24px;
 }
 
+.manual-invoice-dialog {
+  width: min(1040px, calc(100vw - 32px));
+}
+
+.manual-invoice-dialog .stock-dialog-grid {
+  grid-template-columns: minmax(230px, 0.32fr) minmax(0, 1fr);
+  gap: 18px;
+}
+
+.manual-invoice-dialog .dialog-card {
+  min-width: 0;
+}
+
+.manual-invoice-dialog .invoice-item-row {
+  grid-template-columns: minmax(220px, 1fr) minmax(86px, 0.35fr) minmax(120px, 0.45fr) 96px;
+  align-items: end;
+}
+
+.manual-invoice-dialog .invoice-remove-btn {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 0;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
 .rank-no {
   display: grid;
   place-items: center;
@@ -2353,6 +2379,15 @@ tr:hover td {
 
   .roster-date-block {
     min-height: auto;
+  }
+
+  .manual-invoice-dialog .stock-dialog-grid,
+  .manual-invoice-dialog .invoice-item-row {
+    grid-template-columns: 1fr;
+  }
+
+  .manual-invoice-dialog .invoice-remove-btn {
+    margin-top: 0;
   }
 
   .staff-profile-shell {

@@ -384,7 +384,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
-  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog');
+  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -1116,6 +1116,8 @@ function openManualInvoiceDialog() {
     },
     'Create Invoice'
   );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'manual-invoice-dialog');
 }
 
 async function loadInvoices() {
