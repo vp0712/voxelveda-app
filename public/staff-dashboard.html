@@ -38,7 +38,7 @@
         </div>
       </div>
 
-      <button class="nav-btn active" data-section="dashboardSection">Overview</button>
+      <button class="nav-btn active" data-section="dashboardSection">Home</button>
       <button class="nav-btn" data-section="profileSection">Profile</button>
       <details class="nav-group permission-tasks hidden-section" open>
         <summary class="nav-group-toggle">
@@ -59,13 +59,14 @@
           <button class="nav-btn nav-sub-btn permission-stock permission-stock-out hidden-section" data-section="stockOutSection">Stock Out</button>
         </div>
       </details>
-      <details class="nav-group permission-attendance hidden-section" open>
+      <details class="nav-group permission-attendance permission-roster hidden-section" open>
         <summary class="nav-group-toggle">
           <span>Workforce</span>
           <span class="nav-group-caret">v</span>
         </summary>
         <div class="nav-submenu">
           <button class="nav-btn nav-sub-btn permission-attendance hidden-section" data-section="timesheetSection">Timesheet</button>
+          <button class="nav-btn nav-sub-btn permission-roster hidden-section" data-section="rosterSection">Roster</button>
         </div>
       </details>
       <button class="nav-btn permission-meetings hidden-section" data-section="meetingsSection">Meetings & Inspections</button>
@@ -137,6 +138,10 @@
                 <span>My Attendance</span>
                 <strong>Open</strong>
               </button>
+              <button class="profile-action permission-roster hidden-section" type="button" onclick="goStaffSection('rosterSection')">
+                <span>Roster</span>
+                <strong>Open</strong>
+              </button>
               <button class="profile-action permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')">
                 <span>My Tasks</span>
                 <strong>Open</strong>
@@ -191,6 +196,11 @@
             <span>Workforce</span>
             <strong>Timesheet</strong>
             <small>Check weekly and monthly shift history.</small>
+          </button>
+          <button class="staff-action-card permission-roster hidden-section" type="button" onclick="goStaffSection('rosterSection')">
+            <span>Workforce</span>
+            <strong>Roster</strong>
+            <small>See upcoming shifts, location and daily role details.</small>
           </button>
           <button class="staff-action-card permission-meetings hidden-section" type="button" onclick="goStaffSection('meetingsSection')">
             <span>Meetings & Inspections</span>
@@ -295,6 +305,47 @@
 
         </div>
 
+      </section>
+
+      <!-- ROSTER -->
+      <section id="rosterSection" class="page-section hidden-section permission-roster">
+        <div class="section-head">
+          <div>
+            <h2>My Roster</h2>
+            <p>Assigned shifts, locations and role notes from admin.</p>
+          </div>
+          <button class="secondary-btn" onclick="loadMyRoster()">Refresh</button>
+        </div>
+
+        <div class="metric-grid roster-metrics">
+          <div class="card kpi-teal">
+            <h3>Next Shift</h3>
+            <p><strong id="staffNextShiftDate">-</strong></p>
+            <span id="staffNextShiftTime">No upcoming shift</span>
+          </div>
+          <div class="card kpi-blue">
+            <h3>Rostered Hours</h3>
+            <p><strong id="staffRosterHours">0.00</strong></p>
+            <span>Upcoming scheduled time</span>
+          </div>
+          <div class="card kpi-green">
+            <h3>Upcoming Shifts</h3>
+            <p><strong id="staffRosterCount">0</strong></p>
+            <span>Visible from today onward</span>
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head compact-head">
+            <div>
+              <h2>Shift Board</h2>
+              <p>Use this board before clocking in so you know where you are assigned.</p>
+            </div>
+          </div>
+          <div id="staffRosterList" class="roster-card-grid">
+            <div class="empty-state">Loading roster...</div>
+          </div>
+        </div>
       </section>
 
       <!-- MEETINGS -->
@@ -485,7 +536,7 @@
     </section>
   </div>
 
-  <script src="/qr-widget.js?v=20260606-scan-safe-qr"></script>
-  <script src="/staff.js?v=20260602-input-permissions"></script>
+  <script src="/qr-widget.js?v=20260606-roster"></script>
+  <script src="/staff.js?v=20260606-roster"></script>
 </body>
 </html>

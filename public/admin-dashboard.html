@@ -28,7 +28,7 @@
         </div>
       </div>
 
-      <button class="nav-btn active" data-section="dashboardSection">Overview</button>
+      <button class="nav-btn active" data-section="dashboardSection">Home</button>
       <button class="nav-btn" data-section="rfqSection">RFQs</button>
       <button class="nav-btn" data-section="invoiceSection">Invoices</button>
       <button class="nav-btn" data-section="customerSection">Customers</button>
@@ -63,6 +63,7 @@
         </summary>
         <div class="nav-submenu">
           <button class="nav-btn nav-sub-btn" data-section="attendanceSection">Timesheets</button>
+          <button class="nav-btn nav-sub-btn" data-section="rosterSection">Roster</button>
           <button class="nav-btn nav-sub-btn" data-section="staffSection">Staff</button>
         </div>
       </details>
@@ -646,6 +647,101 @@
         </div>
       </section>
 
+      <!-- ROSTER -->
+      <section id="rosterSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <h2>Roster Command</h2>
+            <p>Generate, assign and track engineering workshop shifts</p>
+          </div>
+          <div class="card-actions">
+            <button onclick="openRosterShiftDialog()" class="secondary-btn">Add Shift</button>
+            <button onclick="loadRoster()" class="primary-btn">Refresh Roster</button>
+          </div>
+        </div>
+
+        <div class="card roster-generator-card">
+          <div>
+            <h3>Add Tasks / Generate Shifts</h3>
+            <p class="status-note">Select staff, date range and shift pattern. New roster entries appear at the bottom of the register.</p>
+          </div>
+          <div class="roster-generator-grid">
+            <label class="form-field">
+              <span>Workshop / Location</span>
+              <input id="rosterLocation" placeholder="Voxel Veda Workshop" value="Voxel Veda Workshop" />
+            </label>
+            <label class="form-field">
+              <span>Staff - select one or more</span>
+              <select id="rosterStaffSelect" multiple></select>
+            </label>
+            <label class="form-field">
+              <span>Date From</span>
+              <input id="rosterFromDate" type="date" />
+            </label>
+            <label class="form-field">
+              <span>Date To</span>
+              <input id="rosterToDate" type="date" />
+            </label>
+            <label class="form-field">
+              <span>Start Time</span>
+              <input id="rosterStartTime" type="time" value="08:00" />
+            </label>
+            <label class="form-field">
+              <span>End Time</span>
+              <input id="rosterEndTime" type="time" value="16:00" />
+            </label>
+            <label class="form-field">
+              <span>Role / Shift Type</span>
+              <input id="rosterRoleLabel" placeholder="Production / CNC / Inspection" value="Production" />
+            </label>
+            <label class="form-field">
+              <span>Notes</span>
+              <input id="rosterNotes" placeholder="Job, machine, site or special instruction" />
+            </label>
+            <button class="primary-btn roster-generate-btn" onclick="generateRoster()">Generate</button>
+            <button class="secondary-btn roster-generate-btn" onclick="setRosterLastWeek()">Last Week</button>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card kpi-blue">
+            <h3>Upcoming Shifts</h3>
+            <p><strong id="rosterUpcomingCount">0</strong></p>
+            <span>Scheduled from today onward</span>
+          </div>
+          <div class="card kpi-teal">
+            <h3>Roster Hours</h3>
+            <p><strong id="rosterHoursCount">0.00</strong></p>
+            <span>Total planned hours</span>
+          </div>
+          <div class="card kpi-green">
+            <h3>Staff Covered</h3>
+            <p><strong id="rosterStaffCount">0</strong></p>
+            <span>People with assigned shifts</span>
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <h3>Roster Register</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Staff</th>
+                <th>Date</th>
+                <th>Shift</th>
+                <th>Role / Location</th>
+                <th>Status</th>
+                <th>Created / Updated</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="rosterTableBody">
+              <tr><td colspan="7">Loading roster...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <!-- STAFF -->
       <section id="staffSection" class="page-section hidden-section">
         <div class="section-head">
@@ -1023,7 +1119,7 @@
 
   <div id="toast" class="toast"></div>
 
-  <script src="/qr-widget.js?v=20260606-scan-safe-qr"></script>
-  <script src="/admin-dashboard.js?v=20260606-scan-safe-qr"></script>
+  <script src="/qr-widget.js?v=20260606-roster"></script>
+  <script src="/admin-dashboard.js?v=20260606-roster"></script>
 </body>
 </html>

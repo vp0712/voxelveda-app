@@ -654,6 +654,114 @@ th {
   gap: 16px;
 }
 
+.roster-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.roster-generator-card {
+  display: grid;
+  gap: 18px;
+}
+
+.roster-generator-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(150px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.roster-generator-grid label {
+  display: grid;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.roster-generator-grid select[multiple] {
+  min-height: 96px;
+}
+
+.roster-generate-btn {
+  min-height: 48px;
+}
+
+.roster-shift-card {
+  display: grid;
+  grid-template-columns: 126px minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+  padding: 16px;
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  border-radius: 16px;
+  background:
+    linear-gradient(145deg, rgba(15, 23, 42, 0.92), rgba(8, 47, 73, 0.34)),
+    rgba(2, 6, 23, 0.7);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.roster-date-block {
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  min-height: 112px;
+  padding: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 14px;
+  background: rgba(14, 165, 233, 0.12);
+}
+
+.roster-date-block strong {
+  font-size: 18px;
+  line-height: 1.15;
+}
+
+.roster-date-block span {
+  width: fit-content;
+  padding: 5px 9px;
+  border-radius: 999px;
+  color: #bff7ff;
+  background: rgba(45, 212, 191, 0.12);
+  border: 1px solid rgba(45, 212, 191, 0.2);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.roster-shift-main {
+  min-width: 0;
+}
+
+.roster-shift-main h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.roster-shift-main p,
+.roster-shift-main small {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.roster-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  color: #dffbff;
+  background: rgba(2, 6, 23, 0.48);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  line-height: 1.35;
+}
+
+.compact-head {
+  margin-bottom: 14px;
+}
+
 .card-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2189,6 +2297,24 @@ tr:hover td {
     min-height: 104px;
     border-radius: 18px;
     padding: 16px;
+  }
+
+  .roster-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-generator-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-shift-card {
+    grid-template-columns: 1fr;
+    border-radius: 18px;
+    padding: 14px;
+  }
+
+  .roster-date-block {
+    min-height: auto;
   }
 
   .staff-profile-shell {

@@ -34,6 +34,7 @@ let attendanceCache = [];
 let announcementCache = [];
 let taskCache = [];
 let meetingCache = [];
+let rosterCache = [];
 let attendanceSnapshot = new Map();
 let attendanceFirstLoad = true;
 const registerPagerState = {};
@@ -57,6 +58,8 @@ const ACCESS_OPTIONS = [
   { id: 'competitors_input', label: 'Competitors Input/Edit' },
   { id: 'tasks', label: 'Tasks' },
   { id: 'tasks_input', label: 'Tasks/Announcements Input/Edit' },
+  { id: 'roster', label: 'Roster' },
+  { id: 'roster_input', label: 'Roster Input/Edit' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'attendance_input', label: 'Attendance Input/Edit' },
   { id: 'staff', label: 'Staff' },
@@ -419,6 +422,7 @@ function setupNavigation() {
         loadAnnouncements();
       }
       if (btn.dataset.section === 'meetingSection') loadMeetings();
+      if (btn.dataset.section === 'rosterSection') loadRoster();
       if (btn.dataset.section === 'companyFormsSection') renderCompanyForms();
       toggleMobileMenu(false);
     };
@@ -858,6 +862,7 @@ function collectAccess() {
     compliance_input: ['compliance'],
     competitors_input: ['competitors'],
     tasks_input: ['tasks'],
+    roster_input: ['roster'],
     attendance_input: ['attendance'],
     stock_in_input: ['stock', 'stock_in'],
     stock_out_input: ['stock', 'stock_out'],
@@ -3241,6 +3246,7 @@ async function loadStaff() {
   const users = chronologicalRows(data.users || []);
   staffCache = users;
   populateTimesheetStaffSelect(users);
+  populateRosterStaffSelect(users);
 
   if (select) {
     select.innerHTML = '<option value="">Select Staff</option>';
@@ -3385,6 +3391,20 @@ async function openAddStaff() {
       usernameInput.value = suggestUsernameFromEmail(emailInput.value);
     }
   });
+}
+
+function populateRosterStaffSelect(users = staffCache) {
+  const select = document.getElementById('rosterStaffSelect');
+  if (!select) return;
+
+  const selected = new Set(Array.from(select.selectedOptions || []).map((option) => Number(option.value)));
+  const staffUsers = users.filter((u) => String(u.role || '').toLowerCase() !== 'admin');
+
+  select.innerHTML = staffUsers.map((u) => `
+    <option value="${u.id}" ${selected.has(Number(u.id)) ? 'selected' : ''}>
+      ${escapeHtml(u.name || u.email)} (${escapeHtml(u.email || u.username || '-')})
+    </option>
+  `).join('');
 }
 
 async function openEditStaffDialog(userId) {
@@ -3707,6 +3727,7 @@ async function refreshAllSystemData() {
     loadMaterials('raw_material'),
     loadMaterials('packaging'),
     loadMeetings(),
+    loadRoster(),
     loadAttendance(),
     loadTimesheets(),
     loadSettings()
@@ -4839,6 +4860,213 @@ async function deleteMeeting(id) {
   await loadMeetings();
 }
 
+function rosterShiftHours(shift) {
+  const start = String(shift.start_time || '00:00').slice(0, 5);
+  const end = String(shift.end_time || '00:00').slice(0, 5);
+  const [sh, sm] = start.split(':').map(Number);
+  const [eh, em] = end.split(':').map(Number);
+  let minutes = ((eh * 60) + em) - ((sh * 60) + sm);
+  if (minutes < 0) minutes += 24 * 60;
+  return minutes / 60;
+}
+
+function updateRosterMetrics(rows) {
+  const today = todayISO();
+  const upcoming = rows.filter((row) => String(row.shift_date || '') >= today);
+  const staffIds = new Set(rows.map((row) => Number(row.user_id)).filter(Boolean));
+  setText('rosterUpcomingCount', upcoming.length);
+  setText('rosterHoursCount', rows.reduce((sum, row) => sum + rosterShiftHours(row), 0).toFixed(2));
+  setText('rosterStaffCount', staffIds.size);
+}
+
+function setRosterLastWeek() {
+  document.getElementById('rosterFromDate').value = todayISO(-7);
+  document.getElementById('rosterToDate').value = todayISO(-1);
+}
+
+function selectedRosterStaffIds() {
+  return Array.from(document.getElementById('rosterStaffSelect')?.selectedOptions || [])
+    .map((option) => Number(option.value))
+    .filter(Boolean);
+}
+
+async function loadRoster() {
+  const tbody = document.getElementById('rosterTableBody');
+  if (!tbody) return;
+
+  if (!staffCache.length) await loadStaff();
+
+  const res = await fetch('/api/roster', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load roster')}</td></tr>`;
+    return;
+  }
+
+  const rows = chronologicalRows(data.roster || []);
+  rosterCache = rows;
+  updateRosterMetrics(rows);
+
+  renderRegisterPage({
+    key: 'roster',
+    tbody,
+    rows,
+    colspan: 7,
+    emptyMessage: 'No roster shifts yet.',
+    onChange: loadRoster,
+    rowRenderer: (shift) => `
+      <tr>
+        <td>
+          <strong>${escapeHtml(shift.staff_name || '-')}</strong>
+          <span class="cell-subtext">${escapeHtml(shift.staff_email || '-')}</span>
+        </td>
+        <td>${escapeHtml(formatDate(shift.shift_date))}</td>
+        <td>
+          <strong>${escapeHtml(String(shift.start_time || '').slice(0, 5))} - ${escapeHtml(String(shift.end_time || '').slice(0, 5))}</strong>
+          <span class="cell-subtext">${escapeHtml(rosterShiftHours(shift).toFixed(2))} planned hours</span>
+        </td>
+        <td>
+          <strong>${escapeHtml(shift.role_label || '-')}</strong>
+          <span class="cell-subtext">${escapeHtml(shift.location || '-')}</span>
+          <span class="cell-subtext">${escapeHtml(shift.notes || '')}</span>
+        </td>
+        <td>${statusBadge(shift.status || 'scheduled')}</td>
+        <td>
+          <span class="cell-subtext">Created: ${escapeHtml(shift.created_by_name || '-')}</span>
+          <span class="cell-subtext">Updated: ${escapeHtml(shift.updated_by_name || '-')}</span>
+        </td>
+        <td>
+          <div class="table-action-stack">
+            <button class="small-btn" onclick="openRosterShiftDialog(${shift.id})">Edit</button>
+            <button class="danger-btn" onclick="deleteRosterShift(${shift.id})">Delete</button>
+          </div>
+        </td>
+      </tr>
+    `
+  });
+}
+
+async function generateRoster() {
+  const body = {
+    user_ids: selectedRosterStaffIds(),
+    from_date: document.getElementById('rosterFromDate')?.value,
+    to_date: document.getElementById('rosterToDate')?.value,
+    start_time: document.getElementById('rosterStartTime')?.value,
+    end_time: document.getElementById('rosterEndTime')?.value,
+    role_label: document.getElementById('rosterRoleLabel')?.value.trim(),
+    location: document.getElementById('rosterLocation')?.value.trim(),
+    notes: document.getElementById('rosterNotes')?.value.trim()
+  };
+
+  const res = await fetch('/api/roster/generate', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Roster generation failed');
+    return;
+  }
+
+  showToast(data.message || 'Roster generated');
+  await loadRoster();
+}
+
+function openRosterShiftDialog(id = null) {
+  const shift = rosterCache.find((row) => Number(row.id) === Number(id)) || {};
+  const staffOptions = staffCache
+    .filter((user) => String(user.role || '').toLowerCase() !== 'admin')
+    .map((user) => `
+      <option value="${user.id}" ${Number(shift.user_id) === Number(user.id) ? 'selected' : ''}>
+        ${escapeHtml(user.name || user.email)} (${escapeHtml(user.email || '-')})
+      </option>
+    `).join('');
+
+  showDialog(
+    id ? 'Edit Roster Shift' : 'Add Roster Shift',
+    `
+      <div class="stock-dialog-grid">
+        <div class="dialog-card">
+          <h4>Shift Assignment</h4>
+          <select id="singleRosterUser">${staffOptions}</select>
+          <div class="split-grid">
+            <input id="singleRosterDate" type="date" value="${escapeHtml(formatDate(shift.shift_date) === '-' ? todayISO() : formatDate(shift.shift_date))}" />
+            <input id="singleRosterRole" placeholder="Role / station" value="${escapeHtml(shift.role_label || 'Production')}" />
+          </div>
+          <div class="split-grid">
+            <input id="singleRosterStart" type="time" value="${escapeHtml(String(shift.start_time || '08:00').slice(0, 5))}" />
+            <input id="singleRosterEnd" type="time" value="${escapeHtml(String(shift.end_time || '16:00').slice(0, 5))}" />
+          </div>
+        </div>
+        <div class="dialog-card">
+          <h4>Operational Context</h4>
+          <input id="singleRosterLocation" placeholder="Workshop / client site / machine area" value="${escapeHtml(shift.location || 'Voxel Veda Workshop')}" />
+          <select id="singleRosterStatus">
+            ${['scheduled', 'confirmed', 'completed', 'cancelled'].map((status) => `
+              <option value="${status}" ${String(shift.status || 'scheduled') === status ? 'selected' : ''}>${status}</option>
+            `).join('')}
+          </select>
+          <textarea id="singleRosterNotes" rows="3" placeholder="Job number, machine, safety note or handover">${escapeHtml(shift.notes || '')}</textarea>
+        </div>
+      </div>
+    `,
+    async () => {
+      const body = {
+        id: shift.id,
+        user_id: Number(document.getElementById('singleRosterUser')?.value),
+        shift_date: document.getElementById('singleRosterDate')?.value,
+        start_time: document.getElementById('singleRosterStart')?.value,
+        end_time: document.getElementById('singleRosterEnd')?.value,
+        role_label: document.getElementById('singleRosterRole')?.value.trim(),
+        location: document.getElementById('singleRosterLocation')?.value.trim(),
+        status: document.getElementById('singleRosterStatus')?.value,
+        notes: document.getElementById('singleRosterNotes')?.value.trim()
+      };
+
+      const res = await fetch('/api/roster', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(body)
+      });
+      const data = await safeJson(res);
+
+      if (!res.ok) {
+        showToast(data.message || 'Roster save failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'Roster shift saved');
+      await loadRoster();
+    },
+    id ? 'Update Shift' : 'Save Shift'
+  );
+}
+
+async function deleteRosterShift(id) {
+  if (!confirm('Delete this roster shift?')) return;
+
+  const res = await fetch('/api/roster/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Roster delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Roster shift deleted');
+  await loadRoster();
+}
+
 async function loadTimesheets() {
   const tbody = document.getElementById('timesheetAdminBody');
   if (!tbody) return;
@@ -4978,6 +5206,7 @@ async function bootAdminDashboard() {
       loadMaterials('raw_material'),
       loadMaterials('packaging'),
       loadMeetings(),
+      loadRoster(),
       loadAttendance(),
       loadTimesheets(),
       loadSettings()

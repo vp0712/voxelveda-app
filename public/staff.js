@@ -170,6 +170,7 @@ function hasPermission(permission) {
 function applyPermissionUI() {
   const canUseTasks = hasPermission('tasks');
   const canUseAttendance = hasPermission('attendance');
+  const canUseRoster = hasPermission('roster');
   const canUseMeetings = hasPermission('meetings');
   const canUseStockIn = hasPermission('stock_in');
   const canUseStockOut = hasPermission('stock_out');
@@ -178,6 +179,7 @@ function applyPermissionUI() {
 
   setPermissionVisibility('.permission-tasks', canUseTasks);
   setPermissionVisibility('.permission-attendance', canUseAttendance);
+  setPermissionVisibility('.permission-roster', canUseRoster);
   setPermissionVisibility('.permission-meetings', canUseMeetings);
   setPermissionVisibility('.permission-stock', canUseStock);
   setPermissionVisibility('.permission-stock-in', canUseStockIn);
@@ -596,6 +598,7 @@ function setupStaffNavigation() {
       if (target === 'stockInSection') loadStaffStock();
       if (target === 'stockOutSection') loadStaffStockOut();
       if (target === 'meetingsSection') loadMyMeetings();
+      if (target === 'rosterSection') loadMyRoster();
       toggleMobileMenu(false);
     });
   });
@@ -1238,6 +1241,78 @@ async function loadMyMeetings() {
   }
 }
 
+/* ================= ROSTER ================= */
+
+function rosterShiftHours(shift) {
+  const start = shift.start_time || '00:00';
+  const end = shift.end_time || '00:00';
+  const [startHour, startMinute] = start.split(':').map(Number);
+  const [endHour, endMinute] = end.split(':').map(Number);
+  let minutes = ((endHour * 60) + endMinute) - ((startHour * 60) + startMinute);
+  if (minutes < 0) minutes += 24 * 60;
+  return minutes / 60;
+}
+
+function updateStaffRosterMetrics(rows) {
+  const next = rows[0];
+  setText('staffRosterCount', rows.length);
+  setText('staffRosterHours', rows.reduce((sum, row) => sum + rosterShiftHours(row), 0).toFixed(2));
+  setText('staffNextShiftDate', next ? formatShortDate(next.shift_date) : '-');
+  setText('staffNextShiftTime', next ? `${next.start_time} - ${next.end_time}` : 'No upcoming shift');
+}
+
+function renderMyRoster(rows) {
+  const list = document.getElementById('staffRosterList');
+  if (!list) return;
+
+  updateStaffRosterMetrics(rows);
+
+  if (!rows.length) {
+    list.innerHTML = '<div class="empty-state">No rostered shifts are assigned yet.</div>';
+    return;
+  }
+
+  list.innerHTML = rows.map((shift) => `
+    <article class="roster-shift-card">
+      <div class="roster-date-block">
+        <strong>${escapeHtml(formatShortDate(shift.shift_date))}</strong>
+        <span>${escapeHtml(shift.status || 'scheduled')}</span>
+      </div>
+      <div class="roster-shift-main">
+        <h3>${escapeHtml(shift.role_label || 'Assigned shift')}</h3>
+        <p>${escapeHtml(shift.start_time)} - ${escapeHtml(shift.end_time)} | ${escapeHtml(rosterShiftHours(shift).toFixed(2))} hrs</p>
+        <small>${escapeHtml(shift.location || 'Location not set')}</small>
+        ${shift.notes ? `<div class="roster-note">${escapeHtml(shift.notes)}</div>` : ''}
+      </div>
+    </article>
+  `).join('');
+}
+
+async function loadMyRoster() {
+  if (!hasPermission('roster')) return;
+
+  const list = document.getElementById('staffRosterList');
+  if (!list) return;
+
+  try {
+    const res = await fetch('/api/roster/my', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      list.innerHTML = `<div class="empty-state">${escapeHtml(data.message || 'Failed to load roster')}</div>`;
+      updateStaffRosterMetrics([]);
+      return;
+    }
+
+    renderMyRoster(data.roster || []);
+  } catch {
+    list.innerHTML = '<div class="empty-state">Server error loading roster.</div>';
+    updateStaffRosterMetrics([]);
+  }
+}
+
 /* ================= ATTENDANCE ================= */
 
 async function loadAttendanceStatus() {
@@ -1438,6 +1513,9 @@ function startAutoRefresh() {
     if (hasPermission('meetings')) {
       await loadMyMeetings();
     }
+    if (hasPermission('roster')) {
+      await loadMyRoster();
+    }
   }, 10000);
 }
 
@@ -1459,6 +1537,7 @@ async function bootStaffDashboard() {
       loadAnnouncements(),
       loadAttendanceStatus(),
       loadTimesheet(),
+      loadMyRoster(),
       loadStaffFinanceOverview()
     ]);
 
@@ -1468,6 +1547,9 @@ async function bootStaffDashboard() {
     }
     if (hasPermission('meetings')) {
       await loadMyMeetings();
+    }
+    if (hasPermission('roster')) {
+      await loadMyRoster();
     }
 
     startAutoRefresh();
