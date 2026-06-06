@@ -99,6 +99,37 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
     [...params, safeLimit, offset]
   );
 
+  const ids = rows.map((row) => Number(row.id)).filter(Boolean);
+  if (ids.length) {
+    const [files] = await pool.query(
+      `
+      SELECT ef.*, u.name AS uploaded_by_name
+      FROM expense_files ef
+      LEFT JOIN users u ON u.id = ef.uploaded_by
+      WHERE ef.deleted = 0
+      AND ef.expense_id IN (?)
+      ORDER BY ef.id ASC
+      `,
+      [ids]
+    );
+
+    const filesByExpense = files.reduce((acc, file) => {
+      const key = String(file.expense_id);
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(file);
+      return acc;
+    }, {});
+
+    rows.forEach((row) => {
+      row.files = filesByExpense[String(row.id)] || [];
+      row.file_count = row.files.length;
+    });
+  } else {
+    rows.forEach((row) => {
+      row.files = [];
+    });
+  }
+
   return {
     rows,
     total: Number(countRow.total || 0),

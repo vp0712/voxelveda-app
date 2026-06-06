@@ -2082,7 +2082,11 @@ async function loadExpenses(page = expensePage) {
       <td>${escapeHtml(formatMoney(expense.gst_amount))}</td>
       <td><strong>${escapeHtml(formatMoney(expense.total_amount))}</strong></td>
       <td>${statusBadge(expense.status)}</td>
-      <td>${Number(expense.file_count || 0) ? `<span class="badge active-badge">${escapeHtml(expense.file_count)} file${Number(expense.file_count) === 1 ? '' : 's'}</span>` : '<span class="muted-text">No bill</span>'}</td>
+      <td>
+        ${Number(expense.file_count || 0)
+          ? `<button class="file-badge-btn" onclick="openExpenseFileDialog(${expense.id})">${escapeHtml(expense.file_count)} bill${Number(expense.file_count) === 1 ? '' : 's'} attached</button>`
+          : '<span class="muted-text">No bill</span>'}
+      </td>
       <td>
         <button class="icon-btn" onclick="openExpenseDialog(${expense.id})">Edit</button>
         <button class="icon-btn" onclick="openExpenseFileDialog(${expense.id})">Bill</button>
@@ -2267,14 +2271,38 @@ function calculateExpenseGst() {
 
 function openExpenseFileDialog(id) {
   const expense = expenseCache.find((row) => Number(row.id) === Number(id)) || {};
+  const files = Array.isArray(expense.files) ? expense.files : [];
+  const fileRows = files.length ? files.map((file) => `
+    <div class="file-row expense-file-row">
+      <div>
+        <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.original_name || 'Expense bill')}</a>
+        <small>
+          ${escapeHtml(file.mime_type || 'file')} |
+          Uploaded ${escapeHtml(formatDateTime(file.created_at))}
+          ${file.uploaded_by_name ? ` by ${escapeHtml(file.uploaded_by_name)}` : ''}
+        </small>
+      </div>
+      <div class="file-action-row">
+        <a class="icon-btn" href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">View</a>
+        <button class="mini-danger" onclick="deleteExpenseFile(${file.id})">Delete</button>
+      </div>
+    </div>
+  `).join('') : '<div class="empty-state">No bill photo or file uploaded yet.</div>';
 
   showDialog(
-    'Upload Bill / Expense Photo',
+    'Expense Bills & Photos',
     `
-      <div class="stock-dialog-grid single-dialog-grid">
+      <div class="stock-dialog-grid">
         <div class="dialog-card">
-          <h4>${escapeHtml(expense.supplier_name || 'Expense Bill')}</h4>
-          <p class="status-note">Take a bill photo from your phone or upload a PDF/image. The file is stored with this expense for audit and GST records.</p>
+          <h4>Attached Bills</h4>
+          <p class="status-note">${escapeHtml(expense.supplier_name || 'Expense')} | ${escapeHtml(expense.invoice_no || 'No bill number')}</p>
+          <div class="expense-file-list">
+            ${fileRows}
+          </div>
+        </div>
+        <div class="dialog-card">
+          <h4>Upload Another Bill</h4>
+          <p class="status-note">Take a bill photo from your phone or upload a PDF/image. Every file stays linked to this expense for audit and GST records.</p>
           <input id="expenseBillFile" type="file" accept="image/*,.pdf" capture="environment" />
           <p class="status-note">Automatic bill reading/OCR can be connected later with a dedicated OCR provider. Confirm the amount fields manually for accounting accuracy.</p>
         </div>
@@ -2310,6 +2338,26 @@ function openExpenseFileDialog(id) {
   );
 
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+async function deleteExpenseFile(id) {
+  if (!confirm('Delete this bill/photo only?')) return;
+
+  const res = await fetch('/api/expenses/files/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'Bill file delete failed');
+    return;
+  }
+
+  showToast(data.message || 'Bill file deleted');
+  hideDialog();
+  await loadExpenses(expensePage);
 }
 
 async function deleteExpense(id) {

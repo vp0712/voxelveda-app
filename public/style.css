@@ -1181,6 +1181,44 @@ tr:hover td {
   margin-bottom: 4px;
 }
 
+.expense-file-list {
+  display: grid;
+  gap: 10px;
+  max-height: 430px;
+  overflow-y: auto;
+}
+
+.expense-file-row {
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid rgba(45, 212, 191, 0.16);
+  border-radius: 12px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.file-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.file-badge-btn {
+  border: 1px solid rgba(45, 212, 191, 0.32);
+  border-radius: 999px;
+  padding: 7px 10px;
+  color: var(--accent);
+  background: rgba(45, 212, 191, 0.1);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.file-badge-btn:hover {
+  border-color: rgba(45, 212, 191, 0.62);
+  background: rgba(45, 212, 191, 0.18);
+}
+
 .file-row a {
   color: var(--accent);
   font-weight: 800;
