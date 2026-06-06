@@ -3635,11 +3635,11 @@ function normalizeQrUrl(value) {
 }
 
 function getRfqUrl() {
-  return `${window.location.origin}/customer.html`;
+  return 'https://voxelveda-app-production.up.railway.app/customer.html';
 }
 
 function getPrivacyPolicyUrl() {
-  return `${window.location.origin}/privacy-policy.html`;
+  return 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
 }
 
 function updateQrTargetFromType() {
@@ -3675,7 +3675,7 @@ function renderQrCode() {
       : type === 'custom'
         ? 'Custom QR Link'
         : 'Customer RFQ Form';
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=360x360&margin=16&data=${encodeURIComponent(target)}`;
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=32&ecc=H&color=000000&bgcolor=ffffff&data=${encodeURIComponent(target)}`;
   image.src = qrSrc;
   download.href = qrSrc;
   download.download = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-qr.png`;

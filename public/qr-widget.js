@@ -1,13 +1,17 @@
 (function () {
   if (window.__voxelQrWidgetInstalled) return;
   window.__voxelQrWidgetInstalled = true;
+  const LIVE_APP_ORIGIN = 'https://voxelveda-app-production.up.railway.app';
 
   function qrTarget() {
-    return `${window.location.origin}/customer.html`;
+    return `${LIVE_APP_ORIGIN}/customer.html`;
   }
 
   function qrImageUrl(target) {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=420x420&margin=18&data=${encodeURIComponent(target)}`;
+    if (target === `${LIVE_APP_ORIGIN}/customer.html`) {
+      return '/customer-rfq-qr.png?v=20260606-scan-safe-qr';
+    }
+    return `https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=32&ecc=H&color=000000&bgcolor=ffffff&data=${encodeURIComponent(target)}`;
   }
 
   function closeQrWidget(event) {
