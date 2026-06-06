@@ -33,12 +33,15 @@ async function ensureExpenseTables() {
       original_name VARCHAR(255) NOT NULL,
       file_path TEXT NOT NULL,
       mime_type VARCHAR(120) NULL,
+      file_data LONGBLOB NULL,
       uploaded_by INT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       deleted TINYINT(1) NOT NULL DEFAULT 0,
       INDEX expense_files_expense_id_idx (expense_id)
     )
   `);
+
+  await pool.query('ALTER TABLE expense_files ADD COLUMN file_data LONGBLOB NULL').catch(() => {});
 }
 
 function financialYearBounds(fy) {
@@ -317,19 +320,61 @@ exports.saveExpenseFile = async (req, res) => {
     const [[expense]] = await pool.query('SELECT id FROM expenses WHERE id = ? AND deleted = 0 LIMIT 1', [expenseId]);
     if (!expense) return res.status(404).json({ message: 'Expense not found' });
 
+    const fileData = req.file?.path ? await fs.promises.readFile(req.file.path).catch(() => null) : null;
+
     const [result] = await pool.query(
       `
       INSERT INTO expense_files
-      (expense_id, original_name, file_path, mime_type, uploaded_by)
-      VALUES (?, ?, ?, ?, ?)
+      (expense_id, original_name, file_path, mime_type, file_data, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?)
       `,
-      [expenseId, req.file.originalname, `/uploads/expenses/${req.file.filename}`, req.file.mimetype, req.user.id]
+      [expenseId, req.file.originalname, `/uploads/expenses/${req.file.filename}`, req.file.mimetype, fileData, req.user.id]
     );
 
     res.json({ message: 'Bill file uploaded successfully', file_id: result.insertId });
   } catch (error) {
     console.error('saveExpenseFile error:', error);
     res.status(500).json({ message: 'Failed to upload bill file', error: error.message });
+  }
+};
+
+exports.viewExpenseFile = async (req, res) => {
+  try {
+    await ensureExpenseTables();
+
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'File ID is required' });
+
+    const [[file]] = await pool.query(
+      'SELECT original_name, file_path, mime_type, file_data FROM expense_files WHERE id = ? AND deleted = 0 LIMIT 1',
+      [id]
+    );
+
+    if (!file) return res.status(404).json({ message: 'Bill file not found' });
+
+    const mimeType = file.mime_type || 'application/octet-stream';
+    const safeName = String(file.original_name || `expense-bill-${id}`).replace(/"/g, '');
+    const dbBuffer = file.file_data && Buffer.isBuffer(file.file_data) ? file.file_data : null;
+
+    if (dbBuffer && dbBuffer.length) {
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      return res.send(dbBuffer);
+    }
+
+    const filePath = file.file_path ? path.join(__dirname, '..', file.file_path.replace(/^\//, '')) : '';
+    if (filePath && filePath.includes(`${path.sep}uploads${path.sep}expenses${path.sep}`) && fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      return fs.createReadStream(filePath).pipe(res);
+    }
+
+    return res.status(404).json({
+      message: 'This bill photo is no longer available on the server. Please upload the bill again so it can be stored permanently.'
+    });
+  } catch (error) {
+    console.error('viewExpenseFile error:', error);
+    res.status(500).json({ message: 'Failed to open bill file', error: error.message });
   }
 };
 

@@ -28,6 +28,7 @@ const upload = multer({
 });
 
 router.get('/', expenseController.getExpenses);
+router.get('/files/:id/view', expenseController.viewExpenseFile);
 router.post('/', requireInputPermission('expenses_input'), expenseController.saveExpense);
 router.post('/delete', requireInputPermission('expenses_input'), expenseController.deleteExpense);
 router.post('/:id/files', requireInputPermission('expenses_input'), upload.single('file'), expenseController.saveExpenseFile);

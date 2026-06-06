@@ -2283,7 +2283,7 @@ function openExpenseFileDialog(id) {
         </small>
       </div>
       <div class="file-action-row">
-        <a class="icon-btn" href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">View</a>
+        <button class="icon-btn" onclick="viewExpenseFile(${file.id})">View</button>
         <button class="mini-danger" onclick="deleteExpenseFile(${file.id})">Delete</button>
       </div>
     </div>
@@ -2338,6 +2338,27 @@ function openExpenseFileDialog(id) {
   );
 
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+async function viewExpenseFile(id) {
+  try {
+    const res = await fetch(`/api/expenses/files/${id}/view`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      const data = await safeJson(res);
+      showToast(data.message || 'Bill file could not be opened');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    showToast('Bill file could not be opened');
+  }
 }
 
 async function deleteExpenseFile(id) {
