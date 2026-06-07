@@ -1071,6 +1071,84 @@ function collectInvoiceItems() {
   }));
 }
 
+async function ensureCustomerCache() {
+  if (customerCache.length) return customerCache;
+
+  const res = await fetch('/api/customers', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (res.ok) {
+    customerCache = chronologicalRows(data.customers || []);
+  }
+
+  return customerCache;
+}
+
+function customerSearchText(customer) {
+  return [
+    customer.company_name,
+    customer.contact_name,
+    customer.email,
+    customer.phone,
+    customer.address
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function renderManualCustomerSuggestions() {
+  const query = String(document.getElementById('manualInvoiceCustomer')?.value || '').trim().toLowerCase();
+  const panel = document.getElementById('manualCustomerSuggestions');
+  if (!panel) return;
+
+  if (!query) {
+    panel.innerHTML = '<div class="empty-state">Start typing to search saved customers.</div>';
+    return;
+  }
+
+  const matches = customerCache
+    .filter((customer) => customerSearchText(customer).includes(query))
+    .slice(0, 8);
+
+  if (!matches.length) {
+    panel.innerHTML = '<div class="empty-state">No saved customer found. You can still type a new customer manually.</div>';
+    return;
+  }
+
+  panel.innerHTML = matches.map((customer) => `
+    <button type="button" class="customer-suggestion-btn" onclick="selectManualInvoiceCustomer(${customer.id})">
+      <strong>${escapeHtml(customer.company_name || customer.contact_name || 'Customer')}</strong>
+      <span>${escapeHtml(customer.contact_name || '-')} | ${escapeHtml(customer.email || '-')} | ${escapeHtml(customer.phone || '-')}</span>
+      <small>${escapeHtml(Number(customer.order_count || 0))} orders | ${escapeHtml(formatMoney(customer.total_spend || 0))} history</small>
+    </button>
+  `).join('');
+}
+
+function selectManualInvoiceCustomer(id) {
+  const customer = customerCache.find((row) => Number(row.id) === Number(id));
+  if (!customer) return;
+
+  const name = customer.company_name || customer.contact_name || '';
+  const email = customer.email || '';
+
+  const nameEl = document.getElementById('manualInvoiceCustomer');
+  const emailEl = document.getElementById('manualInvoiceEmail');
+  const selectedEl = document.getElementById('manualInvoiceSelectedCustomer');
+
+  if (nameEl) nameEl.value = name;
+  if (emailEl) emailEl.value = email;
+  if (selectedEl) {
+    selectedEl.innerHTML = `
+      <strong>${escapeHtml(name || 'Selected customer')}</strong>
+      <span>${escapeHtml(customer.contact_name || '-')} | ${escapeHtml(email || '-')} | ${escapeHtml(customer.phone || '-')}</span>
+      ${customer.address ? `<small>${escapeHtml(customer.address)}</small>` : ''}
+    `;
+    selectedEl.classList.remove('hidden-section');
+  }
+
+  renderManualCustomerSuggestions();
+}
+
 function openManualInvoiceDialog() {
   showDialog(
     'Manual Invoice',
@@ -1078,7 +1156,11 @@ function openManualInvoiceDialog() {
       <div class="stock-dialog-grid">
         <div class="dialog-card">
           <h4>Customer</h4>
-          <input id="manualInvoiceCustomer" placeholder="Customer name" />
+          <input id="manualInvoiceCustomer" placeholder="Type first letter, company, contact, phone or email" oninput="renderManualCustomerSuggestions()" autocomplete="off" />
+          <div id="manualInvoiceSelectedCustomer" class="selected-customer-card hidden-section"></div>
+          <div id="manualCustomerSuggestions" class="customer-suggestion-list">
+            <div class="empty-state">Loading saved customers...</div>
+          </div>
           <input id="manualInvoiceEmail" type="email" placeholder="Customer email" />
           <input id="manualInvoiceGst" type="number" min="0" step="0.01" value="10" placeholder="GST rate" />
         </div>
@@ -1118,6 +1200,10 @@ function openManualInvoiceDialog() {
   );
 
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'manual-invoice-dialog');
+  ensureCustomerCache().then(renderManualCustomerSuggestions).catch(() => {
+    const panel = document.getElementById('manualCustomerSuggestions');
+    if (panel) panel.innerHTML = '<div class="empty-state">Customer history could not load. You can still enter details manually.</div>';
+  });
 }
 
 async function loadInvoices() {
