@@ -1193,7 +1193,9 @@ function openManualInvoiceDialog() {
 
       hideDialog();
       showToast(data.message || 'Manual invoice created');
+      customerCache = [];
       await loadInvoices();
+      await ensureCustomerCache();
       await loadDashboardStats();
     },
     'Create Invoice'

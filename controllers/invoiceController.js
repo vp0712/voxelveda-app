@@ -95,6 +95,60 @@ async function ensureInvoiceColumns() {
   `).catch(() => {});
 }
 
+async function ensureInvoiceCustomerTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      company_name VARCHAR(180) NOT NULL,
+      contact_name VARCHAR(180) NULL,
+      email VARCHAR(180) NULL,
+      phone VARCHAR(80) NULL,
+      address TEXT NULL,
+      notes TEXT NULL,
+      file_link TEXT NULL,
+      created_by INT NULL,
+      updated_by INT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+      deleted TINYINT(1) NOT NULL DEFAULT 0
+    )
+  `);
+}
+
+async function rememberManualInvoiceCustomer(conn, { customerName, customerEmail, userId }) {
+  const name = String(customerName || '').trim();
+  const email = String(customerEmail || '').trim();
+  if (!name || !email) return;
+
+  const [[existing]] = await conn.query(
+    'SELECT id FROM customers WHERE LOWER(email) = LOWER(?) AND deleted = 0 LIMIT 1',
+    [email]
+  );
+
+  if (existing) {
+    await conn.query(
+      `
+      UPDATE customers
+      SET company_name = ?,
+          email = ?,
+          updated_by = ?
+      WHERE id = ?
+      `,
+      [name, email, userId || null, existing.id]
+    );
+    return;
+  }
+
+  await conn.query(
+    `
+    INSERT INTO customers
+      (company_name, email, notes, created_by)
+    VALUES (?, ?, ?, ?)
+    `,
+    [name, email, 'Created automatically from manual invoice history.', userId || null]
+  );
+}
+
 function invoiceReceivableSelect(whereClause = 'WHERE i.deleted = 0 OR i.deleted IS NULL') {
   return `
     SELECT
@@ -297,6 +351,7 @@ exports.createManualInvoice = async (req, res) => {
 
   try {
     await ensureInvoiceColumns();
+    await ensureInvoiceCustomerTable();
 
     const { customer_name, customer_email, gst_rate, items } = req.body;
 
@@ -370,6 +425,12 @@ exports.createManualInvoice = async (req, res) => {
         [invoiceId, item.description, item.quantity, item.unitPrice, item.amount]
       );
     }
+
+    await rememberManualInvoiceCustomer(conn, {
+      customerName: customer_name,
+      customerEmail: customer_email,
+      userId: req.user?.id
+    });
 
     await conn.commit();
 
