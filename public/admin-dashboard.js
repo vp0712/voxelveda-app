@@ -16,6 +16,7 @@ let financeChartInstance = null;
 let expenseCategoryChartInstance = null;
 let expenseMonthChartInstance = null;
 let invoiceCache = [];
+let manualInvoiceCustomerMatches = [];
 let stockCache = [];
 let stockUsageCache = [];
 let customerCache = [];
@@ -1033,7 +1034,7 @@ function invoiceItemRows(items = [{ description: '', quantity: 1, unit_price: 0 
     <div class="invoice-item-row" data-invoice-item-row>
       <label>
         <span>Item description</span>
-        <input class="invoiceItemDescription" placeholder="Item description" value="${escapeHtml(item.description || '')}" />
+        <input class="invoiceItemDescription" list="manualInvoiceItemHistory" placeholder="Item description" value="${escapeHtml(item.description || '')}" />
       </label>
       <label>
         <span>Qty</span>
@@ -1086,14 +1087,95 @@ async function ensureCustomerCache() {
   return customerCache;
 }
 
-function customerSearchText(customer) {
+async function ensureInvoiceHistoryCache() {
+  if (invoiceCache.length) return invoiceCache;
+
+  const res = await fetch('/api/invoice', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (res.ok) {
+    invoiceCache = chronologicalRows(data.invoices || []);
+  }
+
+  return invoiceCache;
+}
+
+function manualCustomerSources() {
+  const sources = new Map();
+
+  customerCache.forEach((customer) => {
+    const name = customer.company_name || customer.contact_name || '';
+    const email = customer.email || '';
+    const key = (email || `customer:${name}`).toLowerCase();
+    if (!name || !key) return;
+    sources.set(key, {
+      key,
+      source: 'Customer register',
+      name,
+      contact: customer.contact_name || '',
+      email,
+      phone: customer.phone || '',
+      address: customer.address || '',
+      order_count: Number(customer.order_count || 0),
+      total_spend: Number(customer.total_spend || 0)
+    });
+  });
+
+  invoiceCache.forEach((invoice) => {
+    const name = invoice.customer_name || '';
+    const email = invoice.customer_email || '';
+    const key = (email || `invoice:${name}`).toLowerCase();
+    if (!name || !key) return;
+
+    const existing = sources.get(key);
+    if (existing) {
+      existing.order_count += 1;
+      existing.total_spend += Number(invoice.total || 0);
+      existing.source = existing.source.includes('Invoice') ? existing.source : `${existing.source} + Invoice history`;
+      return;
+    }
+
+    sources.set(key, {
+      key,
+      source: 'Invoice history',
+      name,
+      contact: '',
+      email,
+      phone: '',
+      address: '',
+      order_count: 1,
+      total_spend: Number(invoice.total || 0)
+    });
+  });
+
+  return Array.from(sources.values()).sort((a, b) => b.order_count - a.order_count || a.name.localeCompare(b.name));
+}
+
+function manualCustomerSearchText(customer) {
   return [
-    customer.company_name,
-    customer.contact_name,
+    customer.name,
+    customer.contact,
     customer.email,
     customer.phone,
     customer.address
   ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function renderManualInvoiceItemHistory() {
+  const list = document.getElementById('manualInvoiceItemHistory');
+  if (!list) return;
+
+  const options = [];
+  const seen = new Set();
+  invoiceCache.forEach((invoice) => {
+    const description = String(invoice.description || '').trim();
+    if (!description || seen.has(description.toLowerCase())) return;
+    seen.add(description.toLowerCase());
+    options.push(`<option value="${escapeHtml(description)}"></option>`);
+  });
+  list.innerHTML = options.join('');
 }
 
 function renderManualCustomerSuggestions() {
@@ -1102,33 +1184,34 @@ function renderManualCustomerSuggestions() {
   if (!panel) return;
 
   if (!query) {
-    panel.innerHTML = '<div class="empty-state">Start typing to search saved customers.</div>';
+    panel.innerHTML = '';
     return;
   }
 
-  const matches = customerCache
-    .filter((customer) => customerSearchText(customer).includes(query))
+  const matches = manualCustomerSources()
+    .filter((customer) => manualCustomerSearchText(customer).includes(query))
     .slice(0, 8);
+  manualInvoiceCustomerMatches = matches;
 
   if (!matches.length) {
-    panel.innerHTML = '<div class="empty-state">No saved customer found. You can still type a new customer manually.</div>';
+    panel.innerHTML = '<div class="customer-search-empty">New customer profile will be remembered after invoice creation.</div>';
     return;
   }
 
-  panel.innerHTML = matches.map((customer) => `
-    <button type="button" class="customer-suggestion-btn" onclick="selectManualInvoiceCustomer(${customer.id})">
-      <strong>${escapeHtml(customer.company_name || customer.contact_name || 'Customer')}</strong>
-      <span>${escapeHtml(customer.contact_name || '-')} | ${escapeHtml(customer.email || '-')} | ${escapeHtml(customer.phone || '-')}</span>
-      <small>${escapeHtml(Number(customer.order_count || 0))} orders | ${escapeHtml(formatMoney(customer.total_spend || 0))} history</small>
+  panel.innerHTML = matches.map((customer, index) => `
+    <button type="button" class="customer-suggestion-btn" onclick="selectManualInvoiceCustomer(${index})">
+      <strong>${escapeHtml(customer.name || 'Customer')}</strong>
+      <span>${escapeHtml(customer.contact || customer.source)} | ${escapeHtml(customer.email || '-')} | ${escapeHtml(customer.phone || '-')}</span>
+      <small>${escapeHtml(customer.source)} | ${escapeHtml(Number(customer.order_count || 0))} invoice/order record${Number(customer.order_count || 0) === 1 ? '' : 's'} | ${escapeHtml(formatMoney(customer.total_spend || 0))}</small>
     </button>
   `).join('');
 }
 
-function selectManualInvoiceCustomer(id) {
-  const customer = customerCache.find((row) => Number(row.id) === Number(id));
+function selectManualInvoiceCustomer(index) {
+  const customer = manualInvoiceCustomerMatches[Number(index)];
   if (!customer) return;
 
-  const name = customer.company_name || customer.contact_name || '';
+  const name = customer.name || '';
   const email = customer.email || '';
 
   const nameEl = document.getElementById('manualInvoiceCustomer');
@@ -1140,13 +1223,15 @@ function selectManualInvoiceCustomer(id) {
   if (selectedEl) {
     selectedEl.innerHTML = `
       <strong>${escapeHtml(name || 'Selected customer')}</strong>
-      <span>${escapeHtml(customer.contact_name || '-')} | ${escapeHtml(email || '-')} | ${escapeHtml(customer.phone || '-')}</span>
+      <span>${escapeHtml(customer.contact || customer.source)} | ${escapeHtml(email || '-')} | ${escapeHtml(customer.phone || '-')}</span>
       ${customer.address ? `<small>${escapeHtml(customer.address)}</small>` : ''}
     `;
     selectedEl.classList.remove('hidden-section');
   }
 
-  renderManualCustomerSuggestions();
+  manualInvoiceCustomerMatches = [];
+  const panel = document.getElementById('manualCustomerSuggestions');
+  if (panel) panel.innerHTML = '';
 }
 
 function openManualInvoiceDialog() {
@@ -1158,14 +1243,13 @@ function openManualInvoiceDialog() {
           <h4>Customer</h4>
           <input id="manualInvoiceCustomer" placeholder="Type first letter, company, contact, phone or email" oninput="renderManualCustomerSuggestions()" autocomplete="off" />
           <div id="manualInvoiceSelectedCustomer" class="selected-customer-card hidden-section"></div>
-          <div id="manualCustomerSuggestions" class="customer-suggestion-list">
-            <div class="empty-state">Loading saved customers...</div>
-          </div>
+          <div id="manualCustomerSuggestions" class="customer-suggestion-list"></div>
           <input id="manualInvoiceEmail" type="email" placeholder="Customer email" />
           <input id="manualInvoiceGst" type="number" min="0" step="0.01" value="10" placeholder="GST rate" />
         </div>
         <div class="dialog-card">
           <h4>Line Items</h4>
+          <datalist id="manualInvoiceItemHistory"></datalist>
           <div id="invoiceItemsContainer">${invoiceItemRows()}</div>
           <button type="button" class="secondary-btn" onclick="addInvoiceItemRow()">Add Item</button>
         </div>
@@ -1202,9 +1286,12 @@ function openManualInvoiceDialog() {
   );
 
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'manual-invoice-dialog');
-  ensureCustomerCache().then(renderManualCustomerSuggestions).catch(() => {
+  Promise.all([ensureCustomerCache(), ensureInvoiceHistoryCache()]).then(() => {
+    renderManualInvoiceItemHistory();
+    renderManualCustomerSuggestions();
+  }).catch(() => {
     const panel = document.getElementById('manualCustomerSuggestions');
-    if (panel) panel.innerHTML = '<div class="empty-state">Customer history could not load. You can still enter details manually.</div>';
+    if (panel) panel.innerHTML = '<div class="customer-search-empty">History is temporarily unavailable. Manual entry is ready.</div>';
   });
 }
 
