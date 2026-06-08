@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
+const QRCode = require('qrcode');
 
 const authRoutes = require('./routes/authRoutes');
 const rfqRoutes = require('./routes/rfqRoutes');
@@ -36,6 +37,32 @@ app.use('/invoices', express.static(path.join(__dirname, 'invoices')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth', authRoutes);
+
+app.get('/api/qr', async (req, res) => {
+  try {
+    const data = String(req.query.data || '').trim();
+    if (!data || data.length > 1200) {
+      return res.status(400).json({ message: 'A valid QR data value is required.' });
+    }
+
+    const png = await QRCode.toBuffer(data, {
+      type: 'png',
+      errorCorrectionLevel: 'H',
+      margin: 8,
+      width: 1024,
+      color: {
+        dark: '#000000',
+        light: '#ffffff'
+      }
+    });
+
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(png);
+  } catch (err) {
+    return res.status(500).json({ message: 'QR code generation failed.' });
+  }
+});
 
 app.post('/api/public/rfq', rfqController.createRFQ);
 

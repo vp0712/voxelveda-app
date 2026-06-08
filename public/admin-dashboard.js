@@ -3941,7 +3941,7 @@ function renderQrCode() {
       : type === 'custom'
         ? 'Custom QR Link'
         : 'Customer RFQ Form';
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=32&ecc=H&color=000000&bgcolor=ffffff&data=${encodeURIComponent(target)}`;
+  const qrSrc = `/api/qr?data=${encodeURIComponent(target)}&v=20260608-local-qr`;
   image.src = qrSrc;
   download.href = qrSrc;
   download.download = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-qr.png`;

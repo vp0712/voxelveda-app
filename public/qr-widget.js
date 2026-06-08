@@ -8,10 +8,7 @@
   }
 
   function qrImageUrl(target) {
-    if (target === `${LIVE_APP_ORIGIN}/customer.html`) {
-      return '/customer-rfq-qr.png?v=20260608-scan-safe-qr';
-    }
-    return `https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=32&ecc=H&color=000000&bgcolor=ffffff&data=${encodeURIComponent(target)}`;
+    return `/api/qr?data=${encodeURIComponent(target)}&v=20260608-local-qr`;
   }
 
   function closeQrWidget(event) {
@@ -41,7 +38,10 @@
           <p>Scan to open the customer RFQ form.</p>
           <div class="branded-qr-frame">
             <img id="globalQrImage" alt="Voxel Veda QR code" />
-            <span class="branded-qr-logo"><img src="/Frame 1.png?v=20260601-clean-logo" alt="Voxel Veda" /></span>
+          </div>
+          <div class="qr-brand-strip">
+            <img src="/Frame 1.png?v=20260601-clean-logo" alt="Voxel Veda" />
+            <span>Scan-safe access code</span>
           </div>
           <p id="globalQrUrl" class="global-qr-url"></p>
           <div class="card-actions">

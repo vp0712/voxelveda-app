@@ -1020,6 +1020,30 @@ th {
   font-size: 12px;
 }
 
+.qr-brand-strip {
+  width: min(260px, 100%);
+  margin: -6px auto 12px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 12px;
+  background: rgba(7, 17, 31, 0.76);
+  color: #b8d7e8;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.qr-brand-strip img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
 .settings-qr-frame {
   width: 150px;
   margin: 0;
