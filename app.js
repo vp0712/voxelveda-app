@@ -18,6 +18,7 @@ const materialRoutes = require('./routes/materialRoutes');
 const meetingRoutes = require('./routes/meetingRoutes');
 const rosterRoutes = require('./routes/rosterRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
+const supplierController = require('./controllers/supplierController');
 const complianceRoutes = require('./routes/complianceRoutes');
 const competitorRoutes = require('./routes/competitorRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
@@ -78,6 +79,7 @@ app.use('/api/customers', auth, requirePermission('customers'), requireInputPerm
 app.use('/api/materials', auth, requirePermission('stock'), materialRoutes);
 app.use('/api/meetings', auth, requirePermission('meetings'), meetingRoutes);
 app.use('/api/roster', auth, requirePermission('roster'), rosterRoutes);
+app.get('/api/suppliers/files/:id/view', auth, requirePermission('suppliers'), supplierController.viewSupplierFile);
 app.use('/api/suppliers', auth, requirePermission('suppliers'), supplierRoutes);
 app.use('/api/expenses', auth, requirePermission('expenses'), expenseRoutes);
 app.use('/api/compliance', auth, requirePermission('compliance'), requireInputPermission('compliance_input'), complianceRoutes);
