@@ -265,8 +265,9 @@ exports.viewProcessSheetPdf = async (req, res) => {
       { width: 420 }
     );
     if (fs.existsSync(privacyQrPath)) {
-      doc.image(privacyQrPath, 500, 710, { width: 42 });
-      doc.link(500, 710, 42, 42, privacyPolicyUrl);
+      doc.roundedRect(482, 706, 66, 66, 5).fill('#ffffff').strokeColor('#cbd5e1').stroke();
+      doc.image(privacyQrPath, 489, 713, { width: 52 });
+      doc.link(482, 706, 66, 66, privacyPolicyUrl);
     }
     doc.strokeColor('#cbd5e1').roundedRect(44, 774, 508, 44, 6).stroke();
     doc.fillColor('#0f172a').fontSize(8.5).text('Privacy & Confidentiality Notice', 58, 786);

@@ -981,7 +981,7 @@ th {
   aspect-ratio: 1;
   margin: 18px auto;
   border-radius: 20px;
-  padding: 12px;
+  padding: 16px;
   background: #ffffff;
   box-shadow: inset 0 0 0 1px #d7dee8;
 }
@@ -998,20 +998,20 @@ th {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 44px;
-  height: 44px;
+  width: 34px;
+  height: 34px;
   display: grid;
   place-items: center;
-  border-radius: 12px;
+  border-radius: 10px;
   background: #07111f;
-  border: 4px solid #ffffff;
+  border: 3px solid #ffffff;
   box-shadow: 0 8px 18px rgba(2, 6, 23, 0.16);
   overflow: hidden;
 }
 
 .branded-qr-logo img {
-  width: 36px;
-  height: 36px;
+  width: 27px;
+  height: 27px;
   object-fit: contain;
 }
 

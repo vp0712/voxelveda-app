@@ -9,7 +9,7 @@
 
   function qrImageUrl(target) {
     if (target === `${LIVE_APP_ORIGIN}/customer.html`) {
-      return '/customer-rfq-qr.png?v=20260606-scan-safe-qr';
+      return '/customer-rfq-qr.png?v=20260608-scan-safe-qr';
     }
     return `https://api.qrserver.com/v1/create-qr-code/?size=720x720&margin=32&ecc=H&color=000000&bgcolor=ffffff&data=${encodeURIComponent(target)}`;
   }

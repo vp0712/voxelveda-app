@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Invoice | Voxel Veda</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260606-scan-safe-qr" />
+  <link rel="stylesheet" href="/style.css?v=20260608-scan-safe-qr" />
   <style>
     .invoice-view-shell {
       min-height: 100vh;
@@ -180,7 +180,7 @@
 
     .invoice-privacy-card {
       display: grid;
-      grid-template-columns: 1fr 78px;
+      grid-template-columns: 1fr 112px;
       gap: 16px;
       align-items: center;
       border: 1px solid #d7dee8;
@@ -198,12 +198,21 @@
     }
 
     .invoice-privacy-card img {
-      width: 78px;
-      height: 78px;
+      width: 104px;
+      height: 104px;
       object-fit: contain;
       background: #ffffff;
-      border-radius: 10px;
-      padding: 4px;
+      border: 1px solid #d7dee8;
+      border-radius: 12px;
+      padding: 8px;
+    }
+
+    .invoice-privacy-url {
+      margin-top: 8px;
+      color: #0b4f6c;
+      font-size: 11px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
     }
 
     .invoice-loading {
@@ -299,7 +308,7 @@
     <main id="invoicePreview" class="invoice-loading">Loading invoice preview...</main>
   </div>
 
-  <script src="/qr-widget.js?v=20260606-scan-safe-qr"></script>
+  <script src="/qr-widget.js?v=20260608-scan-safe-qr"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const invoiceId = params.get('id');
@@ -429,8 +438,9 @@
             <div>
               <strong>Privacy, confidentiality & document handling</strong>
               <p>This invoice and any attached documents may contain confidential customer, supplier, pricing, production or payment information. Scan the QR code to view the live Voxel Veda privacy policy.</p>
+              <p class="invoice-privacy-url">voxelveda-app-production.up.railway.app/privacy-policy.html</p>
             </div>
-            <img src="/privacy-qr.png?v=20260606-scan-safe-qr" alt="Privacy Policy QR Code" />
+            <img src="/privacy-qr.png?v=20260608-scan-safe-qr" alt="Privacy Policy QR Code" />
           </div>
 
           <div class="invoice-footer">
