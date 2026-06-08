@@ -1034,7 +1034,7 @@ function invoiceItemRows(items = [{ description: '', quantity: 1, unit_price: 0 
     <div class="invoice-item-row" data-invoice-item-row>
       <label>
         <span>Item description</span>
-        <input class="invoiceItemDescription" list="manualInvoiceItemHistory" placeholder="Item description" value="${escapeHtml(item.description || '')}" />
+        <input class="invoiceItemDescription" placeholder="Item description" autocomplete="off" value="${escapeHtml(item.description || '')}" />
       </label>
       <label>
         <span>Qty</span>
@@ -1163,21 +1163,6 @@ function manualCustomerSearchText(customer) {
   ].filter(Boolean).join(' ').toLowerCase();
 }
 
-function renderManualInvoiceItemHistory() {
-  const list = document.getElementById('manualInvoiceItemHistory');
-  if (!list) return;
-
-  const options = [];
-  const seen = new Set();
-  invoiceCache.forEach((invoice) => {
-    const description = String(invoice.description || '').trim();
-    if (!description || seen.has(description.toLowerCase())) return;
-    seen.add(description.toLowerCase());
-    options.push(`<option value="${escapeHtml(description)}"></option>`);
-  });
-  list.innerHTML = options.join('');
-}
-
 function renderManualCustomerSuggestions() {
   const query = String(document.getElementById('manualInvoiceCustomer')?.value || '').trim().toLowerCase();
   const panel = document.getElementById('manualCustomerSuggestions');
@@ -1249,7 +1234,6 @@ function openManualInvoiceDialog() {
         </div>
         <div class="dialog-card">
           <h4>Line Items</h4>
-          <datalist id="manualInvoiceItemHistory"></datalist>
           <div id="invoiceItemsContainer">${invoiceItemRows()}</div>
           <button type="button" class="secondary-btn" onclick="addInvoiceItemRow()">Add Item</button>
         </div>
@@ -1287,7 +1271,6 @@ function openManualInvoiceDialog() {
 
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'manual-invoice-dialog');
   Promise.all([ensureCustomerCache(), ensureInvoiceHistoryCache()]).then(() => {
-    renderManualInvoiceItemHistory();
     renderManualCustomerSuggestions();
   }).catch(() => {
     const panel = document.getElementById('manualCustomerSuggestions');
