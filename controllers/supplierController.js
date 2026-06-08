@@ -33,12 +33,15 @@ async function ensureSupplierTables() {
       original_name VARCHAR(255) NOT NULL,
       file_path TEXT NOT NULL,
       mime_type VARCHAR(120) NULL,
+      file_data LONGBLOB NULL,
       uploaded_by INT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       deleted TINYINT(1) NOT NULL DEFAULT 0,
       INDEX supplier_files_supplier_id_idx (supplier_id)
     )
   `);
+
+  await pool.query('ALTER TABLE supplier_files ADD COLUMN file_data LONGBLOB NULL').catch(() => {});
 }
 
 exports.getSuppliers = async (req, res) => {
@@ -182,11 +185,13 @@ exports.saveSupplierFile = async (req, res) => {
       return res.status(404).json({ message: 'Supplier not found' });
     }
 
+    const fileData = req.file?.path ? await fs.promises.readFile(req.file.path).catch(() => null) : null;
+
     const [result] = await pool.query(
       `
       INSERT INTO supplier_files
-      (supplier_id, file_type, title, notes, original_name, file_path, mime_type, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (supplier_id, file_type, title, notes, original_name, file_path, mime_type, file_data, uploaded_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         supplierId,
@@ -196,6 +201,7 @@ exports.saveSupplierFile = async (req, res) => {
         req.file.originalname,
         `/uploads/suppliers/${req.file.filename}`,
         req.file.mimetype,
+        fileData,
         req.user.id
       ]
     );
@@ -204,6 +210,46 @@ exports.saveSupplierFile = async (req, res) => {
   } catch (error) {
     console.error('saveSupplierFile error:', error);
     res.status(500).json({ message: 'Failed to upload supplier file', error: error.message });
+  }
+};
+
+exports.viewSupplierFile = async (req, res) => {
+  try {
+    await ensureSupplierTables();
+
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'File ID is required' });
+
+    const [[file]] = await pool.query(
+      'SELECT original_name, file_path, mime_type, file_data FROM supplier_files WHERE id = ? AND deleted = 0 LIMIT 1',
+      [id]
+    );
+
+    if (!file) return res.status(404).json({ message: 'Supplier file not found' });
+
+    const mimeType = file.mime_type || 'application/octet-stream';
+    const safeName = String(file.original_name || `supplier-file-${id}`).replace(/"/g, '');
+    const dbBuffer = file.file_data && Buffer.isBuffer(file.file_data) ? file.file_data : null;
+
+    if (dbBuffer && dbBuffer.length) {
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      return res.send(dbBuffer);
+    }
+
+    const filePath = file.file_path ? path.join(__dirname, '..', file.file_path.replace(/^\//, '')) : '';
+    if (filePath && filePath.includes(`${path.sep}uploads${path.sep}suppliers${path.sep}`) && fs.existsSync(filePath)) {
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      return fs.createReadStream(filePath).pipe(res);
+    }
+
+    return res.status(404).json({
+      message: 'This supplier file is no longer available on the server. Please upload it again so it can be stored permanently.'
+    });
+  } catch (error) {
+    console.error('viewSupplierFile error:', error);
+    res.status(500).json({ message: 'Failed to open supplier file', error: error.message });
   }
 };
 

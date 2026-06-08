@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const supplierController = require('../controllers/supplierController');
+const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 
 const router = express.Router();
 const uploadDir = path.join(__dirname, '..', 'uploads', 'suppliers');
@@ -27,9 +28,10 @@ const upload = multer({
 });
 
 router.get('/', supplierController.getSuppliers);
-router.post('/', supplierController.saveSupplier);
-router.post('/delete', supplierController.deleteSupplier);
-router.post('/:id/files', upload.single('file'), supplierController.saveSupplierFile);
-router.post('/files/delete', supplierController.deleteSupplierFile);
+router.get('/files/:id/view', supplierController.viewSupplierFile);
+router.post('/', requireInputPermission('suppliers_input'), supplierController.saveSupplier);
+router.post('/delete', requireInputPermission('suppliers_input'), supplierController.deleteSupplier);
+router.post('/:id/files', requireInputPermission('suppliers_input'), upload.single('file'), supplierController.saveSupplierFile);
+router.post('/files/delete', requireInputPermission('suppliers_input'), supplierController.deleteSupplierFile);
 
 module.exports = router;

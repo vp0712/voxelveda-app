@@ -1993,8 +1993,11 @@ function renderSuppliers() {
     const files = supplier.files || [];
     const filePreview = files.slice(0, 3).map((file) => `
       <div class="file-row">
-        <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.title || file.original_name)}</a>
-        <button class="mini-danger" onclick="deleteSupplierFile(${file.id})">Delete</button>
+        <span>${escapeHtml(file.title || file.original_name)}</span>
+        <div class="file-action-row">
+          <button class="icon-btn" onclick="viewSupplierFile(${file.id})">View</button>
+          <button class="mini-danger" onclick="deleteSupplierFile(${file.id})">Delete</button>
+        </div>
       </div>
       <small>${escapeHtml(supplierFileTypeLabel(file.file_type))} - Uploaded ${escapeHtml(formatDateTime(file.created_at))}${file.notes ? ` - ${escapeHtml(file.notes)}` : ''}</small>
     `).join('');
@@ -2152,6 +2155,27 @@ function openSupplierFileDialog(supplierId) {
     },
     'Upload File'
   );
+}
+
+async function viewSupplierFile(id) {
+  try {
+    const res = await fetch(`/api/suppliers/files/${id}/view`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      const data = await safeJson(res);
+      showToast(data.message || 'Supplier file could not be opened');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank', 'noopener');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    showToast('Supplier file could not be opened');
+  }
 }
 
 async function deleteSupplier(id) {
