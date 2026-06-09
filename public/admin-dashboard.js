@@ -2347,6 +2347,39 @@ function openExpenseDialog(id = null) {
   const expense = expenseCache.find((row) => Number(row.id) === Number(id)) || {};
   const amountExGst = Number(expense.amount_ex_gst || 0);
   const gstRate = Number(expense.gst_rate ?? 10);
+  const expenseCategories = [
+    'Fuel',
+    'Vehicle & Transport',
+    'Materials',
+    'Raw Material',
+    'Packaging',
+    'Tools & Consumables',
+    'Machinery',
+    'Machine Maintenance',
+    'Repairs & Servicing',
+    'Workshop Supplies',
+    'Freight & Courier',
+    'Rent',
+    'Utilities',
+    'Software & Subscriptions',
+    'Insurance',
+    'Compliance & Licences',
+    'Safety & PPE',
+    'Professional Services',
+    'Accounting & Bookkeeping',
+    'Bank Fees',
+    'Marketing',
+    'Office Supplies',
+    'Cleaning & Waste',
+    'Staff Training',
+    'Meals & Travel',
+    'Other'
+  ];
+  const currentCategory = String(expense.category || '').trim();
+  const categoryOptions = [...expenseCategories];
+  if (currentCategory && !categoryOptions.includes(currentCategory)) {
+    categoryOptions.push(currentCategory);
+  }
 
   showDialog(
     id ? 'Edit Expense' : 'Add Expense',
@@ -2360,8 +2393,8 @@ function openExpenseDialog(id = null) {
           <input id="expenseSupplier" placeholder="Supplier or company name" value="${escapeHtml(expense.supplier_name || '')}" />
           <label class="field-label">Category</label>
           <select id="expenseCategory">
-            ${['Materials', 'Packaging', 'Tools', 'Machinery', 'Software', 'Rent', 'Utilities', 'Freight', 'Professional Services', 'Insurance', 'Marketing', 'Other'].map((cat) => `
-              <option value="${cat}" ${String(expense.category || '') === cat ? 'selected' : ''}>${cat}</option>
+            ${categoryOptions.map((cat) => `
+              <option value="${cat}" ${currentCategory === cat ? 'selected' : ''}>${cat}</option>
             `).join('')}
           </select>
           <label class="field-label">Description</label>
