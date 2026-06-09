@@ -386,7 +386,14 @@ exports.createManualInvoice = async (req, res) => {
       });
     }
 
-    const gstRate = Number(gst_rate || 10);
+    const gstRate = gst_rate === undefined || gst_rate === null || gst_rate === ''
+      ? 10
+      : Number(gst_rate);
+
+    if (!Number.isFinite(gstRate) || gstRate < 0) {
+      return res.status(400).json({ message: 'GST rate must be 0 or higher' });
+    }
+
     const subtotal = cleanItems.reduce((sum, item) => sum + item.amount, 0);
     const gst = subtotal * (gstRate / 100);
     const total = subtotal + gst;
@@ -1366,7 +1373,9 @@ function renderInvoicePdf(doc, invoice, items, id) {
         amount: Number(invoice.quantity || 1) * Number(invoice.unit_price || 0)
       }];
 
-  const gstRate = Number(invoice.gst_rate || 10);
+  const gstRate = invoice.gst_rate === undefined || invoice.gst_rate === null || invoice.gst_rate === ''
+    ? 10
+    : Number(invoice.gst_rate);
   const subtotal = invoiceItems.reduce((sum, item) => sum + Number(item.amount || 0), 0);
   const gst = subtotal * (gstRate / 100);
   const total = subtotal + gst;

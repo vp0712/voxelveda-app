@@ -1043,11 +1043,11 @@ function invoiceItemRows(items = [{ description: '', quantity: 1, unit_price: 0 
       </label>
       <label>
         <span>Qty</span>
-        <input class="invoiceItemQty" type="number" min="0.001" step="0.001" placeholder="Qty" value="${escapeHtml(item.quantity || 1)}" />
+        <input class="invoiceItemQty" type="number" min="0.001" step="0.001" placeholder="Qty" value="${escapeHtml(item.quantity || 1)}" oninput="updateManualInvoiceSummary()" />
       </label>
       <label>
         <span>Unit price</span>
-        <input class="invoiceItemPrice" type="number" min="0" step="0.01" placeholder="Unit price" value="${escapeHtml(item.unit_price || 0)}" />
+        <input class="invoiceItemPrice" type="number" min="0" step="0.01" placeholder="Unit price" value="${escapeHtml(item.unit_price || 0)}" oninput="updateManualInvoiceSummary()" />
       </label>
       <button type="button" class="secondary-btn invoice-remove-btn" onclick="removeInvoiceItemRow(this)">Remove</button>
     </div>
@@ -1058,6 +1058,7 @@ function addInvoiceItemRow() {
   const container = document.getElementById('invoiceItemsContainer');
   if (!container) return;
   container.insertAdjacentHTML('beforeend', invoiceItemRows([{ description: '', quantity: 1, unit_price: 0 }]));
+  updateManualInvoiceSummary();
 }
 
 function removeInvoiceItemRow(button) {
@@ -1067,6 +1068,7 @@ function removeInvoiceItemRow(button) {
     return;
   }
   button.closest('[data-invoice-item-row]')?.remove();
+  updateManualInvoiceSummary();
 }
 
 function collectInvoiceItems() {
@@ -1075,6 +1077,43 @@ function collectInvoiceItems() {
     quantity: Number(row.querySelector('.invoiceItemQty')?.value || 0),
     unit_price: Number(row.querySelector('.invoiceItemPrice')?.value || 0)
   }));
+}
+
+function manualInvoiceGstRate() {
+  const gstEnabled = document.getElementById('manualInvoiceGstEnabled')?.checked ?? true;
+  const input = document.getElementById('manualInvoiceGst');
+  if (!gstEnabled) return 0;
+  return Math.max(Number(input?.value || 0), 0);
+}
+
+function toggleManualInvoiceGst() {
+  const enabled = document.getElementById('manualInvoiceGstEnabled')?.checked ?? true;
+  const input = document.getElementById('manualInvoiceGst');
+  const label = document.getElementById('manualInvoiceGstLabel');
+  const card = document.querySelector('.gst-control-panel');
+
+  if (input) {
+    input.disabled = !enabled;
+    if (!enabled) input.value = '0';
+    if (enabled && Number(input.value || 0) <= 0) input.value = '10';
+  }
+  if (label) label.textContent = enabled ? 'GST On' : 'GST Off';
+  card?.classList.toggle('gst-off', !enabled);
+  updateManualInvoiceSummary();
+}
+
+function updateManualInvoiceSummary() {
+  const subtotal = collectInvoiceItems().reduce((sum, item) => {
+    return sum + (Number(item.quantity || 0) * Number(item.unit_price || 0));
+  }, 0);
+  const gstRate = manualInvoiceGstRate();
+  const gstAmount = subtotal * (gstRate / 100);
+  const total = subtotal + gstAmount;
+
+  setText('manualInvoiceSubtotal', formatMoney(subtotal));
+  setText('manualInvoiceGstAmount', formatMoney(gstAmount));
+  setText('manualInvoiceTotal', formatMoney(total));
+  setText('manualInvoiceGstSummaryLabel', gstRate > 0 ? `GST (${gstRate}%)` : 'GST disabled');
 }
 
 async function ensureCustomerCache() {
@@ -1235,12 +1274,33 @@ function openManualInvoiceDialog() {
           <div id="manualInvoiceSelectedCustomer" class="selected-customer-card hidden-section"></div>
           <div id="manualCustomerSuggestions" class="customer-suggestion-list"></div>
           <input id="manualInvoiceEmail" type="email" placeholder="Customer email" />
-          <input id="manualInvoiceGst" type="number" min="0" step="0.01" value="10" placeholder="GST rate" />
+          <div class="gst-control-panel">
+            <div class="gst-control-head">
+              <div>
+                <strong>GST Control</strong>
+                <span>Switch off for a GST-free invoice.</span>
+              </div>
+              <label class="gst-toggle">
+                <input id="manualInvoiceGstEnabled" type="checkbox" checked onchange="toggleManualInvoiceGst()" />
+                <span class="gst-toggle-track"></span>
+                <b id="manualInvoiceGstLabel">GST On</b>
+              </label>
+            </div>
+            <label class="gst-rate-field">
+              <span>GST rate %</span>
+              <input id="manualInvoiceGst" type="number" min="0" step="0.01" value="10" placeholder="GST rate" oninput="updateManualInvoiceSummary()" />
+            </label>
+          </div>
         </div>
         <div class="dialog-card">
           <h4>Line Items</h4>
           <div id="invoiceItemsContainer">${invoiceItemRows()}</div>
           <button type="button" class="secondary-btn" onclick="addInvoiceItemRow()">Add Item</button>
+          <div class="manual-invoice-summary">
+            <div><span>Subtotal</span><strong id="manualInvoiceSubtotal">$0.00</strong></div>
+            <div><span id="manualInvoiceGstSummaryLabel">GST (10%)</span><strong id="manualInvoiceGstAmount">$0.00</strong></div>
+            <div class="manual-invoice-total"><span>Total</span><strong id="manualInvoiceTotal">$0.00</strong></div>
+          </div>
         </div>
       </div>
     `,
@@ -1248,7 +1308,7 @@ function openManualInvoiceDialog() {
       const body = {
         customer_name: document.getElementById('manualInvoiceCustomer')?.value.trim(),
         customer_email: document.getElementById('manualInvoiceEmail')?.value.trim(),
-        gst_rate: Number(document.getElementById('manualInvoiceGst')?.value || 10),
+        gst_rate: manualInvoiceGstRate(),
         items: collectInvoiceItems()
       };
 
@@ -1275,6 +1335,7 @@ function openManualInvoiceDialog() {
   );
 
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'manual-invoice-dialog');
+  updateManualInvoiceSummary();
   Promise.all([ensureCustomerCache(), ensureInvoiceHistoryCache()]).then(() => {
     renderManualCustomerSuggestions();
   }).catch(() => {

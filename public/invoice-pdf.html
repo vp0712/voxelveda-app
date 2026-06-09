@@ -308,7 +308,7 @@
     <main id="invoicePreview" class="invoice-loading">Loading invoice preview...</main>
   </div>
 
-  <script src="/qr-widget.js?v=20260609-comma-money"></script>
+  <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const invoiceId = params.get('id');
@@ -379,7 +379,9 @@
       const items = data.items?.length
         ? data.items
         : [{ description: invoice.description, quantity: invoice.quantity, unit_price: invoice.unit_price, amount: Number(invoice.quantity || 0) * Number(invoice.unit_price || 0) }];
-      const gstRate = Number(invoice.gst_rate || 10);
+      const gstRate = invoice.gst_rate === undefined || invoice.gst_rate === null || invoice.gst_rate === ''
+        ? 10
+        : Number(invoice.gst_rate);
       const subtotal = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
       const gst = subtotal * (gstRate / 100);
       const total = subtotal + gst;

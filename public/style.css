@@ -545,11 +545,11 @@ body::before {
 }
 
 .manual-invoice-dialog {
-  width: min(1040px, calc(100vw - 32px));
+  width: min(1160px, calc(100vw - 32px));
 }
 
 .manual-invoice-dialog .stock-dialog-grid {
-  grid-template-columns: minmax(230px, 0.32fr) minmax(0, 1fr);
+  grid-template-columns: minmax(290px, 0.42fr) minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -558,7 +558,7 @@ body::before {
 }
 
 .manual-invoice-dialog .invoice-item-row {
-  grid-template-columns: minmax(220px, 1fr) minmax(86px, 0.35fr) minmax(120px, 0.45fr) 96px;
+  grid-template-columns: minmax(260px, 1fr) minmax(92px, 0.35fr) minmax(132px, 0.45fr) 96px;
   align-items: end;
 }
 
@@ -568,6 +568,131 @@ body::before {
   margin-top: 0;
   padding-left: 10px;
   padding-right: 10px;
+}
+
+.gst-control-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 14px;
+  border: 1px solid rgba(45, 212, 191, 0.24);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.12), transparent 54%),
+    rgba(2, 6, 23, 0.42);
+}
+
+.gst-control-panel.gst-off {
+  border-color: rgba(148, 163, 184, 0.24);
+  background: rgba(15, 23, 42, 0.54);
+}
+
+.gst-control-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gst-control-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.gst-control-head strong {
+  color: #ecfeff;
+  font-size: 14px;
+}
+
+.gst-control-head span,
+.gst-rate-field span,
+.manual-invoice-summary span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.gst-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.gst-toggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.gst-toggle-track {
+  position: relative;
+  width: 46px;
+  height: 24px;
+  border: 1px solid rgba(45, 212, 191, 0.42);
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.92);
+  box-shadow: inset 0 0 18px rgba(45, 212, 191, 0.14);
+}
+
+.gst-toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  background: #94a3b8;
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+
+.gst-toggle input:checked + .gst-toggle-track::after {
+  transform: translateX(22px);
+  background: linear-gradient(135deg, #2dd4bf, #38bdf8);
+}
+
+.gst-toggle b {
+  color: #dffcff;
+  font-size: 12px;
+}
+
+.gst-rate-field {
+  display: grid;
+  gap: 7px;
+}
+
+.gst-rate-field input:disabled {
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.manual-invoice-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.manual-invoice-summary div {
+  display: grid;
+  gap: 6px;
+  min-height: 74px;
+  padding: 13px 14px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.42);
+}
+
+.manual-invoice-summary strong {
+  color: #ecfeff;
+  font-size: 18px;
+}
+
+.manual-invoice-summary .manual-invoice-total {
+  border-color: rgba(45, 212, 191, 0.42);
+  background: linear-gradient(135deg, rgba(45, 212, 191, 0.22), rgba(56, 189, 248, 0.12));
 }
 
 .customer-suggestion-list {
@@ -2469,6 +2594,15 @@ tr:hover td {
   .manual-invoice-dialog .stock-dialog-grid,
   .manual-invoice-dialog .invoice-item-row {
     grid-template-columns: 1fr;
+  }
+
+  .manual-invoice-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .gst-control-head {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .manual-invoice-dialog .invoice-remove-btn {
