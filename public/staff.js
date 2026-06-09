@@ -141,7 +141,12 @@ function formatShortDate(value) {
 }
 
 function formatMoney(value) {
-  return `$${Number(value || 0).toFixed(2)}`;
+  return Number(value || 0).toLocaleString('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function getStoredUser() {

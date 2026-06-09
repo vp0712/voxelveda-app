@@ -571,7 +571,7 @@ async function loadDashboardStats() {
 
   if (invoiceStatus) {
     invoiceStatus.innerText =
-      `${data.invoices.total_invoices || 0} total | $${Number(data.invoices.paid_revenue || 0).toFixed(2)} paid`;
+      `${data.invoices.total_invoices || 0} total | ${formatMoney(data.invoices.paid_revenue || 0)} paid`;
   }
 
   setText('dashboardRevenueValue', formatMoney(data.finance?.revenue));
@@ -775,7 +775,12 @@ function todayISO(offsetDays = 0) {
 }
 
 function formatMoney(value) {
-  return `$${Number(value || 0).toFixed(2)}`;
+  return Number(value || 0).toLocaleString('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function formatClockTime(value) {

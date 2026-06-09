@@ -308,7 +308,7 @@
     <main id="invoicePreview" class="invoice-loading">Loading invoice preview...</main>
   </div>
 
-  <script src="/qr-widget.js?v=20260608-local-qr"></script>
+  <script src="/qr-widget.js?v=20260609-comma-money"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
     const invoiceId = params.get('id');
@@ -317,7 +317,12 @@
     const previewEl = document.getElementById('invoicePreview');
 
     function money(value) {
-      return `$${Number(value || 0).toFixed(2)}`;
+      return Number(value || 0).toLocaleString('en-AU', {
+        style: 'currency',
+        currency: 'AUD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
     }
 
     function escapeHtml(value) {

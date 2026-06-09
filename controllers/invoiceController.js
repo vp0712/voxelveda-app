@@ -603,7 +603,7 @@ exports.sendCustomerStatement = async (req, res) => {
         from: `"${process.env.FROM_NAME || 'Voxel Veda'}" <${process.env.FROM_EMAIL}>`,
         to: email,
         subject: `Voxel Veda account statement - ${statement.customer.name}`,
-        text: `Hello ${statement.customer.name},\n\nPlease find attached your Voxel Veda account statement.\n\nInvoice value: $${statement.totals.invoice_value.toFixed(2)}\nPayment received: $${statement.totals.paid.toFixed(2)}\nBalance due: $${statement.totals.balance_due.toFixed(2)}\n\nThank you,\nVoxel Veda`,
+        text: `Hello ${statement.customer.name},\n\nPlease find attached your Voxel Veda account statement.\n\nInvoice value: ${statementMoney(statement.totals.invoice_value)}\nPayment received: ${statementMoney(statement.totals.paid)}\nBalance due: ${statementMoney(statement.totals.balance_due)}\n\nThank you,\nVoxel Veda`,
         attachments: [{
           filename: 'voxel-veda-account-statement.pdf',
           content: pdfBuffer,
@@ -618,9 +618,9 @@ exports.sendCustomerStatement = async (req, res) => {
       const phone = cleanPhoneForWhatsApp(mobile);
       const message = [
         `Voxel Veda account statement for ${statement.customer.name}`,
-        `Invoice value: $${statement.totals.invoice_value.toFixed(2)}`,
-        `Payment received: $${statement.totals.paid.toFixed(2)}`,
-        `Balance due: $${statement.totals.balance_due.toFixed(2)}`,
+        `Invoice value: ${statementMoney(statement.totals.invoice_value)}`,
+        `Payment received: ${statementMoney(statement.totals.paid)}`,
+        `Balance due: ${statementMoney(statement.totals.balance_due)}`,
         'Please contact Voxel Veda accounts for any queries.'
       ].join('\n');
       whatsappUrl = `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
@@ -800,7 +800,7 @@ exports.markInvoicePaid = async (req, res) => {
 
     if (result.affectedRows === 0) return res.status(404).json({ message: 'Invoice not found' });
 
-    await logInvoiceActivity(invoice_id, 'paid', `Invoice marked as paid. Payment captured: ${balanceDue.toFixed(2)}`);
+    await logInvoiceActivity(invoice_id, 'paid', `Invoice marked as paid. Payment captured: ${statementMoney(balanceDue)}`);
 
     res.json({ message: 'Invoice marked as paid' });
   } catch (err) {
@@ -835,7 +835,7 @@ exports.recordInvoicePayment = async (req, res) => {
 
     if (amount > balanceDue + 0.009) {
       return res.status(400).json({
-        message: `Payment cannot exceed balance due of $${balanceDue.toFixed(2)}`
+        message: `Payment cannot exceed balance due of ${statementMoney(balanceDue)}`
       });
     }
 
@@ -860,7 +860,7 @@ exports.recordInvoicePayment = async (req, res) => {
     await logInvoiceActivity(
       invoiceId,
       'payment',
-      `Payment received: $${amount.toFixed(2)} via ${method}${reference ? ` | Ref: ${reference}` : ''}`
+      `Payment received: ${statementMoney(amount)} via ${method}${reference ? ` | Ref: ${reference}` : ''}`
     );
 
     const finalInvoice = await getInvoiceWithReceivables(invoiceId);
@@ -899,7 +899,7 @@ exports.deleteInvoicePayment = async (req, res) => {
       await pool.query("UPDATE invoices SET status = 'sent' WHERE id = ?", [invoiceId]);
     }
 
-    await logInvoiceActivity(invoiceId, 'payment_deleted', `Payment deleted: $${Number(payment.amount || 0).toFixed(2)}`);
+    await logInvoiceActivity(invoiceId, 'payment_deleted', `Payment deleted: ${statementMoney(payment.amount || 0)}`);
 
     res.json({ message: 'Payment entry deleted' });
   } catch (err) {
@@ -1063,7 +1063,7 @@ exports.editInvoice = async (req, res) => {
       );
     }
 
-    await logInvoiceActivity(invoiceId, 'edited', `Invoice ${invoiceNo} edited. Total ${total.toFixed(2)}`);
+    await logInvoiceActivity(invoiceId, 'edited', `Invoice ${invoiceNo} edited. Total ${statementMoney(total)}`);
     await conn.commit();
 
     res.json({ message: 'Invoice updated successfully', total });
@@ -1202,7 +1202,12 @@ function drawStatementHeader(doc, title, subtitle = '') {
 }
 
 function statementMoney(value) {
-  return `$${Number(value || 0).toFixed(2)}`;
+  return Number(value || 0).toLocaleString('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 function drawScanSafeQr(doc, qrPath, targetUrl, x, y, size) {
@@ -1445,8 +1450,8 @@ function renderInvoicePdf(doc, invoice, items, id) {
       .stroke();
     doc.fillColor(ink).fontSize(10).text(item.description || 'Item', tableX + 18, y + 6, { width: 230 });
     doc.fillColor(muted).fontSize(9).text(String(Number(item.quantity || 0)), tableX + 280, y + 6, { width: 42, align: 'right' });
-    doc.text(`$${Number(item.unit_price || 0).toFixed(2)}`, tableX + 350, y + 6, { width: 56, align: 'right' });
-    doc.fillColor(ink).fontSize(10).text(`$${Number(item.amount || 0).toFixed(2)}`, tableX + 424, y + 6, { width: 58, align: 'right' });
+    doc.text(statementMoney(item.unit_price || 0), tableX + 350, y + 6, { width: 56, align: 'right' });
+    doc.fillColor(ink).fontSize(10).text(statementMoney(item.amount || 0), tableX + 424, y + 6, { width: 58, align: 'right' });
     y += rowH;
   });
 
@@ -1454,16 +1459,16 @@ function renderInvoicePdf(doc, invoice, items, id) {
   const totalsY = Math.min(y + 20, 610);
   doc.roundedRect(totalsX, totalsY, 210, 118, 10).fill(panel).strokeColor(line).stroke();
   doc.fillColor(muted).fontSize(9).text('Subtotal', totalsX + 18, totalsY + 14);
-  doc.fillColor(ink).text(`$${subtotal.toFixed(2)}`, totalsX + 120, totalsY + 14, { width: 70, align: 'right' });
+  doc.fillColor(ink).text(statementMoney(subtotal), totalsX + 120, totalsY + 14, { width: 70, align: 'right' });
   doc.fillColor(muted).text(`GST (${gstRate}%)`, totalsX + 18, totalsY + 34);
-  doc.fillColor(ink).text(`$${gst.toFixed(2)}`, totalsX + 120, totalsY + 34, { width: 70, align: 'right' });
+  doc.fillColor(ink).text(statementMoney(gst), totalsX + 120, totalsY + 34, { width: 70, align: 'right' });
   doc.fillColor(muted).text('Total', totalsX + 18, totalsY + 54);
-  doc.fillColor(ink).text(`$${total.toFixed(2)}`, totalsX + 120, totalsY + 54, { width: 70, align: 'right' });
+  doc.fillColor(ink).text(statementMoney(total), totalsX + 120, totalsY + 54, { width: 70, align: 'right' });
   doc.fillColor(muted).text('Paid', totalsX + 18, totalsY + 74);
-  doc.fillColor(ink).text(`$${paidAmount.toFixed(2)}`, totalsX + 120, totalsY + 74, { width: 70, align: 'right' });
+  doc.fillColor(ink).text(statementMoney(paidAmount), totalsX + 120, totalsY + 74, { width: 70, align: 'right' });
   doc.roundedRect(totalsX, totalsY + 92, 210, 42, 8).fill(navy);
   doc.fillColor('#ffffff').fontSize(11).text('BALANCE DUE', totalsX + 18, totalsY + 106);
-  doc.fontSize(14).text(`$${balanceDue.toFixed(2)}`, totalsX + 108, totalsY + 104, { width: 82, align: 'right' });
+  doc.fontSize(14).text(statementMoney(balanceDue), totalsX + 108, totalsY + 104, { width: 82, align: 'right' });
 
   const payY = 642;
   doc.fillColor(accentDark).fontSize(11).text('Payment details', 48, payY);
