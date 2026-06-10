@@ -67,7 +67,7 @@ body::after {
   min-height: 100vh;
   display: flex;
   position: relative;
-  z-index: 1;
+  z-index: auto;
 }
 
 .mobile-menu-btn,
@@ -3607,5 +3607,156 @@ tr:hover td {
   .competitor-info-row {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+}
+
+@media (max-width: 900px) {
+  body.mobile-menu-open .app-shell {
+    z-index: auto;
+  }
+
+  .mobile-sidebar-backdrop {
+    z-index: 9000;
+    background:
+      radial-gradient(circle at 18% 16%, rgba(45, 212, 191, 0.18), transparent 32%),
+      rgba(2, 6, 23, 0.76);
+    backdrop-filter: blur(7px);
+  }
+
+  .mobile-menu-btn {
+    z-index: 12000;
+    border-color: rgba(125, 211, 252, 0.62);
+    background:
+      linear-gradient(145deg, rgba(6, 78, 59, 0.96), rgba(8, 47, 73, 0.95)),
+      rgba(2, 6, 23, 0.96);
+  }
+
+  .sidebar {
+    z-index: 11000;
+    display: flex;
+    flex-direction: column;
+    width: min(90vw, 370px);
+    padding: calc(82px + env(safe-area-inset-top, 0px)) 14px calc(22px + env(safe-area-inset-bottom, 0px));
+    color: #f8fafc;
+    opacity: 1;
+    visibility: visible;
+    background:
+      linear-gradient(180deg, rgba(2, 6, 23, 0.99), rgba(5, 15, 28, 0.99)),
+      radial-gradient(circle at 24% 8%, rgba(45, 212, 191, 0.18), transparent 34%),
+      radial-gradient(circle at 92% 26%, rgba(56, 189, 248, 0.16), transparent 30%);
+    border-right: 1px solid rgba(125, 211, 252, 0.34);
+    border-radius: 0 28px 28px 0;
+    box-shadow: 34px 0 88px rgba(0, 0, 0, 0.7), inset -1px 0 0 rgba(255, 255, 255, 0.06);
+    transform: translateX(-108%);
+  }
+
+  body.mobile-menu-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar::before {
+    content: "Voxel Veda Control";
+    display: block;
+    margin: 0 2px 12px;
+    padding: 11px 13px;
+    border: 1px solid rgba(45, 212, 191, 0.22);
+    border-radius: 16px;
+    color: #a7f3d0;
+    background: rgba(45, 212, 191, 0.08);
+    font-size: 12px;
+    font-weight: 1000;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .sidebar .brand,
+  .staff-sidebar-profile {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: center;
+    gap: 13px;
+    margin: 0 0 14px;
+    padding: 14px;
+    border: 1px solid rgba(45, 212, 191, 0.24);
+    border-radius: 22px;
+    background:
+      linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(8, 47, 73, 0.36)),
+      rgba(2, 6, 23, 0.76);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
+
+  .staff-portal .brand {
+    display: none;
+  }
+
+  .sidebar .logo-img,
+  .staff-avatar.small {
+    width: 58px;
+    height: 58px;
+    flex-basis: 58px;
+  }
+
+  .sidebar .brand h1,
+  .staff-sidebar-profile strong {
+    color: #ffffff;
+    font-size: 17px;
+    line-height: 1.1;
+  }
+
+  .sidebar .brand p,
+  .staff-sidebar-profile span,
+  .staff-sidebar-profile small {
+    color: #cbd5e1;
+    font-weight: 800;
+  }
+
+  .nav-btn,
+  .logout-btn,
+  .nav-group {
+    width: 100%;
+    border-radius: 18px;
+  }
+
+  .nav-btn,
+  .logout-btn,
+  .nav-group-toggle {
+    min-height: 52px;
+    color: #f8fafc;
+    background:
+      linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.76)),
+      rgba(15, 23, 42, 0.86);
+    border-color: rgba(45, 212, 191, 0.24);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .nav-btn.active,
+  .nav-btn:hover,
+  .nav-group:has(.nav-btn.active) > .nav-group-toggle {
+    color: #03111d;
+    background: linear-gradient(135deg, #2dd4bf, #38bdf8);
+    border-color: transparent;
+    box-shadow: 0 18px 38px rgba(45, 212, 191, 0.24);
+  }
+
+  .nav-group {
+    padding: 8px;
+    background: rgba(2, 6, 23, 0.48);
+    border: 1px solid rgba(45, 212, 191, 0.18);
+  }
+
+  .nav-submenu {
+    padding: 9px 2px 2px;
+  }
+
+  .nav-sub-btn {
+    min-height: 46px;
+    padding-left: 18px;
+    background: rgba(2, 6, 23, 0.72);
+  }
+
+  .logout-btn {
+    margin-top: auto;
+    background: linear-gradient(135deg, rgba(127, 29, 29, 0.92), rgba(69, 10, 10, 0.78));
+    border-color: rgba(248, 113, 113, 0.32);
   }
 }
