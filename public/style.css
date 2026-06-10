@@ -41,6 +41,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  z-index: 0;
   background-image:
     linear-gradient(rgba(45, 212, 191, 0.05) 1px, transparent 1px),
     linear-gradient(90deg, rgba(56, 189, 248, 0.04) 1px, transparent 1px);
@@ -48,9 +49,25 @@ body::before {
   mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 80%);
 }
 
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.055;
+  background-image: url("/Frame 1.png?v=20260601-clean-logo");
+  background-repeat: no-repeat;
+  background-position: 62% 52%;
+  background-size: min(52vw, 620px);
+  filter: grayscale(0.15) drop-shadow(0 0 55px rgba(56, 189, 248, 0.2));
+}
+
 .app-shell {
   min-height: 100vh;
   display: flex;
+  position: relative;
+  z-index: 1;
 }
 
 .mobile-menu-btn,
@@ -766,6 +783,124 @@ body::before {
 .manual-invoice-summary .manual-invoice-total {
   border-color: rgba(45, 212, 191, 0.42);
   background: linear-gradient(135deg, rgba(45, 212, 191, 0.22), rgba(56, 189, 248, 0.12));
+}
+
+.expense-dialog-panel {
+  width: min(1120px, calc(100vw - 32px));
+}
+
+.expense-dialog-shell {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
+  gap: 16px;
+}
+
+.expense-dialog-shell .dialog-card {
+  min-width: 0;
+}
+
+.expense-money-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.expense-money-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 82% 12%, rgba(45, 212, 191, 0.16), transparent 32%),
+    linear-gradient(135deg, transparent, rgba(56, 189, 248, 0.08));
+}
+
+.expense-money-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.expense-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.expense-card-head h4 {
+  margin-bottom: 4px;
+}
+
+.expense-card-head p {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.expense-status-chip {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border: 1px solid rgba(45, 212, 191, 0.32);
+  border-radius: 999px;
+  color: #a7f3d0;
+  background: rgba(45, 212, 191, 0.1);
+  font-size: 11px;
+  font-weight: 1000;
+  letter-spacing: 0.04em;
+}
+
+.expense-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.expense-summary-strip div {
+  display: grid;
+  gap: 6px;
+  min-height: 78px;
+  padding: 13px;
+  border: 1px solid rgba(56, 189, 248, 0.2);
+  border-radius: 16px;
+  background: rgba(2, 6, 23, 0.48);
+}
+
+.expense-summary-strip span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 1000;
+}
+
+.expense-summary-strip strong {
+  color: #ecfeff;
+  font-size: 17px;
+}
+
+.expense-upload-note {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(45, 212, 191, 0.22);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(45, 212, 191, 0.12), transparent),
+    rgba(2, 6, 23, 0.5);
+}
+
+.expense-upload-note strong {
+  color: #ecfeff;
+  white-space: nowrap;
+}
+
+.expense-upload-note span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 
 .customer-suggestion-list {
@@ -2678,12 +2813,22 @@ tr:hover td {
   }
 
   .manual-invoice-dialog .stock-dialog-grid,
-  .manual-invoice-dialog .invoice-item-row {
+  .manual-invoice-dialog .invoice-item-row,
+  .expense-dialog-shell {
     grid-template-columns: 1fr;
   }
 
   .manual-invoice-summary {
     grid-template-columns: 1fr;
+  }
+
+  .expense-summary-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-upload-note {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .gst-control-head {
@@ -3099,6 +3244,12 @@ tr:hover td {
     background-size: 30px 30px;
     opacity: 0.65;
     mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 72%);
+  }
+
+  body::after {
+    opacity: 0.045;
+    background-position: 50% 32%;
+    background-size: min(86vw, 360px);
   }
 
   .mobile-menu-btn {

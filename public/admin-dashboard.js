@@ -2450,7 +2450,7 @@ function openExpenseDialog(id = null) {
   showDialog(
     id ? 'Edit Expense' : 'Add Expense',
     `
-      <div class="stock-dialog-grid">
+      <div class="expense-dialog-shell">
         <div class="dialog-card">
           <h4>Expense Details</h4>
           <label class="field-label">Expense date</label>
@@ -2466,12 +2466,21 @@ function openExpenseDialog(id = null) {
           <label class="field-label">Description</label>
           <textarea id="expenseDescription" rows="3" placeholder="What was purchased or paid for">${escapeHtml(expense.description || '')}</textarea>
         </div>
-        <div class="dialog-card">
-          <h4>Amount & GST</h4>
+
+        <div class="dialog-card expense-money-card">
+          <div class="expense-card-head">
+            <div>
+              <h4>Amount & GST</h4>
+              <p>Enter the ex-GST amount. GST and total will calculate automatically.</p>
+            </div>
+            <span class="expense-status-chip">${escapeHtml(String(expense.status || 'paid').toUpperCase())}</span>
+          </div>
+
           <label class="field-label">Invoice / bill number</label>
           <input id="expenseInvoiceNo" placeholder="Invoice or bill reference" value="${escapeHtml(expense.invoice_no || '')}" />
           <label class="field-label">Payment method</label>
           <input id="expensePaymentMethod" placeholder="Bank, card, cash, account" value="${escapeHtml(expense.payment_method || '')}" />
+
           <div class="split-grid">
             <div class="form-field">
               <span>Amount ex GST</span>
@@ -2485,22 +2494,43 @@ function openExpenseDialog(id = null) {
           <div class="split-grid">
             <div class="form-field">
               <span>GST amount</span>
-              <input id="expenseGstAmount" type="number" min="0" step="0.01" value="${escapeHtml(expense.gst_amount || (amountExGst * gstRate / 100).toFixed(2))}" />
+              <input id="expenseGstAmount" type="number" min="0" step="0.01" value="${escapeHtml(expense.gst_amount || (amountExGst * gstRate / 100).toFixed(2))}" oninput="updateExpenseSummaryTiles()" />
             </div>
             <div class="form-field">
               <span>Total paid</span>
-              <input id="expenseTotalAmount" type="number" min="0" step="0.01" value="${escapeHtml(expense.total_amount || (amountExGst + (amountExGst * gstRate / 100)).toFixed(2))}" />
+              <input id="expenseTotalAmount" type="number" min="0" step="0.01" value="${escapeHtml(expense.total_amount || (amountExGst + (amountExGst * gstRate / 100)).toFixed(2))}" oninput="updateExpenseSummaryTiles()" />
             </div>
           </div>
-          <select id="expenseStatus">
+
+          <label class="field-label">Payment status</label>
+          <select id="expenseStatus" onchange="updateExpenseSummaryTiles()">
             ${['paid', 'unpaid', 'reimbursed', 'disputed'].map((status) => `
               <option value="${status}" ${String(expense.status || 'paid') === status ? 'selected' : ''}>${status}</option>
             `).join('')}
           </select>
+
+          <div class="expense-summary-strip">
+            <div>
+              <span>EX GST</span>
+              <strong id="expenseSummaryExGst">$0.00</strong>
+            </div>
+            <div>
+              <span>GST CREDIT</span>
+              <strong id="expenseSummaryGst">$0.00</strong>
+            </div>
+            <div>
+              <span>TOTAL PAID</span>
+              <strong id="expenseSummaryTotal">$0.00</strong>
+            </div>
+          </div>
+
           <textarea id="expenseNotes" rows="3" placeholder="Notes, approval, GST reminder">${escapeHtml(expense.notes || '')}</textarea>
         </div>
       </div>
-      <p class="status-note">Bill photo upload is available after saving the expense. Use the Bill button in the register.</p>
+      <div class="expense-upload-note">
+        <strong>Bill evidence</strong>
+        <span>Save the expense first, then use the Bill button in the register to attach photos, invoices, receipts, and supporting files.</span>
+      </div>
     `,
     async () => {
       const body = {
@@ -2538,7 +2568,8 @@ function openExpenseDialog(id = null) {
     id ? 'Update Expense' : 'Save Expense'
   );
 
-  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'expense-dialog-panel');
+  updateExpenseSummaryTiles();
 }
 
 function calculateExpenseGst() {
@@ -2550,6 +2581,20 @@ function calculateExpenseGst() {
   const totalEl = document.getElementById('expenseTotalAmount');
   if (gstEl) gstEl.value = gst.toFixed(2);
   if (totalEl) totalEl.value = total.toFixed(2);
+  updateExpenseSummaryTiles();
+}
+
+function updateExpenseSummaryTiles() {
+  const amount = Number(document.getElementById('expenseAmountExGst')?.value || 0);
+  const gst = Number(document.getElementById('expenseGstAmount')?.value || 0);
+  const total = Number(document.getElementById('expenseTotalAmount')?.value || 0);
+  const status = document.getElementById('expenseStatus')?.value || 'paid';
+  const chip = document.querySelector('.expense-status-chip');
+
+  setText('expenseSummaryExGst', formatMoney(amount));
+  setText('expenseSummaryGst', formatMoney(gst));
+  setText('expenseSummaryTotal', formatMoney(total));
+  if (chip) chip.textContent = status.toUpperCase();
 }
 
 function openExpenseFileDialog(id) {
