@@ -3626,6 +3626,10 @@ tr:hover td {
 
   .mobile-menu-btn {
     z-index: 12000;
+    width: 44px;
+    height: 44px;
+    padding: 11px;
+    border-radius: 14px;
     border-color: rgba(125, 211, 252, 0.7);
     background:
       linear-gradient(145deg, rgba(6, 78, 59, 0.96), rgba(8, 47, 73, 0.95)),
@@ -3637,8 +3641,8 @@ tr:hover td {
     z-index: 11000;
     display: flex;
     flex-direction: column;
-    width: min(92vw, 382px);
-    padding: calc(78px + env(safe-area-inset-top, 0px)) 14px calc(18px + env(safe-area-inset-bottom, 0px));
+    width: min(78vw, 310px);
+    padding: calc(66px + env(safe-area-inset-top, 0px)) 10px calc(14px + env(safe-area-inset-bottom, 0px));
     color: #f8fafc;
     opacity: 1;
     visibility: visible;
@@ -3647,8 +3651,8 @@ tr:hover td {
       radial-gradient(circle at 22% 6%, rgba(45, 212, 191, 0.22), transparent 36%),
       radial-gradient(circle at 96% 22%, rgba(56, 189, 248, 0.18), transparent 32%);
     border-right: 1px solid rgba(125, 211, 252, 0.42);
-    border-radius: 0 30px 30px 0;
-    box-shadow: 36px 0 92px rgba(0, 0, 0, 0.72), inset -1px 0 0 rgba(255, 255, 255, 0.08);
+    border-radius: 0 22px 22px 0;
+    box-shadow: 24px 0 68px rgba(0, 0, 0, 0.66), inset -1px 0 0 rgba(255, 255, 255, 0.08);
     transform: translateX(-108%);
     scrollbar-width: thin;
     scrollbar-color: rgba(45, 212, 191, 0.42) rgba(2, 6, 23, 0.2);
@@ -3674,13 +3678,13 @@ tr:hover td {
   .sidebar .brand,
   .staff-sidebar-profile {
     display: grid;
-    grid-template-columns: 64px minmax(0, 1fr);
+    grid-template-columns: 48px minmax(0, 1fr);
     align-items: center;
-    gap: 13px;
-    margin: 0 0 14px;
-    padding: 13px;
+    gap: 10px;
+    margin: 0 0 10px;
+    padding: 10px;
     border: 1px solid rgba(125, 211, 252, 0.28);
-    border-radius: 24px;
+    border-radius: 18px;
     background:
       linear-gradient(135deg, rgba(15, 23, 42, 0.94), rgba(8, 47, 73, 0.42)),
       rgba(2, 6, 23, 0.76);
@@ -3693,16 +3697,16 @@ tr:hover td {
 
   .sidebar .logo-img,
   .staff-avatar.small {
-    width: 60px;
-    height: 60px;
-    flex-basis: 60px;
+    width: 46px;
+    height: 46px;
+    flex-basis: 46px;
     filter: drop-shadow(0 0 18px rgba(56, 189, 248, 0.26));
   }
 
   .sidebar .brand h1,
   .staff-sidebar-profile strong {
     color: #ffffff;
-    font-size: 17px;
+    font-size: 14px;
     line-height: 1.1;
   }
 
@@ -3710,27 +3714,40 @@ tr:hover td {
   .staff-sidebar-profile span,
   .staff-sidebar-profile small {
     color: #cbd5e1;
+    font-size: 12px;
     font-weight: 800;
+  }
+
+  .staff-sidebar-profile small {
+    width: fit-content;
+    margin-top: 5px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    color: #06202a;
+    background: linear-gradient(135deg, #2dd4bf, #7dd3fc);
+    font-size: 11px;
   }
 
   .nav-btn,
   .logout-btn,
   .nav-group {
     width: 100%;
-    border-radius: 18px;
+    border-radius: 14px;
   }
 
   .nav-btn,
   .logout-btn,
   .nav-group-toggle {
-    min-height: 54px;
+    min-height: 42px;
+    margin-bottom: 7px;
+    padding: 9px 11px;
     color: #f8fafc;
     background:
       linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.76)),
       rgba(15, 23, 42, 0.86);
     border-color: rgba(45, 212, 191, 0.28);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
-    font-size: 15px;
+    font-size: 13px;
     letter-spacing: 0;
   }
 
@@ -3740,25 +3757,26 @@ tr:hover td {
     color: #03111d;
     background: linear-gradient(135deg, #2dd4bf, #38bdf8);
     border-color: transparent;
-    box-shadow: 0 18px 38px rgba(45, 212, 191, 0.28);
+    box-shadow: 0 10px 26px rgba(45, 212, 191, 0.22);
   }
 
   .nav-group {
-    padding: 7px;
+    padding: 6px;
     background:
       linear-gradient(135deg, rgba(45, 212, 191, 0.06), transparent),
       rgba(2, 6, 23, 0.5);
     border: 1px solid rgba(45, 212, 191, 0.2);
-    margin-bottom: 9px;
+    margin-bottom: 8px;
   }
 
   .nav-submenu {
-    padding: 9px 2px 2px;
+    padding: 5px 2px 1px;
   }
 
   .nav-sub-btn {
-    min-height: 46px;
-    padding-left: 18px;
+    min-height: 38px;
+    padding-left: 14px;
+    font-size: 12px;
     background: rgba(2, 6, 23, 0.72);
     border-color: rgba(125, 211, 252, 0.18);
   }
@@ -3766,7 +3784,8 @@ tr:hover td {
   .logout-btn {
     position: sticky;
     bottom: 0;
-    margin-top: 14px;
+    margin-top: 10px;
+    min-height: 44px;
     background: linear-gradient(135deg, rgba(127, 29, 29, 0.92), rgba(69, 10, 10, 0.78));
     border-color: rgba(248, 113, 113, 0.32);
     box-shadow: 0 -16px 30px rgba(2, 6, 23, 0.5);
