@@ -22,14 +22,20 @@ const clockInMessages = [
   'Today is another chance to build something precise, useful, and proudly Voxel Veda.',
   'Your shift has started. Bring focus, care, and steady energy to every task today.',
   'Great work starts with one clean first step. You are clocked in and ready to move.',
-  'You are on shift now. Make today count with quality, teamwork, and sharp attention.'
+  'You are on shift now. Make today count with quality, teamwork, and sharp attention.',
+  'Precision begins with presence. You are checked in and ready for a strong day.',
+  'Start steady, think clearly, and let every small action lift the whole team.',
+  'Your day is live. Build with care, communicate early, and keep standards high.'
 ];
 
 const clockOutMessages = [
   'Shift complete. Thank you for the work, care, and effort you put in today.',
   'You are clocked out. Rest well knowing today moved the team forward.',
   'Good work today. Every finished task adds strength to the whole operation.',
-  "Shift ended. Recharge well, and carry today's wins into tomorrow."
+  "Shift ended. Recharge well, and carry today's wins into tomorrow.",
+  'You closed the shift with progress behind you. Thank you for showing up well.',
+  'The workday is complete. Reset, recover, and be proud of the effort you gave.',
+  'Clock-out confirmed. Today is recorded, and your contribution matters.'
 ];
 
 function authHeaders() {
@@ -369,6 +375,16 @@ function closeStaffDialog(event) {
 
 function pickMessage(messages) {
   return messages[Math.floor(Math.random() * messages.length)];
+}
+
+function dailyMessage(messages, purpose = 'shift') {
+  const today = new Date();
+  const key = `${today.getFullYear()}-${today.getMonth() + 1}-${today.getDate()}-${purpose}`;
+  let hash = 0;
+  for (let i = 0; i < key.length; i += 1) {
+    hash = ((hash * 31) + key.charCodeAt(i)) % 100000;
+  }
+  return messages[hash % messages.length];
 }
 
 function initialsFromName(name, fallback = 'V') {
@@ -761,6 +777,8 @@ function buildTaskCard(task) {
 function updateTaskCounters(tasks) {
   const todayCountEl = document.getElementById('todayTaskCount');
   const overdueCountEl = document.getElementById('overdueTaskCount');
+  const alertDueEl = document.getElementById('taskAlertDueCount');
+  const alertOverdueEl = document.getElementById('taskAlertOverdueCount');
 
   const today = todayISO();
 
@@ -773,6 +791,14 @@ function updateTaskCounters(tasks) {
 
   if (todayCountEl) todayCountEl.innerText = todayCount;
   if (overdueCountEl) overdueCountEl.innerText = overdueCount;
+  if (alertDueEl) alertDueEl.innerText = todayCount;
+  if (alertOverdueEl) alertOverdueEl.innerText = overdueCount;
+
+  const alertBtn = document.querySelector('.staff-task-alert');
+  if (alertBtn) {
+    alertBtn.classList.toggle('has-overdue', overdueCount > 0);
+    alertBtn.classList.toggle('has-due', todayCount > 0);
+  }
 }
 
 function notifyNewTasks(tasks) {
@@ -1370,10 +1396,10 @@ async function clockIn() {
     showToast(data.message || 'Clock in response');
 
     if (res.ok) {
-      const message = pickMessage(clockInMessages);
-      const subtext = 'Your shift is started now. Stay safe, stay sharp, and keep the work moving.';
+      const message = dailyMessage(clockInMessages, 'clock-in');
+      const subtext = 'Your shift has started. Stay safe, stay sharp, and keep the work moving.';
       showShiftDialog('Shift Started', message, subtext);
-      await sendShiftNotification('Your shift has started', 'You are clocked in now. Have a focused and productive day.');
+      await sendShiftNotification('Your shift has started', message);
     }
 
     await loadAttendanceStatus();
@@ -1395,10 +1421,10 @@ async function clockOut() {
     showToast(data.message || 'Clock out response');
 
     if (res.ok) {
-      const message = pickMessage(clockOutMessages);
+      const message = dailyMessage(clockOutMessages, 'clock-out');
       const subtext = 'Your shift is closed. Thank you for your contribution today.';
       showShiftDialog('Shift Complete', message, subtext);
-      await sendShiftNotification('Your shift is complete', "You are clocked out now. Thank you for today's work.");
+      await sendShiftNotification('Your shift is complete', message);
     }
 
     await loadAttendanceStatus();

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260608-local-qr" />
+  <link rel="stylesheet" href="/style.css?v=20260610-staff-home-alerts" />
 </head>
 
 <body class="staff-portal">
@@ -83,7 +83,16 @@
           <h2>Operations Control</h2>
           <p id="staffInfo">Loading staff...</p>
         </div>
-        <span class="live-pill">Active Session</span>
+        <div class="staff-top-actions">
+          <button class="staff-task-alert permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')" aria-label="Open task alerts">
+            <span class="staff-task-alert-icon">!</span>
+            <span>
+              <strong>Task Alerts</strong>
+              <small><b id="taskAlertDueCount">0</b> due today | <b id="taskAlertOverdueCount">0</b> overdue</small>
+            </span>
+          </button>
+          <span class="live-pill">Active Session</span>
+        </div>
       </header>
 
       <!-- PROFILE -->
@@ -182,26 +191,6 @@
             <strong>Task Board</strong>
             <small>View assigned work and update progress.</small>
           </button>
-          <button class="staff-action-card permission-stock permission-stock-in hidden-section" type="button" onclick="goStaffSection('stockInSection')">
-            <span>Stock Management</span>
-            <strong>Stock In</strong>
-            <small>Add received inventory and batch details.</small>
-          </button>
-          <button class="staff-action-card permission-stock permission-stock-out hidden-section" type="button" onclick="goStaffSection('stockOutSection')">
-            <span>Stock Management</span>
-            <strong>Stock Out</strong>
-            <small>Issue stock and record usage.</small>
-          </button>
-          <button class="staff-action-card permission-attendance hidden-section" type="button" onclick="goStaffSection('timesheetSection')">
-            <span>Workforce</span>
-            <strong>Timesheet</strong>
-            <small>Check weekly and monthly shift history.</small>
-          </button>
-          <button class="staff-action-card permission-roster hidden-section" type="button" onclick="goStaffSection('rosterSection')">
-            <span>Workforce</span>
-            <strong>Roster</strong>
-            <small>See upcoming shifts, location and daily role details.</small>
-          </button>
           <button class="staff-action-card permission-meetings hidden-section" type="button" onclick="goStaffSection('meetingsSection')">
             <span>Meetings & Inspections</span>
             <strong>Upcoming Events</strong>
@@ -209,17 +198,7 @@
           </button>
         </div>
 
-        <div class="metric-grid">
-
-          <div class="card">
-            <h3>Tasks Due Today</h3>
-            <p><strong id="todayTaskCount">0</strong></p>
-          </div>
-
-          <div class="card">
-            <h3>Overdue Tasks</h3>
-            <p><strong id="overdueTaskCount">0</strong></p>
-          </div>
+        <div class="metric-grid staff-home-metrics">
 
           <div class="card">
             <h3>Weekly Hours</h3>
@@ -537,6 +516,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260609-comma-money"></script>
+  <script src="/staff.js?v=20260610-staff-home-alerts"></script>
 </body>
 </html>
