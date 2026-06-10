@@ -17,6 +17,9 @@ let staffStockOutCache = [];
 let staffMeetingCache = [];
 let lastAnnouncementIds = new Set();
 let firstAnnouncementLoad = true;
+let shiftQrScannerStream = null;
+let shiftQrScannerTimer = null;
+let activeShiftQrMode = 'in';
 
 const clockInMessages = [
   'Today is another chance to build something precise, useful, and proudly Voxel Veda.',
@@ -366,6 +369,7 @@ function showStaffDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 }
 
 function hideStaffDialog() {
+  stopShiftQrScanner();
   document.getElementById('staffDialogBackdrop')?.classList.remove('active');
 }
 
@@ -590,6 +594,115 @@ function updateShiftButtons(attendance) {
   if (clockOutBtn) {
     clockOutBtn.style.display = isClockedIn ? 'inline-block' : 'none';
   }
+}
+
+function stopShiftQrScanner() {
+  if (shiftQrScannerTimer) {
+    clearInterval(shiftQrScannerTimer);
+    shiftQrScannerTimer = null;
+  }
+
+  if (shiftQrScannerStream) {
+    shiftQrScannerStream.getTracks().forEach((track) => track.stop());
+    shiftQrScannerStream = null;
+  }
+}
+
+function normalizeShiftQrToken(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  try {
+    const parsed = new URL(raw);
+    return parsed.searchParams.get('shift_qr_token')
+      || parsed.searchParams.get('qr_token')
+      || parsed.searchParams.get('token')
+      || raw;
+  } catch (_) {
+    return raw;
+  }
+}
+
+async function startShiftQrCamera(mode) {
+  const statusEl = document.getElementById('shiftQrScanStatus');
+  const video = document.getElementById('shiftQrVideo');
+
+  if (!video) return;
+
+  if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
+    if (statusEl) statusEl.innerText = 'Camera scanner is not available on this device. Enter the current QR code text or use admin bypass if allowed.';
+    return;
+  }
+
+  try {
+    stopShiftQrScanner();
+    shiftQrScannerStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' },
+      audio: false
+    });
+    video.srcObject = shiftQrScannerStream;
+    await video.play();
+
+    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+    if (statusEl) statusEl.innerText = 'Point the camera at the live admin QR code.';
+
+    shiftQrScannerTimer = setInterval(async () => {
+      try {
+        const codes = await detector.detect(video);
+        const value = codes?.[0]?.rawValue;
+        if (!value) return;
+        stopShiftQrScanner();
+        if (statusEl) statusEl.innerText = 'QR detected. Verifying shift token...';
+        await submitShiftQr(mode, normalizeShiftQrToken(value));
+      } catch (_) {
+        if (statusEl) statusEl.innerText = 'Scanning... keep the QR code inside the frame.';
+      }
+    }, 650);
+  } catch (_) {
+    if (statusEl) statusEl.innerText = 'Camera permission is blocked. Allow camera access, or use admin bypass if enabled.';
+  }
+}
+
+function openShiftQrScanner(mode) {
+  activeShiftQrMode = mode === 'out' ? 'out' : 'in';
+  const actionLabel = activeShiftQrMode === 'out' ? 'End Shift' : 'Start Shift';
+  const actionText = activeShiftQrMode === 'out' ? 'complete your shift' : 'start your shift';
+
+  showStaffDialog(`Scan QR to ${actionLabel}`, `
+    <div class="shift-scan-panel">
+      <div class="shift-scan-camera">
+        <video id="shiftQrVideo" playsinline muted></video>
+        <div class="shift-scan-reticle"></div>
+      </div>
+      <p id="shiftQrScanStatus" class="status-note">Opening camera scanner...</p>
+      <label class="field-label">Manual QR token</label>
+      <input id="shiftQrManualCode" placeholder="Paste live QR code token if camera cannot scan" />
+      <div class="modal-actions compact-actions">
+        <button class="secondary-btn" onclick="submitManualShiftBypass()">Use Admin Bypass</button>
+        <button class="primary-btn" onclick="submitManualShiftQr()">${actionLabel}</button>
+      </div>
+      <p class="status-note">For security, staff must scan the live QR before they ${actionText}. Admin bypass only works when enabled in settings.</p>
+    </div>
+  `);
+
+  startShiftQrCamera(activeShiftQrMode);
+}
+
+async function submitManualShiftQr() {
+  const tokenValue = document.getElementById('shiftQrManualCode')?.value || '';
+  await submitShiftQr(activeShiftQrMode, normalizeShiftQrToken(tokenValue));
+}
+
+async function submitManualShiftBypass() {
+  await submitShiftQr(activeShiftQrMode, '');
+}
+
+async function submitShiftQr(mode, qrToken) {
+  const ok = mode === 'out'
+    ? await clockOut(qrToken)
+    : await clockIn(qrToken);
+
+  if (ok) hideStaffDialog();
 }
 
 function hideShiftDialog() {
@@ -1384,11 +1497,12 @@ async function loadAttendanceStatus() {
   }
 }
 
-async function clockIn() {
+async function clockIn(shiftQrToken = '') {
   try {
     const res = await fetch('/api/attendance/clock-in', {
       method: 'POST',
-      headers: authHeaders()
+      headers: authHeaders(),
+      body: JSON.stringify({ shift_qr_token: shiftQrToken })
     });
 
     const data = await safeJson(res);
@@ -1404,16 +1518,19 @@ async function clockIn() {
 
     await loadAttendanceStatus();
     await loadTimesheet();
+    return res.ok;
   } catch {
     showToast('Clock in failed');
+    return false;
   }
 }
 
-async function clockOut() {
+async function clockOut(shiftQrToken = '') {
   try {
     const res = await fetch('/api/attendance/clock-out', {
       method: 'POST',
-      headers: authHeaders()
+      headers: authHeaders(),
+      body: JSON.stringify({ shift_qr_token: shiftQrToken })
     });
 
     const data = await safeJson(res);
@@ -1429,8 +1546,10 @@ async function clockOut() {
 
     await loadAttendanceStatus();
     await loadTimesheet();
+    return res.ok;
   } catch {
     showToast('Clock out failed');
+    return false;
   }
 }
 

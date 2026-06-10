@@ -1,4 +1,8 @@
+const crypto = require('crypto');
 const pool = require('../config/db');
+
+const SHIFT_QR_WINDOW_SECONDS = 20;
+const SHIFT_QR_PREFIX = 'VVSHIFT';
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -40,6 +44,97 @@ function normalizeDateTime(value) {
 
 function isAdmin(req) {
   return String(req.user?.role || '').trim().toLowerCase() === 'admin';
+}
+
+function shiftQrSecret() {
+  return process.env.JWT_SECRET || process.env.SESSION_SECRET || 'voxelveda-shift-secret';
+}
+
+function signShiftPeriod(period) {
+  return crypto
+    .createHmac('sha256', shiftQrSecret())
+    .update(`${SHIFT_QR_PREFIX}:${period}`)
+    .digest('hex')
+    .slice(0, 18);
+}
+
+function currentShiftPeriod() {
+  return Math.floor(Date.now() / (SHIFT_QR_WINDOW_SECONDS * 1000));
+}
+
+function createShiftQrToken(period = currentShiftPeriod()) {
+  return `${SHIFT_QR_PREFIX}:${period}:${signShiftPeriod(period)}`;
+}
+
+function extractShiftQrToken(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+
+  if (text.startsWith(`${SHIFT_QR_PREFIX}:`)) return text;
+
+  try {
+    const url = new URL(text);
+    return url.searchParams.get('shift_qr_token')
+      || url.searchParams.get('shift_qr')
+      || url.searchParams.get('qr_token')
+      || url.searchParams.get('token')
+      || text;
+  } catch {
+    return text;
+  }
+}
+
+function isValidShiftQrToken(value) {
+  const token = extractShiftQrToken(value);
+  const parts = token.split(':');
+  if (parts.length !== 3 || parts[0] !== SHIFT_QR_PREFIX) return false;
+
+  const period = Number(parts[1]);
+  const signature = parts[2];
+  if (!Number.isInteger(period) || !signature) return false;
+
+  const current = currentShiftPeriod();
+  const allowedPeriods = [current, current - 1, current + 1];
+  return allowedPeriods.some((allowed) => {
+    return period === allowed && signature === signShiftPeriod(period);
+  });
+}
+
+async function ensureSettingsTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_settings (
+      setting_key VARCHAR(120) PRIMARY KEY,
+      setting_value TEXT NULL,
+      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+}
+
+async function getSettingValue(key, fallback = '') {
+  await ensureSettingsTable();
+  const [[row]] = await pool.query(
+    'SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1',
+    [key]
+  );
+  return row?.setting_value ?? fallback;
+}
+
+async function canBypassShiftQr() {
+  const value = await getSettingValue('attendance_allow_manual_without_qr', 'false');
+  return ['true', '1', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+}
+
+async function requireValidShiftQr(req, res) {
+  if (await canBypassShiftQr()) return true;
+
+  const token = req.body?.shift_qr_token || req.body?.qr_token || req.body?.token;
+  if (isValidShiftQrToken(token)) return true;
+
+  res.status(403).json({
+    message: 'Please scan the current shift QR code before starting or ending your shift.',
+    qr_required: true
+  });
+  return false;
 }
 
 async function ensureAttendanceTables() {
@@ -159,6 +254,8 @@ exports.clockIn = async (req, res) => {
   try {
     await ensureAttendanceTables();
 
+    if (!(await requireValidShiftQr(req, res))) return;
+
     const userId = Number(req.user?.id);
     const workDate = todayDate();
 
@@ -214,6 +311,8 @@ exports.clockIn = async (req, res) => {
 exports.clockOut = async (req, res) => {
   try {
     await ensureAttendanceTables();
+
+    if (!(await requireValidShiftQr(req, res))) return;
 
     const userId = Number(req.user?.id);
 
@@ -496,6 +595,32 @@ exports.allWeeklyTimesheets = async (req, res) => {
     console.error('ALL WEEKLY TIMESHEETS ERROR FULL:', err);
     res.status(500).json({
       message: 'Failed to load weekly timesheets',
+      error: err.message
+    });
+  }
+};
+
+exports.shiftQrToken = async (req, res) => {
+  try {
+    if (!isAdmin(req)) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const period = currentShiftPeriod();
+    const token = createShiftQrToken(period);
+    const expiresAtMs = (period + 1) * SHIFT_QR_WINDOW_SECONDS * 1000;
+
+    res.json({
+      token,
+      qr_data: token,
+      expires_in_seconds: Math.max(1, Math.ceil((expiresAtMs - Date.now()) / 1000)),
+      refresh_seconds: SHIFT_QR_WINDOW_SECONDS,
+      manual_bypass_enabled: await canBypassShiftQr()
+    });
+  } catch (err) {
+    console.error('SHIFT QR TOKEN ERROR FULL:', err);
+    res.status(500).json({
+      message: 'Failed to generate shift QR',
       error: err.message
     });
   }

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260610-mobile-drawer-v3" />
+  <link rel="stylesheet" href="/style.css?v=20260610-shift-qr" />
 </head>
 
 <body class="staff-portal">
@@ -24,7 +24,6 @@
         <img src="/Frame 1.png?v=20260601-clean-logo" class="logo-img" alt="Voxel Veda Logo" />
         <div>
           <h1>VOXEL VEDA</h1>
-          <p>Workforce Panel</p>
           <p id="sidebarStaffName">Loading...</p>
         </div>
       </div>
@@ -80,7 +79,7 @@
       <!-- HEADER -->
       <header class="topbar">
         <div>
-          <h2>Operations Control</h2>
+          <h2>Workforce Home</h2>
           <p id="staffInfo">Loading staff...</p>
         </div>
         <div class="staff-top-actions">
@@ -249,10 +248,11 @@
 
           <p id="attendanceStatus">Checking attendance...</p>
 
-          <div style="display:flex; gap:12px;">
-            <button id="clockInBtn" class="primary-btn" onclick="clockIn()">Start Shift</button>
-            <button id="clockOutBtn" class="secondary-btn" onclick="clockOut()">End Shift</button>
+          <div class="shift-action-row">
+            <button id="clockInBtn" class="primary-btn" onclick="openShiftQrScanner('in')">Scan QR & Start Shift</button>
+            <button id="clockOutBtn" class="secondary-btn" onclick="openShiftQrScanner('out')">Scan QR & End Shift</button>
           </div>
+          <p class="status-note">Shift start/end requires the live admin QR unless admin has enabled emergency manual bypass.</p>
         </div>
 
       </section>
@@ -516,6 +516,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260610-staff-home-alerts"></script>
+  <script src="/staff.js?v=20260610-shift-qr"></script>
 </body>
 </html>

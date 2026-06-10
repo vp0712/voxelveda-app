@@ -38,6 +38,9 @@ let meetingCache = [];
 let rosterCache = [];
 let attendanceSnapshot = new Map();
 let attendanceFirstLoad = true;
+let shiftQrTimer = null;
+let shiftQrCountdownTimer = null;
+let shiftQrSecondsLeft = 20;
 const registerPagerState = {};
 const REGISTER_PAGE_SIZES = [10, 25, 50, 100, 200];
 
@@ -424,6 +427,7 @@ function setupNavigation() {
       }
       if (btn.dataset.section === 'meetingSection') loadMeetings();
       if (btn.dataset.section === 'rosterSection') loadRoster();
+      if (btn.dataset.section === 'shiftQrSection') loadShiftQr();
       if (btn.dataset.section === 'companyFormsSection') renderCompanyForms();
       toggleMobileMenu(false);
     };
@@ -4015,6 +4019,13 @@ async function loadSettings() {
     if (el && settings[key] !== undefined) el.value = settings[key];
   });
 
+  const bypassEl = document.getElementById('settingAttendanceManualBypass');
+  if (bypassEl) {
+    bypassEl.checked = ['true', '1', 'yes', 'on'].includes(
+      String(settings.attendance_allow_manual_without_qr || 'false').toLowerCase()
+    );
+  }
+
   updateQrTargetFromType();
 }
 
@@ -4025,7 +4036,8 @@ async function saveSettings() {
     payment_terms: document.getElementById('settingTerms')?.value.trim(),
     bank_name: document.getElementById('settingBank')?.value.trim(),
     website: document.getElementById('settingWebsite')?.value.trim(),
-    support_phone: document.getElementById('settingSupportPhone')?.value.trim()
+    support_phone: document.getElementById('settingSupportPhone')?.value.trim(),
+    attendance_allow_manual_without_qr: document.getElementById('settingAttendanceManualBypass')?.checked ? 'true' : 'false'
   };
 
   const res = await fetch('/api/settings', {
@@ -4037,6 +4049,51 @@ async function saveSettings() {
   const data = await safeJson(res);
   showToast(data.message || (res.ok ? 'Settings saved' : 'Settings save failed'));
   updateQrTargetFromType();
+}
+
+function startShiftQrCountdown(seconds) {
+  shiftQrSecondsLeft = Number(seconds || 20);
+  const countdownEl = document.getElementById('shiftQrCountdown');
+  if (countdownEl) countdownEl.innerText = `${shiftQrSecondsLeft}s`;
+
+  clearInterval(shiftQrCountdownTimer);
+  shiftQrCountdownTimer = setInterval(() => {
+    shiftQrSecondsLeft -= 1;
+    if (countdownEl) countdownEl.innerText = `${Math.max(0, shiftQrSecondsLeft)}s`;
+    if (shiftQrSecondsLeft <= 0) clearInterval(shiftQrCountdownTimer);
+  }, 1000);
+}
+
+async function loadShiftQr() {
+  const image = document.getElementById('shiftQrImage');
+  const tokenText = document.getElementById('shiftQrTokenText');
+  if (!image) return;
+
+  try {
+    const res = await fetch('/api/attendance/shift-qr', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      if (tokenText) tokenText.innerText = data.message || 'Unable to load shift QR.';
+      return;
+    }
+
+    const qrData = data.qr_data || data.token;
+    image.src = `/api/qr?data=${encodeURIComponent(qrData)}&v=${Date.now()}`;
+    if (tokenText) {
+      tokenText.innerText = data.manual_bypass_enabled
+        ? 'Manual bypass is ON. QR is active, but staff can use admin-approved manual shift control.'
+        : 'Manual bypass is OFF. Staff must scan this live QR to start or end shift.';
+    }
+
+    startShiftQrCountdown(data.expires_in_seconds || data.refresh_seconds || 20);
+    clearTimeout(shiftQrTimer);
+    shiftQrTimer = setTimeout(loadShiftQr, Number(data.refresh_seconds || 20) * 1000);
+  } catch {
+    if (tokenText) tokenText.innerText = 'Server error loading shift QR.';
+  }
 }
 
 function openSystemPage(path) {

@@ -7,6 +7,8 @@ const requireInputPermission = require('../middleware/inputPermissionMiddleware'
 
 /* ================= STAFF ATTENDANCE ================= */
 
+router.get('/shift-qr', auth, attendanceController.shiftQrToken);
+
 // Must be logged in
 router.post('/clock-in', auth, requireInputPermission('attendance_input'), attendanceController.clockIn);
 
