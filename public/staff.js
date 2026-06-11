@@ -19,6 +19,8 @@ let lastAnnouncementIds = new Set();
 let firstAnnouncementLoad = true;
 let shiftQrScannerStream = null;
 let shiftQrScannerTimer = null;
+let shiftQrScannerCanvas = null;
+let shiftQrDecoderPromise = null;
 let activeShiftQrMode = 'in';
 
 const clockInMessages = [
@@ -624,14 +626,77 @@ function normalizeShiftQrToken(value) {
   }
 }
 
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${src}"]`);
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', reject, { once: true });
+      if (existing.dataset.loaded === 'true') resolve();
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.onload = () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+async function getShiftQrDecoder() {
+  if ('BarcodeDetector' in window) {
+    return {
+      type: 'native',
+      detector: new BarcodeDetector({ formats: ['qr_code'] })
+    };
+  }
+
+  if (!shiftQrDecoderPromise) {
+    shiftQrDecoderPromise = loadExternalScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
+  }
+
+  await shiftQrDecoderPromise;
+
+  if (typeof window.jsQR !== 'function') {
+    throw new Error('QR decoder unavailable');
+  }
+
+  return { type: 'canvas' };
+}
+
+async function detectShiftQr(video, decoder) {
+  if (decoder.type === 'native') {
+    const codes = await decoder.detector.detect(video);
+    return codes?.[0]?.rawValue || '';
+  }
+
+  const width = video.videoWidth || 640;
+  const height = video.videoHeight || 480;
+  if (!width || !height) return '';
+
+  shiftQrScannerCanvas ||= document.createElement('canvas');
+  shiftQrScannerCanvas.width = width;
+  shiftQrScannerCanvas.height = height;
+  const ctx = shiftQrScannerCanvas.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(video, 0, 0, width, height);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const code = window.jsQR(imageData.data, width, height, { inversionAttempts: 'attemptBoth' });
+  return code?.data || '';
+}
+
 async function startShiftQrCamera(mode) {
   const statusEl = document.getElementById('shiftQrScanStatus');
   const video = document.getElementById('shiftQrVideo');
 
   if (!video) return;
 
-  if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
-    if (statusEl) statusEl.innerText = 'Camera scan unavailable.';
+  if (!navigator.mediaDevices?.getUserMedia) {
+    if (statusEl) statusEl.innerText = 'Camera unavailable.';
     return;
   }
 
@@ -644,13 +709,13 @@ async function startShiftQrCamera(mode) {
     video.srcObject = shiftQrScannerStream;
     await video.play();
 
-    const detector = new BarcodeDetector({ formats: ['qr_code'] });
+    if (statusEl) statusEl.innerText = 'Preparing scanner...';
+    const decoder = await getShiftQrDecoder();
     if (statusEl) statusEl.innerText = 'Scanning...';
 
     shiftQrScannerTimer = setInterval(async () => {
       try {
-        const codes = await detector.detect(video);
-        const value = codes?.[0]?.rawValue;
+        const value = await detectShiftQr(video, decoder);
         if (!value) return;
         stopShiftQrScanner();
         if (statusEl) statusEl.innerText = 'Verifying...';
@@ -660,7 +725,7 @@ async function startShiftQrCamera(mode) {
       }
     }, 650);
   } catch (_) {
-    if (statusEl) statusEl.innerText = 'Camera permission blocked.';
+    if (statusEl) statusEl.innerText = 'Scanner offline.';
   }
 }
 
@@ -670,16 +735,24 @@ function openShiftQrScanner(mode) {
 
   showStaffDialog(`Scan QR to ${actionLabel}`, `
     <div class="shift-scan-panel">
+      <div class="shift-scan-statusbar">
+        <span class="scan-live-dot"></span>
+        <strong>Live QR Required</strong>
+        <small>${activeShiftQrMode === 'out' ? 'Shift completion' : 'Shift start'}</small>
+      </div>
       <div class="shift-scan-camera">
         <video id="shiftQrVideo" playsinline muted></video>
         <div class="shift-scan-reticle"></div>
       </div>
       <p id="shiftQrScanStatus" class="status-note">Opening camera...</p>
-      <input id="shiftQrManualCode" placeholder="QR token" />
-      <div class="modal-actions compact-actions">
-        <button class="secondary-btn" onclick="submitManualShiftBypass()">Bypass</button>
-        <button class="primary-btn" onclick="submitManualShiftQr()">${actionLabel}</button>
-      </div>
+      <details class="shift-manual-panel">
+        <summary>Manual control</summary>
+        <input id="shiftQrManualCode" placeholder="QR token" />
+        <div class="modal-actions compact-actions">
+          <button class="secondary-btn" onclick="submitManualShiftBypass()">Bypass</button>
+          <button class="primary-btn" onclick="submitManualShiftQr()">${actionLabel}</button>
+        </div>
+      </details>
     </div>
   `);
 

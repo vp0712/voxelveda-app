@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260611-user-qr-permission"/>
+  <link rel="stylesheet" href="/style.css?v=20260611-qr-scanner-ultra"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -548,7 +548,10 @@
 
         <div class="shift-qr-console">
           <div class="card shift-qr-card">
-            <h3>Live Attendance QR</h3>
+            <div class="qr-command-head">
+              <span class="scan-live-dot"></span>
+              <h3>Live Attendance QR</h3>
+            </div>
             <div class="branded-qr-frame shift-qr-frame">
               <img id="shiftQrImage" alt="Live shift QR code" />
             </div>
@@ -562,13 +565,11 @@
           <div class="card shift-qr-instructions">
             <h3>Shift Access</h3>
             <div class="system-action-grid">
-              <button class="system-action" onclick="goSection('settingsSection')">
+              <button class="system-action" onclick="goSection('staffSection')">
                 <strong>User QR Bypass</strong>
-                <span>Control bypass from each staff access profile.</span>
               </button>
               <button class="system-action" onclick="loadAttendance()">
                 <strong>Open Timesheets</strong>
-                <span>Review scan-controlled shift records and corrections.</span>
               </button>
             </div>
           </div>
@@ -1161,6 +1162,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260611-user-qr-permission"></script>
+  <script src="/admin-dashboard.js?v=20260611-qr-scanner-ultra"></script>
 </body>
 </html>
