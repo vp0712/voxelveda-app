@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260610-shift-qr"/>
+  <link rel="stylesheet" href="/style.css?v=20260611-user-qr-permission"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -542,7 +542,6 @@
         <div class="section-head">
           <div>
             <h2>Shift QR Control</h2>
-            <p>Staff must scan this live code to start or complete a shift. The code refreshes every 20 seconds.</p>
           </div>
           <button onclick="loadShiftQr()" class="primary-btn">Refresh QR</button>
         </div>
@@ -561,12 +560,11 @@
           </div>
 
           <div class="card shift-qr-instructions">
-            <h3>Attendance Rule</h3>
-            <p>Display this QR on the admin screen, office tablet, or reception device. Staff scan it from their portal before clock-in and clock-out.</p>
+            <h3>Shift Access</h3>
             <div class="system-action-grid">
               <button class="system-action" onclick="goSection('settingsSection')">
-                <strong>Manual Bypass Setting</strong>
-                <span>Admin can allow or block shift start/end without QR scan.</span>
+                <strong>User QR Bypass</strong>
+                <span>Control bypass from each staff access profile.</span>
               </button>
               <button class="system-action" onclick="loadAttendance()">
                 <strong>Open Timesheets</strong>
@@ -1079,18 +1077,6 @@
             </div>
           </div>
 
-          <div class="card">
-            <h3>Attendance QR Control</h3>
-            <p class="status-note">When QR scan is required, staff cannot start or end a shift until they scan the current live code.</p>
-            <label class="settings-toggle-row">
-              <span>
-                <strong>Allow manual shift without QR</strong>
-                <small>Turn on only for emergency, reception failure, or admin-approved exceptions.</small>
-              </span>
-              <input id="settingAttendanceManualBypass" type="checkbox" />
-            </label>
-          </div>
-
           <div class="card qr-tool-card">
             <h3>QR Code Generator</h3>
             <p class="status-note">Create a QR code for the company website, customer RFQ form, privacy policy, or any custom link.</p>
@@ -1175,6 +1161,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260610-shift-qr"></script>
+  <script src="/admin-dashboard.js?v=20260611-user-qr-permission"></script>
 </body>
 </html>

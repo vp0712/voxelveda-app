@@ -364,7 +364,8 @@ function showStaffDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
-  primaryBtn.onclick = onPrimary;
+  primaryBtn.onclick = onPrimary || null;
+  primaryBtn.style.display = typeof onPrimary === 'function' ? 'inline-block' : 'none';
   backdrop.classList.add('active');
 }
 
@@ -630,7 +631,7 @@ async function startShiftQrCamera(mode) {
   if (!video) return;
 
   if (!('BarcodeDetector' in window) || !navigator.mediaDevices?.getUserMedia) {
-    if (statusEl) statusEl.innerText = 'Camera scanner is not available on this device. Enter the current QR code text or use admin bypass if allowed.';
+    if (statusEl) statusEl.innerText = 'Camera scan unavailable.';
     return;
   }
 
@@ -644,7 +645,7 @@ async function startShiftQrCamera(mode) {
     await video.play();
 
     const detector = new BarcodeDetector({ formats: ['qr_code'] });
-    if (statusEl) statusEl.innerText = 'Point the camera at the live admin QR code.';
+    if (statusEl) statusEl.innerText = 'Scanning...';
 
     shiftQrScannerTimer = setInterval(async () => {
       try {
@@ -652,21 +653,20 @@ async function startShiftQrCamera(mode) {
         const value = codes?.[0]?.rawValue;
         if (!value) return;
         stopShiftQrScanner();
-        if (statusEl) statusEl.innerText = 'QR detected. Verifying shift token...';
+        if (statusEl) statusEl.innerText = 'Verifying...';
         await submitShiftQr(mode, normalizeShiftQrToken(value));
       } catch (_) {
-        if (statusEl) statusEl.innerText = 'Scanning... keep the QR code inside the frame.';
+        if (statusEl) statusEl.innerText = 'Scanning...';
       }
     }, 650);
   } catch (_) {
-    if (statusEl) statusEl.innerText = 'Camera permission is blocked. Allow camera access, or use admin bypass if enabled.';
+    if (statusEl) statusEl.innerText = 'Camera permission blocked.';
   }
 }
 
 function openShiftQrScanner(mode) {
   activeShiftQrMode = mode === 'out' ? 'out' : 'in';
   const actionLabel = activeShiftQrMode === 'out' ? 'End Shift' : 'Start Shift';
-  const actionText = activeShiftQrMode === 'out' ? 'complete your shift' : 'start your shift';
 
   showStaffDialog(`Scan QR to ${actionLabel}`, `
     <div class="shift-scan-panel">
@@ -674,14 +674,12 @@ function openShiftQrScanner(mode) {
         <video id="shiftQrVideo" playsinline muted></video>
         <div class="shift-scan-reticle"></div>
       </div>
-      <p id="shiftQrScanStatus" class="status-note">Opening camera scanner...</p>
-      <label class="field-label">Manual QR token</label>
-      <input id="shiftQrManualCode" placeholder="Paste live QR code token if camera cannot scan" />
+      <p id="shiftQrScanStatus" class="status-note">Opening camera...</p>
+      <input id="shiftQrManualCode" placeholder="QR token" />
       <div class="modal-actions compact-actions">
-        <button class="secondary-btn" onclick="submitManualShiftBypass()">Use Admin Bypass</button>
+        <button class="secondary-btn" onclick="submitManualShiftBypass()">Bypass</button>
         <button class="primary-btn" onclick="submitManualShiftQr()">${actionLabel}</button>
       </div>
-      <p class="status-note">For security, staff must scan the live QR before they ${actionText}. Admin bypass only works when enabled in settings.</p>
     </div>
   `);
 

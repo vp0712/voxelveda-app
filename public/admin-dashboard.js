@@ -66,6 +66,7 @@ const ACCESS_OPTIONS = [
   { id: 'roster_input', label: 'Roster Input/Edit' },
   { id: 'attendance', label: 'Attendance' },
   { id: 'attendance_input', label: 'Attendance Input/Edit' },
+  { id: 'attendance_qr_bypass', label: 'QR Shift Bypass' },
   { id: 'staff', label: 'Staff' },
   { id: 'stock', label: 'Stock Management' },
   { id: 'stock_in', label: 'Stock In' },
@@ -827,10 +828,11 @@ function parseAccess(value) {
 
 function accessCheckboxes(selected = [], prefix = 'access') {
   const enabled = new Set(selected);
+  const visibleOptions = ACCESS_OPTIONS.filter((item) => item.id !== 'attendance_qr_bypass');
 
   return `
     <div class="access-grid">
-      ${ACCESS_OPTIONS.map((item) => `
+      ${visibleOptions.map((item) => `
         <label class="access-check">
           <input type="checkbox" data-access="${item.id}" id="${prefix}_${item.id}" ${enabled.has(item.id) ? 'checked' : ''}>
           <span>${item.label}</span>
@@ -874,6 +876,7 @@ function collectAccess() {
     tasks_input: ['tasks'],
     roster_input: ['roster'],
     attendance_input: ['attendance'],
+    attendance_qr_bypass: ['attendance'],
     stock_in_input: ['stock', 'stock_in'],
     stock_out_input: ['stock', 'stock_out'],
     raw_material_input: ['stock', 'raw_material'],
@@ -3738,6 +3741,13 @@ async function openAddStaff() {
           </select>
         </label>
       </div>
+      <label class="access-toggle-row">
+        <span>
+          <strong>QR bypass for shift start/end</strong>
+          <small>Use only for trusted emergency or supervisor-approved accounts.</small>
+        </span>
+        <input type="checkbox" data-access="attendance_qr_bypass">
+      </label>
       <h4>Section Access</h4>
       ${accessCheckboxes(['dashboard', 'tasks', 'attendance'])}
       <p class="status-note">Email and username are separate login options. Staff can sign in with either one.</p>
@@ -3928,6 +3938,13 @@ async function openAccessDialog(userId) {
           <option value="0" ${!user.active ? 'selected' : ''}>Disabled</option>
         </select>
       </div>
+      <label class="access-toggle-row">
+        <span>
+          <strong>QR bypass for shift start/end</strong>
+          <small>Allow this user to clock in or out without scanning the live attendance QR.</small>
+        </span>
+        <input type="checkbox" data-access="attendance_qr_bypass" ${parseAccess(user.permissions).includes('attendance_qr_bypass') ? 'checked' : ''}>
+      </label>
       <h4>Allowed Sections</h4>
       ${accessCheckboxes(parseAccess(user.permissions))}
       <p class="status-note">Admin role can access every section automatically.</p>
@@ -4019,13 +4036,6 @@ async function loadSettings() {
     if (el && settings[key] !== undefined) el.value = settings[key];
   });
 
-  const bypassEl = document.getElementById('settingAttendanceManualBypass');
-  if (bypassEl) {
-    bypassEl.checked = ['true', '1', 'yes', 'on'].includes(
-      String(settings.attendance_allow_manual_without_qr || 'false').toLowerCase()
-    );
-  }
-
   updateQrTargetFromType();
 }
 
@@ -4036,8 +4046,7 @@ async function saveSettings() {
     payment_terms: document.getElementById('settingTerms')?.value.trim(),
     bank_name: document.getElementById('settingBank')?.value.trim(),
     website: document.getElementById('settingWebsite')?.value.trim(),
-    support_phone: document.getElementById('settingSupportPhone')?.value.trim(),
-    attendance_allow_manual_without_qr: document.getElementById('settingAttendanceManualBypass')?.checked ? 'true' : 'false'
+    support_phone: document.getElementById('settingSupportPhone')?.value.trim()
   };
 
   const res = await fetch('/api/settings', {
@@ -4082,11 +4091,7 @@ async function loadShiftQr() {
 
     const qrData = data.qr_data || data.token;
     image.src = `/api/qr?data=${encodeURIComponent(qrData)}&v=${Date.now()}`;
-    if (tokenText) {
-      tokenText.innerText = data.manual_bypass_enabled
-        ? 'Manual bypass is ON. QR is active, but staff can use admin-approved manual shift control.'
-        : 'Manual bypass is OFF. Staff must scan this live QR to start or end shift.';
-    }
+    if (tokenText) tokenText.innerText = 'Live scan token active.';
 
     startShiftQrCountdown(data.expires_in_seconds || data.refresh_seconds || 20);
     clearTimeout(shiftQrTimer);

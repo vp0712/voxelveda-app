@@ -100,32 +100,32 @@ function isValidShiftQrToken(value) {
   });
 }
 
-async function ensureSettingsTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS app_settings (
-      setting_key VARCHAR(120) PRIMARY KEY,
-      setting_value TEXT NULL,
-      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
+function parsePermissions(value) {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
-async function getSettingValue(key, fallback = '') {
-  await ensureSettingsTable();
-  const [[row]] = await pool.query(
-    'SELECT setting_value FROM app_settings WHERE setting_key = ? LIMIT 1',
-    [key]
+async function canBypassShiftQr(req) {
+  const userId = Number(req.user?.id || 0);
+  if (!userId) return false;
+
+  const [rows] = await pool.query(
+    'SELECT permissions FROM users WHERE id = ? LIMIT 1',
+    [userId]
   );
-  return row?.setting_value ?? fallback;
-}
 
-async function canBypassShiftQr() {
-  const value = await getSettingValue('attendance_allow_manual_without_qr', 'false');
-  return ['true', '1', 'yes', 'on'].includes(String(value).trim().toLowerCase());
+  return parsePermissions(rows[0]?.permissions).includes('attendance_qr_bypass');
 }
 
 async function requireValidShiftQr(req, res) {
-  if (await canBypassShiftQr()) return true;
+  if (await canBypassShiftQr(req)) return true;
 
   const token = req.body?.shift_qr_token || req.body?.qr_token || req.body?.token;
   if (isValidShiftQrToken(token)) return true;
@@ -615,7 +615,7 @@ exports.shiftQrToken = async (req, res) => {
       qr_data: token,
       expires_in_seconds: Math.max(1, Math.ceil((expiresAtMs - Date.now()) / 1000)),
       refresh_seconds: SHIFT_QR_WINDOW_SECONDS,
-      manual_bypass_enabled: await canBypassShiftQr()
+      manual_bypass_enabled: false
     });
   } catch (err) {
     console.error('SHIFT QR TOKEN ERROR FULL:', err);

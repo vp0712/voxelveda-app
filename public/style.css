@@ -3861,7 +3861,8 @@ tr:hover td {
   font-size: 12px;
 }
 
-.settings-toggle-row {
+.settings-toggle-row,
+.access-toggle-row {
   display: flex;
   justify-content: space-between;
   gap: 18px;
@@ -3873,20 +3874,27 @@ tr:hover td {
   border: 1px solid rgba(45, 212, 191, 0.22);
 }
 
-.settings-toggle-row span {
+.settings-toggle-row span,
+.access-toggle-row span {
   display: grid;
   gap: 4px;
 }
 
-.settings-toggle-row small {
+.settings-toggle-row small,
+.access-toggle-row small {
   color: #94a3b8;
 }
 
-.settings-toggle-row input[type="checkbox"] {
+.settings-toggle-row input[type="checkbox"],
+.access-toggle-row input[type="checkbox"] {
   width: 54px;
   height: 28px;
   flex: 0 0 auto;
   accent-color: #22d3ee;
+}
+
+.access-toggle-row strong {
+  color: #e0f2fe;
 }
 
 .shift-scan-panel {
@@ -3963,7 +3971,8 @@ tr:hover td {
     border-radius: 22px;
   }
 
-  .settings-toggle-row {
+  .settings-toggle-row,
+  .access-toggle-row {
     align-items: flex-start;
     flex-direction: column;
   }

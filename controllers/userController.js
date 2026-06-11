@@ -15,6 +15,7 @@ const ALL_PERMISSIONS = [
   'roster_input',
   'attendance',
   'attendance_input',
+  'attendance_qr_bypass',
   'staff',
   'settings',
   'stock',
