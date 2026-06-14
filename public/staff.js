@@ -693,6 +693,30 @@ async function detectShiftQr(video, decoder) {
   return code?.data || '';
 }
 
+async function openShiftQrCameraStream() {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
+      audio: false
+    });
+  } catch (err) {
+    const message = String(err?.name || err?.message || '').toLowerCase();
+    if (message.includes('notfound') || message.includes('overconstrained') || message.includes('constraint')) {
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+    throw err;
+  }
+}
+
+function setShiftQrPermissionActions(visible) {
+  const actions = document.getElementById('shiftQrPermissionActions');
+  if (actions) actions.classList.toggle('hidden-section', !visible);
+}
+
 async function startShiftQrCamera(mode) {
   const statusEl = document.getElementById('shiftQrScanStatus');
   const video = document.getElementById('shiftQrVideo');
@@ -701,15 +725,15 @@ async function startShiftQrCamera(mode) {
 
   if (!navigator.mediaDevices?.getUserMedia) {
     if (statusEl) statusEl.innerText = 'Camera unavailable.';
+    setShiftQrPermissionActions(true);
     return;
   }
 
   try {
     stopShiftQrScanner();
-    shiftQrScannerStream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'environment' },
-      audio: false
-    });
+    setShiftQrPermissionActions(false);
+    if (statusEl) statusEl.innerText = 'Requesting camera...';
+    shiftQrScannerStream = await openShiftQrCameraStream();
     video.muted = true;
     video.autoplay = true;
     video.playsInline = true;
@@ -722,6 +746,7 @@ async function startShiftQrCamera(mode) {
 
     if (statusEl) statusEl.innerText = 'Preparing scanner...';
     const decoder = await getShiftQrDecoder();
+    setShiftQrPermissionActions(false);
     if (statusEl) statusEl.innerText = 'Scanning...';
 
     shiftQrScannerTimer = setInterval(async () => {
@@ -740,10 +765,13 @@ async function startShiftQrCamera(mode) {
     if (statusEl) {
       if (message.includes('notallowed') || message.includes('permission')) {
         statusEl.innerText = 'Camera permission needed.';
+        setShiftQrPermissionActions(true);
       } else if (message.includes('decoder') || message.includes('script')) {
         statusEl.innerText = 'QR decoder unavailable.';
+        setShiftQrPermissionActions(true);
       } else {
         statusEl.innerText = 'Scanner offline.';
+        setShiftQrPermissionActions(true);
       }
     }
   }
@@ -765,6 +793,9 @@ function openShiftQrScanner(mode) {
         <div class="shift-scan-reticle"></div>
       </div>
       <p id="shiftQrScanStatus" class="status-note">Opening camera...</p>
+      <div id="shiftQrPermissionActions" class="shift-camera-actions hidden-section">
+        <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Enable Camera</button>
+      </div>
       <details class="shift-manual-panel">
         <summary>Manual control</summary>
         <input id="shiftQrManualCode" placeholder="QR token" />

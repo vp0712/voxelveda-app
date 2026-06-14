@@ -4043,6 +4043,15 @@ body.staff-dialog-open .mobile-menu-btn {
   margin-top: 10px;
 }
 
+.shift-camera-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.shift-camera-actions button {
+  width: 100%;
+}
+
 .shift-qr-dialog-backdrop {
   padding: max(10px, env(safe-area-inset-top, 0px)) 10px max(10px, env(safe-area-inset-bottom, 0px));
   align-items: start;
