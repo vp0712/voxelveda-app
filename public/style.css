@@ -1991,7 +1991,7 @@ tr:hover td {
   place-items: center;
   padding: 20px;
   background: rgba(2, 6, 23, 0.72);
-  z-index: 9998;
+  z-index: 13000;
 }
 
 .dialog-backdrop.active {
@@ -2005,6 +2005,12 @@ tr:hover td {
   border-radius: 18px;
   padding: 22px;
   box-shadow: 0 22px 80px rgba(0, 0, 0, 0.45);
+}
+
+body.staff-dialog-open .mobile-menu-btn {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-8px) scale(0.92);
 }
 
 .dialog-panel.wide-dialog {
@@ -4037,6 +4043,31 @@ tr:hover td {
   margin-top: 10px;
 }
 
+.shift-qr-dialog-backdrop {
+  padding: max(10px, env(safe-area-inset-top, 0px)) 10px max(10px, env(safe-area-inset-bottom, 0px));
+  align-items: start;
+  overflow-y: auto;
+}
+
+.shift-qr-dialog-panel {
+  width: min(430px, 100%);
+  max-height: calc(100dvh - 20px);
+  overflow-y: auto;
+  padding: 16px;
+  border-radius: 22px;
+}
+
+.shift-qr-dialog-panel h3 {
+  margin-bottom: 12px;
+  padding-left: 0;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.shift-qr-dialog-panel .dialog-actions {
+  margin-top: 12px;
+}
+
 .field-label {
   color: #a5f3fc;
   font-weight: 800;
@@ -4079,5 +4110,78 @@ tr:hover td {
   .compact-actions > button,
   .shift-action-row > button {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .shift-qr-dialog-backdrop {
+    place-items: start center;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 8px max(8px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .shift-qr-dialog-panel {
+    width: 100%;
+    max-height: calc(100dvh - 16px);
+    padding: 12px;
+    border-radius: 18px;
+  }
+
+  .shift-qr-dialog-panel h3 {
+    font-size: 21px;
+    margin-bottom: 10px;
+  }
+
+  .shift-scan-panel {
+    gap: 9px;
+  }
+
+  .shift-scan-statusbar {
+    padding: 9px 10px;
+    border-radius: 14px;
+  }
+
+  .shift-scan-statusbar strong {
+    font-size: 15px;
+  }
+
+  .shift-scan-statusbar small {
+    font-size: 12px;
+  }
+
+  .shift-scan-camera,
+  .shift-scan-camera video {
+    min-height: 188px;
+    max-height: 34dvh;
+  }
+
+  .shift-scan-camera {
+    border-radius: 18px;
+  }
+
+  .shift-scan-reticle {
+    inset: 15%;
+    border-radius: 18px;
+  }
+
+  .shift-manual-panel {
+    padding: 8px;
+    border-radius: 14px;
+  }
+
+  .shift-manual-panel summary {
+    font-size: 14px;
+  }
+
+  .shift-manual-panel input {
+    min-height: 42px;
+    margin-top: 8px;
+  }
+
+  .shift-qr-dialog-panel .dialog-actions {
+    position: sticky;
+    bottom: -12px;
+    margin: 8px -12px -12px;
+    padding: 10px 12px 12px;
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.98) 34%);
   }
 }

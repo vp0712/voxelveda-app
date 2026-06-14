@@ -368,11 +368,15 @@ function showStaffDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   primaryBtn.innerText = primaryText;
   primaryBtn.onclick = onPrimary || null;
   primaryBtn.style.display = typeof onPrimary === 'function' ? 'inline-block' : 'none';
+  document.body.classList.add('staff-dialog-open');
   backdrop.classList.add('active');
 }
 
 function hideStaffDialog() {
   stopShiftQrScanner();
+  document.body.classList.remove('staff-dialog-open', 'shift-qr-dialog-open');
+  document.getElementById('staffDialogBackdrop')?.classList.remove('shift-qr-dialog-backdrop');
+  document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('shift-qr-dialog-panel');
   document.getElementById('staffDialogBackdrop')?.classList.remove('active');
 }
 
@@ -706,6 +710,13 @@ async function startShiftQrCamera(mode) {
       video: { facingMode: 'environment' },
       audio: false
     });
+    video.muted = true;
+    video.autoplay = true;
+    video.playsInline = true;
+    video.setAttribute('autoplay', '');
+    video.setAttribute('muted', '');
+    video.setAttribute('playsinline', '');
+    video.setAttribute('webkit-playsinline', '');
     video.srcObject = shiftQrScannerStream;
     await video.play();
 
@@ -724,8 +735,17 @@ async function startShiftQrCamera(mode) {
         if (statusEl) statusEl.innerText = 'Scanning...';
       }
     }, 650);
-  } catch (_) {
-    if (statusEl) statusEl.innerText = 'Scanner offline.';
+  } catch (err) {
+    const message = String(err?.name || err?.message || '').toLowerCase();
+    if (statusEl) {
+      if (message.includes('notallowed') || message.includes('permission')) {
+        statusEl.innerText = 'Camera permission needed.';
+      } else if (message.includes('decoder') || message.includes('script')) {
+        statusEl.innerText = 'QR decoder unavailable.';
+      } else {
+        statusEl.innerText = 'Scanner offline.';
+      }
+    }
   }
 }
 
@@ -756,6 +776,9 @@ function openShiftQrScanner(mode) {
     </div>
   `);
 
+  document.body.classList.add('shift-qr-dialog-open');
+  document.getElementById('staffDialogBackdrop')?.classList.add('shift-qr-dialog-backdrop');
+  document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.add('shift-qr-dialog-panel');
   startShiftQrCamera(activeShiftQrMode);
 }
 
