@@ -183,6 +183,10 @@ function hasPermission(permission) {
   return permissions.includes(permission);
 }
 
+function canUseQrException() {
+  return hasPermission('attendance_qr_bypass');
+}
+
 function applyPermissionUI() {
   const canUseTasks = hasPermission('tasks');
   const canUseAttendance = hasPermission('attendance');
@@ -204,6 +208,26 @@ function applyPermissionUI() {
 
   if (document.querySelector('.nav-btn.active.hidden-section')) {
     document.querySelector('[data-section="dashboardSection"]')?.click();
+  }
+}
+
+async function refreshStaffSession() {
+  try {
+    const res = await fetch('/api/auth/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data.user) return null;
+
+    const role = String(data.user.role || '').trim().toLowerCase();
+    currentUser = { ...data.user, role };
+    currentRole = role;
+    localStorage.setItem('user', JSON.stringify(currentUser));
+    localStorage.setItem('role', role);
+    applyPermissionUI();
+    return currentUser;
+  } catch {
+    return null;
   }
 }
 
@@ -780,6 +804,16 @@ async function startShiftQrCamera(mode) {
 function openShiftQrScanner(mode) {
   activeShiftQrMode = mode === 'out' ? 'out' : 'in';
   const actionLabel = activeShiftQrMode === 'out' ? 'End Shift' : 'Start Shift';
+  const exceptionPanel = canUseQrException()
+    ? `
+      <details class="shift-manual-panel">
+        <summary>Authorized exception</summary>
+        <div class="modal-actions compact-actions">
+          <button class="secondary-btn" onclick="submitAuthorizedShiftException()">Use Authorized Exception</button>
+        </div>
+      </details>
+    `
+    : '';
 
   showStaffDialog(`Scan QR to ${actionLabel}`, `
     <div class="shift-scan-panel">
@@ -796,14 +830,7 @@ function openShiftQrScanner(mode) {
       <div id="shiftQrPermissionActions" class="shift-camera-actions hidden-section">
         <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Enable Camera</button>
       </div>
-      <details class="shift-manual-panel">
-        <summary>Manual control</summary>
-        <input id="shiftQrManualCode" placeholder="QR token" />
-        <div class="modal-actions compact-actions">
-          <button class="secondary-btn" onclick="submitManualShiftBypass()">Bypass</button>
-          <button class="primary-btn" onclick="submitManualShiftQr()">${actionLabel}</button>
-        </div>
-      </details>
+      ${exceptionPanel}
     </div>
   `);
 
@@ -813,12 +840,11 @@ function openShiftQrScanner(mode) {
   startShiftQrCamera(activeShiftQrMode);
 }
 
-async function submitManualShiftQr() {
-  const tokenValue = document.getElementById('shiftQrManualCode')?.value || '';
-  await submitShiftQr(activeShiftQrMode, normalizeShiftQrToken(tokenValue));
-}
-
-async function submitManualShiftBypass() {
+async function submitAuthorizedShiftException() {
+  if (!canUseQrException()) {
+    showToast('Authorized exception is not enabled for your account.');
+    return;
+  }
   await submitShiftQr(activeShiftQrMode, '');
 }
 
@@ -1776,6 +1802,7 @@ function scrollToTimesheet() {
 
 function startAutoRefresh() {
   setInterval(async () => {
+    await refreshStaffSession();
     await loadMyTasks();
     await loadAnnouncements();
     await loadAttendanceStatus();

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260615-camera-permission" />
+  <link rel="stylesheet" href="/style.css?v=20260615-authorized-exception" />
 </head>
 
 <body class="staff-portal">
@@ -252,7 +252,7 @@
             <button id="clockInBtn" class="primary-btn" onclick="openShiftQrScanner('in')">Scan QR & Start Shift</button>
             <button id="clockOutBtn" class="secondary-btn" onclick="openShiftQrScanner('out')">Scan QR & End Shift</button>
           </div>
-          <p class="status-note">Shift start/end requires the live admin QR unless admin has enabled emergency manual bypass.</p>
+          <p class="status-note">Shift start/end requires the live admin QR. Authorized exceptions are controlled by admin access.</p>
         </div>
 
       </section>
@@ -516,6 +516,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260615-camera-permission"></script>
+  <script src="/staff.js?v=20260615-authorized-exception"></script>
 </body>
 </html>
