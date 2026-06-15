@@ -132,6 +132,92 @@ exports.getDashboardStats = async (req, res) => {
       ORDER BY month_key ASC
     `, [fyStart, fyEnd, fyStart, fyEnd]);
 
+    const paidStatusSql = `LOWER(COALESCE(status, '')) IN ('paid', 'settled', 'complete', 'completed')`;
+    const [[supplierPayableSummary]] = await pool.query(`
+      SELECT
+        COUNT(*) AS bill_count,
+        COUNT(DISTINCT NULLIF(TRIM(supplier_name), '')) AS supplier_count,
+        COALESCE(SUM(CASE WHEN ${paidStatusSql} THEN total_amount ELSE 0 END), 0) AS paid_value,
+        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) THEN total_amount ELSE 0 END), 0) AS pending_value,
+        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) AND DATE_ADD(expense_date, INTERVAL 30 DAY) < CURDATE() THEN total_amount ELSE 0 END), 0) AS overdue_value,
+        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) AND DATE_ADD(expense_date, INTERVAL 30 DAY) >= CURDATE() THEN total_amount ELSE 0 END), 0) AS upcoming_value,
+        SUM(CASE WHEN NOT (${paidStatusSql}) THEN 1 ELSE 0 END) AS pending_count,
+        MIN(CASE WHEN NOT (${paidStatusSql}) THEN DATE_ADD(expense_date, INTERVAL 30 DAY) ELSE NULL END) AS next_due_date
+      FROM expenses
+      WHERE deleted = 0
+      AND expense_date BETWEEN ? AND ?
+    `, [fyStart, fyEnd]);
+
+    const [[nextSupplierPayment]] = await pool.query(`
+      SELECT
+        COALESCE(NULLIF(TRIM(supplier_name), ''), 'Unassigned supplier') AS supplier_name,
+        category,
+        invoice_no,
+        total_amount,
+        expense_date,
+        DATE_ADD(expense_date, INTERVAL 30 DAY) AS due_date
+      FROM expenses
+      WHERE deleted = 0
+      AND expense_date BETWEEN ? AND ?
+      AND NOT (${paidStatusSql})
+      ORDER BY DATE_ADD(expense_date, INTERVAL 30 DAY) ASC, id ASC
+      LIMIT 1
+    `, [fyStart, fyEnd]);
+
+    const [supplierCategories] = await pool.query(`
+      SELECT
+        CASE
+          WHEN LOWER(COALESCE(category, '')) LIKE '%raw%' THEN 'Raw Material'
+          WHEN LOWER(COALESCE(category, '')) LIKE '%pack%' THEN 'Packaging'
+          WHEN LOWER(COALESCE(category, '')) LIKE '%fuel%' THEN 'Fuel'
+          WHEN LOWER(COALESCE(category, '')) LIKE '%machin%' THEN 'Machinery'
+          WHEN LOWER(COALESCE(category, '')) LIKE '%tool%' THEN 'Tools'
+          WHEN LOWER(COALESCE(category, '')) LIKE '%freight%' OR LOWER(COALESCE(category, '')) LIKE '%delivery%' THEN 'Freight'
+          ELSE COALESCE(NULLIF(TRIM(category), ''), 'Other')
+        END AS category,
+        COUNT(*) AS bill_count,
+        COALESCE(SUM(CASE WHEN ${paidStatusSql} THEN total_amount ELSE 0 END), 0) AS paid_value,
+        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) THEN total_amount ELSE 0 END), 0) AS pending_value
+      FROM expenses
+      WHERE deleted = 0
+      AND expense_date BETWEEN ? AND ?
+      GROUP BY 1
+      ORDER BY pending_value DESC, paid_value DESC
+      LIMIT 8
+    `, [fyStart, fyEnd]);
+
+    const [supplierExposure] = await pool.query(`
+      SELECT
+        COALESCE(NULLIF(TRIM(supplier_name), ''), 'Unassigned supplier') AS supplier_name,
+        COUNT(*) AS bill_count,
+        COALESCE(SUM(CASE WHEN ${paidStatusSql} THEN total_amount ELSE 0 END), 0) AS paid_value,
+        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) THEN total_amount ELSE 0 END), 0) AS pending_value,
+        MIN(CASE WHEN NOT (${paidStatusSql}) THEN DATE_ADD(expense_date, INTERVAL 30 DAY) ELSE NULL END) AS next_due_date
+      FROM expenses
+      WHERE deleted = 0
+      AND expense_date BETWEEN ? AND ?
+      GROUP BY 1
+      ORDER BY pending_value DESC, paid_value DESC
+      LIMIT 6
+    `, [fyStart, fyEnd]);
+
+    const [upcomingSupplierPayments] = await pool.query(`
+      SELECT
+        id,
+        COALESCE(NULLIF(TRIM(supplier_name), ''), 'Unassigned supplier') AS supplier_name,
+        COALESCE(NULLIF(TRIM(category), ''), 'Other') AS category,
+        invoice_no,
+        total_amount,
+        expense_date,
+        DATE_ADD(expense_date, INTERVAL 30 DAY) AS due_date
+      FROM expenses
+      WHERE deleted = 0
+      AND expense_date BETWEEN ? AND ?
+      AND NOT (${paidStatusSql})
+      ORDER BY DATE_ADD(expense_date, INTERVAL 30 DAY) ASC, total_amount DESC
+      LIMIT 6
+    `, [fyStart, fyEnd]);
+
     const collectedRevenue = Number(paymentStats.collected_revenue || 0);
     const expenses = Number(expenseStats.total_expense_value || 0);
 
@@ -150,6 +236,21 @@ exports.getDashboardStats = async (req, res) => {
         gst_position: Number(gstCollectedRow.gst_collected || 0) - Number(expenseStats.gst_paid || 0),
         total_expenses: Number(expenseStats.total_expenses || 0),
         months: financeMonths
+      },
+      supplier_payables: {
+        financial_year: `${fyStartYear}-${fyStartYear + 1}`,
+        bill_count: Number(supplierPayableSummary.bill_count || 0),
+        supplier_count: Number(supplierPayableSummary.supplier_count || 0),
+        paid_value: Number(supplierPayableSummary.paid_value || 0),
+        pending_value: Number(supplierPayableSummary.pending_value || 0),
+        overdue_value: Number(supplierPayableSummary.overdue_value || 0),
+        upcoming_value: Number(supplierPayableSummary.upcoming_value || 0),
+        pending_count: Number(supplierPayableSummary.pending_count || 0),
+        next_due_date: supplierPayableSummary.next_due_date,
+        next_payment: nextSupplierPayment || null,
+        categories: supplierCategories,
+        suppliers: supplierExposure,
+        upcoming: upcomingSupplierPayments
       }
     });
   } catch (error) {

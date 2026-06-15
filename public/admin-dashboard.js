@@ -13,6 +13,7 @@ if (currentRole && currentRole !== 'admin') {
 let rfqChartInstance = null;
 let invoiceChartInstance = null;
 let financeChartInstance = null;
+let supplierDebtChartInstance = null;
 let expenseCategoryChartInstance = null;
 let expenseMonthChartInstance = null;
 let invoiceCache = [];
@@ -584,6 +585,7 @@ async function loadDashboardStats() {
   setText('dashboardNetWorthValue', formatMoney(data.finance?.net_worth));
 
   renderCharts(data);
+  renderSupplierPayables(data.supplier_payables || {});
   await loadDashboardWidgets();
 }
 
@@ -771,6 +773,160 @@ function renderCharts(data) {
       }
     });
   }
+}
+
+function renderSupplierPayables(payables) {
+  const pendingValue = Number(payables.pending_value || 0);
+  const paidValue = Number(payables.paid_value || 0);
+  const overdueValue = Number(payables.overdue_value || 0);
+  const nextPaymentValue = Number(payables.next_payment?.total_amount || 0);
+  const supplierCount = Number(payables.supplier_count || 0);
+  const pendingCount = Number(payables.pending_count || 0);
+
+  setText('supplierPendingValue', formatMoney(pendingValue));
+  setText('supplierPaidValue', formatMoney(paidValue));
+  setText('supplierOverdueValue', formatMoney(overdueValue));
+  setText('supplierNextPaymentValue', formatMoney(nextPaymentValue));
+  setText('supplierPendingCount', `${pendingCount} pending bill${pendingCount === 1 ? '' : 's'}`);
+  setText('supplierCountLabel', `${supplierCount} supplier${supplierCount === 1 ? '' : 's'}`);
+  setText('supplierFyLabel', payables.financial_year ? `FY ${payables.financial_year}` : 'FY');
+
+  const canvas = document.getElementById('supplierDebtChart');
+  if (canvas && typeof Chart !== 'undefined') {
+    if (supplierDebtChartInstance) supplierDebtChartInstance.destroy();
+
+    const chartValues = [
+      Math.max(paidValue, 0),
+      Math.max(pendingValue - overdueValue, 0),
+      Math.max(overdueValue, 0)
+    ];
+    const hasAnyValue = chartValues.some((value) => value > 0);
+
+    supplierDebtChartInstance = new Chart(canvas, {
+      type: 'doughnut',
+      data: {
+        labels: ['Paid', 'Pending', 'Overdue'],
+        datasets: [{
+          data: hasAnyValue ? chartValues : [1, 1, 1],
+          backgroundColor: hasAnyValue
+            ? ['#2dd4bf', '#38bdf8', '#fb7185']
+            : ['rgba(45,212,191,0.18)', 'rgba(56,189,248,0.16)', 'rgba(251,113,133,0.14)'],
+          borderColor: ['rgba(255,255,255,0.88)', 'rgba(255,255,255,0.75)', 'rgba(255,255,255,0.68)'],
+          borderWidth: 2,
+          hoverOffset: 9
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '72%',
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (context) => `${context.label}: ${formatMoney(context.raw)}`
+            }
+          }
+        }
+      }
+    });
+  }
+
+  renderSupplierCategoryFlows(payables.categories || []);
+  renderSupplierUpcoming(payables.upcoming || []);
+  renderSupplierExposure(payables.suppliers || []);
+}
+
+function renderSupplierCategoryFlows(categories) {
+  const container = document.getElementById('supplierCategoryFlows');
+  if (!container) return;
+
+  if (!categories.length) {
+    container.innerHTML = '<div class="empty-state compact-empty">No supplier bill categories recorded yet.</div>';
+    return;
+  }
+
+  const maxValue = Math.max(...categories.map((row) => Number(row.paid_value || 0) + Number(row.pending_value || 0)), 1);
+  container.innerHTML = categories.map((row) => {
+    const paid = Number(row.paid_value || 0);
+    const pending = Number(row.pending_value || 0);
+    const total = paid + pending;
+    const width = Math.max(5, Math.round((total / maxValue) * 100));
+    const pendingWidth = total ? Math.round((pending / total) * 100) : 0;
+
+    return `
+      <div class="supplier-flow-row">
+        <div class="supplier-flow-label">
+          <strong>${escapeHtml(row.category || 'Other')}</strong>
+          <span>${escapeHtml(row.bill_count || 0)} bill${Number(row.bill_count || 0) === 1 ? '' : 's'} | ${escapeHtml(formatMoney(total))}</span>
+        </div>
+        <div class="supplier-flow-track" title="${escapeHtml(formatMoney(total))}">
+          <span class="supplier-flow-fill" style="width:${width}%">
+            <i style="width:${pendingWidth}%"></i>
+          </span>
+        </div>
+        <div class="supplier-flow-money">
+          <span>Paid ${escapeHtml(formatMoney(paid))}</span>
+          <strong>Due ${escapeHtml(formatMoney(pending))}</strong>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderSupplierUpcoming(upcoming) {
+  const container = document.getElementById('supplierUpcomingList');
+  if (!container) return;
+
+  if (!upcoming.length) {
+    container.innerHTML = '<div class="empty-state compact-empty">No upcoming supplier payments. Clean ledger.</div>';
+    return;
+  }
+
+  container.innerHTML = upcoming.map((row, index) => {
+    const due = row.due_date ? formatDate(row.due_date) : '-';
+    return `
+      <div class="supplier-upcoming-item">
+        <span class="supplier-payment-rank">${index + 1}</span>
+        <div>
+          <strong>${escapeHtml(row.supplier_name || 'Supplier')}</strong>
+          <span>${escapeHtml(row.category || 'Other')} | ${escapeHtml(row.invoice_no || 'No invoice ref')}</span>
+        </div>
+        <div>
+          <strong>${escapeHtml(formatMoney(row.total_amount))}</strong>
+          <span>Due ${escapeHtml(due)}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderSupplierExposure(suppliers) {
+  const container = document.getElementById('supplierExposureList');
+  if (!container) return;
+
+  if (!suppliers.length) {
+    container.innerHTML = `
+      <div class="supplier-exposure-card">
+        <span>No supplier exposure yet</span>
+        <strong>Add supplier bills in Expenses</strong>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = suppliers.map((supplier) => {
+    const pending = Number(supplier.pending_value || 0);
+    const paid = Number(supplier.paid_value || 0);
+    const dueDate = supplier.next_due_date ? formatDate(supplier.next_due_date) : 'No due bill';
+    return `
+      <div class="supplier-exposure-card">
+        <span>${escapeHtml(supplier.supplier_name || 'Supplier')}</span>
+        <strong>${escapeHtml(formatMoney(pending))}</strong>
+        <small>Paid ${escapeHtml(formatMoney(paid))} | Next ${escapeHtml(dueDate)}</small>
+      </div>
+    `;
+  }).join('');
 }
 
 function todayISO(offsetDays = 0) {

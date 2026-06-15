@@ -165,6 +165,62 @@
           </div>
         </div>
 
+        <div class="card supplier-intelligence-card">
+          <div class="supplier-intelligence-head">
+            <div>
+              <span class="panel-kicker">Supplier Payables</span>
+              <h3>Debt Command Centre</h3>
+              <p>Pending bills, paid supplier value and upcoming payment pressure across raw material, packaging and operating suppliers.</p>
+            </div>
+            <button class="secondary-btn" onclick="goSection('expenseSection')">Open Expense Register</button>
+          </div>
+
+          <div class="supplier-intelligence-grid">
+            <div class="supplier-orbit-card">
+              <div class="supplier-orbit-canvas">
+                <canvas id="supplierDebtChart"></canvas>
+                <div class="supplier-orbit-core">
+                  <span>Pending</span>
+                  <strong id="supplierPendingValue">$0.00</strong>
+                  <small id="supplierPendingCount">0 bills</small>
+                </div>
+              </div>
+              <div class="supplier-orbit-stats">
+                <div>
+                  <span>Paid</span>
+                  <strong id="supplierPaidValue">$0.00</strong>
+                </div>
+                <div>
+                  <span>Overdue</span>
+                  <strong id="supplierOverdueValue">$0.00</strong>
+                </div>
+                <div>
+                  <span>Next Payment</span>
+                  <strong id="supplierNextPaymentValue">$0.00</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="supplier-flow-card">
+              <div class="mini-head">
+                <h4>Material Payment Flow</h4>
+                <span id="supplierFyLabel">FY</span>
+              </div>
+              <div id="supplierCategoryFlows" class="supplier-flow-list"></div>
+            </div>
+
+            <div class="supplier-queue-card">
+              <div class="mini-head">
+                <h4>Next Supplier Payments</h4>
+                <span id="supplierCountLabel">0 suppliers</span>
+              </div>
+              <div id="supplierUpcomingList" class="supplier-upcoming-list"></div>
+            </div>
+          </div>
+
+          <div id="supplierExposureList" class="supplier-exposure-strip"></div>
+        </div>
+
       </section>
 
       <!-- RFQ -->
@@ -1162,6 +1218,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260615-qr-mobile-fit"></script>
+  <script src="/admin-dashboard.js?v=20260615-supplier-payables"></script>
 </body>
 </html>
