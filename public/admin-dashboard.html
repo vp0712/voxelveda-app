@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260615-qr-mobile-fit"/>
+  <link rel="stylesheet" href="/style.css?v=20260615-ultra-home"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -88,29 +88,48 @@
 
       <!-- OVERVIEW -->
       <section id="dashboardSection" class="page-section">
+        <div class="home-command-hero">
+          <div class="home-command-copy">
+            <span class="panel-kicker">Operations Core</span>
+            <h1>Voxel Veda Control Room</h1>
+            <p>Live commercial, production, inventory and supplier pressure signals in one executive command view.</p>
+            <div class="home-command-actions">
+              <button class="primary-btn" onclick="goSection('invoiceSection')">Create / Review Invoice</button>
+              <button class="secondary-btn" onclick="goSection('expenseSection')">Supplier Payments</button>
+              <button class="secondary-btn" onclick="goSection('stockSection')">Inventory Control</button>
+            </div>
+          </div>
+          <div class="home-command-orb">
+            <div class="command-ring"></div>
+            <img src="/Frame 1.png?v=20260601-clean-logo" alt="Voxel Veda">
+            <span>System Active</span>
+          </div>
+        </div>
         <div class="dashboard-action-row">
-          <button class="quick-pill" onclick="goSection('invoiceSection')">Invoices</button>
-          <button class="quick-pill" onclick="goSection('rfqSection')">RFQs</button>
-          <button class="quick-pill" onclick="goSection('stockSection')">Stock</button>
-          <button class="quick-pill" onclick="goSection('rawMaterialSection')">Raw Material</button>
-      <button class="quick-pill" onclick="goSection('customerSection')">Customers</button>
-      <button class="quick-pill" onclick="goSection('supplierSection')">Suppliers</button>
-      <button class="quick-pill" onclick="goSection('expenseSection')">Expenses</button>
-      <button class="quick-pill" onclick="goSection('competitorSection')">Competitors</button>
+          <button class="quick-pill command-pill" onclick="goSection('invoiceSection')"><span>01</span>Invoices</button>
+          <button class="quick-pill command-pill" onclick="goSection('rfqSection')"><span>02</span>RFQs</button>
+          <button class="quick-pill command-pill" onclick="goSection('stockSection')"><span>03</span>Stock</button>
+          <button class="quick-pill command-pill" onclick="goSection('rawMaterialSection')"><span>04</span>Raw Material</button>
+          <button class="quick-pill command-pill" onclick="goSection('customerSection')"><span>05</span>Customers</button>
+          <button class="quick-pill command-pill" onclick="goSection('supplierSection')"><span>06</span>Suppliers</button>
+          <button class="quick-pill command-pill" onclick="goSection('expenseSection')"><span>07</span>Expenses</button>
+          <button class="quick-pill command-pill" onclick="goSection('competitorSection')"><span>08</span>Competitors</button>
         </div>
 
-        <div class="metric-grid">
-          <div class="card">
+        <div class="metric-grid command-status-grid">
+          <div class="card command-status-card">
             <h3>RFQs</h3>
             <p id="rfqStatus">Loading...</p>
+            <span id="homeRfqSignal">Quote pipeline scanning</span>
           </div>
 
-          <div class="card">
+          <div class="card command-status-card">
             <h3>Invoices</h3>
             <p id="invoiceStatus">Loading...</p>
+            <span id="homeInvoiceSignal">Payment register syncing</span>
           </div>
 
-          <div class="card">
+          <div class="card command-status-card pipeline-card">
             <h3>Pipeline</h3>
             <p>RFQ → Approval → Invoice → Payment</p>
           </div>
@@ -150,17 +169,26 @@
         </div>
 
         <div class="chart-grid">
-          <div class="card">
-            <h3>RFQ Status</h3>
+          <div class="card command-chart-card">
+            <div class="mini-head">
+              <h3>RFQ Status</h3>
+              <span>Quote signal</span>
+            </div>
             <canvas id="rfqChart"></canvas>
           </div>
 
-          <div class="card">
-            <h3>Invoice Status</h3>
+          <div class="card command-chart-card">
+            <div class="mini-head">
+              <h3>Invoice Status</h3>
+              <span>Register flow</span>
+            </div>
             <canvas id="invoiceChart"></canvas>
           </div>
-          <div class="card finance-chart-card">
-            <h3>Revenue vs Expenses</h3>
+          <div class="card finance-chart-card command-chart-card">
+            <div class="mini-head">
+              <h3>Revenue vs Expenses</h3>
+              <span>Financial year</span>
+            </div>
             <canvas id="financeChart"></canvas>
           </div>
         </div>
@@ -1218,6 +1246,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260615-supplier-payables"></script>
+  <script src="/admin-dashboard.js?v=20260615-ultra-home"></script>
 </body>
 </html>

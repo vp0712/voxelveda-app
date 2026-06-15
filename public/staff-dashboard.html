@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260615-authorized-exception" />
+  <link rel="stylesheet" href="/style.css?v=20260615-ultra-home" />
 </head>
 
 <body class="staff-portal">
@@ -184,6 +184,41 @@
       <!-- DASHBOARD -->
       <section id="dashboardSection" class="page-section">
 
+        <div class="staff-mission-hero">
+          <div class="staff-mission-copy">
+            <span id="staffMissionDate">Today</span>
+            <h1 id="staffMissionGreeting">Ready for your shift</h1>
+            <p id="staffMissionStatus">Your live work panel is syncing tasks, roster and attendance.</p>
+          </div>
+          <button class="staff-mission-scan permission-attendance hidden-section" type="button" onclick="openMissionShiftScanner()">
+            <span id="staffMissionActionLabel">Scan QR</span>
+            <strong id="staffMissionActionText">Start Shift</strong>
+          </button>
+        </div>
+
+        <div class="staff-mission-grid">
+          <button class="staff-mission-tile permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')">
+            <span>Due Today</span>
+            <strong id="todayTaskCount">0</strong>
+            <small>Tasks needing attention</small>
+          </button>
+          <button class="staff-mission-tile danger-tile permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')">
+            <span>Overdue</span>
+            <strong id="overdueTaskCount">0</strong>
+            <small>Priority recovery queue</small>
+          </button>
+          <button class="staff-mission-tile permission-attendance" type="button" onclick="goStaffSection('timesheetSection')">
+            <span>Weekly Hours</span>
+            <strong id="weekHoursCount">0.00</strong>
+            <small id="staffWeekSignal">This week recorded</small>
+          </button>
+          <button class="staff-mission-tile permission-roster hidden-section" type="button" onclick="goStaffSection('rosterSection')">
+            <span>Next Shift</span>
+            <strong id="staffHomeNextShiftDate">-</strong>
+            <small id="staffHomeNextShiftTime">No upcoming shift</small>
+          </button>
+        </div>
+
         <div id="staffActionHub" class="staff-action-hub">
           <button class="staff-action-card permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')">
             <span>Task Control</span>
@@ -195,15 +230,6 @@
             <strong>Upcoming Events</strong>
             <small>Review council, government, customer and conference appointments.</small>
           </button>
-        </div>
-
-        <div class="metric-grid staff-home-metrics">
-
-          <div class="card">
-            <h3>Weekly Hours</h3>
-            <p><strong id="weekHoursCount">0.00</strong></p>
-          </div>
-
         </div>
 
         <div class="metric-grid permission-finance hidden-section">
@@ -238,11 +264,11 @@
         </div>
 
         <!-- ATTENDANCE -->
-        <div class="card">
+        <div class="card staff-shift-console permission-attendance">
           <div class="section-head">
             <div>
               <h2>Shift Tracking</h2>
-              <p>Start or end your working session</p>
+              <p id="staffShiftSubline">Live QR verification required for shift changes</p>
             </div>
           </div>
 
@@ -516,6 +542,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260615-authorized-exception"></script>
+  <script src="/staff.js?v=20260615-ultra-home"></script>
 </body>
 </html>

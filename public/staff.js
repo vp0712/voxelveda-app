@@ -22,6 +22,7 @@ let shiftQrScannerTimer = null;
 let shiftQrScannerCanvas = null;
 let shiftQrDecoderPromise = null;
 let activeShiftQrMode = 'in';
+let currentShiftIsOpen = false;
 
 const clockInMessages = [
   'Today is another chance to build something precise, useful, and proudly Voxel Veda.',
@@ -234,6 +235,16 @@ async function refreshStaffSession() {
 function setText(id, value) {
   const el = document.getElementById(id);
   if (el) el.innerText = value;
+}
+
+function updateStaffMissionBase() {
+  const name = currentUser.name || currentUser.username || 'Team member';
+  setText('staffMissionGreeting', `Welcome, ${name}`);
+  setText('staffMissionDate', new Date().toLocaleDateString('en-AU', {
+    weekday: 'long',
+    day: '2-digit',
+    month: 'short'
+  }));
 }
 
 async function loadStaffFinanceOverview() {
@@ -617,6 +628,7 @@ function updateShiftButtons(attendance) {
   const clockInBtn = document.getElementById('clockInBtn');
   const clockOutBtn = document.getElementById('clockOutBtn');
   const isClockedIn = Boolean(attendance?.clock_in && !attendance?.clock_out);
+  currentShiftIsOpen = isClockedIn;
 
   if (clockInBtn) {
     clockInBtn.style.display = isClockedIn ? 'none' : 'inline-block';
@@ -625,6 +637,10 @@ function updateShiftButtons(attendance) {
   if (clockOutBtn) {
     clockOutBtn.style.display = isClockedIn ? 'inline-block' : 'none';
   }
+}
+
+function openMissionShiftScanner() {
+  openShiftQrScanner(currentShiftIsOpen ? 'out' : 'in');
 }
 
 function stopShiftQrScanner() {
@@ -1057,6 +1073,11 @@ function updateTaskCounters(tasks) {
   if (overdueCountEl) overdueCountEl.innerText = overdueCount;
   if (alertDueEl) alertDueEl.innerText = todayCount;
   if (alertOverdueEl) alertOverdueEl.innerText = overdueCount;
+  setText('staffMissionStatus', overdueCount > 0
+    ? `${overdueCount} overdue task${overdueCount === 1 ? '' : 's'} need priority attention.`
+    : todayCount > 0
+      ? `${todayCount} task${todayCount === 1 ? '' : 's'} due today. Keep the flow moving.`
+      : 'No urgent task pressure. Stay ready for new work updates.');
 
   const alertBtn = document.querySelector('.staff-task-alert');
   if (alertBtn) {
@@ -1554,6 +1575,8 @@ function updateStaffRosterMetrics(rows) {
   setText('staffRosterHours', rows.reduce((sum, row) => sum + rosterShiftHours(row), 0).toFixed(2));
   setText('staffNextShiftDate', next ? formatShortDate(next.shift_date) : '-');
   setText('staffNextShiftTime', next ? `${next.start_time} - ${next.end_time}` : 'No upcoming shift');
+  setText('staffHomeNextShiftDate', next ? formatShortDate(next.shift_date) : '-');
+  setText('staffHomeNextShiftTime', next ? `${next.start_time} - ${next.end_time}` : 'No upcoming shift');
 }
 
 function renderMyRoster(rows) {
@@ -1628,6 +1651,9 @@ async function loadAttendanceStatus() {
 
     if (!data.attendance) {
       status.innerText = 'Not clocked in today.';
+      setText('staffMissionActionLabel', 'Scan QR');
+      setText('staffMissionActionText', 'Start Shift');
+      setText('staffShiftSubline', 'Ready to start. Scan the live admin QR when you arrive.');
       updateShiftButtons(null);
       await checkTenHourReminder(null);
       return;
@@ -1639,6 +1665,12 @@ async function loadAttendanceStatus() {
       `Clock In: ${formatDateTime(row.clock_in)} | ` +
       `Clock Out: ${formatDateTime(row.clock_out)} | ` +
       `Hours: ${Number(row.total_hours || 0).toFixed(2)}`;
+    const isOpen = Boolean(row.clock_in && !row.clock_out);
+    setText('staffMissionActionLabel', isOpen ? 'Active Shift' : 'Shift Closed');
+    setText('staffMissionActionText', isOpen ? 'End Shift' : 'Start Shift');
+    setText('staffShiftSubline', isOpen
+      ? 'Shift is live. Scan the live admin QR when you finish.'
+      : 'Today is recorded. Scan the live QR to begin another approved shift.');
 
     updateShiftButtons(row);
     await checkTenHourReminder(row);
@@ -1831,6 +1863,7 @@ async function bootStaffDashboard() {
 
     const user = await loadStaffInfo();
     if (!user || redirectingToLogin) return;
+    updateStaffMissionBase();
 
     applyPermissionUI();
 

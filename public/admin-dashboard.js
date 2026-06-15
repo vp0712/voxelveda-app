@@ -574,11 +574,14 @@ async function loadDashboardStats() {
     rfqStatus.innerText =
       `${data.rfqs.total_rfqs || 0} total | ${data.rfqs.pending_rfqs || 0} pending`;
   }
+  setText('homeRfqSignal', `${data.rfqs.approved_rfqs || 0} approved | ${data.rfqs.quoted_rfqs || 0} quoted`);
 
   if (invoiceStatus) {
     invoiceStatus.innerText =
       `${data.invoices.total_invoices || 0} total | ${formatMoney(data.invoices.paid_revenue || 0)} paid`;
   }
+  setText('homeInvoiceSignal', `${data.invoices.sent_invoices || 0} sent | ${data.invoices.paid_invoices || 0} paid`);
+  setText('homePipelineSignal', `FY ${data.finance?.financial_year || '-'} | GST position ${formatMoney(data.finance?.gst_position || 0)}`);
 
   setText('dashboardRevenueValue', formatMoney(data.finance?.revenue));
   setText('dashboardExpenseValue', formatMoney(data.finance?.expenses));
