@@ -820,6 +820,7 @@ async function startShiftQrCamera(mode) {
 function openShiftQrScanner(mode) {
   activeShiftQrMode = mode === 'out' ? 'out' : 'in';
   const actionLabel = activeShiftQrMode === 'out' ? 'End Shift' : 'Start Shift';
+  const modeLabel = activeShiftQrMode === 'out' ? 'Shift completion' : 'Shift start';
   const exceptionPanel = canUseQrException()
     ? `
       <details class="shift-manual-panel">
@@ -835,12 +836,16 @@ function openShiftQrScanner(mode) {
     <div class="shift-scan-panel">
       <div class="shift-scan-statusbar">
         <span class="scan-live-dot"></span>
-        <strong>Live QR Required</strong>
-        <small>${activeShiftQrMode === 'out' ? 'Shift completion' : 'Shift start'}</small>
+        <div>
+          <strong>Live QR Required</strong>
+          <small>${modeLabel}</small>
+        </div>
+        <em>${actionLabel}</em>
       </div>
       <div class="shift-scan-camera">
         <video id="shiftQrVideo" playsinline muted></video>
         <div class="shift-scan-reticle"></div>
+        <div class="shift-scan-corners"></div>
       </div>
       <p id="shiftQrScanStatus" class="status-note">Opening camera...</p>
       <div id="shiftQrPermissionActions" class="shift-camera-actions hidden-section">
