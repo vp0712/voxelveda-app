@@ -689,6 +689,48 @@ function renderCharts(data) {
   if (invoiceChartInstance) invoiceChartInstance.destroy();
   if (financeChartInstance) financeChartInstance.destroy();
 
+  const chartGridColor = 'rgba(148, 163, 184, 0.11)';
+  const chartTickColor = '#cbd5e1';
+  const chartTooltip = {
+    backgroundColor: 'rgba(2, 6, 23, 0.94)',
+    borderColor: 'rgba(45, 212, 191, 0.42)',
+    borderWidth: 1,
+    titleColor: '#e0f2fe',
+    bodyColor: '#f8fafc',
+    padding: 12,
+    displayColors: true
+  };
+  const verticalGradient = (context, top, bottom) => {
+    const { chart } = context;
+    const area = chart.chartArea;
+    if (!area) return top;
+    const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
+    gradient.addColorStop(0, top);
+    gradient.addColorStop(1, bottom);
+    return gradient;
+  };
+  const centerTextPlugin = {
+    id: 'rfqCenterText',
+    afterDraw(chart) {
+      const dataset = chart.data.datasets?.[0];
+      const meta = chart.getDatasetMeta(0);
+      if (!dataset || !meta?.data?.[0]) return;
+      const total = dataset.data.reduce((sum, value) => sum + Number(value || 0), 0);
+      const { x, y } = meta.data[0];
+      const ctx = chart.ctx;
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#67e8f9';
+      ctx.font = '900 22px Inter, Arial, sans-serif';
+      ctx.fillText(String(total), x, y - 8);
+      ctx.fillStyle = 'rgba(226, 232, 240, 0.72)';
+      ctx.font = '800 11px Inter, Arial, sans-serif';
+      ctx.fillText('RFQs', x, y + 16);
+      ctx.restore();
+    }
+  };
+
   rfqChartInstance = new Chart(rfqCanvas, {
     type: 'doughnut',
     data: {
@@ -700,22 +742,34 @@ function renderCharts(data) {
           Number(data.rfqs.quoted_rfqs || 0)
         ],
         backgroundColor: ['#38bdf8', '#fb7185', '#f59e0b'],
-        borderColor: 'rgba(224, 242, 254, 0.92)',
-        borderWidth: 2,
-        hoverOffset: 8
+        borderColor: 'rgba(2, 6, 23, 0.92)',
+        borderWidth: 5,
+        borderRadius: 8,
+        hoverBorderColor: '#e0f2fe',
+        hoverOffset: 10,
+        spacing: 3
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '62%',
+      cutout: '68%',
+      animation: { animateRotate: true, duration: 900 },
       plugins: {
+        tooltip: chartTooltip,
         legend: {
           position: 'bottom',
-          labels: { color: '#f8fafc' }
+          labels: {
+            color: '#f8fafc',
+            usePointStyle: true,
+            pointStyle: 'circle',
+            boxWidth: 8,
+            padding: 14
+          }
         }
       }
-    }
+    },
+    plugins: [centerTextPlugin]
   });
 
   invoiceChartInstance = new Chart(invoiceCanvas, {
@@ -730,23 +784,61 @@ function renderCharts(data) {
           Number(data.invoices.sent_invoices || 0),
           Number(data.invoices.paid_invoices || 0)
         ],
-        backgroundColor: ['#2563eb', '#2dd4bf', '#38bdf8', '#22c55e'],
-        borderRadius: 12,
+        backgroundColor: (context) => {
+          const colors = [
+            ['rgba(37, 99, 235, 0.95)', 'rgba(37, 99, 235, 0.22)'],
+            ['rgba(45, 212, 191, 0.95)', 'rgba(45, 212, 191, 0.18)'],
+            ['rgba(56, 189, 248, 0.95)', 'rgba(56, 189, 248, 0.18)'],
+            ['rgba(34, 197, 94, 0.95)', 'rgba(34, 197, 94, 0.18)']
+          ];
+          const color = colors[context.dataIndex] || colors[0];
+          return verticalGradient(context, color[0], color[1]);
+        },
+        borderColor: 'rgba(125, 211, 252, 0.26)',
+        borderWidth: 1,
+        borderRadius: 16,
         borderSkipped: false,
-        maxBarThickness: 48
+        maxBarThickness: 42
+      }, {
+        type: 'line',
+        label: 'Flow line',
+        data: [
+          Number(data.invoices.draft_invoices || 0),
+          Number(data.invoices.approved_invoices || 0),
+          Number(data.invoices.sent_invoices || 0),
+          Number(data.invoices.paid_invoices || 0)
+        ],
+        borderColor: '#67e8f9',
+        backgroundColor: 'rgba(103, 232, 249, 0.15)',
+        pointBackgroundColor: '#e0f2fe',
+        pointBorderColor: '#0891b2',
+        pointBorderWidth: 2,
+        pointRadius: 4,
+        tension: 0.42,
+        fill: false
       }]
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: {
+        tooltip: chartTooltip,
         legend: {
-          labels: { color: '#f8fafc' }
+          position: 'top',
+          align: 'end',
+          labels: {
+            color: '#f8fafc',
+            usePointStyle: true,
+            pointStyle: 'circle',
+            boxWidth: 8,
+            padding: 14
+          }
         }
       },
       scales: {
-        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148, 163, 184, 0.08)' } },
-        y: { beginAtZero: true, ticks: { color: '#cbd5e1', precision: 0 }, grid: { color: 'rgba(148, 163, 184, 0.1)' } }
+        x: { ticks: { color: chartTickColor, font: { weight: 800 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: chartTickColor, precision: 0 }, grid: { color: chartGridColor } }
       }
     }
   });
@@ -761,33 +853,74 @@ function renderCharts(data) {
           {
             label: 'Revenue',
             data: months.map((row) => Number(row.revenue || 0)),
-            backgroundColor: '#2dd4bf',
-            borderRadius: 12,
+            backgroundColor: (context) => verticalGradient(context, 'rgba(45, 212, 191, 0.98)', 'rgba(45, 212, 191, 0.2)'),
+            borderColor: 'rgba(45, 212, 191, 0.35)',
+            borderWidth: 1,
+            borderRadius: 16,
             borderSkipped: false,
-            maxBarThickness: 52
+            maxBarThickness: 46
           },
           {
             label: 'Expenses',
             data: months.map((row) => Number(row.expenses || 0)),
-            backgroundColor: '#fb7185',
-            borderRadius: 12,
+            backgroundColor: (context) => verticalGradient(context, 'rgba(251, 113, 133, 0.96)', 'rgba(251, 113, 133, 0.18)'),
+            borderColor: 'rgba(251, 113, 133, 0.35)',
+            borderWidth: 1,
+            borderRadius: 16,
             borderSkipped: false,
-            maxBarThickness: 52
+            maxBarThickness: 46
+          },
+          {
+            type: 'line',
+            label: 'Net',
+            data: months.map((row) => Number(row.revenue || 0) - Number(row.expenses || 0)),
+            borderColor: '#facc15',
+            backgroundColor: 'rgba(250, 204, 21, 0.14)',
+            pointBackgroundColor: '#fef3c7',
+            pointBorderColor: '#ca8a04',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            tension: 0.4,
+            fill: false
           }
         ]
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
         plugins: {
+          tooltip: {
+            ...chartTooltip,
+            callbacks: {
+              label(context) {
+                return `${context.dataset.label}: ${formatMoney(context.parsed.y)}`;
+              }
+            }
+          },
           legend: {
             position: 'bottom',
-            labels: { color: '#f8fafc' }
+            labels: {
+              color: '#f8fafc',
+              usePointStyle: true,
+              pointStyle: 'circle',
+              boxWidth: 8,
+              padding: 12
+            }
           }
         },
         scales: {
-          x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148, 163, 184, 0.08)' } },
-          y: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } }
+          x: { ticks: { color: chartTickColor, font: { weight: 800 } }, grid: { display: false } },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              color: chartTickColor,
+              callback(value) {
+                return formatMoney(value).replace('.00', '');
+              }
+            },
+            grid: { color: chartGridColor }
+          }
         }
       }
     });
