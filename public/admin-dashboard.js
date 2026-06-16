@@ -586,6 +586,7 @@ async function loadDashboardStats() {
   setText('dashboardRevenueValue', formatMoney(data.finance?.revenue));
   setText('dashboardExpenseValue', formatMoney(data.finance?.expenses));
   setText('dashboardNetWorthValue', formatMoney(data.finance?.net_worth));
+  setText('homeCashPulse', formatMoney(data.finance?.revenue));
 
   renderCharts(data);
   renderSupplierPayables(data.supplier_payables || {});
@@ -622,6 +623,7 @@ async function loadDashboardWidgets() {
     if (invoiceValueEl) invoiceValueEl.innerText = formatMoney(invoiceValue);
     if (stockWorthEl) stockWorthEl.innerText = formatMoney(stockWorth);
     if (materialWorthEl) materialWorthEl.innerText = formatMoney(materialWorth);
+    setText('homeInventoryPulse', formatMoney(stockWorth));
 
   } catch {
     // Dashboard widgets are secondary; keep the main page usable if one feed fails.
@@ -696,7 +698,11 @@ function renderCharts(data) {
           Number(data.rfqs.pending_rfqs || 0),
           Number(data.rfqs.approved_rfqs || 0),
           Number(data.rfqs.quoted_rfqs || 0)
-        ]
+        ],
+        backgroundColor: ['#38bdf8', '#fb7185', '#f59e0b'],
+        borderColor: 'rgba(224, 242, 254, 0.92)',
+        borderWidth: 2,
+        hoverOffset: 8
       }]
     },
     options: {
@@ -723,7 +729,11 @@ function renderCharts(data) {
           Number(data.invoices.approved_invoices || 0),
           Number(data.invoices.sent_invoices || 0),
           Number(data.invoices.paid_invoices || 0)
-        ]
+        ],
+        backgroundColor: ['#2563eb', '#2dd4bf', '#38bdf8', '#22c55e'],
+        borderRadius: 12,
+        borderSkipped: false,
+        maxBarThickness: 48
       }]
     },
     options: {
@@ -735,8 +745,8 @@ function renderCharts(data) {
         }
       },
       scales: {
-        x: { ticks: { color: '#f8fafc' } },
-        y: { beginAtZero: true, ticks: { color: '#f8fafc', precision: 0 } }
+        x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148, 163, 184, 0.08)' } },
+        y: { beginAtZero: true, ticks: { color: '#cbd5e1', precision: 0 }, grid: { color: 'rgba(148, 163, 184, 0.1)' } }
       }
     }
   });
@@ -751,12 +761,18 @@ function renderCharts(data) {
           {
             label: 'Revenue',
             data: months.map((row) => Number(row.revenue || 0)),
-            backgroundColor: '#2dd4bf'
+            backgroundColor: '#2dd4bf',
+            borderRadius: 12,
+            borderSkipped: false,
+            maxBarThickness: 52
           },
           {
             label: 'Expenses',
             data: months.map((row) => Number(row.expenses || 0)),
-            backgroundColor: '#f87171'
+            backgroundColor: '#fb7185',
+            borderRadius: 12,
+            borderSkipped: false,
+            maxBarThickness: 52
           }
         ]
       },
@@ -770,8 +786,8 @@ function renderCharts(data) {
           }
         },
         scales: {
-          x: { ticks: { color: '#f8fafc' } },
-          y: { beginAtZero: true, ticks: { color: '#f8fafc' } }
+          x: { ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148, 163, 184, 0.08)' } },
+          y: { beginAtZero: true, ticks: { color: '#cbd5e1' }, grid: { color: 'rgba(148, 163, 184, 0.1)' } }
         }
       }
     });
@@ -793,6 +809,9 @@ function renderSupplierPayables(payables) {
   setText('supplierPendingCount', `${pendingCount} pending bill${pendingCount === 1 ? '' : 's'}`);
   setText('supplierCountLabel', `${supplierCount} supplier${supplierCount === 1 ? '' : 's'}`);
   setText('supplierFyLabel', payables.financial_year ? `FY ${payables.financial_year}` : 'FY');
+  setText('homeSupplierRisk', formatMoney(pendingValue));
+  setText('homeSupplierRiskNote', pendingCount > 0 ? `${pendingCount} payable item${pendingCount === 1 ? '' : 's'} open` : 'No pending supplier debt');
+  setText('supplierPressurePill', pendingValue > 0 ? `${formatMoney(pendingValue)} pending` : 'Ledger clean');
 
   const canvas = document.getElementById('supplierDebtChart');
   if (canvas && typeof Chart !== 'undefined') {

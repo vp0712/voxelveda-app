@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260615-ultra-home"/>
+  <link rel="stylesheet" href="/style.css?v=20260617-home-pro"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
@@ -168,6 +168,29 @@
           </div>
         </div>
 
+        <div class="command-insight-strip">
+          <button type="button" class="command-insight-card" onclick="goSection('invoiceSection')">
+            <span>Cashflow Pulse</span>
+            <strong id="homeCashPulse">$0.00</strong>
+            <small>Collected this FY</small>
+          </button>
+          <button type="button" class="command-insight-card" onclick="goSection('stockSection')">
+            <span>Inventory Pulse</span>
+            <strong id="homeInventoryPulse">$0.00</strong>
+            <small>Finished stock worth</small>
+          </button>
+          <button type="button" class="command-insight-card danger-signal" onclick="goSection('expenseSection')">
+            <span>Supplier Risk</span>
+            <strong id="homeSupplierRisk">$0.00</strong>
+            <small id="homeSupplierRiskNote">Pending payable pressure</small>
+          </button>
+          <button type="button" class="command-insight-card" onclick="goSection('complianceSection')">
+            <span>Compliance Vault</span>
+            <strong>Forms</strong>
+            <small>Licences, records and company documents</small>
+          </button>
+        </div>
+
         <div class="chart-grid">
           <div class="card command-chart-card">
             <div class="mini-head">
@@ -200,7 +223,10 @@
               <h3>Debt Command Centre</h3>
               <p>Pending bills, paid supplier value and upcoming payment pressure across raw material, packaging and operating suppliers.</p>
             </div>
-            <button class="secondary-btn" onclick="goSection('expenseSection')">Open Expense Register</button>
+            <div class="supplier-head-actions">
+              <span id="supplierPressurePill">Ledger clean</span>
+              <button class="secondary-btn" onclick="goSection('expenseSection')">Expense Register</button>
+            </div>
           </div>
 
           <div class="supplier-intelligence-grid">
@@ -1246,6 +1272,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260615-ultra-home"></script>
+  <script src="/admin-dashboard.js?v=20260617-home-pro"></script>
 </body>
 </html>
