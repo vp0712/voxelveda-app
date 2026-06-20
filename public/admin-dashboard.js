@@ -325,6 +325,12 @@ function showAppNotificationBanner(title, body, variant = 'info') {
   window.__voxelBannerTimer = setTimeout(() => banner.classList.remove('show'), 5200);
 }
 
+function sendNativeMobileNotification(title, body) {
+  if (!window.VoxelVedaNative || typeof window.VoxelVedaNative.notify !== 'function') return false;
+  window.VoxelVedaNative.notify(String(title || 'Voxel Veda'), String(body || 'New operation alert'));
+  return true;
+}
+
 async function requestNotificationPermission() {
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
@@ -335,6 +341,7 @@ async function requestNotificationPermission() {
 }
 
 async function sendAdminNotification(title, body) {
+  if (sendNativeMobileNotification(title, body)) return;
   showAppNotificationBanner(title, body, 'info');
   const allowed = await requestNotificationPermission();
   if (!allowed) return;

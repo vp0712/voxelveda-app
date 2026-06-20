@@ -414,6 +414,12 @@ function showAppNotificationBanner(title, body, variant = 'info') {
   window.__voxelBannerTimer = setTimeout(() => banner.classList.remove('show'), 5200);
 }
 
+function sendNativeMobileNotification(title, body) {
+  if (!window.VoxelVedaNative || typeof window.VoxelVedaNative.notify !== 'function') return false;
+  window.VoxelVedaNative.notify(String(title || 'Voxel Veda'), String(body || 'New operation alert'));
+  return true;
+}
+
 function showStaffDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   const backdrop = document.getElementById('staffDialogBackdrop');
   const titleEl = document.getElementById('staffDialogTitle');
@@ -480,6 +486,7 @@ async function requestNotificationPermission() {
 }
 
 async function sendShiftNotification(title, body) {
+  if (sendNativeMobileNotification(title, body)) return;
   showAppNotificationBanner(title, body, 'success');
   const allowed = await requestNotificationPermission();
 
@@ -492,6 +499,7 @@ async function sendShiftNotification(title, body) {
 }
 
 async function sendStaffNotification(title, body) {
+  if (sendNativeMobileNotification(title, body)) return;
   showAppNotificationBanner(title, body, 'info');
   const allowed = await requestNotificationPermission();
   if (!allowed) return;
