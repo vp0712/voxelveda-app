@@ -5243,3 +5243,176 @@ body.staff-dialog-open .mobile-menu-btn {
     background: linear-gradient(180deg, rgba(15, 23, 42, 0.1), rgba(15, 23, 42, 0.98) 34%);
   }
 }
+
+@media (max-width: 900px) {
+  body.mobile-menu-open {
+    overflow: hidden;
+  }
+
+  body.mobile-menu-open .app-shell {
+    filter: none;
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    display: block;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 9000;
+    background:
+      radial-gradient(circle at 92% 16%, rgba(45, 212, 191, 0.14), transparent 30%),
+      rgba(1, 8, 20, 0.74);
+    backdrop-filter: blur(7px);
+    transition: opacity 0.22s ease;
+  }
+
+  body.mobile-menu-open .mobile-sidebar-backdrop {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobile-menu-btn {
+    width: 44px;
+    height: 44px;
+    z-index: 12000;
+    border-radius: 16px;
+  }
+
+  body.mobile-menu-open .mobile-menu-btn {
+    left: 16px;
+    top: calc(10px + env(safe-area-inset-top, 0px));
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 11000;
+    width: min(82vw, 318px);
+    max-width: 318px;
+    height: 100dvh;
+    padding: calc(66px + env(safe-area-inset-top, 0px)) 12px calc(16px + env(safe-area-inset-bottom, 0px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    transform: translateX(-105%);
+    border-right: 1px solid rgba(45, 212, 191, 0.34);
+    border-radius: 0 22px 22px 0;
+    background:
+      linear-gradient(180deg, rgba(2, 8, 20, 0.98), rgba(3, 12, 26, 0.98)),
+      radial-gradient(circle at 18% 7%, rgba(45, 212, 191, 0.16), transparent 36%);
+    box-shadow: 20px 0 52px rgba(0, 0, 0, 0.58);
+    scrollbar-width: none;
+  }
+
+  .sidebar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  body.mobile-menu-open .sidebar {
+    transform: translateX(0);
+  }
+
+  .sidebar .brand,
+  .staff-sidebar-profile {
+    grid-template-columns: 42px minmax(0, 1fr);
+    min-height: 66px;
+    margin: 0 0 12px;
+    padding: 9px 10px;
+    border-radius: 18px;
+  }
+
+  .sidebar .logo-img,
+  .staff-avatar.small {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+    border-radius: 13px;
+  }
+
+  .sidebar .brand h1,
+  .staff-sidebar-profile strong {
+    font-size: 16px;
+    line-height: 1.08;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sidebar .brand p,
+  .staff-sidebar-profile span,
+  .staff-sidebar-profile small {
+    font-size: 12px;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .nav-btn,
+  .nav-group-toggle,
+  .logout-btn {
+    min-height: 44px;
+    margin-bottom: 8px;
+    padding: 10px 12px;
+    border-radius: 15px;
+    font-size: 14px;
+    line-height: 1.15;
+  }
+
+  .nav-group {
+    margin: 0 0 8px;
+    padding: 6px;
+    border-radius: 18px;
+  }
+
+  .nav-submenu {
+    display: grid;
+    gap: 7px;
+    padding: 2px 0 0;
+  }
+
+  .nav-sub-btn {
+    min-height: 38px;
+    margin: 0;
+    padding: 9px 12px;
+    border-radius: 13px;
+    font-size: 13px;
+  }
+
+  .nav-sub-btn::before {
+    width: 5px;
+    height: 5px;
+    margin-right: 6px;
+  }
+
+  .logout-btn {
+    position: static;
+    margin-top: 10px;
+    margin-bottom: 0;
+    background: linear-gradient(135deg, rgba(127, 29, 29, 0.92), rgba(69, 10, 10, 0.88));
+    box-shadow: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .sidebar {
+    width: min(84vw, 304px);
+    max-width: 304px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .nav-btn,
+  .nav-group-toggle,
+  .logout-btn {
+    min-height: 42px;
+    font-size: 13px;
+  }
+
+  .sidebar .brand h1,
+  .staff-sidebar-profile strong {
+    font-size: 15px;
+  }
+}
