@@ -390,6 +390,30 @@ function showToast(message) {
   }, 3500);
 }
 
+function showAppNotificationBanner(title, body, variant = 'info') {
+  let banner = document.getElementById('appNotificationBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'appNotificationBanner';
+    banner.className = 'app-notification-banner';
+    banner.innerHTML = `
+      <div class="app-notification-icon">VV</div>
+      <div class="app-notification-copy">
+        <strong></strong>
+        <span></span>
+      </div>
+    `;
+    document.body.appendChild(banner);
+  }
+
+  banner.className = `app-notification-banner ${variant}`;
+  banner.querySelector('strong').textContent = title || 'Voxel Veda';
+  banner.querySelector('span').textContent = body || '';
+  banner.classList.add('show');
+  clearTimeout(window.__voxelBannerTimer);
+  window.__voxelBannerTimer = setTimeout(() => banner.classList.remove('show'), 5200);
+}
+
 function showStaffDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   const backdrop = document.getElementById('staffDialogBackdrop');
   const titleEl = document.getElementById('staffDialogTitle');
@@ -456,6 +480,7 @@ async function requestNotificationPermission() {
 }
 
 async function sendShiftNotification(title, body) {
+  showAppNotificationBanner(title, body, 'success');
   const allowed = await requestNotificationPermission();
 
   if (!allowed) return;
@@ -467,6 +492,7 @@ async function sendShiftNotification(title, body) {
 }
 
 async function sendStaffNotification(title, body) {
+  showAppNotificationBanner(title, body, 'info');
   const allowed = await requestNotificationPermission();
   if (!allowed) return;
 
@@ -488,7 +514,6 @@ function installAccessDeniedHandler() {
         if (data?.accessDenied) {
           const message = data.message || "You don't have access to input or change data in this section. Please contact admin.";
           showToast(message);
-          alert(message);
           sendStaffNotification('Access not enabled', message);
         }
       }).catch(() => {});

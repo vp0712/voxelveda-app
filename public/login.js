@@ -7,6 +7,22 @@ async function pageExists(path) {
   }
 }
 
+async function redirectSavedSession() {
+  const token = localStorage.getItem('token');
+  const role = String(localStorage.getItem('role') || '').trim().toLowerCase();
+  const user = localStorage.getItem('user');
+
+  if (!token || !role || !user) return false;
+
+  if (role === 'admin') {
+    window.location.replace((await pageExists('/admin-dashboard.html')) ? '/admin-dashboard.html' : '/dashboard.html');
+    return true;
+  }
+
+  window.location.replace('/staff-dashboard.html');
+  return true;
+}
+
 function showLoginMessageFromUrl() {
   const loginStatus = document.getElementById('loginStatus');
   if (!loginStatus) return;
@@ -88,4 +104,9 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-document.addEventListener('DOMContentLoaded', showLoginMessageFromUrl);
+document.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(window.location.search);
+  const explicitMessage = params.get('message');
+  if (!explicitMessage && await redirectSavedSession()) return;
+  showLoginMessageFromUrl();
+});

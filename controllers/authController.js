@@ -46,7 +46,7 @@ function createToken(user) {
       permissions: parsePermissions(user.permissions)
     },
     process.env.JWT_SECRET,
-    { expiresIn: '7d' }
+    { expiresIn: '180d' }
   );
 }
 
