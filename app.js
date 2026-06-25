@@ -19,6 +19,7 @@ const meetingRoutes = require('./routes/meetingRoutes');
 const rosterRoutes = require('./routes/rosterRoutes');
 const supplierRoutes = require('./routes/supplierRoutes');
 const supplierController = require('./controllers/supplierController');
+const attendanceController = require('./controllers/attendanceController');
 const complianceRoutes = require('./routes/complianceRoutes');
 const competitorRoutes = require('./routes/competitorRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
@@ -66,6 +67,7 @@ app.get('/api/qr', async (req, res) => {
 });
 
 app.post('/api/public/rfq', rfqController.createRFQ);
+app.get('/api/public/shift-qr', attendanceController.publicShiftQrToken);
 
 app.use('/api/rfq', auth, requirePermission('rfqs'), rfqRoutes);
 app.use('/api/invoice', auth, requirePermission('invoices'), invoiceRoutes);

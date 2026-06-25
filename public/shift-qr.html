@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Shift QR Terminal</title>
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
+  <link rel="stylesheet" href="/style.css?v=20260625-shift-terminal" />
+</head>
+<body class="shift-terminal-page">
+  <main class="shift-terminal-shell">
+    <section class="shift-terminal-hero">
+      <div class="terminal-brand-lockup">
+        <img src="/Frame 1.png?v=20260601-clean-logo" alt="Voxel Veda" />
+        <div>
+          <span>VOXEL VEDA</span>
+          <strong>Live Shift QR Terminal</strong>
+        </div>
+      </div>
+      <div class="terminal-status-pill">
+        <span class="scan-live-dot"></span>
+        <strong id="terminalStatus">Syncing secure token</strong>
+      </div>
+    </section>
+
+    <section class="shift-terminal-grid">
+      <article class="terminal-qr-stage">
+        <div class="terminal-qr-orbit" aria-hidden="true"></div>
+        <div class="terminal-qr-frame">
+          <img id="terminalQrImage" alt="Live shift QR code" />
+        </div>
+        <div class="terminal-countdown-ring">
+          <span>Refresh</span>
+          <strong id="terminalCountdown">20s</strong>
+        </div>
+      </article>
+
+      <aside class="terminal-command-panel">
+        <span class="terminal-eyebrow">Attendance Access</span>
+        <h1>Scan to start or end shift</h1>
+        <p>Open this page on the workshop tablet, reception screen, or office monitor. Staff use their Voxel Veda app scanner to verify the live QR before clocking in or out.</p>
+        <div class="terminal-signal-grid">
+          <div><strong>20s</strong><span>rotating token</span></div>
+          <div><strong>Live</strong><span>server verified</span></div>
+          <div><strong>Secure</strong><span>attendance only</span></div>
+        </div>
+        <div class="terminal-actions">
+          <button type="button" class="primary-btn" onclick="loadShiftTerminalQr(true)">Refresh Now</button>
+          <button type="button" class="secondary-btn" onclick="toggleTerminalFullscreen()">Full Screen</button>
+        </div>
+        <p id="terminalTokenState" class="terminal-token-state">Preparing QR terminal...</p>
+      </aside>
+    </section>
+  </main>
+  <script src="/shift-qr-terminal.js?v=20260625-shift-terminal"></script>
+</body>
+</html>

@@ -600,25 +600,42 @@ exports.allWeeklyTimesheets = async (req, res) => {
   }
 };
 
+function buildShiftQrPayload() {
+  const period = currentShiftPeriod();
+  const token = createShiftQrToken(period);
+  const expiresAtMs = (period + 1) * SHIFT_QR_WINDOW_SECONDS * 1000;
+
+  return {
+    token,
+    qr_data: token,
+    expires_in_seconds: Math.max(1, Math.ceil((expiresAtMs - Date.now()) / 1000)),
+    refresh_seconds: SHIFT_QR_WINDOW_SECONDS,
+    manual_bypass_enabled: false
+  };
+}
+
 exports.shiftQrToken = async (req, res) => {
   try {
     if (!isAdmin(req)) {
       return res.status(403).json({ message: 'Admin access required' });
     }
 
-    const period = currentShiftPeriod();
-    const token = createShiftQrToken(period);
-    const expiresAtMs = (period + 1) * SHIFT_QR_WINDOW_SECONDS * 1000;
-
-    res.json({
-      token,
-      qr_data: token,
-      expires_in_seconds: Math.max(1, Math.ceil((expiresAtMs - Date.now()) / 1000)),
-      refresh_seconds: SHIFT_QR_WINDOW_SECONDS,
-      manual_bypass_enabled: false
-    });
+    res.json(buildShiftQrPayload());
   } catch (err) {
     console.error('SHIFT QR TOKEN ERROR FULL:', err);
+    res.status(500).json({
+      message: 'Failed to generate shift QR',
+      error: err.message
+    });
+  }
+};
+
+exports.publicShiftQrToken = async (_req, res) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
+    res.json(buildShiftQrPayload());
+  } catch (err) {
+    console.error('PUBLIC SHIFT QR TOKEN ERROR FULL:', err);
     res.status(500).json({
       message: 'Failed to generate shift QR',
       error: err.message

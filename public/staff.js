@@ -805,7 +805,7 @@ async function startShiftQrCamera(mode) {
   try {
     stopShiftQrScanner();
     setShiftQrPermissionActions(false);
-    if (statusEl) statusEl.innerText = 'Requesting camera...';
+    if (statusEl) statusEl.innerText = 'Requesting camera access...';
     shiftQrScannerStream = await openShiftQrCameraStream();
     video.muted = true;
     video.autoplay = true;
@@ -817,27 +817,27 @@ async function startShiftQrCamera(mode) {
     video.srcObject = shiftQrScannerStream;
     await video.play();
 
-    if (statusEl) statusEl.innerText = 'Preparing scanner...';
+    if (statusEl) statusEl.innerText = 'Calibrating scanner...';
     const decoder = await getShiftQrDecoder();
     setShiftQrPermissionActions(false);
-    if (statusEl) statusEl.innerText = 'Scanning...';
+    if (statusEl) statusEl.innerText = 'Scanning live QR...';
 
     shiftQrScannerTimer = setInterval(async () => {
       try {
         const value = await detectShiftQr(video, decoder);
         if (!value) return;
         stopShiftQrScanner();
-        if (statusEl) statusEl.innerText = 'Verifying...';
+        if (statusEl) statusEl.innerText = 'Verifying secure token...';
         await submitShiftQr(mode, normalizeShiftQrToken(value));
       } catch (_) {
-        if (statusEl) statusEl.innerText = 'Scanning...';
+        if (statusEl) statusEl.innerText = 'Scanning live QR...';
       }
     }, 650);
   } catch (err) {
     const message = String(err?.name || err?.message || '').toLowerCase();
     if (statusEl) {
       if (message.includes('notallowed') || message.includes('permission')) {
-        statusEl.innerText = 'Camera permission needed.';
+        statusEl.innerText = 'Camera permission is required for QR verification.';
         setShiftQrPermissionActions(true);
       } else if (message.includes('decoder') || message.includes('script')) {
         statusEl.innerText = 'QR decoder unavailable.';
@@ -865,24 +865,30 @@ function openShiftQrScanner(mode) {
     `
     : '';
 
-  showStaffDialog(`Scan QR to ${actionLabel}`, `
-    <div class="shift-scan-panel">
+  showStaffDialog(`QR Verification`, `
+    <div class="shift-scan-panel pro-shift-scanner">
       <div class="shift-scan-statusbar">
         <span class="scan-live-dot"></span>
         <div>
-          <strong>Live QR Required</strong>
-          <small>${modeLabel}</small>
+          <strong>${actionLabel}</strong>
+          <small>${modeLabel} verification</small>
         </div>
-        <em>${actionLabel}</em>
+        <em>Live Scan</em>
       </div>
       <div class="shift-scan-camera">
         <video id="shiftQrVideo" playsinline muted></video>
+        <div class="shift-camera-glass"></div>
         <div class="shift-scan-reticle"></div>
         <div class="shift-scan-corners"></div>
+        <div class="shift-scanline"></div>
+        <div class="shift-scan-hint">Align QR inside frame</div>
       </div>
-      <p id="shiftQrScanStatus" class="status-note">Opening camera...</p>
+      <div class="shift-scan-feedback">
+        <strong id="shiftQrScanStatus">Opening camera...</strong>
+        <span>Secure attendance token check</span>
+      </div>
       <div id="shiftQrPermissionActions" class="shift-camera-actions hidden-section">
-        <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Enable Camera</button>
+        <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Open Camera Scanner</button>
       </div>
       ${exceptionPanel}
     </div>
