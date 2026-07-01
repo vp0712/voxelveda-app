@@ -16,6 +16,7 @@ let financeChartInstance = null;
 let supplierDebtChartInstance = null;
 let expenseCategoryChartInstance = null;
 let expenseMonthChartInstance = null;
+let dashboardStatsCache = null;
 let invoiceCache = [];
 let manualInvoiceCustomerMatches = [];
 let stockCache = [];
@@ -128,7 +129,136 @@ function toggleMobileMenu(open) {
     ? open
     : !document.body.classList.contains('mobile-menu-open');
   document.body.classList.toggle('mobile-menu-open', shouldOpen);
+  document.querySelectorAll('.topbar-menu-btn, .mobile-menu-btn').forEach((btn) => {
+    btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  });
+  if (shouldOpen) closeNotificationPanel();
 }
+
+function compactName(value, fallback = 'Admin') {
+  return String(value || fallback).trim() || fallback;
+}
+
+function syncTopbarUser(user = currentUser) {
+  const name = compactName(user?.name || user?.username || user?.email, 'Admin');
+  const initial = name.slice(0, 1).toUpperCase();
+  const initialEl = document.getElementById('profileInitial');
+  const nameEl = document.getElementById('profileNameLabel');
+  if (initialEl) initialEl.innerText = initial;
+  if (nameEl) nameEl.innerText = name.split(' ')[0] || name;
+}
+
+function setActivePageTitle(btn) {
+  const title = btn?.dataset?.title || btn?.textContent?.trim() || 'Operational Dashboard';
+  const titleEl = document.getElementById('activePageTitle');
+  if (titleEl) titleEl.innerText = title === 'Home' ? 'Operational Dashboard' : title;
+}
+
+function closeNotificationPanel() {
+  const panel = document.getElementById('notificationPanel');
+  const bell = document.getElementById('notificationBell');
+  if (panel) panel.hidden = true;
+  if (bell) bell.setAttribute('aria-expanded', 'false');
+}
+
+function toggleNotificationPanel(event) {
+  event?.stopPropagation?.();
+  const panel = document.getElementById('notificationPanel');
+  const bell = document.getElementById('notificationBell');
+  if (!panel) return;
+  const willOpen = panel.hidden;
+  panel.hidden = !willOpen;
+  if (bell) bell.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+  if (willOpen) toggleMobileMenu(false);
+}
+
+function openNotificationTarget(sectionId) {
+  if (sectionId) goSection(sectionId);
+  closeNotificationPanel();
+}
+
+function addShellNotification(list, type, title, body, sectionId) {
+  list.push({ type, title, body, sectionId });
+}
+
+function buildShellNotifications() {
+  const list = [];
+  const pendingRfqs = Number(dashboardStatsCache?.rfqs?.pending_rfqs || 0);
+  if (pendingRfqs > 0) {
+    addShellNotification(list, 'rfq', 'New RFQ received', `${pendingRfqs} RFQ${pendingRfqs === 1 ? '' : 's'} waiting for review.`, 'rfqSection');
+  }
+
+  const openInvoices = invoiceCache.filter((invoice) => Number(invoice.balance_due || 0) > 0 || String(invoice.status || '').toLowerCase().includes('overdue'));
+  if (openInvoices.length) {
+    const total = openInvoices.reduce((sum, invoice) => sum + Number(invoice.balance_due || 0), 0);
+    addShellNotification(list, 'invoice', 'Invoice overdue', `${openInvoices.length} invoice${openInvoices.length === 1 ? '' : 's'} need payment follow-up. ${formatMoney(total)} open.`, 'invoiceSection');
+  }
+
+  const supplierBills = expenseCache.filter((expense) => !['paid', 'reimbursed', 'closed'].includes(String(expense.status || '').toLowerCase()));
+  if (supplierBills.length) {
+    const total = supplierBills.reduce((sum, expense) => sum + Number(expense.total_amount || 0), 0);
+    addShellNotification(list, 'supplier', 'Supplier payment due', `${supplierBills.length} supplier bill${supplierBills.length === 1 ? '' : 's'} pending. ${formatMoney(total)} outstanding.`, 'expenseSection');
+  }
+
+  const materialRows = [...(materialCache.raw_material || []), ...(materialCache.packaging || [])];
+  const lowStock = materialRows.filter((item) => {
+    const level = Number(item.reorder_level || item.minimum_stock || 0);
+    const qty = Number(item.current_qty || item.current_quantity || item.available_qty || 0);
+    return level > 0 && qty <= level;
+  });
+  if (lowStock.length) {
+    addShellNotification(list, 'stock', 'Low raw material stock', `${lowStock.length} raw/packaging item${lowStock.length === 1 ? '' : 's'} at reorder level.`, 'rawMaterialSection');
+  }
+
+  const now = Date.now();
+  const thirtyDays = 30 * 24 * 60 * 60 * 1000;
+  const dueCompliance = complianceCache.filter((row) => {
+    const dateValue = row.expiry_date || row.renewal_date || row.due_date;
+    const due = dateValue ? new Date(dateValue).getTime() : 0;
+    const status = String(row.status || '').toLowerCase();
+    return status.includes('due') || status.includes('renew') || (due && due - now <= thirtyDays);
+  });
+  if (dueCompliance.length) {
+    addShellNotification(list, 'compliance', 'Compliance/licence reminder', `${dueCompliance.length} compliance record${dueCompliance.length === 1 ? '' : 's'} need attention.`, 'complianceSection');
+  }
+
+  return list.slice(0, 7);
+}
+
+function renderNotificationDropdown() {
+  const listEl = document.getElementById('notificationList');
+  const emptyEl = document.getElementById('notificationEmpty');
+  const badgeEl = document.getElementById('notificationBadge');
+  const countEl = document.getElementById('notificationPanelCount');
+  if (!listEl || !emptyEl || !badgeEl || !countEl) return;
+
+  const notifications = buildShellNotifications();
+  badgeEl.innerText = notifications.length > 9 ? '9+' : String(notifications.length);
+  badgeEl.classList.toggle('hidden-section', notifications.length === 0);
+  countEl.innerText = notifications.length ? `${notifications.length} new` : 'All clear';
+  emptyEl.style.display = notifications.length ? 'none' : 'block';
+
+  listEl.innerHTML = notifications.map((item) => `
+    <button class="notification-item" type="button" onclick="openNotificationTarget('${escapeHtml(item.sectionId)}')">
+      <span class="notification-dot ${escapeHtml(item.type)}"></span>
+      <span>
+        <strong>${escapeHtml(item.title)}</strong>
+        <small>${escapeHtml(item.body)}</small>
+      </span>
+    </button>
+  `).join('');
+}
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest?.('.notification-center')) closeNotificationPanel();
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    closeNotificationPanel();
+    toggleMobileMenu(false);
+  }
+});
 
 function enhanceResponsiveTables() {
   document.querySelectorAll('table').forEach((table) => {
@@ -396,7 +526,6 @@ async function loadAccessAttempts() {
   });
   const data = await safeJson(res);
   if (!res.ok) return;
-
   const attempts = data.attempts || [];
   const seen = getSeenAccessAttempts();
   const fresh = attempts.filter((attempt) => !seen.has(Number(attempt.id)));
@@ -440,9 +569,12 @@ function closeDialog(event) {
 
 function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach((btn) => {
+    if (!btn.dataset.section) return;
     btn.onclick = () => {
       document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
+      setActivePageTitle(btn);
+      closeNotificationPanel();
 
       document.querySelectorAll('.page-section').forEach((s) => s.classList.add('hidden-section'));
       document.getElementById(btn.dataset.section)?.classList.remove('hidden-section');
@@ -579,6 +711,7 @@ async function loadMe() {
     }
 
     el.innerText = `${data.user.name} | ${data.user.email} | task control`;
+    syncTopbarUser(currentUser);
     configureTaskManagerView();
     return data.user;
   }
@@ -588,6 +721,7 @@ async function loadMe() {
   localStorage.setItem('user', JSON.stringify(currentUser));
   localStorage.setItem('role', role);
   el.innerText = `${data.user.name} | ${data.user.email} | ${role}`;
+  syncTopbarUser(currentUser);
   return data.user;
 }
 
@@ -598,6 +732,8 @@ async function loadDashboardStats() {
 
   const data = await safeJson(res);
   if (!res.ok) return;
+  dashboardStatsCache = data;
+  renderNotificationDropdown();
 
   const rfqStatus = document.getElementById('rfqStatus');
   const invoiceStatus = document.getElementById('invoiceStatus');
@@ -1712,6 +1848,7 @@ async function loadInvoices() {
   const invoices = chronologicalRows(data.invoices || []);
   invoiceCache = invoices;
   updateInvoiceMetrics(invoices);
+  renderNotificationDropdown();
 
   renderRegisterPage({
     key: 'invoices',
@@ -2661,6 +2798,7 @@ async function loadExpenses(page = expensePage) {
   }
 
   expenseCache = data.expenses || [];
+  renderNotificationDropdown();
   renderExpenseSummary(data.summary || {}, data.total || 0, data.page || 1, data.limit || expenseLimit);
   renderExpenseCharts(data.summary || {});
 
@@ -3335,6 +3473,7 @@ async function loadComplianceEntries() {
   }
 
   complianceCache = data.entries || [];
+  renderNotificationDropdown();
   renderComplianceEntries();
 }
 
@@ -4363,7 +4502,6 @@ async function loadSettings() {
 
   const data = await safeJson(res);
   if (!res.ok) return;
-
   const settings = data.settings || {};
   const map = {
     company_email: 'settingEmail',
@@ -4651,6 +4789,7 @@ async function loadMaterials(type) {
   const rows = chronologicalRows(data.materials || []);
   materialCache[type] = rows;
   updateMaterialMetrics(type, rows);
+  renderNotificationDropdown();
 
   renderRegisterPage({
     key: type,
@@ -6015,6 +6154,7 @@ async function bootAdminDashboard() {
     ]);
 
     await loadAccessAttempts();
+    renderNotificationDropdown();
     setInterval(loadAttendance, 15000);
     setInterval(loadAccessAttempts, 20000);
   } catch (err) {

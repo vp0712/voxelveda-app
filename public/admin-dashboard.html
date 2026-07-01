@@ -5,22 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260701-mobile-shell"/>
+  <link rel="stylesheet" href="/style.css?v=20260701-premium-nav"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 
 <body>
-  <button class="mobile-menu-btn" type="button" aria-label="Open menu" onclick="toggleMobileMenu(true)">
-    <span></span>
-    <span></span>
-    <span></span>
-  </button>
   <div class="mobile-sidebar-backdrop" onclick="toggleMobileMenu(false)"></div>
 
   <div class="app-shell">
-
-    <aside class="sidebar">
-      <div class="brand">
+    <aside class="sidebar vv-sidebar" aria-label="Voxel Veda navigation">
+      <div class="brand shell-brand">
         <img src="/Frame 1.png?v=20260601-clean-logo" class="logo-img" alt="Voxel Veda Logo">
         <div>
           <h1>VOXEL VEDA</h1>
@@ -28,62 +22,100 @@
         </div>
       </div>
 
-      <button class="nav-btn active" data-section="dashboardSection">Home</button>
-      <button class="nav-btn" data-section="rfqSection">RFQs</button>
-      <button class="nav-btn" data-section="invoiceSection">Invoices</button>
-      <button class="nav-btn" data-section="customerSection">Customers</button>
-      <button class="nav-btn" data-section="supplierSection">Suppliers</button>
-      <button class="nav-btn" data-section="expenseSection">Expenses</button>
-      <button class="nav-btn" data-section="competitorSection">Competitors</button>
-      <details class="nav-group" open>
-        <summary class="nav-group-toggle">
-          <span>Stock Management</span>
-          <span class="nav-group-caret">v</span>
-        </summary>
-        <div class="nav-submenu">
-          <button class="nav-btn nav-sub-btn" data-section="stockSection">Stock In</button>
-          <button class="nav-btn nav-sub-btn" data-section="stockUsageSection">Stock Out</button>
-        </div>
-      </details>
-      <button class="nav-btn" data-section="rawMaterialSection">Raw Material</button>
-      <button class="nav-btn" data-section="packagingSection">Packaging</button>
-      <details class="nav-group" open>
-        <summary class="nav-group-toggle">
-          <span>Task Control</span>
-          <span class="nav-group-caret">v</span>
-        </summary>
-        <div class="nav-submenu">
-          <button class="nav-btn nav-sub-btn" data-section="taskSection">Announcements & Tasks</button>
-        </div>
-      </details>
-      <details class="nav-group" open>
-        <summary class="nav-group-toggle">
-          <span>Workforce</span>
-          <span class="nav-group-caret">v</span>
-        </summary>
-        <div class="nav-submenu">
-          <button class="nav-btn nav-sub-btn" type="button" onclick="openSystemPage('/shift-qr.html')">Shift QR Terminal</button>
-          <button class="nav-btn nav-sub-btn" data-section="attendanceSection">Timesheets</button>
-          <button class="nav-btn nav-sub-btn" data-section="rosterSection">Roster</button>
-          <button class="nav-btn nav-sub-btn" data-section="staffSection">Staff</button>
-        </div>
-      </details>
-      <button class="nav-btn" data-section="meetingSection">Meetings & Inspections</button>
-      <button class="nav-btn" data-section="complianceSection">Compliance & Licences</button>
-      <button class="nav-btn" data-section="companyFormsSection">Company Forms</button>
-      <button class="nav-btn" data-section="settingsSection">Settings</button>
+      <nav class="sidebar-nav" aria-label="Admin sections">
+        <span class="nav-section-label">Dashboard</span>
+        <button class="nav-btn active" data-icon="H" data-title="Home" data-section="dashboardSection">Home</button>
 
-      <button class="logout-btn" onclick="logout()">Logout</button>
+        <span class="nav-section-label">Sales</span>
+        <button class="nav-btn" data-icon="Q" data-title="RFQs" data-section="rfqSection">RFQs</button>
+        <button class="nav-btn" data-icon="I" data-title="Invoices" data-section="invoiceSection">Invoices</button>
+        <button class="nav-btn" data-icon="C" data-title="Customers" data-section="customerSection">Customers</button>
+        <button class="nav-btn" data-icon="S" data-title="Suppliers" data-section="supplierSection">Suppliers</button>
+
+        <span class="nav-section-label">Operations</span>
+        <button class="nav-btn" data-icon="X" data-title="Competitors" data-section="competitorSection">Competitors</button>
+        <details class="nav-group" open>
+          <summary class="nav-group-toggle" data-icon="M">
+            <span>Stock Management</span>
+            <span class="nav-group-caret">v</span>
+          </summary>
+          <div class="nav-submenu">
+            <button class="nav-btn nav-sub-btn" data-icon="+" data-title="Stock In" data-section="stockSection">Stock In</button>
+            <button class="nav-btn nav-sub-btn" data-icon="-" data-title="Stock Out" data-section="stockUsageSection">Stock Out</button>
+          </div>
+        </details>
+        <button class="nav-btn" data-icon="R" data-title="Raw Material" data-section="rawMaterialSection">Raw Material</button>
+        <button class="nav-btn" data-icon="P" data-title="Packaging" data-section="packagingSection">Packaging</button>
+        <button class="nav-btn" data-icon="MI" data-title="Meetings & Inspections" data-section="meetingSection">Meetings & Inspections</button>
+
+        <span class="nav-section-label">Finance</span>
+        <button class="nav-btn" data-icon="$" data-title="Expenses" data-section="expenseSection">Expenses</button>
+
+        <span class="nav-section-label">Company</span>
+        <details class="nav-group" open>
+          <summary class="nav-group-toggle" data-icon="T">
+            <span>Task Control</span>
+            <span class="nav-group-caret">v</span>
+          </summary>
+          <div class="nav-submenu">
+            <button class="nav-btn nav-sub-btn" data-icon="A" data-title="Announcements & Tasks" data-section="taskSection">Announcements & Tasks</button>
+          </div>
+        </details>
+        <details class="nav-group" open>
+          <summary class="nav-group-toggle" data-icon="W">
+            <span>Workforce</span>
+            <span class="nav-group-caret">v</span>
+          </summary>
+          <div class="nav-submenu">
+            <button class="nav-btn nav-sub-btn" data-icon="QR" type="button" onclick="openSystemPage('/shift-qr.html')">Shift QR Terminal</button>
+            <button class="nav-btn nav-sub-btn" data-icon="TS" data-title="Timesheets" data-section="attendanceSection">Timesheets</button>
+            <button class="nav-btn nav-sub-btn" data-icon="RO" data-title="Roster" data-section="rosterSection">Roster</button>
+            <button class="nav-btn nav-sub-btn" data-icon="ST" data-title="Staff" data-section="staffSection">Staff</button>
+          </div>
+        </details>
+        <button class="nav-btn" data-icon="CL" data-title="Compliance & Licences" data-section="complianceSection">Compliance & Licences</button>
+        <button class="nav-btn" data-icon="F" data-title="Company Forms" data-section="companyFormsSection">Company Forms</button>
+        <button class="nav-btn" data-icon="G" data-title="Settings" data-section="settingsSection">Settings</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <button class="logout-btn" onclick="logout()">Logout</button>
+      </div>
     </aside>
-
     <main class="main">
-
-      <header class="topbar">
-        <div>
-          <h2>Operational Dashboard</h2>
+      <header class="topbar vv-topbar">
+        <button class="topbar-menu-btn" type="button" aria-label="Open menu" aria-expanded="false" onclick="toggleMobileMenu()">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        <div class="topbar-title">
+          <span class="topbar-kicker">Voxel Veda Operations</span>
+          <h2 id="activePageTitle">Operational Dashboard</h2>
           <p id="adminInfo">Loading user...</p>
         </div>
-        <span class="live-pill">System Active</span>
+        <div class="topbar-actions">
+          <button class="topbar-quick-action" type="button" onclick="goSection('invoiceSection')">New Invoice</button>
+          <div class="notification-center">
+            <button id="notificationBell" class="notification-bell" type="button" aria-label="Open notifications" aria-expanded="false" onclick="toggleNotificationPanel(event)">
+              <span class="bell-mark">!</span>
+              <span id="notificationBadge" class="notification-badge hidden-section">0</span>
+            </button>
+            <div id="notificationPanel" class="notification-panel" hidden>
+              <div class="notification-panel-head">
+                <strong>Operations Alerts</strong>
+                <span id="notificationPanelCount">0 new</span>
+              </div>
+              <div id="notificationList" class="notification-list"></div>
+              <div id="notificationEmpty" class="notification-empty">No new notifications</div>
+            </div>
+          </div>
+          <button class="profile-chip" type="button" onclick="goSection('staffSection')">
+            <span id="profileInitial" class="profile-initial">A</span>
+            <span id="profileNameLabel">Admin</span>
+          </button>
+          <span class="live-pill">System Active</span>
+        </div>
       </header>
 
       <!-- OVERVIEW -->
