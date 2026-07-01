@@ -221,8 +221,18 @@ function buildShellNotifications() {
   if (dueCompliance.length) {
     addShellNotification(list, 'compliance', 'Compliance/licence reminder', `${dueCompliance.length} compliance record${dueCompliance.length === 1 ? '' : 's'} need attention.`, 'complianceSection');
   }
+  const upcomingMeetings = meetingCache.filter((meeting) => {
+    const status = String(meeting.status || '').toLowerCase();
+    if (['completed', 'cancelled'].includes(status)) return false;
+    const dateValue = meeting.meeting_date || meeting.date || meeting.due_date;
+    const due = dateValue ? new Date(dateValue).getTime() : 0;
+    return due && due >= now - 24 * 60 * 60 * 1000 && due - now <= 7 * 24 * 60 * 60 * 1000;
+  });
+  if (upcomingMeetings.length) {
+    addShellNotification(list, 'meeting', 'Meeting / inspection coming up', `${upcomingMeetings.length} scheduled meeting${upcomingMeetings.length === 1 ? '' : 's'} in the next 7 days.`, 'meetingSection');
+  }
 
-  return list.slice(0, 7);
+  return list.slice(0, 8);
 }
 
 function renderNotificationDropdown() {
@@ -4690,7 +4700,10 @@ async function loadShiftQr() {
 }
 
 function openSystemPage(path) {
-  window.open(path, '_blank', 'noopener');
+  toggleMobileMenu(false);
+  closeNotificationPanel();
+  const opened = window.open(path, '_blank', 'noopener');
+  if (!opened) window.location.href = path;
 }
 
 function normalizeQrUrl(value) {
@@ -5764,6 +5777,7 @@ async function loadMeetings() {
 
   const rows = chronologicalRows(data.meetings || []);
   meetingCache = rows;
+  renderNotificationDropdown();
 
   renderRegisterPage({
     key: 'meetings',

@@ -7371,3 +7371,257 @@ body {
     justify-content: center;
   }
 }
+
+
+/* Final admin shell audit - 20260701 */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+.sidebar.vv-sidebar,
+.topbar.vv-topbar,
+.notification-panel,
+.dialog-panel {
+  box-sizing: border-box;
+}
+
+.notification-panel {
+  z-index: 14000;
+}
+
+.notification-dot.meeting {
+  background: #60a5fa;
+}
+
+@media (max-width: 860px) {
+  :root {
+    --shell-topbar: 64px;
+  }
+
+  body.mobile-menu-open {
+    overflow: hidden !important;
+    touch-action: none;
+  }
+
+  .app-shell {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: clip !important;
+  }
+
+  .main {
+    width: 100% !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    overflow-x: clip !important;
+  }
+
+  .topbar.vv-topbar {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 9000 !important;
+    grid-template-columns: 40px minmax(0, 1fr) auto !important;
+    gap: 9px !important;
+    min-height: var(--shell-topbar) !important;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 10px 8px !important;
+    border-radius: 0 !important;
+  }
+
+  .topbar-menu-btn {
+    display: grid !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 9px !important;
+    border-radius: 14px !important;
+    z-index: 15000 !important;
+  }
+
+  .topbar-menu-btn span {
+    width: 18px !important;
+  }
+
+  .topbar-title h2 {
+    font-size: 0.98rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .topbar-title p {
+    max-width: 42vw !important;
+    font-size: 0.68rem !important;
+  }
+
+  .topbar-actions {
+    gap: 6px !important;
+  }
+
+  .notification-bell,
+  .profile-chip {
+    width: 38px !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    flex: 0 0 38px !important;
+  }
+
+  .mobile-sidebar-backdrop {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 11000 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    background: rgba(0, 8, 18, 0.72) !important;
+    backdrop-filter: blur(9px) !important;
+    transition: opacity 180ms ease !important;
+  }
+
+  body.mobile-menu-open .mobile-sidebar-backdrop {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .sidebar.vv-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    z-index: 12000 !important;
+    width: min(74vw, 284px) !important;
+    max-width: 284px !important;
+    height: 100dvh !important;
+    display: grid !important;
+    grid-template-rows: auto minmax(0, 1fr) auto !important;
+    gap: 8px !important;
+    padding: calc(10px + env(safe-area-inset-top, 0px)) 9px calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+    border-radius: 0 20px 20px 0 !important;
+    transform: translate3d(-104%, 0, 0) !important;
+    transition: transform 240ms cubic-bezier(.2,.75,.2,1), box-shadow 240ms ease !important;
+    overflow: hidden !important;
+    background: linear-gradient(180deg, rgba(3, 9, 21, 0.99), rgba(7, 17, 35, 0.98)) !important;
+    box-shadow: none !important;
+  }
+
+  body.mobile-menu-open .sidebar.vv-sidebar {
+    transform: translate3d(0, 0, 0) !important;
+    box-shadow: 26px 0 70px rgba(0, 0, 0, 0.46), 0 0 32px rgba(45, 212, 191, 0.16) !important;
+  }
+
+  .shell-brand {
+    min-height: 48px !important;
+    padding: 6px !important;
+    border-radius: 14px !important;
+  }
+
+  .shell-brand .logo-img {
+    width: 34px !important;
+    height: 34px !important;
+    border-radius: 10px !important;
+  }
+
+  .shell-brand h1 {
+    font-size: 0.8rem !important;
+    line-height: 1 !important;
+  }
+
+  .shell-brand p {
+    font-size: 0.58rem !important;
+  }
+
+  .sidebar-nav {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding: 2px 2px 12px 0 !important;
+    overscroll-behavior: contain !important;
+  }
+
+  .nav-section-label {
+    margin: 9px 7px 5px !important;
+    font-size: 0.52rem !important;
+    letter-spacing: 0.09em !important;
+  }
+
+  .sidebar .nav-btn,
+  .sidebar .nav-group-toggle,
+  .sidebar .logout-btn {
+    min-height: 34px !important;
+    border-radius: 11px !important;
+    font-size: 0.72rem !important;
+    line-height: 1.1 !important;
+    padding: 7px 8px !important;
+    margin-bottom: 5px !important;
+  }
+
+  .sidebar .nav-btn::before,
+  .sidebar .nav-group-toggle::before {
+    width: 20px !important;
+    height: 20px !important;
+    flex: 0 0 20px !important;
+    border-radius: 7px !important;
+    font-size: 0.48rem !important;
+  }
+
+  .nav-group {
+    margin-bottom: 6px !important;
+    padding: 5px !important;
+    border-radius: 13px !important;
+  }
+
+  .nav-submenu {
+    gap: 4px !important;
+    padding: 4px 0 0 4px !important;
+  }
+
+  .sidebar-footer {
+    position: sticky !important;
+    bottom: 0 !important;
+    padding-top: 8px !important;
+    background: linear-gradient(180deg, rgba(3, 9, 21, 0), rgba(3, 9, 21, 0.98) 35%) !important;
+  }
+
+  .main .page-section {
+    padding: 14px 10px 26px !important;
+  }
+
+  .notification-panel {
+    position: fixed !important;
+    top: calc(var(--shell-topbar) + 8px) !important;
+    left: 10px !important;
+    right: 10px !important;
+    width: auto !important;
+    max-height: min(72dvh, 520px) !important;
+    overflow-y: auto !important;
+    z-index: 16000 !important;
+  }
+
+  .dialog-panel,
+  .wide-dialog,
+  .manual-invoice-dialog {
+    width: calc(100vw - 18px) !important;
+    max-width: calc(100vw - 18px) !important;
+    max-height: calc(100dvh - 22px) !important;
+    overflow-y: auto !important;
+  }
+}
+
+@media (max-width: 430px) {
+  .sidebar.vv-sidebar {
+    width: min(72vw, 264px) !important;
+    max-width: 264px !important;
+  }
+
+  .topbar-title p {
+    max-width: 34vw !important;
+  }
+
+  .sidebar .nav-btn,
+  .sidebar .nav-group-toggle,
+  .sidebar .logout-btn {
+    font-size: 0.68rem !important;
+  }
+}
