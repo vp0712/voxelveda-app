@@ -376,6 +376,11 @@ function ensureRegisterControls(key, tbody, onChange) {
   });
 }
 
+function setRegisterLoading(tbody, colspan, message = 'Loading data...') {
+  if (!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="${colspan}"><span class="table-loading-state">${escapeHtml(message)}</span></td></tr>`;
+}
+
 function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRenderer, onChange }) {
   const orderedRows = chronologicalRows(rows || []);
   registerPagerState[key] = {
@@ -571,13 +576,19 @@ function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach((btn) => {
     if (!btn.dataset.section) return;
     btn.onclick = () => {
+      const targetSection = document.getElementById(btn.dataset.section);
+      if (!targetSection) {
+        showToast('Section is not available yet');
+        return;
+      }
+
       document.querySelectorAll('.nav-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       setActivePageTitle(btn);
       closeNotificationPanel();
 
       document.querySelectorAll('.page-section').forEach((s) => s.classList.add('hidden-section'));
-      document.getElementById(btn.dataset.section)?.classList.remove('hidden-section');
+      targetSection.classList.remove('hidden-section');
 
       if (btn.dataset.section === 'customerSection') loadCustomers();
       if (btn.dataset.section === 'supplierSection') loadSuppliers();
@@ -601,7 +612,14 @@ function setupNavigation() {
 }
 
 function goSection(sectionId) {
-  document.querySelector(`[data-section="${sectionId}"]`)?.click();
+  const targetSection = document.getElementById(sectionId);
+  const btn = document.querySelector('[data-section="' + sectionId + '"]');
+  if (!targetSection || !btn) {
+    showToast('Section is not available yet');
+    document.querySelector('[data-section="dashboardSection"]')?.click();
+    return;
+  }
+  btn.click();
 }
 
 function renderCompanyForms() {
@@ -1415,6 +1433,7 @@ async function submitRFQ() {
 async function loadRFQs() {
   const tbody = document.getElementById('rfqTableBody');
   if (!tbody) return;
+  setRegisterLoading(tbody, 11, 'Loading RFQs...');
 
   const res = await fetch('/api/rfq', {
     headers: { Authorization: `Bearer ${token}` }
@@ -1436,7 +1455,7 @@ async function loadRFQs() {
     onChange: loadRFQs,
     rowRenderer: (r) => {
     const status = String(r.status || '').toLowerCase();
-    const canInvoice = status === 'approved' || status === 'quoted';
+    const canInvoice = status === 'approved';
 
     return `
       <tr>
@@ -1500,24 +1519,73 @@ async function createInvoiceFromRFQ(rfqId) {
 }
 
 async function manualCreateInvoice() {
+  let rfqs = [];
+  try {
+    const res = await fetch('/api/rfq', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.message || 'Failed to load RFQs');
+    rfqs = chronologicalRows(data.rfqs || []).filter((rfq) => String(rfq.status || '').toLowerCase() === 'approved');
+  } catch (err) {
+    showToast(err.message || 'Failed to load RFQs');
+    return;
+  }
+
+  const options = rfqs.map((rfq) => {
+    const label = `#${rfq.id} - ${rfq.name || rfq.customer_name || 'Customer'} - ${rfq.material || rfq.project_name || 'RFQ'}`;
+    return `<option value="${escapeHtml(rfq.id)}">${escapeHtml(label)}</option>`;
+  }).join('');
+
   showDialog(
     'Create Invoice From RFQ',
-    `
-      <p class="status-note">Enter an approved RFQ ID. The invoice will be generated as a draft.</p>
-      <input id="dialogRfqId" type="number" min="1" placeholder="Approved RFQ ID" />
+    rfqs.length ? `
+      <div class="rfq-picker-panel">
+        <label>
+          <span>Approved RFQ</span>
+          <select id="dialogRfqId" onchange="previewSelectedRFQ()">${options}</select>
+        </label>
+        <div id="rfqInvoicePreview" class="rfq-invoice-preview"></div>
+      </div>
+    ` : `
+      <div class="empty-state-panel">
+        <strong>No approved RFQs ready for invoicing.</strong>
+        <span>Approve an RFQ first, then create the invoice from here.</span>
+      </div>
     `,
     async () => {
       const rfqId = Number(document.getElementById('dialogRfqId')?.value);
       if (!rfqId) {
-        showToast('Enter a valid RFQ ID');
+        if (!rfqs.length) hideDialog();
+        else showToast('Select an approved RFQ');
         return;
       }
 
       hideDialog();
       await createInvoiceFromRFQ(rfqId);
     },
-    'Create Invoice'
+    rfqs.length ? 'Create Invoice' : 'Close'
   );
+
+  window.__rfqInvoiceOptions = rfqs;
+  previewSelectedRFQ();
+}
+
+function previewSelectedRFQ() {
+  const preview = document.getElementById('rfqInvoicePreview');
+  if (!preview) return;
+  const rfqId = Number(document.getElementById('dialogRfqId')?.value);
+  const rfq = (window.__rfqInvoiceOptions || []).find((item) => Number(item.id) === rfqId);
+  if (!rfq) {
+    preview.innerHTML = '<span class="status-note">Select an approved RFQ to preview invoice data.</span>';
+    return;
+  }
+
+  preview.innerHTML = `
+    <div><span>Customer</span><strong>${escapeHtml(rfq.name || rfq.customer_name || '-')}</strong></div>
+    <div><span>Email</span><strong>${escapeHtml(rfq.email || '-')}</strong></div>
+    <div><span>Scope / Item</span><strong>${escapeHtml(rfq.material || rfq.project_name || '-')}</strong></div>
+    <div><span>Quantity</span><strong>${escapeHtml(rfq.quantity || '-')}</strong></div>
+    <div><span>Status</span><strong>Approved</strong></div>
+  `;
 }
 
 function invoiceItemRows(items = [{ description: '', quantity: 1, unit_price: 0 }]) {
@@ -1798,6 +1866,17 @@ function openManualInvoiceDialog() {
         items: collectInvoiceItems()
       };
 
+      const invalidItem = body.items.find((item) => !item.description || Number(item.quantity) <= 0 || Number(item.unit_price) < 0);
+      if (!body.customer_name || !body.items.length || invalidItem) {
+        showToast('Please fill required fields');
+        return;
+      }
+
+      if (body.customer_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer_email)) {
+        showToast('Enter a valid customer email');
+        return;
+      }
+
       const res = await fetch('/api/invoice/manual', {
         method: 'POST',
         headers: authHeaders(),
@@ -1833,6 +1912,7 @@ function openManualInvoiceDialog() {
 async function loadInvoices() {
   const tbody = document.getElementById('invoiceTableBody');
   if (!tbody) return;
+  setRegisterLoading(tbody, 9, 'Loading invoices...');
 
   const res = await fetch('/api/invoice', {
     headers: { Authorization: `Bearer ${token}` }
@@ -1874,6 +1954,7 @@ async function loadInvoices() {
           <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'paid')">Paid</button>
           <button class="secondary-btn" onclick="openEditInvoiceDialog(${invoice.id})">Edit</button>
           <button class="secondary-btn" onclick="openInvoicePdf(${invoice.id})">PDF</button>
+          <button class="secondary-btn" onclick="openInvoiceQrDialog(${invoice.id})">QR</button>
           <button class="danger-btn" onclick="invoiceAction(${invoice.id}, 'delete')">Delete</button>
         </td>
       </tr>
@@ -2208,6 +2289,32 @@ function openInvoicePdf(invoiceId) {
   if (!opened) {
     window.location.href = url;
   }
+}
+
+async function openInvoiceQrDialog(invoiceId) {
+  const invoice = invoiceCache.find((item) => Number(item.id) === Number(invoiceId));
+  const invoiceNo = invoice?.invoice_no || `INV-${invoiceId}`;
+  const invoiceUrl = `${window.location.origin}/invoice-pdf.html?id=${encodeURIComponent(invoiceId)}&token=${encodeURIComponent(token)}`;
+  const qrUrl = `/api/qr?data=${encodeURIComponent(invoiceUrl)}`;
+
+  showDialog(
+    `Invoice QR - ${escapeHtml(invoiceNo)}`,
+    `
+      <div class="invoice-qr-dialog">
+        <div class="invoice-qr-card">
+          <img src="${qrUrl}" alt="Invoice QR code for ${escapeHtml(invoiceNo)}" />
+          <strong>Scan to open invoice</strong>
+          <span>Invoice ${escapeHtml(invoiceNo)} opens in the secure Voxel Veda invoice viewer.</span>
+        </div>
+        <div class="invoice-qr-actions">
+          <button type="button" class="primary-btn" onclick="openInvoicePdf(${Number(invoiceId)})">Open Invoice</button>
+          <a class="secondary-btn" href="${qrUrl}" download="${escapeHtml(invoiceNo)}-qr.png">Download QR</a>
+        </div>
+      </div>
+    `,
+    () => hideDialog(),
+    'Close'
+  );
 }
 
 async function openEditInvoiceDialog(invoiceId) {
