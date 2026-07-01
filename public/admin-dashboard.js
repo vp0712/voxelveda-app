@@ -129,6 +129,7 @@ function toggleMobileMenu(open) {
     ? open
     : !document.body.classList.contains('mobile-menu-open');
   document.body.classList.toggle('mobile-menu-open', shouldOpen);
+  document.documentElement.classList.toggle('mobile-menu-open', shouldOpen);
   document.querySelectorAll('.topbar-menu-btn, .mobile-menu-btn').forEach((btn) => {
     btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
   });
@@ -270,6 +271,13 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+window.addEventListener('resize', () => {
+  window.requestAnimationFrame(() => {
+    closeResponsiveOverlaysForViewport();
+    enhanceResponsiveTables();
+  });
+});
+
 function enhanceResponsiveTables() {
   document.querySelectorAll('table').forEach((table) => {
     const headers = Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent.trim());
@@ -284,11 +292,32 @@ function enhanceResponsiveTables() {
   });
 }
 
+function normalizeActionButtons(root = document) {
+  root.querySelectorAll('button:not([type])').forEach((button) => {
+    button.type = 'button';
+  });
+}
+
+function closeResponsiveOverlaysForViewport() {
+  if (window.innerWidth >= 1024) {
+    toggleMobileMenu(false);
+    closeNotificationPanel();
+  }
+}
+
 function startResponsiveTableObserver() {
+  normalizeActionButtons();
   enhanceResponsiveTables();
 
+  let pendingFrame = false;
   const observer = new MutationObserver(() => {
-    window.requestAnimationFrame(enhanceResponsiveTables);
+    if (pendingFrame) return;
+    pendingFrame = true;
+    window.requestAnimationFrame(() => {
+      pendingFrame = false;
+      normalizeActionButtons();
+      enhanceResponsiveTables();
+    });
   });
 
   observer.observe(document.body, {
@@ -571,6 +600,8 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
   primaryBtn.onclick = onPrimary;
+  normalizeActionButtons(bodyEl);
+  enhanceResponsiveTables();
   backdrop.classList.add('active');
 }
 
@@ -6236,6 +6267,7 @@ async function loadSelectedStaffTimesheets() {
 async function bootAdminDashboard() {
   try {
     installAccessDeniedHandler();
+    normalizeActionButtons();
     setupNavigation();
     startResponsiveTableObserver();
 
@@ -6287,3 +6319,4 @@ async function bootAdminDashboard() {
 }
 
 document.addEventListener('DOMContentLoaded', bootAdminDashboard);
+
