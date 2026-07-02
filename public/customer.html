@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Customer RFQ</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260702-vv-ai" />
+  <link rel="stylesheet" href="/style.css?v=20260703-ai-lead" />
 </head>
 
 <body>
@@ -60,7 +60,7 @@
         <button type="button" class="vv-ai-close" aria-label="Close assistant" onclick="toggleVoxelAi(false)">x</button>
       </div>
       <div class="vv-ai-messages" id="vvAiMessages" aria-live="polite">
-        <div class="vv-ai-message bot">Tell me what you are making, or choose a quick option. I can help with material choice, RFQ details, file prep, tolerances, and next steps.</div>
+        <div class="vv-ai-message bot">Hi, I am Voxel Veda AI. First I will collect your details so the engineering team can contact you. What is your full name?</div>
       </div>
       <div class="vv-ai-quick-actions" aria-label="AI quick actions">
         <button type="button" onclick="askVoxelAi('What material should I choose?')">Material</button>
@@ -69,7 +69,7 @@
         <button type="button" onclick="askVoxelAi('Help me complete the RFQ')">RFQ help</button>
       </div>
       <div class="vv-ai-input-row">
-        <input id="vvAiInput" type="text" placeholder="Ask about materials, tolerances, quote steps..." onkeydown="handleVoxelAiKey(event)" />
+        <input id="vvAiInput" type="text" placeholder="Your full name" onkeydown="handleVoxelAiKey(event)" />
         <button type="button" onclick="sendVoxelAiQuestion()">Send</button>
       </div>
       <div class="vv-ai-actions">
@@ -80,6 +80,6 @@
     </section>
   </aside>
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/customer.js?v=20260702-vv-ai"></script>
+  <script src="/customer.js?v=20260703-ai-lead"></script>
 </body>
 </html>

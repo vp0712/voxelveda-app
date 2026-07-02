@@ -12,6 +12,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const rfqController = require('./controllers/rfqController');
+const aiLeadController = require('./controllers/aiLeadController');
 const stockRoutes = require('./routes/stockRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const materialRoutes = require('./routes/materialRoutes');
@@ -67,6 +68,7 @@ app.get('/api/qr', async (req, res) => {
 });
 
 app.post('/api/public/rfq', rfqController.createRFQ);
+app.post('/api/public/ai-lead', aiLeadController.createLead);
 app.get('/api/public/shift-qr', attendanceController.publicShiftQrToken);
 
 app.use('/api/rfq', auth, requirePermission('rfqs'), rfqRoutes);
