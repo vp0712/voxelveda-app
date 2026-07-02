@@ -46,7 +46,39 @@
       </div>
     </section>
   </main>
-
+  <aside class="vv-ai-widget" id="vvAiWidget" aria-label="Voxel Veda AI assistant">
+    <button type="button" class="vv-ai-toggle" id="vvAiToggle" aria-expanded="false" aria-controls="vvAiPanel" onclick="toggleVoxelAi()">
+      <span class="vv-ai-orb">AI</span>
+      <span>Voxel Veda AI</span>
+    </button>
+    <section class="vv-ai-panel" id="vvAiPanel" hidden>
+      <div class="vv-ai-head">
+        <div>
+          <p class="eyebrow">Manufacturing Assistant</p>
+          <h2>How can I help?</h2>
+        </div>
+        <button type="button" class="vv-ai-close" aria-label="Close assistant" onclick="toggleVoxelAi(false)">x</button>
+      </div>
+      <div class="vv-ai-messages" id="vvAiMessages" aria-live="polite">
+        <div class="vv-ai-message bot">Tell me what you are making, or choose a quick option. I can help with material choice, RFQ details, file prep, tolerances, and next steps.</div>
+      </div>
+      <div class="vv-ai-quick-actions" aria-label="AI quick actions">
+        <button type="button" onclick="askVoxelAi('What material should I choose?')">Material</button>
+        <button type="button" onclick="askVoxelAi('What files do I need for RFQ?')">Files</button>
+        <button type="button" onclick="askVoxelAi('I need NDA or confidential project support')">NDA</button>
+        <button type="button" onclick="askVoxelAi('Help me complete the RFQ')">RFQ help</button>
+      </div>
+      <div class="vv-ai-input-row">
+        <input id="vvAiInput" type="text" placeholder="Ask about materials, tolerances, quote steps..." onkeydown="handleVoxelAiKey(event)" />
+        <button type="button" onclick="sendVoxelAiQuestion()">Send</button>
+      </div>
+      <div class="vv-ai-actions">
+        <button type="button" onclick="focusCustomerField('customerApplication')">Fill RFQ</button>
+        <a href="mailto:info@voxelveda.com?subject=Voxel%20Veda%20RFQ%20Support">Email team</a>
+        <a href="tel:+61420407232">Call</a>
+      </div>
+    </section>
+  </aside>
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
   <script src="/customer.js"></script>
 </body>
