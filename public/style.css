@@ -8657,4 +8657,90 @@ textarea {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* Advanced Voxel Veda AI intake polish */
+.vv-ai-widget.is-open .vv-ai-toggle {
+  transform: translateY(-2px) scale(.98);
+}
+
+.vv-ai-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  padding: 5px 7px;
+  border: 1px solid rgba(13, 148, 180, .2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .68);
+  color: #0e7490;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.vv-ai-stage strong {
+  display: inline-grid;
+  min-width: 34px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  color: #031726;
+  background: linear-gradient(135deg, #a7f3ff, #22d3ee);
+}
+
+.vv-ai-insight-card {
+  display: grid;
+  gap: 8px;
+  width: min(100%, 290px);
+  padding: 12px;
+  border: 1px solid rgba(13, 148, 180, .18);
+  border-radius: 18px 18px 6px 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(225,246,255,.86));
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+.vv-ai-insight-card div {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) 1fr;
+  gap: 8px;
+  align-items: start;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.vv-ai-insight-card strong {
+  color: #075985;
+}
+
+.vv-ai-insight-card span {
+  color: #173146;
+}
+
+.vv-ai-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vv-ai-actions button,
+.vv-ai-actions a {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+@media (max-width: 420px) {
+  .vv-ai-panel {
+    padding: 16px;
+  }
+
+  .vv-ai-head h2 {
+    font-size: 21px;
+  }
+
+  .vv-ai-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* End advanced Voxel Veda AI intake polish */
 /* End Voxel Veda AI assistant widget */

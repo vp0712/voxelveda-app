@@ -68,9 +68,21 @@ async function submitCustomerRFQ() {
 }
 
 const voxelAiState = {
+  started: true,
   step: 'name',
   lead: { name: '', email: '', phone: '', company: '', need: '' },
-  transcript: []
+  transcript: [],
+  rfqId: null,
+  emailSent: false
+};
+
+const voxelAiSteps = {
+  name: { label: 'Contact', progress: '1/5', placeholder: 'Your full name' },
+  email: { label: 'Email', progress: '2/5', placeholder: 'Email address' },
+  phone: { label: 'Phone', progress: '3/5', placeholder: 'Phone number' },
+  company: { label: 'Company', progress: '4/5', placeholder: 'Company or individual' },
+  need: { label: 'Project', progress: '5/5', placeholder: 'Part, material, qty, deadline...' },
+  sent: { label: 'Queued', progress: 'Saved', placeholder: 'Ask a follow-up question' }
 };
 
 function toggleVoxelAi(forceOpen) {
@@ -99,6 +111,17 @@ function focusCustomerField(id) {
   field.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
+function updateVoxelAiStage() {
+  const meta = voxelAiSteps[voxelAiState.step] || voxelAiSteps.name;
+  const stepEl = document.getElementById('vvAiStep');
+  const progressEl = document.getElementById('vvAiProgress');
+  const input = document.getElementById('vvAiInput');
+
+  if (stepEl) stepEl.textContent = meta.label;
+  if (progressEl) progressEl.textContent = meta.progress;
+  if (input) input.placeholder = meta.placeholder;
+}
+
 function appendVoxelAiMessage(message, sender = 'bot') {
   const messages = document.getElementById('vvAiMessages');
   if (!messages) return;
@@ -112,42 +135,110 @@ function appendVoxelAiMessage(message, sender = 'bot') {
   voxelAiState.transcript.push(`${sender}: ${message}`);
 }
 
-function setVoxelAiPlaceholder(text) {
-  const input = document.getElementById('vvAiInput');
-  if (input) input.placeholder = text;
+function appendVoxelAiCard(items) {
+  const messages = document.getElementById('vvAiMessages');
+  if (!messages) return;
+
+  const card = document.createElement('div');
+  card.className = 'vv-ai-insight-card bot';
+
+  items.forEach(({ label, value }) => {
+    const row = document.createElement('div');
+    const strong = document.createElement('strong');
+    const span = document.createElement('span');
+    strong.textContent = label;
+    span.textContent = value || '-';
+    row.append(strong, span);
+    card.appendChild(row);
+  });
+
+  messages.appendChild(card);
+  messages.scrollTop = messages.scrollHeight;
 }
 
 function ensureVoxelAiIntro() {
-  if (voxelAiState.started) return;
-  voxelAiState.started = true;
-  appendVoxelAiMessage('Hi, I am Voxel Veda AI. First I will collect your details so the engineering team can contact you. What is your full name?');
-  setVoxelAiPlaceholder('Your full name');
+  const messages = document.getElementById('vvAiMessages');
+  if (messages && !voxelAiState.transcript.length) {
+    const first = messages.querySelector('.vv-ai-message.bot');
+    if (first) voxelAiState.transcript.push(`bot: ${first.textContent.trim()}`);
+  }
+  updateVoxelAiStage();
 }
 
 function isEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
+function extractQuantity(text) {
+  const match = String(text || '').match(/(?:qty|quantity)?\s*(\d{1,6})\s*(?:pcs|pieces|parts|units)?/i);
+  return match ? Number(match[1]) : 1;
+}
+
+function extractMaterial(text) {
+  const q = String(text || '').toLowerCase();
+  const materials = ['fdm', 'sla', 'sls', 'nylon', 'carbon fiber', 'carbon-filled nylon', 'pla', 'petg', 'abs', 'asa', 'tpu', 'resin', 'aluminium', 'aluminum', 'stainless steel'];
+  return materials.find((material) => q.includes(material)) || 'AI recommendation requested';
+}
+
+function getLeadSummary() {
+  return [
+    `Name: ${voxelAiState.lead.name}`,
+    `Email: ${voxelAiState.lead.email}`,
+    `Phone: ${voxelAiState.lead.phone || '-'}`,
+    `Company: ${voxelAiState.lead.company || '-'}`,
+    `Need: ${voxelAiState.lead.need}`,
+    voxelAiState.rfqId ? `Reference: #${voxelAiState.rfqId}` : ''
+  ].filter(Boolean).join('\n');
+}
+
+function syncLeadToRFQForm() {
+  const quantity = extractQuantity(voxelAiState.lead.need);
+  const material = extractMaterial(voxelAiState.lead.need);
+  const application = [
+    voxelAiState.lead.need,
+    voxelAiState.rfqId ? `AI assistant reference #${voxelAiState.rfqId}` : '',
+    voxelAiState.lead.company ? `Company: ${voxelAiState.lead.company}` : ''
+  ].filter(Boolean).join('\n');
+
+  const values = {
+    customerName: voxelAiState.lead.company || voxelAiState.lead.name,
+    customerEmail: voxelAiState.lead.email,
+    customerPhone: voxelAiState.lead.phone,
+    customerMaterial: material,
+    customerQuantity: quantity,
+    customerApplication: application
+  };
+
+  Object.entries(values).forEach(([id, value]) => {
+    const el = document.getElementById(id);
+    if (el && value) el.value = value;
+  });
+}
+
 function getVoxelAiResponse(question) {
   const q = String(question || '').toLowerCase();
 
   if (q.includes('material') || q.includes('pla') || q.includes('abs') || q.includes('nylon') || q.includes('resin') || q.includes('carbon')) {
-    return 'Material guide: PLA is best for visual prototypes, PETG for tougher functional parts, ABS/ASA for heat and outdoor use, Nylon or carbon-filled Nylon for strength, TPU for flexible parts, and resin for fine detail.';
+    return 'Material guide: PLA for visual prototypes, PETG for tougher functional parts, ABS/ASA for heat or outdoor use, Nylon or carbon-filled Nylon for strength, TPU for flexible parts, and resin for fine detail.';
   }
 
   if (q.includes('file') || q.includes('stl') || q.includes('step') || q.includes('drawing') || q.includes('cad')) {
-    return 'Best RFQ files: STEP or Parasolid for engineering review, STL/3MF for printing geometry, and PDF drawings for critical tolerances.';
+    return 'Best RFQ package: STEP or Parasolid for engineering review, STL/3MF for print geometry, and a PDF drawing for critical tolerances or inserts.';
   }
 
   if (q.includes('nda') || q.includes('confidential') || q.includes('sensitive') || q.includes('defence')) {
-    return 'For confidential work, mention NDA required. Voxel Veda can review sensitive defence, aerospace, medical, and robotics projects through a controlled workflow.';
+    return 'For confidential work, mark NDA required and avoid unnecessary public details. The team can review sensitive defence, aerospace, medical, and robotics projects through controlled workflows.';
   }
 
   if (q.includes('tolerance') || q.includes('precision') || q.includes('finish')) {
-    return 'For precision work, include target tolerance, mating surfaces, surface finish, inspection needs, and the part function.';
+    return 'For precision work, include target tolerance, mating surfaces, surface finish, inspection needs, load, heat, and whether the part is prototype-only or production-intent.';
   }
 
-  return 'Thanks. I have sent your details to the Voxel Veda team. You can also use the RFQ form on this page if you want to add structured quote details.';
+  if (q.includes('deadline') || q.includes('urgent') || q.includes('lead time')) {
+    return 'For fast turnaround, include deadline, quantity, material flexibility, and whether partial delivery is acceptable. That helps engineering choose the fastest route.';
+  }
+
+  return 'Your request is in the engineering queue. Ask me about material choice, CAD file prep, tolerances, NDA handling, or fastest quote next steps.';
 }
 
 async function sendVoxelAiLead() {
@@ -165,7 +256,7 @@ async function sendVoxelAiLead() {
   });
 
   const data = await safeJson(res);
-  if (!res.ok) throw new Error(data.message || 'Lead email failed.');
+  if (!res.ok) throw new Error(data.message || 'Lead save failed.');
   return data;
 }
 
@@ -176,19 +267,19 @@ async function handleVoxelAiLeadAnswer(answer) {
     voxelAiState.lead.name = value;
     voxelAiState.step = 'email';
     appendVoxelAiMessage('Thanks. What is your email address?');
-    setVoxelAiPlaceholder('Email address');
+    updateVoxelAiStage();
     return;
   }
 
   if (voxelAiState.step === 'email') {
     if (!isEmail(value)) {
-      appendVoxelAiMessage('Please enter a valid email address so we can send the lead to the team.');
+      appendVoxelAiMessage('Please enter a valid email address so the team can contact you.');
       return;
     }
     voxelAiState.lead.email = value;
     voxelAiState.step = 'phone';
     appendVoxelAiMessage('Great. What phone number should the team use?');
-    setVoxelAiPlaceholder('Phone number');
+    updateVoxelAiStage();
     return;
   }
 
@@ -196,30 +287,37 @@ async function handleVoxelAiLeadAnswer(answer) {
     voxelAiState.lead.phone = value;
     voxelAiState.step = 'company';
     appendVoxelAiMessage('Company name? You can type individual if this is personal.');
-    setVoxelAiPlaceholder('Company or individual');
+    updateVoxelAiStage();
     return;
   }
 
   if (voxelAiState.step === 'company') {
     voxelAiState.lead.company = value;
     voxelAiState.step = 'need';
-    appendVoxelAiMessage('Now tell me what you need: part type, material, quantity, deadline, tolerance, NDA needs, or any project notes.');
-    setVoxelAiPlaceholder('What do you need?');
+    appendVoxelAiMessage('Now describe the job: part type, material, quantity, deadline, tolerance, NDA needs, and any CAD file status.');
+    updateVoxelAiStage();
     return;
   }
 
   if (voxelAiState.step === 'need') {
     voxelAiState.lead.need = value;
     voxelAiState.step = 'sent';
-    appendVoxelAiMessage('Sending your information to Voxel Veda now...');
-    setVoxelAiPlaceholder('Ask a follow-up question');
+    updateVoxelAiStage();
+    appendVoxelAiMessage('Running a quick project intake check and saving your request...');
+
     try {
       const result = await sendVoxelAiLead();
-      if (result.email_sent) {
-        appendVoxelAiMessage('Done. Your details were emailed to the Voxel Veda team in a lead table and saved in the app. ' + getVoxelAiResponse(value));
-      } else {
-        appendVoxelAiMessage('Done. Your details were saved in the Voxel Veda app for the team to review. Email notification needs SMTP setup before it can send automatically.');
-      }
+      voxelAiState.rfqId = result.rfq_id || null;
+      voxelAiState.emailSent = Boolean(result.email_sent);
+      syncLeadToRFQForm();
+
+      appendVoxelAiMessage(`Done. Your project is saved in the Voxel Veda app${voxelAiState.rfqId ? ` as reference #${voxelAiState.rfqId}` : ''}. The engineering team can review it from the dashboard.`);
+      appendVoxelAiCard([
+        { label: 'Detected material', value: extractMaterial(value) },
+        { label: 'Quantity', value: String(extractQuantity(value)) },
+        { label: 'Next best step', value: 'Upload CAD/drawing files or add tolerance notes in the RFQ form.' }
+      ]);
+      appendVoxelAiMessage(getVoxelAiResponse(value));
     } catch {
       appendVoxelAiMessage('I could not save this automatically. Please email info@voxelveda.com or try again shortly.');
     }
@@ -234,9 +332,8 @@ function askVoxelAi(question) {
   appendVoxelAiMessage(question, 'user');
 
   if (voxelAiState.step !== 'sent') {
-    appendVoxelAiMessage('I will help with that after I collect your contact details. What is your full name?');
-    voxelAiState.step = 'name';
-    setVoxelAiPlaceholder('Your full name');
+    appendVoxelAiMessage('I can answer that after the intake details are captured. Please continue with the current question in the input box.');
+    updateVoxelAiStage();
     return;
   }
 
@@ -257,6 +354,40 @@ function handleVoxelAiKey(event) {
   if (event.key === 'Enter') sendVoxelAiQuestion();
 }
 
+function startNewVoxelAiLead() {
+  voxelAiState.step = 'name';
+  voxelAiState.lead = { name: '', email: '', phone: '', company: '', need: '' };
+  voxelAiState.transcript = [];
+  voxelAiState.rfqId = null;
+  voxelAiState.emailSent = false;
+
+  const messages = document.getElementById('vvAiMessages');
+  if (messages) {
+    messages.innerHTML = '<div class="vv-ai-message bot">Fresh intake started. What is your full name?</div>';
+    voxelAiState.transcript.push('bot: Fresh intake started. What is your full name?');
+  }
+
+  updateVoxelAiStage();
+  toggleVoxelAi(true);
+}
+
+async function copyVoxelAiSummary() {
+  const summary = getLeadSummary();
+  if (!summary.trim()) {
+    appendVoxelAiMessage('No project summary is ready yet. Complete the intake first.');
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(summary);
+    appendVoxelAiMessage('Project summary copied. You can paste it into an email, drawing note, or internal handoff.');
+  } catch {
+    appendVoxelAiMessage(summary);
+  }
+}
+
 window.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') toggleVoxelAi(false);
 });
+
+window.addEventListener('DOMContentLoaded', updateVoxelAiStage);
