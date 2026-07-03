@@ -6,7 +6,8 @@ const {
   listMyRoster,
   saveShift,
   generateRoster,
-  deleteShift
+  deleteShift,
+  publishRoster
 } = require('../controllers/rosterController');
 
 const router = express.Router();
@@ -16,5 +17,6 @@ router.get('/my', listMyRoster);
 router.post('/', requireRole('admin'), requireInputPermission('roster_input'), saveShift);
 router.post('/generate', requireRole('admin'), requireInputPermission('roster_input'), generateRoster);
 router.post('/delete', requireRole('admin'), requireInputPermission('roster_input'), deleteShift);
+router.post('/publish', requireRole('admin'), requireInputPermission('roster_input'), publishRoster);
 
 module.exports = router;

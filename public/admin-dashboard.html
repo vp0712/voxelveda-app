@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260702-responsive-audit"/>
+<link rel="stylesheet" href="/style.css?v=20260703-workforce-suite"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -735,6 +735,30 @@
           </div>
           <button onclick="openAttendanceDialog()" class="primary-btn">Add / Fix Timesheet</button>
         </div>
+        <div class="metric-grid workforce-command-metrics">
+          <div class="card kpi-blue"><h3>Clocked In Now</h3><p><strong id="clockedInCount">0</strong></p><span>Active shifts on the floor</span></div>
+          <div class="card kpi-teal"><h3>Pending Timesheets</h3><p><strong id="pendingTimesheetCount">0</strong></p><span>Waiting for manager review</span></div>
+          <div class="card kpi-green"><h3>Payroll Ready</h3><p><strong id="payrollReadyCount">0</strong></p><span>Approved or clean summaries</span></div>
+          <div class="card kpi-red"><h3>Overtime Alerts</h3><p><strong id="overtimeWarningCount">0</strong></p><span>Shifts over standard limits</span></div>
+        </div>
+
+        <div class="card workforce-action-centre">
+          <div class="section-head">
+            <div><h3>Timesheet Command Centre</h3><p>Email, export and review weekly or monthly timesheets without leaving Workforce.</p></div>
+            <div class="card-actions">
+              <button class="secondary-btn" onclick="exportTimesheetCsv()">Export CSV</button>
+              <button class="secondary-btn" onclick="exportTimesheetHtml()">Preview Summary</button>
+              <button class="primary-btn" onclick="sendTimesheetEmail()">Send Timesheet</button>
+            </div>
+          </div>
+          <div class="form-grid timesheet-send-grid">
+            <label class="form-field"><span>Staff</span><select id="timesheetSendStaffSelect"><option value="">All staff</option></select></label>
+            <label class="form-field"><span>From</span><input id="timesheetSendFrom" type="date" /></label>
+            <label class="form-field"><span>To</span><input id="timesheetSendTo" type="date" /></label>
+            <label class="form-field"><span>Extra recipient</span><input id="timesheetSendRecipient" placeholder="Optional payroll/admin email" /></label>
+          </div>
+          <div id="timesheetEmailLogBody" class="status-note">Ready to prepare a timesheet summary.</div>
+        </div>
 
         <div class="card table-wrap">
           <div class="section-head">
@@ -856,84 +880,53 @@
             <p class="status-note">Select staff, date range and shift pattern. New roster entries appear at the bottom of the register.</p>
           </div>
           <div class="roster-generator-grid">
-            <label class="form-field">
-              <span>Workshop / Location</span>
-              <input id="rosterLocation" placeholder="Voxel Veda Workshop" value="Voxel Veda Workshop" />
-            </label>
-            <label class="form-field">
-              <span>Staff - select one or more</span>
-              <select id="rosterStaffSelect" multiple></select>
-            </label>
-            <label class="form-field">
-              <span>Date From</span>
-              <input id="rosterFromDate" type="date" />
-            </label>
-            <label class="form-field">
-              <span>Date To</span>
-              <input id="rosterToDate" type="date" />
-            </label>
-            <label class="form-field">
-              <span>Start Time</span>
-              <input id="rosterStartTime" type="time" value="08:00" />
-            </label>
-            <label class="form-field">
-              <span>End Time</span>
-              <input id="rosterEndTime" type="time" value="16:00" />
-            </label>
-            <label class="form-field">
-              <span>Role / Shift Type</span>
-              <input id="rosterRoleLabel" placeholder="Production / CNC / Inspection" value="Production" />
-            </label>
-            <label class="form-field">
-              <span>Notes</span>
-              <input id="rosterNotes" placeholder="Job, machine, site or special instruction" />
-            </label>
+            <label class="form-field"><span>Workshop / Location</span><input id="rosterLocation" placeholder="Voxel Veda Workshop" value="Voxel Veda Workshop" /></label>
+            <label class="form-field"><span>Staff - select one or more</span><select id="rosterStaffSelect" multiple></select></label>
+            <label class="form-field"><span>Date From</span><input id="rosterFromDate" type="date" /></label>
+            <label class="form-field"><span>Date To</span><input id="rosterToDate" type="date" /></label>
+            <label class="form-field"><span>Start Time</span><input id="rosterStartTime" type="time" value="08:00" /></label>
+            <label class="form-field"><span>End Time</span><input id="rosterEndTime" type="time" value="16:00" /></label>
+            <label class="form-field"><span>Role / Shift Type</span><input id="rosterRoleLabel" placeholder="Production / CNC / Inspection" value="Production" /></label>
+            <label class="form-field"><span>Break minutes</span><input id="rosterBreakMinutes" type="number" min="0" value="30" /></label>
+            <label class="form-field"><span>Hourly rate</span><input id="rosterHourlyRate" type="number" min="0" step="0.01" value="32" /></label>
+            <label class="form-field"><span>Weekly wage budget</span><input id="rosterWeeklyBudget" type="number" min="0" step="0.01" placeholder="Optional budget" /></label>
+            <label class="form-field"><span>Notes</span><input id="rosterNotes" placeholder="Job, machine, site or special instruction" /></label>
             <button class="primary-btn roster-generate-btn" onclick="generateRoster()">Generate</button>
             <button class="secondary-btn roster-generate-btn" onclick="setRosterLastWeek()">Last Week</button>
           </div>
         </div>
 
-        <div class="metric-grid">
-          <div class="card kpi-blue">
-            <h3>Upcoming Shifts</h3>
-            <p><strong id="rosterUpcomingCount">0</strong></p>
-            <span>Scheduled from today onward</span>
+        <div class="metric-grid roster-command-metrics">
+          <div class="card kpi-blue"><h3>Upcoming Shifts</h3><p><strong id="rosterUpcomingCount">0</strong></p><span>Scheduled from today onward</span></div>
+          <div class="card kpi-teal"><h3>Roster Hours</h3><p><strong id="rosterHoursCount">0.00</strong></p><span>Net planned hours after breaks</span></div>
+          <div class="card kpi-green"><h3>Roster Cost</h3><p><strong id="rosterCostCount">$0.00</strong></p><span>Estimated wage cost</span></div>
+          <div class="card kpi-red"><h3>Budget Signal</h3><p><strong id="rosterBudgetStatus">No budget</strong></p><span>Live roster cost guardrail</span></div>
+        </div>
+
+        <div class="card roster-intelligence-card">
+          <div class="section-head">
+            <div><h3>Roster Intelligence</h3><p>Cost, overtime, publish readiness and weekly coverage signals.</p></div>
+            <div class="card-actions">
+              <button class="secondary-btn" onclick="openSmartRosterDialog()">Smart Builder</button>
+              <button class="secondary-btn" onclick="exportRosterCsv()">Export CSV</button>
+              <button class="secondary-btn" onclick="exportRosterPrint()">Print / PDF</button>
+              <button class="primary-btn" onclick="publishRoster()">Publish Roster</button>
+            </div>
           </div>
-          <div class="card kpi-teal">
-            <h3>Roster Hours</h3>
-            <p><strong id="rosterHoursCount">0.00</strong></p>
-            <span>Total planned hours</span>
-          </div>
-          <div class="card kpi-green">
-            <h3>Staff Covered</h3>
-            <p><strong id="rosterStaffCount">0</strong></p>
-            <span>People with assigned shifts</span>
-          </div>
+          <div id="rosterComplianceAlerts" class="roster-signal-grid"></div>
+          <div id="rosterCalendarCards" class="roster-week-strip"></div>
         </div>
 
         <div class="card table-wrap">
           <h3>Roster Register</h3>
           <table>
-            <thead>
-              <tr>
-                <th>Staff</th>
-                <th>Date</th>
-                <th>Shift</th>
-                <th>Role / Location</th>
-                <th>Status</th>
-                <th>Created / Updated</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody id="rosterTableBody">
-              <tr><td colspan="7">Loading roster...</td></tr>
-            </tbody>
+            <thead><tr><th>Staff</th><th>Date</th><th>Shift</th><th>Role / Location</th><th>Status</th><th>Created / Updated</th><th>Actions</th></tr></thead>
+            <tbody id="rosterTableBody"><tr><td colspan="7">Loading roster...</td></tr></tbody>
           </table>
         </div>
       </section>
 
-      <!-- STAFF -->
-      <section id="staffSection" class="page-section hidden-section">
+      <!-- STAFF -->      <section id="staffSection" class="page-section hidden-section">
         <div class="section-head">
           <h2>Staff Management</h2>
           <button onclick="openAddStaff()" class="primary-btn">Add Staff</button>
@@ -1313,6 +1306,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260702-responsive-audit"></script>
+  <script src="/admin-dashboard.js?v=20260703-workforce-suite"></script>
 </body>
 </html>

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
+const { sendMail, isEmailConfigured, missingSmtpKeys } = require('../services/emailService');
 
 const SHIFT_QR_WINDOW_SECONDS = 20;
 const SHIFT_QR_PREFIX = 'VVSHIFT';
@@ -36,6 +37,30 @@ function weekEndForDate(value) {
   return d.toISOString().slice(0, 10);
 }
 
+
+function timesheetEscapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+async function ensureTimesheetEmailLogTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS timesheet_email_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NULL,
+      period_label VARCHAR(120) NOT NULL,
+      recipients TEXT NOT NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'queued',
+      message TEXT NULL,
+      created_by INT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+}
 function normalizeDateTime(value) {
   const text = String(value || '').trim();
   if (!text) return null;
@@ -950,3 +975,106 @@ async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
     [userId, weekStart, weekEnd, totalHours, 'open']
   );
 }
+
+exports.sendTimesheetSummary = async (req, res) => {
+  try {
+    await ensureAttendanceTables();
+    await ensureTimesheetEmailLogTable();
+
+    if (!isAdmin(req)) {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const userId = Number(req.body.user_id || 0) || null;
+    const fromDate = String(req.body.from_date || weekStartDate()).slice(0, 10);
+    const toDate = String(req.body.to_date || weekEndDate()).slice(0, 10);
+    const includeEmployee = req.body.include_employee !== false;
+    const extraRecipient = String(req.body.recipient || '').trim();
+
+    const params = [fromDate, toDate];
+    let userFilter = '';
+    if (userId) {
+      userFilter = 'AND sa.user_id = ?';
+      params.push(userId);
+    }
+
+    const [rows] = await pool.query(`
+      SELECT sa.*, u.name, u.email
+      FROM staff_attendance sa
+      LEFT JOIN users u ON u.id = sa.user_id
+      WHERE sa.deleted = 0
+        AND DATE(sa.clock_in) BETWEEN ? AND ?
+        ${userFilter}
+      ORDER BY u.name ASC, sa.clock_in ASC
+    `, params);
+
+    const totalHours = rows.reduce((sum, row) => sum + Number(row.total_hours || 0), 0);
+    const staffNames = [...new Set(rows.map((row) => row.name || row.email || `User ${row.user_id}`))];
+    const recipients = new Set();
+    const adminRecipient = process.env.TIMESHEET_EMAIL || process.env.FROM_EMAIL || process.env.SMTP_USER;
+    if (adminRecipient) recipients.add(adminRecipient);
+    if (extraRecipient) recipients.add(extraRecipient);
+    if (includeEmployee) rows.forEach((row) => row.email && recipients.add(row.email));
+
+    const tableRows = rows.length ? rows.map((row) => `
+      <tr>
+        <td>${timesheetEscapeHtml(row.name || '-')}</td>
+        <td>${timesheetEscapeHtml(String(row.work_date || row.clock_in || '').slice(0, 10))}</td>
+        <td>${timesheetEscapeHtml(row.clock_in || '-')}</td>
+        <td>${timesheetEscapeHtml(row.clock_out || '-')}</td>
+        <td>${Number(row.total_hours || 0).toFixed(2)}</td>
+        <td>${timesheetEscapeHtml(row.notes || '-')}</td>
+      </tr>
+    `).join('') : '<tr><td colspan="6">No timesheet records found for this period.</td></tr>';
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;color:#0f172a">
+        <h2>Voxel Veda Timesheet Summary</h2>
+        <p><strong>Period:</strong> ${timesheetEscapeHtml(fromDate)} to ${timesheetEscapeHtml(toDate)}</p>
+        <p><strong>Staff:</strong> ${timesheetEscapeHtml(staffNames.join(', ') || 'All staff')}</p>
+        <p><strong>Total hours:</strong> ${totalHours.toFixed(2)}</p>
+        <table cellspacing="0" cellpadding="8" style="border-collapse:collapse;width:100%;font-size:13px">
+          <thead><tr style="background:#0b1220;color:#fff"><th align="left">Staff</th><th align="left">Date</th><th align="left">Clock in</th><th align="left">Clock out</th><th align="left">Hours</th><th align="left">Notes</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+    `;
+
+    if (!isEmailConfigured()) {
+      await pool.query(`
+        INSERT INTO timesheet_email_logs (user_id, period_label, recipients, status, message, created_by)
+        VALUES (?, ?, ?, 'setup_required', ?, ?)
+      `, [userId, `${fromDate} to ${toDate}`, [...recipients].join(', '), `Missing SMTP: ${missingSmtpKeys().join(', ')}`, Number(req.user?.id || 0) || null]);
+      return res.status(400).json({
+        message: 'SMTP email setup required before sending timesheets',
+        missing: missingSmtpKeys(),
+        preview: { from_date: fromDate, to_date: toDate, total_hours: Number(totalHours.toFixed(2)), records: rows.length }
+      });
+    }
+
+    if (!recipients.size) {
+      return res.status(400).json({ message: 'No email recipient found for this timesheet' });
+    }
+
+    await sendMail({
+      to: [...recipients],
+      subject: `Voxel Veda Timesheet ${fromDate} to ${toDate}`,
+      html
+    });
+
+    await pool.query(`
+      INSERT INTO timesheet_email_logs (user_id, period_label, recipients, status, message, created_by)
+      VALUES (?, ?, ?, 'sent', ?, ?)
+    `, [userId, `${fromDate} to ${toDate}`, [...recipients].join(', '), `${rows.length} records, ${totalHours.toFixed(2)} hours`, Number(req.user?.id || 0) || null]);
+
+    res.json({
+      message: 'Timesheet summary emailed successfully',
+      recipients: [...recipients],
+      total_hours: Number(totalHours.toFixed(2)),
+      records: rows.length
+    });
+  } catch (err) {
+    console.error('SEND TIMESHEET SUMMARY ERROR:', err);
+    res.status(500).json({ message: 'Failed to send timesheet summary', error: err.message });
+  }
+};
