@@ -6389,10 +6389,24 @@ function openSmartRosterDialog() {
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
 }
 /* ================= EMAIL FALLBACK OVERRIDE 20260703 ================= */
+let lastTimesheetEmailDraft = null;
+
 function buildTimesheetEmailDraft(rows, fromDate, toDate) {
-  const total = rows.reduce((sum, row) => sum + Number(row.total_hours || 0), 0);
-  const staffNames = [...new Set(rows.map((row) => row.name || row.email || 'Staff'))].join(', ') || 'All staff';
-  const lines = [
+  const cleanRows = Array.isArray(rows) ? rows : [];
+  const total = cleanRows.reduce((sum, row) => sum + Number(row.total_hours || 0), 0);
+  const staffNames = [...new Set(cleanRows.map((row) => row.name || row.email || 'Staff'))].join(', ') || 'All staff';
+  const rowHtml = cleanRows.length ? cleanRows.map((row, index) => `
+    <tr>
+      <td>${index + 1}</td>
+      <td>${escapeHtml(row.name || '-')}</td>
+      <td>${escapeHtml(formatDate(row.work_date || row.clock_in))}</td>
+      <td>${escapeHtml(formatClockTime(row.clock_in))}</td>
+      <td>${escapeHtml(formatClockTime(row.clock_out))}</td>
+      <td>${Number(row.total_hours || 0).toFixed(2)}</td>
+      <td>${escapeHtml(row.notes || '-')}</td>
+    </tr>
+  `).join('') : '<tr><td colspan="7">No timesheet records found for this selected period.</td></tr>';
+  const textLines = [
     'Voxel Veda Timesheet Summary',
     `Period: ${fromDate} to ${toDate}`,
     `Staff: ${staffNames}`,
@@ -6400,16 +6414,116 @@ function buildTimesheetEmailDraft(rows, fromDate, toDate) {
     '',
     'Records:'
   ];
-  rows.forEach((row) => {
-    lines.push(`${row.name || '-'} | ${formatDate(row.work_date || row.clock_in)} | ${formatClockTime(row.clock_in)} - ${formatClockTime(row.clock_out)} | ${Number(row.total_hours || 0).toFixed(2)} hrs | ${row.notes || '-'}`);
+  cleanRows.forEach((row, index) => {
+    textLines.push(`${index + 1}. ${row.name || '-'} | ${formatDate(row.work_date || row.clock_in)} | ${formatClockTime(row.clock_in)} - ${formatClockTime(row.clock_out)} | ${Number(row.total_hours || 0).toFixed(2)} hrs | ${row.notes || '-'}`);
   });
-  if (!rows.length) lines.push('No records for this selected period.');
-  return { subject: `Voxel Veda Timesheet ${fromDate} to ${toDate}`, body: lines.join('\n') };
+  if (!cleanRows.length) textLines.push('No records for this selected period.');
+
+  const html = `
+    <!doctype html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Voxel Veda Timesheet ${escapeHtml(fromDate)} to ${escapeHtml(toDate)}</title>
+      <style>
+        body{margin:0;background:#eef5f9;color:#0b1725;font-family:Arial,Helvetica,sans-serif}
+        .sheet{max-width:1120px;margin:24px auto;background:#fff;border:1px solid #d7e3ec;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(15,23,42,.16)}
+        .hero{background:linear-gradient(135deg,#061324,#0c3148 58%,#11cdd4);color:#fff;padding:30px 34px;display:flex;justify-content:space-between;gap:20px;align-items:center}
+        .brand{font-size:24px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.muted{color:#bcd6e6}.pill{display:inline-flex;border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:8px 12px;color:#dffbff;font-weight:800}
+        .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:22px 34px;background:#f8fbfd}.card{border:1px solid #dce8f0;border-radius:14px;padding:14px}.label{font-size:11px;text-transform:uppercase;color:#5e7182;font-weight:800;letter-spacing:.08em}.value{font-size:21px;font-weight:900;margin-top:5px}
+        .content{padding:26px 34px}.section-title{font-size:18px;font-weight:900;margin-bottom:12px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#071827;color:#dffbff;text-align:left;padding:12px;border-bottom:1px solid #1a3950}td{padding:11px;border-bottom:1px solid #e4edf3;vertical-align:top}tr:nth-child(even) td{background:#f9fcfe}.footer{display:flex;justify-content:space-between;gap:16px;padding:20px 34px 30px;color:#637588;font-size:12px}.stamp{font-weight:900;color:#0b1725}
+        @media(max-width:720px){.sheet{margin:0;border-radius:0}.hero,.footer{display:block}.summary{grid-template-columns:1fr}.content{padding:18px;overflow-x:auto}.hero,.summary,.footer{padding-left:18px;padding-right:18px}table{min-width:760px}}
+        @media print{body{background:#fff}.sheet{box-shadow:none;margin:0;border-radius:0;border:0}.no-print{display:none!important}}
+      </style>
+    </head>
+    <body>
+      <main class="sheet">
+        <section class="hero">
+          <div><div class="brand">Voxel Veda</div><div class="muted">Workforce Timesheet Summary</div></div>
+          <div class="pill">${escapeHtml(fromDate)} to ${escapeHtml(toDate)}</div>
+        </section>
+        <section class="summary">
+          <div class="card"><div class="label">Staff</div><div class="value">${escapeHtml(staffNames)}</div></div>
+          <div class="card"><div class="label">Total Hours</div><div class="value">${total.toFixed(2)}</div></div>
+          <div class="card"><div class="label">Records</div><div class="value">${cleanRows.length}</div></div>
+        </section>
+        <section class="content">
+          <div class="section-title">Attendance Records</div>
+          <table><thead><tr><th>#</th><th>Staff</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Notes</th></tr></thead><tbody>${rowHtml}</tbody></table>
+        </section>
+        <section class="footer"><div>Generated by Voxel Veda operations system.</div><div class="stamp">Voxel Veda Pty Ltd</div></section>
+      </main>
+    </body>
+    </html>
+  `;
+  return { subject: `Voxel Veda Timesheet ${fromDate} to ${toDate}`, body: textLines.join('\n'), html };
 }
 
 function openEmailDraft(to, subject, body) {
   const href = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   window.location.href = href;
+}
+
+function openTimesheetPreviewWindow() {
+  if (!lastTimesheetEmailDraft?.html) return showToast('No timesheet preview ready');
+  const win = window.open('', '_blank');
+  if (!win) return showToast('Popup blocked. Allow popups to preview the timesheet.');
+  win.document.open();
+  win.document.write(lastTimesheetEmailDraft.html);
+  win.document.close();
+}
+
+function printTimesheetPreview() {
+  if (!lastTimesheetEmailDraft?.html) return showToast('No timesheet preview ready');
+  const win = window.open('', '_blank');
+  if (!win) return showToast('Popup blocked. Allow popups to print/save PDF.');
+  win.document.open();
+  win.document.write(lastTimesheetEmailDraft.html);
+  win.document.close();
+  win.focus();
+  setTimeout(() => win.print(), 350);
+}
+
+async function copyTimesheetDraft() {
+  if (!lastTimesheetEmailDraft?.body) return showToast('No timesheet draft ready');
+  await navigator.clipboard?.writeText(lastTimesheetEmailDraft.body);
+  showToast('Timesheet summary copied');
+}
+
+function openTimesheetMailDraft() {
+  if (!lastTimesheetEmailDraft) return showToast('No timesheet draft ready');
+  openEmailDraft(lastTimesheetEmailDraft.recipient || '', lastTimesheetEmailDraft.subject, lastTimesheetEmailDraft.body);
+}
+
+function showTimesheetEmailSetupDialog(data, draft) {
+  const missing = (data?.missing || ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL']).join(', ');
+  const html = `
+    <style>
+      .email-setup-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.65fr);gap:18px}.email-preview-card{border:1px solid rgba(56,189,248,.38);border-radius:18px;background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(8,32,48,.94));padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.28)}.email-preview-card h3{margin:0 0 8px}.email-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.smtp-chip{display:inline-flex;margin:4px 6px 4px 0;padding:7px 10px;border-radius:999px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);color:#9ff7ff;font-weight:800;font-size:12px}.smtp-note{color:#b7c7d6;line-height:1.55}.smtp-box{border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:14px;background:rgba(2,6,23,.45)}.email-mini-table{width:100%;border-collapse:collapse;font-size:12px}.email-mini-table th,.email-mini-table td{padding:8px;border-bottom:1px solid rgba(148,163,184,.2);text-align:left}.email-mini-table th{color:#49f4e7;text-transform:uppercase;font-size:10px}@media(max-width:760px){.email-setup-grid{grid-template-columns:1fr}.email-actions .btn{width:100%;justify-content:center}}
+    </style>
+    <div class="email-setup-grid">
+      <div class="email-preview-card">
+        <div class="eyebrow">Email delivery</div>
+        <h3>SMTP is not connected yet</h3>
+        <p class="smtp-note">The app can generate the timesheet now, but Railway needs these email variables before it can send automatically from Voxel Veda.</p>
+        <div>${missing.split(', ').map((key) => `<span class="smtp-chip">${escapeHtml(key)}</span>`).join('')}</div>
+        <div class="email-actions">
+          <button class="btn primary" type="button" onclick="openTimesheetPreviewWindow()">Preview Timesheet</button>
+          <button class="btn" type="button" onclick="printTimesheetPreview()">Print / Save PDF</button>
+          <button class="btn" type="button" onclick="copyTimesheetDraft()">Copy Summary</button>
+          <button class="btn" type="button" onclick="openTimesheetMailDraft()">Open Mail Draft</button>
+        </div>
+      </div>
+      <div class="smtp-box">
+        <div class="eyebrow">Preview</div>
+        <h3>${escapeHtml(draft.subject)}</h3>
+        <p class="smtp-note">Records: ${escapeHtml(data?.preview?.records ?? '0')}<br>Total hours: ${escapeHtml(data?.preview?.total_hours ?? '0')}</p>
+        <table class="email-mini-table"><thead><tr><th>Next step</th><th>Status</th></tr></thead><tbody><tr><td>Professional preview</td><td>Ready</td></tr><tr><td>Direct email send</td><td>Needs SMTP</td></tr></tbody></table>
+      </div>
+    </div>
+  `;
+  showDialog('Timesheet Email', html, hideDialog, 'Close');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
 }
 
 async function sendTimesheetEmail() {
@@ -6438,16 +6552,16 @@ async function sendTimesheetEmail() {
   }
 
   const draft = buildTimesheetEmailDraft(selectedRows, body.from_date, body.to_date);
-  const recipient = body.recipient || data?.recipient || '';
+  lastTimesheetEmailDraft = { ...draft, recipient: body.recipient || data?.recipient || '' };
   if (data?.missing) {
     const setup = `SMTP setup required: ${data.missing.join(', ')}`;
-    if (log) log.textContent = `${setup}. Opening email draft instead.`;
-    showToast('Email setup is missing. Opening email draft.');
-    openEmailDraft(recipient, draft.subject, draft.body + `\n\nNote: ${setup}`);
+    if (log) log.textContent = `${setup}. Timesheet preview is ready.`;
+    showToast('Email setup needed. Timesheet preview is ready.');
+    showTimesheetEmailSetupDialog(data, lastTimesheetEmailDraft);
     return;
   }
 
-  if (log) log.textContent = data.message || 'Email could not be sent. Opening email draft instead.';
-  showToast(data.message || 'Opening email draft');
-  openEmailDraft(recipient, draft.subject, draft.body);
+  if (log) log.textContent = data.message || 'Email could not be sent. Timesheet preview is ready.';
+  showToast(data.message || 'Timesheet preview is ready');
+  showTimesheetEmailSetupDialog(data, lastTimesheetEmailDraft);
 }
