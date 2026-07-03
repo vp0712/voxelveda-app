@@ -40,7 +40,7 @@
             <img id="globalQrImage" alt="Voxel Veda QR code" />
           </div>
           <div class="qr-brand-strip">
-            <img src="/Frame 1.png?v=20260601-clean-logo" alt="Voxel Veda" />
+            <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda" />
             <span>Scan-safe access code</span>
           </div>
           <p id="globalQrUrl" class="global-qr-url"></p>

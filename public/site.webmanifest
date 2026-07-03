@@ -1,0 +1,21 @@
+{
+    "icons":  [
+                  {
+                      "type":  "image/png",
+                      "sizes":  "192x192",
+                      "src":  "/favicon-192.png?v=20260703-brand"
+                  },
+                  {
+                      "type":  "image/png",
+                      "sizes":  "512x512",
+                      "src":  "/favicon-512.png?v=20260703-brand"
+                  }
+              ],
+    "description":  "Advanced manufacturing, 3D printing, prototyping and RFQ portal",
+    "background_color":  "#061b2d",
+    "theme_color":  "#22d3ee",
+    "name":  "Voxel Veda",
+    "start_url":  "/customer.html",
+    "display":  "standalone",
+    "short_name":  "Voxel Veda"
+}

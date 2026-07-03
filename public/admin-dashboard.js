@@ -522,7 +522,7 @@ async function sendAdminNotification(title, body) {
 
   new Notification(title, {
     body,
-    icon: '/Frame 1.png?v=20260601-clean-logo'
+    icon: '/Frame 1.png?v=20260703-brand'
   });
 }
 
@@ -6319,4 +6319,3 @@ async function bootAdminDashboard() {
 }
 
 document.addEventListener('DOMContentLoaded', bootAdminDashboard);
-
