@@ -6388,3 +6388,66 @@ function openSmartRosterDialog() {
   }, 'Prepare Draft');
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
 }
+/* ================= EMAIL FALLBACK OVERRIDE 20260703 ================= */
+function buildTimesheetEmailDraft(rows, fromDate, toDate) {
+  const total = rows.reduce((sum, row) => sum + Number(row.total_hours || 0), 0);
+  const staffNames = [...new Set(rows.map((row) => row.name || row.email || 'Staff'))].join(', ') || 'All staff';
+  const lines = [
+    'Voxel Veda Timesheet Summary',
+    `Period: ${fromDate} to ${toDate}`,
+    `Staff: ${staffNames}`,
+    `Total hours: ${total.toFixed(2)}`,
+    '',
+    'Records:'
+  ];
+  rows.forEach((row) => {
+    lines.push(`${row.name || '-'} | ${formatDate(row.work_date || row.clock_in)} | ${formatClockTime(row.clock_in)} - ${formatClockTime(row.clock_out)} | ${Number(row.total_hours || 0).toFixed(2)} hrs | ${row.notes || '-'}`);
+  });
+  if (!rows.length) lines.push('No records for this selected period.');
+  return { subject: `Voxel Veda Timesheet ${fromDate} to ${toDate}`, body: lines.join('\n') };
+}
+
+function openEmailDraft(to, subject, body) {
+  const href = `mailto:${encodeURIComponent(to || '')}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = href;
+}
+
+async function sendTimesheetEmail() {
+  const body = {
+    user_id: Number(document.getElementById('timesheetSendStaffSelect')?.value || 0) || null,
+    from_date: document.getElementById('timesheetSendFrom')?.value || todayISO(-7),
+    to_date: document.getElementById('timesheetSendTo')?.value || todayISO(),
+    recipient: document.getElementById('timesheetSendRecipient')?.value.trim(),
+    include_employee: true
+  };
+  const log = document.getElementById('timesheetEmailLogBody');
+  const selectedRows = filteredTimesheetAttendanceRows();
+  if (log) log.textContent = 'Preparing timesheet email...';
+
+  const res = await fetch('/api/attendance/timesheets/send', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify(body)
+  });
+  const data = await safeJson(res);
+
+  if (res.ok) {
+    if (log) log.textContent = `${data.message}. Records: ${data.records}, hours: ${data.total_hours}`;
+    showToast(data.message || 'Timesheet sent');
+    return;
+  }
+
+  const draft = buildTimesheetEmailDraft(selectedRows, body.from_date, body.to_date);
+  const recipient = body.recipient || data?.recipient || '';
+  if (data?.missing) {
+    const setup = `SMTP setup required: ${data.missing.join(', ')}`;
+    if (log) log.textContent = `${setup}. Opening email draft instead.`;
+    showToast('Email setup is missing. Opening email draft.');
+    openEmailDraft(recipient, draft.subject, draft.body + `\n\nNote: ${setup}`);
+    return;
+  }
+
+  if (log) log.textContent = data.message || 'Email could not be sent. Opening email draft instead.';
+  showToast(data.message || 'Opening email draft');
+  openEmailDraft(recipient, draft.subject, draft.body);
+}

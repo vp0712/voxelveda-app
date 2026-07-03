@@ -173,6 +173,7 @@ async function ensureAttendanceTables() {
       total_hours DECIMAL(8,2) NOT NULL DEFAULT 0,
       work_date DATE NOT NULL,
       notes TEXT NULL,
+      deleted TINYINT NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_staff_attendance_user_date (user_id, work_date)
@@ -198,7 +199,8 @@ async function ensureAttendanceTables() {
   await pool.query(`ALTER TABLE staff_attendance ADD COLUMN work_date DATE NULL`).catch(() => {});
   await pool.query(`ALTER TABLE staff_attendance ADD COLUMN notes TEXT NULL`).catch(() => {});
   await pool.query(`ALTER TABLE staff_attendance ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_attendance ADD COLUMN updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query('ALTER TABLE staff_attendance ADD COLUMN updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP').catch(() => {});
+  await pool.query('ALTER TABLE staff_attendance ADD COLUMN deleted TINYINT NOT NULL DEFAULT 0').catch(() => {});
   await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN user_id INT NOT NULL`).catch(() => {});
   await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN week_start DATE NOT NULL`).catch(() => {});
   await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN week_end DATE NOT NULL`).catch(() => {});
