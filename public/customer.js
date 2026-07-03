@@ -214,10 +214,14 @@ async function handleVoxelAiLeadAnswer(answer) {
     appendVoxelAiMessage('Sending your information to Voxel Veda now...');
     setVoxelAiPlaceholder('Ask a follow-up question');
     try {
-      await sendVoxelAiLead();
-      appendVoxelAiMessage('Done. Your details were emailed to the Voxel Veda team in a lead table. ' + getVoxelAiResponse(value));
+      const result = await sendVoxelAiLead();
+      if (result.email_sent) {
+        appendVoxelAiMessage('Done. Your details were emailed to the Voxel Veda team in a lead table and saved in the app. ' + getVoxelAiResponse(value));
+      } else {
+        appendVoxelAiMessage('Done. Your details were saved in the Voxel Veda app for the team to review. Email notification needs SMTP setup before it can send automatically.');
+      }
     } catch {
-      appendVoxelAiMessage('I could not send the email automatically. Please email info@voxelveda.com or try again shortly.');
+      appendVoxelAiMessage('I could not save this automatically. Please email info@voxelveda.com or try again shortly.');
     }
     return;
   }
