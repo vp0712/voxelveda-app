@@ -68,12 +68,12 @@ async function submitCustomerRFQ() {
 }
 
 const voxelAiState = {
-  started: true,
   step: 'name',
   lead: { name: '', email: '', phone: '', company: '', need: '' },
   transcript: [],
   rfqId: null,
-  emailSent: false
+  emailSent: false,
+  analysis: null
 };
 
 const voxelAiSteps = {
@@ -82,7 +82,7 @@ const voxelAiSteps = {
   phone: { label: 'Phone', progress: '3/5', placeholder: 'Phone number' },
   company: { label: 'Company', progress: '4/5', placeholder: 'Company or individual' },
   need: { label: 'Project', progress: '5/5', placeholder: 'Part, material, qty, deadline...' },
-  sent: { label: 'Queued', progress: 'Saved', placeholder: 'Ask a follow-up question' }
+  sent: { label: 'Queued', progress: 'Saved', placeholder: 'Ask about material, files, tolerance...' }
 };
 
 function toggleVoxelAi(forceOpen) {
@@ -135,12 +135,15 @@ function appendVoxelAiMessage(message, sender = 'bot') {
   voxelAiState.transcript.push(`${sender}: ${message}`);
 }
 
-function appendVoxelAiCard(items) {
+function appendVoxelAiCard(items, title = 'Engineering intake') {
   const messages = document.getElementById('vvAiMessages');
   if (!messages) return;
 
   const card = document.createElement('div');
   card.className = 'vv-ai-insight-card bot';
+  const heading = document.createElement('h3');
+  heading.textContent = title;
+  card.appendChild(heading);
 
   items.forEach(({ label, value }) => {
     const row = document.createElement('div');
@@ -153,6 +156,21 @@ function appendVoxelAiCard(items) {
   });
 
   messages.appendChild(card);
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function appendVoxelAiChips(chips) {
+  const messages = document.getElementById('vvAiMessages');
+  if (!messages || !chips.length) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'vv-ai-chip-row';
+  chips.forEach((chip) => {
+    const span = document.createElement('span');
+    span.textContent = chip;
+    wrap.appendChild(span);
+  });
+  messages.appendChild(wrap);
   messages.scrollTop = messages.scrollHeight;
 }
 
@@ -170,33 +188,87 @@ function isEmail(value) {
 }
 
 function extractQuantity(text) {
-  const match = String(text || '').match(/(?:qty|quantity)?\s*(\d{1,6})\s*(?:pcs|pieces|parts|units)?/i);
-  return match ? Number(match[1]) : 1;
+  const value = String(text || '');
+  const explicit = value.match(/(?:qty|quantity)\D{0,12}(\d{1,6})/i);
+  if (explicit) return Number(explicit[1]);
+  const parts = value.match(/(\d{1,6})\s*(?:pcs|pieces|parts|units)\b/i);
+  return parts ? Number(parts[1]) : 1;
 }
 
 function extractMaterial(text) {
   const q = String(text || '').toLowerCase();
-  const materials = ['fdm', 'sla', 'sls', 'nylon', 'carbon fiber', 'carbon-filled nylon', 'pla', 'petg', 'abs', 'asa', 'tpu', 'resin', 'aluminium', 'aluminum', 'stainless steel'];
+  const materials = ['carbon-filled nylon', 'stainless steel', 'carbon fiber', 'aluminium', 'aluminum', 'nylon', 'resin', 'petg', 'abs', 'asa', 'tpu', 'pla', 'fdm', 'sla', 'sls'];
   return materials.find((material) => q.includes(material)) || 'AI recommendation requested';
 }
 
+function detectProjectSignals(text) {
+  const q = String(text || '').toLowerCase();
+  return {
+    hasCad: /\b(step|stp|stl|3mf|cad|drawing|iges|igs|pdf)\b/.test(q),
+    hasTolerance: /\b(tolerance|precision|accurate|fit|thread|insert|surface finish|micron|mm)\b/.test(q),
+    hasDeadline: /\b(deadline|urgent|asap|rush|lead time|tomorrow|week|date)\b/.test(q),
+    hasNda: /\b(nda|confidential|sensitive|defence|defense|aerospace|medical)\b/.test(q),
+    hasMaterial: extractMaterial(q) !== 'AI recommendation requested',
+    hasQuantity: extractQuantity(q) > 1
+  };
+}
+
+function buildProjectAnalysis(text) {
+  const signals = detectProjectSignals(text);
+  const missing = [];
+  let score = 35;
+
+  if (signals.hasMaterial) score += 15; else missing.push('Preferred material or application conditions');
+  if (signals.hasQuantity) score += 12; else missing.push('Quantity or production batch size');
+  if (signals.hasCad) score += 15; else missing.push('CAD file type: STEP/STL/3MF/PDF drawing');
+  if (signals.hasTolerance) score += 13; else missing.push('Critical tolerances or mating surfaces');
+  if (signals.hasDeadline) score += 10; else missing.push('Deadline or target delivery window');
+
+  score = Math.min(score, 100);
+
+  const tags = [];
+  if (signals.hasNda) tags.push('NDA-sensitive');
+  if (signals.hasDeadline) tags.push('Time-critical');
+  if (signals.hasTolerance) tags.push('Precision review');
+  if (signals.hasCad) tags.push('CAD mentioned');
+  if (!tags.length) tags.push('Standard RFQ');
+
+  return {
+    score,
+    material: extractMaterial(text),
+    quantity: extractQuantity(text),
+    tags,
+    missing,
+    route: signals.hasTolerance || signals.hasNda ? 'Engineering review' : 'Fast quote review'
+  };
+}
+
 function getLeadSummary() {
+  const analysis = voxelAiState.analysis;
   return [
+    'Voxel Veda AI Intake Summary',
+    voxelAiState.rfqId ? `Reference: #${voxelAiState.rfqId}` : '',
     `Name: ${voxelAiState.lead.name}`,
     `Email: ${voxelAiState.lead.email}`,
     `Phone: ${voxelAiState.lead.phone || '-'}`,
     `Company: ${voxelAiState.lead.company || '-'}`,
     `Need: ${voxelAiState.lead.need}`,
-    voxelAiState.rfqId ? `Reference: #${voxelAiState.rfqId}` : ''
+    analysis ? `Readiness: ${analysis.score}%` : '',
+    analysis ? `Detected Material: ${analysis.material}` : '',
+    analysis ? `Detected Quantity: ${analysis.quantity}` : '',
+    analysis ? `Review Route: ${analysis.route}` : '',
+    analysis ? `Missing Info: ${analysis.missing.join('; ') || 'None'}` : ''
   ].filter(Boolean).join('\n');
 }
 
 function syncLeadToRFQForm() {
-  const quantity = extractQuantity(voxelAiState.lead.need);
-  const material = extractMaterial(voxelAiState.lead.need);
+  const analysis = voxelAiState.analysis || buildProjectAnalysis(voxelAiState.lead.need);
   const application = [
     voxelAiState.lead.need,
     voxelAiState.rfqId ? `AI assistant reference #${voxelAiState.rfqId}` : '',
+    `Readiness score: ${analysis.score}%`,
+    `Review route: ${analysis.route}`,
+    analysis.missing.length ? `Missing info: ${analysis.missing.join('; ')}` : '',
     voxelAiState.lead.company ? `Company: ${voxelAiState.lead.company}` : ''
   ].filter(Boolean).join('\n');
 
@@ -204,8 +276,8 @@ function syncLeadToRFQForm() {
     customerName: voxelAiState.lead.company || voxelAiState.lead.name,
     customerEmail: voxelAiState.lead.email,
     customerPhone: voxelAiState.lead.phone,
-    customerMaterial: material,
-    customerQuantity: quantity,
+    customerMaterial: analysis.material,
+    customerQuantity: analysis.quantity,
     customerApplication: application
   };
 
@@ -217,6 +289,16 @@ function syncLeadToRFQForm() {
 
 function getVoxelAiResponse(question) {
   const q = String(question || '').toLowerCase();
+
+  if (q.includes('readiness') || q.includes('score') || q.includes('missing')) {
+    const analysis = voxelAiState.analysis || buildProjectAnalysis(voxelAiState.lead.need || question);
+    return `Quote readiness is ${analysis.score}%. Missing: ${analysis.missing.join(', ') || 'nothing major'}.`;
+  }
+
+  if (q.includes('checklist') || q.includes('next')) {
+    const analysis = voxelAiState.analysis || buildProjectAnalysis(voxelAiState.lead.need || question);
+    return `Next checklist: ${analysis.missing.join('; ') || 'upload CAD/drawing files and wait for engineering review'}.`;
+  }
 
   if (q.includes('material') || q.includes('pla') || q.includes('abs') || q.includes('nylon') || q.includes('resin') || q.includes('carbon')) {
     return 'Material guide: PLA for visual prototypes, PETG for tougher functional parts, ABS/ASA for heat or outdoor use, Nylon or carbon-filled Nylon for strength, TPU for flexible parts, and resin for fine detail.';
@@ -238,7 +320,7 @@ function getVoxelAiResponse(question) {
     return 'For fast turnaround, include deadline, quantity, material flexibility, and whether partial delivery is acceptable. That helps engineering choose the fastest route.';
   }
 
-  return 'Your request is in the engineering queue. Ask me about material choice, CAD file prep, tolerances, NDA handling, or fastest quote next steps.';
+  return 'Your request is in the engineering queue. Ask me about quote readiness, missing details, material choice, CAD file prep, tolerances, or NDA handling.';
 }
 
 async function sendVoxelAiLead() {
@@ -302,8 +384,9 @@ async function handleVoxelAiLeadAnswer(answer) {
   if (voxelAiState.step === 'need') {
     voxelAiState.lead.need = value;
     voxelAiState.step = 'sent';
+    voxelAiState.analysis = buildProjectAnalysis(value);
     updateVoxelAiStage();
-    appendVoxelAiMessage('Running a quick project intake check and saving your request...');
+    appendVoxelAiMessage('Running engineering triage and saving your request...');
 
     try {
       const result = await sendVoxelAiLead();
@@ -311,13 +394,16 @@ async function handleVoxelAiLeadAnswer(answer) {
       voxelAiState.emailSent = Boolean(result.email_sent);
       syncLeadToRFQForm();
 
-      appendVoxelAiMessage(`Done. Your project is saved in the Voxel Veda app${voxelAiState.rfqId ? ` as reference #${voxelAiState.rfqId}` : ''}. The engineering team can review it from the dashboard.`);
+      appendVoxelAiMessage(`Saved. Your project is in the Voxel Veda app${voxelAiState.rfqId ? ` as reference #${voxelAiState.rfqId}` : ''}.`);
+      appendVoxelAiChips(voxelAiState.analysis.tags);
       appendVoxelAiCard([
-        { label: 'Detected material', value: extractMaterial(value) },
-        { label: 'Quantity', value: String(extractQuantity(value)) },
-        { label: 'Next best step', value: 'Upload CAD/drawing files or add tolerance notes in the RFQ form.' }
-      ]);
-      appendVoxelAiMessage(getVoxelAiResponse(value));
+        { label: 'Readiness', value: `${voxelAiState.analysis.score}%` },
+        { label: 'Route', value: voxelAiState.analysis.route },
+        { label: 'Material', value: voxelAiState.analysis.material },
+        { label: 'Quantity', value: String(voxelAiState.analysis.quantity) },
+        { label: 'Missing', value: voxelAiState.analysis.missing.join('; ') || 'Nothing major' }
+      ], 'AI triage result');
+      appendVoxelAiMessage('I filled the RFQ form with this intake. Add CAD files or tolerance notes if available, then the team has a cleaner package to review.');
     } catch {
       appendVoxelAiMessage('I could not save this automatically. Please email info@voxelveda.com or try again shortly.');
     }
@@ -360,6 +446,7 @@ function startNewVoxelAiLead() {
   voxelAiState.transcript = [];
   voxelAiState.rfqId = null;
   voxelAiState.emailSent = false;
+  voxelAiState.analysis = null;
 
   const messages = document.getElementById('vvAiMessages');
   if (messages) {
@@ -372,18 +459,40 @@ function startNewVoxelAiLead() {
 }
 
 async function copyVoxelAiSummary() {
-  const summary = getLeadSummary();
-  if (!summary.trim()) {
+  if (!voxelAiState.lead.need) {
     appendVoxelAiMessage('No project summary is ready yet. Complete the intake first.');
     return;
   }
 
+  const summary = getLeadSummary();
   try {
     await navigator.clipboard.writeText(summary);
     appendVoxelAiMessage('Project summary copied. You can paste it into an email, drawing note, or internal handoff.');
   } catch {
     appendVoxelAiMessage(summary);
   }
+}
+
+function showVoxelAiReadiness() {
+  if (!voxelAiState.lead.need) {
+    appendVoxelAiMessage('Complete the project intake first, then I can score quote readiness.');
+    return;
+  }
+  const analysis = voxelAiState.analysis || buildProjectAnalysis(voxelAiState.lead.need);
+  appendVoxelAiCard([
+    { label: 'Readiness', value: `${analysis.score}%` },
+    { label: 'Route', value: analysis.route },
+    { label: 'Missing', value: analysis.missing.join('; ') || 'Nothing major' }
+  ], 'Quote readiness');
+}
+
+function showVoxelAiChecklist() {
+  if (!voxelAiState.lead.need) {
+    appendVoxelAiMessage('Complete the project intake first, then I can build the checklist.');
+    return;
+  }
+  const analysis = voxelAiState.analysis || buildProjectAnalysis(voxelAiState.lead.need);
+  appendVoxelAiMessage(`Checklist: ${analysis.missing.join('; ') || 'Upload CAD/drawing files and wait for engineering review.'}`);
 }
 
 window.addEventListener('keydown', (event) => {

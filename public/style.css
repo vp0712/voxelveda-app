@@ -8742,5 +8742,71 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+/* Voxel Veda AI triage upgrade */
+.vv-ai-quick-actions {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.vv-ai-quick-actions button:nth-last-child(-n+2) {
+  background: linear-gradient(135deg, rgba(230, 250, 255, .94), rgba(174, 243, 255, .78));
+  border-color: rgba(14, 165, 233, .24);
+}
+
+.vv-ai-insight-card h3 {
+  margin: 0 0 4px;
+  color: #063047;
+  font-size: 13px;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+}
+
+.vv-ai-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: 92%;
+}
+
+.vv-ai-chip-row span {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 4px 8px;
+  border: 1px solid rgba(6, 182, 212, .28);
+  border-radius: 999px;
+  color: #064e64;
+  background: rgba(209, 250, 254, .78);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.vv-ai-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.vv-ai-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(8, 145, 178, .07) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(8, 145, 178, .07) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,.9), transparent 72%);
+}
+
+.vv-ai-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+@media (max-width: 620px) {
+  .vv-ai-quick-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+/* End Voxel Veda AI triage upgrade */
 /* End advanced Voxel Veda AI intake polish */
 /* End Voxel Veda AI assistant widget */

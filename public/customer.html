@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Customer RFQ</title>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260601-clean-logo" />
-  <link rel="stylesheet" href="/style.css?v=20260703-ai-pro" />
+  <link rel="stylesheet" href="/style.css?v=20260703-ai-triage" />
 </head>
 
 <body>
@@ -54,7 +54,8 @@
     <section class="vv-ai-panel" id="vvAiPanel" hidden>
       <div class="vv-ai-head">
         <div>
-          <p class="eyebrow">Manufacturing Assistant</p><div class="vv-ai-stage"><span id="vvAiStep">Contact</span><strong id="vvAiProgress">1/5</strong></div>
+          <p class="eyebrow">Manufacturing Assistant</p>
+          <div class="vv-ai-stage"><span id="vvAiStep">Contact</span><strong id="vvAiProgress">1/5</strong></div>
           <h2>How can I help?</h2>
         </div>
         <button type="button" class="vv-ai-close" aria-label="Close assistant" onclick="toggleVoxelAi(false)">x</button>
@@ -67,18 +68,22 @@
         <button type="button" onclick="askVoxelAi('What files do I need for RFQ?')">Files</button>
         <button type="button" onclick="askVoxelAi('I need NDA or confidential project support')">NDA</button>
         <button type="button" onclick="askVoxelAi('Help me complete the RFQ')">RFQ help</button>
+        <button type="button" onclick="showVoxelAiReadiness()">Readiness</button>
+        <button type="button" onclick="showVoxelAiChecklist()">Checklist</button>
       </div>
       <div class="vv-ai-input-row">
         <input id="vvAiInput" type="text" placeholder="Your full name" onkeydown="handleVoxelAiKey(event)" />
         <button type="button" onclick="sendVoxelAiQuestion()">Send</button>
       </div>
       <div class="vv-ai-actions">
-        <button type="button" onclick="focusCustomerField('customerApplication')">Fill RFQ</button><button type="button" onclick="copyVoxelAiSummary()">Copy summary</button><button type="button" onclick="startNewVoxelAiLead()">New lead</button>
+        <button type="button" onclick="focusCustomerField('customerApplication')">Fill RFQ</button>
+        <button type="button" onclick="copyVoxelAiSummary()">Copy summary</button>
+        <button type="button" onclick="startNewVoxelAiLead()">New lead</button>
         <a href="mailto:info@voxelveda.com?subject=Voxel%20Veda%20RFQ%20Support">Email team</a>
         <a href="tel:+61420407232">Call</a>
       </div>
     </section>
   </aside>
-  <script src="/customer.js?v=20260703-ai-pro"></script>
+  <script src="/customer.js?v=20260703-ai-triage"></script>
 </body>
 </html>
