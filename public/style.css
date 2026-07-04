@@ -10464,3 +10464,126 @@ textarea:focus {
     border-radius: 16px;
   }
 }
+/* STAFF WORK HUB UPGRADE */
+.staff-work-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.8fr) minmax(320px, 1.2fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.staff-work-form,
+.staff-work-panel,
+.staff-document-card {
+  border-color: rgba(34, 211, 238, 0.24);
+  background: linear-gradient(145deg, rgba(10, 25, 46, 0.94), rgba(4, 12, 26, 0.9));
+}
+
+.staff-work-form label {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 14px;
+  color: #72f7f2;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.staff-work-form input,
+.staff-work-form select,
+.staff-work-form textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid rgba(34, 211, 238, 0.26);
+  border-radius: 12px;
+  padding: 12px 14px;
+  color: #f8fbff;
+  background: rgba(2, 8, 23, 0.82);
+  outline: none;
+}
+
+.staff-module-list {
+  display: grid;
+  gap: 12px;
+}
+
+.staff-mini-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(34, 211, 238, 0.2);
+  border-radius: 14px;
+  background: rgba(5, 16, 32, 0.72);
+}
+
+.staff-mini-card div {
+  display: grid;
+  gap: 5px;
+}
+
+.staff-mini-card span,
+.staff-mini-card small,
+.staff-document-card p {
+  color: rgba(226, 238, 255, 0.72);
+}
+
+.staff-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 86px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  background: rgba(34, 211, 238, 0.1);
+  color: #72f7f2;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.staff-status-pill.pending {
+  border-color: rgba(250, 204, 21, 0.35);
+  background: rgba(250, 204, 21, 0.11);
+  color: #fde68a;
+}
+
+.compact-btn {
+  min-height: 34px;
+  padding: 8px 12px;
+}
+
+.staff-document-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.staff-document-card {
+  display: grid;
+  gap: 12px;
+}
+
+.staff-document-card > span {
+  color: #22d3ee;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 820px) {
+  .staff-work-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-mini-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .staff-document-grid {
+    grid-template-columns: 1fr;
+  }
+}

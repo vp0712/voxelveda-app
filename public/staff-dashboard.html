@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-<link rel="stylesheet" href="/style.css?v=20260704-aurora-graphite" />
+<link rel="stylesheet" href="/style.css?v=20260704-workhub" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -75,6 +75,19 @@
         <div class="nav-submenu">
           <button class="nav-btn nav-sub-btn permission-attendance hidden-section" data-section="timesheetSection">Timesheet</button>
           <button class="nav-btn nav-sub-btn permission-roster hidden-section" data-section="rosterSection">Roster</button>
+        </div>
+      </details>
+      <details class="nav-group permission-workhub hidden-section" open>
+        <summary class="nav-group-toggle">
+          <span>Work Hub</span>
+          <span class="nav-group-caret">v</span>
+        </summary>
+        <div class="nav-submenu">
+          <button class="nav-btn nav-sub-btn permission-leave hidden-section" data-section="leaveSection">Leave</button>
+          <button class="nav-btn nav-sub-btn permission-availability hidden-section" data-section="availabilitySection">Availability</button>
+          <button class="nav-btn nav-sub-btn permission-documents hidden-section" data-section="documentsSection">Documents</button>
+          <button class="nav-btn nav-sub-btn permission-forms hidden-section" data-section="formsSection">Forms</button>
+          <button class="nav-btn nav-sub-btn permission-messages hidden-section" data-section="messagesSection">Messages</button>
         </div>
       </details>
       <button class="nav-btn permission-meetings hidden-section" data-section="meetingsSection">Meetings & Inspections</button>
@@ -229,6 +242,31 @@
         </div>
 
         <div id="staffActionHub" class="staff-action-hub">
+          <button class="staff-action-card permission-leave hidden-section" type="button" onclick="goStaffSection('leaveSection')">
+            <span>People Ops</span>
+            <strong>Leave Requests</strong>
+            <small>Submit leave and track manager review status.</small>
+          </button>
+          <button class="staff-action-card permission-availability hidden-section" type="button" onclick="goStaffSection('availabilitySection')">
+            <span>Roster Planning</span>
+            <strong>Availability</strong>
+            <small>Tell the team when you are available or unavailable.</small>
+          </button>
+          <button class="staff-action-card permission-documents hidden-section" type="button" onclick="goStaffSection('documentsSection')">
+            <span>Knowledge Base</span>
+            <strong>Documents</strong>
+            <small>Read policies, SOPs and safety records.</small>
+          </button>
+          <button class="staff-action-card permission-forms hidden-section" type="button" onclick="goStaffSection('formsSection')">
+            <span>Quality Control</span>
+            <strong>Forms</strong>
+            <small>Submit daily checklists and process records.</small>
+          </button>
+          <button class="staff-action-card permission-messages hidden-section" type="button" onclick="goStaffSection('messagesSection')">
+            <span>Communication</span>
+            <strong>Messages</strong>
+            <small>Send operational updates to the office.</small>
+          </button>
           <button class="staff-action-card permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')">
             <span>Task Control</span>
             <strong>Task Board</strong>
@@ -477,6 +515,113 @@
         </div>
       </section>
 
+      <!-- LEAVE REQUESTS -->
+      <section id="leaveSection" class="page-section hidden-section permission-leave">
+        <div class="section-head">
+          <div>
+            <h2>Leave Requests</h2>
+            <p>Submit leave with clear dates and manager-ready notes.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="renderStaffLeaveRequests()">Refresh</button>
+        </div>
+        <div class="staff-work-grid">
+          <form class="card staff-work-form" onsubmit="submitLeaveRequest(event)">
+            <h3>New Leave Request</h3>
+            <label>Leave type<select id="leaveType" required><option value="Annual Leave">Annual Leave</option><option value="Personal Leave">Personal Leave</option><option value="Unpaid Leave">Unpaid Leave</option><option value="Emergency Leave">Emergency Leave</option></select></label>
+            <label>From<input id="leaveFrom" type="date" required /></label>
+            <label>To<input id="leaveTo" type="date" required /></label>
+            <label>Reason<textarea id="leaveReason" rows="4" placeholder="Reason or handover note" required></textarea></label>
+            <button class="primary-btn" type="submit">Submit Leave</button>
+          </form>
+          <div class="card staff-work-panel">
+            <div class="section-head compact-head"><div><h3>My Leave Register</h3><p>Newest requests stay at the bottom.</p></div></div>
+            <div id="staffLeaveList" class="staff-module-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- AVAILABILITY -->
+      <section id="availabilitySection" class="page-section hidden-section permission-availability">
+        <div class="section-head">
+          <div>
+            <h2>Availability</h2>
+            <p>Keep roster planning clean with preferred and unavailable days.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="renderStaffAvailability()">Refresh</button>
+        </div>
+        <div class="staff-work-grid">
+          <form class="card staff-work-form" onsubmit="saveAvailability(event)">
+            <h3>Add Availability</h3>
+            <label>Date<input id="availabilityDate" type="date" required /></label>
+            <label>Status<select id="availabilityStatus" required><option value="Available">Available</option><option value="Unavailable">Unavailable</option><option value="Preferred Shift">Preferred Shift</option><option value="Training / Restricted">Training / Restricted</option></select></label>
+            <label>Notes<textarea id="availabilityNotes" rows="4" placeholder="Shift preference, reason or restriction"></textarea></label>
+            <button class="primary-btn" type="submit">Save Availability</button>
+          </form>
+          <div class="card staff-work-panel">
+            <h3>Availability Board</h3>
+            <div id="staffAvailabilityList" class="staff-module-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DOCUMENTS -->
+      <section id="documentsSection" class="page-section hidden-section permission-documents">
+        <div class="section-head">
+          <div>
+            <h2>My Documents</h2>
+            <p>Policies, SOPs, safety documents and read confirmations.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="renderStaffDocuments()">Refresh</button>
+        </div>
+        <div id="staffDocumentList" class="staff-document-grid"></div>
+      </section>
+
+      <!-- FORMS -->
+      <section id="formsSection" class="page-section hidden-section permission-forms">
+        <div class="section-head">
+          <div>
+            <h2>Forms & Checklists</h2>
+            <p>Submit quality, safety and daily operational records from mobile.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="renderStaffFormSubmissions()">Refresh</button>
+        </div>
+        <div class="staff-work-grid">
+          <form class="card staff-work-form" onsubmit="submitStaffChecklist(event)">
+            <h3>Submit Checklist</h3>
+            <label>Form<select id="staffFormType" required><option value="Daily Workshop Safety Check">Daily Workshop Safety Check</option><option value="Machine Pre-start Checklist">Machine Pre-start Checklist</option><option value="Material Quality Release">Material Quality Release</option><option value="Packaging Release Check">Packaging Release Check</option><option value="Delivery / Dispatch Check">Delivery / Dispatch Check</option></select></label>
+            <label>Result<select id="staffFormResult" required><option value="Passed">Passed</option><option value="Needs Review">Needs Review</option><option value="Failed / Hold">Failed / Hold</option></select></label>
+            <label>Notes<textarea id="staffFormNotes" rows="4" placeholder="Inspection result, fault, corrective action or evidence note"></textarea></label>
+            <button class="primary-btn" type="submit">Submit Form</button>
+          </form>
+          <div class="card staff-work-panel">
+            <h3>My Submissions</h3>
+            <div id="staffFormList" class="staff-module-list"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MESSAGES -->
+      <section id="messagesSection" class="page-section hidden-section permission-messages">
+        <div class="section-head">
+          <div>
+            <h2>Messages</h2>
+            <p>Send operational updates, questions and handover notes.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="renderStaffMessages()">Refresh</button>
+        </div>
+        <div class="staff-work-grid">
+          <form class="card staff-work-form" onsubmit="sendStaffMessage(event)">
+            <h3>New Message</h3>
+            <label>Priority<select id="staffMessagePriority"><option value="Normal">Normal</option><option value="Urgent">Urgent</option><option value="Safety">Safety</option><option value="Handover">Handover</option></select></label>
+            <label>Message<textarea id="staffMessageBody" rows="5" placeholder="Write the update for admin or operations" required></textarea></label>
+            <button class="primary-btn" type="submit">Send Message</button>
+          </form>
+          <div class="card staff-work-panel">
+            <h3>Message History</h3>
+            <div id="staffMessageList" class="staff-module-list"></div>
+          </div>
+        </div>
+      </section>
       <!-- TIMESHEET -->
       <section id="timesheetSection" class="page-section hidden-section permission-attendance">
 
@@ -572,6 +717,7 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260704-timesheet-review"></script>
+  <script src="/staff.js?v=20260704-workhub"></script>
 </body>
 </html>
+

@@ -69,6 +69,11 @@ const ACCESS_OPTIONS = [
   { id: 'attendance', label: 'Attendance' },
   { id: 'attendance_input', label: 'Attendance Input/Edit' },
   { id: 'attendance_qr_bypass', label: 'QR Shift Bypass' },
+  { id: 'leave', label: 'Leave Requests' },
+  { id: 'availability', label: 'Availability' },
+  { id: 'documents', label: 'Staff Documents' },
+  { id: 'forms', label: 'Forms & Checklists' },
+  { id: 'messages', label: 'Messages' },
   { id: 'staff', label: 'Staff' },
   { id: 'stock', label: 'Stock Management' },
   { id: 'stock_in', label: 'Stock In' },
@@ -6664,3 +6669,4 @@ async function loadTimesheets() {
     }
   });
 }
+

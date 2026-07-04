@@ -189,6 +189,13 @@ function canUseQrException() {
   return hasPermission('attendance_qr_bypass');
 }
 
+function hasStaffWorkAccess(permission) {
+  const user = getStoredUser();
+  const role = String(user.role || currentRole || '').trim().toLowerCase();
+  if (['admin', 'super admin', 'manager', 'staff'].includes(role)) return true;
+  return hasPermission(permission);
+}
+
 function applyPermissionUI() {
   const canUseTasks = hasPermission('tasks');
   const canUseAttendance = hasPermission('attendance');
@@ -198,6 +205,12 @@ function applyPermissionUI() {
   const canUseStockOut = hasPermission('stock_out');
   const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut;
   const canUseFinance = hasPermission('invoices') || hasPermission('expenses');
+  const canUseLeave = hasStaffWorkAccess('leave');
+  const canUseAvailability = hasStaffWorkAccess('availability');
+  const canUseDocuments = hasStaffWorkAccess('documents');
+  const canUseForms = hasStaffWorkAccess('forms');
+  const canUseMessages = hasStaffWorkAccess('messages');
+  const canUseWorkHub = canUseLeave || canUseAvailability || canUseDocuments || canUseForms || canUseMessages;
 
   setPermissionVisibility('.permission-tasks', canUseTasks);
   setPermissionVisibility('.permission-attendance', canUseAttendance);
@@ -207,6 +220,12 @@ function applyPermissionUI() {
   setPermissionVisibility('.permission-stock-in', canUseStockIn);
   setPermissionVisibility('.permission-stock-out', canUseStockOut);
   setPermissionVisibility('.permission-finance', canUseFinance);
+  setPermissionVisibility('.permission-workhub', canUseWorkHub);
+  setPermissionVisibility('.permission-leave', canUseLeave);
+  setPermissionVisibility('.permission-availability', canUseAvailability);
+  setPermissionVisibility('.permission-documents', canUseDocuments);
+  setPermissionVisibility('.permission-forms', canUseForms);
+  setPermissionVisibility('.permission-messages', canUseMessages);
 
   if (document.querySelector('.nav-btn.active.hidden-section')) {
     document.querySelector('[data-section="dashboardSection"]')?.click();
@@ -227,6 +246,7 @@ async function refreshStaffSession() {
     localStorage.setItem('user', JSON.stringify(currentUser));
     localStorage.setItem('role', role);
     applyPermissionUI();
+    loadWorkHubModules();
     return currentUser;
   } catch {
     return null;
@@ -984,6 +1004,7 @@ async function loadStaffInfo() {
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('role', role);
     applyPermissionUI();
+    loadWorkHubModules();
 
     if (role === 'admin') {
       window.location.href = '/admin-dashboard.html';
@@ -1938,6 +1959,213 @@ function startAutoRefresh() {
   }, 10000);
 }
 
+/* ================= STAFF WORK HUB ================= */
+
+const staffDocumentLibrary = [
+  { id: 'safety-policy', category: 'Safety', title: 'Workshop Safety Policy', summary: 'Core PPE, hazard reporting and safe workshop conduct.' },
+  { id: 'machine-sop', category: 'SOP', title: 'Machine Pre-start SOP', summary: 'Daily checks before printers, tools, compressors or workshop machinery are used.' },
+  { id: 'quality-release', category: 'Quality', title: 'Quality Release Standard', summary: 'Inspection, hold, release and corrective-action requirements for production work.' },
+  { id: 'privacy', category: 'Policy', title: 'Privacy & Confidentiality', summary: 'Customer, invoice, staff and supplier information handling rules.' }
+];
+
+function staffWorkIdentity() {
+  const user = getStoredUser();
+  return String(user.id || user.email || user.username || 'staff').replace(/[^a-z0-9_-]/gi, '_');
+}
+
+function staffWorkKey(name) {
+  return `voxel-staff-${staffWorkIdentity()}-${name}`;
+}
+
+function readStaffWorkStore(name) {
+  try {
+    const value = JSON.parse(localStorage.getItem(staffWorkKey(name)) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStaffWorkStore(name, rows) {
+  localStorage.setItem(staffWorkKey(name), JSON.stringify(Array.isArray(rows) ? rows : []));
+}
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function staffUserLabel() {
+  const user = getStoredUser();
+  return user.name || user.username || user.email || 'Staff';
+}
+
+function renderStaffModuleList(targetId, rows, emptyText, template) {
+  const el = document.getElementById(targetId);
+  if (!el) return;
+  if (!rows.length) {
+    el.innerHTML = `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+  el.innerHTML = rows.map(template).join('');
+}
+
+function submitLeaveRequest(event) {
+  event.preventDefault();
+  const type = document.getElementById('leaveType')?.value || '';
+  const from = document.getElementById('leaveFrom')?.value || '';
+  const to = document.getElementById('leaveTo')?.value || '';
+  const reason = document.getElementById('leaveReason')?.value.trim() || '';
+  if (!type || !from || !to || !reason) {
+    showToast('Please fill required fields');
+    return;
+  }
+  if (new Date(to) < new Date(from)) {
+    showToast('Leave end date must be after start date');
+    return;
+  }
+  const rows = readStaffWorkStore('leave');
+  rows.push({ id: Date.now(), type, from, to, reason, status: 'Pending', created_at: new Date().toISOString(), staff: staffUserLabel() });
+  writeStaffWorkStore('leave', rows);
+  event.target.reset();
+  renderStaffLeaveRequests();
+  sendStaffNotification('Leave request submitted', `${type} from ${from} to ${to}`);
+  showToast('Saved successfully');
+}
+
+function renderStaffLeaveRequests() {
+  const rows = readStaffWorkStore('leave');
+  renderStaffModuleList('staffLeaveList', rows, 'No leave requests yet.', (row) => `
+    <article class="staff-mini-card">
+      <div><strong>${escapeHtml(row.type)}</strong><span>${escapeHtml(row.from)} to ${escapeHtml(row.to)}</span><small>${escapeHtml(row.reason)}</small></div>
+      <span class="staff-status-pill pending">${escapeHtml(row.status)}</span>
+    </article>
+  `);
+}
+
+function saveAvailability(event) {
+  event.preventDefault();
+  const date = document.getElementById('availabilityDate')?.value || '';
+  const status = document.getElementById('availabilityStatus')?.value || '';
+  const notes = document.getElementById('availabilityNotes')?.value.trim() || '';
+  if (!date || !status) {
+    showToast('Please fill required fields');
+    return;
+  }
+  const rows = readStaffWorkStore('availability');
+  rows.push({ id: Date.now(), date, status, notes, created_at: new Date().toISOString() });
+  writeStaffWorkStore('availability', rows);
+  event.target.reset();
+  renderStaffAvailability();
+  sendStaffNotification('Availability saved', `${status} on ${date}`);
+  showToast('Saved successfully');
+}
+
+function renderStaffAvailability() {
+  const rows = readStaffWorkStore('availability');
+  renderStaffModuleList('staffAvailabilityList', rows, 'No availability records yet.', (row) => `
+    <article class="staff-mini-card">
+      <div><strong>${escapeHtml(row.date)}</strong><span>${escapeHtml(row.status)}</span><small>${escapeHtml(row.notes || 'No notes')}</small></div>
+      <button type="button" class="secondary-btn compact-btn" onclick="deleteStaffWorkRecord('availability', ${Number(row.id)}, renderStaffAvailability)">Delete</button>
+    </article>
+  `);
+}
+
+function renderStaffDocuments() {
+  const readRows = readStaffWorkStore('documents');
+  const readIds = new Set(readRows.map((row) => row.id));
+  const el = document.getElementById('staffDocumentList');
+  if (!el) return;
+  el.innerHTML = staffDocumentLibrary.map((doc) => {
+    const read = readIds.has(doc.id);
+    return `
+      <article class="card staff-document-card">
+        <span>${escapeHtml(doc.category)}</span>
+        <h3>${escapeHtml(doc.title)}</h3>
+        <p>${escapeHtml(doc.summary)}</p>
+        <button class="${read ? 'secondary-btn' : 'primary-btn'}" type="button" onclick="markStaffDocumentRead('${escapeHtml(doc.id)}')">${read ? 'Read Confirmed' : 'Mark Read'}</button>
+      </article>`;
+  }).join('');
+}
+
+function markStaffDocumentRead(id) {
+  const doc = staffDocumentLibrary.find((item) => item.id === id);
+  if (!doc) return;
+  const rows = readStaffWorkStore('documents').filter((row) => row.id !== id);
+  rows.push({ id, title: doc.title, read_at: new Date().toISOString() });
+  writeStaffWorkStore('documents', rows);
+  renderStaffDocuments();
+  showToast('Updated successfully');
+}
+
+function submitStaffChecklist(event) {
+  event.preventDefault();
+  const type = document.getElementById('staffFormType')?.value || '';
+  const result = document.getElementById('staffFormResult')?.value || '';
+  const notes = document.getElementById('staffFormNotes')?.value.trim() || '';
+  if (!type || !result) {
+    showToast('Please fill required fields');
+    return;
+  }
+  const rows = readStaffWorkStore('forms');
+  rows.push({ id: Date.now(), type, result, notes, submitted_at: new Date().toISOString(), staff: staffUserLabel() });
+  writeStaffWorkStore('forms', rows);
+  event.target.reset();
+  renderStaffFormSubmissions();
+  sendStaffNotification('Form submitted', `${type}: ${result}`);
+  showToast('Saved successfully');
+}
+
+function renderStaffFormSubmissions() {
+  const rows = readStaffWorkStore('forms');
+  renderStaffModuleList('staffFormList', rows, 'No form submissions yet.', (row) => `
+    <article class="staff-mini-card">
+      <div><strong>${escapeHtml(row.type)}</strong><span>${escapeHtml(row.result)}</span><small>${escapeHtml(new Date(row.submitted_at).toLocaleString())}</small><small>${escapeHtml(row.notes || '')}</small></div>
+      <button type="button" class="secondary-btn compact-btn" onclick="deleteStaffWorkRecord('forms', ${Number(row.id)}, renderStaffFormSubmissions)">Delete</button>
+    </article>
+  `);
+}
+
+function sendStaffMessage(event) {
+  event.preventDefault();
+  const priority = document.getElementById('staffMessagePriority')?.value || 'Normal';
+  const body = document.getElementById('staffMessageBody')?.value.trim() || '';
+  if (!body) {
+    showToast('Please fill required fields');
+    return;
+  }
+  const rows = readStaffWorkStore('messages');
+  rows.push({ id: Date.now(), priority, body, sent_at: new Date().toISOString(), status: 'Sent to admin queue' });
+  writeStaffWorkStore('messages', rows);
+  event.target.reset();
+  renderStaffMessages();
+  sendStaffNotification('Message sent', `${priority} message saved for admin review`);
+  showToast('Saved successfully');
+}
+
+function renderStaffMessages() {
+  const rows = readStaffWorkStore('messages');
+  renderStaffModuleList('staffMessageList', rows, 'No messages yet.', (row) => `
+    <article class="staff-mini-card">
+      <div><strong>${escapeHtml(row.priority)}</strong><span>${escapeHtml(row.body)}</span><small>${escapeHtml(new Date(row.sent_at).toLocaleString())}</small></div>
+      <span class="staff-status-pill">${escapeHtml(row.status)}</span>
+    </article>
+  `);
+}
+
+function deleteStaffWorkRecord(store, id, renderFn) {
+  const rows = readStaffWorkStore(store).filter((row) => Number(row.id) !== Number(id));
+  writeStaffWorkStore(store, rows);
+  if (typeof renderFn === 'function') renderFn();
+  showToast('Deleted successfully');
+}
+
+function loadWorkHubModules() {
+  renderStaffLeaveRequests();
+  renderStaffAvailability();
+  renderStaffDocuments();
+  renderStaffFormSubmissions();
+  renderStaffMessages();
+}
 /* ================= STARTUP ================= */
 
 async function bootStaffDashboard() {
@@ -1951,6 +2179,7 @@ async function bootStaffDashboard() {
     updateStaffMissionBase();
 
     applyPermissionUI();
+    loadWorkHubModules();
 
     await Promise.all([
       loadMyTasks(),
@@ -1982,3 +2211,5 @@ async function bootStaffDashboard() {
 }
 
 document.addEventListener('DOMContentLoaded', bootStaffDashboard);
+
+
