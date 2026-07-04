@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-<link rel="stylesheet" href="/style.css?v=20260704-qr-scanner-pro" />
+<link rel="stylesheet" href="/style.css?v=20260704-simple-shift-scan" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -200,7 +200,7 @@
             <p id="staffMissionStatus">Your live work panel is syncing tasks, roster and attendance.</p>
           </div>
           <button class="staff-mission-scan permission-attendance hidden-section" type="button" onclick="openMissionShiftScanner()">
-            <span id="staffMissionActionLabel">Scan QR</span>
+            <span id="staffMissionActionLabel">Attendance</span>
             <strong id="staffMissionActionText">Start Shift</strong>
           </button>
         </div>
@@ -277,17 +277,16 @@
           <div class="section-head">
             <div>
               <h2>Shift Tracking</h2>
-              <p id="staffShiftSubline">Live QR verification required for shift changes</p>
+              <p id="staffShiftSubline">Start or end your shift securely.</p>
             </div>
           </div>
 
           <p id="attendanceStatus">Checking attendance...</p>
 
           <div class="shift-action-row">
-            <button id="clockInBtn" class="primary-btn" onclick="openShiftQrScanner('in')">Scan QR & Start Shift</button>
-            <button id="clockOutBtn" class="secondary-btn" onclick="openShiftQrScanner('out')">Scan QR & End Shift</button>
+            <button id="clockInBtn" class="primary-btn" onclick="openShiftQrScanner('in')">Start Shift</button>
+            <button id="clockOutBtn" class="secondary-btn" onclick="openShiftQrScanner('out')">End Shift</button>
           </div>
-          <p class="status-note">Shift start/end requires the live admin QR. Authorized exceptions are controlled by admin access.</p>
         </div>
 
       </section>
@@ -573,6 +572,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260704-qr-scanner-pro"></script>
+  <script src="/staff.js?v=20260704-simple-shift-scan"></script>
 </body>
 </html>

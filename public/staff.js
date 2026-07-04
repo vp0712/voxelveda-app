@@ -853,46 +853,20 @@ async function startShiftQrCamera(mode) {
 
 function openShiftQrScanner(mode) {
   activeShiftQrMode = mode === 'out' ? 'out' : 'in';
-  const actionLabel = activeShiftQrMode === 'out' ? 'End Shift' : 'Start Shift';
-  const modeLabel = activeShiftQrMode === 'out' ? 'Shift completion' : 'Shift start';
-  const exceptionPanel = canUseQrException()
-    ? `
-      <details class="shift-manual-panel">
-        <summary>Authorized exception</summary>
-        <div class="modal-actions compact-actions">
-          <button class="secondary-btn" onclick="submitAuthorizedShiftException()">Use Authorized Exception</button>
-        </div>
-      </details>
-    `
-    : '';
 
-  showStaffDialog(`QR Verification`, `
-    <div class="shift-scan-panel pro-shift-scanner">
-      <div class="shift-scan-statusbar">
-        <span class="scan-live-dot"></span>
-        <div>
-          <strong>${actionLabel}</strong>
-          <small>${modeLabel} verification</small>
-        </div>
-        <em>Live Scan</em>
-      </div>
+  showStaffDialog(``, `
+    <div class="shift-scan-panel simple-shift-scanner">
       <div class="shift-scan-camera">
         <video id="shiftQrVideo" autoplay playsinline webkit-playsinline muted></video>
         <div class="shift-camera-glass"></div>
-        <div class="shift-scanner-focus-mark"><span></span></div>
         <div class="shift-scan-reticle"></div>
         <div class="shift-scan-corners"></div>
         <div class="shift-scanline"></div>
-        <div class="shift-scan-hint">Hold steady inside the frame</div>
       </div>
-      <div class="shift-scan-feedback">
-        <strong id="shiftQrScanStatus">Opening camera...</strong>
-        <span>Encrypted attendance token verification</span>
-      </div>
+      <strong id="shiftQrScanStatus" class="shift-scan-status-text">Opening camera...</strong>
       <div id="shiftQrPermissionActions" class="shift-camera-actions hidden-section">
-        <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Open Camera Scanner</button>
+        <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Open Camera</button>
       </div>
-      ${exceptionPanel}
     </div>
   `);
 
@@ -1734,9 +1708,9 @@ async function loadAttendanceStatus() {
 
     if (!data.attendance) {
       status.innerText = 'Not clocked in today.';
-      setText('staffMissionActionLabel', 'Scan QR');
+      setText('staffMissionActionLabel', 'Attendance');
       setText('staffMissionActionText', 'Start Shift');
-      setText('staffShiftSubline', 'Ready to start. Scan the live admin QR when you arrive.');
+      setText('staffShiftSubline', 'Ready to start your shift.');
       updateShiftButtons(null);
       await checkTenHourReminder(null);
       return;
@@ -1749,11 +1723,11 @@ async function loadAttendanceStatus() {
       `Clock Out: ${formatDateTime(row.clock_out)} | ` +
       `Hours: ${Number(row.total_hours || 0).toFixed(2)}`;
     const isOpen = Boolean(row.clock_in && !row.clock_out);
-    setText('staffMissionActionLabel', isOpen ? 'Active Shift' : 'Shift Closed');
+    setText('staffMissionActionLabel', 'Attendance');
     setText('staffMissionActionText', isOpen ? 'End Shift' : 'Start Shift');
     setText('staffShiftSubline', isOpen
-      ? 'Shift is live. Scan the live admin QR when you finish.'
-      : 'Today is recorded. Scan the live QR to begin another approved shift.');
+      ? 'Shift is live.'
+      : 'Today is recorded. You can start another approved shift if needed.');
 
     updateShiftButtons(row);
     await checkTenHourReminder(row);
