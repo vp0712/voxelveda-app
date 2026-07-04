@@ -9547,3 +9547,33 @@ textarea {
 .simple-shift-scanner .shift-scanline {
   z-index: 2;
 }
+
+/* 20260704 sidebar badge cleanup */
+.sidebar .nav-btn::before,
+.sidebar .nav-sub-btn::before,
+.sidebar .nav-group-toggle::before,
+.staff-portal .sidebar .nav-btn::before,
+.staff-portal .sidebar .nav-sub-btn::before {
+  content: none !important;
+  display: none !important;
+}
+
+.sidebar .nav-btn,
+.sidebar .nav-sub-btn,
+.sidebar .nav-group-toggle,
+.staff-portal .sidebar .nav-btn,
+.staff-portal .sidebar .nav-sub-btn {
+  gap: 0 !important;
+}
+
+.sidebar .nav-submenu {
+  padding-left: 0;
+}
+
+.sidebar .nav-sub-btn {
+  padding-left: 12px;
+}
+
+.sidebar .nav-btn.active {
+  padding-left: 13px;
+}
