@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260704-executive-theme"/>
+<link rel="stylesheet" href="/style.css?v=20260704-timesheet-review"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -172,7 +172,7 @@
 
           <div class="card command-status-card pipeline-card">
             <h3>Pipeline</h3>
-            <p>RFQ → Approval → Invoice → Payment</p>
+            <p>RFQ &rarr; Approval &rarr; Invoice &rarr; Payment</p>
           </div>
         </div>
 
@@ -478,7 +478,7 @@
         <div class="section-head">
           <div>
             <h2>Stock In</h2>
-            <p>Home • Inventory • Stock</p>
+            <p>Home &bull; Inventory &bull; Stock</p>
           </div>
           <button onclick="openStockDialog()" class="primary-btn">Add Stock</button>
         </div>
@@ -746,6 +746,7 @@
           <div class="section-head">
             <div><h3>Timesheet Command Centre</h3><p>Email, export and review weekly or monthly timesheets without leaving Workforce.</p></div>
             <div class="card-actions">
+              <button class="secondary-btn" onclick="reviewPendingTimesheets()">Review Pending</button>
               <button class="secondary-btn" onclick="exportTimesheetCsv()">Export CSV</button>
               <button class="secondary-btn" onclick="exportTimesheetHtml()">Preview Summary</button>
               <button class="primary-btn" onclick="sendTimesheetEmail()">Send Timesheet</button>
@@ -799,10 +800,11 @@
                 <th>Week End</th>
                 <th>Total Hours</th>
                 <th>Status</th>
+                <th>Review</th>
               </tr>
             </thead>
             <tbody id="timesheetAdminBody">
-              <tr><td colspan="5">Loading...</td></tr>
+              <tr><td colspan="6">Loading...</td></tr>
             </tbody>
           </table>
         </div>
@@ -1306,6 +1308,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260703-workforce-suite"></script>
+  <script src="/admin-dashboard.js?v=20260704-timesheet-review"></script>
 </body>
 </html>

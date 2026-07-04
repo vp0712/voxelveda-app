@@ -5593,7 +5593,7 @@ async function loadAttendance() {
           </div>
         </td>
         <td><strong>${escapeHtml(Number(a.total_hours || 0).toFixed(2))}</strong></td>
-        <td>${escapeHtml(a.notes || '-')}</td>
+        <td>${renderTimesheetNote(a.notes)}</td>
         <td>
           <div class="table-action-stack">
             <button class="small-btn" onclick="openAttendanceDialog(${a.id})">Edit</button>
@@ -6564,4 +6564,79 @@ async function sendTimesheetEmail() {
   if (log) log.textContent = data.message || 'Email could not be sent. Timesheet preview is ready.';
   showToast(data.message || 'Timesheet preview is ready');
   showTimesheetEmailSetupDialog(data, lastTimesheetEmailDraft);
+}
+
+function isAutoClockNote(note) {
+  return /(^|\s)A(\s|$)|auto clock-out after 12 hours/i.test(String(note || ''));
+}
+
+function renderTimesheetNote(note) {
+  if (isAutoClockNote(note)) {
+    return '<span class="auto-clock-badge" title="Auto clock-out after 12 hours">A</span>';
+  }
+  return escapeHtml(note || '-');
+}
+
+function reviewPendingTimesheets() {
+  const section = document.getElementById('timesheetAdminBody')?.closest('.table-wrap');
+  const pending = (window.vvTimesheetCache || []).filter((row) => String(row.status || 'open').toLowerCase() === 'open');
+  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast(pending.length ? `${pending.length} pending timesheet${pending.length === 1 ? '' : 's'} ready for review` : 'No pending timesheets');
+}
+
+async function updateTimesheetStatus(id, status) {
+  try {
+    const res = await fetch('/api/attendance/timesheets/status', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ id, status })
+    });
+    const data = await safeJson(res);
+    showToast(data.message || (res.ok ? 'Timesheet updated' : 'Timesheet update failed'));
+    if (res.ok) await loadTimesheets();
+  } catch (err) {
+    showToast('Timesheet update failed');
+  }
+}
+
+function renderTimesheetStatusChip(status) {
+  const clean = String(status || 'open').toLowerCase();
+  const label = clean === 'approved' ? 'Approved' : clean === 'rejected' ? 'Needs Review' : 'Pending';
+  return '<span class="timesheet-status-chip ' + escapeHtml(clean) + '">' + escapeHtml(label) + '</span>';
+}
+
+function renderTimesheetReviewActions(timesheet) {
+  const id = Number(timesheet.id || 0);
+  const status = String(timesheet.status || 'open').toLowerCase();
+  if (!id) return '-';
+  if (status === 'approved') {
+    return '<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="updateTimesheetStatus(' + id + ', \'open\')">Reopen</button></div>';
+  }
+  return '<div class="table-action-stack timesheet-review-actions"><button class="small-btn" onclick="updateTimesheetStatus(' + id + ', \'approved\')">Approve</button><button class="secondary-btn small" onclick="updateTimesheetStatus(' + id + ', \'rejected\')">Flag</button></div>';
+}
+
+async function loadTimesheets() {
+  var tbody = document.getElementById('timesheetAdminBody');
+  if (!tbody) return;
+  populateTimesheetSendStaffSelect();
+  var res = await fetch('/api/attendance/timesheets', { headers: { Authorization: 'Bearer ' + token } });
+  var data = await safeJson(res);
+  if (!res.ok) {
+    tbody.innerHTML = '<tr><td colspan="6">Failed to load timesheets</td></tr>';
+    return;
+  }
+  window.vvTimesheetCache = data.timesheets || [];
+  updateWorkforceDashboardMetrics();
+  renderRegisterPage({
+    key: 'timesheets',
+    tbody: tbody,
+    rows: window.vvTimesheetCache,
+    colspan: 6,
+    emptyMessage: 'No weekly timesheets yet.',
+    onChange: loadTimesheets,
+    rowRenderer: function(t) {
+      var status = String(t.status || 'open').toLowerCase();
+      return '<tr class="' + (status === 'open' ? 'timesheet-pending-row' : '') + '"><td><strong>' + escapeHtml(t.name || '-') + '</strong><span class="cell-subtext">' + escapeHtml(t.email || '-') + '</span></td><td>' + escapeHtml(String(t.week_start || '').slice(0, 10)) + '</td><td>' + escapeHtml(String(t.week_end || '').slice(0, 10)) + '</td><td><strong>' + escapeHtml(Number(t.total_hours || 0).toFixed(2)) + '</strong></td><td>' + renderTimesheetStatusChip(status) + '</td><td>' + renderTimesheetReviewActions(t) + '</td></tr>';
+    }
+  });
 }

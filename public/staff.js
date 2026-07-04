@@ -605,6 +605,27 @@ async function loadAnnouncements() {
   }
 }
 
+
+function staffAutoClockNote(note) {
+  return /(^|\s)A(\s|$)|auto clock-out after 12 hours/i.test(String(note || ''));
+}
+
+async function checkAutoClockOutNotification(attendance) {
+  if (!attendance?.clock_in || !attendance.clock_out || !staffAutoClockNote(attendance.notes)) return;
+  const reminderKey = String(attendance.id || attendance.clock_out || attendance.clock_in);
+  if (localStorage.getItem('twelveHourAutoClockOutAttendanceId') === reminderKey) return;
+
+  localStorage.setItem('twelveHourAutoClockOutAttendanceId', reminderKey);
+  const message = 'Your shift reached 12 hours and was closed automatically.';
+  showToast(message);
+  showShiftDialog(
+    'Shift Auto Closed',
+    message,
+    'Please review your timesheet and contact admin if anything needs correction.'
+  );
+  await sendShiftNotification('Shift auto clocked-out', message);
+}
+
 async function checkTenHourReminder(attendance) {
   if (!attendance?.clock_in || attendance.clock_out) {
     tenHourReminderShown = false;
@@ -1736,6 +1757,7 @@ async function loadAttendanceStatus() {
 
     updateShiftButtons(row);
     await checkTenHourReminder(row);
+    await checkAutoClockOutNotification(row);
   } catch {
     status.innerText = 'Server error loading attendance';
     updateShiftButtons(null);

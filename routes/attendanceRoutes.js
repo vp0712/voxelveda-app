@@ -30,6 +30,7 @@ router.get('/timesheets', auth, attendanceController.allWeeklyTimesheets);
 
 router.get('/timesheets/user', auth, attendanceController.userTimesheets);
 router.post('/timesheets/send', auth, requireInputPermission('attendance_input'), attendanceController.sendTimesheetSummary);
+router.post('/timesheets/status', auth, requireInputPermission('attendance_input'), attendanceController.updateWeeklyTimesheetStatus);
 
 router.post('/admin/save', auth, requireInputPermission('attendance_input'), attendanceController.saveAttendance);
 

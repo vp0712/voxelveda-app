@@ -260,7 +260,11 @@ async function autoClockOutExpiredShifts(userId = null) {
       clock_out = DATE_ADD(clock_in, INTERVAL 12 HOUR),
       total_minutes = 720,
       total_hours = 12,
-      notes = TRIM(CONCAT(IFNULL(notes, ''), ' Auto clock-out after 12 hours.'))
+      notes = CASE
+        WHEN notes IS NULL OR TRIM(notes) = '' THEN 'A'
+        WHEN notes REGEXP '(^|[[:space:]])A([[:space:]]|$)' OR notes LIKE '%Auto clock-out after 12 hours.%' THEN notes
+        ELSE TRIM(CONCAT(notes, ' A'))
+      END
     WHERE id IN (?)
     `,
     [ids]
@@ -627,6 +631,40 @@ exports.allWeeklyTimesheets = async (req, res) => {
   }
 };
 
+exports.updateWeeklyTimesheetStatus = async (req, res) => {
+  try {
+    await ensureAttendanceTables();
+
+    if (!isAdmin(req)) {
+      return res.status(403).json({ message: 'Admin only' });
+    }
+
+    const id = Number(req.body.id);
+    const status = String(req.body.status || '').trim().toLowerCase();
+    const allowed = new Set(['open', 'approved', 'rejected']);
+
+    if (!id || !allowed.has(status)) {
+      return res.status(400).json({ message: 'Valid timesheet and status are required' });
+    }
+
+    const [result] = await pool.query(
+      `UPDATE weekly_timesheets SET status = ? WHERE id = ?`,
+      [status, id]
+    );
+
+    if (!result.affectedRows) {
+      return res.status(404).json({ message: 'Timesheet not found' });
+    }
+
+    res.json({ message: 'Timesheet status updated', status });
+  } catch (err) {
+    console.error('UPDATE WEEKLY TIMESHEET STATUS ERROR FULL:', err);
+    res.status(500).json({
+      message: 'Failed to update timesheet status',
+      error: err.message
+    });
+  }
+};
 function buildShiftQrPayload() {
   const period = currentShiftPeriod();
   const token = createShiftQrToken(period);
