@@ -2125,7 +2125,7 @@ function renderStaffFormSubmissions() {
   `);
 }
 
-function sendStaffMessage(event) {
+async function sendStaffMessage(event) {
   event.preventDefault();
   const priority = document.getElementById('staffMessagePriority')?.value || 'Normal';
   const body = document.getElementById('staffMessageBody')?.value.trim() || '';
@@ -2133,23 +2133,51 @@ function sendStaffMessage(event) {
     showToast('Please fill required fields');
     return;
   }
-  const rows = readStaffWorkStore('messages');
-  rows.push({ id: Date.now(), priority, body, sent_at: new Date().toISOString(), status: 'Sent to admin queue' });
-  writeStaffWorkStore('messages', rows);
-  event.target.reset();
-  renderStaffMessages();
-  sendStaffNotification('Message sent', `${priority} message saved for admin review`);
-  showToast('Saved successfully');
+
+  try {
+    const res = await fetch('/api/tasks/messages', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ priority, body })
+    });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      showToast(data.message || 'Message send failed');
+      return;
+    }
+
+    event.target.reset();
+    await renderStaffMessages();
+    sendStaffNotification('Message sent', `${priority} message delivered to admin`);
+    showToast(data.message || 'Message sent to admin');
+  } catch (err) {
+    showToast('Message send failed');
+  }
 }
 
-function renderStaffMessages() {
-  const rows = readStaffWorkStore('messages');
-  renderStaffModuleList('staffMessageList', rows, 'No messages yet.', (row) => `
-    <article class="staff-mini-card">
-      <div><strong>${escapeHtml(row.priority)}</strong><span>${escapeHtml(row.body)}</span><small>${escapeHtml(new Date(row.sent_at).toLocaleString())}</small></div>
-      <span class="staff-status-pill">${escapeHtml(row.status)}</span>
-    </article>
-  `);
+async function renderStaffMessages() {
+  const list = document.getElementById('staffMessageList');
+  if (list) list.innerHTML = '<div class="empty-state compact">Loading messages...</div>';
+  try {
+    const res = await fetch('/api/tasks/messages/my', { headers: authHeaders() });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.message || 'Failed to load messages');
+    const rows = Array.isArray(data.messages) ? data.messages : [];
+    renderStaffModuleList('staffMessageList', rows, 'No messages yet.', (row) => `
+      <article class="staff-mini-card">
+        <div><strong>${escapeHtml(row.priority || 'Normal')}</strong><span>${escapeHtml(row.body || '')}</span><small>${escapeHtml(new Date(row.created_at || row.sent_at || Date.now()).toLocaleString())}</small></div>
+        <span class="staff-status-pill">${escapeHtml(row.status || 'Open')}</span>
+      </article>
+    `);
+  } catch (err) {
+    const rows = readStaffWorkStore('messages');
+    renderStaffModuleList('staffMessageList', rows, 'No messages yet.', (row) => `
+      <article class="staff-mini-card">
+        <div><strong>${escapeHtml(row.priority)}</strong><span>${escapeHtml(row.body)}</span><small>${escapeHtml(new Date(row.sent_at).toLocaleString())}</small></div>
+        <span class="staff-status-pill">Local only</span>
+      </article>
+    `);
+  }
 }
 
 function deleteStaffWorkRecord(store, id, renderFn) {

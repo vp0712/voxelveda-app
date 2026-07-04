@@ -14,6 +14,16 @@ router.get('/announcements', taskController.getAnnouncements);
 
 router.get('/announcements/my', taskController.getMyAnnouncements);
 
+router.get('/messages', taskController.getStaffMessages);
+
+router.get('/messages/my', taskController.getMyStaffMessages);
+
+router.post('/messages', taskController.createStaffMessage);
+
+router.post('/messages/update', requireInputPermission('tasks_input'), taskController.updateStaffMessage);
+
+router.post('/messages/delete', requireInputPermission('tasks_input'), taskController.deleteStaffMessage);
+
 router.post('/announcements', requireInputPermission('tasks_input'), taskController.createAnnouncement);
 
 router.post('/announcements/update', requireInputPermission('tasks_input'), taskController.updateAnnouncement);

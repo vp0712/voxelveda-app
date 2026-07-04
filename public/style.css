@@ -10795,3 +10795,142 @@ textarea:focus {
     min-height: 74px;
   }
 }
+/* 20260704 premium graphite theme refresh */
+:root {
+  --bg: #070b14;
+  --panel: rgba(12, 18, 30, 0.92);
+  --border: rgba(118, 146, 176, 0.24);
+  --accent: #60a5fa;
+  --accent-2: #22d3ee;
+  --text: #f8fbff;
+  --muted: #a7b4c5;
+  --danger: #f43f5e;
+  --warning: #fbbf24;
+  --success: #34d399;
+}
+
+body {
+  background:
+    radial-gradient(circle at 12% 14%, rgba(96, 165, 250, 0.16), transparent 28%),
+    radial-gradient(circle at 88% 18%, rgba(34, 211, 238, 0.12), transparent 30%),
+    linear-gradient(135deg, #040814 0%, #08111f 48%, #030712 100%) !important;
+}
+
+body::before {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(96, 165, 250, 0.04) 1px, transparent 1px) !important;
+  background-size: 56px 56px !important;
+}
+
+.sidebar {
+  background: linear-gradient(180deg, rgba(5, 10, 20, 0.98), rgba(7, 12, 22, 0.96)) !important;
+  border-right-color: rgba(96, 165, 250, 0.22) !important;
+  box-shadow: 18px 0 45px rgba(0, 0, 0, 0.28) !important;
+}
+
+.brand {
+  margin-bottom: 26px !important;
+  padding: 10px !important;
+  border: 1px solid rgba(96, 165, 250, 0.2) !important;
+  border-radius: 16px !important;
+  background: rgba(15, 23, 42, 0.52) !important;
+}
+
+.brand-mark {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 14px !important;
+}
+
+.brand h1 {
+  font-size: 15px !important;
+  letter-spacing: 0.02em !important;
+}
+
+.nav-btn,
+.logout-btn {
+  border-radius: 12px !important;
+  border-color: rgba(96, 165, 250, 0.2) !important;
+  background: rgba(12, 18, 32, 0.78) !important;
+  min-height: 42px !important;
+  padding: 10px 12px !important;
+  font-weight: 800 !important;
+}
+
+.nav-btn.active,
+.nav-btn:hover {
+  background: linear-gradient(135deg, #60a5fa, #22d3ee) !important;
+  color: #06111f !important;
+  box-shadow: 0 12px 28px rgba(34, 211, 238, 0.2) !important;
+}
+
+.nav-group {
+  border-color: rgba(96, 165, 250, 0.18) !important;
+  background: rgba(8, 14, 26, 0.72) !important;
+  border-radius: 14px !important;
+}
+
+.topbar,
+.card,
+.dialog-panel,
+.modal,
+.staff-work-form,
+.staff-work-panel {
+  background: linear-gradient(145deg, rgba(13, 22, 36, 0.92), rgba(8, 14, 26, 0.94)) !important;
+  border-color: rgba(96, 165, 250, 0.22) !important;
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.22) !important;
+}
+
+.primary-btn,
+.system-action,
+.admin-workhub-card strong,
+.staff-status-pill {
+  background: linear-gradient(135deg, #60a5fa, #22d3ee) !important;
+  color: #06111f !important;
+}
+
+.admin-workhub-card,
+.staff-mini-card {
+  border-color: rgba(96, 165, 250, 0.2) !important;
+  background: rgba(5, 12, 24, 0.58) !important;
+}
+
+.admin-message-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.staff-message-row strong span {
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  margin-left: 8px;
+  text-transform: uppercase;
+}
+
+.admin-workhub-dialog-body.single-column {
+  grid-template-columns: 1fr !important;
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    width: min(82vw, 320px) !important;
+    padding: 14px !important;
+  }
+
+  .brand {
+    margin-bottom: 14px !important;
+  }
+
+  .nav-btn,
+  .logout-btn {
+    min-height: 40px !important;
+    font-size: 13px !important;
+  }
+
+  .topbar {
+    border-radius: 16px !important;
+  }
+}

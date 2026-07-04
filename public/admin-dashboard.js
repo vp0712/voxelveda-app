@@ -38,6 +38,7 @@ let announcementCache = [];
 let taskCache = [];
 let meetingCache = [];
 let rosterCache = [];
+let staffMessageCache = [];
 let attendanceSnapshot = new Map();
 let attendanceFirstLoad = true;
 let shiftQrTimer = null;
@@ -227,6 +228,12 @@ function buildShellNotifications() {
   if (dueCompliance.length) {
     addShellNotification(list, 'compliance', 'Compliance/licence reminder', `${dueCompliance.length} compliance record${dueCompliance.length === 1 ? '' : 's'} need attention.`, 'complianceSection');
   }
+  const openStaffMessages = staffMessageCache.filter((message) => !['reviewed', 'closed', 'deleted'].includes(String(message.status || '').toLowerCase()));
+  if (openStaffMessages.length) {
+    const label = openStaffMessages.length === 1 ? 'message' : 'messages';
+    addShellNotification(list, 'message', 'Staff message received', ` staff ` + label + ' waiting for admin review.', 'staffSection');
+  }
+
   const upcomingMeetings = meetingCache.filter((meeting) => {
     const status = String(meeting.status || '').toLowerCase();
     if (['completed', 'cancelled'].includes(status)) return false;
@@ -4436,6 +4443,91 @@ function openAdminWorkHub(type) {
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'admin-workhub-dialog');
 }
 
+
+async function loadAdminStaffMessages() {
+  try {
+    const res = await fetch('/api/tasks/messages', { headers: authHeaders() });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.message || 'Failed to load staff messages');
+    staffMessageCache = Array.isArray(data.messages) ? data.messages : [];
+    renderAdminWorkHubSummary();
+    renderNotificationDropdown();
+    return staffMessageCache;
+  } catch (err) {
+    staffMessageCache = [];
+    renderAdminWorkHubSummary();
+    return [];
+  }
+}
+
+function renderAdminStaffMessageRows(rows = staffMessageCache) {
+  if (!rows.length) return '<div class="empty-state compact">No staff messages waiting.</div>';
+  return rows.map((row) => `
+    <article class="admin-workhub-row staff-message-row">
+      <div>
+        <strong>${escapeHtml(row.staff_name || row.staff_email || 'Staff')} <span>${escapeHtml(row.priority || 'Normal')}</span></strong>
+        <span>${escapeHtml(row.body || '')}</span>
+        <small>${escapeHtml(new Date(row.created_at || Date.now()).toLocaleString())} | ${escapeHtml(row.status || 'Open')}</small>
+      </div>
+      <div class="admin-message-actions">
+        <button type="button" class="secondary-btn small-btn" onclick="updateAdminStaffMessage(${Number(row.id)}, 'Reviewed')">Reviewed</button>
+        <button type="button" class="danger-btn small-btn" onclick="deleteAdminStaffMessage(${Number(row.id)})">Delete</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+async function openAdminStaffMessages() {
+  await loadAdminStaffMessages();
+  showDialog('Staff Messages', `
+    <div class="admin-workhub-dialog-body single-column">
+      <section>
+        <div class="admin-workhub-register-head">
+          <h4>Incoming Staff Queue</h4>
+          <button type="button" class="secondary-btn small-btn" onclick="refreshAdminStaffMessagesPanel()">Refresh</button>
+        </div>
+        <div id="adminStaffMessageRegister" class="admin-workhub-register">${renderAdminStaffMessageRows()}</div>
+      </section>
+    </div>
+  `, hideDialog, 'Close');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'admin-workhub-dialog');
+}
+
+async function refreshAdminStaffMessagesPanel() {
+  await loadAdminStaffMessages();
+  const panel = document.getElementById('adminStaffMessageRegister');
+  if (panel) panel.innerHTML = renderAdminStaffMessageRows();
+}
+
+async function updateAdminStaffMessage(id, status) {
+  const res = await fetch('/api/tasks/messages/update', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id, status })
+  });
+  const data = await safeJson(res);
+  if (!res.ok) {
+    showToast(data.message || 'Message update failed');
+    return;
+  }
+  showToast(data.message || 'Message updated');
+  await refreshAdminStaffMessagesPanel();
+}
+
+async function deleteAdminStaffMessage(id) {
+  const res = await fetch('/api/tasks/messages/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+  if (!res.ok) {
+    showToast(data.message || 'Message delete failed');
+    return;
+  }
+  showToast(data.message || 'Message deleted');
+  await refreshAdminStaffMessagesPanel();
+}
 function saveAdminWorkHubEntry(type) {
   const title = document.getElementById('adminWorkHubTitle')?.value.trim();
   if (!title) {

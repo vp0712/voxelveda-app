@@ -658,3 +658,154 @@ exports.deleteAnnouncement = async (req, res) => {
     res.status(500).json({ message: 'Announcement delete failed', error: err.message });
   }
 };
+
+async function ensureStaffMessageTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS staff_messages (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      priority VARCHAR(40) NOT NULL DEFAULT 'Normal',
+      body TEXT NOT NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'Open',
+      deleted TINYINT(1) NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at DATETIME NULL,
+      reviewed_by INT NULL,
+      INDEX idx_staff_messages_user (user_id),
+      INDEX idx_staff_messages_status (status),
+      INDEX idx_staff_messages_deleted (deleted)
+    )
+  `);
+
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN user_id INT NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN priority VARCHAR(40) NOT NULL DEFAULT 'Normal'`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN body TEXT NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'Open'`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN reviewed_at DATETIME NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_messages ADD COLUMN reviewed_by INT NULL`).catch(() => {});
+}
+
+exports.getStaffMessages = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+
+    await ensureStaffMessageTable();
+
+    const [rows] = await pool.query(`
+      SELECT
+        sm.*,
+        u.name AS staff_name,
+        u.email AS staff_email,
+        reviewer.name AS reviewed_by_name
+      FROM staff_messages sm
+      LEFT JOIN users u ON u.id = sm.user_id
+      LEFT JOIN users reviewer ON reviewer.id = sm.reviewed_by
+      WHERE IFNULL(sm.deleted, 0) = 0
+      ORDER BY
+        CASE WHEN LOWER(sm.status) IN ('open', 'new') THEN 1 ELSE 2 END,
+        sm.id DESC
+    `);
+
+    res.json({ messages: rows });
+  } catch (err) {
+    console.error('GET STAFF MESSAGES ERROR FULL:', err);
+    res.status(500).json({ message: 'Failed to load staff messages', error: err.message });
+  }
+};
+
+exports.getMyStaffMessages = async (req, res) => {
+  try {
+    const userId = Number(req.user?.id || 0);
+    if (!userId) return res.status(401).json({ message: 'Unauthorized user' });
+
+    await ensureStaffMessageTable();
+
+    const [rows] = await pool.query(
+      `SELECT * FROM staff_messages WHERE user_id = ? AND IFNULL(deleted, 0) = 0 ORDER BY id DESC`,
+      [userId]
+    );
+
+    res.json({ messages: rows });
+  } catch (err) {
+    console.error('GET MY STAFF MESSAGES ERROR FULL:', err);
+    res.status(500).json({ message: 'Failed to load your messages', error: err.message });
+  }
+};
+
+exports.createStaffMessage = async (req, res) => {
+  try {
+    const userId = Number(req.user?.id || 0);
+    if (!userId) return res.status(401).json({ message: 'Unauthorized user' });
+
+    const priority = String(req.body.priority || 'Normal').trim().slice(0, 40) || 'Normal';
+    const body = String(req.body.body || '').trim();
+
+    if (!body) return res.status(400).json({ message: 'Message is required' });
+    if (body.length > 5000) return res.status(400).json({ message: 'Message is too long' });
+
+    await ensureStaffMessageTable();
+
+    const [result] = await pool.query(
+      `INSERT INTO staff_messages (user_id, priority, body, status) VALUES (?, ?, ?, 'Open')`,
+      [userId, priority, body]
+    );
+
+    res.json({ message: 'Message sent to admin successfully', message_id: result.insertId });
+  } catch (err) {
+    console.error('CREATE STAFF MESSAGE ERROR FULL:', err);
+    res.status(500).json({ message: 'Message send failed', error: err.message });
+  }
+};
+
+exports.updateStaffMessage = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+
+    const id = Number(req.body.id || 0);
+    const status = String(req.body.status || 'Reviewed').trim().slice(0, 40) || 'Reviewed';
+    if (!id) return res.status(400).json({ message: 'Message ID is required' });
+
+    await ensureStaffMessageTable();
+
+    const [result] = await pool.query(
+      `UPDATE staff_messages SET status = ?, reviewed_at = NOW(), reviewed_by = ? WHERE id = ? AND IFNULL(deleted, 0) = 0`,
+      [status, req.user?.id || null, id]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Message not found' });
+    res.json({ message: 'Message updated successfully' });
+  } catch (err) {
+    console.error('UPDATE STAFF MESSAGE ERROR FULL:', err);
+    res.status(500).json({ message: 'Message update failed', error: err.message });
+  }
+};
+
+exports.deleteStaffMessage = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+
+    const id = Number(req.body.id || 0);
+    if (!id) return res.status(400).json({ message: 'Message ID is required' });
+
+    await ensureStaffMessageTable();
+
+    const [result] = await pool.query(
+      `UPDATE staff_messages SET deleted = 1 WHERE id = ?`,
+      [id]
+    );
+
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Message not found' });
+    res.json({ message: 'Message deleted successfully' });
+  } catch (err) {
+    console.error('DELETE STAFF MESSAGE ERROR FULL:', err);
+    res.status(500).json({ message: 'Message delete failed', error: err.message });
+  }
+};
