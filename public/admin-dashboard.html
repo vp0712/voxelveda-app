@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260704-message-theme"/>
+<link rel="stylesheet" href="/style.css?v=20260704-staff-inbox-orbit"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -951,6 +951,19 @@
         </div>
 
 
+        <div class="card admin-message-inbox">
+          <div class="admin-workhub-register-head">
+            <div>
+              <span class="eyebrow">Incoming Staff Queue</span>
+              <h3>Staff Messages & Approvals</h3>
+              <p>New messages sent from staff portal appear here instantly for admin review.</p>
+            </div>
+            <button type="button" class="secondary-btn small" onclick="refreshAdminStaffMessagesPanel()">Refresh Inbox</button>
+          </div>
+          <div id="adminStaffMessageInline" class="admin-workhub-register admin-message-inbox-list">
+            <div class="empty-state compact">Loading staff messages...</div>
+          </div>
+        </div>
         <div class="card table-wrap">
           <h3>Staff Users</h3>
           <table>
@@ -1325,6 +1338,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260704-message-theme"></script>
+  <script src="/admin-dashboard.js?v=20260704-staff-inbox-orbit"></script>
 </body>
 </html>

@@ -228,10 +228,10 @@ function buildShellNotifications() {
   if (dueCompliance.length) {
     addShellNotification(list, 'compliance', 'Compliance/licence reminder', `${dueCompliance.length} compliance record${dueCompliance.length === 1 ? '' : 's'} need attention.`, 'complianceSection');
   }
-  const openStaffMessages = staffMessageCache.filter((message) => !['reviewed', 'closed', 'deleted'].includes(String(message.status || '').toLowerCase()));
+  const openStaffMessages = staffMessageCache.filter((message) => !['reviewed', 'approved', 'closed', 'deleted'].includes(String(message.status || '').toLowerCase()));
   if (openStaffMessages.length) {
     const label = openStaffMessages.length === 1 ? 'message' : 'messages';
-    addShellNotification(list, 'message', 'Staff message received', ` staff ` + label + ' waiting for admin review.', 'staffSection');
+    addShellNotification(list, 'message', 'Staff message received', String(openStaffMessages.length) + ' staff ' + label + ' waiting for admin review.', 'staffSection');
   }
 
   const upcomingMeetings = meetingCache.filter((meeting) => {
@@ -4451,15 +4451,24 @@ async function loadAdminStaffMessages() {
     if (!res.ok) throw new Error(data.message || 'Failed to load staff messages');
     staffMessageCache = Array.isArray(data.messages) ? data.messages : [];
     renderAdminWorkHubSummary();
+    renderAdminStaffMessageSurfaces();
     renderNotificationDropdown();
     return staffMessageCache;
   } catch (err) {
     staffMessageCache = [];
     renderAdminWorkHubSummary();
+    renderAdminStaffMessageSurfaces();
     return [];
   }
 }
 
+function renderAdminStaffMessageSurfaces() {
+  const html = renderAdminStaffMessageRows();
+  ['adminStaffMessageRegister', 'adminStaffMessageInline'].forEach((id) => {
+    const target = document.getElementById(id);
+    if (target) target.innerHTML = html;
+  });
+}
 function renderAdminStaffMessageRows(rows = staffMessageCache) {
   if (!rows.length) return '<div class="empty-state compact">No staff messages waiting.</div>';
   return rows.map((row) => `
@@ -4470,7 +4479,7 @@ function renderAdminStaffMessageRows(rows = staffMessageCache) {
         <small>${escapeHtml(new Date(row.created_at || Date.now()).toLocaleString())} | ${escapeHtml(row.status || 'Open')}</small>
       </div>
       <div class="admin-message-actions">
-        <button type="button" class="secondary-btn small-btn" onclick="updateAdminStaffMessage(${Number(row.id)}, 'Reviewed')">Reviewed</button>
+        <button type="button" class="primary-btn small-btn" onclick="updateAdminStaffMessage(${Number(row.id)}, 'Approved')">Approve</button>
         <button type="button" class="danger-btn small-btn" onclick="deleteAdminStaffMessage(${Number(row.id)})">Delete</button>
       </div>
     </article>
@@ -4495,8 +4504,7 @@ async function openAdminStaffMessages() {
 
 async function refreshAdminStaffMessagesPanel() {
   await loadAdminStaffMessages();
-  const panel = document.getElementById('adminStaffMessageRegister');
-  if (panel) panel.innerHTML = renderAdminStaffMessageRows();
+  renderAdminStaffMessageSurfaces();
 }
 
 async function updateAdminStaffMessage(id, status) {
@@ -6896,3 +6904,11 @@ async function loadTimesheets() {
   });
 }
 
+
+if (!window.__adminStaffMessagePoller) {
+  window.__adminStaffMessagePoller = setInterval(() => {
+    if (token && !redirectingToLogin && document.visibilityState !== 'hidden') {
+      loadAdminStaffMessages();
+    }
+  }, 30000);
+}

@@ -10934,3 +10934,257 @@ body::before {
     border-radius: 16px !important;
   }
 }
+/* 20260704 orbital command interface */
+:root {
+  --bg: #05070d;
+  --bg-soft: #08111d;
+  --panel: rgba(13, 22, 34, 0.88);
+  --panel-strong: rgba(16, 29, 45, 0.94);
+  --panel-glass: rgba(9, 19, 30, 0.74);
+  --border: rgba(123, 214, 255, 0.18);
+  --border-strong: rgba(90, 210, 255, 0.34);
+  --text: #f4f8ff;
+  --muted: #9fb3c8;
+  --accent: #49d5ff;
+  --accent-2: #3f83ff;
+  --accent-3: #30e2bd;
+  --danger: #ff4e5c;
+  --success: #25df87;
+  --warning: #f8c654;
+  --shadow: 0 24px 70px rgba(0, 0, 0, 0.36);
+}
+
+body {
+  background:
+    radial-gradient(circle at 18% 16%, rgba(48, 226, 189, 0.12), transparent 34%),
+    radial-gradient(circle at 86% 6%, rgba(63, 131, 255, 0.16), transparent 28%),
+    linear-gradient(135deg, #05070d 0%, #071522 52%, #05070d 100%) !important;
+  color: var(--text);
+}
+
+body::after {
+  opacity: 0.032 !important;
+  filter: saturate(0.9) contrast(1.08);
+  background-size: min(42vw, 520px) auto !important;
+}
+
+.sidebar {
+  width: 248px !important;
+  padding: 14px 12px !important;
+  background: linear-gradient(180deg, rgba(6, 12, 22, 0.96), rgba(8, 17, 29, 0.94)) !important;
+  border-right: 1px solid var(--border) !important;
+  box-shadow: 18px 0 50px rgba(0, 0, 0, 0.26) !important;
+}
+
+.brand {
+  padding: 8px 10px !important;
+  border-radius: 16px !important;
+  background: linear-gradient(135deg, rgba(73, 213, 255, 0.08), rgba(63, 131, 255, 0.06)) !important;
+  border: 1px solid var(--border) !important;
+  min-height: 56px !important;
+}
+
+.brand-mark,
+.brand img {
+  width: 42px !important;
+  height: 42px !important;
+  border-radius: 12px !important;
+  object-fit: cover !important;
+}
+
+.brand h1,
+.brand-title {
+  font-size: 13px !important;
+  letter-spacing: 0.06em !important;
+  line-height: 1.1 !important;
+}
+
+.brand p,
+.brand-subtitle {
+  font-size: 10px !important;
+  color: var(--muted) !important;
+}
+
+.nav-section-title {
+  color: rgba(177, 198, 220, 0.68) !important;
+  font-size: 10px !important;
+  letter-spacing: 0.14em !important;
+  margin: 16px 6px 7px !important;
+}
+
+.nav-btn,
+.nav-group-toggle,
+.sidebar a,
+.sidebar button:not(.logout-btn):not(.sidebar-close):not(.hamburger) {
+  min-height: 38px !important;
+  border-radius: 12px !important;
+  border-color: rgba(123, 214, 255, 0.16) !important;
+  background: rgba(8, 16, 29, 0.78) !important;
+  color: var(--text) !important;
+  font-size: 13px !important;
+  box-shadow: none !important;
+}
+
+.nav-btn.active,
+.sidebar a.active,
+.sidebar button.active,
+.nav-group.active .nav-group-toggle {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  color: #03111c !important;
+  border-color: transparent !important;
+  box-shadow: 0 12px 28px rgba(73, 213, 255, 0.2) !important;
+}
+
+.nav-submenu,
+.nav-group-items {
+  margin: 6px 0 0 !important;
+  padding: 6px !important;
+  border-radius: 14px !important;
+  background: rgba(4, 10, 19, 0.48) !important;
+  border: 1px solid rgba(123, 214, 255, 0.12) !important;
+}
+
+.logout-btn {
+  border-radius: 13px !important;
+  min-height: 40px !important;
+  background: linear-gradient(135deg, #9f1d2d, #e4472f) !important;
+  box-shadow: 0 12px 28px rgba(255, 78, 92, 0.18) !important;
+}
+
+.topbar,
+.page-hero,
+.admin-page-hero,
+.staff-page-hero {
+  background: linear-gradient(135deg, rgba(12, 28, 43, 0.92), rgba(10, 19, 32, 0.86)) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 20px !important;
+  box-shadow: var(--shadow) !important;
+}
+
+.card,
+.stat-card,
+.metric-card,
+.table-wrap,
+.modal-content,
+.staff-work-form,
+.admin-message-inbox,
+.admin-workhub-register,
+.shell-panel,
+.form-panel {
+  background: linear-gradient(145deg, rgba(13, 26, 42, 0.9), rgba(7, 15, 27, 0.86)) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.2) !important;
+}
+
+.card:hover,
+.stat-card:hover,
+.metric-card:hover {
+  border-color: var(--border-strong) !important;
+}
+
+.primary-btn,
+.secondary-btn,
+.system-action,
+button[type="submit"],
+.action-btn {
+  border-radius: 12px !important;
+  min-height: 38px !important;
+  font-weight: 800 !important;
+}
+
+.primary-btn,
+.system-action,
+button[type="submit"] {
+  background: linear-gradient(135deg, var(--accent), var(--accent-2)) !important;
+  color: #03111c !important;
+  border: 0 !important;
+}
+
+.secondary-btn,
+.action-btn {
+  background: rgba(8, 16, 29, 0.74) !important;
+  border: 1px solid var(--border) !important;
+  color: var(--text) !important;
+}
+
+input,
+select,
+textarea {
+  background: rgba(4, 10, 19, 0.86) !important;
+  border: 1px solid rgba(123, 214, 255, 0.2) !important;
+  border-radius: 12px !important;
+  color: var(--text) !important;
+}
+
+th,
+.table-head,
+.eyebrow {
+  color: #37ffe0 !important;
+  letter-spacing: 0.08em !important;
+}
+
+.admin-message-inbox {
+  margin: 16px 0 20px !important;
+  padding: 18px !important;
+}
+
+.admin-message-inbox-list {
+  max-height: 370px !important;
+  overflow: auto !important;
+  padding: 10px !important;
+}
+
+.staff-message-row,
+.admin-message-row {
+  border-left: 3px solid var(--accent) !important;
+  background: rgba(4, 12, 23, 0.62) !important;
+  border-radius: 14px !important;
+  margin-bottom: 10px !important;
+  padding: 12px !important;
+}
+
+.staff-message-row strong,
+.admin-message-row strong {
+  color: var(--text) !important;
+}
+
+.notification-dropdown {
+  border-radius: 18px !important;
+  border: 1px solid var(--border) !important;
+  background: rgba(8, 16, 29, 0.96) !important;
+  box-shadow: var(--shadow) !important;
+}
+
+@media (max-width: 767px) {
+  .sidebar {
+    width: min(82vw, 310px) !important;
+    padding: 12px !important;
+  }
+
+  .nav-btn,
+  .nav-group-toggle,
+  .sidebar a,
+  .sidebar button:not(.logout-btn):not(.sidebar-close):not(.hamburger) {
+    min-height: 42px !important;
+    font-size: 13px !important;
+  }
+
+  .main,
+  .content,
+  main {
+    padding-inline: clamp(12px, 4vw, 18px) !important;
+  }
+
+  .card,
+  .stat-card,
+  .metric-card,
+  .table-wrap,
+  .modal-content {
+    border-radius: 16px !important;
+  }
+
+  .admin-message-inbox-list {
+    max-height: 52vh !important;
+  }
+}
