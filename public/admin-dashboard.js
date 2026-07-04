@@ -600,7 +600,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
-  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog');
+  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -4345,6 +4345,137 @@ function populateTimesheetStaffSelect(users = staffCache) {
   }
 }
 
+
+const ADMIN_WORK_HUB_MODULES = {
+  leave: { title: 'Leave Requests', metric: 'Pending leave', placeholder: 'Leave request, date range or approval note' },
+  availability: { title: 'Availability Planner', metric: 'Availability records', placeholder: 'Available days, restrictions or shift preference' },
+  documents: { title: 'Staff Documents', metric: 'Document records', placeholder: 'Licence, induction, certificate or document note' },
+  forms: { title: 'Forms & Checklists', metric: 'Checklist records', placeholder: 'Checklist, onboarding form or inspection record' },
+  messages: { title: 'Staff Messages', metric: 'Message records', placeholder: 'Message subject or team instruction' }
+};
+
+function adminWorkHubStorageKey(type) {
+  return `voxel-admin-workhub-${type}`;
+}
+
+function readAdminWorkHub(type) {
+  try {
+    return JSON.parse(localStorage.getItem(adminWorkHubStorageKey(type)) || '[]');
+  } catch (_) {
+    return [];
+  }
+}
+
+function writeAdminWorkHub(type, rows) {
+  localStorage.setItem(adminWorkHubStorageKey(type), JSON.stringify(rows));
+}
+
+function adminWorkHubCountId(type) {
+  return {
+    leave: 'adminWorkHubLeaveCount',
+    availability: 'adminWorkHubAvailabilityCount',
+    documents: 'adminWorkHubDocumentsCount',
+    forms: 'adminWorkHubFormsCount',
+    messages: 'adminWorkHubMessagesCount'
+  }[type];
+}
+
+function renderAdminWorkHubSummary() {
+  Object.keys(ADMIN_WORK_HUB_MODULES).forEach((type) => {
+    const rows = readAdminWorkHub(type);
+    const countEl = document.getElementById(adminWorkHubCountId(type));
+    if (countEl) countEl.textContent = rows.length;
+  });
+}
+
+function renderAdminWorkHubRows(type) {
+  const rows = readAdminWorkHub(type);
+  if (!rows.length) {
+    return '<div class="empty-state compact">No records saved yet.</div>';
+  }
+  return rows.map((row) => `
+    <article class="admin-workhub-row">
+      <div>
+        <strong>${escapeHtml(row.title || '-')}</strong>
+        <span>${escapeHtml(row.assigned || 'All assigned staff')} | ${escapeHtml(row.due || 'No due date')} | ${escapeHtml(row.status || 'Open')}</span>
+        ${row.notes ? `<small>${escapeHtml(row.notes)}</small>` : ''}
+      </div>
+      <button type="button" class="danger-btn small-btn" onclick="deleteAdminWorkHubEntry('${type}', ${Number(row.id)})">Delete</button>
+    </article>
+  `).join('');
+}
+
+function openAdminWorkHub(type) {
+  const config = ADMIN_WORK_HUB_MODULES[type];
+  if (!config) return;
+  showDialog(config.title, `
+    <div class="admin-workhub-dialog-body">
+      <section class="admin-workhub-entry-form">
+        <label>Record title<input id="adminWorkHubTitle" placeholder="${escapeHtml(config.placeholder)}" /></label>
+        <label>Assigned to<input id="adminWorkHubAssigned" placeholder="Staff name, team or all staff" /></label>
+        <label>Due / review date<input id="adminWorkHubDue" type="date" /></label>
+        <label>Status
+          <select id="adminWorkHubStatus">
+            <option>Open</option>
+            <option>Pending review</option>
+            <option>Approved</option>
+            <option>Completed</option>
+          </select>
+        </label>
+        <label class="span-2">Notes<textarea id="adminWorkHubNotes" rows="3" placeholder="Add instruction, document reference, approval note or follow-up detail"></textarea></label>
+      </section>
+      <section>
+        <div class="admin-workhub-register-head">
+          <h4>Saved Records</h4>
+          <span>${escapeHtml(config.metric)}</span>
+        </div>
+        <div id="adminWorkHubRegister" class="admin-workhub-register">${renderAdminWorkHubRows(type)}</div>
+      </section>
+    </div>
+  `, () => saveAdminWorkHubEntry(type), 'Save Entry');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'admin-workhub-dialog');
+}
+
+function saveAdminWorkHubEntry(type) {
+  const title = document.getElementById('adminWorkHubTitle')?.value.trim();
+  if (!title) {
+    showToast('Please enter a record title', 'error');
+    return;
+  }
+  const rows = readAdminWorkHub(type);
+  rows.push({
+    id: Date.now(),
+    title,
+    assigned: document.getElementById('adminWorkHubAssigned')?.value.trim() || 'All assigned staff',
+    due: document.getElementById('adminWorkHubDue')?.value || '',
+    status: document.getElementById('adminWorkHubStatus')?.value || 'Open',
+    notes: document.getElementById('adminWorkHubNotes')?.value.trim() || '',
+    createdAt: new Date().toISOString()
+  });
+  writeAdminWorkHub(type, rows);
+  renderAdminWorkHubSummary();
+  const register = document.getElementById('adminWorkHubRegister');
+  if (register) register.innerHTML = renderAdminWorkHubRows(type);
+  ['adminWorkHubTitle', 'adminWorkHubAssigned', 'adminWorkHubDue', 'adminWorkHubNotes'].forEach((id) => {
+    const field = document.getElementById(id);
+    if (field) field.value = '';
+  });
+  showToast('Saved successfully');
+}
+
+function deleteAdminWorkHubEntry(type, id) {
+  const rows = readAdminWorkHub(type).filter((row) => Number(row.id) !== Number(id));
+  writeAdminWorkHub(type, rows);
+  renderAdminWorkHubSummary();
+  const register = document.getElementById('adminWorkHubRegister');
+  if (register) register.innerHTML = renderAdminWorkHubRows(type);
+  showToast('Deleted successfully');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  renderAdminWorkHubSummary();
+});
+
 async function openAddStaff() {
   showDialog(
     'Add Staff Member',
@@ -4429,6 +4560,8 @@ async function openAddStaff() {
     },
     'Create Staff'
   );
+
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'staff-access-dialog');
 
   const emailInput = document.getElementById('dialogStaffEmail');
   const usernameInput = document.getElementById('dialogStaffUsername');
@@ -4541,7 +4674,7 @@ async function openEditStaffDialog(userId) {
     'Update Staff'
   );
 
-  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'staff-access-dialog');
 }
 
 async function openAccessDialog(userId) {
@@ -4608,6 +4741,7 @@ async function openAccessDialog(userId) {
     },
     'Update Access'
   );
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'staff-access-dialog');
 }
 
 async function openPasswordResetDialog(userId) {
