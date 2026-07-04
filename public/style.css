@@ -9520,3 +9520,30 @@ textarea {
     min-height: min(64vw, 250px);
   }
 }
+
+/* 20260704 clean inactive camera frame */
+.simple-shift-scanner .shift-scan-camera video:not(.camera-active) {
+  opacity: 0;
+}
+
+.simple-shift-scanner .shift-scan-camera::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(45, 212, 191, 0.08), transparent 42%),
+    linear-gradient(145deg, #020617, #071426);
+}
+
+.simple-shift-scanner .shift-scan-camera video.camera-active {
+  opacity: 1;
+}
+
+.simple-shift-scanner .shift-camera-glass,
+.simple-shift-scanner .shift-scan-reticle,
+.simple-shift-scanner .shift-scan-corners,
+.simple-shift-scanner .shift-scanline {
+  z-index: 2;
+}

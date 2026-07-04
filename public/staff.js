@@ -678,6 +678,7 @@ function openMissionShiftScanner() {
 }
 
 function stopShiftQrScanner() {
+  document.getElementById('shiftQrVideo')?.classList.remove('camera-active');
   if (shiftQrScannerTimer) {
     clearInterval(shiftQrScannerTimer);
     shiftQrScannerTimer = null;
@@ -778,6 +779,7 @@ async function openShiftQrCameraStream() {
       audio: false
     });
   } catch (err) {
+    video.classList.remove('camera-active');
     const message = String(err?.name || err?.message || '').toLowerCase();
     if (message.includes('notfound') || message.includes('overconstrained') || message.includes('constraint')) {
       return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
@@ -815,8 +817,10 @@ async function startShiftQrCamera(mode) {
     video.setAttribute('muted', '');
     video.setAttribute('playsinline', '');
     video.setAttribute('webkit-playsinline', '');
+    video.classList.remove('camera-active');
     video.srcObject = shiftQrScannerStream;
     await video.play();
+    video.classList.add('camera-active');
 
     if (statusEl) statusEl.innerText = 'Calibrating scanner...';
     const decoder = await getShiftQrDecoder();
@@ -835,6 +839,7 @@ async function startShiftQrCamera(mode) {
       }
     }, 650);
   } catch (err) {
+    video.classList.remove('camera-active');
     const message = String(err?.name || err?.message || '').toLowerCase();
     if (statusEl) {
       if (message.includes('notallowed') || message.includes('permission')) {
@@ -1947,6 +1952,7 @@ async function bootStaffDashboard() {
 
     startAutoRefresh();
   } catch (err) {
+    video.classList.remove('camera-active');
     if (!redirectingToLogin) {
       console.error('STAFF DASHBOARD STARTUP ERROR:', err);
     }
