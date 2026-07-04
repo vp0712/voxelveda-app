@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260704-timesheet-review"/>
+<link rel="stylesheet" href="/style.css?v=20260704-aurora-graphite"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -737,9 +737,9 @@
         </div>
         <div class="metric-grid workforce-command-metrics">
           <div class="card kpi-blue"><h3>Clocked In Now</h3><p><strong id="clockedInCount">0</strong></p><span>Active shifts on the floor</span></div>
-          <div class="card kpi-teal"><h3>Pending Timesheets</h3><p><strong id="pendingTimesheetCount">0</strong></p><span>Waiting for manager review</span></div>
-          <div class="card kpi-green"><h3>Payroll Ready</h3><p><strong id="payrollReadyCount">0</strong></p><span>Approved or clean summaries</span></div>
-          <div class="card kpi-red"><h3>Overtime Alerts</h3><p><strong id="overtimeWarningCount">0</strong></p><span>Shifts over standard limits</span></div>
+          <button type="button" class="card kpi-teal workforce-kpi-action" onclick="reviewPendingTimesheets()"><h3>Pending Timesheets</h3><p><strong id="pendingTimesheetCount">0</strong></p><span>Waiting for manager review</span></button>
+          <button type="button" class="card kpi-green workforce-kpi-action" onclick="reviewPayrollReadyTimesheets()"><h3>Payroll Ready</h3><p><strong id="payrollReadyCount">0</strong></p><span>Approved or clean summaries</span></button>
+          <button type="button" class="card kpi-red workforce-kpi-action" onclick="reviewOvertimeTimesheets()"><h3>Overtime Alerts</h3><p><strong id="overtimeWarningCount">0</strong></p><span>Shifts over standard limits</span></button>
         </div>
 
         <div class="card workforce-action-centre">
@@ -1308,6 +1308,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260704-timesheet-review"></script>
+  <script src="/admin-dashboard.js?v=20260704-payroll-theme"></script>
 </body>
 </html>

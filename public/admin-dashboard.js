@@ -6584,6 +6584,30 @@ function reviewPendingTimesheets() {
   showToast(pending.length ? `${pending.length} pending timesheet${pending.length === 1 ? '' : 's'} ready for review` : 'No pending timesheets');
 }
 
+
+function focusTimesheetRegister(message, rowClass) {
+  const section = document.getElementById('timesheetAdminBody')?.closest('.table-wrap');
+  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (rowClass) {
+    document.querySelectorAll('#timesheetAdminBody tr').forEach((row) => row.classList.remove('timesheet-focus-row'));
+    document.querySelectorAll(rowClass).forEach((row) => row.classList.add('timesheet-focus-row'));
+    window.setTimeout(() => document.querySelectorAll(rowClass).forEach((row) => row.classList.remove('timesheet-focus-row')), 2800);
+  }
+  showToast(message);
+}
+
+function reviewPayrollReadyTimesheets() {
+  const ready = (window.vvTimesheetCache || []).filter((row) => String(row.status || 'open').toLowerCase() === 'approved');
+  focusTimesheetRegister(ready.length ? `${ready.length} payroll-ready timesheet${ready.length === 1 ? '' : 's'}` : 'No approved payroll-ready timesheets yet', '.timesheet-approved-row');
+}
+
+function reviewOvertimeTimesheets() {
+  const overtime = (attendanceCache || []).filter((row) => Number(row.total_hours || 0) > 10);
+  const section = document.getElementById('attendanceTableBody')?.closest('.table-wrap');
+  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast(overtime.length ? `${overtime.length} overtime alert${overtime.length === 1 ? '' : 's'} in the register` : 'No overtime alerts');
+}
+
 async function updateTimesheetStatus(id, status) {
   try {
     const res = await fetch('/api/attendance/timesheets/status', {
@@ -6636,7 +6660,7 @@ async function loadTimesheets() {
     onChange: loadTimesheets,
     rowRenderer: function(t) {
       var status = String(t.status || 'open').toLowerCase();
-      return '<tr class="' + (status === 'open' ? 'timesheet-pending-row' : '') + '"><td><strong>' + escapeHtml(t.name || '-') + '</strong><span class="cell-subtext">' + escapeHtml(t.email || '-') + '</span></td><td>' + escapeHtml(String(t.week_start || '').slice(0, 10)) + '</td><td>' + escapeHtml(String(t.week_end || '').slice(0, 10)) + '</td><td><strong>' + escapeHtml(Number(t.total_hours || 0).toFixed(2)) + '</strong></td><td>' + renderTimesheetStatusChip(status) + '</td><td>' + renderTimesheetReviewActions(t) + '</td></tr>';
+      return '<tr class="' + (status === 'open' ? 'timesheet-pending-row' : (status === 'approved' ? 'timesheet-approved-row' : '')) + '"><td><strong>' + escapeHtml(t.name || '-') + '</strong><span class="cell-subtext">' + escapeHtml(t.email || '-') + '</span></td><td>' + escapeHtml(String(t.week_start || '').slice(0, 10)) + '</td><td>' + escapeHtml(String(t.week_end || '').slice(0, 10)) + '</td><td><strong>' + escapeHtml(Number(t.total_hours || 0).toFixed(2)) + '</strong></td><td>' + renderTimesheetStatusChip(status) + '</td><td>' + renderTimesheetReviewActions(t) + '</td></tr>';
     }
   });
 }
