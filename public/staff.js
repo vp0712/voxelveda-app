@@ -23,6 +23,7 @@ let shiftQrScannerCanvas = null;
 let shiftQrDecoderPromise = null;
 let activeShiftQrMode = 'in';
 let currentShiftIsOpen = false;
+let latestRosterRows = [];
 
 const clockInMessages = [
   'Today is another chance to build something precise, useful, and proudly Voxel Veda.',
@@ -1614,13 +1615,38 @@ function rosterShiftHours(shift) {
 }
 
 function updateStaffRosterMetrics(rows) {
-  const next = rows[0];
-  setText('staffRosterCount', rows.length);
-  setText('staffRosterHours', rows.reduce((sum, row) => sum + rosterShiftHours(row), 0).toFixed(2));
+  latestRosterRows = Array.isArray(rows) ? rows : [];
+  const next = latestRosterRows[0];
+  const rosterHours = latestRosterRows.reduce((sum, row) => sum + rosterShiftHours(row), 0);
+  const today = todayISO();
+  const todayRows = latestRosterRows.filter((row) => String(row.shift_date || '').slice(0, 10) === today);
+  const missingLocation = latestRosterRows.filter((row) => !row.location).length;
+  const missingNotes = latestRosterRows.filter((row) => !row.notes).length;
+  const scheduleStatus = missingLocation || missingNotes ? 'Review' : 'Ready';
+
+  setText('staffRosterCount', latestRosterRows.length);
+  setText('staffRosterHours', rosterHours.toFixed(2));
   setText('staffNextShiftDate', next ? formatShortDate(next.shift_date) : '-');
   setText('staffNextShiftTime', next ? `${next.start_time} - ${next.end_time}` : 'No upcoming shift');
   setText('staffHomeNextShiftDate', next ? formatShortDate(next.shift_date) : '-');
   setText('staffHomeNextShiftTime', next ? `${next.start_time} - ${next.end_time}` : 'No upcoming shift');
+  setText('staffRosterTodayCount', `${todayRows.length} shift${todayRows.length === 1 ? '' : 's'}`);
+  setText('staffRosterTodaySignal', todayRows.length ? todayRows.map((row) => `${row.start_time} - ${row.end_time}`).join(', ') : 'No shift scheduled today');
+  setText('staffRosterComplianceSignal', scheduleStatus);
+  setText('staffRosterBudgetSignal', `${rosterHours.toFixed(2)} hrs`);
+  updateTimesheetVarianceSignals();
+}
+
+function updateTimesheetVarianceSignals(totalHours = null) {
+  const recordedEl = document.getElementById('weekHoursCount');
+  const recorded = totalHours === null ? Number(recordedEl?.innerText || 0) : Number(totalHours || 0);
+  const rostered = latestRosterRows.reduce((sum, row) => sum + rosterShiftHours(row), 0);
+  const variance = recorded - rostered;
+  setText('timesheetRecordedSignal', `${recorded.toFixed(2)} hrs`);
+  setText('staffRosterVarianceSignal', rostered ? `${Math.abs(variance).toFixed(2)} hrs` : 'No roster');
+  setText('timesheetVarianceSignal', rostered ? `${variance >= 0 ? '+' : '-'}${Math.abs(variance).toFixed(2)} hrs` : 'No roster');
+  setText('timesheetVarianceDetail', rostered ? `${recorded.toFixed(2)} recorded vs ${rostered.toFixed(2)} rostered` : 'Roster sync will appear here');
+  setText('timesheetPayrollSignal', recorded > 0 ? 'Ready for review' : 'Open');
 }
 
 function renderMyRoster(rows) {
@@ -1634,20 +1660,32 @@ function renderMyRoster(rows) {
     return;
   }
 
-  list.innerHTML = rows.map((shift) => `
-    <article class="roster-shift-card">
-      <div class="roster-date-block">
-        <strong>${escapeHtml(formatShortDate(shift.shift_date))}</strong>
-        <span>${escapeHtml(shift.status || 'scheduled')}</span>
-      </div>
-      <div class="roster-shift-main">
-        <h3>${escapeHtml(shift.role_label || 'Assigned shift')}</h3>
-        <p>${escapeHtml(shift.start_time)} - ${escapeHtml(shift.end_time)} | ${escapeHtml(rosterShiftHours(shift).toFixed(2))} hrs</p>
-        <small>${escapeHtml(shift.location || 'Location not set')}</small>
-        ${shift.notes ? `<div class="roster-note">${escapeHtml(shift.notes)}</div>` : ''}
-      </div>
-    </article>
-  `).join('');
+  list.innerHTML = rows.map((shift) => {
+    const hours = rosterShiftHours(shift);
+    const readiness = shift.location && shift.notes ? 'Ready' : 'Check details';
+    return `
+      <article class="roster-shift-card roster-shift-pro-card">
+        <div class="roster-date-block">
+          <strong>${escapeHtml(formatShortDate(shift.shift_date))}</strong>
+          <span>${escapeHtml(shift.status || 'scheduled')}</span>
+        </div>
+        <div class="roster-shift-main">
+          <div class="roster-shift-title-row">
+            <h3>${escapeHtml(shift.role_label || 'Assigned shift')}</h3>
+            <span class="roster-readiness-pill">${escapeHtml(readiness)}</span>
+          </div>
+          <p>${escapeHtml(shift.start_time)} - ${escapeHtml(shift.end_time)} | ${escapeHtml(hours.toFixed(2))} hrs</p>
+          <small>${escapeHtml(shift.location || 'Location not set')}</small>
+          <div class="roster-shift-signals">
+            <span>Clock QR required</span>
+            <span>${hours >= 8 ? 'Break planning advised' : 'Standard shift'}</span>
+            <span>Payroll visible after clock-out</span>
+          </div>
+          ${shift.notes ? `<div class="roster-note">${escapeHtml(shift.notes)}</div>` : ''}
+        </div>
+      </article>
+    `;
+  }).join('');
 }
 
 async function loadMyRoster() {
@@ -1817,6 +1855,7 @@ async function loadTimesheet() {
 
         if (weekHours) {
           weekHours.innerText = totalHours.toFixed(2);
+          updateTimesheetVarianceSignals(totalHours);
         }
 
         if (!rows.length) {

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-<link rel="stylesheet" href="/style.css?v=20260701-mobile-shell" />
+<link rel="stylesheet" href="/style.css?v=20260704-workforce-roster-pro" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -331,21 +331,37 @@
           <button class="secondary-btn" onclick="loadMyRoster()">Refresh</button>
         </div>
 
-        <div class="metric-grid roster-metrics">
-          <div class="card kpi-teal">
+        <div class="metric-grid roster-metrics workforce-command-strip">
+          <div class="card kpi-teal command-kpi">
             <h3>Next Shift</h3>
             <p><strong id="staffNextShiftDate">-</strong></p>
             <span id="staffNextShiftTime">No upcoming shift</span>
           </div>
-          <div class="card kpi-blue">
+          <div class="card kpi-blue command-kpi">
             <h3>Rostered Hours</h3>
             <p><strong id="staffRosterHours">0.00</strong></p>
             <span>Upcoming scheduled time</span>
           </div>
-          <div class="card kpi-green">
+          <div class="card kpi-green command-kpi">
             <h3>Upcoming Shifts</h3>
             <p><strong id="staffRosterCount">0</strong></p>
             <span>Visible from today onward</span>
+          </div>
+        </div>
+
+        <div class="workforce-intelligence-panel">
+          <div class="workforce-panel-head">
+            <div>
+              <span>Roster Intelligence</span>
+              <h3>Shift Control Centre</h3>
+            </div>
+            <button class="secondary-btn" type="button" onclick="loadMyRoster()">Sync Roster</button>
+          </div>
+          <div class="workforce-signal-grid">
+            <article class="workforce-signal-card"><small>Today</small><strong id="staffRosterTodayCount">0 shifts</strong><span id="staffRosterTodaySignal">No shift scheduled today</span></article>
+            <article class="workforce-signal-card"><small>Schedule Fit</small><strong id="staffRosterComplianceSignal">Ready</strong><span>Breaks, location and role notes visible before clock-in</span></article>
+            <article class="workforce-signal-card"><small>Forecast</small><strong id="staffRosterBudgetSignal">0.00 hrs</strong><span>Upcoming hours visible for planning</span></article>
+            <article class="workforce-signal-card"><small>Timesheet Match</small><strong id="staffRosterVarianceSignal">Synced</strong><span>Roster and recorded hours compared weekly</span></article>
           </div>
         </div>
 
@@ -476,6 +492,12 @@
             <button class="primary-btn" onclick="loadTimesheet()">Refresh</button>
           </div>
 
+          <div class="timesheet-insight-strip">
+            <article><small>Recorded This Week</small><strong id="timesheetRecordedSignal">0.00 hrs</strong><span>Auto-calculated from clock-in/out</span></article>
+            <article><small>Roster Comparison</small><strong id="timesheetVarianceSignal">Waiting</strong><span id="timesheetVarianceDetail">Roster sync will appear here</span></article>
+            <article><small>Payroll Readiness</small><strong id="timesheetPayrollSignal">Open</strong><span>Review before admin finalises payroll</span></article>
+          </div>
+
           <table>
             <thead>
               <tr>
@@ -551,6 +573,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260625-shift-terminal"></script>
+  <script src="/staff.js?v=20260704-workforce-roster-pro"></script>
 </body>
 </html>
