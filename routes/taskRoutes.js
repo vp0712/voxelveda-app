@@ -14,6 +14,15 @@ router.get('/announcements', taskController.getAnnouncements);
 
 router.get('/announcements/my', taskController.getMyAnnouncements);
 
+router.get('/workhub', taskController.getStaffWorkRequests);
+
+router.get('/workhub/my', taskController.getMyStaffWorkRequests);
+
+router.post('/workhub', taskController.createStaffWorkRequest);
+
+router.post('/workhub/update', requireInputPermission('tasks_input'), taskController.updateStaffWorkRequest);
+
+router.post('/workhub/delete', requireInputPermission('tasks_input'), taskController.deleteStaffWorkRequest);
 router.get('/messages', taskController.getStaffMessages);
 
 router.get('/messages/my', taskController.getMyStaffMessages);

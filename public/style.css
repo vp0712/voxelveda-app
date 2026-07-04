@@ -11188,3 +11188,26 @@ th,
     max-height: 52vh !important;
   }
 }
+
+
+/* 20260704 staff request queue polish */
+.staff-request-row {
+  border-left: 3px solid rgba(50, 211, 255, 0.72);
+  background: linear-gradient(135deg, rgba(31, 195, 255, 0.12), rgba(7, 18, 32, 0.84));
+}
+.staff-request-row strong {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+.staff-request-row strong span {
+  color: var(--text, #f6fbff);
+}
+.staff-request-row .status-chip {
+  margin-left: auto;
+}
+@media (max-width: 640px) {
+  .staff-request-row strong { align-items: flex-start; }
+  .staff-request-row .status-chip { margin-left: 0; }
+}

@@ -809,3 +809,139 @@ exports.deleteStaffMessage = async (req, res) => {
     res.status(500).json({ message: 'Message delete failed', error: err.message });
   }
 };
+const STAFF_WORK_REQUEST_TYPES = new Set(['leave', 'availability', 'documents', 'forms']);
+
+async function ensureStaffWorkRequestTable() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS staff_work_requests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      request_type VARCHAR(40) NOT NULL,
+      title VARCHAR(180) NOT NULL,
+      body TEXT NULL,
+      payload LONGTEXT NULL,
+      status VARCHAR(40) NOT NULL DEFAULT 'Open',
+      deleted TINYINT(1) NOT NULL DEFAULT 0,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      reviewed_at DATETIME NULL,
+      reviewed_by INT NULL,
+      INDEX idx_staff_work_requests_user (user_id),
+      INDEX idx_staff_work_requests_type (request_type),
+      INDEX idx_staff_work_requests_status (status),
+      INDEX idx_staff_work_requests_deleted (deleted)
+    )
+  `);
+
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN user_id INT NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN request_type VARCHAR(40) NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN title VARCHAR(180) NOT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN body TEXT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN payload LONGTEXT NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'Open'`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN reviewed_at DATETIME NULL`).catch(() => {});
+  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN reviewed_by INT NULL`).catch(() => {});
+}
+
+function normaliseStaffWorkType(type) {
+  const clean = String(type || '').trim().toLowerCase();
+  return STAFF_WORK_REQUEST_TYPES.has(clean) ? clean : '';
+}
+
+exports.getStaffWorkRequests = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+    await ensureStaffWorkRequestTable();
+    const [rows] = await pool.query(`
+      SELECT swr.*, u.name AS staff_name, u.email AS staff_email, reviewer.name AS reviewed_by_name
+      FROM staff_work_requests swr
+      LEFT JOIN users u ON u.id = swr.user_id
+      LEFT JOIN users reviewer ON reviewer.id = swr.reviewed_by
+      WHERE IFNULL(swr.deleted, 0) = 0
+      ORDER BY CASE WHEN LOWER(swr.status) IN ('open', 'pending', 'pending review') THEN 1 ELSE 2 END, swr.id DESC
+    `);
+    res.json({ requests: rows });
+  } catch (err) {
+    console.error('GET STAFF WORK REQUESTS ERROR FULL:', err);
+    res.status(500).json({ message: 'Failed to load staff requests', error: err.message });
+  }
+};
+
+exports.getMyStaffWorkRequests = async (req, res) => {
+  try {
+    const userId = Number(req.user?.id || 0);
+    if (!userId) return res.status(401).json({ message: 'Unauthorized user' });
+    await ensureStaffWorkRequestTable();
+    const [rows] = await pool.query(
+      `SELECT * FROM staff_work_requests WHERE user_id = ? AND IFNULL(deleted, 0) = 0 ORDER BY id DESC`,
+      [userId]
+    );
+    res.json({ requests: rows });
+  } catch (err) {
+    console.error('GET MY STAFF WORK REQUESTS ERROR FULL:', err);
+    res.status(500).json({ message: 'Failed to load your requests', error: err.message });
+  }
+};
+
+exports.createStaffWorkRequest = async (req, res) => {
+  try {
+    const userId = Number(req.user?.id || 0);
+    if (!userId) return res.status(401).json({ message: 'Unauthorized user' });
+    const requestType = normaliseStaffWorkType(req.body.request_type || req.body.type);
+    if (!requestType) return res.status(400).json({ message: 'Request type is not valid' });
+    const title = String(req.body.title || '').trim().slice(0, 180);
+    const body = String(req.body.body || '').trim();
+    const payload = req.body.payload && typeof req.body.payload === 'object' ? JSON.stringify(req.body.payload) : null;
+    if (!title) return res.status(400).json({ message: 'Request title is required' });
+    await ensureStaffWorkRequestTable();
+    const [result] = await pool.query(
+      `INSERT INTO staff_work_requests (user_id, request_type, title, body, payload, status) VALUES (?, ?, ?, ?, ?, 'Open')`,
+      [userId, requestType, title, body || null, payload]
+    );
+    res.json({ message: 'Request sent to admin successfully', request_id: result.insertId });
+  } catch (err) {
+    console.error('CREATE STAFF WORK REQUEST ERROR FULL:', err);
+    res.status(500).json({ message: 'Request send failed', error: err.message });
+  }
+};
+
+exports.updateStaffWorkRequest = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+    const id = Number(req.body.id || 0);
+    const status = String(req.body.status || 'Approved').trim().slice(0, 40) || 'Approved';
+    if (!id) return res.status(400).json({ message: 'Request ID is required' });
+    await ensureStaffWorkRequestTable();
+    const [result] = await pool.query(
+      `UPDATE staff_work_requests SET status = ?, reviewed_at = NOW(), reviewed_by = ? WHERE id = ? AND IFNULL(deleted, 0) = 0`,
+      [status, req.user?.id || null, id]
+    );
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Request not found' });
+    res.json({ message: 'Request updated successfully' });
+  } catch (err) {
+    console.error('UPDATE STAFF WORK REQUEST ERROR FULL:', err);
+    res.status(500).json({ message: 'Request update failed', error: err.message });
+  }
+};
+
+exports.deleteStaffWorkRequest = async (req, res) => {
+  try {
+    if (!canManageTasks(req)) {
+      return res.status(403).json({ message: 'Task control access is not enabled for your account' });
+    }
+    const id = Number(req.body.id || 0);
+    if (!id) return res.status(400).json({ message: 'Request ID is required' });
+    await ensureStaffWorkRequestTable();
+    const [result] = await pool.query(`UPDATE staff_work_requests SET deleted = 1 WHERE id = ?`, [id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: 'Request not found' });
+    res.json({ message: 'Request deleted successfully' });
+  } catch (err) {
+    console.error('DELETE STAFF WORK REQUEST ERROR FULL:', err);
+    res.status(500).json({ message: 'Request delete failed', error: err.message });
+  }
+};

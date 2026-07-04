@@ -2009,7 +2009,23 @@ function renderStaffModuleList(targetId, rows, emptyText, template) {
   el.innerHTML = rows.map(template).join('');
 }
 
-function submitLeaveRequest(event) {
+async function sendStaffWorkRequest(type, title, body, payload = {}) {
+  try {
+    const res = await fetch('/api/tasks/workhub', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ request_type: type, title, body, payload })
+    });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.message || 'Request send failed');
+    return data;
+  } catch (err) {
+    console.warn('STAFF WORK REQUEST SYNC FAILED', err);
+    showToast('Saved locally, but admin sync failed');
+    return null;
+  }
+}
+async function submitLeaveRequest(event) {
   event.preventDefault();
   const type = document.getElementById('leaveType')?.value || '';
   const from = document.getElementById('leaveFrom')?.value || '';
@@ -2042,7 +2058,7 @@ function renderStaffLeaveRequests() {
   `);
 }
 
-function saveAvailability(event) {
+async function saveAvailability(event) {
   event.preventDefault();
   const date = document.getElementById('availabilityDate')?.value || '';
   const status = document.getElementById('availabilityStatus')?.value || '';
@@ -2087,7 +2103,7 @@ function renderStaffDocuments() {
   }).join('');
 }
 
-function markStaffDocumentRead(id) {
+async function markStaffDocumentRead(id) {
   const doc = staffDocumentLibrary.find((item) => item.id === id);
   if (!doc) return;
   const rows = readStaffWorkStore('documents').filter((row) => row.id !== id);
@@ -2097,7 +2113,7 @@ function markStaffDocumentRead(id) {
   showToast('Updated successfully');
 }
 
-function submitStaffChecklist(event) {
+async function submitStaffChecklist(event) {
   event.preventDefault();
   const type = document.getElementById('staffFormType')?.value || '';
   const result = document.getElementById('staffFormResult')?.value || '';

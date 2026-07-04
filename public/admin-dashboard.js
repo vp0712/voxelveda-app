@@ -39,6 +39,7 @@ let taskCache = [];
 let meetingCache = [];
 let rosterCache = [];
 let staffMessageCache = [];
+let staffWorkRequestCache = [];
 let attendanceSnapshot = new Map();
 let attendanceFirstLoad = true;
 let shiftQrTimer = null;
@@ -234,6 +235,10 @@ function buildShellNotifications() {
     addShellNotification(list, 'message', 'Staff message received', String(openStaffMessages.length) + ' staff ' + label + ' waiting for admin review.', 'staffSection');
   }
 
+  const openWorkHubRequests = staffWorkRequestCache.filter((request) => isOpenWorkHubStatus(request.status));
+  if (openWorkHubRequests.length) {
+    addShellNotification(list, 'workhub', 'Staff work request received', String(openWorkHubRequests.length) + ' staff request' + (openWorkHubRequests.length === 1 ? '' : 's') + ' waiting for admin action.', 'staffSection');
+  }
   const upcomingMeetings = meetingCache.filter((meeting) => {
     const status = String(meeting.status || '').toLowerCase();
     if (['completed', 'cancelled'].includes(status)) return false;
@@ -4387,20 +4392,61 @@ function adminWorkHubCountId(type) {
   }[type];
 }
 
+function isOpenWorkHubStatus(status) {
+  return !['approved', 'reviewed', 'completed', 'closed', 'deleted'].includes(String(status || 'Open').toLowerCase());
+}
+
+function adminServerWorkHubRows(type) {
+  return staffWorkRequestCache.filter((row) => String(row.request_type || '').toLowerCase() === type && !Number(row.deleted || 0));
+}
+
 function renderAdminWorkHubSummary() {
   Object.keys(ADMIN_WORK_HUB_MODULES).forEach((type) => {
-    const rows = readAdminWorkHub(type);
+    const localRows = readAdminWorkHub(type);
+    const serverRows = type === 'messages'
+      ? staffMessageCache.filter((row) => isOpenWorkHubStatus(row.status))
+      : adminServerWorkHubRows(type).filter((row) => isOpenWorkHubStatus(row.status));
     const countEl = document.getElementById(adminWorkHubCountId(type));
-    if (countEl) countEl.textContent = rows.length;
+    if (countEl) countEl.textContent = localRows.length + serverRows.length;
   });
 }
 
+function describeStaffWorkPayload(row) {
+  let payload = {};
+  try { payload = row.payload ? JSON.parse(row.payload) : {}; } catch (_) { payload = {}; }
+  const parts = [];
+  if (payload.from || payload.to) parts.push(`${payload.from || '-'} to ${payload.to || '-'}`);
+  if (payload.date) parts.push(payload.date);
+  if (payload.result) parts.push(payload.result);
+  if (payload.title && payload.title !== row.title) parts.push(payload.title);
+  return parts.join(' | ');
+}
+
+function renderServerWorkHubRequest(row) {
+  const meta = describeStaffWorkPayload(row);
+  return `
+    <article class="admin-workhub-row staff-request-row">
+      <div>
+        <strong>${escapeHtml(row.title || '-')} <span>${escapeHtml(row.request_type || '')}</span></strong>
+        <span>${escapeHtml(row.staff_name || row.staff_email || 'Staff')} | ${escapeHtml(row.status || 'Open')} | ${escapeHtml(new Date(row.created_at || Date.now()).toLocaleString())}</span>
+        ${meta ? `<small>${escapeHtml(meta)}</small>` : ''}
+        ${row.body ? `<small>${escapeHtml(row.body)}</small>` : ''}
+      </div>
+      <div class="admin-message-actions">
+        <button type="button" class="primary-btn small-btn" onclick="updateStaffWorkRequest(${Number(row.id)}, 'Approved')">Approve</button>
+        <button type="button" class="danger-btn small-btn" onclick="deleteStaffWorkRequest(${Number(row.id)})">Delete</button>
+      </div>
+    </article>`;
+}
+
 function renderAdminWorkHubRows(type) {
-  const rows = readAdminWorkHub(type);
-  if (!rows.length) {
-    return '<div class="empty-state compact">No records saved yet.</div>';
+  const serverRows = adminServerWorkHubRows(type);
+  const localRows = readAdminWorkHub(type);
+  if (!serverRows.length && !localRows.length) {
+    return '<div class="empty-state compact">No staff requests or saved records yet.</div>';
   }
-  return rows.map((row) => `
+  const serverHtml = serverRows.map(renderServerWorkHubRequest).join('');
+  const localHtml = localRows.map((row) => `
     <article class="admin-workhub-row">
       <div>
         <strong>${escapeHtml(row.title || '-')}</strong>
@@ -4410,6 +4456,7 @@ function renderAdminWorkHubRows(type) {
       <button type="button" class="danger-btn small-btn" onclick="deleteAdminWorkHubEntry('${type}', ${Number(row.id)})">Delete</button>
     </article>
   `).join('');
+  return serverHtml + localHtml;
 }
 
 function openAdminWorkHub(type) {
@@ -4436,7 +4483,7 @@ function openAdminWorkHub(type) {
           <h4>Saved Records</h4>
           <span>${escapeHtml(config.metric)}</span>
         </div>
-        <div id="adminWorkHubRegister" class="admin-workhub-register">${renderAdminWorkHubRows(type)}</div>
+        <div id="adminWorkHubRegister" data-type="${escapeHtml(type)}" class="admin-workhub-register">${renderAdminWorkHubRows(type)}</div>
       </section>
     </div>
   `, () => saveAdminWorkHubEntry(type), 'Save Entry');
@@ -4444,6 +4491,53 @@ function openAdminWorkHub(type) {
 }
 
 
+async function loadAdminWorkHubRequests() {
+  try {
+    const res = await fetch('/api/tasks/workhub', { headers: authHeaders() });
+    const data = await safeJson(res);
+    if (!res.ok) throw new Error(data.message || 'Failed to load staff requests');
+    staffWorkRequestCache = Array.isArray(data.requests) ? data.requests : [];
+    renderAdminWorkHubSummary();
+    const register = document.getElementById('adminWorkHubRegister');
+    if (register && register.dataset.type) register.innerHTML = renderAdminWorkHubRows(register.dataset.type);
+    renderNotificationDropdown();
+    return staffWorkRequestCache;
+  } catch (err) {
+    staffWorkRequestCache = [];
+    renderAdminWorkHubSummary();
+    return [];
+  }
+}
+
+async function updateStaffWorkRequest(id, status) {
+  const res = await fetch('/api/tasks/workhub/update', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id, status })
+  });
+  const data = await safeJson(res);
+  if (!res.ok) {
+    showToast(data.message || 'Request update failed');
+    return;
+  }
+  showToast(data.message || 'Request updated');
+  await loadAdminWorkHubRequests();
+}
+
+async function deleteStaffWorkRequest(id) {
+  const res = await fetch('/api/tasks/workhub/delete', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ id })
+  });
+  const data = await safeJson(res);
+  if (!res.ok) {
+    showToast(data.message || 'Request delete failed');
+    return;
+  }
+  showToast(data.message || 'Request deleted');
+  await loadAdminWorkHubRequests();
+}
 async function loadAdminStaffMessages() {
   try {
     const res = await fetch('/api/tasks/messages', { headers: authHeaders() });
@@ -4488,6 +4582,7 @@ function renderAdminStaffMessageRows(rows = staffMessageCache) {
 
 async function openAdminStaffMessages() {
   await loadAdminStaffMessages();
+  await loadAdminWorkHubRequests();
   showDialog('Staff Messages', `
     <div class="admin-workhub-dialog-body single-column">
       <section>
@@ -4504,6 +4599,7 @@ async function openAdminStaffMessages() {
 
 async function refreshAdminStaffMessagesPanel() {
   await loadAdminStaffMessages();
+  await loadAdminWorkHubRequests();
   renderAdminStaffMessageSurfaces();
 }
 
@@ -5060,6 +5156,8 @@ async function refreshAllSystemData() {
     loadRoster(),
     loadAttendance(),
     loadTimesheets(),
+    loadAdminStaffMessages(),
+    loadAdminWorkHubRequests(),
     loadSettings()
   ]);
 
@@ -6542,7 +6640,9 @@ async function bootAdminDashboard() {
       loadRoster(),
       loadAttendance(),
       loadTimesheets(),
-      loadSettings()
+    loadAdminStaffMessages(),
+    loadAdminWorkHubRequests(),
+    loadSettings()
     ]);
 
     await loadAccessAttempts();
@@ -6909,6 +7009,7 @@ if (!window.__adminStaffMessagePoller) {
   window.__adminStaffMessagePoller = setInterval(() => {
     if (token && !redirectingToLogin && document.visibilityState !== 'hidden') {
       loadAdminStaffMessages();
+      loadAdminWorkHubRequests();
     }
   }, 30000);
 }
