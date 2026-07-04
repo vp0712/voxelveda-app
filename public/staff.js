@@ -877,16 +877,17 @@ function openShiftQrScanner(mode) {
         <em>Live Scan</em>
       </div>
       <div class="shift-scan-camera">
-        <video id="shiftQrVideo" playsinline muted></video>
+        <video id="shiftQrVideo" autoplay playsinline webkit-playsinline muted></video>
         <div class="shift-camera-glass"></div>
+        <div class="shift-scanner-focus-mark"><span></span></div>
         <div class="shift-scan-reticle"></div>
         <div class="shift-scan-corners"></div>
         <div class="shift-scanline"></div>
-        <div class="shift-scan-hint">Align QR inside frame</div>
+        <div class="shift-scan-hint">Hold steady inside the frame</div>
       </div>
       <div class="shift-scan-feedback">
         <strong id="shiftQrScanStatus">Opening camera...</strong>
-        <span>Secure attendance token check</span>
+        <span>Encrypted attendance token verification</span>
       </div>
       <div id="shiftQrPermissionActions" class="shift-camera-actions hidden-section">
         <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Open Camera Scanner</button>
