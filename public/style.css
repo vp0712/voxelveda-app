@@ -12160,3 +12160,212 @@ html.mobile-menu-open main {
     min-height: 31px !important;
   }
 }
+
+/* 20260723 PLATINUM ATTENDANCE GATE */
+.shift-terminal-page {
+  min-height: 100vh;
+  color: #f8fafc;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(148, 163, 184, 0.18), transparent 30%),
+    radial-gradient(circle at 82% 14%, rgba(59, 130, 246, 0.16), transparent 28%),
+    linear-gradient(145deg, #020617 0%, #07111f 48%, #0b0f14 100%) !important;
+  font-family: Inter, Arial, sans-serif;
+}
+.shift-terminal-shell {
+  width: min(1180px, calc(100% - 48px));
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 42px) 0;
+}
+.shift-terminal-hero,
+.shift-terminal-grid {
+  border: 1px solid rgba(148, 163, 184, 0.32) !important;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.92), rgba(2, 6, 23, 0.82)) !important;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+.shift-terminal-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: clamp(18px, 2.5vw, 28px);
+  border-radius: 24px;
+}
+.terminal-brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.terminal-brand-lockup img {
+  width: 58px;
+  height: 58px;
+  border-radius: 16px;
+  object-fit: cover;
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.38);
+}
+.terminal-brand-lockup span,
+.terminal-eyebrow {
+  color: #93c5fd !important;
+  letter-spacing: 0.08em;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.terminal-brand-lockup strong {
+  display: block;
+  margin-top: 3px;
+  font-size: clamp(1.45rem, 3vw, 2.25rem);
+  letter-spacing: 0;
+}
+.terminal-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.38) !important;
+  background: rgba(15, 23, 42, 0.78) !important;
+  color: #bfdbfe !important;
+}
+.scan-live-dot {
+  background: #22c55e !important;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.82) !important;
+}
+.shift-terminal-grid {
+  margin-top: 26px;
+  display: grid;
+  grid-template-columns: minmax(320px, 0.95fr) minmax(320px, 1.05fr);
+  gap: 26px;
+  padding: clamp(20px, 3vw, 30px);
+  border-radius: 26px;
+}
+.terminal-qr-stage,
+.terminal-command-panel {
+  min-height: 520px;
+  border: 1px solid rgba(96, 165, 250, 0.28) !important;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.76), rgba(8, 13, 23, 0.92)) !important;
+}
+.terminal-qr-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 34px;
+  overflow: hidden;
+}
+.terminal-qr-orbit {
+  display: none !important;
+}
+.terminal-qr-frame {
+  width: min(330px, 82vw);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 4vw, 30px);
+  border-radius: 26px;
+  background: #ffffff !important;
+  border: 10px solid #e2e8f0 !important;
+  box-shadow: 0 22px 70px rgba(59, 130, 246, 0.28), 0 0 0 1px rgba(255,255,255,0.75) inset !important;
+}
+.terminal-qr-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+.terminal-countdown-ring {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  width: 96px;
+  height: 96px;
+  border-radius: 24px;
+  border: 1px solid rgba(96, 165, 250, 0.42) !important;
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.96), rgba(30, 41, 59, 0.9)) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35) !important;
+}
+.terminal-countdown-ring span {
+  color: #94a3b8 !important;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+}
+.terminal-countdown-ring strong {
+  color: #bfdbfe !important;
+  font-size: 1.55rem;
+}
+.terminal-command-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: clamp(26px, 5vw, 44px);
+}
+.terminal-command-panel h1 {
+  max-width: 620px;
+  margin: 12px 0 16px;
+  color: #f8fafc;
+  font-size: clamp(2.1rem, 5vw, 4.25rem);
+  line-height: 0.98;
+  letter-spacing: 0;
+}
+.terminal-command-panel p {
+  max-width: 540px;
+  color: #cbd5e1 !important;
+  font-size: clamp(0.98rem, 1.5vw, 1.1rem);
+  line-height: 1.55;
+}
+.terminal-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 26px 0 16px;
+}
+.terminal-signal-grid div {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, 0.26) !important;
+  background: rgba(2, 6, 23, 0.62) !important;
+}
+.terminal-signal-grid strong {
+  color: #f8fafc;
+  font-size: 1rem;
+}
+.terminal-signal-grid span {
+  color: #93c5fd !important;
+  font-size: 0.72rem;
+}
+.terminal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.terminal-actions .primary-btn {
+  background: linear-gradient(135deg, #2563eb, #38bdf8) !important;
+  color: #f8fafc !important;
+  box-shadow: 0 18px 42px rgba(37, 99, 235, 0.28) !important;
+}
+.terminal-actions .secondary-btn {
+  border-color: rgba(148, 163, 184, 0.34) !important;
+  color: #e2e8f0 !important;
+  background: rgba(15, 23, 42, 0.78) !important;
+}
+.terminal-token-state {
+  color: #93c5fd !important;
+  font-weight: 700;
+}
+@media (max-width: 860px) {
+  .shift-terminal-shell { width: min(100% - 28px, 720px); padding: 18px 0; }
+  .shift-terminal-hero { align-items: flex-start; flex-direction: column; border-radius: 20px; }
+  .shift-terminal-grid { grid-template-columns: 1fr; gap: 16px; padding: 16px; border-radius: 22px; }
+  .terminal-qr-stage, .terminal-command-panel { min-height: auto; border-radius: 20px; }
+  .terminal-qr-stage { padding: 28px 18px 112px; }
+  .terminal-countdown-ring { width: 82px; height: 82px; right: 18px; bottom: 18px; border-radius: 22px; }
+  .terminal-command-panel { padding: 24px 18px; }
+  .terminal-signal-grid { grid-template-columns: 1fr; }
+  .terminal-command-panel h1 { font-size: clamp(2rem, 12vw, 3.1rem); }
+}
+@media (max-width: 420px) {
+  .terminal-brand-lockup img { width: 48px; height: 48px; }
+  .terminal-status-pill { width: 100%; justify-content: center; }
+  .terminal-qr-frame { width: min(280px, 78vw); border-width: 8px !important; }
+  .terminal-actions > button { width: 100%; }
+}

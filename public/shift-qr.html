@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Voxel Veda Shift QR Terminal</title>
-<link rel="stylesheet" href="/style.css?v=20260704-aurora-graphite" />
+  <title>Voxel Veda Attendance Gate</title>
+<link rel="stylesheet" href="/style.css?v=20260723-attendance-gate-platinum" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -23,12 +23,12 @@
         <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda" />
         <div>
           <span>VOXEL VEDA</span>
-          <strong>Live Shift QR Terminal</strong>
+          <strong>Attendance Gate</strong>
         </div>
       </div>
       <div class="terminal-status-pill">
         <span class="scan-live-dot"></span>
-        <strong id="terminalStatus">Syncing secure token</strong>
+        <strong id="terminalStatus">Preparing access</strong>
       </div>
     </section>
 
@@ -45,22 +45,22 @@
       </article>
 
       <aside class="terminal-command-panel">
-        <span class="terminal-eyebrow">Attendance Access</span>
-        <h1>Scan to start or end shift</h1>
-        <p>Open this page on the workshop tablet, reception screen, or office monitor. Staff use their Voxel Veda app scanner to verify the live QR before clocking in or out.</p>
+        <span class="terminal-eyebrow">Verified Entry</span>
+        <h1>Scan QR to verify shift</h1>
+        <p>A fresh access code is issued automatically for verified attendance. Staff scan once to start shift and scan again to end shift.</p>
         <div class="terminal-signal-grid">
-          <div><strong>20s</strong><span>rotating token</span></div>
-          <div><strong>Live</strong><span>server verified</span></div>
-          <div><strong>Secure</strong><span>attendance only</span></div>
+          <div><strong>20s</strong><span>code refresh</span></div>
+          <div><strong>Verified</strong><span>server check</span></div>
+          <div><strong>Access</strong><span>shift only</span></div>
         </div>
         <div class="terminal-actions">
-          <button type="button" class="primary-btn" onclick="loadShiftTerminalQr(true)">Refresh Now</button>
-          <button type="button" class="secondary-btn" onclick="toggleTerminalFullscreen()">Full Screen</button>
+          <button type="button" class="primary-btn" onclick="loadShiftTerminalQr(true)">New Code</button>
+          <button type="button" class="secondary-btn" onclick="toggleTerminalFullscreen()">Display Mode</button>
         </div>
-        <p id="terminalTokenState" class="terminal-token-state">Preparing QR terminal...</p>
+        <p id="terminalTokenState" class="terminal-token-state">Access code preparing.</p>
       </aside>
     </section>
   </main>
-  <script src="/shift-qr-terminal.js?v=20260625-shift-terminal"></script>
+  <script src="/shift-qr-terminal.js?v=20260723-attendance-gate-platinum"></script>
 </body>
 </html>

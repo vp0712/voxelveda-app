@@ -23,22 +23,22 @@ async function loadShiftTerminalQr(force = false) {
   if (!image) return;
 
   try {
-    setTerminalText('terminalStatus', force ? 'Refreshing token' : 'Live token active');
+    setTerminalText('terminalStatus', force ? 'Issuing new code' : 'QR active');
     const res = await fetch(`/api/public/shift-qr?t=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'QR terminal unavailable');
 
     const qrData = data.qr_data || data.token;
     image.src = `/api/qr?data=${encodeURIComponent(qrData)}&v=${Date.now()}`;
-    setTerminalText('terminalStatus', 'Live QR ready');
-    setTerminalText('terminalTokenState', 'Live attendance token is rotating and ready for staff scanner verification.');
+    setTerminalText('terminalStatus', 'QR active');
+    setTerminalText('terminalTokenState', 'Ready for staff attendance scan.');
     startTerminalCountdown(data.expires_in_seconds || data.refresh_seconds || 20);
 
     clearTimeout(terminalRefreshTimer);
     terminalRefreshTimer = setTimeout(loadShiftTerminalQr, Number(data.refresh_seconds || 20) * 1000);
   } catch (err) {
-    setTerminalText('terminalStatus', 'Connection offline');
-    setTerminalText('terminalTokenState', err.message || 'Unable to load live QR token. Check server connection.');
+    setTerminalText('terminalStatus', 'Connection paused');
+    setTerminalText('terminalTokenState', err.message || 'Unable to issue attendance code. Check server connection.');
     clearTimeout(terminalRefreshTimer);
     terminalRefreshTimer = setTimeout(loadShiftTerminalQr, 8000);
   }
