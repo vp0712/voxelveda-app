@@ -68,12 +68,40 @@ function logout() {
   window.location.href = '/login.html';
 }
 
+function isMobileShellViewport() {
+  return window.matchMedia('(max-width: 1023px)').matches;
+}
+
+function syncMobileMenuState(shouldOpen) {
+  document.body.classList.toggle('mobile-menu-open', shouldOpen);
+  document.documentElement.classList.toggle('mobile-menu-open', shouldOpen);
+  document.body.classList.toggle('vv-scroll-locked', shouldOpen);
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.querySelector('.mobile-sidebar-backdrop');
+  document.querySelectorAll('.mobile-menu-btn, .topbar-menu-btn').forEach((btn) => {
+    btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  });
+  if (sidebar) sidebar.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+  if (backdrop) backdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+}
+
 function toggleMobileMenu(open) {
   const shouldOpen = typeof open === 'boolean'
     ? open
     : !document.body.classList.contains('mobile-menu-open');
-  document.body.classList.toggle('mobile-menu-open', shouldOpen);
+  syncMobileMenuState(shouldOpen);
+  if (shouldOpen) {
+    window.setTimeout(() => document.querySelector('.sidebar .nav-btn:not(.hidden-section), .sidebar .nav-group-toggle')?.focus?.(), 80);
+  }
 }
+
+function closeMobileMenuOnCompact() {
+  if (isMobileShellViewport()) toggleMobileMenu(false);
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') toggleMobileMenu(false);
+});
 
 function enhanceResponsiveTables() {
   document.querySelectorAll('table').forEach((table) => {
@@ -901,17 +929,14 @@ function openShiftQrScanner(mode) {
   activeShiftQrMode = mode === 'out' ? 'out' : 'in';
 
   showStaffDialog(``, `
-    <div class="shift-scan-panel simple-shift-scanner">
-      <div class="shift-scan-camera">
+    <div class="shift-scan-panel simple-shift-scanner vv-plain-qr-scanner">
+      <div class="shift-scan-camera" aria-label="Live QR camera preview">
         <video id="shiftQrVideo" autoplay playsinline webkit-playsinline muted></video>
-        <div class="shift-camera-glass"></div>
         <div class="shift-scan-reticle"></div>
-        <div class="shift-scan-corners"></div>
-        <div class="shift-scanline"></div>
       </div>
       <strong id="shiftQrScanStatus" class="shift-scan-status-text">Opening camera...</strong>
       <div id="shiftQrPermissionActions" class="shift-camera-actions hidden-section">
-        <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Open Camera</button>
+        <button class="primary-btn" type="button" onclick="startShiftQrCamera(activeShiftQrMode)">Allow Camera</button>
       </div>
     </div>
   `);
@@ -2039,13 +2064,14 @@ async function submitLeaveRequest(event) {
     showToast('Leave end date must be after start date');
     return;
   }
+  const sync = await sendStaffWorkRequest('leave', type + ' leave request', reason, { type, from, to, reason });
   const rows = readStaffWorkStore('leave');
-  rows.push({ id: Date.now(), type, from, to, reason, status: 'Pending', created_at: new Date().toISOString(), staff: staffUserLabel() });
+  rows.push({ id: sync?.request_id || Date.now(), type, from, to, reason, status: sync ? 'Sent to admin' : 'Local sync failed', created_at: new Date().toISOString(), staff: staffUserLabel() });
   writeStaffWorkStore('leave', rows);
   event.target.reset();
   renderStaffLeaveRequests();
   sendStaffNotification('Leave request submitted', `${type} from ${from} to ${to}`);
-  showToast('Saved successfully');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
 }
 
 function renderStaffLeaveRequests() {
@@ -2067,13 +2093,14 @@ async function saveAvailability(event) {
     showToast('Please fill required fields');
     return;
   }
+  const sync = await sendStaffWorkRequest('availability', status + ' availability', notes || status, { date, status, notes });
   const rows = readStaffWorkStore('availability');
-  rows.push({ id: Date.now(), date, status, notes, created_at: new Date().toISOString() });
+  rows.push({ id: sync?.request_id || Date.now(), date, status, notes, sync_status: sync ? 'Sent to admin' : 'Local sync failed', created_at: new Date().toISOString() });
   writeStaffWorkStore('availability', rows);
   event.target.reset();
   renderStaffAvailability();
   sendStaffNotification('Availability saved', `${status} on ${date}`);
-  showToast('Saved successfully');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
 }
 
 function renderStaffAvailability() {
@@ -2107,10 +2134,11 @@ async function markStaffDocumentRead(id) {
   const doc = staffDocumentLibrary.find((item) => item.id === id);
   if (!doc) return;
   const rows = readStaffWorkStore('documents').filter((row) => row.id !== id);
-  rows.push({ id, title: doc.title, read_at: new Date().toISOString() });
+  const sync = await sendStaffWorkRequest('documents', 'Document read: ' + doc.title, doc.summary || 'Staff confirmed document review', { document_id: id, title: doc.title, read_at: new Date().toISOString() });
+  rows.push({ id, title: doc.title, read_at: new Date().toISOString(), sync_status: sync ? 'Sent to admin' : 'Local sync failed' });
   writeStaffWorkStore('documents', rows);
   renderStaffDocuments();
-  showToast('Updated successfully');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
 }
 
 async function submitStaffChecklist(event) {
@@ -2122,13 +2150,14 @@ async function submitStaffChecklist(event) {
     showToast('Please fill required fields');
     return;
   }
+  const sync = await sendStaffWorkRequest('forms', type + ' checklist', notes || result, { type, result, notes });
   const rows = readStaffWorkStore('forms');
-  rows.push({ id: Date.now(), type, result, notes, submitted_at: new Date().toISOString(), staff: staffUserLabel() });
+  rows.push({ id: sync?.request_id || Date.now(), type, result, notes, sync_status: sync ? 'Sent to admin' : 'Local sync failed', submitted_at: new Date().toISOString(), staff: staffUserLabel() });
   writeStaffWorkStore('forms', rows);
   event.target.reset();
   renderStaffFormSubmissions();
   sendStaffNotification('Form submitted', `${type}: ${result}`);
-  showToast('Saved successfully');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
 }
 
 function renderStaffFormSubmissions() {
@@ -2255,5 +2284,3 @@ async function bootStaffDashboard() {
 }
 
 document.addEventListener('DOMContentLoaded', bootStaffDashboard);
-
-

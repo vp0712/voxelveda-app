@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-<link rel="stylesheet" href="/style.css?v=20260704-workhub-requests" />
+<link rel="stylesheet" href="/style.css?v=20260723-connecteam-suite" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -241,6 +241,27 @@
           </button>
         </div>
 
+
+        <div class="vv-suite-panel staff-suite-panel">
+          <div class="vv-suite-head compact">
+            <div>
+              <span class="panel-kicker">My Work App</span>
+              <h2>Today's Workforce Tools</h2>
+              <p>Everything assigned to your account appears here based on admin access.</p>
+            </div>
+          </div>
+          <div class="vv-suite-grid staff-suite-grid">
+            <button type="button" class="vv-suite-card permission-attendance hidden-section" onclick="openMissionShiftScanner()"><span>Time Clock</span><strong>Start / End shift</strong><small>QR attendance and timesheet record.</small></button>
+            <button type="button" class="vv-suite-card permission-roster hidden-section" onclick="goStaffSection('rosterSection')"><span>Roster</span><strong>My shifts</strong><small>View upcoming shift time, location and notes.</small></button>
+            <button type="button" class="vv-suite-card permission-tasks hidden-section" onclick="goStaffSection('tasksSection')"><span>Tasks</span><strong>Assigned work</strong><small>Due, overdue and progress updates.</small></button>
+            <button type="button" class="vv-suite-card permission-leave hidden-section" onclick="goStaffSection('leaveSection')"><span>Time Off</span><strong>Leave requests</strong><small>Submit request and follow approval status.</small></button>
+            <button type="button" class="vv-suite-card permission-availability hidden-section" onclick="goStaffSection('availabilitySection')"><span>Availability</span><strong>Roster preference</strong><small>Tell admin when you can work.</small></button>
+            <button type="button" class="vv-suite-card permission-forms hidden-section" onclick="goStaffSection('formsSection')"><span>Forms</span><strong>Checklists</strong><small>Quality, safety and daily records.</small></button>
+            <button type="button" class="vv-suite-card permission-documents hidden-section" onclick="goStaffSection('documentsSection')"><span>Knowledge</span><strong>Documents</strong><small>Policies, SOPs and company files.</small></button>
+            <button type="button" class="vv-suite-card permission-messages hidden-section" onclick="goStaffSection('messagesSection')"><span>Messages</span><strong>Contact admin</strong><small>Operational notes and help requests.</small></button>
+            <button type="button" class="vv-suite-card permission-meetings hidden-section" onclick="goStaffSection('meetingsSection')"><span>Events</span><strong>Meetings</strong><small>Inspections, conference and visit schedule.</small></button>
+          </div>
+        </div>
         <div id="staffActionHub" class="staff-action-hub">
           <button class="staff-action-card permission-leave hidden-section" type="button" onclick="goStaffSection('leaveSection')">
             <span>People Ops</span>
@@ -692,6 +713,14 @@
     </main>
   </div>
 
+
+  <nav class="mobile-bottom-nav staff-mobile-bottom-nav" aria-label="Staff mobile quick navigation">
+    <button type="button" class="nav-btn" data-section="dashboardSection">Home</button>
+    <button type="button" data-section="timesheetSection" class="nav-btn permission-attendance hidden-section">Shift</button>
+    <button type="button" class="mobile-bottom-primary permission-attendance hidden-section" onclick="openMissionShiftScanner()">QR</button>
+    <button type="button" data-section="tasksSection" class="nav-btn permission-tasks hidden-section">Tasks</button>
+    <button type="button" class="nav-btn" data-section="profileSection">Profile</button>
+  </nav>
   <div id="toast" class="toast"></div>
 
   <div id="staffDialogBackdrop" class="dialog-backdrop" onclick="closeStaffDialog(event)">
@@ -717,7 +746,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260704-workhub-requests"></script>
+  <script src="/staff.js?v=20260722-mobile-shell"></script>
 </body>
 </html>
-

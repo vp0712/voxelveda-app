@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260704-workhub-requests"/>
+<link rel="stylesheet" href="/style.css?v=20260723-connecteam-suite"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -157,6 +157,29 @@
           <button class="quick-pill command-pill" onclick="goSection('competitorSection')"><span>08</span>Competitors</button>
         </div>
 
+
+        <div class="vv-suite-panel admin-suite-panel">
+          <div class="vv-suite-head">
+            <div>
+              <span class="panel-kicker">Workforce OS</span>
+              <h2>Admin Feature Command Centre</h2>
+              <p>Connect rostering, time clock, forms, tasks, messages, staff records and compliance from one operations layer.</p>
+            </div>
+            <button class="secondary-btn" type="button" onclick="goSection('staffSection')">Manage Access</button>
+          </div>
+          <div class="vv-suite-grid">
+            <button type="button" class="vv-suite-card" onclick="goSection('attendanceSection')"><span>Time Clock</span><strong>Timesheet approvals</strong><small>Clock-in review, payroll export and correction queue.</small></button>
+            <button type="button" class="vv-suite-card" onclick="goSection('rosterSection')"><span>Rostering</span><strong>Shift planning</strong><small>Publish shifts, locations, notes and staff coverage.</small></button>
+            <button type="button" class="vv-suite-card" onclick="goSection('taskSection')"><span>Tasks</span><strong>Quick task control</strong><small>Assign work, announcements and production updates.</small></button>
+            <button type="button" class="vv-suite-card" onclick="goSection('staffSection')"><span>Staff Directory</span><strong>Access and profiles</strong><small>Users, permissions, QR bypass, documents and messages.</small></button>
+            <button type="button" class="vv-suite-card" onclick="openAdminWorkHub('forms')"><span>Forms</span><strong>Checklists</strong><small>Quality, safety, joining and inspection records.</small></button>
+            <button type="button" class="vv-suite-card" onclick="openAdminWorkHub('documents')"><span>Documents</span><strong>Knowledge base</strong><small>Policies, SOPs, licences and controlled files.</small></button>
+            <button type="button" class="vv-suite-card" onclick="openAdminWorkHub('messages')"><span>Messages</span><strong>Help desk inbox</strong><small>Staff updates, requests and admin review actions.</small></button>
+            <button type="button" class="vv-suite-card" onclick="goSection('complianceSection')"><span>Compliance</span><strong>Licence reminders</strong><small>Council, government, safety and expiry tracking.</small></button>
+            <button type="button" class="vv-suite-card" onclick="goSection('meetingSection')"><span>Events</span><strong>Meetings & inspections</strong><small>Visitors, conference, audits and reminder schedule.</small></button>
+            <button type="button" class="vv-suite-card" onclick="goSection('companyFormsSection')"><span>HR & Training</span><strong>Forms, training, recognition</strong><small>Company records, onboarding packs and staff milestones.</small></button>
+          </div>
+        </div>
         <div class="metric-grid command-status-grid">
           <div class="card command-status-card">
             <h3>RFQs</h3>
@@ -1335,9 +1358,17 @@
     </section>
   </div>
 
+
+  <nav class="mobile-bottom-nav admin-mobile-bottom-nav" aria-label="Admin mobile quick navigation">
+    <button type="button" class="nav-btn" data-section="dashboardSection">Home</button>
+    <button type="button" class="nav-btn" data-section="attendanceSection">Workforce</button>
+    <button type="button" class="nav-btn" data-section="taskSection">Tasks</button>
+    <button type="button" onclick="toggleNotificationPanel(event)">Alerts</button>
+    <button type="button" onclick="toggleMobileMenu(true)">More</button>
+  </nav>
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260704-workhub-requests"></script>
+  <script src="/admin-dashboard.js?v=20260722-mobile-shell"></script>
 </body>
 </html>

@@ -131,16 +131,32 @@ function logout() {
   window.location.href = '/login.html';
 }
 
+function isMobileShellViewport() {
+  return window.matchMedia('(max-width: 1023px)').matches;
+}
+
 function toggleMobileMenu(open) {
   const shouldOpen = typeof open === 'boolean'
     ? open
     : !document.body.classList.contains('mobile-menu-open');
   document.body.classList.toggle('mobile-menu-open', shouldOpen);
   document.documentElement.classList.toggle('mobile-menu-open', shouldOpen);
+  document.body.classList.toggle('vv-scroll-locked', shouldOpen);
+  const sidebar = document.querySelector('.sidebar');
+  const backdrop = document.querySelector('.mobile-sidebar-backdrop');
   document.querySelectorAll('.topbar-menu-btn, .mobile-menu-btn').forEach((btn) => {
     btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
   });
-  if (shouldOpen) closeNotificationPanel();
+  if (sidebar) sidebar.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+  if (backdrop) backdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+  if (shouldOpen) {
+    closeNotificationPanel();
+    window.setTimeout(() => document.querySelector('.sidebar .nav-btn, .sidebar .nav-group-toggle')?.focus?.(), 80);
+  }
+}
+
+function closeMobileMenuOnCompact() {
+  if (isMobileShellViewport()) toggleMobileMenu(false);
 }
 
 function compactName(value, fallback = 'Admin') {
@@ -4440,12 +4456,17 @@ function renderServerWorkHubRequest(row) {
 }
 
 function renderAdminWorkHubRows(type) {
-  const serverRows = adminServerWorkHubRows(type);
+  const isMessageModule = type === 'messages';
+  const serverRows = isMessageModule
+    ? staffMessageCache.filter((row) => !Number(row.deleted || 0))
+    : adminServerWorkHubRows(type);
   const localRows = readAdminWorkHub(type);
   if (!serverRows.length && !localRows.length) {
     return '<div class="empty-state compact">No staff requests or saved records yet.</div>';
   }
-  const serverHtml = serverRows.map(renderServerWorkHubRequest).join('');
+  const serverHtml = isMessageModule
+    ? serverRows.map(renderAdminStaffMessageRow).join('')
+    : serverRows.map(renderServerWorkHubRequest).join('');
   const localHtml = localRows.map((row) => `
     <article class="admin-workhub-row">
       <div>
@@ -4459,9 +4480,15 @@ function renderAdminWorkHubRows(type) {
   return serverHtml + localHtml;
 }
 
-function openAdminWorkHub(type) {
+async function openAdminWorkHub(type) {
   const config = ADMIN_WORK_HUB_MODULES[type];
   if (!config) return;
+  if (type === 'messages') {
+    await loadAdminStaffMessages();
+    await loadAdminWorkHubRequests();
+  } else {
+    await loadAdminWorkHubRequests();
+  }
   showDialog(config.title, `
     <div class="admin-workhub-dialog-body">
       <section class="admin-workhub-entry-form">
@@ -4498,6 +4525,7 @@ async function loadAdminWorkHubRequests() {
     if (!res.ok) throw new Error(data.message || 'Failed to load staff requests');
     staffWorkRequestCache = Array.isArray(data.requests) ? data.requests : [];
     renderAdminWorkHubSummary();
+    renderAdminStaffMessageSurfaces();
     const register = document.getElementById('adminWorkHubRegister');
     if (register && register.dataset.type) register.innerHTML = renderAdminWorkHubRows(register.dataset.type);
     renderNotificationDropdown();
@@ -4557,15 +4585,30 @@ async function loadAdminStaffMessages() {
 }
 
 function renderAdminStaffMessageSurfaces() {
-  const html = renderAdminStaffMessageRows();
+  const html = renderAdminUnifiedStaffQueueRows();
   ['adminStaffMessageRegister', 'adminStaffMessageInline'].forEach((id) => {
     const target = document.getElementById(id);
     if (target) target.innerHTML = html;
   });
 }
+
+function renderAdminUnifiedStaffQueueRows() {
+  const messageRows = staffMessageCache.map((row) => ({ ...row, queue_type: 'message' }));
+  const requestRows = staffWorkRequestCache.map((row) => ({ ...row, queue_type: row.request_type || 'request' }));
+  const rows = [...messageRows, ...requestRows]
+    .filter((row) => !Number(row.deleted || 0) && isOpenWorkHubStatus(row.status))
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  if (!rows.length) return '<div class="empty-state compact">No staff requests waiting.</div>';
+  return rows.map((row) => row.queue_type === 'message' ? renderAdminStaffMessageRow(row) : renderServerWorkHubRequest(row)).join('');
+}
+
 function renderAdminStaffMessageRows(rows = staffMessageCache) {
   if (!rows.length) return '<div class="empty-state compact">No staff messages waiting.</div>';
-  return rows.map((row) => `
+  return rows.map(renderAdminStaffMessageRow).join('');
+}
+
+function renderAdminStaffMessageRow(row) {
+  return `
     <article class="admin-workhub-row staff-message-row">
       <div>
         <strong>${escapeHtml(row.staff_name || row.staff_email || 'Staff')} <span>${escapeHtml(row.priority || 'Normal')}</span></strong>
@@ -4576,8 +4619,7 @@ function renderAdminStaffMessageRows(rows = staffMessageCache) {
         <button type="button" class="primary-btn small-btn" onclick="updateAdminStaffMessage(${Number(row.id)}, 'Approved')">Approve</button>
         <button type="button" class="danger-btn small-btn" onclick="deleteAdminStaffMessage(${Number(row.id)})">Delete</button>
       </div>
-    </article>
-  `).join('');
+    </article>`;
 }
 
 async function openAdminStaffMessages() {
@@ -4590,7 +4632,7 @@ async function openAdminStaffMessages() {
           <h4>Incoming Staff Queue</h4>
           <button type="button" class="secondary-btn small-btn" onclick="refreshAdminStaffMessagesPanel()">Refresh</button>
         </div>
-        <div id="adminStaffMessageRegister" class="admin-workhub-register">${renderAdminStaffMessageRows()}</div>
+        <div id="adminStaffMessageRegister" class="admin-workhub-register">${renderAdminUnifiedStaffQueueRows()}</div>
       </section>
     </div>
   `, hideDialog, 'Close');
