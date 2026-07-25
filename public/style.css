@@ -11318,6 +11318,113 @@ body.vv-scroll-locked { overflow: hidden !important; }
 .vv-plain-qr-scanner .shift-scan-reticle::before, .vv-plain-qr-scanner .shift-scan-reticle::after { display: none !important; content: none !important; }
 .shift-qr-dialog-panel:has(.vv-plain-qr-scanner) { width: min(94vw, 440px) !important; padding: 18px !important; }
 .shift-qr-dialog-panel:has(.vv-plain-qr-scanner) h3 { display: none !important; }
+
+/* 20260725 company forms digital workflow */
+.form-action-stack {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.form-action-stack .primary-btn,
+.form-action-stack .icon-btn,
+.form-action-stack a.icon-btn {
+  min-height: 38px;
+  padding-inline: 12px;
+}
+
+.form-record-line {
+  color: rgba(203, 213, 225, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.digital-form-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.digital-form-summary {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(56, 189, 248, 0.14), transparent 34%),
+    rgba(2, 8, 23, 0.5);
+}
+
+.digital-form-summary h4,
+.digital-form-summary p {
+  margin: 0;
+}
+
+.digital-form-summary p {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.digital-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.digital-form-grid label {
+  display: grid;
+  gap: 7px;
+  color: #5eead4;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.digital-form-grid textarea {
+  min-height: 110px;
+}
+
+.form-entry-list {
+  display: grid;
+  gap: 12px;
+}
+
+.form-record-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid rgba(56, 189, 248, 0.22);
+  border-radius: 14px;
+  background: rgba(2, 8, 23, 0.46);
+}
+
+.form-record-card strong,
+.form-record-card span {
+  display: block;
+}
+
+.form-record-card span {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .digital-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-record-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .form-record-card .inline-actions,
+  .form-action-stack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+}
 @media (max-width: 1023px) {
   html.mobile-menu-open, body.mobile-menu-open, body.vv-scroll-locked { overflow: hidden !important; height: 100% !important; }
   .app-shell { display: block !important; min-height: 100vh !important; width: 100% !important; overflow-x: hidden !important; }

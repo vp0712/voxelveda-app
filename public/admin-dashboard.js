@@ -108,7 +108,30 @@ const COMPANY_FORMS = [
   { category: 'Safety', title: 'Visitor / Contractor Induction', file: '/forms/company/visitor-contractor-induction.pdf', visual: 'visitor', note: 'Use before visitors or contractors enter production, storage or machinery areas.' }
 ];
 
-const COMPANY_FORM_VERSION = '20260602-privacy-policy';
+const ADDITIONAL_COMPANY_FORMS = [
+  { category: 'Supplier', title: 'Supplier Onboarding & Approval Form', file: '/forms/company/supplier-onboarding-approval.pdf', visual: 'supplier', note: 'Use before approving a supplier for raw material, packaging, transport, tooling, outsourced manufacturing or services.' },
+  { category: 'Finance', title: 'Purchase Order & Supplier Bill Register', file: '/forms/company/purchase-order-supplier-bill-register.pdf', visual: 'contract', note: 'Use to control purchase orders, supplier bills, GST, payment status, due dates and approval evidence.' },
+  { category: 'Quality', title: 'Raw Material Receiving & Traceability Form', file: '/forms/company/raw-material-receiving-traceability.pdf', visual: 'risk', note: 'Use when receiving material so batch, supplier, COA/SDS, quantity, condition and release status are traceable.' },
+  { category: 'Quality', title: 'Packaging Receiving & Release Form', file: '/forms/company/packaging-receiving-release.pdf', visual: 'dispatch', note: 'Use when receiving cartons, labels, bags, inserts or packaging so quality release is recorded before use.' },
+  { category: 'Production', title: 'Job Traveller / Production Batch Record', file: '/forms/company/job-traveller-production-batch-record.pdf', visual: 'machine', note: 'Use for every production job to connect customer order, drawing, material batch, operator checks and final release.' },
+  { category: 'Quality', title: 'Quality Inspection & Release Certificate', file: '/forms/company/quality-inspection-release-certificate.pdf', visual: 'safety', note: 'Use before dispatch when dimensions, finish, quantity, test results and customer requirements must be signed off.' },
+  { category: 'Quality', title: 'Non-Conformance & Corrective Action Form', file: '/forms/company/non-conformance-corrective-action.pdf', visual: 'incident', note: 'Use when product, material, process or delivery fails requirement and corrective action is required.' },
+  { category: 'Quality', title: 'Customer Complaint & Product Failure Investigation', file: '/forms/company/customer-complaint-product-failure.pdf', visual: 'client', note: 'Use when a customer reports a product issue, failure, defect, shortage, delay or quality concern.' },
+  { category: 'Machinery', title: 'Calibration & Measurement Tool Register', file: '/forms/company/calibration-measurement-tool-register.pdf', visual: 'machinery-chart', note: 'Use to track calipers, gauges, scales, test equipment and calibration status for inspection confidence.' },
+  { category: 'Machinery', title: 'Preventive Maintenance & Service Log', file: '/forms/company/preventive-maintenance-service-log.pdf', visual: 'machine', note: 'Use for printers, tools, compressors and plant servicing, repairs, downtime and next maintenance date.' },
+  { category: 'Safety', title: 'SWMS / Job Safety Analysis Form', file: '/forms/company/swms-jsa-work-method-statement.pdf', visual: 'risk', note: 'Use before higher-risk or non-routine work to record hazards, controls, PPE, isolation and worker sign-off.' },
+  { category: 'Safety', title: 'Emergency Drill & Evacuation Checklist', file: '/forms/company/emergency-drill-evacuation-checklist.pdf', visual: 'safety', note: 'Use for evacuation practice, emergency readiness, assembly point checks and action follow-up.' },
+  { category: 'Safety', title: 'First Aid & Fire Safety Inspection', file: '/forms/company/first-aid-fire-safety-inspection.pdf', visual: 'ppe', note: 'Use to inspect first-aid kits, extinguishers, exits, signage and emergency access.' },
+  { category: 'HR', title: 'Training & Competency Matrix', file: '/forms/company/training-competency-matrix.pdf', visual: 'staff', note: 'Use to prove staff training, machinery authorisation, safety competence and refresher dates.' },
+  { category: 'HR', title: 'Timesheet & Roster Approval Record', file: '/forms/company/timesheet-roster-approval-record.pdf', visual: 'staff', note: 'Use for weekly timesheet approval, roster exceptions, leave notes, overtime and payroll readiness.' },
+  { category: 'Import / Export', title: 'Import & Customs Document Checklist', file: '/forms/company/import-customs-document-checklist.pdf', visual: 'contract', note: 'Use before importing goods to confirm supplier invoice, packing list, permits, declarations, duty/GST and freight records.' },
+  { category: 'Import / Export', title: 'Export Dispatch Document Checklist', file: '/forms/company/export-dispatch-document-checklist.pdf', visual: 'dispatch', note: 'Use before exporting samples, goods or parts to confirm receiver details, invoice, customs declaration and carrier evidence.' },
+  { category: 'Environment', title: 'Waste Disposal & Environmental Register', file: '/forms/company/waste-disposal-environment-register.pdf', visual: 'hazard-chart', note: 'Use for scrap, chemicals, resin, failed material, packaging waste and disposal evidence.' }
+];
+
+COMPANY_FORMS.push(...ADDITIONAL_COMPANY_FORMS);
+
+const COMPANY_FORM_VERSION = '20260725-engineering-form-pack';
 
 function authHeaders() {
   return {
@@ -719,6 +742,7 @@ function renderCompanyForms() {
     acc[form.category].push(form);
     return acc;
   }, {});
+  const digitalRecords = loadCompanyFormRecords();
 
   panel.innerHTML = Object.entries(grouped).map(([groupName, forms]) => `
     <div class="card form-group">
@@ -729,6 +753,8 @@ function renderCompanyForms() {
       <div class="form-card-grid">
         ${forms.map((form) => {
           const fileUrl = `${form.file}?v=${COMPANY_FORM_VERSION}`;
+          const formKey = companyFormKey(form);
+          const savedCount = digitalRecords.filter((record) => record.formKey === formKey).length;
           return `
           <article class="form-card ${form.category === 'Charts' ? 'chart-form-card' : ''}">
             <div class="form-visual form-visual-${escapeHtml(form.visual || form.category.toLowerCase())}">
@@ -742,7 +768,10 @@ function renderCompanyForms() {
             <span class="status-chip">${escapeHtml(form.category)}</span>
             <h4>${escapeHtml(form.title)}</h4>
             <p>${escapeHtml(form.note)}</p>
-            <div class="dialog-actions inline-actions">
+            <div class="form-record-line">${savedCount} digital record${savedCount === 1 ? '' : 's'} saved</div>
+            <div class="dialog-actions inline-actions form-action-stack">
+              <button class="primary-btn" onclick="openCompanyFormFiller('${escapeHtml(formKey)}')">Fill Digitally</button>
+              <button class="icon-btn" onclick="openCompanyFormEntries('${escapeHtml(formKey)}')">Entries</button>
               <button class="icon-btn" onclick="window.open('${escapeHtml(fileUrl)}', '_blank', 'noopener')">Preview PDF</button>
               <a class="icon-btn" href="${escapeHtml(fileUrl)}" download>Download</a>
             </div>
@@ -751,6 +780,329 @@ function renderCompanyForms() {
       </div>
     </div>
   `).join('');
+}
+
+function companyFormKey(formOrTitle) {
+  const title = typeof formOrTitle === 'string' ? formOrTitle : formOrTitle?.title;
+  return String(title || '')
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function findCompanyFormByKey(formKey) {
+  return COMPANY_FORMS.find((form) => companyFormKey(form) === formKey);
+}
+
+function loadCompanyFormRecords() {
+  try {
+    const records = JSON.parse(localStorage.getItem('voxelVedaCompanyFormRecordsV1') || '[]');
+    return Array.isArray(records) ? records : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveCompanyFormRecords(records) {
+  localStorage.setItem('voxelVedaCompanyFormRecordsV1', JSON.stringify(records));
+}
+
+function companyFormFieldId(label) {
+  return String(label || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function companyFormFields(form) {
+  const title = String(form?.title || '').toLowerCase();
+  const category = String(form?.category || '').toLowerCase();
+  let fields = [
+    { label: 'Record Date', type: 'date', required: true },
+    { label: 'Prepared By', required: true },
+    { label: 'Reference Number' },
+    { label: 'Related Job / Supplier / Customer' },
+    { label: 'Status', type: 'select', options: ['Draft', 'In Review', 'Approved', 'Submitted', 'Closed'], required: true },
+    { label: 'Notes / Evidence', type: 'textarea' }
+  ];
+
+  if (title.includes('supplier onboarding')) {
+    fields = [
+      { label: 'Supplier / Company Name', required: true },
+      { label: 'ABN / Supplier ID', required: true },
+      { label: 'Contact Person' },
+      { label: 'Email', type: 'email' },
+      { label: 'Phone' },
+      { label: 'Supply Category', required: true },
+      { label: 'Payment Terms' },
+      { label: 'Quality Evidence / Insurance' },
+      { label: 'Approved By', required: true },
+      { label: 'Review Date', type: 'date' },
+      { label: 'Notes', type: 'textarea' }
+    ];
+  } else if (title.includes('purchase order') || title.includes('supplier bill')) {
+    fields = [
+      { label: 'PO Number', required: true },
+      { label: 'Supplier', required: true },
+      { label: 'Supplier Invoice No' },
+      { label: 'Category' },
+      { label: 'Amount Ex GST', type: 'number', required: true },
+      { label: 'GST Amount', type: 'number' },
+      { label: 'Total Payable', type: 'number', required: true },
+      { label: 'Due Date', type: 'date' },
+      { label: 'Payment Status', type: 'select', options: ['Pending', 'Approved', 'Paid', 'On Hold'], required: true },
+      { label: 'Approved By' },
+      { label: 'Notes', type: 'textarea' }
+    ];
+  } else if (title.includes('raw material') || title.includes('packaging receiving')) {
+    fields = [
+      { label: 'Item / Material Name', required: true },
+      { label: 'Supplier', required: true },
+      { label: 'Batch / Lot / SKU', required: true },
+      { label: 'Quantity Received', type: 'number', required: true },
+      { label: 'Unit' },
+      { label: 'COA / SDS / Certificate Ref' },
+      { label: 'Condition', type: 'select', options: ['Accepted', 'Quarantine', 'Rejected'], required: true },
+      { label: 'Released By', required: true },
+      { label: 'Release Date', type: 'date' },
+      { label: 'Quality Notes', type: 'textarea' }
+    ];
+  } else if (title.includes('job traveller') || title.includes('production')) {
+    fields = [
+      { label: 'Job / Batch Number', required: true },
+      { label: 'Customer / Project', required: true },
+      { label: 'Part / Product Name', required: true },
+      { label: 'Drawing / Revision' },
+      { label: 'Material Batch' },
+      { label: 'Operator', required: true },
+      { label: 'Accepted Quantity', type: 'number' },
+      { label: 'Rejected Quantity', type: 'number' },
+      { label: 'Final Release By' },
+      { label: 'Process Notes', type: 'textarea' }
+    ];
+  } else if (category.includes('quality') || title.includes('non-conformance') || title.includes('complaint')) {
+    fields = [
+      { label: 'Case / Inspection Number', required: true },
+      { label: 'Customer / Supplier / Job' },
+      { label: 'Item / Part', required: true },
+      { label: 'Issue / Inspection Result', required: true, type: 'textarea' },
+      { label: 'Root Cause' },
+      { label: 'Corrective Action', type: 'textarea' },
+      { label: 'Owner' },
+      { label: 'Due Date', type: 'date' },
+      { label: 'Final Status', type: 'select', options: ['Open', 'In Progress', 'Approved', 'Closed'], required: true },
+      { label: 'Approved By' }
+    ];
+  } else if (category.includes('safety') || title.includes('swms') || title.includes('emergency') || title.includes('first aid')) {
+    fields = [
+      { label: 'Date', type: 'date', required: true },
+      { label: 'Area / Location', required: true },
+      { label: 'Person Responsible', required: true },
+      { label: 'Hazards / Findings', type: 'textarea', required: true },
+      { label: 'Controls / Actions', type: 'textarea' },
+      { label: 'PPE / Equipment Checked' },
+      { label: 'Follow Up Date', type: 'date' },
+      { label: 'Status', type: 'select', options: ['Open', 'Action Required', 'Completed'], required: true }
+    ];
+  } else if (category.includes('import') || category.includes('export')) {
+    fields = [
+      { label: 'Shipment / Consignment Ref', required: true },
+      { label: 'Supplier / Customer', required: true },
+      { label: 'Country' },
+      { label: 'Invoice / Declaration Ref' },
+      { label: 'Carrier / Broker' },
+      { label: 'Duty / GST Notes' },
+      { label: 'Dispatch / Arrival Date', type: 'date' },
+      { label: 'Document Status', type: 'select', options: ['Preparing', 'Submitted', 'Cleared', 'Delivered'], required: true },
+      { label: 'Notes', type: 'textarea' }
+    ];
+  }
+
+  return fields.map((field) => ({ ...field, id: companyFormFieldId(field.label) }));
+}
+
+function openCompanyFormFiller(formKey, recordId = '') {
+  const form = findCompanyFormByKey(formKey);
+  if (!form) {
+    showToast('Form is not available');
+    return;
+  }
+  const records = loadCompanyFormRecords();
+  const record = records.find((item) => item.id === recordId);
+  const values = record?.values || {};
+  const fields = companyFormFields(form);
+  const today = new Date().toISOString().slice(0, 10);
+  const fieldHtml = fields.map((field) => {
+    const value = values[field.id] ?? (field.type === 'date' && field.required ? today : '');
+    const required = field.required ? 'required' : '';
+    const label = `${escapeHtml(field.label)}${field.required ? ' *' : ''}`;
+    if (field.type === 'textarea') {
+      return `<label>${label}<textarea id="companyFormField_${field.id}" ${required}>${escapeHtml(value)}</textarea></label>`;
+    }
+    if (field.type === 'select') {
+      return `<label>${label}<select id="companyFormField_${field.id}" ${required}>${(field.options || []).map((option) => `<option ${option === value ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}</select></label>`;
+    }
+    return `<label>${label}<input id="companyFormField_${field.id}" type="${escapeHtml(field.type || 'text')}" value="${escapeHtml(value)}" ${required}></label>`;
+  }).join('');
+
+  showDialog(
+    record ? `Edit ${form.title}` : `Fill ${form.title}`,
+    `
+      <input type="hidden" id="companyDigitalFormKey" value="${escapeHtml(formKey)}">
+      <input type="hidden" id="companyDigitalRecordId" value="${escapeHtml(recordId)}">
+      <div class="digital-form-shell">
+        <div class="digital-form-summary">
+          <span class="status-chip">${escapeHtml(form.category)}</span>
+          <h4>${escapeHtml(form.title)}</h4>
+          <p>${escapeHtml(form.note)}</p>
+        </div>
+        <div class="digital-form-grid">${fieldHtml}</div>
+      </div>
+    `,
+    saveCompanyFormRecord,
+    record ? 'Update Digital Form' : 'Save Digital Form'
+  );
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+function saveCompanyFormRecord() {
+  const formKey = document.getElementById('companyDigitalFormKey')?.value;
+  const recordId = document.getElementById('companyDigitalRecordId')?.value;
+  const form = findCompanyFormByKey(formKey);
+  if (!form) return;
+
+  const fields = companyFormFields(form);
+  const values = {};
+  const missing = [];
+  fields.forEach((field) => {
+    const value = String(document.getElementById(`companyFormField_${field.id}`)?.value || '').trim();
+    values[field.id] = value;
+    if (field.required && !value) missing.push(field.label);
+  });
+  if (missing.length) {
+    showToast(`Please fill required fields: ${missing.slice(0, 3).join(', ')}`);
+    return;
+  }
+
+  const records = loadCompanyFormRecords();
+  const now = new Date().toISOString();
+  const nextRecord = {
+    id: recordId || `cff-${Date.now()}`,
+    formKey,
+    formTitle: form.title,
+    category: form.category,
+    values,
+    createdAt: recordId ? records.find((item) => item.id === recordId)?.createdAt || now : now,
+    updatedAt: now,
+    updatedBy: currentUser?.name || currentUser?.email || 'Admin'
+  };
+  const nextRecords = recordId
+    ? records.map((item) => (item.id === recordId ? nextRecord : item))
+    : [...records, nextRecord];
+  saveCompanyFormRecords(nextRecords);
+  hideDialog();
+  showToast(recordId ? 'Digital form updated successfully' : 'Digital form saved successfully');
+  renderCompanyForms();
+}
+
+function openCompanyFormEntries(formKey) {
+  const form = findCompanyFormByKey(formKey);
+  if (!form) {
+    showToast('Form is not available');
+    return;
+  }
+  const records = loadCompanyFormRecords().filter((record) => record.formKey === formKey);
+  const body = records.length
+    ? records.map((record) => {
+        const values = record.values || {};
+        const titleValue = values.supplier_company_name || values.item_material_name || values.job_batch_number || values.case_inspection_number || values.shipment_consignment_ref || values.reference_number || record.formTitle;
+        return `
+          <div class="form-record-card">
+            <div>
+              <strong>${escapeHtml(titleValue)}</strong>
+              <span>${escapeHtml(record.formTitle)} • ${new Date(record.updatedAt).toLocaleString()}</span>
+            </div>
+            <div class="inline-actions">
+              <button class="icon-btn" onclick="previewCompanyFormRecord('${escapeHtml(record.id)}')">Preview</button>
+              <button class="primary-btn" onclick="openCompanyFormFiller('${escapeHtml(formKey)}', '${escapeHtml(record.id)}')">Edit</button>
+              <button class="danger-btn" onclick="deleteCompanyFormRecord('${escapeHtml(record.id)}', '${escapeHtml(formKey)}')">Delete</button>
+            </div>
+          </div>
+        `;
+      }).join('')
+    : '<div class="empty-state">No digital entries saved for this form yet.</div>';
+
+  showDialog(
+    `${form.title} Entries`,
+    `<div class="form-entry-list">${body}</div>`,
+    () => openCompanyFormFiller(formKey),
+    'New Entry'
+  );
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+function deleteCompanyFormRecord(recordId, formKey) {
+  if (!confirm('Delete this saved digital form entry?')) return;
+  saveCompanyFormRecords(loadCompanyFormRecords().filter((record) => record.id !== recordId));
+  showToast('Digital form entry deleted');
+  openCompanyFormEntries(formKey);
+  renderCompanyForms();
+}
+
+function previewCompanyFormRecord(recordId) {
+  const record = loadCompanyFormRecords().find((item) => item.id === recordId);
+  if (!record) {
+    showToast('Saved entry not found');
+    return;
+  }
+  const form = findCompanyFormByKey(record.formKey) || record;
+  const fields = companyFormFields(form);
+  const rows = fields.map((field) => `
+    <tr>
+      <th>${escapeHtml(field.label)}</th>
+      <td>${escapeHtml(record.values?.[field.id] || '-')}</td>
+    </tr>
+  `).join('');
+  const preview = window.open('', '_blank', 'noopener');
+  if (!preview) {
+    showToast('Popup blocked. Allow popups to preview the form.');
+    return;
+  }
+  preview.document.write(`
+    <!doctype html>
+    <html>
+      <head>
+        <title>${escapeHtml(record.formTitle)}</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 36px; color: #0f172a; }
+          header { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #0ea5e9; padding-bottom: 16px; margin-bottom: 24px; }
+          img { width: 86px; height: 86px; object-fit: contain; border-radius: 18px; }
+          h1 { margin: 0; font-size: 26px; }
+          p { margin: 4px 0 0; color: #475569; }
+          table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+          th, td { text-align: left; vertical-align: top; border: 1px solid #cbd5e1; padding: 12px; }
+          th { width: 34%; background: #f1f5f9; }
+          footer { margin-top: 28px; font-size: 12px; color: #64748b; }
+          @media print { body { margin: 16mm; } button { display: none; } }
+        </style>
+      </head>
+      <body>
+        <button onclick="window.print()">Print / Save PDF</button>
+        <header>
+          <img src="/Frame 1.png" alt="Voxel Veda">
+          <div>
+            <p>Voxel Veda Pty Ltd</p>
+            <h1>${escapeHtml(record.formTitle)}</h1>
+            <p>${escapeHtml(record.category || '')} • Uploaded ${new Date(record.updatedAt).toLocaleString()}</p>
+          </div>
+        </header>
+        <table>${rows}</table>
+        <footer>Digital company form record. Keep with job, supplier, customer, safety, quality or compliance evidence as applicable.</footer>
+      </body>
+    </html>
+  `);
+  preview.document.close();
 }
 
 function hasCurrentPermission(permission) {

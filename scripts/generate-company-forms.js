@@ -203,6 +203,101 @@ const forms = [
   }
 ];
 
+
+const additionalEngineeringForms = [
+  {
+    file: 'supplier-onboarding-approval.pdf', title: 'Supplier Onboarding & Approval Form', category: 'Supplier', subtitle: 'Supplier identity, capability, payment and risk approval', visual: 'supplier', note: 'Use before buying material, packaging, tooling, outsourced manufacturing, transport or services from a new supplier. Keep evidence with supplier profile and payment terms.',
+    sections: [['Supplier Identity', ['Supplier Name', 'ABN / Supplier ID', 'Contact Person', 'Email', 'Phone', 'Address']], ['Capability & Risk', ['Supply Category', 'Criticality', 'Quality Evidence', 'Insurance / Certificates', 'SDS / COA Available', 'Approved By']], ['Commercial Setup', ['Payment Terms', 'Bank Details Verified', 'Tax Invoice Required', 'Credit Limit', 'Review Date', 'Notes']]],
+    checklist: ['ABN checked', 'Contact verified', 'Payment details verified', 'Quality evidence reviewed', 'Approved before purchase']
+  },
+  {
+    file: 'purchase-order-supplier-bill-register.pdf', title: 'Purchase Order & Supplier Bill Register', category: 'Finance', subtitle: 'PO, supplier invoice, GST and payment control', visual: 'contract', note: 'Use when raising purchase orders, receiving supplier bills or tracking payment approval for raw materials, packaging, fuel, tools or services.',
+    sections: [['Purchase Details', ['PO Number', 'Supplier', 'Requested By', 'Date', 'Category', 'Job / Project Ref']], ['Bill & GST', ['Supplier Invoice No', 'Amount Ex GST', 'GST', 'Total Payable', 'Due Date', 'Payment Status']], ['Approval', ['Goods Received By', 'Checked Against PO', 'Approved By', 'Payment Date', 'Notes', 'Attachment Ref']]],
+    checklist: ['Supplier invoice received', 'GST checked', 'Goods/services received', 'Approved for payment', 'Bill image uploaded']
+  },
+  {
+    file: 'raw-material-receiving-traceability.pdf', title: 'Raw Material Receiving & Traceability Form', category: 'Quality', subtitle: 'Material receipt, batch, COA/SDS and release evidence', visual: 'hazard', note: 'Use every time raw material is received. Attach supplier delivery photo, COA/SDS where required, and link the entry to stock/raw material records.',
+    sections: [['Material Details', ['Material Name', 'Supplier', 'Delivery Date', 'Batch / Lot', 'SKU / Reference', 'Quantity Received']], ['Quality Check', ['COA Attached', 'SDS Attached', 'Visual Condition', 'Packaging Condition', 'Contamination Check', 'Storage Condition']], ['Release', ['Accepted / Quarantine / Rejected', 'Released By', 'Date', 'Corrective Action', 'Linked Stock ID', 'Notes']]],
+    checklist: ['Batch recorded', 'Quantity checked', 'COA/SDS reviewed', 'Photos attached', 'Release status recorded']
+  },
+  {
+    file: 'packaging-receiving-release.pdf', title: 'Packaging Receiving & Release Form', category: 'Quality', subtitle: 'Packaging receipt, inspection and release record', visual: 'dispatch', note: 'Use when packaging, labels, cartons, bags, trays or dispatch material arrives. Keep with packaging stock and supplier records.',
+    sections: [['Packaging Details', ['Packaging Item', 'Supplier', 'Delivery Date', 'Lot / SKU', 'Quantity Received', 'Storage Location']], ['Inspection', ['Visual Condition', 'Dimensions / Fit', 'Cleanliness', 'Label Accuracy', 'Damage / Shortage', 'Photos Ref']], ['Release', ['Accepted / Quarantine / Rejected', 'Released By', 'Date', 'Corrective Action', 'Linked Packaging ID', 'Notes']]],
+    checklist: ['Quantity counted', 'Damage checked', 'Fit/label checked', 'Release status recorded', 'Supplier issue raised if required']
+  },
+  {
+    file: 'job-traveller-production-batch-record.pdf', title: 'Job Traveller / Production Batch Record', category: 'Production', subtitle: 'Production route, operator, machine and inspection traceability', visual: 'machine', note: 'Use for every production job where traceability, rework history, operator sign-off or customer audit evidence is needed.',
+    sections: [['Job Details', ['Job No', 'Customer', 'Part / Product', 'Drawing Revision', 'Quantity', 'Due Date']], ['Production Route', ['Process Step', 'Machine / Station', 'Operator', 'Start / Finish Time', 'Material Batch', 'In-process Check']], ['Release', ['Final Qty Accepted', 'Rejected Qty', 'Rework Notes', 'Released By', 'Date', 'Customer Certificate Ref']]],
+    checklist: ['Drawing revision checked', 'Material batch linked', 'Operators signed', 'Inspection complete', 'Released before dispatch']
+  },
+  {
+    file: 'quality-inspection-release-certificate.pdf', title: 'Quality Inspection & Release Certificate', category: 'Quality', subtitle: 'Final inspection, customer release and certificate evidence', visual: 'safety', note: 'Use before dispatching finished goods, prototypes, critical parts or customer jobs requiring inspection evidence.',
+    sections: [['Inspection Details', ['Job / Invoice Ref', 'Customer', 'Product / Part', 'Drawing Rev', 'Inspector', 'Inspection Date']], ['Inspection Results', ['Critical Dimensions', 'Surface Finish', 'Quantity Accepted', 'Quantity Rejected', 'Photos / Files', 'Certification Required']], ['Release Decision', ['Released / Hold / Rework', 'Released By', 'Customer Approval', 'Dispatch Approval', 'Notes', 'Signature']]],
+    checklist: ['Specification checked', 'Evidence attached', 'Rejected items isolated', 'Customer requirements met', 'Release signed']
+  },
+  {
+    file: 'non-conformance-corrective-action.pdf', title: 'Non-Conformance & Corrective Action Form', category: 'Quality', subtitle: 'NCR, root cause, containment and CAPA record', visual: 'risk', note: 'Use when material, packaging, process, product, service, delivery or documentation fails requirements.',
+    sections: [['Non-Conformance', ['NCR No', 'Date', 'Raised By', 'Supplier / Customer / Internal', 'Job / Batch', 'Issue Description']], ['Containment & Root Cause', ['Immediate Action', 'Affected Quantity', 'Root Cause', 'Risk Level', 'Owner', 'Due Date']], ['Corrective Action', ['Action Taken', 'Verification Method', 'Completed Date', 'Approved By', 'Effectiveness Review', 'Closure Notes']]],
+    checklist: ['Issue contained', 'Root cause recorded', 'Action owner assigned', 'Evidence attached', 'Effectiveness reviewed']
+  },
+  {
+    file: 'customer-complaint-product-failure.pdf', title: 'Customer Complaint & Product Failure Investigation', category: 'Quality', subtitle: 'Complaint intake, investigation and resolution record', visual: 'client', note: 'Use whenever a customer reports a defect, late delivery, incorrect product, performance failure, documentation issue or service complaint.',
+    sections: [['Complaint Intake', ['Customer', 'Contact', 'Date Received', 'Invoice / Job Ref', 'Product / Part', 'Complaint Type']], ['Investigation', ['Batch / Material Ref', 'Photos / Evidence', 'Likely Cause', 'Risk / Impact', 'Containment', 'Responsible Person']], ['Resolution', ['Replacement / Credit / Rework', 'Customer Response', 'Closed Date', 'Approved By', 'Preventive Action', 'Notes']]],
+    checklist: ['Complaint acknowledged', 'Evidence captured', 'Batch traced', 'Resolution approved', 'Customer notified']
+  },
+  {
+    file: 'calibration-measurement-tool-register.pdf', title: 'Calibration & Measurement Tool Register', category: 'Machinery', subtitle: 'Gauge, scale, measuring tool and calibration control', visual: 'machine', note: 'Use for calipers, scales, gauges, torque tools and measuring equipment used for inspection or release decisions.',
+    sections: [['Tool Details', ['Tool ID', 'Tool Name', 'Serial No', 'Location', 'Owner', 'Critical / Non-critical']], ['Calibration', ['Last Calibration Date', 'Next Due Date', 'Calibration Provider', 'Certificate Ref', 'Result', 'Status']], ['Action', ['Out of Tolerance Action', 'Tagged By', 'Returned to Service By', 'Notes', 'Attachment Ref', 'Review Date']]],
+    checklist: ['Tool labelled', 'Due date visible', 'Certificate attached', 'Out-of-date tools isolated', 'Register reviewed']
+  },
+  {
+    file: 'preventive-maintenance-service-log.pdf', title: 'Preventive Maintenance & Service Log', category: 'Machinery', subtitle: 'Equipment maintenance, breakdown and service history', visual: 'machinery', note: 'Use for printers, CNC, compressors, extraction, vehicles, tools and plant requiring scheduled maintenance or repair records.',
+    sections: [['Equipment', ['Asset ID', 'Equipment Name', 'Location', 'Manufacturer', 'Serial No', 'Service Frequency']], ['Maintenance Record', ['Date', 'Work Completed', 'Parts Used', 'Downtime', 'Service Provider', 'Cost']], ['Release', ['Safe to Use?', 'Next Service Date', 'Faults Remaining', 'Approved By', 'Attachment Ref', 'Notes']]],
+    checklist: ['Power isolated if required', 'Fault corrected', 'Test run completed', 'Next service scheduled', 'Record filed']
+  },
+  {
+    file: 'swms-jsa-work-method-statement.pdf', title: 'SWMS / Job Safety Analysis Form', category: 'Safety', subtitle: 'Safe work method, hazards, controls and sign-on', visual: 'risk', note: 'Use before high-risk, changed, non-routine or contractor work. Keep with job documents and induction records.',
+    sections: [['Work Activity', ['Task', 'Location', 'Supervisor', 'Workers Consulted', 'Date', 'Review Trigger']], ['Risk Controls', ['Step', 'Hazard', 'Initial Risk', 'Control Measures', 'Residual Risk', 'Person Responsible']], ['Sign-on', ['Worker Name', 'Understood Controls', 'Signature', 'Time', 'Supervisor Approval', 'Notes']]],
+    checklist: ['Workers consulted', 'Controls practical', 'Emergency process known', 'PPE confirmed', 'Work stopped if conditions change']
+  },
+  {
+    file: 'emergency-drill-evacuation-checklist.pdf', title: 'Emergency Drill & Evacuation Checklist', category: 'Safety', subtitle: 'Emergency readiness, evacuation and drill evidence', visual: 'safety', note: 'Use for evacuation drills, emergency response reviews and site readiness checks.',
+    sections: [['Drill Details', ['Date', 'Time', 'Scenario', 'Coordinator', 'Assembly Area', 'Participants']], ['Performance', ['Alarm / Notification Worked', 'Evacuation Time', 'Visitors Accounted', 'First Aid Ready', 'Issues Found', 'Photos Ref']], ['Improvement', ['Corrective Action', 'Owner', 'Due Date', 'Completed Date', 'Approved By', 'Notes']]],
+    checklist: ['Exits clear', 'Assembly area known', 'First aid checked', 'Emergency contacts current', 'Actions assigned']
+  },
+  {
+    file: 'first-aid-fire-safety-inspection.pdf', title: 'First Aid & Fire Safety Inspection', category: 'Safety', subtitle: 'First aid kit, extinguisher and emergency equipment check', visual: 'ppe', note: 'Use monthly or before inspections to record first aid kit, fire extinguisher, spill kit and emergency equipment readiness.',
+    sections: [['Inspection Details', ['Date', 'Location', 'Inspector', 'Area', 'Next Check Date', 'Supervisor']], ['Equipment Checks', ['First Aid Kit Stocked', 'Extinguishers Accessible', 'Expiry / Service Date', 'Spill Kit Stocked', 'Exit Path Clear', 'Signs Visible']], ['Action Required', ['Issue', 'Action Owner', 'Due Date', 'Completed Date', 'Approved By', 'Notes']]],
+    checklist: ['Expired items replaced', 'Blocked access cleared', 'Service tags checked', 'Actions logged', 'Photos attached if needed']
+  },
+  {
+    file: 'training-competency-matrix.pdf', title: 'Training & Competency Matrix', category: 'HR', subtitle: 'Worker skill, induction and authorisation record', visual: 'staff', note: 'Use to track who is trained and authorised for machinery, processes, software access, safety procedures and quality checks.',
+    sections: [['Worker Details', ['Staff Name', 'Role', 'Department', 'Manager', 'Start Date', 'Review Date']], ['Competency Record', ['Training Item', 'Trainer', 'Date Completed', 'Expiry / Review', 'Competent?', 'Evidence Ref']], ['Approval', ['Restrictions', 'Authorised Equipment', 'Approved By', 'Next Review', 'Notes', 'Signature']]],
+    checklist: ['Induction complete', 'Machine access controlled', 'Evidence attached', 'Expired training flagged', 'Manager review complete']
+  },
+  {
+    file: 'timesheet-roster-approval-record.pdf', title: 'Timesheet & Roster Approval Record', category: 'HR', subtitle: 'Roster, attendance correction and payroll evidence', visual: 'staff', note: 'Use when approving weekly rosters, correcting missed clock-in/out events, overtime or payroll-ready timesheets.',
+    sections: [['Period', ['Week / Month', 'Staff Name', 'Manager', 'Date From', 'Date To', 'Payroll Period']], ['Attendance Review', ['Rostered Hours', 'Clocked Hours', 'Overtime', 'Breaks', 'Corrections Made', 'Reason']], ['Approval', ['Staff Confirmed', 'Manager Approved', 'Payroll Ready', 'Approved Date', 'Notes', 'Signature']]],
+    checklist: ['Clock times reviewed', 'Corrections documented', 'Overtime approved', 'Staff confirmation captured', 'Payroll ready']
+  },
+  {
+    file: 'import-customs-document-checklist.pdf', title: 'Import & Customs Document Checklist', category: 'Import / Export', subtitle: 'Import evidence, customs and receiving control', visual: 'dispatch', note: 'Use before and after importing machinery, parts, resin, raw materials, packaging or equipment. Keep supplier invoice, packing list, freight and customs evidence.',
+    sections: [['Shipment', ['Supplier', 'Country of Origin', 'Invoice No', 'Packing List Ref', 'Freight / Broker', 'Arrival Date']], ['Customs Evidence', ['Tariff / HS Code', 'Value AUD', 'Duty / GST', 'ABF Declaration Ref', 'Permit Required?', 'Quarantine / Biosecurity']], ['Receiving', ['Goods Received', 'Damage / Shortage', 'Stock Entry Ref', 'Photos Ref', 'Approved By', 'Notes']]],
+    checklist: ['Invoice and packing list saved', 'Broker/customs ref recorded', 'Duty/GST checked', 'Goods inspected', 'Stock updated']
+  },
+  {
+    file: 'export-dispatch-document-checklist.pdf', title: 'Export Dispatch Document Checklist', category: 'Import / Export', subtitle: 'Export packing, declaration and customer dispatch control', visual: 'dispatch', note: 'Use before exporting goods to record customer, invoice, packing, declaration and carrier evidence.',
+    sections: [['Export Details', ['Customer / Consignee', 'Destination Country', 'Commercial Invoice No', 'Packing List Ref', 'Incoterms', 'Carrier']], ['Declaration', ['Export Declaration Required?', 'ABF Ref', 'HS Code', 'Goods Value', 'Permit / Restriction Check', 'Insurance']], ['Dispatch', ['Packed By', 'Checked By', 'Pickup Date', 'Tracking No', 'Documents Sent', 'Notes']]],
+    checklist: ['Customer details checked', 'Invoice/packing list attached', 'Declaration requirement checked', 'Tracking recorded', 'Export evidence retained']
+  },
+  {
+    file: 'waste-disposal-environment-register.pdf', title: 'Waste Disposal & Environmental Register', category: 'Environment', subtitle: 'Waste, recycling, chemical disposal and environmental evidence', visual: 'hygiene', note: 'Use for scrap material, chemical waste, resin, packaging waste, e-waste, coolant, oils or regulated waste disposal evidence.',
+    sections: [['Waste Details', ['Waste Type', 'Source / Process', 'Quantity', 'Container / Label', 'Storage Location', 'Date Generated']], ['Disposal', ['Disposal Method', 'Contractor / Facility', 'Pickup Date', 'Docket / Certificate Ref', 'Cost', 'Photos Ref']], ['Review', ['Environmental Risk', 'Approved By', 'Improvement Action', 'Due Date', 'Completed Date', 'Notes']]],
+    checklist: ['Waste labelled', 'Incompatible waste separated', 'Licensed disposal checked if required', 'Evidence retained', 'Register updated']
+  }
+];
+
+forms.push(...additionalEngineeringForms);
 function writeText(doc, value, x, y, options = {}) {
   doc
     .fillColor(options.color || colors.ink)

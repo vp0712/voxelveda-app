@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260723-titanium-sidebar-fix"/>
+<link rel="stylesheet" href="/style.css?v=20260725-company-forms-pack"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -1228,7 +1228,7 @@
         <div class="section-head">
           <div>
             <h2>Company Forms</h2>
-            <p>Voxel Veda branded forms, safety charts, handling rules and operational templates.</p>
+            <p>Voxel Veda branded forms, digital records, safety charts, quality controls and operational templates.</p>
           </div>
           <button onclick="renderCompanyForms()" class="secondary-btn">Refresh Library</button>
         </div>
@@ -1237,15 +1237,22 @@
           <div class="form-grid">
             <select id="companyFormCategory" onchange="renderCompanyForms()">
               <option value="">All form categories</option>
+              <option>Policy</option>
               <option>Operations</option>
               <option>HR</option>
               <option>Safety</option>
               <option>Client</option>
               <option>Contract</option>
+              <option>Supplier</option>
+              <option>Finance</option>
+              <option>Quality</option>
+              <option>Production</option>
               <option>Machinery</option>
               <option>Charts</option>
+              <option>Import / Export</option>
+              <option>Environment</option>
             </select>
-            <input id="companyFormSearch" placeholder="Search delivery, staff, safety, client, contract, machinery, hazard..." oninput="renderCompanyForms()" />
+            <input id="companyFormSearch" placeholder="Search delivery, staff, quality, supplier, import, export, safety..." oninput="renderCompanyForms()" />
           </div>
         </div>
 
@@ -1369,6 +1376,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260722-mobile-shell"></script>
+  <script src="/admin-dashboard.js?v=20260725-company-forms-pack"></script>
 </body>
 </html>
