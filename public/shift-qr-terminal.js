@@ -23,15 +23,15 @@ async function loadShiftTerminalQr(force = false) {
   if (!image) return;
 
   try {
-    setTerminalText('terminalStatus', force ? 'Issuing new code' : 'QR active');
+    setTerminalText('terminalStatus', 'Auto refresh');
     const res = await fetch(`/api/public/shift-qr?t=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'QR terminal unavailable');
 
     const qrData = data.qr_data || data.token;
     image.src = `/api/qr?data=${encodeURIComponent(qrData)}&v=${Date.now()}`;
-    setTerminalText('terminalStatus', 'QR active');
-    setTerminalText('terminalTokenState', 'Ready for staff attendance scan.');
+    setTerminalText('terminalStatus', 'Auto refresh');
+    setTerminalText('terminalTokenState', '');
     startTerminalCountdown(data.expires_in_seconds || data.refresh_seconds || 20);
 
     clearTimeout(terminalRefreshTimer);

@@ -12369,3 +12369,107 @@ html.mobile-menu-open main {
   .terminal-qr-frame { width: min(280px, 78vw); border-width: 8px !important; }
   .terminal-actions > button { width: 100%; }
 }
+
+/* 20260725 QR DISPLAY ONLY */
+.shift-terminal-page {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(148, 163, 184, 0.16), transparent 32%),
+    linear-gradient(145deg, #05070b 0%, #0b111b 52%, #020617 100%) !important;
+}
+.shift-terminal-shell {
+  width: min(760px, calc(100% - 36px)) !important;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+  padding: clamp(18px, 4vw, 34px) 0 !important;
+}
+.shift-terminal-hero {
+  padding: 14px 16px !important;
+  border-radius: 22px !important;
+  background: rgba(10, 16, 27, 0.74) !important;
+  border-color: rgba(148, 163, 184, 0.26) !important;
+}
+.terminal-brand-lockup img {
+  width: 52px !important;
+  height: 52px !important;
+  border-radius: 14px !important;
+}
+.terminal-brand-lockup span {
+  color: #cbd5e1 !important;
+}
+.terminal-brand-lockup strong {
+  font-size: clamp(1.2rem, 4vw, 1.8rem) !important;
+}
+.terminal-status-pill {
+  background: rgba(2, 6, 23, 0.68) !important;
+  color: #dbeafe !important;
+}
+.shift-terminal-grid {
+  display: block !important;
+  margin-top: 0 !important;
+  padding: clamp(18px, 4vw, 34px) !important;
+  border-radius: 30px !important;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.78), rgba(3, 7, 18, 0.9)) !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+}
+.terminal-command-panel,
+.terminal-signal-grid,
+.terminal-actions,
+.terminal-token-state,
+.terminal-eyebrow {
+  display: none !important;
+}
+.terminal-qr-stage {
+  min-height: min(72vh, 640px) !important;
+  padding: clamp(28px, 7vw, 64px) clamp(18px, 5vw, 44px) 120px !important;
+  border-radius: 26px !important;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(96, 165, 250, 0.12), transparent 42%),
+    rgba(2, 6, 23, 0.72) !important;
+  border-color: rgba(148, 163, 184, 0.24) !important;
+}
+.terminal-qr-frame {
+  width: min(430px, 78vw) !important;
+  border-radius: 30px !important;
+  border: 12px solid #f8fafc !important;
+  box-shadow: 0 28px 90px rgba(2, 6, 23, 0.62), 0 0 0 1px rgba(148, 163, 184, 0.45) !important;
+}
+.terminal-countdown-ring {
+  left: 50% !important;
+  right: auto !important;
+  bottom: 24px !important;
+  transform: translateX(-50%);
+  width: auto !important;
+  height: auto !important;
+  min-width: 132px;
+  padding: 12px 18px;
+  border-radius: 999px !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.86) !important;
+  border-color: rgba(96, 165, 250, 0.34) !important;
+}
+.terminal-countdown-ring span {
+  color: #94a3b8 !important;
+  font-size: 0.7rem !important;
+}
+.terminal-countdown-ring strong {
+  color: #f8fafc !important;
+  font-size: 1.15rem !important;
+}
+@media (max-width: 560px) {
+  .shift-terminal-shell { width: min(100% - 22px, 460px) !important; gap: 14px; }
+  .shift-terminal-hero { align-items: center !important; flex-direction: row !important; }
+  .terminal-brand-lockup { gap: 10px !important; }
+  .terminal-brand-lockup img { width: 42px !important; height: 42px !important; }
+  .terminal-brand-lockup strong { font-size: 1.05rem !important; }
+  .terminal-status-pill { padding: 8px 10px !important; font-size: 0.76rem !important; }
+  .shift-terminal-grid { padding: 12px !important; border-radius: 22px !important; }
+  .terminal-qr-stage { min-height: 72vh !important; padding: 24px 12px 96px !important; border-radius: 18px !important; }
+  .terminal-qr-frame { width: min(300px, 76vw) !important; border-width: 8px !important; border-radius: 22px !important; }
+  .terminal-countdown-ring { bottom: 18px !important; min-width: 112px; padding: 10px 14px; }
+}

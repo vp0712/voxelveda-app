@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Attendance Gate</title>
-<link rel="stylesheet" href="/style.css?v=20260723-attendance-gate-platinum" />
+<link rel="stylesheet" href="/style.css?v=20260725-qr-display-only" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -28,7 +28,7 @@
       </div>
       <div class="terminal-status-pill">
         <span class="scan-live-dot"></span>
-        <strong id="terminalStatus">Preparing access</strong>
+        <strong id="terminalStatus">Auto refresh</strong>
       </div>
     </section>
 
@@ -43,24 +43,8 @@
           <strong id="terminalCountdown">20s</strong>
         </div>
       </article>
-
-      <aside class="terminal-command-panel">
-        <span class="terminal-eyebrow">Verified Entry</span>
-        <h1>Scan QR to verify shift</h1>
-        <p>A fresh access code is issued automatically for verified attendance. Staff scan once to start shift and scan again to end shift.</p>
-        <div class="terminal-signal-grid">
-          <div><strong>20s</strong><span>code refresh</span></div>
-          <div><strong>Verified</strong><span>server check</span></div>
-          <div><strong>Access</strong><span>shift only</span></div>
-        </div>
-        <div class="terminal-actions">
-          <button type="button" class="primary-btn" onclick="loadShiftTerminalQr(true)">New Code</button>
-          <button type="button" class="secondary-btn" onclick="toggleTerminalFullscreen()">Display Mode</button>
-        </div>
-        <p id="terminalTokenState" class="terminal-token-state">Access code preparing.</p>
-      </aside>
     </section>
   </main>
-  <script src="/shift-qr-terminal.js?v=20260723-attendance-gate-platinum"></script>
+  <script src="/shift-qr-terminal.js?v=20260725-qr-display-only"></script>
 </body>
 </html>
