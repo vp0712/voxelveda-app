@@ -4,6 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const expenseController = require('../controllers/expenseController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
+const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
 const uploadDir = path.join(__dirname, '..', 'uploads', 'expenses');
@@ -17,15 +18,12 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename(req, file, cb) {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const safeName = sanitizeUploadName(file.originalname);
     cb(null, `expense_${req.params.id || 'new'}_${Date.now()}_${safeName}`);
   }
 });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 12 * 1024 * 1024 }
-});
+const upload = multer(secureMulterOptions(storage, 12));
 
 router.get('/', expenseController.getExpenses);
 router.get('/files/:id/view', expenseController.viewExpenseFile);

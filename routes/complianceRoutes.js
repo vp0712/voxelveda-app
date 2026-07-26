@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const complianceController = require('../controllers/complianceController');
+const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
 const uploadDir = path.join(__dirname, '..', 'uploads', 'compliance');
@@ -16,15 +17,12 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename(req, file, cb) {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const safeName = sanitizeUploadName(file.originalname);
     cb(null, `compliance_${req.params.id}_${Date.now()}_${safeName}`);
   }
 });
 
-const upload = multer({
-  storage,
-  limits: { fileSize: 15 * 1024 * 1024 }
-});
+const upload = multer(secureMulterOptions(storage, 15));
 
 router.get('/', complianceController.getComplianceEntries);
 router.post('/', complianceController.saveComplianceEntry);

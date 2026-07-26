@@ -4,14 +4,15 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/roleMiddleware');
+const { authRateLimit } = require('../middleware/securityMiddleware');
 
 /* ================= AUTH ================= */
 
-router.post('/login', authController.login);
+router.post('/login', authRateLimit(), authController.login);
 
-router.post('/register', auth, requireRole('admin'), authController.register);
+router.post('/register', authRateLimit(), auth, requireRole('admin'), authController.register);
 
-router.post('/customer-register', authController.customerRegister);
+router.post('/customer-register', authRateLimit(), authController.customerRegister);
 
 router.get('/me', auth, authController.me);
 

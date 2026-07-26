@@ -26,18 +26,49 @@ const competitorRoutes = require('./routes/competitorRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
+const {
+  corsOptions,
+  rateLimit,
+  securityHeaders,
+  safeErrorHandler
+} = require('./middleware/securityMiddleware');
 
 const auth = require('./middleware/auth');
 
 const app = express();
 
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.disable('x-powered-by');
+app.set('trust proxy', 1);
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.use('/invoices', express.static(path.join(__dirname, 'invoices')));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use(securityHeaders);
+app.use(cors(corsOptions()));
+app.use(rateLimit());
+app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.FORM_BODY_LIMIT || '1mb' }));
+
+app.use(express.static(path.join(__dirname, 'public'), {
+  dotfiles: 'deny',
+  index: false,
+  setHeaders(res) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  }
+}));
+app.use('/invoices', express.static(path.join(__dirname, 'invoices'), {
+  dotfiles: 'deny',
+  index: false,
+  setHeaders(res) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
+  }
+}));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  dotfiles: 'deny',
+  index: false,
+  setHeaders(res) {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('Cache-Control', 'private, no-store');
+  }
+}));
 
 app.use('/api/auth', authRoutes);
 
@@ -106,5 +137,7 @@ app.use((req, res) => {
     path: req.originalUrl
   });
 });
+
+app.use(safeErrorHandler);
 
 module.exports = app;

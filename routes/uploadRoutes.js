@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pool = require('../config/db');
+const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
 
@@ -17,12 +18,12 @@ const storage = multer.diskStorage({
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    const safeName = file.originalname.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    const safeName = sanitizeUploadName(file.originalname);
     cb(null, `rfq_${req.params.id}_${Date.now()}_${safeName}`);
   }
 });
 
-const upload = multer({ storage });
+const upload = multer(secureMulterOptions(storage, 12));
 
 router.post('/rfq/:id', upload.single('file'), async (req, res) => {
   try {

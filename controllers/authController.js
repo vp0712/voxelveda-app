@@ -46,7 +46,7 @@ function createToken(user) {
       permissions: parsePermissions(user.permissions)
     },
     process.env.JWT_SECRET,
-    { expiresIn: '180d' }
+    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
   );
 }
 
@@ -102,8 +102,7 @@ exports.login = async (req, res) => {
   } catch (err) {
     console.error('LOGIN ERROR:', err);
     res.status(500).json({
-      message: 'Login failed',
-      error: err.message
+      message: 'Login failed'
     });
   }
 };
@@ -119,6 +118,14 @@ exports.register = async (req, res) => {
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email and password required' });
+    }
+
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: 'Valid email address is required' });
+    }
+
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
     }
 
     const allowedRoles = ['admin', 'staff', 'sales', 'production', 'viewer'];
@@ -148,8 +155,7 @@ exports.register = async (req, res) => {
   } catch (err) {
     console.error('REGISTER ERROR:', err);
     res.status(500).json({
-      message: 'Registration failed',
-      error: err.message
+      message: 'Registration failed'
     });
   }
 };
@@ -185,8 +191,7 @@ exports.me = async (req, res) => {
   } catch (err) {
     console.error('ME ERROR:', err);
     res.status(500).json({
-      message: 'Failed to load user',
-      error: err.message
+      message: 'Failed to load user'
     });
   }
 };
@@ -240,8 +245,7 @@ exports.customerRegister = async (req, res) => {
   } catch (err) {
     console.error('CUSTOMER REGISTER ERROR:', err);
     res.status(500).json({
-      message: 'Customer account registration failed',
-      error: err.message
+      message: 'Customer account registration failed'
     });
   }
 };
