@@ -3291,9 +3291,12 @@ function setExpenseFinancialYearOptions() {
 
   const now = new Date();
   const currentStart = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;
-  select.innerHTML = Array.from({ length: 7 }, (_, index) => currentStart - index).map((year, index) => `
-    <option value="${year}" ${index === 0 ? 'selected' : ''}>FY ${year}-${year + 1}</option>
-  `).join('');
+  select.innerHTML = `
+    <option value="" selected>All years</option>
+    ${Array.from({ length: 7 }, (_, index) => currentStart - index).map((year) => `
+      <option value="${year}">FY ${year}-${year + 1}</option>
+    `).join('')}
+  `;
   select.dataset.ready = '1';
 }
 
@@ -3584,7 +3587,9 @@ function openExpenseDialog(id = null) {
 
       hideDialog();
       showToast(data.message || 'Expense saved');
-      await loadExpenses(expensePage);
+      const fySelect = document.getElementById('expenseFinancialYear');
+      if (fySelect) fySelect.value = '';
+      await loadExpenses(1);
     },
     id ? 'Update Expense' : 'Save Expense'
   );

@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260725-company-forms-pack"/>
+<link rel="stylesheet" href="/style.css?v=20260730-expense-access"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -1121,7 +1121,7 @@
         <div class="card">
           <div class="form-grid">
             <select id="expenseFinancialYear" onchange="loadExpenses(1)">
-              <option value="">Current financial year</option>
+              <option value="">All years</option>
             </select>
             <select id="expensePageSize" onchange="setExpensePageSize()">
               <option value="10">Show 10 entries</option>
@@ -1145,7 +1145,7 @@
           </div>
         </div>
 
-        <div class="card table-wrap">
+        <div class="card table-wrap expense-table-wrap">
           <div class="section-head compact-head">
             <div>
               <h3>Expense Register</h3>
@@ -1376,6 +1376,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/qr-widget.js?v=20260609-gst-toggle"></script>
-  <script src="/admin-dashboard.js?v=20260725-company-forms-pack"></script>
+  <script src="/admin-dashboard.js?v=20260730-expense-access"></script>
 </body>
 </html>

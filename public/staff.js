@@ -14,6 +14,8 @@ let firstTaskLoad = true;
 let tenHourReminderShown = false;
 let staffStockCache = [];
 let staffStockOutCache = [];
+let staffExpensePage = 1;
+let staffExpenseLimit = 25;
 let staffMeetingCache = [];
 let lastAnnouncementIds = new Set();
 let firstAnnouncementLoad = true;
@@ -232,7 +234,8 @@ function applyPermissionUI() {
   const canUseStockIn = hasPermission('stock_in');
   const canUseStockOut = hasPermission('stock_out');
   const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut;
-  const canUseFinance = hasPermission('invoices') || hasPermission('expenses');
+  const canUseExpenses = hasPermission('expenses');
+  const canUseFinance = hasPermission('invoices') || canUseExpenses;
   const canUseLeave = hasStaffWorkAccess('leave');
   const canUseAvailability = hasStaffWorkAccess('availability');
   const canUseDocuments = hasStaffWorkAccess('documents');
@@ -248,6 +251,7 @@ function applyPermissionUI() {
   setPermissionVisibility('.permission-stock-in', canUseStockIn);
   setPermissionVisibility('.permission-stock-out', canUseStockOut);
   setPermissionVisibility('.permission-finance', canUseFinance);
+  setPermissionVisibility('.permission-expenses', canUseExpenses);
   setPermissionVisibility('.permission-workhub', canUseWorkHub);
   setPermissionVisibility('.permission-leave', canUseLeave);
   setPermissionVisibility('.permission-availability', canUseAvailability);
@@ -309,6 +313,86 @@ async function loadStaffFinanceOverview() {
   setText('staffRevenueValue', formatMoney(data.finance?.revenue));
   setText('staffExpenseValue', formatMoney(data.finance?.expenses));
   setText('staffNetWorthValue', formatMoney(data.finance?.net_worth));
+}
+
+function staffExpenseStatusBadge(status) {
+  const label = String(status || 'paid').trim() || 'paid';
+  return `<span class="status-badge status-${escapeHtml(label.toLowerCase().replace(/\s+/g, '-'))}">${escapeHtml(label)}</span>`;
+}
+
+function changeStaffExpensePage(delta) {
+  loadStaffExpenses(Math.max(1, staffExpensePage + delta));
+}
+
+async function loadStaffExpenses(page = staffExpensePage) {
+  if (!hasPermission('expenses')) return;
+
+  const tbody = document.getElementById('staffExpenseTableBody');
+  if (!tbody) return;
+
+  staffExpensePage = Math.max(Number(page || 1), 1);
+  staffExpenseLimit = Number(document.getElementById('staffExpensePageSize')?.value || staffExpenseLimit || 25);
+  const search = document.getElementById('staffExpenseSearch')?.value.trim() || '';
+  const params = new URLSearchParams({
+    page: staffExpensePage,
+    limit: staffExpenseLimit,
+    search
+  });
+
+  tbody.innerHTML = '<tr><td colspan="9">Loading expenses...</td></tr>';
+
+  try {
+    const res = await fetch(`/api/expenses?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await safeJson(res);
+
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="9">${escapeHtml(data.message || 'Failed to load expenses')}</td></tr>`;
+      return;
+    }
+
+    const rows = data.expenses || [];
+    const summary = data.summary || {};
+    const totalRows = Number(data.total || rows.length || 0);
+    const currentPage = Number(data.page || staffExpensePage);
+    const currentLimit = Number(data.limit || staffExpenseLimit);
+
+    setText('staffExpenseListTotal', formatMoney(summary.total_expense));
+    setText('staffExpenseListGst', formatMoney(summary.gst_paid));
+    setText('staffExpenseListCount', String(summary.expense_count || totalRows || 0));
+
+    const info = document.getElementById('staffExpensePageInfo');
+    if (info) {
+      const start = totalRows ? ((currentPage - 1) * currentLimit) + 1 : 0;
+      const end = Math.min(currentPage * currentLimit, totalRows);
+      info.textContent = `Showing ${start}-${end} of ${totalRows} entries`;
+    }
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="9">No expenses found for this view.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((expense) => `
+      <tr>
+        <td>${escapeHtml(formatShortDate(expense.expense_date))}</td>
+        <td>
+          <strong>${escapeHtml(expense.supplier_name || '-')}</strong><br>
+          <span class="muted-text">${escapeHtml(expense.description || '-')}</span>
+        </td>
+        <td>${escapeHtml(expense.category || '-')}</td>
+        <td>${escapeHtml(expense.invoice_no || '-')}</td>
+        <td>${escapeHtml(formatMoney(expense.amount_ex_gst))}</td>
+        <td>${escapeHtml(formatMoney(expense.gst_amount))}</td>
+        <td><strong>${escapeHtml(formatMoney(expense.total_amount))}</strong></td>
+        <td>${staffExpenseStatusBadge(expense.status)}</td>
+        <td>${Number(expense.file_count || 0) ? `${escapeHtml(expense.file_count)} attached` : '<span class="muted-text">No file</span>'}</td>
+      </tr>
+    `).join('');
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="9">Failed to load expenses</td></tr>';
+  }
 }
 
 function setPermissionVisibility(selector, allowed) {
@@ -989,6 +1073,7 @@ function setupStaffNavigation() {
 
       if (target === 'stockInSection') loadStaffStock();
       if (target === 'stockOutSection') loadStaffStockOut();
+      if (target === 'staffExpenseSection') loadStaffExpenses(1);
       if (target === 'meetingsSection') loadMyMeetings();
       if (target === 'rosterSection') loadMyRoster();
       toggleMobileMenu(false);
@@ -1971,6 +2056,9 @@ function startAutoRefresh() {
     await loadAttendanceStatus();
     await loadTimesheet();
     await loadStaffFinanceOverview();
+    if (hasPermission('expenses')) {
+      await loadStaffExpenses(1);
+    }
     if (hasPermission('stock')) {
       await loadStaffStock();
       await loadStaffStockOut();
@@ -2260,7 +2348,8 @@ async function bootStaffDashboard() {
       loadAttendanceStatus(),
       loadTimesheet(),
       loadMyRoster(),
-      loadStaffFinanceOverview()
+      loadStaffFinanceOverview(),
+      hasPermission('expenses') ? loadStaffExpenses(1) : Promise.resolve()
     ]);
 
     if (hasPermission('stock')) {

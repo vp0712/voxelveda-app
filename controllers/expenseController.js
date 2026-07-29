@@ -142,7 +142,12 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
 }
 
 async function getExpenseSummary(fy = '') {
+  const hasFinancialYear = String(fy || '').trim() !== '';
   const bounds = financialYearBounds(fy);
+  const expenseDateWhere = hasFinancialYear ? 'AND expense_date BETWEEN ? AND ?' : '';
+  const invoiceDateWhere = hasFinancialYear ? 'AND created_at BETWEEN ? AND DATE_ADD(?, INTERVAL 1 DAY)' : '';
+  const expenseDateParams = hasFinancialYear ? [bounds.start, bounds.end] : [];
+  const invoiceDateParams = hasFinancialYear ? [bounds.start, bounds.end] : [];
 
   const [[expenses]] = await pool.query(
     `
@@ -152,9 +157,9 @@ async function getExpenseSummary(fy = '') {
       COUNT(*) AS expense_count
     FROM expenses
     WHERE deleted = 0
-    AND expense_date BETWEEN ? AND ?
+    ${expenseDateWhere}
     `,
-    [bounds.start, bounds.end]
+    expenseDateParams
   );
 
   const [[invoices]] = await pool.query(
@@ -164,9 +169,9 @@ async function getExpenseSummary(fy = '') {
       COALESCE(SUM(total), 0) AS invoice_value
     FROM invoices
     WHERE (deleted = 0 OR deleted IS NULL)
-    AND created_at BETWEEN ? AND DATE_ADD(?, INTERVAL 1 DAY)
+    ${invoiceDateWhere}
     `,
-    [bounds.start, bounds.end]
+    invoiceDateParams
   ).catch(() => [[{ gst_collected: 0, invoice_value: 0 }]]);
 
   const [categoryRows] = await pool.query(
@@ -175,12 +180,12 @@ async function getExpenseSummary(fy = '') {
            COALESCE(SUM(total_amount), 0) AS total_amount
     FROM expenses
     WHERE deleted = 0
-    AND expense_date BETWEEN ? AND ?
+    ${expenseDateWhere}
     GROUP BY COALESCE(NULLIF(category, ''), 'Uncategorised')
     ORDER BY total_amount DESC
     LIMIT 12
     `,
-    [bounds.start, bounds.end]
+    expenseDateParams
   );
 
   const [monthRows] = await pool.query(
@@ -189,17 +194,17 @@ async function getExpenseSummary(fy = '') {
            COALESCE(SUM(total_amount), 0) AS total_amount
     FROM expenses
     WHERE deleted = 0
-    AND expense_date BETWEEN ? AND ?
+    ${expenseDateWhere}
     GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
     ORDER BY month ASC
     `,
-    [bounds.start, bounds.end]
+    expenseDateParams
   );
 
   return {
-    financial_year: `${bounds.startYear}-${bounds.startYear + 1}`,
-    start: bounds.start,
-    end: bounds.end,
+    financial_year: hasFinancialYear ? `${bounds.startYear}-${bounds.startYear + 1}` : 'All years',
+    start: hasFinancialYear ? bounds.start : null,
+    end: hasFinancialYear ? bounds.end : null,
     expense_count: Number(expenses.expense_count || 0),
     total_expense: Number(expenses.total_expense || 0),
     gst_paid: Number(expenses.gst_paid || 0),

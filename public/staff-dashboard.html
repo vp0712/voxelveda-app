@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-<link rel="stylesheet" href="/style.css?v=20260723-titanium-sidebar-fix" />
+<link rel="stylesheet" href="/style.css?v=20260730-expense-access" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -75,6 +75,15 @@
         <div class="nav-submenu">
           <button class="nav-btn nav-sub-btn permission-attendance hidden-section" data-section="timesheetSection">Timesheet</button>
           <button class="nav-btn nav-sub-btn permission-roster hidden-section" data-section="rosterSection">Roster</button>
+        </div>
+      </details>
+      <details class="nav-group permission-finance hidden-section" open>
+        <summary class="nav-group-toggle">
+          <span>Finance</span>
+          <span class="nav-group-caret">v</span>
+        </summary>
+        <div class="nav-submenu">
+          <button class="nav-btn nav-sub-btn permission-expenses hidden-section" data-section="staffExpenseSection">Expenses</button>
         </div>
       </details>
       <details class="nav-group permission-workhub hidden-section" open>
@@ -259,6 +268,7 @@
             <button type="button" class="vv-suite-card permission-forms hidden-section" onclick="goStaffSection('formsSection')"><span>Forms</span><strong>Checklists</strong><small>Quality, safety and daily records.</small></button>
             <button type="button" class="vv-suite-card permission-documents hidden-section" onclick="goStaffSection('documentsSection')"><span>Knowledge</span><strong>Documents</strong><small>Policies, SOPs and company files.</small></button>
             <button type="button" class="vv-suite-card permission-messages hidden-section" onclick="goStaffSection('messagesSection')"><span>Messages</span><strong>Contact admin</strong><small>Operational notes and help requests.</small></button>
+            <button type="button" class="vv-suite-card permission-expenses hidden-section" onclick="goStaffSection('staffExpenseSection')"><span>Finance</span><strong>Expenses</strong><small>View expense records assigned to your account.</small></button>
             <button type="button" class="vv-suite-card permission-meetings hidden-section" onclick="goStaffSection('meetingsSection')"><span>Events</span><strong>Meetings</strong><small>Inspections, conference and visit schedule.</small></button>
           </div>
         </div>
@@ -536,6 +546,75 @@
         </div>
       </section>
 
+      <!-- EXPENSES -->
+      <section id="staffExpenseSection" class="page-section hidden-section permission-expenses">
+        <div class="section-head">
+          <div>
+            <h2>Expenses</h2>
+            <p>Company expense register visible to authorised staff.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffExpenses(1)">Refresh</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card kpi-teal">
+            <h3>Total Expenses</h3>
+            <p><strong id="staffExpenseListTotal">$0.00</strong></p>
+            <span>Visible register value</span>
+          </div>
+          <div class="card kpi-blue">
+            <h3>GST Paid</h3>
+            <p><strong id="staffExpenseListGst">$0.00</strong></p>
+            <span>Recorded GST amount</span>
+          </div>
+          <div class="card kpi-green">
+            <h3>Entries</h3>
+            <p><strong id="staffExpenseListCount">0</strong></p>
+            <span>Expense records</span>
+          </div>
+        </div>
+
+        <div class="card staff-expense-control">
+          <div class="form-grid">
+            <input id="staffExpenseSearch" placeholder="Search supplier, category, invoice or description" oninput="loadStaffExpenses(1)" />
+            <select id="staffExpensePageSize" onchange="loadStaffExpenses(1)">
+              <option value="10">Show 10 entries</option>
+              <option value="25" selected>Show 25 entries</option>
+              <option value="50">Show 50 entries</option>
+              <option value="100">Show 100 entries</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card table-wrap staff-expense-register">
+          <table>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Supplier</th>
+                <th>Category</th>
+                <th>Bill</th>
+                <th>Ex GST</th>
+                <th>GST</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Files</th>
+              </tr>
+            </thead>
+            <tbody id="staffExpenseTableBody">
+              <tr><td colspan="9">Loading expenses...</td></tr>
+            </tbody>
+          </table>
+          <div class="register-footer">
+            <span id="staffExpensePageInfo">Showing 0 entries</span>
+            <div class="pagination-actions">
+              <button class="secondary-btn" type="button" onclick="changeStaffExpensePage(-1)">Previous</button>
+              <button class="secondary-btn" type="button" onclick="changeStaffExpensePage(1)">Next</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <!-- LEAVE REQUESTS -->
       <section id="leaveSection" class="page-section hidden-section permission-leave">
         <div class="section-head">
@@ -746,6 +825,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260722-mobile-shell"></script>
+  <script src="/staff.js?v=20260730-expense-access"></script>
 </body>
 </html>

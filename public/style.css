@@ -12809,3 +12809,126 @@ html.mobile-menu-open main {
     text-align: center;
   }
 }
+
+/* Expense register + staff finance repair layer */
+.login-page .login-logo-box {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px !important;
+  overflow: hidden !important;
+}
+
+.login-page .login-logo {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 96px !important;
+  max-height: 76px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+}
+
+.expense-table-wrap,
+.staff-expense-register,
+.table-wrap {
+  max-width: 100% !important;
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.expense-table-wrap table,
+.staff-expense-register table {
+  min-width: 980px;
+  width: 100%;
+  table-layout: auto;
+}
+
+.expense-table-wrap th,
+.expense-table-wrap td,
+.staff-expense-register th,
+.staff-expense-register td {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+.staff-expense-control {
+  margin-bottom: 16px;
+}
+
+.staff-expense-register .register-footer,
+.register-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  color: rgba(226, 232, 240, 0.78);
+}
+
+.pagination-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.expense-dialog-panel {
+  width: min(980px, calc(100vw - 28px)) !important;
+  max-height: calc(100dvh - 32px) !important;
+  overflow-y: auto !important;
+}
+
+.expense-dialog-panel .expense-dialog-shell {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(91, 223, 255, 0.22);
+  background: rgba(12, 24, 43, 0.78);
+  color: #e2e8f0;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.status-paid,
+.status-reimbursed {
+  border-color: rgba(34, 197, 94, 0.36);
+  background: rgba(34, 197, 94, 0.14);
+  color: #86efac;
+}
+
+.status-unpaid,
+.status-disputed {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.14);
+  color: #fecaca;
+}
+
+@media (max-width: 760px) {
+  .expense-dialog-panel .expense-dialog-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .expense-table-wrap table,
+  .staff-expense-register table {
+    min-width: 820px;
+  }
+
+  .staff-expense-register .register-footer,
+  .register-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pagination-actions .secondary-btn {
+    flex: 1 1 auto;
+  }
+}
