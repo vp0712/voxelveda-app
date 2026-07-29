@@ -12580,3 +12580,232 @@ html.mobile-menu-open main {
   .terminal-qr-frame { width: min(300px, 76vw) !important; border-width: 8px !important; border-radius: 22px !important; }
   .terminal-countdown-ring { bottom: 18px !important; min-width: 112px; padding: 10px 14px; }
 }
+
+/* Voxel Veda launch experience */
+.login-page {
+  min-height: 100dvh;
+  background:
+    radial-gradient(circle at 50% 4%, rgba(91, 223, 255, 0.22), transparent 28%),
+    radial-gradient(circle at 12% 72%, rgba(48, 209, 176, 0.14), transparent 32%),
+    linear-gradient(160deg, #030711 0%, #071522 48%, #02050e 100%) !important;
+}
+
+.login-page .login-shell {
+  position: relative;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: clamp(18px, 4vw, 42px);
+  opacity: 0;
+  transform: translateY(14px) scale(0.985);
+  animation: vvLoginReveal 700ms ease 1900ms forwards;
+}
+
+.login-page .login-card {
+  position: relative;
+  width: min(440px, 100%);
+  border-radius: 28px !important;
+  background: linear-gradient(145deg, rgba(10, 23, 38, 0.94), rgba(4, 10, 21, 0.96)) !important;
+  border: 1px solid rgba(91, 223, 255, 0.28) !important;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.login-page .login-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(91, 223, 255, 0.08) 42%, transparent 72%),
+    radial-gradient(circle at 50% 0%, rgba(91, 223, 255, 0.16), transparent 34%);
+}
+
+.login-page .login-logo-box,
+.login-page .login-card h1,
+.login-page .login-field,
+.login-page .login-btn,
+.login-page .portal-links,
+.login-page .login-footnote,
+.login-page .status {
+  position: relative;
+  z-index: 1;
+}
+
+.login-page .login-logo-box {
+  width: 108px;
+  height: 86px;
+  margin-inline: auto;
+  border-radius: 24px;
+  background: rgba(1, 8, 18, 0.78);
+  border: 1px solid rgba(91, 223, 255, 0.22);
+  box-shadow: 0 0 44px rgba(45, 212, 191, 0.18);
+}
+
+.login-page .login-logo {
+  max-width: 92px;
+  max-height: 72px;
+}
+
+.login-page .login-card h1 {
+  font-size: clamp(31px, 7vw, 42px) !important;
+  margin-top: 18px;
+  margin-bottom: 22px;
+}
+
+.login-page .login-card input {
+  min-height: 50px;
+  border-radius: 16px !important;
+  background: rgba(2, 7, 18, 0.84) !important;
+}
+
+.login-page .login-btn {
+  min-height: 52px;
+  border-radius: 18px !important;
+  margin-top: 10px;
+}
+
+.login-page .portal-links {
+  gap: 14px;
+  justify-content: center;
+}
+
+.login-page .portal-links a {
+  color: #67e8f9 !important;
+}
+
+.login-page .login-footnote {
+  color: rgba(226, 232, 240, 0.74) !important;
+}
+
+.vv-entry-sequence {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 50%, rgba(91, 223, 255, 0.20), transparent 30%),
+    linear-gradient(160deg, #02050e, #061526 55%, #02050e);
+  animation: vvEntryExit 520ms ease 1750ms forwards;
+}
+
+.vv-entry-core {
+  position: relative;
+  width: clamp(176px, 48vw, 260px);
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+}
+
+.vv-entry-core img {
+  width: 52%;
+  max-width: 134px;
+  border-radius: 24px;
+  filter: drop-shadow(0 20px 44px rgba(91, 223, 255, 0.24));
+  animation: vvEntryLogo 1500ms ease both;
+}
+
+.vv-entry-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(91, 223, 255, 0.28);
+  box-shadow: 0 0 70px rgba(91, 223, 255, 0.13);
+}
+
+.vv-entry-ring-one {
+  animation: vvEntrySpin 1800ms linear infinite;
+  border-top-color: rgba(103, 232, 249, 0.95);
+}
+
+.vv-entry-ring-two {
+  inset: 18%;
+  border-right-color: rgba(45, 212, 191, 0.88);
+  animation: vvEntrySpin 1300ms linear reverse infinite;
+}
+
+.vv-entry-scan {
+  position: absolute;
+  left: 16%;
+  right: 16%;
+  top: 50%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #67e8f9, transparent);
+  box-shadow: 0 0 24px rgba(103, 232, 249, 0.72);
+  animation: vvEntryScan 1350ms ease-in-out infinite;
+}
+
+.vv-entry-status {
+  position: absolute;
+  bottom: clamp(34px, 8vh, 72px);
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(91, 223, 255, 0.22);
+  background: rgba(5, 14, 28, 0.76);
+  color: rgba(248, 250, 252, 0.94);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(16px);
+}
+
+.vv-entry-status span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 18px rgba(34, 197, 94, 0.9);
+}
+
+.vv-entry-status strong {
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+@keyframes vvEntryExit {
+  to { opacity: 0; visibility: hidden; }
+}
+
+@keyframes vvLoginReveal {
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes vvEntrySpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes vvEntryLogo {
+  0% { opacity: 0; transform: scale(0.82); }
+  55% { opacity: 1; transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+@keyframes vvEntryScan {
+  0%, 100% { transform: translateY(-54px); opacity: 0; }
+  20%, 80% { opacity: 1; }
+  50% { transform: translateY(54px); }
+}
+
+@media (max-width: 520px) {
+  .login-page .login-shell {
+    padding: 14px;
+    align-items: start;
+    padding-top: max(22px, env(safe-area-inset-top));
+  }
+
+  .login-page .login-card {
+    border-radius: 24px !important;
+    padding: 22px 18px !important;
+  }
+
+  .login-page .portal-links {
+    display: grid;
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+}
