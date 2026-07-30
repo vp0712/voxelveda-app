@@ -12959,16 +12959,19 @@ html.mobile-menu-open main {
 
 @media (min-width: 1024px) {
   .app-shell {
-    align-items: start !important;
+    display: block !important;
+    min-height: 100dvh !important;
   }
 
   .sidebar,
   .sidebar.vv-sidebar,
   .staff-portal .sidebar,
   .customer-portal .sidebar {
-    position: sticky !important;
+    position: fixed !important;
     top: 0 !important;
-    align-self: start !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 248px !important;
     height: 100dvh !important;
     min-height: 100dvh !important;
     max-height: 100dvh !important;
@@ -12976,6 +12979,16 @@ html.mobile-menu-open main {
     overflow-y: auto !important;
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
+    z-index: 80 !important;
+    transform: none !important;
+  }
+
+  .app-shell > .main,
+  .staff-portal .app-shell > .main,
+  .customer-portal .app-shell > .main {
+    width: calc(100% - 248px) !important;
+    min-width: 0 !important;
+    margin-left: 248px !important;
   }
 }
 
