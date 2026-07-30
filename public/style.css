@@ -12932,3 +12932,68 @@ html.mobile-menu-open main {
     flex: 1 1 auto;
   }
 }
+
+/* Sidebar brand visibility and independent scrolling */
+.sidebar .brand,
+.sidebar.vv-sidebar .shell-brand,
+.staff-portal .sidebar .brand,
+.customer-portal .sidebar .brand {
+  min-height: 62px !important;
+  flex: 0 0 auto !important;
+  overflow: visible !important;
+}
+
+.sidebar .brand .logo-img,
+.sidebar.vv-sidebar .shell-brand .logo-img,
+.staff-portal .sidebar .brand .logo-img,
+.customer-portal .sidebar .brand .logo-img {
+  display: block !important;
+  width: 52px !important;
+  height: 52px !important;
+  min-width: 52px !important;
+  flex: 0 0 52px !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  overflow: visible !important;
+}
+
+@media (min-width: 1024px) {
+  .app-shell {
+    align-items: start !important;
+  }
+
+  .sidebar,
+  .sidebar.vv-sidebar,
+  .staff-portal .sidebar,
+  .customer-portal .sidebar {
+    position: sticky !important;
+    top: 0 !important;
+    align-self: start !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    max-height: 100dvh !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (max-width: 1023px) {
+  .sidebar .brand,
+  .sidebar.vv-sidebar .shell-brand,
+  .staff-portal .sidebar .brand,
+  .customer-portal .sidebar .brand {
+    min-height: 58px !important;
+  }
+
+  .sidebar .brand .logo-img,
+  .sidebar.vv-sidebar .shell-brand .logo-img,
+  .staff-portal .sidebar .brand .logo-img,
+  .customer-portal .sidebar .brand .logo-img {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    flex-basis: 48px !important;
+  }
+}
