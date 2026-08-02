@@ -7,7 +7,7 @@ if (!token) redirectToLogin('Please login to continue.');
 
 if (currentRole && currentRole !== 'admin') {
   alert('Access denied. Admin only.');
-  window.location.href = '/staff-dashboard.html';
+  window.location.href = '/dashboard';
 }
 
 let rfqChartInstance = null;
@@ -145,13 +145,21 @@ function redirectToLogin(message = 'Your session expired. Please login again.') 
   redirectingToLogin = true;
   localStorage.clear();
   const params = new URLSearchParams({ message });
-  window.location.replace(`/login.html?${params.toString()}`);
+  window.location.replace(`/login?${params.toString()}`);
   throw new Error('Redirecting to login');
 }
 
-function logout() {
-  localStorage.clear();
-  window.location.href = '/login.html';
+async function logout() {
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+  } finally {
+    localStorage.clear();
+    window.location.href = '/login';
+  }
 }
 
 function isMobileShellViewport() {
@@ -719,6 +727,20 @@ function goSection(sectionId) {
   btn.click();
 }
 
+function openAdminViewFromUrl() {
+  const view = new URLSearchParams(window.location.search).get('view');
+  if (!view) return;
+  const sections = {
+    rfqs: 'rfqSection', invoices: 'invoiceSection', customers: 'customerSection',
+    suppliers: 'supplierSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
+    packaging: 'packagingSection', expenses: 'expenseSection', workforce: 'attendanceSection',
+    timesheets: 'attendanceSection', roster: 'rosterSection', staff: 'staffSection',
+    compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection',
+    meetings: 'meetingSection', tasks: 'taskSection'
+  };
+  if (sections[view]) window.setTimeout(() => goSection(sections[view]), 0);
+}
+
 function renderCompanyForms() {
   const panel = document.getElementById('companyFormsLibrary');
   if (!panel) return;
@@ -1150,7 +1172,7 @@ async function loadMe() {
     localStorage.setItem('role', role);
     if (!hasCurrentPermission('tasks')) {
       alert('Access denied. Admin only.');
-      window.location.replace('/staff-dashboard.html');
+      window.location.replace('/dashboard');
       return null;
     }
 
@@ -2709,7 +2731,7 @@ function openCustomerStatementSendDialog(index) {
 }
 
 function openInvoicePdf(invoiceId) {
-  const url = `/invoice-pdf.html?id=${encodeURIComponent(invoiceId)}&token=${encodeURIComponent(token)}`;
+  const url = `/invoice/view?id=${encodeURIComponent(invoiceId)}`;
   const opened = window.open(url, '_blank', 'noopener');
 
   if (!opened) {
@@ -2720,7 +2742,7 @@ function openInvoicePdf(invoiceId) {
 async function openInvoiceQrDialog(invoiceId) {
   const invoice = invoiceCache.find((item) => Number(item.id) === Number(invoiceId));
   const invoiceNo = invoice?.invoice_no || `INV-${invoiceId}`;
-  const invoiceUrl = `${window.location.origin}/invoice-pdf.html?id=${encodeURIComponent(invoiceId)}&token=${encodeURIComponent(token)}`;
+  const invoiceUrl = `${window.location.origin}/invoice/view?id=${encodeURIComponent(invoiceId)}`;
   const qrUrl = `/api/qr?data=${encodeURIComponent(invoiceUrl)}`;
 
   showDialog(
@@ -5480,11 +5502,11 @@ function normalizeQrUrl(value) {
 }
 
 function getRfqUrl() {
-  return 'https://voxelveda-app-production.up.railway.app/customer.html';
+  return `${window.location.origin}/request-quote`;
 }
 
 function getPrivacyPolicyUrl() {
-  return 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
+  return `${window.location.origin}/privacy`;
 }
 
 function updateQrTargetFromType() {
@@ -5946,7 +5968,7 @@ function collectProcessSheet() {
 }
 
 function openProcessSheetPdf(id) {
-  window.open(`/api/materials/${id}/process-sheet.pdf?token=${encodeURIComponent(token)}`, '_blank');
+  window.open(`/api/materials/${id}/process-sheet.pdf`, '_blank');
 }
 
 async function deleteMaterial(type, id) {
@@ -7005,6 +7027,7 @@ async function bootAdminDashboard() {
     installAccessDeniedHandler();
     normalizeActionButtons();
     setupNavigation();
+    openAdminViewFromUrl();
     startResponsiveTableObserver();
 
     const user = await loadMe();

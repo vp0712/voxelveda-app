@@ -1,12 +1,3 @@
-async function pageExists(path) {
-  try {
-    const res = await fetch(path, { method: 'HEAD' });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 async function redirectSavedSession() {
   const token = localStorage.getItem('token');
   const role = String(localStorage.getItem('role') || '').trim().toLowerCase();
@@ -14,13 +5,30 @@ async function redirectSavedSession() {
 
   if (!token || !role || !user) return false;
 
-  if (role === 'admin') {
-    window.location.replace((await pageExists('/admin-dashboard.html')) ? '/admin-dashboard.html' : '/dashboard.html');
+  try {
+    const res = await fetch('/api/auth/session', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!res.ok) throw new Error('Saved session is no longer valid');
+    window.location.replace(role === 'admin' ? '/admin' : '/dashboard');
     return true;
+  } catch {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    return false;
   }
+}
 
-  window.location.replace('/staff-dashboard.html');
-  return true;
+function safeReturnTo(role) {
+  const value = new URLSearchParams(window.location.search).get('returnTo');
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
+    return role === 'admin' ? '/admin' : '/dashboard';
+  }
+  if (role !== 'admin' && value.startsWith('/admin')) return '/dashboard';
+  return value;
 }
 
 function showLoginMessageFromUrl() {
@@ -54,6 +62,7 @@ async function login() {
   try {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
+      credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
     });
@@ -81,16 +90,7 @@ async function login() {
     loginStatus.innerText = 'Login successful. Redirecting...';
     loginStatus.style.color = '#22c55e';
 
-    if (role === 'admin') {
-      if (await pageExists('/admin-dashboard.html')) {
-        window.location.href = '/admin-dashboard.html';
-      } else {
-        window.location.href = '/dashboard.html';
-      }
-      return;
-    }
-
-    window.location.href = '/staff-dashboard.html';
+    window.location.href = safeReturnTo(role);
   } catch (err) {
     console.error('LOGIN ERROR:', err);
     loginStatus.innerText = 'Server error. Check backend terminal.';

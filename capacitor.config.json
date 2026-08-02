@@ -3,7 +3,7 @@
   "appName": "Voxel Veda",
   "webDir": "public",
   "server": {
-    "url": "https://voxelveda-app-production.up.railway.app",
-    "cleartext": true
+    "url": "https://app.voxelveda.com",
+    "cleartext": false
   }
 }

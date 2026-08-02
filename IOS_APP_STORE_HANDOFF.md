@@ -6,7 +6,7 @@ This project now includes the Capacitor iOS platform under `ios/`. The Windows m
 
 - App name: Voxel Veda
 - Bundle ID: `com.voxelveda.app`
-- Live web server: `https://voxelveda-app-production.up.railway.app`
+- Live web server: `https://app.voxelveda.com`
 - iOS project: `ios/App/App.xcodeproj`
 - Camera permission text is included for secure shift QR scanning.
 

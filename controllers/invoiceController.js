@@ -3,6 +3,7 @@ const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
 const nodemailer = require('nodemailer');
+const urls = require('../config/urls');
 
 async function ensureInvoiceColumns() {
   await pool.query(`
@@ -1235,7 +1236,7 @@ function renderCustomerStatementPdf(doc, statement) {
   const navy = '#07111f';
   const accent = '#12b3c7';
   const privacyQrPath = path.join(__dirname, '..', 'public', 'privacy-qr.png');
-  const privacyPolicyUrl = 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
+  const privacyPolicyUrl = urls.absolute('/privacy');
 
   drawStatementHeader(doc, 'ACCOUNT STATEMENT', 'Payment record, invoice history and balance due');
 
@@ -1389,7 +1390,7 @@ function renderInvoicePdf(doc, invoice, items, id) {
 
   const logoPath = path.join(__dirname, '..', 'public', 'Frame 1.png');
   const privacyQrPath = path.join(__dirname, '..', 'public', 'privacy-qr.png');
-  const privacyPolicyUrl = 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
+  const privacyPolicyUrl = urls.absolute('/privacy');
   const W = doc.page.width;
   const H = doc.page.height;
   const navy = '#07111f';

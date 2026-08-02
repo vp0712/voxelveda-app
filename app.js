@@ -26,6 +26,8 @@ const competitorRoutes = require('./routes/competitorRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
+const pageAuth = require('./middleware/pageAuth');
+const urls = require('./config/urls');
 const {
   corsOptions,
   rateLimit,
@@ -36,6 +38,7 @@ const {
 const auth = require('./middleware/auth');
 
 const app = express();
+const publicDir = path.join(__dirname, 'public');
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -46,27 +49,112 @@ app.use(rateLimit());
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: process.env.FORM_BODY_LIMIT || '1mb' }));
 
-app.use(express.static(path.join(__dirname, 'public'), {
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'voxel-veda-app',
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.use((req, res, next) => {
+  if (process.env.FORCE_CANONICAL_HOST !== 'true' || req.path === '/api/health') return next();
+
+  const currentHost = String(req.hostname || '').toLowerCase();
+  const canonicalHost = new URL(urls.app).hostname;
+  const fallbackHost = String(
+    process.env.RAILWAY_FALLBACK_HOST || 'voxelveda-app-production.up.railway.app'
+  ).toLowerCase();
+
+  if (currentHost !== fallbackHost || currentHost === canonicalHost) return next();
+  return res.redirect(302, new URL(req.originalUrl || '/', `${urls.app}/`).toString());
+});
+
+function noIndex(req, res, next) {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  res.setHeader('Cache-Control', 'private, no-store');
+  next();
+}
+
+function sendPage(filename) {
+  return (req, res) => res.sendFile(path.join(publicDir, filename));
+}
+
+function redirectPreservingQuery(target) {
+  return (req, res) => {
+    const queryIndex = req.originalUrl.indexOf('?');
+    const query = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+    return res.redirect(302, `${target}${query}`);
+  };
+}
+
+app.get('/', sendPage('index.html'));
+app.get('/login', noIndex, sendPage('login.html'));
+app.get('/register', noIndex, sendPage('register.html'));
+app.get('/request-quote', sendPage('customer.html'));
+app.get('/privacy', sendPage('privacy-policy.html'));
+app.get('/terms', sendPage('terms.html'));
+app.get('/support', sendPage('support.html'));
+app.get('/forgot-password', noIndex, sendPage('forgot-password.html'));
+app.get('/reset-password', noIndex, sendPage('reset-password.html'));
+app.get('/attendance-terminal', noIndex, sendPage('shift-qr.html'));
+app.get('/401', noIndex, (req, res) => res.status(401).sendFile(path.join(publicDir, '401.html')));
+app.get('/403', noIndex, (req, res) => res.status(403).sendFile(path.join(publicDir, '403.html')));
+app.get('/404', noIndex, (req, res) => res.status(404).sendFile(path.join(publicDir, '404.html')));
+app.get('/429', noIndex, (req, res) => res.status(429).sendFile(path.join(publicDir, '429.html')));
+app.get('/500', noIndex, (req, res) => res.status(500).sendFile(path.join(publicDir, '500.html')));
+app.get('/maintenance', noIndex, (req, res) => res.status(503).sendFile(path.join(publicDir, 'maintenance.html')));
+
+app.get('/admin', noIndex, pageAuth({ adminOnly: true }), sendPage('admin-dashboard.html'));
+app.get('/dashboard', noIndex, pageAuth(), sendPage('staff-dashboard.html'));
+app.get('/invoice/view', noIndex, pageAuth(), sendPage('invoice-pdf.html'));
+
+app.get('/index.html', redirectPreservingQuery('/'));
+app.get('/login.html', redirectPreservingQuery('/login'));
+app.get('/register.html', redirectPreservingQuery('/register'));
+app.get('/customer.html', redirectPreservingQuery('/request-quote'));
+app.get('/privacy-policy.html', redirectPreservingQuery('/privacy'));
+app.get('/admin-dashboard.html', redirectPreservingQuery('/admin'));
+app.get('/staff-dashboard.html', redirectPreservingQuery('/dashboard'));
+app.get('/dashboard.html', redirectPreservingQuery('/dashboard'));
+app.get('/invoice-pdf.html', redirectPreservingQuery('/invoice/view'));
+app.get('/shift-qr.html', redirectPreservingQuery('/attendance-terminal'));
+
+const protectedModuleRoutes = [
+  '/rfqs', '/invoices', '/customers', '/suppliers', '/stock', '/raw-material',
+  '/packaging', '/expenses', '/workforce', '/timesheets', '/roster', '/staff',
+  '/compliance', '/forms', '/settings', '/meetings', '/tasks'
+];
+
+app.get(protectedModuleRoutes, noIndex, pageAuth(), (req, res) => {
+  const routeName = req.path.replace(/^\//, '');
+  const portal = req.user.role === 'admin' ? '/admin' : '/dashboard';
+  return res.redirect(302, `${portal}?view=${encodeURIComponent(routeName)}`);
+});
+
+app.use(express.static(publicDir, {
   dotfiles: 'deny',
   index: false,
   setHeaders(res) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
   }
 }));
-app.use('/invoices', express.static(path.join(__dirname, 'invoices'), {
+app.use('/invoices', noIndex, auth, express.static(path.join(__dirname, 'invoices'), {
   dotfiles: 'deny',
   index: false,
   setHeaders(res) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   }
 }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+app.use('/uploads', noIndex, auth, express.static(path.join(__dirname, 'uploads'), {
   dotfiles: 'deny',
   index: false,
   setHeaders(res) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   }
 }));
 
@@ -127,15 +215,11 @@ try {
   console.log('Attendance routes not loaded.');
 }
 
-app.get('/', (req, res) => {
-  res.redirect('/login.html');
-});
-
 app.use((req, res) => {
-  res.status(404).json({
-    message: 'Route not found',
-    path: req.originalUrl
-  });
+  if (!req.path.startsWith('/api/') && req.accepts('html')) {
+    return res.status(404).sendFile(path.join(publicDir, '404.html'));
+  }
+  return res.status(404).json({ message: 'Route not found' });
 });
 
 app.use(safeErrorHandler);

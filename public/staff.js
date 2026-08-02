@@ -6,7 +6,7 @@ let redirectingToLogin = false;
 if (!token) redirectToLogin('Please login to continue.');
 
 if (currentRole === 'admin') {
-  window.location.href = '/admin-dashboard.html';
+  window.location.href = '/admin';
 }
 
 let lastTaskIds = new Set();
@@ -59,15 +59,23 @@ function redirectToLogin(message = 'Your session expired. Please login again.') 
   redirectingToLogin = true;
   localStorage.clear();
   const params = new URLSearchParams({ message });
-  window.location.replace(`/login.html?${params.toString()}`);
+  window.location.replace(`/login?${params.toString()}`);
   throw new Error('Redirecting to login');
 }
 
-function logout() {
-  localStorage.removeItem('token');
-  localStorage.removeItem('user');
-  localStorage.removeItem('role');
-  window.location.href = '/login.html';
+async function logout() {
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    });
+  } finally {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
+    window.location.href = '/login';
+  }
 }
 
 function isMobileShellViewport() {
@@ -1085,6 +1093,18 @@ function goStaffSection(sectionId) {
   document.querySelector(`[data-section="${sectionId}"]`)?.click();
 }
 
+function openStaffViewFromUrl() {
+  const view = new URLSearchParams(window.location.search).get('view');
+  if (!view) return;
+  const sections = {
+    stock: 'stockInSection', 'raw-material': 'stockInSection', packaging: 'stockInSection',
+    expenses: 'staffExpenseSection', workforce: 'timesheetSection', timesheets: 'timesheetSection',
+    roster: 'rosterSection', meetings: 'meetingsSection', tasks: 'tasksSection',
+    forms: 'formsSection', settings: 'profileSection'
+  };
+  if (sections[view]) window.setTimeout(() => goStaffSection(sections[view]), 0);
+}
+
 /* ================= STAFF INFO ================= */
 
 async function loadStaffInfo() {
@@ -1117,7 +1137,7 @@ async function loadStaffInfo() {
     loadWorkHubModules();
 
     if (role === 'admin') {
-      window.location.href = '/admin-dashboard.html';
+      window.location.href = '/admin';
       return null;
     }
 
@@ -2333,6 +2353,7 @@ async function bootStaffDashboard() {
   try {
     installAccessDeniedHandler();
     setupStaffNavigation();
+    openStaffViewFromUrl();
     startResponsiveTableObserver();
 
     const user = await loadStaffInfo();

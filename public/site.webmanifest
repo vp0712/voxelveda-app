@@ -11,11 +11,11 @@
                       "src":  "/favicon-512.png?v=20260703-brand"
                   }
               ],
-    "description":  "Advanced manufacturing, 3D printing, prototyping and RFQ portal",
-    "background_color":  "#061b2d",
-    "theme_color":  "#22d3ee",
-    "name":  "Voxel Veda",
-    "start_url":  "/customer.html",
+    "description":  "Engineering, workforce and manufacturing operations control.",
+    "background_color":  "#050b14",
+    "theme_color":  "#07111f",
+    "name":  "Voxel Veda Operations Platform",
+    "start_url":  "/login",
     "display":  "standalone",
     "short_name":  "Voxel Veda"
 }

@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "check": "node scripts/check-syntax.js",
+    "lint": "node scripts/check-syntax.js",
+    "typecheck": "node scripts/check-syntax.js",
+    "test": "node scripts/domain-smoke-test.js",
+    "build": "npm run check",
     "cap:sync:ios": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios"
   },

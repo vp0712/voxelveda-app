@@ -1,63 +1,39 @@
 const path = require('path');
 const dotenv = require('dotenv');
 
-/* ================= LOAD ENV ================= */
-
 const envPath = path.join(__dirname, '.env');
 const result = dotenv.config({ path: envPath });
 
-if (result.error) {
-  console.error('❌ .env loading failed:', result.error.message);
-  process.exit(1);
+if (result.error && process.env.NODE_ENV !== 'production') {
+  console.warn('.env file not loaded; using shell environment variables.');
 }
 
-console.log('✅ .env loaded from:', envPath);
-console.log('🚀 Server starting...');
-
-console.log('Environment loaded. Database and JWT configuration present.');
-
-/* ================= LOAD APP ================= */
+console.log('Server starting...');
 
 const app = require('./app');
-
-/* ================= SEED ADMIN ================= */
 
 try {
   require('./utils/seedAdmin')();
 } catch (err) {
-  console.error('⚠️ Admin seed failed:', err.message);
+  console.error('Admin seed failed:', err.message);
 }
 
-/* ================= SERVER ================= */
+const PORT = Number(process.env.PORT || 5001);
+const HOST = '0.0.0.0';
+const server = app.listen(PORT, HOST, () => {
+  console.log(`Server running on ${HOST}:${PORT}`);
+  console.log(`Local entry: http://localhost:${PORT}/`);
+});
 
-const DEFAULT_PORT = 5001;
-let PORT = process.env.PORT || DEFAULT_PORT;
+server.on('error', (err) => {
+  console.error('Server error:', err.message);
+  process.exit(1);
+});
 
-/* Try next port if busy */
-function startServer(port) {
-  const server = app.listen(port, () => {
-    console.log(`✅ Server running on port ${port}`);
-    console.log(`🌐 Open: http://localhost:${port}/login.html`);
-  });
-
-  server.on('error', (err) => {
-    if (err.code === 'EADDRINUSE') {
-      console.warn(`⚠️ Port ${port} busy, trying ${port + 1}...`);
-      startServer(port + 1);
-    } else {
-      console.error('❌ Server error:', err);
-      process.exit(1);
-    }
-  });
-
-  /* Graceful shutdown */
-  process.on('SIGINT', () => {
-    console.log('\n🛑 Server shutting down...');
-    server.close(() => {
-      console.log('✅ Server closed cleanly');
-      process.exit(0);
-    });
-  });
+function shutdown(signal) {
+  console.log(`${signal} received. Closing server.`);
+  server.close(() => process.exit(0));
 }
 
-startServer(PORT);
+process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('SIGTERM', () => shutdown('SIGTERM'));

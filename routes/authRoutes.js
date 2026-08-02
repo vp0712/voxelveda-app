@@ -9,6 +9,8 @@ const { authRateLimit } = require('../middleware/securityMiddleware');
 /* ================= AUTH ================= */
 
 router.post('/login', authRateLimit(), authController.login);
+router.post('/logout', authController.logout);
+router.post('/session', auth, authController.refreshSessionCookie);
 
 router.post('/register', authRateLimit(), auth, requireRole('admin'), authController.register);
 

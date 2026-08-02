@@ -6,7 +6,7 @@ const root = path.join(__dirname, '..');
 const outputDir = path.join(root, 'public', 'forms', 'company');
 const logoPath = path.join(root, 'public', 'Frame 1.png');
 const privacyQrPath = path.join(root, 'public', 'privacy-qr.png');
-const privacyPolicyUrl = 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
+const privacyPolicyUrl = process.env.PUBLIC_APP_URL || 'https://app.voxelveda.com/privacy';
 
 fs.mkdirSync(outputDir, { recursive: true });
 

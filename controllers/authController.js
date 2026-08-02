@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { getRequestToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
+const { revoke } = require('../utils/tokenRevocation');
 
 function normalizeRole(role) {
   return String(role || 'staff').trim().toLowerCase();
@@ -93,6 +95,8 @@ exports.login = async (req, res) => {
     };
 
     const token = createToken(cleanUser);
+
+    setSessionCookie(req, res, token);
 
     res.json({
       message: 'Login successful',
@@ -248,4 +252,18 @@ exports.customerRegister = async (req, res) => {
       message: 'Customer account registration failed'
     });
   }
+};
+
+exports.logout = async (req, res) => {
+  const token = getRequestToken(req);
+  if (token) revoke(token);
+  clearSessionCookie(req, res);
+  return res.json({ message: 'Logout successful' });
+};
+
+exports.refreshSessionCookie = async (req, res) => {
+  const token = getRequestToken(req);
+  if (!token) return res.status(401).json({ message: 'Authorization token missing' });
+  setSessionCookie(req, res, token);
+  return res.json({ message: 'Session refreshed' });
 };

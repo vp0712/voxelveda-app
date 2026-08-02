@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /dashboard
+Disallow: /invoice/
+Disallow: /api/
+Disallow: /uploads/
+Disallow: /invoices/
+
+Sitemap: https://app.voxelveda.com/sitemap.xml

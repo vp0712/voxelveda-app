@@ -43,7 +43,7 @@ async function createCustomerAccount() {
     status.innerText = data.message || 'Account created. You can login now.';
     status.style.color = '#22c55e';
     setTimeout(() => {
-      window.location.href = `/login.html?message=${encodeURIComponent('Customer account created. Please login.')}`;
+      window.location.href = `/login?message=${encodeURIComponent('Customer account created. Please login.')}`;
     }, 1200);
   } catch (error) {
     console.error('Customer account creation error:', error);

@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
+const { getRequestToken } = require('../utils/session');
+const { isRevoked } = require('../utils/tokenRevocation');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -15,16 +17,17 @@ function parsePermissions(value) {
 
 module.exports = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization || '';
-    const queryToken = req.query?.token;
+    const token = getRequestToken(req);
 
-    if (!authHeader.startsWith('Bearer ') && !queryToken) {
+    if (!token) {
       return res.status(401).json({
         message: 'Authorization token missing'
       });
     }
 
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : queryToken;
+    if (isRevoked(token)) {
+      return res.status(401).json({ message: 'Session has ended. Please sign in again.' });
+    }
 
     if (!process.env.JWT_SECRET) {
       return res.status(500).json({

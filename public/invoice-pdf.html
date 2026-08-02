@@ -295,11 +295,12 @@
   <link rel="manifest" href="/site.webmanifest?v=20260703-brand" />
   <meta name="theme-color" content="#22d3ee" />
   <meta property="og:site_name" content="Voxel Veda" />
-  <meta property="og:image" content="https://voxelveda-app-production.up.railway.app/og-image.png?v=20260703-brand" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <meta property="og:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />
   <meta property="og:image:width" content="1254" />
   <meta property="og:image:height" content="1254" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="https://voxelveda-app-production.up.railway.app/og-image.png?v=20260703-brand" /></head>
+  <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /></head>
 <body>
   <div class="invoice-view-shell">
     <header class="invoice-view-top">
@@ -321,7 +322,6 @@
   <script>
     const params = new URLSearchParams(window.location.search);
     const invoiceId = params.get('id');
-    const token = params.get('token') || localStorage.getItem('token') || '';
     const statusEl = document.getElementById('pdfStatus');
     const previewEl = document.getElementById('invoicePreview');
 
@@ -344,12 +344,12 @@
     }
 
     function pdfUrl(download = false) {
-      const extra = download ? '&download=1' : '';
-      return `/api/invoice/${encodeURIComponent(invoiceId)}/pdf?token=${encodeURIComponent(token)}${extra}`;
+      const extra = download ? '?download=1' : '';
+      return `/api/invoice/${encodeURIComponent(invoiceId)}/pdf${extra}`;
     }
 
     function detailUrl() {
-      return `/api/invoice/${encodeURIComponent(invoiceId)}?token=${encodeURIComponent(token)}`;
+      return `/api/invoice/${encodeURIComponent(invoiceId)}`;
     }
 
     function goBack() {
@@ -357,7 +357,7 @@
         history.back();
         return;
       }
-      window.location.href = '/admin-dashboard.html';
+      window.location.href = '/admin';
     }
 
     function openDirectPdf() {
@@ -369,7 +369,7 @@
     }
 
     async function loadInvoicePreview() {
-      if (!invoiceId || !token) {
+      if (!invoiceId) {
         statusEl.textContent = 'Login again, then open the invoice.';
         previewEl.textContent = 'Invoice cannot load because the secure session is missing.';
         return;
@@ -454,7 +454,7 @@
             <div>
               <strong>Privacy, confidentiality & document handling</strong>
               <p>This invoice and any attached documents may contain confidential customer, supplier, pricing, production or payment information. Scan the QR code to view the live Voxel Veda privacy policy.</p>
-              <p class="invoice-privacy-url">voxelveda-app-production.up.railway.app/privacy-policy.html</p>
+              <p class="invoice-privacy-url">app.voxelveda.com/privacy</p>
             </div>
             <img src="/privacy-qr.png?v=20260608-local-qr" alt="Privacy Policy QR Code" />
           </div>

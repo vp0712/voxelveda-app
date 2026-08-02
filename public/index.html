@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voxel Veda Operations Platform | Business Management App</title>
+  <meta name="description" content="Secure Voxel Veda operations platform for managing RFQs, invoices, customers, suppliers, inventory, expenses, workforce activity and company compliance.">
+  <meta name="theme-color" content="#07111f">
+  <link rel="canonical" href="https://app.voxelveda.com/">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/public-pages.css">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Voxel Veda Operations Platform">
+  <meta property="og:description" content="One secure workspace for Voxel Veda commercial, inventory, workforce and compliance operations.">
+  <meta property="og:url" content="https://app.voxelveda.com/">
+  <meta property="og:image" content="https://app.voxelveda.com/og-image.png">
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"Organization","name":"Voxel Veda","url":"https://voxelveda.com","logo":"https://app.voxelveda.com/logo.png"}
+  </script>
+  <script type="application/ld+json">
+  {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Voxel Veda Operations Platform","applicationCategory":"BusinessApplication","operatingSystem":"Web, Android, iOS","url":"https://app.voxelveda.com/"}
+  </script>
+</head>
+<body class="public-page">
+  <header class="public-nav">
+    <a class="public-brand" href="/" aria-label="Voxel Veda home">
+      <img src="/logo.png" alt="Voxel Veda">
+      <span>VOXEL VEDA</span>
+    </a>
+    <nav aria-label="Primary">
+      <a href="/request-quote">Request a quote</a>
+      <a class="button button-small" href="/login">Sign in</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="public-hero">
+      <div class="hero-content">
+        <p class="eyebrow">VOXEL VEDA OPERATIONS PLATFORM</p>
+        <h1>Voxel Veda</h1>
+        <p class="hero-copy">Manage quotations, invoices, customers, suppliers, inventory, expenses, workforce activity, compliance and company records through one controlled operations platform.</p>
+        <div class="hero-actions">
+          <a class="button" href="/login">Sign in to your account</a>
+          <a class="button button-secondary" href="https://voxelveda.com">Visit Voxel Veda website</a>
+        </div>
+      </div>
+      <img class="hero-logo" src="/logo.png" alt="Voxel Veda Innovation in Motion">
+    </section>
+
+    <section class="capability-band" aria-labelledby="capabilities-title">
+      <div class="section-heading">
+        <p class="eyebrow">CONNECTED CONTROL</p>
+        <h2 id="capabilities-title">One operating layer for critical work</h2>
+      </div>
+      <div class="capability-grid capability-grid-dense">
+        <article><h3>RFQs and quotations</h3><p>Controlled enquiry and quotation workflows.</p></article>
+        <article><h3>Invoices and payments</h3><p>Billing, payment history and account statements.</p></article>
+        <article><h3>Customers and suppliers</h3><p>Central contact, commercial and document records.</p></article>
+        <article><h3>Inventory</h3><p>Finished stock, raw materials and packaging control.</p></article>
+        <article><h3>Expenses</h3><p>Business costs, evidence and financial-year visibility.</p></article>
+        <article><h3>Workforce</h3><p>Rosters, attendance, timesheets and staff permissions.</p></article>
+        <article><h3>Tasks and announcements</h3><p>Assigned work, operational updates and reminders.</p></article>
+        <article><h3>Compliance and records</h3><p>Licences, forms, meetings and inspection evidence.</p></article>
+      </div>
+      <div class="trust-strip" aria-label="Platform controls">
+        <span>Secure account access</span>
+        <span>Role-based permissions</span>
+        <span>Controlled business records</span>
+        <span>Audit-ready workflows</span>
+        <span>Responsive desktop and mobile access</span>
+      </div>
+    </section>
+  </main>
+
+  <footer class="public-footer">
+    <span>&copy; <span id="year"></span> Voxel Veda Pty Ltd</span>
+    <nav aria-label="Footer"><a href="https://voxelveda.com">Main website</a><a href="/login">Sign in</a><a href="/support">Support</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a></nav>
+  </footer>
+  <script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js').catch(() => {});
+  </script>
+</body>
+</html>

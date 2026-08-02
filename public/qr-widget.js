@@ -1,10 +1,8 @@
 (function () {
   if (window.__voxelQrWidgetInstalled) return;
   window.__voxelQrWidgetInstalled = true;
-  const LIVE_APP_ORIGIN = 'https://voxelveda-app-production.up.railway.app';
-
   function qrTarget() {
-    return `${LIVE_APP_ORIGIN}/customer.html`;
+    return `${window.location.origin}/request-quote`;
   }
 
   function qrImageUrl(target) {
@@ -45,7 +43,7 @@
           </div>
           <p id="globalQrUrl" class="global-qr-url"></p>
           <div class="card-actions">
-            <a id="globalQrOpen" class="secondary-btn" href="/customer.html" target="_blank" rel="noopener">Open</a>
+            <a id="globalQrOpen" class="secondary-btn" href="/request-quote" target="_blank" rel="noopener">Open</a>
             <a id="globalQrDownload" class="primary-btn" href="#" download="voxel-veda-rfq-qr.png">Download QR</a>
           </div>
         </section>

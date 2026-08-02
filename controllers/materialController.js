@@ -1,5 +1,7 @@
 const pool = require('../config/db');
 const PDFDocument = require('pdfkit');
+const path = require('path');
+const urls = require('../config/urls');
 
 async function ensureMaterialTable() {
   await pool.query(`
@@ -203,7 +205,7 @@ exports.viewProcessSheetPdf = async (req, res) => {
     const sheet = parseProcessSheet(item.process_sheet);
     const doc = new PDFDocument({ size: 'A4', margin: 44 });
     const privacyQrPath = path.join(__dirname, '..', 'public', 'privacy-qr.png');
-    const privacyPolicyUrl = 'https://voxelveda-app-production.up.railway.app/privacy-policy.html';
+    const privacyPolicyUrl = urls.absolute('/privacy');
 
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `inline; filename="process-sheet-${item.id}.pdf"`);
