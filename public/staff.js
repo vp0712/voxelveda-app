@@ -14,6 +14,10 @@ let firstTaskLoad = true;
 let tenHourReminderShown = false;
 let staffStockCache = [];
 let staffStockOutCache = [];
+let staffMaterialCache = {
+  raw_material: [],
+  packaging: []
+};
 let staffExpensePage = 1;
 let staffExpenseLimit = 25;
 let staffMeetingCache = [];
@@ -208,19 +212,56 @@ function getStoredUser() {
   }
 }
 
+const PERMISSION_INPUT_PARENTS = {
+  rfqs_input: ['rfqs'],
+  invoices_input: ['invoices'],
+  customers_input: ['customers'],
+  suppliers_input: ['suppliers'],
+  expenses_input: ['expenses'],
+  compliance_input: ['compliance'],
+  competitors_input: ['competitors'],
+  tasks_input: ['tasks'],
+  roster_input: ['roster'],
+  attendance_input: ['attendance'],
+  attendance_qr_bypass: ['attendance'],
+  stock_in_input: ['stock', 'stock_in'],
+  stock_out_input: ['stock', 'stock_out'],
+  raw_material_input: ['stock', 'raw_material'],
+  packaging_input: ['stock', 'packaging'],
+  meetings_input: ['meetings']
+};
+
+function getEffectivePermissions() {
+  const user = getStoredUser();
+  const rawPermissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const permissions = new Set(rawPermissions.filter(Boolean));
+  const explicitlyGrantedStock = permissions.has('stock');
+
+  Object.entries(PERMISSION_INPUT_PARENTS).forEach(([inputPermission, parents]) => {
+    if (permissions.has(inputPermission)) parents.forEach((parent) => permissions.add(parent));
+  });
+
+  if (['stock', 'stock_in', 'stock_out', 'raw_material', 'packaging'].some((id) => permissions.has(id))) {
+    permissions.add('stock');
+  }
+
+  if (explicitlyGrantedStock) {
+    ['stock_in', 'stock_out', 'raw_material', 'packaging'].forEach((id) => permissions.add(id));
+  }
+
+  return permissions;
+}
+
 function hasPermission(permission) {
   const user = getStoredUser();
   const role = String(user.role || currentRole || '').trim().toLowerCase();
   if (role === 'admin') return true;
 
-  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
-  if (permission === 'stock') {
-    return permissions.includes('stock') || permissions.includes('stock_in') || permissions.includes('stock_out');
-  }
-  if (permission === 'stock_in' || permission === 'stock_out') {
-    return permissions.includes(permission) || permissions.includes('stock');
-  }
-  return permissions.includes(permission);
+  return getEffectivePermissions().has(permission);
+}
+
+function canInput(permission) {
+  return hasPermission(`${permission}_input`);
 }
 
 function canUseQrException() {
@@ -238,12 +279,22 @@ function applyPermissionUI() {
   const canUseTasks = hasPermission('tasks');
   const canUseAttendance = hasPermission('attendance');
   const canUseRoster = hasPermission('roster');
+  const canUseWorkforce = canUseAttendance || canUseRoster;
   const canUseMeetings = hasPermission('meetings');
+  const canUseRfqs = hasPermission('rfqs');
+  const canUseInvoices = hasPermission('invoices');
+  const canUseCustomers = hasPermission('customers');
+  const canUseSuppliers = hasPermission('suppliers');
   const canUseStockIn = hasPermission('stock_in');
   const canUseStockOut = hasPermission('stock_out');
-  const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut;
+  const canUseRawMaterial = hasPermission('raw_material');
+  const canUsePackaging = hasPermission('packaging');
+  const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut || canUseRawMaterial || canUsePackaging;
   const canUseExpenses = hasPermission('expenses');
-  const canUseFinance = hasPermission('invoices') || canUseExpenses;
+  const canUseFinance = canUseInvoices || canUseExpenses;
+  const canUseCompliance = hasPermission('compliance');
+  const canUseCompetitors = hasPermission('competitors');
+  const canUseSales = canUseRfqs || canUseInvoices || canUseCustomers || canUseSuppliers;
   const canUseLeave = hasStaffWorkAccess('leave');
   const canUseAvailability = hasStaffWorkAccess('availability');
   const canUseDocuments = hasStaffWorkAccess('documents');
@@ -251,15 +302,36 @@ function applyPermissionUI() {
   const canUseMessages = hasStaffWorkAccess('messages');
   const canUseWorkHub = canUseLeave || canUseAvailability || canUseDocuments || canUseForms || canUseMessages;
 
+  setPermissionVisibility('.permission-sales', canUseSales);
+  setPermissionVisibility('.permission-rfqs', canUseRfqs);
+  setPermissionVisibility('.permission-rfqs-input', canInput('rfqs'));
+  setPermissionVisibility('.permission-invoices', canUseInvoices);
+  setPermissionVisibility('.permission-invoices-input', canInput('invoices'));
+  setPermissionVisibility('.permission-customers', canUseCustomers);
+  setPermissionVisibility('.permission-customers-input', canInput('customers'));
+  setPermissionVisibility('.permission-suppliers', canUseSuppliers);
+  setPermissionVisibility('.permission-suppliers-input', canInput('suppliers'));
   setPermissionVisibility('.permission-tasks', canUseTasks);
   setPermissionVisibility('.permission-attendance', canUseAttendance);
   setPermissionVisibility('.permission-roster', canUseRoster);
+  setPermissionVisibility('.permission-workforce', canUseWorkforce);
   setPermissionVisibility('.permission-meetings', canUseMeetings);
   setPermissionVisibility('.permission-stock', canUseStock);
   setPermissionVisibility('.permission-stock-in', canUseStockIn);
+  setPermissionVisibility('.permission-stock-in-input', canInput('stock_in'));
   setPermissionVisibility('.permission-stock-out', canUseStockOut);
+  setPermissionVisibility('.permission-stock-out-input', canInput('stock_out'));
+  setPermissionVisibility('.permission-raw-material', canUseRawMaterial);
+  setPermissionVisibility('.permission-raw-material-input', canInput('raw_material'));
+  setPermissionVisibility('.permission-packaging', canUsePackaging);
+  setPermissionVisibility('.permission-packaging-input', canInput('packaging'));
   setPermissionVisibility('.permission-finance', canUseFinance);
   setPermissionVisibility('.permission-expenses', canUseExpenses);
+  setPermissionVisibility('.permission-expenses-input', canInput('expenses'));
+  setPermissionVisibility('.permission-compliance', canUseCompliance);
+  setPermissionVisibility('.permission-compliance-input', canInput('compliance'));
+  setPermissionVisibility('.permission-competitors', canUseCompetitors);
+  setPermissionVisibility('.permission-competitors-input', canInput('competitors'));
   setPermissionVisibility('.permission-workhub', canUseWorkHub);
   setPermissionVisibility('.permission-leave', canUseLeave);
   setPermissionVisibility('.permission-availability', canUseAvailability);
@@ -321,6 +393,390 @@ async function loadStaffFinanceOverview() {
   setText('staffRevenueValue', formatMoney(data.finance?.revenue));
   setText('staffExpenseValue', formatMoney(data.finance?.expenses));
   setText('staffNetWorthValue', formatMoney(data.finance?.net_worth));
+}
+
+function staffMatchesSearch(row, search, fields) {
+  const term = String(search || '').trim().toLowerCase();
+  if (!term) return true;
+  return fields.some((field) => String(row[field] ?? '').toLowerCase().includes(term));
+}
+
+function staffStatusBadge(status) {
+  const label = String(status || 'open').trim() || 'open';
+  return `<span class="status-badge status-${escapeHtml(label.toLowerCase().replace(/\s+/g, '-'))}">${escapeHtml(label)}</span>`;
+}
+
+async function loadStaffRfqs() {
+  if (!hasPermission('rfqs')) return;
+  const tbody = document.getElementById('staffRfqTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="7">Loading RFQs...</td></tr>';
+
+  try {
+    const res = await fetch('/api/rfq', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load RFQs')}</td></tr>`;
+      return;
+    }
+
+    const search = document.getElementById('staffRfqSearch')?.value || '';
+    const rows = (data.rfqs || []).filter((row) => staffMatchesSearch(row, search, ['id', 'customer_name', 'email', 'phone', 'material', 'application', 'status']));
+    const pending = rows.filter((row) => String(row.status || '').toLowerCase() === 'pending').length;
+    const approved = rows.filter((row) => ['approved', 'quoted'].includes(String(row.status || '').toLowerCase())).length;
+    const inputAllowed = canInput('rfqs');
+
+    setText('staffRfqTotal', String(rows.length));
+    setText('staffRfqPending', String(pending));
+    setText('staffRfqApproved', String(approved));
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7">No RFQs found for this view.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((rfq) => `
+      <tr>
+        <td>#${escapeHtml(rfq.id)}</td>
+        <td><strong>${escapeHtml(rfq.customer_name || '-')}</strong></td>
+        <td>${escapeHtml(rfq.email || '-')}<br><span class="muted-text">${escapeHtml(rfq.phone || '-')}</span></td>
+        <td><strong>${escapeHtml(rfq.material || '-')}</strong><br><span class="muted-text">${escapeHtml(rfq.application || '-')}</span></td>
+        <td>${escapeHtml(rfq.quantity || 0)}</td>
+        <td>${staffStatusBadge(rfq.status)}</td>
+        <td class="${inputAllowed ? '' : 'hidden-section'}">
+          <button class="icon-btn" type="button" onclick="updateStaffRfqStatus(${Number(rfq.id)}, 'approve')">Approve</button>
+          <button class="icon-btn danger-icon" type="button" onclick="updateStaffRfqStatus(${Number(rfq.id)}, 'reject')">Reject</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="7">Failed to load RFQs</td></tr>';
+  }
+}
+
+async function updateStaffRfqStatus(id, action) {
+  if (!canInput('rfqs')) {
+    showToast("You don't have access to update RFQs. Please contact admin.");
+    return;
+  }
+
+  const res = await fetch(`/api/rfq/${action}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ rfq_id: id })
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    showToast(data.message || 'RFQ update failed');
+    return;
+  }
+
+  showToast(data.message || 'RFQ updated');
+  await loadStaffRfqs();
+}
+
+async function openStaffInvoicePdf(id) {
+  try {
+    const res = await fetch(`/api/invoice/${id}/pdf`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (!res.ok) {
+      const data = await safeJson(res);
+      showToast(data.message || 'Invoice PDF failed');
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch {
+    showToast('Invoice PDF failed');
+  }
+}
+
+async function loadStaffInvoices() {
+  if (!hasPermission('invoices')) return;
+  const tbody = document.getElementById('staffInvoiceTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="8">Loading invoices...</td></tr>';
+
+  try {
+    const res = await fetch('/api/invoice', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="8">${escapeHtml(data.message || 'Failed to load invoices')}</td></tr>`;
+      return;
+    }
+
+    const search = document.getElementById('staffInvoiceSearch')?.value || '';
+    const rows = (data.invoices || []).filter((row) => staffMatchesSearch(row, search, ['invoice_no', 'customer_name', 'customer_email', 'rfq_id', 'status', 'payment_state']));
+
+    const totals = rows.reduce((acc, invoice) => {
+      acc.total += Number(invoice.total || 0);
+      acc.paid += Number(invoice.paid_amount || 0);
+      acc.debt += Number(invoice.balance_due || 0);
+      return acc;
+    }, { total: 0, paid: 0, debt: 0 });
+
+    setText('staffInvoiceTotal', formatMoney(totals.total));
+    setText('staffInvoicePaid', formatMoney(totals.paid));
+    setText('staffInvoiceDebt', formatMoney(totals.debt));
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="8">No invoices found for this view.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((invoice) => `
+      <tr>
+        <td><strong>${escapeHtml(invoice.invoice_no || `INV-${invoice.id}`)}</strong></td>
+        <td>${escapeHtml(invoice.customer_name || '-')}<br><span class="muted-text">${escapeHtml(invoice.customer_email || '-')}</span></td>
+        <td>${escapeHtml(invoice.rfq_id || 'Manual')}</td>
+        <td><strong>${escapeHtml(formatMoney(invoice.total))}</strong></td>
+        <td>${escapeHtml(formatMoney(invoice.paid_amount))}</td>
+        <td>${escapeHtml(formatMoney(invoice.balance_due))}</td>
+        <td>${staffStatusBadge(invoice.payment_state || invoice.status)}</td>
+        <td><button class="icon-btn" type="button" onclick="openStaffInvoicePdf(${Number(invoice.id)})">PDF</button></td>
+      </tr>
+    `).join('');
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="8">Failed to load invoices</td></tr>';
+  }
+}
+
+async function loadStaffCustomers() {
+  if (!hasPermission('customers')) return;
+  const tbody = document.getElementById('staffCustomerTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="7">Loading customers...</td></tr>';
+
+  try {
+    const res = await fetch('/api/customers', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load customers')}</td></tr>`;
+      return;
+    }
+
+    const search = document.getElementById('staffCustomerSearch')?.value || '';
+    const rows = (data.customers || []).filter((row) => staffMatchesSearch(row, search, ['company_name', 'contact_name', 'email', 'phone', 'address', 'notes']));
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7">No customers found for this view.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((customer) => `
+      <tr>
+        <td><strong>${escapeHtml(customer.company_name || '-')}</strong><br><span class="muted-text">${escapeHtml(customer.address || '')}</span></td>
+        <td>${escapeHtml(customer.contact_name || '-')}</td>
+        <td>${escapeHtml(customer.email || '-')}</td>
+        <td>${escapeHtml(customer.phone || '-')}</td>
+        <td>${escapeHtml(customer.order_count || 0)}</td>
+        <td><strong>${escapeHtml(formatMoney(customer.total_spend))}</strong></td>
+        <td>${escapeHtml(customer.notes || '-')}</td>
+      </tr>
+    `).join('');
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="7">Failed to load customers</td></tr>';
+  }
+}
+
+async function loadStaffSuppliers() {
+  if (!hasPermission('suppliers')) return;
+  const tbody = document.getElementById('staffSupplierTableBody');
+  if (!tbody) return;
+
+  tbody.innerHTML = '<tr><td colspan="7">Loading suppliers...</td></tr>';
+
+  try {
+    const res = await fetch('/api/suppliers', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load suppliers')}</td></tr>`;
+      return;
+    }
+
+    const search = document.getElementById('staffSupplierSearch')?.value || '';
+    const rows = (data.suppliers || []).filter((row) => staffMatchesSearch(row, search, ['supplier_name', 'contact_name', 'email', 'phone', 'category', 'payment_terms', 'abn_acn', 'notes']));
+
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7">No suppliers found for this view.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((supplier) => `
+      <tr>
+        <td><strong>${escapeHtml(supplier.supplier_name || '-')}</strong><br><span class="muted-text">${escapeHtml(supplier.address || '')}</span></td>
+        <td>${escapeHtml(supplier.contact_name || '-')}<br><span class="muted-text">${escapeHtml(supplier.email || '-')} | ${escapeHtml(supplier.phone || '-')}</span></td>
+        <td>${escapeHtml(supplier.category || '-')}</td>
+        <td>${escapeHtml(supplier.payment_terms || '-')}</td>
+        <td>${escapeHtml(supplier.abn_acn || '-')}</td>
+        <td>${Number(supplier.file_count || 0)} files</td>
+        <td>${escapeHtml(supplier.notes || '-')}</td>
+      </tr>
+    `).join('');
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="7">Failed to load suppliers</td></tr>';
+  }
+}
+
+function updateStaffMaterialMetrics(type, rows) {
+  const prefix = type === 'packaging' ? 'staffPackaging' : 'staffRawMaterial';
+  const value = rows.reduce((sum, item) => sum + Number(item.current_value || 0), 0);
+  const qty = rows.reduce((sum, item) => sum + Number(item.current_qty || 0), 0);
+  const low = rows.filter((item) => Number(item.current_qty || 0) <= Number(item.reorder_level || 0)).length;
+
+  setText(`${prefix}Value`, formatMoney(value));
+  setText(`${prefix}Qty`, String(qty));
+  setText(`${prefix}Low`, String(low));
+}
+
+async function loadStaffMaterials(type) {
+  const permission = type === 'packaging' ? 'packaging' : 'raw_material';
+  if (!hasPermission(permission)) return;
+
+  const tableId = type === 'packaging' ? 'staffPackagingTableBody' : 'staffRawMaterialTableBody';
+  const tbody = document.getElementById(tableId);
+  if (!tbody) return;
+
+  tbody.innerHTML = `<tr><td colspan="8">Loading ${type === 'packaging' ? 'packaging' : 'raw material'}...</td></tr>`;
+
+  try {
+    const res = await fetch(`/api/materials?type=${encodeURIComponent(type)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      tbody.innerHTML = `<tr><td colspan="8">${escapeHtml(data.message || 'Failed to load inventory')}</td></tr>`;
+      return;
+    }
+
+    const rows = data.materials || [];
+    staffMaterialCache[type] = rows;
+    updateStaffMaterialMetrics(type, rows);
+
+    if (!rows.length) {
+      tbody.innerHTML = `<tr><td colspan="8">No ${type === 'packaging' ? 'packaging' : 'raw material'} items yet.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = rows.map((item) => {
+      const processSheet = item.process_sheet || {};
+      const quality = [
+        processSheet.visual_condition,
+        processSheet.contamination_check,
+        processSheet.final_disposition
+      ].filter(Boolean).join(' / ') || '-';
+
+      return `
+        <tr>
+          <td><strong>${escapeHtml(item.item_name || '-')}</strong><br><span class="muted-text">${escapeHtml(item.notes || '')}</span></td>
+          <td>${escapeHtml(item.supplier || '-')}</td>
+          <td>${escapeHtml(item.reference_code || '-')}</td>
+          <td><strong>${escapeHtml(item.current_qty || 0)} ${escapeHtml(item.unit_label || 'units')}</strong><br><span class="muted-text">Input: ${escapeHtml(item.input_qty || 0)}</span></td>
+          <td>${escapeHtml(formatMoney(item.unit_price))}</td>
+          <td><strong>${escapeHtml(formatMoney(item.current_value))}</strong></td>
+          <td>${escapeHtml(quality)}</td>
+          <td>Created: ${escapeHtml(item.created_by_name || '-')}<br><span class="muted-text">Updated: ${escapeHtml(item.updated_by_name || '-')}</span></td>
+        </tr>
+      `;
+    }).join('');
+  } catch {
+    tbody.innerHTML = '<tr><td colspan="8">Failed to load inventory</td></tr>';
+  }
+}
+
+async function loadStaffCompliance() {
+  if (!hasPermission('compliance')) return;
+  const list = document.getElementById('staffComplianceList');
+  if (!list) return;
+
+  list.innerHTML = '<div class="empty-state">Loading compliance register...</div>';
+
+  try {
+    const res = await fetch('/api/compliance', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      list.innerHTML = `<div class="empty-state">${escapeHtml(data.message || 'Failed to load compliance register')}</div>`;
+      return;
+    }
+
+    const rows = data.entries || [];
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-state">No compliance records yet.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map((entry) => `
+      <article class="mobile-card announcement-card">
+        <div class="section-head">
+          <div>
+            <h3>${escapeHtml(entry.title || '-')}</h3>
+            <p>${escapeHtml(entry.category || '-')} | ${escapeHtml(entry.authority || '-')}</p>
+          </div>
+          ${staffStatusBadge(entry.status)}
+        </div>
+        <p><strong>Requirement:</strong> ${escapeHtml(entry.requirement_type || '-')}</p>
+        <p><strong>Due / Renewal:</strong> ${escapeHtml(formatShortDate(entry.due_date))} / ${escapeHtml(formatShortDate(entry.renewal_date))}</p>
+        <p><strong>Process sheet:</strong> ${entry.process_sheet_required ? 'Required' : 'Not required'} | <strong>Files:</strong> ${Number(entry.files?.length || 0)}</p>
+        <p>${escapeHtml(entry.notes || '-')}</p>
+        ${entry.official_link ? `<a class="secondary-btn inline-action" href="${escapeHtml(entry.official_link)}" target="_blank" rel="noopener">Open Form</a>` : ''}
+      </article>
+    `).join('');
+  } catch {
+    list.innerHTML = '<div class="empty-state">Failed to load compliance register</div>';
+  }
+}
+
+async function loadStaffCompetitors() {
+  if (!hasPermission('competitors')) return;
+  const list = document.getElementById('staffCompetitorList');
+  if (!list) return;
+
+  list.innerHTML = '<div class="empty-state">Loading competitors...</div>';
+
+  try {
+    const res = await fetch('/api/competitors', { headers: { Authorization: `Bearer ${token}` } });
+    const data = await safeJson(res);
+    if (!res.ok) {
+      list.innerHTML = `<div class="empty-state">${escapeHtml(data.message || 'Failed to load competitors')}</div>`;
+      return;
+    }
+
+    const search = document.getElementById('staffCompetitorSearch')?.value || '';
+    const rows = (data.competitors || []).filter((row) => staffMatchesSearch(row, search, ['company_name', 'category', 'country', 'city', 'capabilities', 'materials', 'target_market', 'strength']));
+
+    if (!rows.length) {
+      list.innerHTML = '<div class="empty-state">No competitor records found for this view.</div>';
+      return;
+    }
+
+    list.innerHTML = rows.map((company) => `
+      <article class="mobile-card announcement-card">
+        <div class="section-head">
+          <div>
+            <h3>${escapeHtml(company.company_name || '-')}</h3>
+            <p>${escapeHtml(company.category || '-')} | ${escapeHtml(company.city || '-')} ${escapeHtml(company.country || '')}</p>
+          </div>
+          <span class="badge">${escapeHtml(company.source_type || 'tracked')}</span>
+        </div>
+        <p><strong>Capabilities:</strong> ${escapeHtml(company.capabilities || '-')}</p>
+        <p><strong>Materials:</strong> ${escapeHtml(company.materials || '-')}</p>
+        <p><strong>Market:</strong> ${escapeHtml(company.target_market || '-')}</p>
+        <p><strong>Strength:</strong> ${escapeHtml(company.strength || '-')}</p>
+        ${company.website ? `<a class="secondary-btn inline-action" href="${escapeHtml(company.website)}" target="_blank" rel="noopener">Website</a>` : ''}
+      </article>
+    `).join('');
+  } catch {
+    list.innerHTML = '<div class="empty-state">Failed to load competitors</div>';
+  }
 }
 
 function staffExpenseStatusBadge(status) {
@@ -1079,9 +1535,17 @@ function setupStaffNavigation() {
 
       document.getElementById(target)?.classList.remove('hidden-section');
 
+      if (target === 'staffRfqSection') loadStaffRfqs();
+      if (target === 'staffInvoiceSection') loadStaffInvoices();
+      if (target === 'staffCustomerSection') loadStaffCustomers();
+      if (target === 'staffSupplierSection') loadStaffSuppliers();
       if (target === 'stockInSection') loadStaffStock();
       if (target === 'stockOutSection') loadStaffStockOut();
+      if (target === 'rawMaterialSection') loadStaffMaterials('raw_material');
+      if (target === 'packagingSection') loadStaffMaterials('packaging');
       if (target === 'staffExpenseSection') loadStaffExpenses(1);
+      if (target === 'staffComplianceSection') loadStaffCompliance();
+      if (target === 'staffCompetitorSection') loadStaffCompetitors();
       if (target === 'meetingsSection') loadMyMeetings();
       if (target === 'rosterSection') loadMyRoster();
       toggleMobileMenu(false);
@@ -1093,13 +1557,53 @@ function goStaffSection(sectionId) {
   document.querySelector(`[data-section="${sectionId}"]`)?.click();
 }
 
+async function refreshGrantedStaffData() {
+  const jobs = [];
+  if (hasPermission('rfqs')) jobs.push(loadStaffRfqs());
+  if (hasPermission('invoices')) jobs.push(loadStaffInvoices());
+  if (hasPermission('customers')) jobs.push(loadStaffCustomers());
+  if (hasPermission('suppliers')) jobs.push(loadStaffSuppliers());
+  if (hasPermission('stock_in')) jobs.push(loadStaffStock());
+  if (hasPermission('stock_out')) jobs.push(loadStaffStockOut());
+  if (hasPermission('raw_material')) jobs.push(loadStaffMaterials('raw_material'));
+  if (hasPermission('packaging')) jobs.push(loadStaffMaterials('packaging'));
+  if (hasPermission('expenses')) jobs.push(loadStaffExpenses(staffExpensePage));
+  if (hasPermission('compliance')) jobs.push(loadStaffCompliance());
+  if (hasPermission('competitors')) jobs.push(loadStaffCompetitors());
+  if (hasPermission('meetings')) jobs.push(loadMyMeetings());
+  if (hasPermission('roster')) jobs.push(loadMyRoster());
+  await Promise.allSettled(jobs);
+}
+
+async function refreshVisibleStaffSection() {
+  const visible = Array.from(document.querySelectorAll('.page-section'))
+    .find((section) => !section.classList.contains('hidden-section'));
+  const id = visible?.id;
+
+  if (id === 'staffRfqSection') return loadStaffRfqs();
+  if (id === 'staffInvoiceSection') return loadStaffInvoices();
+  if (id === 'staffCustomerSection') return loadStaffCustomers();
+  if (id === 'staffSupplierSection') return loadStaffSuppliers();
+  if (id === 'rawMaterialSection') return loadStaffMaterials('raw_material');
+  if (id === 'packagingSection') return loadStaffMaterials('packaging');
+  if (id === 'staffComplianceSection') return loadStaffCompliance();
+  if (id === 'staffCompetitorSection') return loadStaffCompetitors();
+  if (id === 'stockInSection') return loadStaffStock();
+  if (id === 'stockOutSection') return loadStaffStockOut();
+  if (id === 'staffExpenseSection') return loadStaffExpenses(staffExpensePage);
+  return Promise.resolve();
+}
+
 function openStaffViewFromUrl() {
   const view = new URLSearchParams(window.location.search).get('view');
   if (!view) return;
   const sections = {
-    stock: 'stockInSection', 'raw-material': 'stockInSection', packaging: 'stockInSection',
+    rfqs: 'staffRfqSection', invoices: 'staffInvoiceSection', customers: 'staffCustomerSection',
+    suppliers: 'staffSupplierSection', stock: 'stockInSection', 'stock-in': 'stockInSection',
+    'stock-out': 'stockOutSection', 'raw-material': 'rawMaterialSection', packaging: 'packagingSection',
     expenses: 'staffExpenseSection', workforce: 'timesheetSection', timesheets: 'timesheetSection',
     roster: 'rosterSection', meetings: 'meetingsSection', tasks: 'tasksSection',
+    compliance: 'staffComplianceSection', competitors: 'staffCompetitorSection',
     forms: 'formsSection', settings: 'profileSection'
   };
   if (sections[view]) window.setTimeout(() => goStaffSection(sections[view]), 0);
@@ -1380,6 +1884,8 @@ async function loadStaffStock() {
 
   const tbody = document.getElementById('staffStockTableBody');
   if (!tbody) return;
+  const canEditStockIn = canInput('stock_in');
+  const canIssueStock = canInput('stock_out');
 
   const search = document.getElementById('staffStockSearch')?.value.trim() || '';
   const res = await fetch(`/api/stock?search=${encodeURIComponent(search)}`, {
@@ -1425,14 +1931,20 @@ async function loadStaffStock() {
         <span>Updated: ${escapeHtml(item.updated_by_name || '-')}</span>
       </td>
       <td>
-        <button class="icon-btn" onclick="openStaffStockDialog(${item.id})">Edit</button>
-        <button class="icon-btn" onclick="openStaffStockOutDialog(${item.id})">Out</button>
+        ${canEditStockIn ? `<button class="icon-btn" onclick="openStaffStockDialog(${item.id})">Edit</button>` : ''}
+        ${canIssueStock ? `<button class="icon-btn" onclick="openStaffStockOutDialog(${item.id})">Out</button>` : ''}
+        ${!canEditStockIn && !canIssueStock ? '<span class="muted-text">View only</span>' : ''}
       </td>
     </tr>
   `).join('');
 }
 
 function openStaffStockDialog(stockId = null) {
+  if (!canInput('stock_in')) {
+    showToast("You don't have access to add or edit stock in. Please contact admin.");
+    return;
+  }
+
   const item = staffStockCache.find((row) => Number(row.id) === Number(stockId)) || {};
 
   showStaffDialog(
@@ -1504,6 +2016,7 @@ async function loadStaffStockOut() {
 
   const tbody = document.getElementById('staffStockOutTableBody');
   if (!tbody) return;
+  const canEditStockOut = canInput('stock_out');
 
   const res = await fetch('/api/stock/movements', {
     headers: { Authorization: `Bearer ${token}` }
@@ -1538,14 +2051,20 @@ async function loadStaffStockOut() {
       <td>${escapeHtml(item.notes || '-')}</td>
       <td>${escapeHtml(item.created_by_name || '-')}</td>
       <td>
-        <button class="icon-btn" onclick="openStaffStockOutById(${item.id})">Edit</button>
-        <button class="icon-btn danger-icon" onclick="deleteStaffStockOut(${item.id})">Delete</button>
+        ${canEditStockOut ? `<button class="icon-btn" onclick="openStaffStockOutById(${item.id})">Edit</button>` : ''}
+        ${canEditStockOut ? `<button class="icon-btn danger-icon" onclick="deleteStaffStockOut(${item.id})">Delete</button>` : ''}
+        ${!canEditStockOut ? '<span class="muted-text">View only</span>' : ''}
       </td>
     </tr>
   `).join('');
 }
 
 function openStaffStockOutDialog(stockId = null, movement = null) {
+  if (!canInput('stock_out')) {
+    showToast("You don't have access to issue or edit stock out. Please contact admin.");
+    return;
+  }
+
   if (!staffStockCache.length) {
     showToast('Add stock before issuing it');
     return;
@@ -1628,6 +2147,11 @@ function updateStaffOutPreview() {
 }
 
 function openStaffStockOutById(id) {
+  if (!canInput('stock_out')) {
+    showToast("You don't have access to edit stock out. Please contact admin.");
+    return;
+  }
+
   const movement = staffStockOutCache.find((row) => Number(row.id) === Number(id));
   if (!movement) {
     showToast('Stock out entry not found');
@@ -1637,6 +2161,11 @@ function openStaffStockOutById(id) {
 }
 
 async function deleteStaffStockOut(id) {
+  if (!canInput('stock_out')) {
+    showToast("You don't have access to delete stock out entries. Please contact admin.");
+    return;
+  }
+
   if (!confirm('Delete this stock out entry and restore quantity?')) return;
 
   const res = await fetch('/api/stock/movement/delete', {
@@ -2076,19 +2605,7 @@ function startAutoRefresh() {
     await loadAttendanceStatus();
     await loadTimesheet();
     await loadStaffFinanceOverview();
-    if (hasPermission('expenses')) {
-      await loadStaffExpenses(1);
-    }
-    if (hasPermission('stock')) {
-      await loadStaffStock();
-      await loadStaffStockOut();
-    }
-    if (hasPermission('meetings')) {
-      await loadMyMeetings();
-    }
-    if (hasPermission('roster')) {
-      await loadMyRoster();
-    }
+    await refreshVisibleStaffSection();
   }, 10000);
 }
 
@@ -2373,16 +2890,7 @@ async function bootStaffDashboard() {
       hasPermission('expenses') ? loadStaffExpenses(1) : Promise.resolve()
     ]);
 
-    if (hasPermission('stock')) {
-      await loadStaffStock();
-      await loadStaffStockOut();
-    }
-    if (hasPermission('meetings')) {
-      await loadMyMeetings();
-    }
-    if (hasPermission('roster')) {
-      await loadMyRoster();
-    }
+    await refreshGrantedStaffData();
 
     startAutoRefresh();
   } catch (err) {

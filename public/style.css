@@ -2456,15 +2456,87 @@ tr:hover td {
 .access-check {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   padding: 10px;
   border: 1px solid rgba(45, 212, 191, 0.22);
   border-radius: 10px;
   background: rgba(2, 6, 23, 0.45);
+  cursor: pointer;
+  min-width: 0;
+  transition: border-color 0.18s ease, background 0.18s ease, transform 0.18s ease;
 }
 
-.access-check input {
-  width: auto;
+.access-check:hover,
+.access-toggle-row:hover {
+  border-color: rgba(56, 212, 231, 0.48);
+  background: rgba(8, 20, 38, 0.72);
+}
+
+.access-switch-card .access-switch-copy {
+  color: #e5f7ff;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.access-switch-control {
+  position: relative;
+  display: inline-flex;
+  width: 54px;
+  height: 30px;
+  flex: 0 0 54px;
+  align-items: center;
+}
+
+.access-switch-input {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.access-switch-ui {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.86));
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04), inset 0 2px 8px rgba(0, 0, 0, 0.34);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+.access-switch-ui > span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #cbd5e1, #f8fafc);
+  box-shadow: 0 5px 12px rgba(0, 0, 0, 0.34);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.access-switch-input:checked + .access-switch-ui {
+  border-color: rgba(34, 211, 238, 0.82);
+  background: linear-gradient(135deg, #20d6c6, #38bdf8);
+  box-shadow: 0 0 0 1px rgba(56, 212, 231, 0.22), 0 0 22px rgba(34, 211, 238, 0.24);
+}
+
+.access-switch-input:checked + .access-switch-ui > span {
+  transform: translateX(24px);
+  background: linear-gradient(135deg, #02111f, #0f172a);
+}
+
+.access-switch-input:focus-visible + .access-switch-ui {
+  outline: 3px solid rgba(96, 165, 250, 0.36);
+  outline-offset: 3px;
 }
 
 .stock-dialog-grid {
@@ -4878,6 +4950,21 @@ body.staff-dialog-open .mobile-menu-btn {
 
 .access-toggle-row strong {
   color: #e0f2fe;
+}
+
+.access-toggle-row .access-switch-control {
+  display: inline-flex;
+  width: 54px;
+  height: 30px;
+  flex: 0 0 54px;
+}
+
+.access-toggle-row .access-switch-ui {
+  display: block;
+}
+
+.access-toggle-row .access-switch-ui > span {
+  display: block;
 }
 
 .shift-scan-panel {

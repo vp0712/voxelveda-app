@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-<link rel="stylesheet" href="/style.css?v=20260730-sidebar-fixed" />
+<link rel="stylesheet" href="/style.css?v=20260805-staff-access" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -49,6 +49,18 @@
 
       <button class="nav-btn active" data-section="dashboardSection">Home</button>
       <button class="nav-btn" data-section="profileSection">Profile</button>
+      <details class="nav-group permission-sales hidden-section" open>
+        <summary class="nav-group-toggle">
+          <span>Sales</span>
+          <span class="nav-group-caret">v</span>
+        </summary>
+        <div class="nav-submenu">
+          <button class="nav-btn nav-sub-btn permission-rfqs hidden-section" data-section="staffRfqSection">RFQs</button>
+          <button class="nav-btn nav-sub-btn permission-invoices hidden-section" data-section="staffInvoiceSection">Invoices</button>
+          <button class="nav-btn nav-sub-btn permission-customers hidden-section" data-section="staffCustomerSection">Customers</button>
+          <button class="nav-btn nav-sub-btn permission-suppliers hidden-section" data-section="staffSupplierSection">Suppliers</button>
+        </div>
+      </details>
       <details class="nav-group permission-tasks hidden-section" open>
         <summary class="nav-group-toggle">
           <span>Task Control</span>
@@ -66,9 +78,11 @@
         <div class="nav-submenu">
           <button class="nav-btn nav-sub-btn permission-stock permission-stock-in hidden-section" data-section="stockInSection">Stock In</button>
           <button class="nav-btn nav-sub-btn permission-stock permission-stock-out hidden-section" data-section="stockOutSection">Stock Out</button>
+          <button class="nav-btn nav-sub-btn permission-stock permission-raw-material hidden-section" data-section="rawMaterialSection">Raw Material</button>
+          <button class="nav-btn nav-sub-btn permission-stock permission-packaging hidden-section" data-section="packagingSection">Packaging</button>
         </div>
       </details>
-      <details class="nav-group permission-attendance permission-roster hidden-section" open>
+      <details class="nav-group permission-workforce hidden-section" open>
         <summary class="nav-group-toggle">
           <span>Workforce</span>
           <span class="nav-group-caret">v</span>
@@ -101,6 +115,8 @@
         </div>
       </details>
       <button class="nav-btn permission-meetings hidden-section" data-section="meetingsSection">Meetings & Inspections</button>
+      <button class="nav-btn permission-compliance hidden-section" data-section="staffComplianceSection">Compliance & Licences</button>
+      <button class="nav-btn permission-competitors hidden-section" data-section="staffCompetitorSection">Competitors & Industry</button>
 
       <button class="logout-btn" onclick="logout()">Logout</button>
     </aside>
@@ -269,8 +285,16 @@
             <button type="button" class="vv-suite-card permission-forms hidden-section" onclick="goStaffSection('formsSection')"><span>Forms</span><strong>Checklists</strong><small>Quality, safety and daily records.</small></button>
             <button type="button" class="vv-suite-card permission-documents hidden-section" onclick="goStaffSection('documentsSection')"><span>Knowledge</span><strong>Documents</strong><small>Policies, SOPs and company files.</small></button>
             <button type="button" class="vv-suite-card permission-messages hidden-section" onclick="goStaffSection('messagesSection')"><span>Messages</span><strong>Contact admin</strong><small>Operational notes and help requests.</small></button>
+            <button type="button" class="vv-suite-card permission-rfqs hidden-section" onclick="goStaffSection('staffRfqSection')"><span>Sales</span><strong>RFQ register</strong><small>Live customer quote requests and status.</small></button>
+            <button type="button" class="vv-suite-card permission-invoices hidden-section" onclick="goStaffSection('staffInvoiceSection')"><span>Accounts</span><strong>Invoices</strong><small>Invoice value, paid and balance records.</small></button>
+            <button type="button" class="vv-suite-card permission-customers hidden-section" onclick="goStaffSection('staffCustomerSection')"><span>CRM</span><strong>Customers</strong><small>Customer contact and order history.</small></button>
+            <button type="button" class="vv-suite-card permission-suppliers hidden-section" onclick="goStaffSection('staffSupplierSection')"><span>Supply</span><strong>Suppliers</strong><small>Supplier contacts, files and commercial notes.</small></button>
             <button type="button" class="vv-suite-card permission-expenses hidden-section" onclick="goStaffSection('staffExpenseSection')"><span>Finance</span><strong>Expenses</strong><small>View expense records assigned to your account.</small></button>
+            <button type="button" class="vv-suite-card permission-raw-material hidden-section" onclick="goStaffSection('rawMaterialSection')"><span>Materials</span><strong>Raw material</strong><small>Material quantity, worth and traceability.</small></button>
+            <button type="button" class="vv-suite-card permission-packaging hidden-section" onclick="goStaffSection('packagingSection')"><span>Materials</span><strong>Packaging</strong><small>Packaging stock, supplier and process records.</small></button>
             <button type="button" class="vv-suite-card permission-meetings hidden-section" onclick="goStaffSection('meetingsSection')"><span>Events</span><strong>Meetings</strong><small>Inspections, conference and visit schedule.</small></button>
+            <button type="button" class="vv-suite-card permission-compliance hidden-section" onclick="goStaffSection('staffComplianceSection')"><span>Governance</span><strong>Compliance</strong><small>Licences, process sheets and review dates.</small></button>
+            <button type="button" class="vv-suite-card permission-competitors hidden-section" onclick="goStaffSection('staffCompetitorSection')"><span>Market</span><strong>Competitors</strong><small>Industry companies and capability tracking.</small></button>
           </div>
         </div>
         <div id="staffActionHub" class="staff-action-hub">
@@ -470,7 +494,7 @@
             <h2>Stock In</h2>
             <p>Engineering parts received into inventory</p>
           </div>
-          <button class="primary-btn" onclick="openStaffStockDialog()">Add Stock</button>
+          <button class="primary-btn permission-stock-in-input hidden-section" onclick="openStaffStockDialog()">Add Stock</button>
         </div>
 
         <div class="metric-grid stock-metrics">
@@ -522,7 +546,7 @@
             <h2>Stock Out</h2>
             <p>Sold, issued, or allocated inventory with automatic batch deduction</p>
           </div>
-          <button class="primary-btn" onclick="openStaffStockOutDialog()">Minus Stock</button>
+          <button class="primary-btn permission-stock-out-input hidden-section" onclick="openStaffStockOutDialog()">Minus Stock</button>
         </div>
 
         <div class="card table-wrap stock-table-card">
@@ -613,6 +637,273 @@
               <button class="secondary-btn" type="button" onclick="changeStaffExpensePage(1)">Next</button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- RFQS -->
+      <section id="staffRfqSection" class="page-section hidden-section permission-rfqs">
+        <div class="section-head">
+          <div>
+            <h2>RFQs</h2>
+            <p>Customer quote requests visible to authorised staff.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffRfqs()">Refresh</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card kpi-teal"><h3>Total RFQs</h3><p><strong id="staffRfqTotal">0</strong></p><span>Visible register</span></div>
+          <div class="card kpi-blue"><h3>Pending</h3><p><strong id="staffRfqPending">0</strong></p><span>Waiting for action</span></div>
+          <div class="card kpi-green"><h3>Approved / Quoted</h3><p><strong id="staffRfqApproved">0</strong></p><span>Ready for invoice flow</span></div>
+        </div>
+
+        <div class="card staff-expense-control">
+          <div class="form-grid">
+            <input id="staffRfqSearch" placeholder="Search RFQ, customer, email, material or status" oninput="loadStaffRfqs()" />
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Customer</th>
+                <th>Contact</th>
+                <th>Material / Application</th>
+                <th>Qty</th>
+                <th>Status</th>
+                <th class="permission-rfqs-input hidden-section">Action</th>
+              </tr>
+            </thead>
+            <tbody id="staffRfqTableBody">
+              <tr><td colspan="7">Loading RFQs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- INVOICES -->
+      <section id="staffInvoiceSection" class="page-section hidden-section permission-invoices">
+        <div class="section-head">
+          <div>
+            <h2>Invoices</h2>
+            <p>Invoice register, paid value and debt balance.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffInvoices()">Refresh</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card kpi-teal"><h3>Total Invoice Value</h3><p><strong id="staffInvoiceTotal">$0.00</strong></p><span>All visible invoices</span></div>
+          <div class="card kpi-blue"><h3>Collected / Paid</h3><p><strong id="staffInvoicePaid">$0.00</strong></p><span>Recorded payments</span></div>
+          <div class="card kpi-green"><h3>Debt / Balance Left</h3><p><strong id="staffInvoiceDebt">$0.00</strong></p><span>Outstanding receivables</span></div>
+        </div>
+
+        <div class="card staff-expense-control">
+          <div class="form-grid">
+            <input id="staffInvoiceSearch" placeholder="Search invoice, customer, email, RFQ or status" oninput="loadStaffInvoices()" />
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Customer</th>
+                <th>RFQ</th>
+                <th>Total</th>
+                <th>Paid</th>
+                <th>Balance</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="staffInvoiceTableBody">
+              <tr><td colspan="8">Loading invoices...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- CUSTOMERS -->
+      <section id="staffCustomerSection" class="page-section hidden-section permission-customers">
+        <div class="section-head">
+          <div>
+            <h2>Customers</h2>
+            <p>Customer contacts, order counts and recorded value.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffCustomers()">Refresh</button>
+        </div>
+
+        <div class="card staff-expense-control">
+          <div class="form-grid">
+            <input id="staffCustomerSearch" placeholder="Search customer, contact, email, phone or notes" oninput="loadStaffCustomers()" />
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Company</th>
+                <th>Contact</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Orders</th>
+                <th>Total Spend</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="staffCustomerTableBody">
+              <tr><td colspan="7">Loading customers...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- SUPPLIERS -->
+      <section id="staffSupplierSection" class="page-section hidden-section permission-suppliers">
+        <div class="section-head">
+          <div>
+            <h2>Suppliers</h2>
+            <p>Supplier contacts, commercial notes and uploaded file count.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffSuppliers()">Refresh</button>
+        </div>
+
+        <div class="card staff-expense-control">
+          <div class="form-grid">
+            <input id="staffSupplierSearch" placeholder="Search supplier, contact, category, phone or email" oninput="loadStaffSuppliers()" />
+          </div>
+        </div>
+
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Supplier</th>
+                <th>Contact</th>
+                <th>Category</th>
+                <th>Terms</th>
+                <th>ABN / ID</th>
+                <th>Files</th>
+                <th>Notes</th>
+              </tr>
+            </thead>
+            <tbody id="staffSupplierTableBody">
+              <tr><td colspan="7">Loading suppliers...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- RAW MATERIAL -->
+      <section id="rawMaterialSection" class="page-section hidden-section permission-stock permission-raw-material">
+        <div class="section-head">
+          <div>
+            <h2>Raw Material</h2>
+            <p>Raw material stock, current worth and process sheet release status.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffMaterials('raw_material')">Refresh</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card kpi-teal"><h3>Material Value</h3><p><strong id="staffRawMaterialValue">$0.00</strong></p><span>Current worth left</span></div>
+          <div class="card kpi-blue"><h3>Quantity Left</h3><p><strong id="staffRawMaterialQty">0</strong></p><span>Total current units</span></div>
+          <div class="card kpi-green"><h3>Low Stock</h3><p><strong id="staffRawMaterialLow">0</strong></p><span>At or below reorder level</span></div>
+        </div>
+
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Supplier</th>
+                <th>Reference</th>
+                <th>Qty Left</th>
+                <th>Unit Price</th>
+                <th>Worth</th>
+                <th>Quality</th>
+                <th>Created / Updated</th>
+              </tr>
+            </thead>
+            <tbody id="staffRawMaterialTableBody">
+              <tr><td colspan="8">Loading raw material...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- PACKAGING -->
+      <section id="packagingSection" class="page-section hidden-section permission-stock permission-packaging">
+        <div class="section-head">
+          <div>
+            <h2>Packaging</h2>
+            <p>Packaging inventory, supplier records and quality release data.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffMaterials('packaging')">Refresh</button>
+        </div>
+
+        <div class="metric-grid">
+          <div class="card kpi-teal"><h3>Packaging Value</h3><p><strong id="staffPackagingValue">$0.00</strong></p><span>Current worth left</span></div>
+          <div class="card kpi-blue"><h3>Quantity Left</h3><p><strong id="staffPackagingQty">0</strong></p><span>Total current units</span></div>
+          <div class="card kpi-green"><h3>Low Stock</h3><p><strong id="staffPackagingLow">0</strong></p><span>At or below reorder level</span></div>
+        </div>
+
+        <div class="card table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Supplier</th>
+                <th>Reference</th>
+                <th>Qty Left</th>
+                <th>Unit Price</th>
+                <th>Worth</th>
+                <th>Quality</th>
+                <th>Created / Updated</th>
+              </tr>
+            </thead>
+            <tbody id="staffPackagingTableBody">
+              <tr><td colspan="8">Loading packaging...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- COMPLIANCE -->
+      <section id="staffComplianceSection" class="page-section hidden-section permission-compliance">
+        <div class="section-head">
+          <div>
+            <h2>Compliance & Licences</h2>
+            <p>Company forms, licence reminders and process sheet requirements.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffCompliance()">Refresh</button>
+        </div>
+
+        <div id="staffComplianceList" class="card-list">
+          <div class="empty-state">Loading compliance register...</div>
+        </div>
+      </section>
+
+      <!-- COMPETITORS -->
+      <section id="staffCompetitorSection" class="page-section hidden-section permission-competitors">
+        <div class="section-head">
+          <div>
+            <h2>Competitors & Industry</h2>
+            <p>Industry companies, location, capabilities and market notes.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffCompetitors()">Refresh</button>
+        </div>
+
+        <div class="card staff-expense-control">
+          <div class="form-grid">
+            <input id="staffCompetitorSearch" placeholder="Search company, country, capability, material or category" oninput="loadStaffCompetitors()" />
+          </div>
+        </div>
+
+        <div id="staffCompetitorList" class="card-list">
+          <div class="empty-state">Loading competitors...</div>
         </div>
       </section>
 
@@ -826,6 +1117,6 @@
   </div>
 
   <script src="/qr-widget.js?v=20260608-local-qr"></script>
-  <script src="/staff.js?v=20260730-expense-access"></script>
+  <script src="/staff.js?v=20260805-staff-access"></script>
 </body>
 </html>

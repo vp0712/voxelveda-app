@@ -1771,6 +1771,22 @@ function parseAccess(value) {
   }
 }
 
+function accessSwitchInput(accessId, inputId, checked = false, label = '') {
+  return `
+    <span class="access-switch-control">
+      <input
+        class="access-switch-input"
+        type="checkbox"
+        data-access="${accessId}"
+        id="${inputId}"
+        ${label ? `aria-label="${escapeHtml(label)}"` : ''}
+        ${checked ? 'checked' : ''}
+      >
+      <span class="access-switch-ui" aria-hidden="true"><span></span></span>
+    </span>
+  `;
+}
+
 function accessCheckboxes(selected = [], prefix = 'access') {
   const enabled = new Set(selected);
   const visibleOptions = ACCESS_OPTIONS.filter((item) => item.id !== 'attendance_qr_bypass');
@@ -1778,9 +1794,9 @@ function accessCheckboxes(selected = [], prefix = 'access') {
   return `
     <div class="access-grid">
       ${visibleOptions.map((item) => `
-        <label class="access-check">
-          <input type="checkbox" data-access="${item.id}" id="${prefix}_${item.id}" ${enabled.has(item.id) ? 'checked' : ''}>
-          <span>${item.label}</span>
+        <label class="access-check access-switch-card">
+          <span class="access-switch-copy">${escapeHtml(item.label)}</span>
+          ${accessSwitchInput(item.id, `${prefix}_${item.id}`, enabled.has(item.id), item.label)}
         </label>
       `).join('')}
     </div>
@@ -1810,12 +1826,14 @@ function collectAccess() {
     .map((input) => input.dataset.access)
       .filter(Boolean)
   );
+  const explicitlySelectedStock = selected.has('stock');
 
   const inputParents = {
     rfqs_input: ['rfqs'],
     invoices_input: ['invoices'],
     customers_input: ['customers'],
     suppliers_input: ['suppliers'],
+    expenses_input: ['expenses'],
     compliance_input: ['compliance'],
     competitors_input: ['competitors'],
     tasks_input: ['tasks'],
@@ -1834,9 +1852,11 @@ function collectAccess() {
   });
 
   if (selected.has('stock_in') || selected.has('stock_out') || selected.has('raw_material') || selected.has('packaging')) selected.add('stock');
-  if (selected.has('stock')) {
+  if (explicitlySelectedStock) {
     selected.add('stock_in');
     selected.add('stock_out');
+    selected.add('raw_material');
+    selected.add('packaging');
   }
 
   return ACCESS_OPTIONS
@@ -5129,7 +5149,7 @@ async function openAddStaff() {
           <strong>QR bypass for shift start/end</strong>
           <small>Use only for trusted emergency or supervisor-approved accounts.</small>
         </span>
-        <input type="checkbox" data-access="attendance_qr_bypass">
+        ${accessSwitchInput('attendance_qr_bypass', 'addStaffQrBypass', false, 'QR bypass for shift start/end')}
       </label>
       <h4>Section Access</h4>
       ${accessCheckboxes(['dashboard', 'tasks', 'attendance'])}
@@ -5254,6 +5274,13 @@ async function openEditStaffDialog(userId) {
           </select>
         </label>
       </div>
+      <label class="access-toggle-row">
+        <span>
+          <strong>QR bypass for shift start/end</strong>
+          <small>Use only for trusted emergency or supervisor-approved accounts.</small>
+        </span>
+        ${accessSwitchInput('attendance_qr_bypass', 'editStaffQrBypass', parseAccess(user.permissions).includes('attendance_qr_bypass'), 'QR bypass for shift start/end')}
+      </label>
       <h4>Allowed Sections</h4>
       ${accessCheckboxes(parseAccess(user.permissions), 'editAccess')}
       <p class="status-note">System ID is fixed so existing timesheets, tasks, stock records and audit history stay connected.</p>
@@ -5328,7 +5355,7 @@ async function openAccessDialog(userId) {
           <strong>QR bypass for shift start/end</strong>
           <small>Allow this user to clock in or out without scanning the live attendance QR.</small>
         </span>
-        <input type="checkbox" data-access="attendance_qr_bypass" ${parseAccess(user.permissions).includes('attendance_qr_bypass') ? 'checked' : ''}>
+        ${accessSwitchInput('attendance_qr_bypass', 'accessQrBypass', parseAccess(user.permissions).includes('attendance_qr_bypass'), 'QR bypass for shift start/end')}
       </label>
       <h4>Allowed Sections</h4>
       ${accessCheckboxes(parseAccess(user.permissions))}
