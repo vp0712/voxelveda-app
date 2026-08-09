@@ -1024,9 +1024,13 @@
               <h2>Weekly Timesheet</h2>
               <p id="currentWeekRange">Your current week summary</p>
             </div>
-
-            <button class="primary-btn" onclick="loadTimesheet()">Refresh</button>
+            <div class="timesheet-staff-actions">
+              <span id="currentTimesheetStatus" class="timesheet-status-chip draft">Draft</span>
+              <button id="submitTimesheetBtn" class="primary-btn" type="button" onclick="submitCurrentTimesheet()">Submit Timesheet</button>
+              <button class="secondary-btn" type="button" onclick="loadTimesheet()">Refresh</button>
+            </div>
           </div>
+          <div id="currentTimesheetManagerNote" class="status-note hidden-section"></div>
 
           <div class="timesheet-insight-strip">
             <article><small>Recorded This Week</small><strong id="timesheetRecordedSignal">0.00 hrs</strong><span>Auto-calculated from clock-in/out</span></article>

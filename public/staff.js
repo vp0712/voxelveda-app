@@ -30,6 +30,7 @@ let shiftQrDecoderPromise = null;
 let activeShiftQrMode = 'in';
 let currentShiftIsOpen = false;
 let latestRosterRows = [];
+let currentWeekTimesheet = null;
 
 const clockInMessages = [
   'Today is another chance to build something precise, useful, and proudly Voxel Veda.',
@@ -2327,7 +2328,98 @@ function updateTimesheetVarianceSignals(totalHours = null) {
   setText('staffRosterVarianceSignal', rostered ? `${Math.abs(variance).toFixed(2)} hrs` : 'No roster');
   setText('timesheetVarianceSignal', rostered ? `${variance >= 0 ? '+' : '-'}${Math.abs(variance).toFixed(2)} hrs` : 'No roster');
   setText('timesheetVarianceDetail', rostered ? `${recorded.toFixed(2)} recorded vs ${rostered.toFixed(2)} rostered` : 'Roster sync will appear here');
-  setText('timesheetPayrollSignal', recorded > 0 ? 'Ready for review' : 'Open');
+  if (!currentWeekTimesheet) {
+    setText('timesheetPayrollSignal', recorded > 0 ? 'Draft' : 'Open');
+  }
+}
+
+function timesheetStatusLabel(status) {
+  const labels = {
+    DRAFT: 'Draft',
+    PENDING_APPROVAL: 'Pending Approval',
+    CORRECTION_RESUBMITTED: 'Resubmitted',
+    APPROVED: 'Approved',
+    REJECTED: 'Rejected',
+    CORRECTION_REQUIRED: 'Correction Required',
+    ARCHIVED: 'Archived'
+  };
+  return labels[String(status || 'DRAFT').toUpperCase()] || 'Draft';
+}
+
+function renderCurrentTimesheetWorkflow(timesheet, totalHours) {
+  currentWeekTimesheet = timesheet || null;
+  const status = String(timesheet?.status || 'DRAFT').toUpperCase();
+  const statusEl = document.getElementById('currentTimesheetStatus');
+  const submitButton = document.getElementById('submitTimesheetBtn');
+  const managerNote = document.getElementById('currentTimesheetManagerNote');
+  const payrollLabels = {
+    DRAFT: 'Draft',
+    PENDING_APPROVAL: 'Awaiting Approval',
+    CORRECTION_RESUBMITTED: 'Awaiting Review',
+    APPROVED: String(timesheet?.payroll_status || '').toUpperCase() === 'READY' ? 'Payroll Ready' : 'Approved',
+    REJECTED: 'Rejected',
+    CORRECTION_REQUIRED: 'Action Required',
+    ARCHIVED: 'Archived'
+  };
+
+  if (statusEl) {
+    statusEl.className = `timesheet-status-chip ${status.toLowerCase()}`;
+    statusEl.textContent = timesheetStatusLabel(status);
+  }
+
+  if (submitButton) {
+    const editable = ['DRAFT', 'CORRECTION_REQUIRED'].includes(status);
+    const canSubmit = editable && Number(totalHours || 0) > 0 && Boolean(timesheet?.id);
+    submitButton.classList.toggle('hidden-section', !editable);
+    submitButton.disabled = !canSubmit;
+    submitButton.textContent = status === 'CORRECTION_REQUIRED' ? 'Resubmit Timesheet' : 'Submit Timesheet';
+  }
+
+  setText('timesheetPayrollSignal', payrollLabels[status] || 'Open');
+
+  if (managerNote) {
+    const note = String(timesheet?.manager_comments || '').trim();
+    managerNote.classList.toggle('hidden-section', !note);
+    managerNote.innerHTML = note ? `<strong>Manager note:</strong> ${escapeHtml(note)}` : '';
+  }
+}
+
+async function submitCurrentTimesheet() {
+  const timesheet = currentWeekTimesheet;
+  if (!timesheet?.id) {
+    showToast('Current weekly timesheet is not ready yet.');
+    return;
+  }
+  const status = String(timesheet.status || 'DRAFT').toUpperCase();
+  if (!['DRAFT', 'CORRECTION_REQUIRED'].includes(status)) {
+    showToast('This timesheet has already been submitted.');
+    return;
+  }
+  if (Number(timesheet.total_hours || 0) <= 0) {
+    showToast('Record shift hours before submitting this timesheet.');
+    return;
+  }
+  if (!window.confirm(status === 'CORRECTION_REQUIRED'
+    ? 'Resubmit this corrected timesheet for manager approval?'
+    : 'Submit this weekly timesheet for manager approval?')) return;
+
+  const button = document.getElementById('submitTimesheetBtn');
+  if (button) button.disabled = true;
+  try {
+    const res = await fetch(`/api/attendance/timesheets/${Number(timesheet.id)}/submit`, {
+      method: 'POST',
+      headers: authHeaders()
+    });
+    const data = await safeJson(res);
+    showToast(data.message || (res.ok ? 'Timesheet submitted for approval.' : 'Timesheet submission failed.'));
+    if (res.ok) await loadTimesheet();
+  } catch {
+    showToast('Timesheet submission failed. Please try again.');
+  } finally {
+    if (button && ['DRAFT', 'CORRECTION_REQUIRED'].includes(String(currentWeekTimesheet?.status || '').toUpperCase())) {
+      button.disabled = false;
+    }
+  }
 }
 
 function renderMyRoster(rows) {
@@ -2530,6 +2622,7 @@ async function loadTimesheet() {
       } else {
         const rows = weekData.attendance || [];
         const totalHours = Number(weekData.total_hours || 0);
+        renderCurrentTimesheetWorkflow(weekData.timesheet, totalHours);
 
         if (currentWeekRange) {
           currentWeekRange.innerText = `This timesheet is from ${formatShortDate(weekData.week_start)} to ${formatShortDate(weekData.week_end)} of this week`;
@@ -2571,6 +2664,8 @@ async function loadTimesheet() {
       }
     }
   } catch {
+    currentWeekTimesheet = null;
+    renderCurrentTimesheetWorkflow(null, 0);
     if (tbody) {
       tbody.innerHTML = `<tr><td colspan="4">Server error loading weekly timesheet.</td></tr>`;
     }

@@ -812,23 +812,33 @@
         <div class="card table-wrap">
           <div class="section-head">
             <div>
-              <h3>Weekly Timesheets</h3>
-              <p>All staff weekly summary</p>
+              <h3>Timesheet Approval Ledger</h3>
+              <p>Pending work stays separate from approved payroll records.</p>
             </div>
+          </div>
+          <div class="timesheet-workflow-tabs" role="tablist" aria-label="Timesheet status">
+            <button type="button" class="timesheet-tab active" data-timesheet-status="PENDING_APPROVAL" onclick="setTimesheetTab('PENDING_APPROVAL')">Pending</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="APPROVED" onclick="setTimesheetTab('APPROVED')">Approved</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="CORRECTION_REQUIRED" onclick="setTimesheetTab('CORRECTION_REQUIRED')">Correction Required</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="REJECTED" onclick="setTimesheetTab('REJECTED')">Rejected</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="ALL" onclick="setTimesheetTab('ALL')">All</button>
+            <button type="button" class="timesheet-tab" data-timesheet-status="ARCHIVED" onclick="setTimesheetTab('ARCHIVED')">Archived</button>
           </div>
           <table>
             <thead>
               <tr>
                 <th>Staff</th>
-                <th>Week Start</th>
-                <th>Week End</th>
-                <th>Total Hours</th>
+                <th>Period</th>
+                <th>Submitted Hrs</th>
+                <th>Ordinary</th>
+                <th>Overtime</th>
+                <th>Approved</th>
                 <th>Status</th>
-                <th>Review</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody id="timesheetAdminBody">
-              <tr><td colspan="6">Loading...</td></tr>
+              <tr><td colspan="8">Loading...</td></tr>
             </tbody>
           </table>
         </div>

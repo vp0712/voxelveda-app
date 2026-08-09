@@ -8301,6 +8301,148 @@ textarea {
   }
 }
 
+/* Timesheet approval workflow */
+.timesheet-workflow-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  border: 1px solid rgba(91, 219, 255, 0.18);
+  border-radius: 10px;
+  background: rgba(3, 10, 20, 0.56);
+}
+
+.timesheet-tab {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.timesheet-tab:hover,
+.timesheet-tab:focus-visible {
+  border-color: rgba(91, 219, 255, 0.32);
+  color: var(--text);
+  outline: none;
+}
+
+.timesheet-tab.active {
+  border-color: rgba(54, 226, 214, 0.5);
+  background: rgba(54, 226, 214, 0.15);
+  color: #a7fff7;
+  box-shadow: inset 0 0 0 1px rgba(54, 226, 214, 0.08);
+}
+
+.timesheet-staff-actions,
+.timesheet-review-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.timesheet-detail-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.timesheet-detail-summary article {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(91, 219, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(5, 14, 27, 0.64);
+}
+
+.timesheet-detail-summary small,
+.timesheet-detail-summary strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.timesheet-detail-summary small {
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+.timesheet-status-chip.pending_approval,
+.timesheet-status-chip.correction_resubmitted {
+  border-color: rgba(75, 183, 255, 0.52);
+  background: rgba(75, 183, 255, 0.15);
+  color: #a9ddff;
+}
+
+.timesheet-status-chip.correction_required {
+  border-color: rgba(255, 189, 74, 0.55);
+  background: rgba(255, 189, 74, 0.14);
+  color: #ffd789;
+}
+
+.timesheet-status-chip.rejected {
+  border-color: rgba(255, 77, 94, 0.52);
+  background: rgba(255, 77, 94, 0.14);
+  color: #ffadb5;
+}
+
+.timesheet-status-chip.archived {
+  border-color: rgba(159, 177, 199, 0.35);
+  background: rgba(159, 177, 199, 0.1);
+  color: #cbd8e6;
+}
+
+.cell-subtext {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+button:disabled,
+.primary-btn:disabled,
+.secondary-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  filter: saturate(0.55);
+}
+
+@media (max-width: 900px) {
+  .timesheet-detail-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .timesheet-staff-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .timesheet-staff-actions button {
+    flex: 1 1 10rem;
+  }
+
+  .timesheet-detail-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .timesheet-review-actions {
+    min-width: 10rem;
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 767px) {
   :root {
     --vv-hit: 42px;
@@ -13095,5 +13237,35 @@ html.mobile-menu-open main {
     height: 48px !important;
     min-width: 48px !important;
     flex-basis: 48px !important;
+  }
+
+  body.mobile-menu-open .topbar,
+  html.mobile-menu-open .topbar,
+  body.mobile-menu-open .vv-topbar,
+  html.mobile-menu-open .vv-topbar {
+    background: transparent !important;
+    border-color: transparent !important;
+    box-shadow: none !important;
+    pointer-events: none !important;
+  }
+
+  body.mobile-menu-open .topbar > :not(.mobile-menu-btn):not(.topbar-menu-btn),
+  html.mobile-menu-open .topbar > :not(.mobile-menu-btn):not(.topbar-menu-btn),
+  body.mobile-menu-open .vv-topbar > :not(.mobile-menu-btn):not(.topbar-menu-btn),
+  html.mobile-menu-open .vv-topbar > :not(.mobile-menu-btn):not(.topbar-menu-btn) {
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+  }
+
+  body.mobile-menu-open .mobile-menu-btn,
+  html.mobile-menu-open .mobile-menu-btn,
+  body.mobile-menu-open .topbar-menu-btn,
+  html.mobile-menu-open .topbar-menu-btn {
+    position: fixed !important;
+    top: max(10px, env(safe-area-inset-top)) !important;
+    left: min(190px, calc(100vw - 54px)) !important;
+    right: auto !important;
+    pointer-events: auto !important;
   }
 }

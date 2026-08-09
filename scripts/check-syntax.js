@@ -3,9 +3,14 @@ const path = require('path');
 
 const files = [
   'app.js', 'server.js', 'config/urls.js',
-  'controllers/authController.js', 'controllers/invoiceController.js', 'controllers/materialController.js',
+  'controllers/attendanceController.js', 'controllers/authController.js', 'controllers/emailController.js',
+  'controllers/invoiceController.js', 'controllers/materialController.js', 'controllers/timesheetWorkflowController.js',
   'middleware/auth.js', 'middleware/pageAuth.js', 'middleware/securityMiddleware.js',
-  'routes/authRoutes.js', 'utils/session.js', 'utils/tokenRevocation.js',
+  'routes/attendanceRoutes.js', 'routes/authRoutes.js', 'routes/emailRoutes.js',
+  'services/auditService.js', 'services/emailQueue.js', 'services/emailService.js',
+  'services/emailTemplates.js', 'services/notificationService.js',
+  'services/timesheetWorkflowService.js', 'services/workforceSchema.js',
+  'utils/session.js', 'utils/tokenRevocation.js',
   'public/login.js', 'public/admin-dashboard.js', 'public/staff.js', 'public/qr-widget.js',
   'public/service-worker.js'
 ];

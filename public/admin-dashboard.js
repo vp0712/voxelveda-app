@@ -7111,10 +7111,22 @@ document.addEventListener('DOMContentLoaded', bootAdminDashboard);
 
 /* ================= WORKFORCE OPS SUITE 20260703 ================= */
 window.vvTimesheetCache = window.vvTimesheetCache || [];
+let activeTimesheetTab = 'PENDING_APPROVAL';
 function rosterNetHours(shift) { return Math.max(0, rosterShiftHours(shift) - (Number(shift.break_minutes || 0) / 60)); }
 function rosterShiftCost(shift) { return rosterNetHours(shift) * Number(shift.hourly_rate || 0); }
 function rosterWeekKey(value) { var date = new Date(value || todayISO()); if (Number.isNaN(date.getTime())) return 'Unscheduled'; var day = date.getDay(); date.setDate(date.getDate() - day + (day === 0 ? -6 : 1)); return date.toISOString().slice(0, 10); }
-function updateWorkforceDashboardMetrics() { var timesheets = window.vvTimesheetCache || []; var active = attendanceCache.filter(function(row) { return row.clock_in && !row.clock_out; }).length; var pending = timesheets.filter(function(row) { return String(row.status || 'open').toLowerCase() === 'open'; }).length; var payrollReady = Math.max(0, timesheets.length - pending); var overtime = attendanceCache.filter(function(row) { return Number(row.total_hours || 0) > 10; }).length; setText('clockedInCount', active); setText('pendingTimesheetCount', pending); setText('payrollReadyCount', payrollReady); setText('overtimeWarningCount', overtime); }
+function updateWorkforceDashboardMetrics() {
+  const timesheets = window.vvTimesheetCache || [];
+  const active = attendanceCache.filter((row) => row.clock_in && !row.clock_out).length;
+  const pendingStatuses = new Set(['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED']);
+  const pending = timesheets.filter((row) => pendingStatuses.has(String(row.status || '').toUpperCase())).length;
+  const payrollReady = timesheets.filter((row) => String(row.payroll_status || '').toUpperCase() === 'READY').length;
+  const overtime = timesheets.filter((row) => Number(row.overtime_hours || 0) > 0).length;
+  setText('clockedInCount', active);
+  setText('pendingTimesheetCount', pending);
+  setText('payrollReadyCount', payrollReady);
+  setText('overtimeWarningCount', overtime);
+}
 function renderRosterIntelligence(rows, summary) { summary = summary || {}; var alerts = document.getElementById('rosterComplianceAlerts'); var calendar = document.getElementById('rosterCalendarCards'); if (alerts) { var published = rows.filter(function(row) { return String(row.status || '').toLowerCase() === 'published'; }).length; var warnings = [{ label: 'Cost Signal', value: summary.budget && summary.cost > summary.budget ? 'Budget risk' : 'Controlled', tone: summary.budget && summary.cost > summary.budget ? 'danger' : 'ok' }, { label: 'Overtime', value: String(summary.overtime || 0) + ' shifts', tone: summary.overtime ? 'warn' : 'ok' }, { label: 'Published', value: published + '/' + (rows.length || 0), tone: published === rows.length && rows.length ? 'ok' : 'warn' }, { label: 'Payroll Sync', value: 'Integration setup required', tone: 'info' }]; alerts.innerHTML = warnings.map(function(item) { return '<div class="roster-signal-card ' + item.tone + '"><span>' + escapeHtml(item.label) + '</span><strong>' + escapeHtml(item.value) + '</strong></div>'; }).join(''); } if (calendar) { var weeks = new Map(); rows.forEach(function(row) { var key = rosterWeekKey(row.shift_date); var item = weeks.get(key) || { hours: 0, cost: 0, shifts: 0 }; item.hours += rosterNetHours(row); item.cost += rosterShiftCost(row); item.shifts += 1; weeks.set(key, item); }); var cards = Array.from(weeks.entries()).slice(-6).map(function(pair) { return '<div class="roster-week-card"><span>Week ' + escapeHtml(pair[0]) + '</span><strong>' + pair[1].shifts + ' shifts</strong><small>' + pair[1].hours.toFixed(2) + ' hrs | ' + formatMoney(pair[1].cost) + '</small></div>'; }).join(''); calendar.innerHTML = cards || '<div class="empty-state compact">No roster weeks yet.</div>'; } }
 function updateRosterMetrics(rows) { var today = todayISO(); var upcoming = rows.filter(function(row) { return String(row.shift_date || '') >= today; }); var staffIds = new Set(rows.map(function(row) { return Number(row.user_id); }).filter(Boolean)); var netHours = rows.reduce(function(sum, row) { return sum + rosterNetHours(row); }, 0); var cost = rows.reduce(function(sum, row) { return sum + rosterShiftCost(row); }, 0); var budget = rows.reduce(function(max, row) { return Math.max(max, Number(row.wage_budget || 0)); }, 0); var overtime = rows.filter(function(row) { return rosterNetHours(row) > 10; }).length; setText('rosterUpcomingCount', upcoming.length); setText('rosterHoursCount', netHours.toFixed(2)); setText('rosterStaffCount', staffIds.size); setText('rosterCostCount', formatMoney(cost)); setText('rosterBudgetStatus', budget && cost > budget ? 'Over budget' : (budget ? 'On track' : 'No budget')); setText('overtimeWarningCount', overtime); renderRosterIntelligence(rows, { cost: cost, budget: budget, overtime: overtime, upcoming: upcoming.length }); updateWorkforceDashboardMetrics(); }
 function populateTimesheetSendStaffSelect() { var select = document.getElementById('timesheetSendStaffSelect'); if (!select) return; select.innerHTML = '<option value="">All staff</option>' + staffCache.filter(function(user) { return String(user.role || '').toLowerCase() !== 'admin'; }).map(function(user) { return '<option value="' + user.id + '">' + escapeHtml(user.name || user.email) + ' (' + escapeHtml(user.email || '-') + ')</option>'; }).join(''); var from = document.getElementById('timesheetSendFrom'); var to = document.getElementById('timesheetSendTo'); if (from && !from.value) from.value = todayISO(-7); if (to && !to.value) to.value = todayISO(); }
@@ -7366,9 +7378,8 @@ function renderTimesheetNote(note) {
 }
 
 function reviewPendingTimesheets() {
-  const section = document.getElementById('timesheetAdminBody')?.closest('.table-wrap');
-  const pending = (window.vvTimesheetCache || []).filter((row) => String(row.status || 'open').toLowerCase() === 'open');
-  if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  setTimesheetTab('PENDING_APPROVAL');
+  const pending = (window.vvTimesheetCache || []).filter((row) => ['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(String(row.status || '').toUpperCase()));
   showToast(pending.length ? `${pending.length} pending timesheet${pending.length === 1 ? '' : 's'} ready for review` : 'No pending timesheets');
 }
 
@@ -7385,7 +7396,8 @@ function focusTimesheetRegister(message, rowClass) {
 }
 
 function reviewPayrollReadyTimesheets() {
-  const ready = (window.vvTimesheetCache || []).filter((row) => String(row.status || 'open').toLowerCase() === 'approved');
+  setTimesheetTab('APPROVED');
+  const ready = (window.vvTimesheetCache || []).filter((row) => String(row.status || '').toUpperCase() === 'APPROVED');
   focusTimesheetRegister(ready.length ? `${ready.length} payroll-ready timesheet${ready.length === 1 ? '' : 's'}` : 'No approved payroll-ready timesheets yet', '.timesheet-approved-row');
 }
 
@@ -7411,46 +7423,159 @@ async function updateTimesheetStatus(id, status) {
   }
 }
 
+function formatTimesheetStatusLabel(value) {
+  return String(value || 'DRAFT')
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, '_')
+    .split('_')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function renderTimesheetStatusChip(status) {
-  const clean = String(status || 'open').toLowerCase();
-  const label = clean === 'approved' ? 'Approved' : clean === 'rejected' ? 'Needs Review' : 'Pending';
+  const clean = String(status || 'DRAFT').toLowerCase();
+  const labels = {
+    draft: 'Draft',
+    pending_approval: 'Pending Approval',
+    correction_resubmitted: 'Resubmitted',
+    approved: 'Approved',
+    rejected: 'Rejected',
+    correction_required: 'Correction Required',
+    archived: 'Archived'
+  };
+  const label = labels[clean] || formatTimesheetStatusLabel(clean);
   return '<span class="timesheet-status-chip ' + escapeHtml(clean) + '">' + escapeHtml(label) + '</span>';
+}
+
+function timesheetMatchesActiveTab(row) {
+  const status = String(row.status || 'DRAFT').toUpperCase();
+  if (activeTimesheetTab === 'ALL') return true;
+  if (activeTimesheetTab === 'PENDING_APPROVAL') {
+    return ['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(status);
+  }
+  return status === activeTimesheetTab;
+}
+
+function setTimesheetTab(status) {
+  activeTimesheetTab = String(status || 'PENDING_APPROVAL').toUpperCase();
+  document.querySelectorAll('.timesheet-tab').forEach((button) => {
+    button.classList.toggle('active', button.dataset.timesheetStatus === activeTimesheetTab);
+  });
+  renderTimesheetRegister();
+  document.getElementById('timesheetAdminBody')?.closest('.table-wrap')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function openTimesheetDetail(id) {
+  const res = await fetch(`/api/attendance/timesheets/${Number(id)}`, { headers: authHeaders() });
+  const data = await safeJson(res);
+  if (!res.ok) return showToast(data.message || 'Unable to load timesheet detail');
+  const timesheet = data.timesheet || {};
+  const records = data.summary?.records || [];
+  const rows = records.map((row) => `
+    <tr><td>${escapeHtml(String(row.work_date || '').slice(0, 10))}</td><td>${escapeHtml(formatDateTime(row.clock_in))}</td><td>${escapeHtml(formatDateTime(row.clock_out))}</td><td>${Number(row.total_hours || 0).toFixed(2)}</td><td>${renderTimesheetNote(row.notes)}</td></tr>
+  `).join('') || '<tr><td colspan="5">No attendance records.</td></tr>';
+  showDialog('Timesheet Review', `
+    <div class="timesheet-detail-summary">
+      <article><small>Employee</small><strong>${escapeHtml(timesheet.name || timesheet.email || '-')}</strong></article>
+      <article><small>Period</small><strong>${escapeHtml(String(timesheet.week_start || '').slice(0, 10))} to ${escapeHtml(String(timesheet.week_end || '').slice(0, 10))}</strong></article>
+      <article><small>Submitted</small><strong>${Number(timesheet.total_hours || 0).toFixed(2)} hrs</strong></article>
+      <article><small>Status</small><strong>${renderTimesheetStatusChip(timesheet.status)}</strong></article>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${timesheet.manager_comments ? `<div class="status-note"><strong>Manager note:</strong> ${escapeHtml(timesheet.manager_comments)}</div>` : ''}
+  `, hideDialog, 'Close');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+}
+
+async function approveTimesheetRecord(id, approvedHours, comments = '') {
+  const res = await fetch(`/api/attendance/timesheets/${Number(id)}/approve`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ approved_hours: approvedHours, comments })
+  });
+  const data = await safeJson(res);
+  showToast(data.message || (res.ok ? 'Timesheet approved' : 'Timesheet approval failed'));
+  if (res.ok) {
+    hideDialog();
+    await loadTimesheets();
+  }
+}
+
+function openTimesheetDecision(id, action, submittedHours) {
+  const labels = {
+    approve: ['Approve Timesheet', 'Approve'],
+    correction: ['Request Correction', 'Send Request'],
+    reject: ['Reject Timesheet', 'Reject'],
+    amend: ['Amend Approved Timesheet', 'Save Amendment']
+  };
+  const [title, buttonText] = labels[action] || labels.approve;
+  const needsReason = action !== 'approve';
+  showDialog(title, `
+    <div class="form-stack">
+      ${(action === 'approve' || action === 'amend') ? `<label>Approved hours<input id="timesheetDecisionHours" type="number" min="0" max="168" step="0.01" value="${Number(submittedHours || 0).toFixed(2)}"></label>` : ''}
+      <label>${needsReason ? 'Reason / manager comments' : 'Manager comments (optional)'}<textarea id="timesheetDecisionComments" rows="4" placeholder="${needsReason ? 'Required for the audit history' : 'Optional approval note'}"></textarea></label>
+    </div>
+  `, async () => {
+    const comments = document.getElementById('timesheetDecisionComments')?.value.trim() || '';
+    const approvedHours = Number(document.getElementById('timesheetDecisionHours')?.value || submittedHours || 0);
+    if (needsReason && !comments) return showToast('A reason is required');
+    if (action === 'approve') return approveTimesheetRecord(id, approvedHours, comments);
+    const endpoint = action === 'amend' ? 'amend' : action;
+    const body = action === 'amend' ? { approved_hours: approvedHours, reason: comments } : { comments };
+    const res = await fetch(`/api/attendance/timesheets/${Number(id)}/${endpoint}`, {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify(body)
+    });
+    const data = await safeJson(res);
+    showToast(data.message || (res.ok ? 'Timesheet updated' : 'Timesheet update failed'));
+    if (res.ok) { hideDialog(); await loadTimesheets(); }
+  }, buttonText);
 }
 
 function renderTimesheetReviewActions(timesheet) {
   const id = Number(timesheet.id || 0);
-  const status = String(timesheet.status || 'open').toLowerCase();
+  const status = String(timesheet.status || 'DRAFT').toUpperCase();
   if (!id) return '-';
-  if (status === 'approved') {
-    return '<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="updateTimesheetStatus(' + id + ', \'open\')">Reopen</button></div>';
+  if (status === 'APPROVED') {
+    return `<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="openTimesheetDetail(${id})">View</button><button class="secondary-btn small" onclick="openTimesheetDecision(${id}, 'amend', ${Number(timesheet.approved_hours || 0)})">Amend</button></div>`;
   }
-  return '<div class="table-action-stack timesheet-review-actions"><button class="small-btn" onclick="updateTimesheetStatus(' + id + ', \'approved\')">Approve</button><button class="secondary-btn small" onclick="updateTimesheetStatus(' + id + ', \'rejected\')">Flag</button></div>';
+  if (['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(status)) {
+    return `<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="openTimesheetDetail(${id})">View</button><button class="small-btn" onclick="openTimesheetDecision(${id}, 'approve', ${Number(timesheet.total_hours || 0)})">Approve</button><button class="secondary-btn small" onclick="openTimesheetDecision(${id}, 'correction', ${Number(timesheet.total_hours || 0)})">Correction</button><button class="danger-btn small" onclick="openTimesheetDecision(${id}, 'reject', ${Number(timesheet.total_hours || 0)})">Reject</button></div>`;
+  }
+  return `<div class="table-action-stack timesheet-review-actions"><button class="secondary-btn small" onclick="openTimesheetDetail(${id})">View</button></div>`;
+}
+
+function renderTimesheetRegister() {
+  var tbody = document.getElementById('timesheetAdminBody');
+  if (!tbody) return;
+  const visibleRows = (window.vvTimesheetCache || []).filter(timesheetMatchesActiveTab);
+  renderRegisterPage({
+    key: `timesheets-${activeTimesheetTab.toLowerCase()}`,
+    tbody: tbody,
+    rows: visibleRows,
+    colspan: 8,
+    emptyMessage: `No ${activeTimesheetTab === 'ALL' ? '' : formatTimesheetStatusLabel(activeTimesheetTab)} timesheets.`,
+    onChange: renderTimesheetRegister,
+    rowRenderer: function(t) {
+      var status = String(t.status || 'DRAFT').toUpperCase();
+      return `<tr class="${status === 'APPROVED' ? 'timesheet-approved-row' : (['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED'].includes(status) ? 'timesheet-pending-row' : '')}"><td><strong>${escapeHtml(t.name || '-')}</strong><span class="cell-subtext">${escapeHtml(t.email || '-')}</span></td><td>${escapeHtml(String(t.week_start || '').slice(0, 10))}<span class="cell-subtext">to ${escapeHtml(String(t.week_end || '').slice(0, 10))}</span></td><td><strong>${Number(t.total_hours || 0).toFixed(2)}</strong></td><td>${Number(t.ordinary_hours || 0).toFixed(2)}</td><td>${Number(t.overtime_hours || 0).toFixed(2)}</td><td>${status === 'APPROVED' ? Number(t.approved_hours || 0).toFixed(2) : '-'}</td><td>${renderTimesheetStatusChip(status)}</td><td>${renderTimesheetReviewActions(t)}</td></tr>`;
+    }
+  });
 }
 
 async function loadTimesheets() {
-  var tbody = document.getElementById('timesheetAdminBody');
+  const tbody = document.getElementById('timesheetAdminBody');
   if (!tbody) return;
   populateTimesheetSendStaffSelect();
-  var res = await fetch('/api/attendance/timesheets', { headers: { Authorization: 'Bearer ' + token } });
-  var data = await safeJson(res);
+  tbody.innerHTML = '<tr><td colspan="8">Loading timesheets...</td></tr>';
+  const res = await fetch('/api/attendance/timesheets?status=ALL', { headers: { Authorization: 'Bearer ' + token } });
+  const data = await safeJson(res);
   if (!res.ok) {
-    tbody.innerHTML = '<tr><td colspan="6">Failed to load timesheets</td></tr>';
+    tbody.innerHTML = `<tr><td colspan="8">${escapeHtml(data.message || 'Failed to load timesheets')}</td></tr>`;
     return;
   }
   window.vvTimesheetCache = data.timesheets || [];
   updateWorkforceDashboardMetrics();
-  renderRegisterPage({
-    key: 'timesheets',
-    tbody: tbody,
-    rows: window.vvTimesheetCache,
-    colspan: 6,
-    emptyMessage: 'No weekly timesheets yet.',
-    onChange: loadTimesheets,
-    rowRenderer: function(t) {
-      var status = String(t.status || 'open').toLowerCase();
-      return '<tr class="' + (status === 'open' ? 'timesheet-pending-row' : (status === 'approved' ? 'timesheet-approved-row' : '')) + '"><td><strong>' + escapeHtml(t.name || '-') + '</strong><span class="cell-subtext">' + escapeHtml(t.email || '-') + '</span></td><td>' + escapeHtml(String(t.week_start || '').slice(0, 10)) + '</td><td>' + escapeHtml(String(t.week_end || '').slice(0, 10)) + '</td><td><strong>' + escapeHtml(Number(t.total_hours || 0).toFixed(2)) + '</strong></td><td>' + renderTimesheetStatusChip(status) + '</td><td>' + renderTimesheetReviewActions(t) + '</td></tr>';
-    }
-  });
+  renderTimesheetRegister();
 }
 
 

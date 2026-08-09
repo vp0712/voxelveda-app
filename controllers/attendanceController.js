@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { sendMail, isEmailConfigured, missingSmtpKeys } = require('../services/emailService');
+const { ensureWorkforceSchema } = require('../services/workforceSchema');
 
 const SHIFT_QR_WINDOW_SECONDS = 20;
 const SHIFT_QR_PREFIX = 'VVSHIFT';
@@ -213,6 +214,8 @@ async function ensureAttendanceTables() {
     SET work_date = DATE(clock_in)
     WHERE work_date IS NULL
   `).catch(() => {});
+
+  await ensureWorkforceSchema();
   await pool.query(`
     UPDATE staff_attendance
     SET
@@ -484,13 +487,14 @@ exports.weekAttendance = async (req, res) => {
 
     const data = await getWeekAttendance(userId, start, end);
 
-    await upsertWeeklyTimesheet(userId, start, end, data.totalHours);
+    const timesheet = await upsertWeeklyTimesheet(userId, start, end, data.totalHours);
 
     res.json({
       week_start: start,
       week_end: end,
       total_hours: data.totalHours,
-      attendance: data.rows
+      attendance: data.rows,
+      timesheet
     });
   } catch (err) {
     console.error('WEEK ATTENDANCE ERROR FULL:', err);
@@ -984,7 +988,8 @@ async function refreshWeekForDate(userId, dateValue) {
 async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
   const [existing] = await pool.query(
     `
-    SELECT id
+    SELECT id, status, total_hours, ordinary_hours, overtime_hours, approved_hours,
+      payroll_status, submitted_at, approved_at, version_no, manager_comments
     FROM weekly_timesheets
     WHERE user_id = ?
     AND week_start = ?
@@ -995,25 +1000,61 @@ async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
   );
 
   if (existing.length) {
-    await pool.query(
-      `
-      UPDATE weekly_timesheets
-      SET total_hours = ?
-      WHERE id = ?
-      `,
-      [totalHours, existing[0].id]
-    );
-    return;
+    const record = existing[0];
+    const status = String(record.status || 'DRAFT').trim().toUpperCase();
+    if (['DRAFT', 'CORRECTION_REQUIRED'].includes(status)) {
+      const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
+      await pool.query(
+        `
+        UPDATE weekly_timesheets
+        SET total_hours = ?, ordinary_hours = ?, overtime_hours = ?
+        WHERE id = ?
+        `,
+        [
+          totalHours,
+          Math.min(Number(totalHours || 0), standardHours),
+          Math.max(0, Number(totalHours || 0) - standardHours),
+          record.id
+        ]
+      );
+      record.total_hours = totalHours;
+      record.ordinary_hours = Math.min(Number(totalHours || 0), standardHours);
+      record.overtime_hours = Math.max(0, Number(totalHours || 0) - standardHours);
+    }
+    record.status = status;
+    return record;
   }
 
-  await pool.query(
+  const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
+  const [result] = await pool.query(
     `
     INSERT INTO weekly_timesheets
-    (user_id, week_start, week_end, total_hours, status)
-    VALUES (?, ?, ?, ?, ?)
+    (user_id, week_start, week_end, total_hours, ordinary_hours, overtime_hours, status)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
     `,
-    [userId, weekStart, weekEnd, totalHours, 'open']
+    [
+      userId,
+      weekStart,
+      weekEnd,
+      totalHours,
+      Math.min(Number(totalHours || 0), standardHours),
+      Math.max(0, Number(totalHours || 0) - standardHours),
+      'DRAFT'
+    ]
   );
+  return {
+    id: result.insertId,
+    user_id: userId,
+    week_start: weekStart,
+    week_end: weekEnd,
+    total_hours: totalHours,
+    ordinary_hours: Math.min(Number(totalHours || 0), standardHours),
+    overtime_hours: Math.max(0, Number(totalHours || 0) - standardHours),
+    approved_hours: 0,
+    status: 'DRAFT',
+    payroll_status: 'NOT_READY',
+    version_no: 0
+  };
 }
 
 exports.sendTimesheetSummary = async (req, res) => {
