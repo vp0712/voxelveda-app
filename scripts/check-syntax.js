@@ -9,7 +9,8 @@ const files = [
   'routes/attendanceRoutes.js', 'routes/authRoutes.js', 'routes/emailRoutes.js',
   'services/auditService.js', 'services/emailQueue.js', 'services/emailService.js',
   'services/emailTemplates.js', 'services/notificationService.js',
-  'services/timesheetWorkflowService.js', 'services/workforceSchema.js',
+  'services/timesheetWorkflowService.js', 'services/userLifecycleService.js',
+  'services/weeklyTimesheetScheduler.js', 'services/workforceSchema.js',
   'utils/session.js', 'utils/tokenRevocation.js',
   'public/login.js', 'public/admin-dashboard.js', 'public/staff.js', 'public/qr-widget.js',
   'public/service-worker.js'

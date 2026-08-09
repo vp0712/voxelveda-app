@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getRequestToken } = require('../utils/session');
 const { isRevoked } = require('../utils/tokenRevocation');
+const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -37,8 +38,13 @@ module.exports = async (req, res, next) => {
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    await ensureUserLifecycleSchema();
+
     const [[freshUser]] = await pool.query(
-      'SELECT id, email, username, role, permissions, active FROM users WHERE id = ? LIMIT 1',
+      `SELECT id, email, username, role, permissions, active
+       FROM users
+       WHERE id = ? AND deleted_at IS NULL
+       LIMIT 1`,
       [decoded.id]
     );
 

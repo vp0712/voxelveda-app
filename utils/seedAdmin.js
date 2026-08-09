@@ -11,6 +11,9 @@ async function seedAdmin() {
     await pool.query(`ALTER TABLE users ADD COLUMN active TINYINT(1) NOT NULL DEFAULT 1`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN password_reset_required TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN last_password_reset_at DATETIME NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN deleted_at DATETIME NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN deleted_by INT NULL`).catch(() => {});
+    await pool.query(`ALTER TABLE users ADD COLUMN deletion_reason VARCHAR(255) NULL`).catch(() => {});
 
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@test.com';
     const adminPassword = process.env.ADMIN_PASSWORD || '123456';

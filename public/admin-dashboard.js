@@ -4741,9 +4741,12 @@ async function loadStaff() {
           <td>${escapeHtml(String(u.role).toLowerCase() === 'admin' ? 'All sections' : accessLabels(parseAccess(u.permissions)).join(', ') || 'No extra access')}</td>
           <td>${statusBadge(u.active ? 'active' : 'disabled')}</td>
           <td>
-            <button class="small-btn" onclick="openEditStaffDialog(${u.id})">Edit</button>
-            <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
-            <button class="secondary-btn" onclick="openPasswordResetDialog(${u.id})">Reset Password</button>
+            <div class="staff-account-actions">
+              <button class="small-btn" onclick="openEditStaffDialog(${u.id})">Edit</button>
+              <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
+              <button class="secondary-btn" onclick="openPasswordResetDialog(${u.id})">Reset Password</button>
+              ${Number(u.id) === Number(currentUser.id) ? '' : `<button class="danger-btn" onclick="openDeleteStaffDialog(${u.id})">Delete Account</button>`}
+            </div>
           </td>
         </tr>
       `
@@ -5424,6 +5427,57 @@ async function openPasswordResetDialog(userId) {
     },
     'Reset Password'
   );
+}
+
+function openDeleteStaffDialog(userId) {
+  const user = staffCache.find((item) => Number(item.id) === Number(userId));
+  if (!user) {
+    showToast('User not found');
+    return;
+  }
+
+  showDialog(
+    `Delete Account: ${user.name || user.email}`,
+    `
+      <div class="account-delete-warning">
+        <strong>This permanently removes login access.</strong>
+        <p>The account will disappear from Staff Management. Existing timesheets, approvals, stock records and audit history will remain linked to an anonymous system ID.</p>
+      </div>
+      <label class="form-field">
+        <span>Reason (optional)</span>
+        <textarea id="deleteStaffReason" rows="3" placeholder="Employment ended, duplicate account, account created in error"></textarea>
+      </label>
+      <label class="form-field">
+        <span>Type DELETE to confirm</span>
+        <input id="deleteStaffConfirmation" autocomplete="off" placeholder="DELETE" />
+      </label>
+    `,
+    async () => {
+      const confirmation = document.getElementById('deleteStaffConfirmation')?.value.trim();
+      const reason = document.getElementById('deleteStaffReason')?.value.trim();
+      if (confirmation !== 'DELETE') {
+        showToast('Type DELETE to confirm account deletion');
+        return;
+      }
+
+      const res = await fetch(`/api/users/${Number(userId)}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+        body: JSON.stringify({ reason })
+      });
+      const data = await safeJson(res);
+      if (!res.ok) {
+        showToast(data.message || 'Account deletion failed');
+        return;
+      }
+
+      hideDialog();
+      showToast(data.message || 'User account deleted');
+      await loadStaff();
+    },
+    'Delete Account'
+  );
+  document.querySelector('.dialog-panel')?.classList.add('account-delete-dialog');
 }
 
 async function loadSettings() {

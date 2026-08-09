@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getRequestToken, safeReturnTo } = require('../utils/session');
 const { isRevoked } = require('../utils/tokenRevocation');
+const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -27,8 +28,12 @@ function pageAuth({ adminOnly = false } = {}) {
       if (!token || isRevoked(token) || !process.env.JWT_SECRET) return redirectToLogin(req, res);
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      await ensureUserLifecycleSchema();
       const [[user]] = await pool.query(
-        'SELECT id, email, username, role, permissions, active FROM users WHERE id = ? LIMIT 1',
+        `SELECT id, email, username, role, permissions, active
+         FROM users
+         WHERE id = ? AND deleted_at IS NULL
+         LIMIT 1`,
         [decoded.id]
       );
       if (!user || Number(user.active) === 0) return redirectToLogin(req, res);

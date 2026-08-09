@@ -1,5 +1,9 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
+const { ensureWorkforceSchema } = require('../services/workforceSchema');
+const { logAudit } = require('../services/auditService');
 
 const ALL_PERMISSIONS = [
   'dashboard',
@@ -61,6 +65,7 @@ function isValidEmail(value) {
 
 exports.createUser = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
@@ -119,6 +124,7 @@ exports.createUser = async (req, res) => {
 
 exports.getUsers = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const [rows] = await pool.query(
       `SELECT
         id,
@@ -131,6 +137,7 @@ exports.getUsers = async (req, res) => {
         password_reset_required,
         last_password_reset_at
       FROM users
+      WHERE deleted_at IS NULL
       ORDER BY id ASC`
     );
 
@@ -152,6 +159,7 @@ exports.getUsers = async (req, res) => {
 
 exports.updateUserAccess = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const userId = Number(req.params.id);
     const role = normalizeRole(req.body.role || 'staff');
     const active = req.body.active === undefined ? true : Boolean(req.body.active);
@@ -174,7 +182,7 @@ exports.updateUserAccess = async (req, res) => {
     const [result] = await pool.query(
       `UPDATE users
        SET role = ?, permissions = ?, active = ?
-       WHERE id = ?`,
+       WHERE id = ? AND deleted_at IS NULL`,
       [role, JSON.stringify(permissions), active ? 1 : 0, userId]
     );
 
@@ -194,6 +202,7 @@ exports.updateUserAccess = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const userId = Number(req.params.id);
     const name = String(req.body.name || '').trim();
     const username = String(req.body.username || '').trim().toLowerCase();
@@ -241,7 +250,7 @@ exports.updateUser = async (req, res) => {
            role = ?,
            permissions = ?,
            active = ?
-       WHERE id = ?`,
+       WHERE id = ? AND deleted_at IS NULL`,
       [name, username, email, role, JSON.stringify(permissions), active ? 1 : 0, userId]
     );
 
@@ -261,6 +270,7 @@ exports.updateUser = async (req, res) => {
 
 exports.resetUserPassword = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const userId = Number(req.params.id);
     const newPassword = String(req.body.password || '').trim();
 
@@ -279,7 +289,7 @@ exports.resetUserPassword = async (req, res) => {
        SET password = ?,
            password_reset_required = 1,
            last_password_reset_at = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND deleted_at IS NULL`,
       [hashedPassword, userId]
     );
 
@@ -296,5 +306,101 @@ exports.resetUserPassword = async (req, res) => {
       message: 'Failed to reset password',
       error: error.message
     });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  const userId = Number(req.params.id);
+  const reason = String(req.body?.reason || 'Removed by administrator').trim().slice(0, 255);
+
+  if (!userId) {
+    return res.status(400).json({ message: 'User ID is required' });
+  }
+
+  if (Number(req.user.id) === userId) {
+    return res.status(400).json({ message: 'You cannot delete your own account' });
+  }
+
+  let connection;
+  try {
+    await ensureUserLifecycleSchema();
+    await ensureWorkforceSchema();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
+    const [[target]] = await connection.query(
+      `SELECT id, role, active
+       FROM users
+       WHERE id = ? AND deleted_at IS NULL
+       FOR UPDATE`,
+      [userId]
+    );
+
+    if (!target) {
+      await connection.rollback();
+      return res.status(404).json({ message: 'User account not found' });
+    }
+
+    if (String(target.role || '').toLowerCase() === 'admin') {
+      const [[adminCount]] = await connection.query(
+        `SELECT COUNT(*) AS total
+         FROM users
+         WHERE role = 'admin' AND active = 1 AND deleted_at IS NULL`
+      );
+      if (Number(adminCount.total || 0) <= 1) {
+        await connection.rollback();
+        return res.status(409).json({ message: 'The last active admin account cannot be deleted' });
+      }
+    }
+
+    const deletionToken = `${userId}_${Date.now()}_${crypto.randomBytes(5).toString('hex')}`;
+    const disabledPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
+
+    await connection.query(
+      `UPDATE users
+       SET name = ?,
+           username = ?,
+           email = ?,
+           password = ?,
+           permissions = '[]',
+           active = 0,
+           password_reset_required = 0,
+           deleted_at = NOW(),
+           deleted_by = ?,
+           deletion_reason = ?
+       WHERE id = ?`,
+      [
+        `Deleted User #${userId}`,
+        `deleted_${deletionToken}`,
+        `deleted+${deletionToken}@removed.voxelveda.invalid`,
+        disabledPassword,
+        req.user.id,
+        reason || 'Removed by administrator',
+        userId
+      ]
+    );
+
+    await logAudit(connection, {
+      actorId: req.user.id,
+      action: 'USER_ACCOUNT_DELETED',
+      module: 'staff',
+      recordType: 'user',
+      recordId: userId,
+      oldValue: { active: Number(target.active) !== 0, role: target.role },
+      newValue: { active: false, deleted: true },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
+
+    await connection.commit();
+    return res.json({
+      message: 'User account deleted. Login access was removed and historical records were preserved.'
+    });
+  } catch (error) {
+    if (connection) await connection.rollback().catch(() => {});
+    console.error('deleteUser error:', error);
+    return res.status(500).json({ message: 'Failed to delete user account' });
+  } finally {
+    connection?.release();
   }
 };

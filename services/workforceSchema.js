@@ -214,6 +214,15 @@ async function createWorkforceSchema() {
   await addColumn(`ALTER TABLE weekly_timesheets ADD COLUMN version_no INT NOT NULL DEFAULT 0`);
   await addColumn(`ALTER TABLE weekly_timesheets ADD COLUMN payroll_status VARCHAR(30) NOT NULL DEFAULT 'NOT_READY'`);
   await addIndex(`ALTER TABLE weekly_timesheets ADD INDEX idx_weekly_timesheet_status (status, week_start, week_end)`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN actor_id INT NULL`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN module VARCHAR(80) NULL`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN record_type VARCHAR(80) NULL`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN record_id VARCHAR(80) NULL`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN old_value LONGTEXT NULL`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN new_value LONGTEXT NULL`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN ip_address VARCHAR(80) NULL`);
+  await addColumn(`ALTER TABLE audit_logs ADD COLUMN user_agent TEXT NULL`);
+  await addIndex(`ALTER TABLE audit_logs ADD INDEX idx_audit_record (module, record_id, created_at)`);
   await addColumn(`ALTER TABLE email_queue ADD COLUMN idempotency_key VARCHAR(180) NULL`);
   await addIndex(`ALTER TABLE email_queue ADD UNIQUE KEY uniq_email_idempotency (idempotency_key)`);
 

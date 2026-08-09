@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getRequestToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
 const { revoke } = require('../utils/tokenRevocation');
+const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 
 function normalizeRole(role) {
   return String(role || 'staff').trim().toLowerCase();
@@ -54,6 +55,7 @@ function createToken(user) {
 
 exports.login = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
 
@@ -64,7 +66,8 @@ exports.login = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT id, name, username, email, password, role, permissions, active
        FROM users
-       WHERE LOWER(email) = ? OR LOWER(username) = ?
+       WHERE (LOWER(email) = ? OR LOWER(username) = ?)
+         AND deleted_at IS NULL
        LIMIT 1`,
       [email, email]
     );
@@ -113,6 +116,7 @@ exports.login = async (req, res) => {
 
 exports.register = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
@@ -166,12 +170,13 @@ exports.register = async (req, res) => {
 
 exports.me = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     if (!req.user || !req.user.id) {
       return res.status(401).json({ message: 'Unauthorized' });
     }
 
     const [rows] = await pool.query(
-      'SELECT id, name, username, email, role, permissions, active FROM users WHERE id = ? LIMIT 1',
+      'SELECT id, name, username, email, role, permissions, active FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [req.user.id]
     );
 
@@ -202,6 +207,7 @@ exports.me = async (req, res) => {
 
 exports.customerRegister = async (req, res) => {
   try {
+    await ensureUserLifecycleSchema();
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');

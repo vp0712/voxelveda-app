@@ -13,6 +13,10 @@ console.log('Server starting...');
 const app = require('./app');
 const { isEmailConfigured, verifyConnection } = require('./services/emailService');
 const { processEmailQueue } = require('./services/emailQueue');
+const {
+  startWeeklyTimesheetScheduler,
+  stopWeeklyTimesheetScheduler
+} = require('./services/weeklyTimesheetScheduler');
 
 try {
   require('./utils/seedAdmin')();
@@ -52,6 +56,8 @@ if (isEmailConfigured()) {
   setTimeout(runEmailQueue, 5000).unref();
 }
 
+startWeeklyTimesheetScheduler();
+
 server.on('error', (err) => {
   console.error('Server error:', err.message);
   process.exit(1);
@@ -59,6 +65,7 @@ server.on('error', (err) => {
 
 function shutdown(signal) {
   console.log(`${signal} received. Closing server.`);
+  stopWeeklyTimesheetScheduler();
   server.close(() => process.exit(0));
 }
 

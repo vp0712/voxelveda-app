@@ -44,11 +44,17 @@ EMAIL_QUEUE_INTERVAL_MS=30000
 EMAIL_QUEUE_BATCH_SIZE=10
 TIMESHEET_APPROVAL_EMAIL_ENABLED=true
 TIMESHEET_REVIEW_EMAIL_ENABLED=true
+WEEKLY_TIMESHEET_EMAIL_ENABLED=true
+WEEKLY_TIMESHEET_EMAIL_TIMEZONE=Australia/Sydney
+WEEKLY_TIMESHEET_EMAIL_HOUR=7
+WEEKLY_TIMESHEET_EMAIL_INTERVAL_MS=900000
 ```
 
 Use port `587` with `SMTP_SECURE=false` only when the Hostinger mailbox is configured for STARTTLS instead of implicit TLS.
 
 Email is queued only after the database transaction commits. `email_queue` provides idempotency, retries, exponential delay, and delivery status. `email_logs` stores the recipient, subject, related record, provider message id, and failure reason. One email failure does not roll back a valid timesheet decision.
+
+The weekly scheduler runs continuously and, after the configured local morning hour, prepares the most recently completed Monday-to-Sunday period. Each active staff member who can use attendance receives one branded summary email, including a zero-hour summary when no shifts were recorded. The idempotency key includes the timesheet and week, so restarts and repeated scheduler cycles cannot send the same weekly summary twice. If SMTP is temporarily unavailable, the message remains in `email_queue` for the normal retry worker.
 
 Admin email diagnostics are available under `/api/email`:
 
@@ -62,14 +68,18 @@ Admin email diagnostics are available under `/api/email`:
 ## Deployment
 
 1. Back up the production database.
-2. Deploy the application or apply `migrations/20260809_timesheet_workflow.sql` first.
+2. Apply `migrations/20260809_timesheet_workflow.sql`, then `migrations/20260809_weekly_timesheet_email_user_lifecycle.sql`, or deploy the application and allow its additive startup schema to apply both changes.
 3. Add the Hostinger variables in Railway.
 4. Restart the service and confirm `/api/health` returns HTTP 200.
 5. Run the email verify and test endpoints as an admin.
 6. Submit a draft timesheet, request a correction, resubmit it, and approve it.
 7. Confirm an immutable version, approval event, payroll row, notification, audit entry, and email log were created.
 
-`services/workforceSchema.js` also performs additive startup migration for installations that have not run the SQL file. It never drops workforce data.
+`services/workforceSchema.js` also performs additive startup migration for installations that have not run the SQL file. It includes compatibility columns for legacy audit tables and never drops workforce data.
+
+## User account deletion
+
+Admin can delete a staff account from Staff Management. The operation is an audited soft deletion: login access is removed immediately, personal login identifiers are anonymised, and historical timesheets, approvals, attendance and inventory attribution remain intact. A current admin cannot delete their own account, and the final active admin account is protected. Existing JWTs are rejected on the next API call or page request because every authentication path checks the live account state.
 
 ## Current scope
 

@@ -7,7 +7,8 @@ const {
   getUsers,
   updateUser,
   updateUserAccess,
-  resetUserPassword
+  resetUserPassword,
+  deleteUser
 } = require('../controllers/userController');
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.post('/', authMiddleware, requireRole('admin'), createUser);
 router.post('/:id', authMiddleware, requireRole('admin'), updateUser);
 router.post('/:id/access', authMiddleware, requireRole('admin'), updateUserAccess);
 router.post('/:id/reset-password', authMiddleware, requireRole('admin'), resetUserPassword);
+router.delete('/:id', authMiddleware, requireRole('admin'), deleteUser);
 
 module.exports = router;
