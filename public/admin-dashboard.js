@@ -5502,7 +5502,13 @@ async function loadSettings() {
     if (el && settings[key] !== undefined) el.value = settings[key];
   });
 
+  const companyEmail = document.getElementById('settingEmail');
+  if (companyEmail && !companyEmail.value.trim()) companyEmail.value = 'info@voxelveda.com';
+  const testRecipient = document.getElementById('emailTestRecipient');
+  if (testRecipient && !testRecipient.value.trim()) testRecipient.value = companyEmail?.value || 'info@voxelveda.com';
+
   updateQrTargetFromType();
+  loadEmailControl();
 }
 
 async function saveSettings() {
@@ -5524,6 +5530,130 @@ async function saveSettings() {
   const data = await safeJson(res);
   showToast(data.message || (res.ok ? 'Settings saved' : 'Settings save failed'));
   updateQrTargetFromType();
+}
+
+function emailRecipientLabel(value) {
+  try {
+    const parsed = Array.isArray(value) ? value : JSON.parse(value || '[]');
+    return parsed.filter(Boolean).join(', ') || '-';
+  } catch {
+    return String(value || '-');
+  }
+}
+
+function emailStatusClass(status) {
+  const value = String(status || '').toUpperCase();
+  if (value === 'SENT') return 'email-delivery-sent';
+  if (value === 'FAILED') return 'email-delivery-failed';
+  if (value === 'RETRY') return 'email-delivery-retry';
+  return 'email-delivery-pending';
+}
+
+async function loadEmailControl() {
+  const list = document.getElementById('emailDeliveryList');
+  if (!list) return;
+
+  try {
+    const [configRes, queueRes, logsRes] = await Promise.all([
+      fetch('/api/email/config', { headers: authHeaders() }),
+      fetch('/api/email/queue?limit=50', { headers: authHeaders() }),
+      fetch('/api/email/logs?limit=10', { headers: authHeaders() })
+    ]);
+    const [config, queueData, logData] = await Promise.all([
+      safeJson(configRes), safeJson(queueRes), safeJson(logsRes)
+    ]);
+    if (!configRes.ok || !queueRes.ok || !logsRes.ok) {
+      throw new Error(config.message || queueData.message || logData.message || 'Email control could not load');
+    }
+
+    const counts = queueData.counts || {};
+    const pending = Number(counts.PENDING || 0) + Number(counts.RETRY || 0) + Number(counts.SENDING || 0);
+    const failed = Number(counts.FAILED || 0);
+    const status = document.getElementById('emailDeliveryStatus');
+    if (status) {
+      status.textContent = config.configured ? 'Connected' : 'Setup required';
+      status.className = `email-state-chip ${config.configured ? 'email-state-connected' : 'email-state-warning'}`;
+    }
+    const sender = document.getElementById('emailSenderAddress');
+    const transport = document.getElementById('emailTransportState');
+    const pendingEl = document.getElementById('emailPendingCount');
+    const failureEl = document.getElementById('emailFailureCount');
+    const lastDelivery = document.getElementById('emailLastDelivery');
+    if (sender) sender.textContent = config.from_address || 'info@voxelveda.com';
+    if (transport) {
+      transport.textContent = config.configured ? `${config.provider} : ${config.port}` : 'Not connected';
+    }
+    if (pendingEl) pendingEl.textContent = String(pending);
+    if (failureEl) failureEl.textContent = `${failed} failed`;
+    const logs = logData.logs || [];
+    const lastSent = logs.find((row) => String(row.status).toUpperCase() === 'SENT');
+    if (lastDelivery) lastDelivery.textContent = lastSent?.created_at ? formatDateTime(lastSent.created_at) : '-';
+
+    const activity = logs.length ? logs : (queueData.emails || []).slice(0, 10);
+    list.innerHTML = activity.length ? activity.map((row) => {
+      const state = String(row.status || 'PENDING').toUpperCase();
+      const queueId = Number(row.queue_id || row.id || 0);
+      const retryButton = ['FAILED', 'RETRY'].includes(state) && queueId
+        ? `<button type="button" class="secondary-btn compact-btn" onclick="retryEmailDelivery(${queueId})">Retry</button>`
+        : '';
+      return `
+        <article class="email-delivery-row ${emailStatusClass(state)}">
+          <div>
+            <strong>${escapeHtml(row.subject || 'Email delivery')}</strong>
+            <span>${escapeHtml(row.recipients || emailRecipientLabel(row.to_json))}</span>
+          </div>
+          <div class="email-delivery-meta">
+            <span>${escapeHtml(state)}</span>
+            <small>${escapeHtml(formatDateTime(row.created_at || row.sent_at || new Date()))}</small>
+            ${retryButton}
+          </div>
+        </article>`;
+    }).join('') : '<div class="empty-state">No email delivery activity yet.</div>';
+  } catch (error) {
+    list.innerHTML = `<div class="empty-state">${escapeHtml(error.message || 'Email control could not load.')}</div>`;
+  }
+}
+
+async function verifyEmailDelivery() {
+  const res = await fetch('/api/email/verify', { method: 'POST', headers: authHeaders() });
+  const data = await safeJson(res);
+  showToast(data.message || (res.ok ? 'Email connection verified' : 'Email verification failed'));
+  await loadEmailControl();
+}
+
+async function sendEmailTest() {
+  const recipient = document.getElementById('emailTestRecipient')?.value.trim();
+  if (!isValidEmail(recipient)) return showToast('Enter a valid test recipient');
+  const res = await fetch('/api/email/test', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ to: recipient })
+  });
+  const data = await safeJson(res);
+  showToast(data.message || (res.ok ? 'Test email sent' : 'Test email failed'));
+  await loadEmailControl();
+}
+
+async function processPendingEmails() {
+  const res = await fetch('/api/email/process', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ limit: 25 })
+  });
+  const data = await safeJson(res);
+  const sent = (data.outcomes || []).filter((item) => item.status === 'SENT').length;
+  showToast(res.ok ? `${sent} queued email${sent === 1 ? '' : 's'} delivered` : (data.message || 'Email queue processing failed'));
+  await loadEmailControl();
+}
+
+async function retryEmailDelivery(queueId) {
+  const retryRes = await fetch(`/api/email/queue/${Number(queueId)}/retry`, {
+    method: 'POST',
+    headers: authHeaders()
+  });
+  const retryData = await safeJson(retryRes);
+  if (!retryRes.ok) return showToast(retryData.message || 'Email retry failed');
+  await processPendingEmails();
 }
 
 function startShiftQrCountdown(seconds) {
@@ -7350,7 +7480,7 @@ function openTimesheetMailDraft() {
 }
 
 function showTimesheetEmailSetupDialog(data, draft) {
-  const missing = (data?.missing || ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL']).join(', ');
+  const missing = (data?.missing || ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'MAIL_FROM_ADDRESS']).join(', ');
   const html = `
     <style>
       .email-setup-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.65fr);gap:18px}.email-preview-card{border:1px solid rgba(56,189,248,.38);border-radius:18px;background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(8,32,48,.94));padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.28)}.email-preview-card h3{margin:0 0 8px}.email-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.smtp-chip{display:inline-flex;margin:4px 6px 4px 0;padding:7px 10px;border-radius:999px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);color:#9ff7ff;font-weight:800;font-size:12px}.smtp-note{color:#b7c7d6;line-height:1.55}.smtp-box{border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:14px;background:rgba(2,6,23,.45)}.email-mini-table{width:100%;border-collapse:collapse;font-size:12px}.email-mini-table th,.email-mini-table td{padding:8px;border-bottom:1px solid rgba(148,163,184,.2);text-align:left}.email-mini-table th{color:#49f4e7;text-transform:uppercase;font-size:10px}@media(max-width:760px){.email-setup-grid{grid-template-columns:1fr}.email-actions .btn{width:100%;justify-content:center}}
@@ -7358,8 +7488,8 @@ function showTimesheetEmailSetupDialog(data, draft) {
     <div class="email-setup-grid">
       <div class="email-preview-card">
         <div class="eyebrow">Email delivery</div>
-        <h3>SMTP is not connected yet</h3>
-        <p class="smtp-note">The app can generate the timesheet now, but Railway needs these email variables before it can send automatically from Voxel Veda.</p>
+        <h3>Company email delivery is offline</h3>
+        <p class="smtp-note">The timesheet is ready, but Railway must have the secure Voxel Veda mailbox variables before direct delivery can start.</p>
         <div>${missing.split(', ').map((key) => `<span class="smtp-chip">${escapeHtml(key)}</span>`).join('')}</div>
         <div class="email-actions">
           <button class="btn primary" type="button" onclick="openTimesheetPreviewWindow()">Preview Timesheet</button>

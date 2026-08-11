@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const { companyProfile } = require('../config/companyProfile');
 
 const SMTP_FIELDS = {
   host: ['SMTP_HOST', 'EMAIL_HOST', 'MAIL_HOST'],
@@ -18,19 +19,20 @@ function firstEnv(keys) {
 }
 
 function smtpConfig() {
-  const user = firstEnv(SMTP_FIELDS.user);
+  const profile = companyProfile();
+  const user = firstEnv(SMTP_FIELDS.user) || profile.email;
   const port = Number(firstEnv(SMTP_FIELDS.port) || 465);
   return {
-    host: firstEnv(SMTP_FIELDS.host),
+    host: firstEnv(SMTP_FIELDS.host) || 'smtp.hostinger.com',
     port,
     user,
     pass: firstEnv(SMTP_FIELDS.pass),
-    fromEmail: firstEnv(SMTP_FIELDS.fromEmail) || user,
-    fromName: firstEnv(SMTP_FIELDS.fromName) || 'Voxel Veda',
+    fromEmail: firstEnv(SMTP_FIELDS.fromEmail) || profile.email || user,
+    fromName: firstEnv(SMTP_FIELDS.fromName) || profile.name,
     secure: process.env.SMTP_SECURE === undefined
       ? port === 465
       : String(process.env.SMTP_SECURE).toLowerCase() === 'true',
-    replyTo: String(process.env.MAIL_REPLY_TO || '').trim()
+    replyTo: profile.replyTo
   };
 }
 

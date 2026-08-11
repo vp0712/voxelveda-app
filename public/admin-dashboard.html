@@ -1286,12 +1286,50 @@
           <div class="card">
             <h3>Company & Invoice Data</h3>
             <div class="form-grid">
-              <input id="settingEmail" placeholder="Company Email">
+              <input id="settingEmail" type="email" value="info@voxelveda.com" placeholder="Company Email">
               <input id="settingAbn" placeholder="ABN">
               <input id="settingTerms" placeholder="Payment Terms">
               <input id="settingBank" placeholder="Bank Name">
               <input id="settingWebsite" placeholder="Website">
               <input id="settingSupportPhone" placeholder="Support Phone">
+            </div>
+          </div>
+
+          <div class="card email-control-card">
+            <div class="email-control-head">
+              <div>
+                <span class="eyebrow">Company communications</span>
+                <h3>Email Control</h3>
+              </div>
+              <span id="emailDeliveryStatus" class="email-state-chip">Checking</span>
+            </div>
+
+            <div class="email-health-grid">
+              <article><small>Sender</small><strong id="emailSenderAddress">info@voxelveda.com</strong></article>
+              <article><small>Transport</small><strong id="emailTransportState">Hostinger SMTP</strong></article>
+              <article><small>Pending</small><strong id="emailPendingCount">0</strong></article>
+              <article><small>Last delivery</small><strong id="emailLastDelivery">-</strong></article>
+            </div>
+
+            <div class="email-control-toolbar">
+              <label class="form-field email-test-field">
+                <span>Test recipient</span>
+                <input id="emailTestRecipient" type="email" value="info@voxelveda.com" placeholder="name@company.com" />
+              </label>
+              <div class="email-control-actions">
+                <button type="button" class="secondary-btn" onclick="verifyEmailDelivery()">Verify</button>
+                <button type="button" class="secondary-btn" onclick="sendEmailTest()">Send Test</button>
+                <button type="button" class="primary-btn" onclick="processPendingEmails()">Process Queue</button>
+                <button type="button" class="icon-btn" title="Refresh email delivery" aria-label="Refresh email delivery" onclick="loadEmailControl()">&#8635;</button>
+              </div>
+            </div>
+
+            <div class="email-delivery-head">
+              <strong>Recent delivery activity</strong>
+              <span id="emailFailureCount">0 failed</span>
+            </div>
+            <div id="emailDeliveryList" class="email-delivery-list">
+              <div class="empty-state">Loading email delivery activity...</div>
             </div>
           </div>
 

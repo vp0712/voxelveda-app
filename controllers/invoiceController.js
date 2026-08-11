@@ -2,8 +2,29 @@ const pool = require('../config/db');
 const PDFDocument = require('pdfkit');
 const path = require('path');
 const fs = require('fs');
-const nodemailer = require('nodemailer');
 const urls = require('../config/urls');
+const { companyProfile } = require('../config/companyProfile');
+const { sendMail, missingSmtpKeys } = require('../services/emailService');
+const { brandedLayout } = require('../services/emailTemplates');
+
+function escapeEmailHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+function smtpFailure(res, error) {
+  if (error?.code !== 'SMTP_CONFIG_MISSING') return false;
+  res.status(503).json({
+    message: 'Email delivery is awaiting secure mailbox configuration.',
+    missing: missingSmtpKeys(),
+    code: error.code
+  });
+  return true;
+}
 
 async function ensureInvoiceColumns() {
   await pool.query(`
@@ -587,31 +608,26 @@ exports.sendCustomerStatement = async (req, res) => {
     let whatsappUrl = '';
 
     if (email) {
-      const required = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL'];
-      const missing = required.filter((key) => !process.env[key]);
-
-      if (missing.length) {
-        return res.status(500).json({
-          message: `Email is not configured. Missing: ${missing.join(', ')}`
-        });
-      }
-
       const pdfBuffer = await buildCustomerStatementPdfBuffer(statement);
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
-        secure: String(process.env.SMTP_SECURE || 'true') === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
+      const company = companyProfile();
+      const text = `Hello ${statement.customer.name},\n\nPlease find attached your Voxel Veda account statement.\n\nInvoice value: ${statementMoney(statement.totals.invoice_value)}\nPayment received: ${statementMoney(statement.totals.paid)}\nBalance due: ${statementMoney(statement.totals.balance_due)}\n\nQuestions can be sent to ${company.email}.\n\nThank you,\nVoxel Veda`;
+      const html = brandedLayout(`
+        <h2 style="margin-top:0">Account statement</h2>
+        <p>Hello ${escapeEmailHtml(statement.customer.name)},</p>
+        <p>Your current Voxel Veda account statement is attached.</p>
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="8" style="border-collapse:collapse;background:#f8fafc">
+          <tr><td>Invoice value</td><td align="right"><strong>${escapeEmailHtml(statementMoney(statement.totals.invoice_value))}</strong></td></tr>
+          <tr><td>Payment received</td><td align="right"><strong>${escapeEmailHtml(statementMoney(statement.totals.paid))}</strong></td></tr>
+          <tr><td>Balance due</td><td align="right"><strong>${escapeEmailHtml(statementMoney(statement.totals.balance_due))}</strong></td></tr>
+        </table>
+        <p>For account questions, reply to this email.</p>
+      `, `Account statement for ${statement.customer.name}`);
 
-      await transporter.sendMail({
-        from: `"${process.env.FROM_NAME || 'Voxel Veda'}" <${process.env.FROM_EMAIL}>`,
+      await sendMail({
         to: email,
         subject: `Voxel Veda account statement - ${statement.customer.name}`,
-        text: `Hello ${statement.customer.name},\n\nPlease find attached your Voxel Veda account statement.\n\nInvoice value: ${statementMoney(statement.totals.invoice_value)}\nPayment received: ${statementMoney(statement.totals.paid)}\nBalance due: ${statementMoney(statement.totals.balance_due)}\n\nThank you,\nVoxel Veda`,
+        text,
+        html,
         attachments: [{
           filename: 'voxel-veda-account-statement.pdf',
           content: pdfBuffer,
@@ -643,6 +659,7 @@ exports.sendCustomerStatement = async (req, res) => {
     });
   } catch (err) {
     console.error('SEND CUSTOMER STATEMENT ERROR FULL:', err);
+    if (smtpFailure(res, err)) return;
     res.status(500).json({ message: 'Statement send failed', error: err.message });
   }
 };
@@ -685,32 +702,23 @@ exports.sendInvoice = async (req, res) => {
     let smsSent = false;
 
     if (email) {
-      const required = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL'];
-      const missing = required.filter((key) => !process.env[key]);
-
-      if (missing.length) {
-        return res.status(500).json({
-          message: `Email is not configured. Missing: ${missing.join(', ')}`
-        });
-      }
-
-      const transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT),
-        secure: String(process.env.SMTP_SECURE || 'true') === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
-      });
-
       const pdfBuffer = await buildInvoicePdfBuffer(invoice_id);
+      const company = companyProfile();
+      const invoiceReference = invoice.invoice_no || invoice_id;
+      const text = `Hello ${invoice.customer_name || 'Customer'},\n\nPlease find attached invoice ${invoiceReference}.\n\nFor invoice questions, reply to this email or contact ${company.email}.\n\nThank you,\nVoxel Veda`;
+      const html = brandedLayout(`
+        <h2 style="margin-top:0">Invoice ${escapeEmailHtml(invoiceReference)}</h2>
+        <p>Hello ${escapeEmailHtml(invoice.customer_name || 'Customer')},</p>
+        <p>Your Voxel Veda invoice is attached as a PDF.</p>
+        <p><strong>Invoice reference:</strong> ${escapeEmailHtml(invoiceReference)}</p>
+        <p>For invoice questions, reply directly to this email.</p>
+      `, `Invoice ${invoiceReference} from Voxel Veda`);
 
-      await transporter.sendMail({
-        from: `"${process.env.FROM_NAME || 'Voxel Veda'}" <${process.env.FROM_EMAIL}>`,
+      await sendMail({
         to: email,
-        subject: `Invoice ${invoice.invoice_no || invoice_id} from Voxel Veda`,
-        text: `Hello ${invoice.customer_name || 'Customer'},\n\nPlease find attached invoice ${invoice.invoice_no || invoice_id}.\n\nThank you,\nVoxel Veda`,
+        subject: `Invoice ${invoiceReference} from Voxel Veda`,
+        text,
+        html,
         attachments: [
           {
             filename: `${invoice.invoice_no || `invoice-${invoice_id}`}.pdf`,
@@ -766,6 +774,7 @@ exports.sendInvoice = async (req, res) => {
     });
   } catch (err) {
     console.error('SEND INVOICE ERROR FULL:', err);
+    if (smtpFailure(res, err)) return;
     res.status(500).json({ message: 'Invoice send failed', error: err.message });
   }
 };
@@ -1424,7 +1433,8 @@ function renderInvoicePdf(doc, invoice, items, id) {
   doc.fillColor(ink).fontSize(16).text('Voxel Veda Pty Ltd', 48, 161);
   doc.fillColor(muted).fontSize(9);
   doc.text('Advanced manufacturing and engineering services', 48, 184);
-  doc.text('info@voxelveda.com | www.voxelveda.com', 48, 199);
+  const company = companyProfile();
+  doc.text(`${company.email} | ${company.website.replace(/^https?:\/\//, '')}`, 48, 199);
 
   const metaX = 366;
   doc.roundedRect(metaX, 142, 182, 94, 8).fill(panel).strokeColor(line).stroke();

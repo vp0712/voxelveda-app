@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
-const { sendMail, isEmailConfigured, missingSmtpKeys } = require('../services/emailService');
+const { sendMail, isEmailConfigured, missingSmtpKeys, smtpConfig } = require('../services/emailService');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
 
 const SHIFT_QR_WINDOW_SECONDS = 20;
@@ -1092,7 +1092,7 @@ exports.sendTimesheetSummary = async (req, res) => {
     const totalHours = rows.reduce((sum, row) => sum + Number(row.total_hours || 0), 0);
     const staffNames = [...new Set(rows.map((row) => row.name || row.email || `User ${row.user_id}`))];
     const recipients = new Set();
-    const adminRecipient = process.env.TIMESHEET_EMAIL || process.env.FROM_EMAIL || process.env.SMTP_USER;
+    const adminRecipient = process.env.TIMESHEET_EMAIL || smtpConfig().fromEmail;
     if (adminRecipient) recipients.add(adminRecipient);
     if (extraRecipient) recipients.add(extraRecipient);
     if (includeEmployee) rows.forEach((row) => row.email && recipients.add(row.email));

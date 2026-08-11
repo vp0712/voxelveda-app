@@ -3,11 +3,13 @@ const {
   isEmailConfigured,
   missingSmtpKeys,
   smtpConfig,
-  verifyConnection
+  verifyConnection,
+  sendMail
 } = require('../services/emailService');
-const { queueEmail, processEmailQueue } = require('../services/emailQueue');
+const { processEmailQueue } = require('../services/emailQueue');
 const { renderEmailTemplate, templates } = require('../services/emailTemplates');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
+const { companyProfile } = require('../config/companyProfile');
 
 function pageSize(value) {
   return Math.max(1, Math.min(Number(value) || 25, 100));
@@ -23,6 +25,7 @@ function masked(value) {
 
 exports.config = async (_req, res) => {
   const config = smtpConfig();
+  const company = companyProfile();
   return res.json({
     provider: 'Hostinger SMTP',
     configured: isEmailConfigured(),
@@ -33,6 +36,8 @@ exports.config = async (_req, res) => {
     username: masked(config.user),
     from_name: config.fromName,
     from_address: config.fromEmail,
+    reply_to: config.replyTo,
+    support_address: company.supportEmail,
     password_configured: Boolean(config.pass)
   });
 };
@@ -61,23 +66,13 @@ exports.sendTest = async (req, res) => {
       title: 'Voxel Veda email test',
       message: 'Your Hostinger SMTP connection and Voxel Veda delivery queue are working correctly.'
     });
-    const queueId = await queueEmail({
+    const result = await sendMail({
       to: recipient,
       ...rendered,
-      relatedModule: 'settings',
-      relatedRecordId: 'smtp-test',
-      idempotencyKey: `smtp-test-${req.user.id}-${Date.now()}`,
-      createdBy: req.user.id
     });
-    const outcomes = await processEmailQueue(5);
-    const outcome = outcomes.find((item) => Number(item.id) === Number(queueId));
-    if (outcome?.status === 'SENT') {
-      return res.json({ message: `Test email sent to ${recipient}.`, queue_id: queueId });
-    }
-    return res.status(502).json({
-      message: outcome?.error || 'The test email was queued but could not be delivered yet.',
-      queue_id: queueId,
-      status: outcome?.status || 'PENDING'
+    return res.json({
+      message: `Test email sent to ${recipient}.`,
+      message_id: result.messageId || null
     });
   } catch (error) {
     console.error('SMTP TEST ERROR:', error.message);
@@ -101,7 +96,14 @@ exports.queue = async (req, res) => {
        FROM email_queue ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`,
       params
     );
-    return res.json({ emails: rows, page, limit });
+    const [countRows] = await pool.query(
+      'SELECT status, COUNT(*) AS total FROM email_queue GROUP BY status'
+    );
+    const counts = countRows.reduce((result, row) => {
+      result[String(row.status || 'UNKNOWN').toUpperCase()] = Number(row.total || 0);
+      return result;
+    }, {});
+    return res.json({ emails: rows, counts, page, limit });
   } catch (error) {
     console.error('EMAIL QUEUE LIST ERROR:', error);
     return res.status(500).json({ message: 'Unable to load the email queue.' });

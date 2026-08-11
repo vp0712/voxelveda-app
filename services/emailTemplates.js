@@ -1,3 +1,5 @@
+const { companyProfile } = require('../config/companyProfile');
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -15,6 +17,7 @@ function interpolate(template, variables, escapeValues = false) {
 }
 
 function brandedLayout(content, previewText = '') {
+  const company = companyProfile();
   return `<!doctype html>
   <html><body style="margin:0;background:#eef3f7;font-family:Arial,sans-serif;color:#13202d">
     <span style="display:none;max-height:0;overflow:hidden">${escapeHtml(previewText)}</span>
@@ -23,7 +26,7 @@ function brandedLayout(content, previewText = '') {
         <table role="presentation" width="620" cellspacing="0" cellpadding="0" style="max-width:620px;width:100%;background:#fff;border:1px solid #d8e2ea">
           <tr><td style="padding:22px 28px;background:#10283a;color:#fff"><strong style="font-size:20px">VOXEL VEDA</strong><br><span style="font-size:12px;color:#8fe3dc">Innovation in Motion</span></td></tr>
           <tr><td style="padding:30px 28px;line-height:1.55">${content}</td></tr>
-          <tr><td style="padding:18px 28px;background:#f5f8fa;color:#607080;font-size:12px">Voxel Veda Pty Ltd | info@voxelveda.com</td></tr>
+          <tr><td style="padding:18px 28px;background:#f5f8fa;color:#607080;font-size:12px">${escapeHtml(company.legalName)} | <a href="mailto:${escapeHtml(company.email)}" style="color:#0b7285">${escapeHtml(company.email)}</a></td></tr>
         </table>
       </td></tr>
     </table>

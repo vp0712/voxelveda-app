@@ -1,33 +1,15 @@
 require('dotenv').config();
-const nodemailer = require('nodemailer');
+const { verifyConnection, sendMail, smtpConfig } = require('./services/emailService');
 
 async function testSMTP() {
   try {
-    const required = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USER', 'SMTP_PASS', 'FROM_EMAIL'];
-    const missing = required.filter((key) => !process.env[key]);
+    const result = await verifyConnection();
+    console.log(`SMTP verified successfully (${result.host}:${result.port})`);
 
-    if (missing.length) {
-      throw new Error(`Missing SMTP environment values: ${missing.join(', ')}`);
-    }
-
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT),
-      secure: String(process.env.SMTP_SECURE || 'true') === 'true',
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS
-      }
-    });
-
-    await transporter.verify();
-    console.log('SMTP verified successfully');
-
-    const info = await transporter.sendMail({
-      from: `"${process.env.FROM_NAME || 'Voxel Veda'}" <${process.env.FROM_EMAIL}>`,
-      to: process.env.SMTP_TEST_TO || process.env.FROM_EMAIL,
-      subject: 'SMTP Test',
-      text: 'This is a direct SMTP test.'
+    const info = await sendMail({
+      to: process.env.SMTP_TEST_TO || smtpConfig().fromEmail,
+      subject: 'Voxel Veda email delivery test',
+      text: 'Voxel Veda secure email delivery is working correctly.'
     });
 
     console.log('Email sent:', info.messageId);
