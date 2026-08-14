@@ -2876,6 +2876,8 @@ function openSendInvoiceDialog(invoiceId) {
       </div>
     `,
     async () => {
+      const sendButton = document.getElementById('dialogPrimaryBtn');
+      if (sendButton?.disabled) return;
       const email = document.getElementById('sendInvoiceEmail')?.value.trim();
       const mobile = document.getElementById('sendInvoiceMobile')?.value.trim();
 
@@ -2884,28 +2886,47 @@ function openSendInvoiceDialog(invoiceId) {
         return;
       }
 
-      const res = await fetch('/api/invoice/send', {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ invoice_id: invoiceId, email, mobile })
-      });
-
-      const data = await safeJson(res);
-
-      if (!res.ok) {
-        const status = document.getElementById('sendInvoiceDeliveryStatus');
-        if (status && /^EMAIL_|^SMTP_/.test(String(data.code || ''))) {
-          status.hidden = false;
-          status.innerHTML = `<strong>Invoice ${escapeHtml(invoiceReference)} is ready.</strong><span>${escapeHtml(data.message || 'Direct delivery is unavailable. Use the PDF or mail draft option below.')}</span>`;
-        }
-        showToast(data.message || 'Invoice send failed');
-        return;
+      if (sendButton) {
+        sendButton.disabled = true;
+        sendButton.textContent = 'Sending...';
       }
 
-      hideDialog();
-      showToast(data.message || 'Invoice sent');
-      await loadInvoices();
-      await loadDashboardStats();
+      try {
+        const res = await fetch('/api/invoice/send', {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ invoice_id: invoiceId, email, mobile })
+        });
+
+        const data = await safeJson(res);
+
+        if (!res.ok) {
+          const status = document.getElementById('sendInvoiceDeliveryStatus');
+          if (status && /^EMAIL_|^SMTP_/.test(String(data.code || ''))) {
+            status.hidden = false;
+            status.innerHTML = `<strong>Invoice ${escapeHtml(invoiceReference)} is ready.</strong><span>${escapeHtml(data.message || 'Direct delivery is unavailable. Use the PDF or mail draft option below.')}</span>`;
+          }
+          showToast(data.message || 'Invoice send failed');
+          return;
+        }
+
+        hideDialog();
+        showToast(data.message || 'Invoice sent');
+        await loadInvoices();
+        await loadDashboardStats();
+      } catch (error) {
+        const status = document.getElementById('sendInvoiceDeliveryStatus');
+        if (status) {
+          status.hidden = false;
+          status.innerHTML = `<strong>Invoice ${escapeHtml(invoiceReference)} is ready.</strong><span>The server could not be reached. Preview the PDF or open a mail draft and try direct delivery again later.</span>`;
+        }
+        showToast('Invoice delivery could not connect');
+      } finally {
+        if (sendButton && document.body.contains(sendButton)) {
+          sendButton.disabled = false;
+          sendButton.textContent = 'Send Invoice';
+        }
+      }
     },
     'Send Invoice'
   );
