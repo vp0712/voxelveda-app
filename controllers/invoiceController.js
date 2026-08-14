@@ -4,7 +4,11 @@ const path = require('path');
 const fs = require('fs');
 const urls = require('../config/urls');
 const { companyProfile } = require('../config/companyProfile');
-const { sendMail, missingSmtpKeys } = require('../services/emailService');
+const {
+  sendMail,
+  emailFailureDetails,
+  isEmailTransportError
+} = require('../services/emailService');
 const { brandedLayout } = require('../services/emailTemplates');
 
 function escapeEmailHtml(value) {
@@ -16,13 +20,10 @@ function escapeEmailHtml(value) {
     .replace(/'/g, '&#039;');
 }
 
-function smtpFailure(res, error) {
-  if (error?.code !== 'SMTP_CONFIG_MISSING') return false;
-  res.status(503).json({
-    message: 'Email delivery is awaiting secure mailbox configuration.',
-    missing: missingSmtpKeys(),
-    code: error.code
-  });
+function emailDeliveryFailure(res, error) {
+  if (!isEmailTransportError(error)) return false;
+  const details = emailFailureDetails(error);
+  res.status(details.status).json(details);
   return true;
 }
 
@@ -659,7 +660,7 @@ exports.sendCustomerStatement = async (req, res) => {
     });
   } catch (err) {
     console.error('SEND CUSTOMER STATEMENT ERROR FULL:', err);
-    if (smtpFailure(res, err)) return;
+    if (emailDeliveryFailure(res, err)) return;
     res.status(500).json({ message: 'Statement send failed', error: err.message });
   }
 };
@@ -774,7 +775,7 @@ exports.sendInvoice = async (req, res) => {
     });
   } catch (err) {
     console.error('SEND INVOICE ERROR FULL:', err);
-    if (smtpFailure(res, err)) return;
+    if (emailDeliveryFailure(res, err)) return;
     res.status(500).json({ message: 'Invoice send failed', error: err.message });
   }
 };

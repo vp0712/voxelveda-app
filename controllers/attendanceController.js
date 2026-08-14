@@ -1,6 +1,13 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
-const { sendMail, isEmailConfigured, missingSmtpKeys, smtpConfig } = require('../services/emailService');
+const {
+  sendMail,
+  isEmailConfigured,
+  missingSmtpKeys,
+  smtpConfig,
+  emailFailureDetails,
+  isEmailTransportError
+} = require('../services/emailService');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
 
 const SHIFT_QR_WINDOW_SECONDS = 20;
@@ -1156,6 +1163,10 @@ exports.sendTimesheetSummary = async (req, res) => {
     });
   } catch (err) {
     console.error('SEND TIMESHEET SUMMARY ERROR:', err);
+    if (isEmailTransportError(err)) {
+      const details = emailFailureDetails(err);
+      return res.status(details.status).json(details);
+    }
     res.status(500).json({ message: 'Failed to send timesheet summary', error: err.message });
   }
 };

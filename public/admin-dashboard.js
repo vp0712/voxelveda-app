@@ -2861,12 +2861,19 @@ async function openEditInvoiceDialog(invoiceId) {
 }
 
 function openSendInvoiceDialog(invoiceId) {
+  const invoice = invoiceCache.find((item) => Number(item.id) === Number(invoiceId));
+  const invoiceReference = invoice?.invoice_no || `INV-${invoiceId}`;
   showDialog(
     'Send Invoice',
     `
       <p class="status-note">Send the PDF by email. Mobile number is saved on the send record for follow-up/SMS setup.</p>
       <input id="sendInvoiceEmail" type="email" placeholder="Customer email address" />
       <input id="sendInvoiceMobile" placeholder="Customer mobile number" />
+      <div id="sendInvoiceDeliveryStatus" class="email-delivery-status" hidden></div>
+      <div class="document-recovery-actions">
+        <button type="button" class="secondary-btn" onclick="openInvoicePdf(${Number(invoiceId)})">Preview PDF</button>
+        <button type="button" class="secondary-btn" onclick="openInvoiceMailDraft(${Number(invoiceId)})">Open Mail Draft</button>
+      </div>
     `,
     async () => {
       const email = document.getElementById('sendInvoiceEmail')?.value.trim();
@@ -2886,6 +2893,11 @@ function openSendInvoiceDialog(invoiceId) {
       const data = await safeJson(res);
 
       if (!res.ok) {
+        const status = document.getElementById('sendInvoiceDeliveryStatus');
+        if (status && /^EMAIL_|^SMTP_/.test(String(data.code || ''))) {
+          status.hidden = false;
+          status.innerHTML = `<strong>Invoice ${escapeHtml(invoiceReference)} is ready.</strong><span>${escapeHtml(data.message || 'Direct delivery is unavailable. Use the PDF or mail draft option below.')}</span>`;
+        }
         showToast(data.message || 'Invoice send failed');
         return;
       }
@@ -2897,6 +2909,15 @@ function openSendInvoiceDialog(invoiceId) {
     },
     'Send Invoice'
   );
+}
+
+function openInvoiceMailDraft(invoiceId) {
+  const invoice = invoiceCache.find((item) => Number(item.id) === Number(invoiceId));
+  const reference = invoice?.invoice_no || `INV-${invoiceId}`;
+  const email = document.getElementById('sendInvoiceEmail')?.value.trim() || invoice?.customer_email || '';
+  const customer = invoice?.customer_name || 'Customer';
+  const body = `Hello ${customer},\n\nPlease find invoice ${reference} from Voxel Veda. Use Preview PDF to open the invoice, then attach or share it from your device.\n\nThank you,\nVoxel Veda`;
+  openEmailDraft(email, `Invoice ${reference} from Voxel Veda`, body);
 }
 
 async function invoiceAction(invoiceId, action) {
@@ -7480,17 +7501,21 @@ function openTimesheetMailDraft() {
 }
 
 function showTimesheetEmailSetupDialog(data, draft) {
-  const missing = (data?.missing || ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'MAIL_FROM_ADDRESS']).join(', ');
+  const missingKeys = Array.isArray(data?.missing) ? data.missing.filter(Boolean) : [];
+  const setupIncomplete = missingKeys.length > 0;
+  const heading = setupIncomplete ? 'Company email setup is incomplete' : 'Direct email delivery is unavailable';
+  const description = data?.message || 'The email provider could not complete delivery. Your timesheet is still ready to preview, print, or send from your mail app.';
+  const deliveryStatus = setupIncomplete ? 'Setup required' : 'Connection unavailable';
   const html = `
     <style>
-      .email-setup-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.65fr);gap:18px}.email-preview-card{border:1px solid rgba(56,189,248,.38);border-radius:18px;background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(8,32,48,.94));padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.28)}.email-preview-card h3{margin:0 0 8px}.email-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.smtp-chip{display:inline-flex;margin:4px 6px 4px 0;padding:7px 10px;border-radius:999px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);color:#9ff7ff;font-weight:800;font-size:12px}.smtp-note{color:#b7c7d6;line-height:1.55}.smtp-box{border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:14px;background:rgba(2,6,23,.45)}.email-mini-table{width:100%;border-collapse:collapse;font-size:12px}.email-mini-table th,.email-mini-table td{padding:8px;border-bottom:1px solid rgba(148,163,184,.2);text-align:left}.email-mini-table th{color:#49f4e7;text-transform:uppercase;font-size:10px}@media(max-width:760px){.email-setup-grid{grid-template-columns:1fr}.email-actions .btn{width:100%;justify-content:center}}
+      .email-setup-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.65fr);gap:18px;max-width:100%}.email-setup-grid>*{min-width:0}.email-preview-card{border:1px solid rgba(56,189,248,.38);border-radius:14px;background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(8,32,48,.94));padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.28)}.email-preview-card h3{margin:0 0 8px;overflow-wrap:anywhere}.email-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.smtp-chip{display:inline-flex;margin:4px 6px 4px 0;padding:7px 10px;border-radius:999px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);color:#9ff7ff;font-weight:800;font-size:12px}.smtp-note{color:#b7c7d6;line-height:1.55;overflow-wrap:anywhere}.smtp-box{border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:14px;background:rgba(2,6,23,.45);overflow:hidden}.email-mini-table{width:100%;border-collapse:collapse;font-size:12px}.email-mini-table th,.email-mini-table td{padding:8px;border-bottom:1px solid rgba(148,163,184,.2);text-align:left;overflow-wrap:anywhere}.email-mini-table th{color:#49f4e7;text-transform:uppercase;font-size:10px}@media(max-width:760px){.email-setup-grid{grid-template-columns:1fr}.email-actions{display:grid;grid-template-columns:1fr 1fr}.email-actions .btn{width:100%;justify-content:center}.smtp-box{order:-1}}@media(max-width:460px){.email-actions{grid-template-columns:1fr}}
     </style>
     <div class="email-setup-grid">
       <div class="email-preview-card">
         <div class="eyebrow">Email delivery</div>
-        <h3>Company email delivery is offline</h3>
-        <p class="smtp-note">The timesheet is ready, but Railway must have the secure Voxel Veda mailbox variables before direct delivery can start.</p>
-        <div>${missing.split(', ').map((key) => `<span class="smtp-chip">${escapeHtml(key)}</span>`).join('')}</div>
+        <h3>${escapeHtml(heading)}</h3>
+        <p class="smtp-note">${escapeHtml(description)}</p>
+        ${missingKeys.length ? `<div>${missingKeys.map((key) => `<span class="smtp-chip">${escapeHtml(key)}</span>`).join('')}</div>` : ''}
         <div class="email-actions">
           <button class="btn primary" type="button" onclick="openTimesheetPreviewWindow()">Preview Timesheet</button>
           <button class="btn" type="button" onclick="printTimesheetPreview()">Print / Save PDF</button>
@@ -7502,7 +7527,7 @@ function showTimesheetEmailSetupDialog(data, draft) {
         <div class="eyebrow">Preview</div>
         <h3>${escapeHtml(draft.subject)}</h3>
         <p class="smtp-note">Records: ${escapeHtml(data?.preview?.records ?? '0')}<br>Total hours: ${escapeHtml(data?.preview?.total_hours ?? '0')}</p>
-        <table class="email-mini-table"><thead><tr><th>Next step</th><th>Status</th></tr></thead><tbody><tr><td>Professional preview</td><td>Ready</td></tr><tr><td>Direct email send</td><td>Needs SMTP</td></tr></tbody></table>
+        <table class="email-mini-table"><thead><tr><th>Action</th><th>Status</th></tr></thead><tbody><tr><td>Timesheet document</td><td>Ready</td></tr><tr><td>Direct email</td><td>${escapeHtml(deliveryStatus)}</td></tr></tbody></table>
       </div>
     </div>
   `;
@@ -7545,8 +7570,8 @@ async function sendTimesheetEmail() {
     return;
   }
 
-  if (log) log.textContent = data.message || 'Email could not be sent. Timesheet preview is ready.';
-  showToast(data.message || 'Timesheet preview is ready');
+  if (log) log.textContent = `${data.message || 'Email could not be sent.'} Timesheet preview is ready.`;
+  showToast(data.message || 'Direct email unavailable. Timesheet preview is ready.');
   showTimesheetEmailSetupDialog(data, lastTimesheetEmailDraft);
 }
 

@@ -4,7 +4,9 @@ const {
   missingSmtpKeys,
   smtpConfig,
   verifyConnection,
-  sendMail
+  sendMail,
+  emailFailureDetails,
+  isEmailTransportError
 } = require('../services/emailService');
 const { processEmailQueue } = require('../services/emailQueue');
 const { renderEmailTemplate, templates } = require('../services/emailTemplates');
@@ -48,12 +50,8 @@ exports.verify = async (_req, res) => {
     return res.json({ message: 'SMTP connection verified successfully.', ...result });
   } catch (error) {
     console.error('SMTP VERIFY ERROR:', error.message);
-    return res.status(502).json({
-      message: error.code === 'SMTP_CONFIG_MISSING'
-        ? error.message
-        : 'Unable to verify SMTP. Check the Hostinger mailbox credentials and Railway variables.',
-      code: error.code || 'SMTP_VERIFY_FAILED'
-    });
+    const details = emailFailureDetails(error);
+    return res.status(details.status).json(details);
   }
 };
 
@@ -76,7 +74,10 @@ exports.sendTest = async (req, res) => {
     });
   } catch (error) {
     console.error('SMTP TEST ERROR:', error.message);
-    return res.status(400).json({ message: error.message, code: error.code || 'EMAIL_TEST_FAILED' });
+    const details = isEmailTransportError(error)
+      ? emailFailureDetails(error)
+      : { status: 400, message: error.message, code: error.code || 'EMAIL_TEST_FAILED' };
+    return res.status(details.status).json(details);
   }
 };
 

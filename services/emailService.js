@@ -51,6 +51,63 @@ function isEmailConfigured() {
   return missingSmtpKeys().length === 0;
 }
 
+const EMAIL_TRANSPORT_CODES = new Set([
+  'SMTP_CONFIG_MISSING',
+  'EAUTH',
+  'ETIMEDOUT',
+  'ESOCKET',
+  'ECONNECTION',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'EDNS'
+]);
+
+function isEmailTransportError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  return EMAIL_TRANSPORT_CODES.has(code) || /smtp|socket|connection|timed?\s*out/i.test(String(error?.message || ''));
+}
+
+function emailFailureDetails(error) {
+  const code = String(error?.code || 'EMAIL_DELIVERY_FAILED').toUpperCase();
+
+  if (code === 'SMTP_CONFIG_MISSING') {
+    return {
+      status: 503,
+      code,
+      message: 'Company email setup is incomplete. Preview or download the document while an administrator completes email configuration.',
+      missing: missingSmtpKeys(),
+      retryable: false
+    };
+  }
+
+  if (code === 'EAUTH') {
+    return {
+      status: 503,
+      code: 'EMAIL_AUTHENTICATION_FAILED',
+      message: 'The company mailbox rejected the sign-in. An administrator must verify the mailbox credentials before direct delivery can resume.',
+      retryable: false
+    };
+  }
+
+  if (isEmailTransportError(error)) {
+    return {
+      status: 503,
+      code: 'EMAIL_TRANSPORT_UNAVAILABLE',
+      message: 'Direct email delivery is unavailable from the current hosting connection. The document is still ready to preview, download, or send from your mail app.',
+      retryable: true
+    };
+  }
+
+  return {
+    status: 502,
+    code: 'EMAIL_DELIVERY_FAILED',
+    message: 'The email provider could not complete delivery. The document is still ready to preview or download.',
+    retryable: true
+  };
+}
+
 function normalizeAddressList(value) {
   const list = Array.isArray(value) ? value : String(value || '').split(/[;,]/);
   return list.map((item) => String(item || '').trim()).filter(Boolean);
@@ -137,5 +194,7 @@ module.exports = {
   missingSmtpKeys,
   smtpConfig,
   normalizeAddressList,
-  validateRecipients
+  validateRecipients,
+  isEmailTransportError,
+  emailFailureDetails
 };

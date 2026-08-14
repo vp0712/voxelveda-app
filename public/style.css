@@ -10643,6 +10643,44 @@ textarea:focus {
   background: linear-gradient(90deg, rgba(57, 229, 140, 0.08), transparent 55%);
 }
 
+.email-delivery-status {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 10px;
+  background: rgba(120, 53, 15, 0.2);
+  color: #fde68a;
+  line-height: 1.45;
+}
+
+.email-delivery-status[hidden] {
+  display: none;
+}
+
+.email-delivery-status span {
+  color: #dbe7ef;
+}
+
+.document-recovery-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+@media (max-width: 520px) {
+  .document-recovery-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .document-recovery-actions > * {
+    width: 100%;
+  }
+}
+
 .staff-account-actions {
   display: flex;
   flex-wrap: wrap;
