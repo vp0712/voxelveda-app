@@ -972,7 +972,43 @@ function renderGroupedTimesheets(container, groups, type) {
   `).join('');
 }
 
+function isSuccessfulActionMessage(message) {
+  const text = String(message || '');
+  const hasSuccessSignal = /\b(successfully|saved|updated|created|submitted|sent|deleted|approved|published|recorded|completed|processed|ready)\b/i.test(text);
+  const hasFailureSignal = /\b(failed|failure|error|unable|unavailable|offline|missing|required|denied|not sent|could not|did not)\b/i.test(text);
+  return hasSuccessSignal && !hasFailureSignal;
+}
+
+function showSuccessConfirmation(message) {
+  let popup = document.getElementById('actionSuccessPopup');
+  if (!popup) {
+    popup = document.createElement('section');
+    popup.id = 'actionSuccessPopup';
+    popup.className = 'action-success-popup';
+    popup.setAttribute('role', 'status');
+    popup.setAttribute('aria-live', 'polite');
+    popup.innerHTML = `
+      <div class="action-success-icon" aria-hidden="true">&#10003;</div>
+      <div class="action-success-copy"><strong>Completed</strong><span></span></div>
+      <button type="button" class="action-success-close" aria-label="Close confirmation">&#215;</button>
+    `;
+    popup.querySelector('.action-success-close').onclick = () => popup.classList.remove('show');
+    document.body.appendChild(popup);
+  }
+
+  popup.querySelector('.action-success-copy span').textContent = String(message || 'Action completed successfully');
+  popup.classList.remove('show');
+  requestAnimationFrame(() => popup.classList.add('show'));
+  clearTimeout(window.__actionSuccessTimer);
+  window.__actionSuccessTimer = setTimeout(() => popup.classList.remove('show'), 4600);
+}
+
 function showToast(message) {
+  if (isSuccessfulActionMessage(message)) {
+    showSuccessConfirmation(message);
+    return;
+  }
+
   const toast = document.getElementById('toast');
 
   if (!toast) {
