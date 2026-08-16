@@ -40,6 +40,13 @@ const auth = require('./middleware/auth');
 
 const app = express();
 const publicDir = path.join(__dirname, 'public');
+const noStorePublicAssets = new Set([
+  'admin-dashboard.js',
+  'staff.js',
+  'style.css',
+  'mobile-shell.js',
+  'service-worker.js'
+]);
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
@@ -136,8 +143,11 @@ app.get(protectedModuleRoutes, noIndex, pageAuth(), (req, res) => {
 app.use(express.static(publicDir, {
   dotfiles: 'deny',
   index: false,
-  setHeaders(res) {
+  setHeaders(res, filePath) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
+    if (noStorePublicAssets.has(path.basename(filePath))) {
+      res.setHeader('Cache-Control', 'no-store, max-age=0');
+    }
   }
 }));
 app.use('/invoices', noIndex, auth, express.static(path.join(__dirname, 'invoices'), {
