@@ -2940,9 +2940,12 @@ function openSendInvoiceDialog(invoiceId) {
           const status = document.getElementById('sendInvoiceDeliveryStatus');
           if (status && /^EMAIL_|^SMTP_/.test(String(data.code || ''))) {
             status.hidden = false;
-            status.innerHTML = `<strong>Invoice ${escapeHtml(invoiceReference)} is ready.</strong><span>${escapeHtml(data.message || 'Direct delivery is unavailable. Use the PDF or mail draft option below.')}</span>`;
+            status.setAttribute('role', 'status');
+            status.innerHTML = `<strong>Delivery options for ${escapeHtml(invoiceReference)}</strong><span>${escapeHtml(data.message || 'Direct delivery is unavailable. Preview the PDF or open a prepared mail draft below.')}</span>`;
+            if (sendButton) sendButton.dataset.deliveryUnavailable = 'true';
+          } else {
+            showToast(data.message || 'Invoice send failed');
           }
-          showToast(data.message || 'Invoice send failed');
           return;
         }
 
@@ -2954,13 +2957,14 @@ function openSendInvoiceDialog(invoiceId) {
         const status = document.getElementById('sendInvoiceDeliveryStatus');
         if (status) {
           status.hidden = false;
-          status.innerHTML = `<strong>Invoice ${escapeHtml(invoiceReference)} is ready.</strong><span>The server could not be reached. Preview the PDF or open a mail draft and try direct delivery again later.</span>`;
+          status.setAttribute('role', 'status');
+          status.innerHTML = `<strong>Delivery options for ${escapeHtml(invoiceReference)}</strong><span>The email service could not be reached. Preview the PDF or open a prepared mail draft below.</span>`;
         }
-        showToast('Invoice delivery could not connect');
+        if (sendButton) sendButton.dataset.deliveryUnavailable = 'true';
       } finally {
         if (sendButton && document.body.contains(sendButton)) {
           sendButton.disabled = false;
-          sendButton.textContent = 'Send Invoice';
+          sendButton.textContent = sendButton.dataset.deliveryUnavailable === 'true' ? 'Retry Email' : 'Send Invoice';
         }
       }
     },

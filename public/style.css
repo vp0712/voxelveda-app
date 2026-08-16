@@ -10740,11 +10740,12 @@ textarea:focus {
   gap: 5px;
   margin-top: 12px;
   padding: 13px 14px;
-  border: 1px solid rgba(251, 191, 36, 0.45);
+  border: 1px solid rgba(56, 189, 248, 0.42);
   border-radius: 10px;
-  background: rgba(120, 53, 15, 0.2);
-  color: #fde68a;
+  background: linear-gradient(145deg, rgba(8, 47, 73, 0.42), rgba(8, 35, 54, 0.28));
+  color: #9eeeff;
   line-height: 1.45;
+  box-shadow: inset 3px 0 0 rgba(45, 212, 191, 0.72);
 }
 
 .email-delivery-status[hidden] {
