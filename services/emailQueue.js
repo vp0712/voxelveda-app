@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { ensureWorkforceSchema } = require('./workforceSchema');
-const { sendMail, normalizeAddressList } = require('./emailService');
+const { sendMail, normalizeAddressList, isEmailTransportError } = require('./emailService');
 
 function parseJson(value, fallback) {
   try {
@@ -119,8 +119,13 @@ async function processEmailQueue(limit = 10) {
       outcomes.push({ id: row.id, status: 'SENT' });
     } catch (error) {
       const attempts = Number(row.attempts || 0) + 1;
-      const retry = attempts < Number(row.max_attempts || 5);
-      const retryMinutes = Math.min(60, 2 ** Math.max(0, attempts - 1));
+      const code = String(error?.code || '').toUpperCase();
+      const persistentTransportRetry = isEmailTransportError(error)
+        && !['EAUTH', 'SMTP_CONFIG_MISSING'].includes(code);
+      const retry = persistentTransportRetry || attempts < Number(row.max_attempts || 5);
+      const retryMinutes = persistentTransportRetry
+        ? Math.min(360, 2 ** Math.min(9, Math.max(0, attempts - 1)))
+        : Math.min(60, 2 ** Math.max(0, attempts - 1));
       await pool.query(
         `
         UPDATE email_queue

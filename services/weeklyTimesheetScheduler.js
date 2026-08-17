@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { queueEmail } = require('./emailQueue');
+const { isEmailTransportError } = require('./emailService');
 const { brandedLayout } = require('./emailTemplates');
 const { ensureWorkforceSchema } = require('./workforceSchema');
 const { ensureUserLifecycleSchema } = require('./userLifecycleService');
@@ -19,6 +20,10 @@ function escapeHtml(value) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+function validEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
 function isoDate(date) {
@@ -183,6 +188,8 @@ async function queueClosedWeekTimesheets(options = {}) {
 
   let queued = 0;
   let existing = 0;
+  let recovered = 0;
+  let invalid = 0;
   for (const staff of staffRows) {
     const totalHours = Number(staff.total_hours || 0);
     const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
@@ -206,11 +213,33 @@ async function queueClosedWeekTimesheets(options = {}) {
     );
     const idempotencyKey = `weekly-timesheet:${timesheet.id}:${period.start}:${period.end}:v1`;
     const [[alreadyQueued]] = await pool.query(
-      'SELECT id FROM email_queue WHERE idempotency_key = ? LIMIT 1',
+      'SELECT id, status, last_error FROM email_queue WHERE idempotency_key = ? LIMIT 1',
       [idempotencyKey]
     );
     if (alreadyQueued) {
+      const failedForTransport = String(alreadyQueued.status || '').toUpperCase() === 'FAILED'
+        && isEmailTransportError({ message: alreadyQueued.last_error || '' });
+      if (failedForTransport) {
+        await pool.query(
+          `UPDATE email_queue
+           SET status = 'RETRY', attempts = 0, next_attempt_at = NOW(), last_error = NULL
+           WHERE id = ? AND status = 'FAILED'`,
+          [alreadyQueued.id]
+        );
+        recovered += 1;
+      }
       existing += 1;
+      continue;
+    }
+
+    if (!validEmail(staff.email)) {
+      await pool.query(
+        `INSERT INTO notifications
+         (user_id, type, title, message, priority, linked_module, linked_record_id)
+         VALUES (?, 'WEEKLY_TIMESHEET_EMAIL_REQUIRED', 'Add an email for weekly timesheets', ?, 'high', 'profile', ?)`,
+        [staff.id, `Your timesheet for ${period.start} to ${period.end} is ready, but your profile email is missing or invalid.`, String(timesheet.id)]
+      );
+      invalid += 1;
       continue;
     }
 
@@ -234,12 +263,12 @@ async function queueClosedWeekTimesheets(options = {}) {
       `INSERT INTO notifications
        (user_id, type, title, message, priority, linked_module, linked_record_id)
        VALUES (?, 'WEEKLY_TIMESHEET_READY', 'Weekly timesheet ready', ?, 'normal', 'timesheets', ?)`,
-      [staff.id, `Your timesheet for ${period.start} to ${period.end} has been prepared and emailed.`, String(timesheet.id)]
+      [staff.id, `Your timesheet for ${period.start} to ${period.end} has been prepared and queued for email delivery.`, String(timesheet.id)]
     );
     queued += 1;
   }
 
-  return { skipped: false, queued, existing, staff: staffRows.length, period };
+  return { skipped: false, queued, existing, recovered, invalid, staff: staffRows.length, period };
 }
 
 async function runScheduledWeeklyTimesheetEmails() {
@@ -249,7 +278,7 @@ async function runScheduledWeeklyTimesheetEmails() {
     const result = await queueClosedWeekTimesheets();
     const runKey = result.period ? `${result.period.start}:${result.period.end}` : '';
     if (!result.skipped && (result.queued > 0 || lastCompletedRunKey !== runKey)) {
-      console.log(`Weekly timesheet email run ${runKey}: ${result.queued} queued, ${result.existing} already queued.`);
+      console.log(`Weekly timesheet email run ${runKey}: ${result.queued} queued, ${result.recovered || 0} recovered, ${result.existing} already queued, ${result.invalid || 0} invalid emails.`);
     }
     if (!result.skipped) lastCompletedRunKey = runKey;
   } catch (error) {
