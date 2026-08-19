@@ -44,6 +44,7 @@ const noStorePublicAssets = new Set([
   'admin-dashboard.js',
   'staff.js',
   'style.css',
+  'advanced-theme.css',
   'mobile-shell.js',
   'service-worker.js'
 ]);
