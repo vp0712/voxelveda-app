@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
 <link rel="stylesheet" href="/style.css?v=20260816-invoice-delivery-ux"/>
-  <link rel="stylesheet" href="/advanced-theme.css?v=20260819-precision-ui" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260820-forge-ui" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
   <link rel="manifest" href="/site.webmanifest?v=20260703-brand" />
-  <meta name="theme-color" content="#101311" />
+  <meta name="theme-color" content="#0b0d0f" />
   <meta property="og:site_name" content="Voxel Veda" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <meta property="og:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />
@@ -24,7 +24,8 @@
   <div class="mobile-sidebar-backdrop" onclick="toggleMobileMenu(false)"></div>
 
   <div class="app-shell">
-    <aside class="sidebar vv-sidebar" aria-label="Voxel Veda navigation">
+    <aside id="primarySidebar" class="sidebar vv-sidebar" aria-label="Voxel Veda navigation">
+      <button class="sidebar-close" type="button" aria-label="Close menu" onclick="toggleMobileMenu(false)">&times;</button>
       <div class="brand shell-brand">
         <img src="/Frame 1.png?v=20260703-brand" class="logo-img" alt="Voxel Veda Logo">
         <div>
@@ -135,7 +136,6 @@
           <div class="home-command-copy">
             <span class="panel-kicker">Operations Core</span>
             <h1>Voxel Veda Control Room</h1>
-            <p>Live commercial, production, inventory and supplier pressure signals in one executive command view.</p>
             <div class="home-command-actions">
               <button class="primary-btn" onclick="goSection('invoiceSection')">Create / Review Invoice</button>
               <button class="secondary-btn" onclick="goSection('expenseSection')">Supplier Payments</button>

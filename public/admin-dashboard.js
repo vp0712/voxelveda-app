@@ -175,10 +175,12 @@ function toggleMobileMenu(open) {
   document.body.classList.toggle('vv-scroll-locked', shouldOpen);
   const sidebar = document.querySelector('.sidebar');
   const backdrop = document.querySelector('.mobile-sidebar-backdrop');
+  sidebar?.classList.toggle('is-open', shouldOpen);
+  backdrop?.classList.toggle('is-open', shouldOpen);
   document.querySelectorAll('.topbar-menu-btn, .mobile-menu-btn').forEach((btn) => {
     btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
   });
-  if (sidebar) sidebar.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+  if (sidebar) sidebar.setAttribute('aria-hidden', isMobileShellViewport() && !shouldOpen ? 'true' : 'false');
   if (backdrop) backdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
   if (shouldOpen) {
     closeNotificationPanel();
@@ -366,6 +368,8 @@ function closeResponsiveOverlaysForViewport() {
   if (window.innerWidth >= 1024) {
     toggleMobileMenu(false);
     closeNotificationPanel();
+  } else if (!document.body.classList.contains('mobile-menu-open')) {
+    document.querySelector('.sidebar')?.setAttribute('aria-hidden', 'true');
   }
 }
 

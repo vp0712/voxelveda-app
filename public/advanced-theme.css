@@ -1,28 +1,28 @@
-/* Voxel Veda Precision UI 2026-08-19
+/* Voxel Veda Forge UI 2026-08-20
    Final shared presentation layer. Loaded after the historical application CSS. */
 
 :root {
   color-scheme: dark;
-  --vv-bg: #101311;
-  --vv-bg-raised: #151917;
-  --vv-surface: #1a1f1c;
-  --vv-surface-2: #202622;
-  --vv-surface-3: #272e29;
-  --vv-line: rgba(226, 232, 226, 0.13);
-  --vv-line-strong: rgba(190, 242, 100, 0.34);
-  --vv-text: #f4f7f4;
-  --vv-muted: #a7b0a9;
-  --vv-soft: #7f8981;
-  --vv-accent: #bef264;
-  --vv-accent-strong: #a3e635;
-  --vv-info: #67e8f9;
-  --vv-warning: #facc15;
-  --vv-danger: #fb7185;
-  --vv-success: #86efac;
-  --vv-sidebar-width: 236px;
-  --vv-topbar-height: 76px;
+  --vv-bg: #0b0d0f;
+  --vv-bg-raised: #111416;
+  --vv-surface: #171b1e;
+  --vv-surface-2: #1e2428;
+  --vv-surface-3: #273036;
+  --vv-line: rgba(173, 197, 207, 0.16);
+  --vv-line-strong: rgba(79, 209, 255, 0.42);
+  --vv-text: #f4f8fa;
+  --vv-muted: #a8b6bc;
+  --vv-soft: #7d8c93;
+  --vv-accent: #4fd1ff;
+  --vv-accent-strong: #22b8e6;
+  --vv-info: #8b9dff;
+  --vv-warning: #ffbd66;
+  --vv-danger: #ff7184;
+  --vv-success: #4de2a8;
+  --vv-sidebar-width: 248px;
+  --vv-topbar-height: 72px;
   --vv-radius: 8px;
-  --vv-shadow: 0 18px 44px rgba(0, 0, 0, 0.26);
+  --vv-shadow: 0 20px 48px rgba(0, 0, 0, 0.3);
 }
 
 html,
@@ -42,9 +42,9 @@ body.customer-portal {
 body::before {
   opacity: 1 !important;
   background-image:
-    linear-gradient(rgba(190, 242, 100, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(103, 232, 249, 0.018) 1px, transparent 1px) !important;
-  background-size: 56px 56px !important;
+    linear-gradient(rgba(79, 209, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 189, 102, 0.016) 1px, transparent 1px) !important;
+  background-size: 64px 64px !important;
   mask-image: linear-gradient(to bottom, #000, transparent 76%) !important;
   filter: none !important;
 }
@@ -75,7 +75,7 @@ input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
 summary:focus-visible {
-  outline: 3px solid rgba(190, 242, 100, 0.36) !important;
+  outline: 3px solid rgba(79, 209, 255, 0.38) !important;
   outline-offset: 2px !important;
 }
 
@@ -1254,5 +1254,584 @@ textarea:focus { border-color: var(--vv-accent) !important; }
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ========================================================================== */
+/* Forge shell: authoritative final overrides                                 */
+/* ========================================================================== */
+
+html.vv-scroll-locked,
+body.vv-scroll-locked {
+  overflow: hidden !important;
+  overscroll-behavior: none !important;
+}
+
+body,
+body.staff-portal,
+body.customer-portal {
+  background:
+    radial-gradient(circle at 82% 4%, rgba(79, 209, 255, 0.08), transparent 28rem),
+    radial-gradient(circle at 16% 88%, rgba(255, 189, 102, 0.045), transparent 34rem),
+    var(--vv-bg) !important;
+}
+
+body::after {
+  opacity: 0.015 !important;
+  background-size: min(32vw, 460px) !important;
+  filter: grayscale(1) contrast(0.8) !important;
+}
+
+.sidebar,
+.sidebar.vv-sidebar,
+.staff-portal .sidebar,
+.customer-portal .sidebar {
+  background: linear-gradient(180deg, #0d1114 0%, #090b0d 100%) !important;
+  border-right: 1px solid rgba(126, 154, 166, 0.2) !important;
+  box-shadow: 18px 0 48px rgba(0, 0, 0, 0.28) !important;
+}
+
+.sidebar .brand,
+.sidebar.vv-sidebar .shell-brand,
+.staff-portal .sidebar .brand,
+.customer-portal .sidebar .brand,
+.staff-sidebar-profile {
+  background: linear-gradient(145deg, rgba(79, 209, 255, 0.09), rgba(139, 157, 255, 0.035)) !important;
+  border-color: rgba(79, 209, 255, 0.2) !important;
+}
+
+.sidebar .brand .logo-img,
+.sidebar.vv-sidebar .shell-brand .logo-img,
+.staff-portal .sidebar .brand .logo-img,
+.customer-portal .sidebar .brand .logo-img {
+  background: #080b0d !important;
+  border: 1px solid rgba(173, 197, 207, 0.13) !important;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(79, 209, 255, 0.3) !important;
+}
+
+.nav-section-label {
+  color: #778991 !important;
+}
+
+.sidebar .nav-btn,
+.sidebar .nav-sub-btn,
+.sidebar .nav-group-toggle,
+.staff-portal .sidebar .nav-btn,
+.staff-portal .sidebar .nav-sub-btn {
+  color: #dbe5e9 !important;
+}
+
+.sidebar .nav-btn:hover,
+.sidebar .nav-sub-btn:hover,
+.sidebar .nav-group-toggle:hover {
+  background: rgba(79, 209, 255, 0.07) !important;
+  border-color: rgba(79, 209, 255, 0.2) !important;
+}
+
+.sidebar .nav-btn.active,
+.sidebar .nav-sub-btn.active,
+.staff-portal .sidebar .nav-btn.active,
+.staff-portal .sidebar .nav-sub-btn.active {
+  color: #061116 !important;
+  background: linear-gradient(135deg, #70dcff, #4fd1ff 58%, #8b9dff) !important;
+  border-color: transparent !important;
+  box-shadow: inset 3px 0 0 rgba(255, 255, 255, 0.72), 0 10px 24px rgba(79, 209, 255, 0.14) !important;
+}
+
+.sidebar .nav-group {
+  background: rgba(255, 255, 255, 0.014) !important;
+  border-color: rgba(173, 197, 207, 0.12) !important;
+}
+
+.nav-group-caret {
+  color: var(--vv-accent) !important;
+}
+
+.sidebar-footer {
+  background: linear-gradient(180deg, rgba(9, 11, 13, 0), #090b0d 24%) !important;
+  border-top-color: rgba(173, 197, 207, 0.12) !important;
+}
+
+.sidebar-close {
+  position: absolute !important;
+  top: calc(12px + env(safe-area-inset-top)) !important;
+  right: 12px !important;
+  z-index: 4 !important;
+  display: none !important;
+  place-items: center !important;
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  color: var(--vv-text) !important;
+  background: rgba(255, 255, 255, 0.055) !important;
+  border: 1px solid rgba(173, 197, 207, 0.2) !important;
+  border-radius: 8px !important;
+  font-size: 1.65rem !important;
+  font-weight: 400 !important;
+  line-height: 1 !important;
+}
+
+.app-shell > .main,
+.staff-portal .app-shell > .main,
+.customer-portal .app-shell > .main {
+  padding: 18px clamp(22px, 2.3vw, 46px) 48px !important;
+}
+
+.page-section {
+  max-width: 1920px !important;
+}
+
+.topbar,
+.vv-topbar,
+.staff-portal .topbar {
+  top: 10px !important;
+  background: rgba(17, 22, 25, 0.97) !important;
+  border-color: rgba(173, 197, 207, 0.17) !important;
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.24) !important;
+}
+
+.topbar::after,
+.vv-topbar::after {
+  content: "" !important;
+  position: absolute !important;
+  right: 14px !important;
+  bottom: -1px !important;
+  left: 14px !important;
+  height: 1px !important;
+  pointer-events: none !important;
+  background: linear-gradient(90deg, transparent, rgba(79, 209, 255, 0.5), rgba(255, 189, 102, 0.34), transparent) !important;
+}
+
+.topbar-title h2,
+.topbar > div:first-child h2 {
+  font-size: clamp(1.08rem, 1.25vw, 1.34rem) !important;
+}
+
+.topbar-kicker,
+.panel-kicker,
+.eyebrow {
+  color: var(--vv-accent) !important;
+}
+
+.topbar-quick-action,
+.primary-btn,
+.login-btn,
+.roster-generate-btn,
+button.primary-btn {
+  color: #061116 !important;
+  background: linear-gradient(135deg, #70dcff, #4fd1ff 58%, #8b9dff) !important;
+  border-color: transparent !important;
+  box-shadow: 0 10px 24px rgba(79, 209, 255, 0.13) !important;
+}
+
+.topbar-quick-action:hover,
+.primary-btn:hover,
+.login-btn:hover {
+  color: #061116 !important;
+  background: linear-gradient(135deg, #90e6ff, #6bdcff 56%, #a8b4ff) !important;
+}
+
+.secondary-btn,
+.icon-btn,
+.quick-pill,
+.profile-chip,
+.notification-bell,
+.staff-task-alert {
+  background: rgba(255, 255, 255, 0.035) !important;
+  border-color: rgba(173, 197, 207, 0.17) !important;
+}
+
+.profile-initial,
+.staff-avatar,
+.notification-bell .bell-mark {
+  color: #061116 !important;
+  background: var(--vv-accent) !important;
+}
+
+.live-pill {
+  color: var(--vv-success) !important;
+  background: rgba(77, 226, 168, 0.07) !important;
+  border-color: rgba(77, 226, 168, 0.26) !important;
+}
+
+.notification-panel,
+.notification-dropdown {
+  background: #12181c !important;
+  border-color: rgba(79, 209, 255, 0.32) !important;
+}
+
+.home-command-hero {
+  grid-template-columns: minmax(0, 1fr) 132px !important;
+  min-height: 176px !important;
+  padding: clamp(22px, 2.2vw, 34px) !important;
+  background:
+    linear-gradient(105deg, rgba(79, 209, 255, 0.07), transparent 42%),
+    linear-gradient(155deg, #171d21, #121619) !important;
+  border-color: rgba(173, 197, 207, 0.16) !important;
+  border-left-color: var(--vv-accent) !important;
+  box-shadow: 0 24px 54px rgba(0, 0, 0, 0.25) !important;
+}
+
+.home-command-copy h1 {
+  margin: 8px 0 18px !important;
+  font-size: clamp(2rem, 2.4vw, 3rem) !important;
+}
+
+.home-command-copy > p {
+  display: none !important;
+}
+
+.home-command-actions {
+  margin-top: 0 !important;
+}
+
+.home-command-orb {
+  width: 118px !important;
+  height: 118px !important;
+  padding: 14px !important;
+  background: #0b0f12 !important;
+  border-color: rgba(79, 209, 255, 0.2) !important;
+}
+
+.home-command-orb img {
+  width: 68px !important;
+  height: 68px !important;
+}
+
+.home-command-orb span {
+  color: var(--vv-accent) !important;
+}
+
+.dashboard-action-row {
+  gap: 10px !important;
+}
+
+.command-pill {
+  min-height: 44px !important;
+  background: linear-gradient(180deg, rgba(30, 36, 40, 0.96), rgba(19, 23, 26, 0.96)) !important;
+}
+
+.command-pill span {
+  color: #061116 !important;
+  background: var(--vv-accent) !important;
+}
+
+.card,
+.vv-suite-panel,
+.admin-workhub-control,
+.staff-work-panel,
+.staff-suite-panel,
+.workforce-intelligence-panel,
+.roster-generator-card,
+.supplier-intelligence-card,
+.stock-table-card,
+.table-wrap,
+.dialog-panel,
+.modal,
+.modal-content,
+.login-card,
+.public-card,
+.settings-qr-frame,
+.qr-tool-card,
+.announcement-panel {
+  background: linear-gradient(155deg, rgba(25, 30, 34, 0.98), rgba(18, 22, 25, 0.98)) !important;
+  border-color: rgba(173, 197, 207, 0.15) !important;
+}
+
+.vv-suite-card,
+.command-insight-card,
+.system-action,
+.staff-action-card,
+.roster-signal-card,
+.roster-week-card {
+  background: rgba(255, 255, 255, 0.022) !important;
+  border-color: rgba(173, 197, 207, 0.15) !important;
+}
+
+.card:hover,
+.vv-suite-card:hover,
+.command-insight-card:hover,
+.system-action:hover,
+.staff-action-card:hover {
+  border-color: rgba(79, 209, 255, 0.38) !important;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.2) !important;
+}
+
+.kpi-teal,
+.kpi-blue,
+.kpi-green,
+.kpi-red {
+  border-top-color: var(--vv-accent) !important;
+}
+
+.kpi-blue { border-top-color: var(--vv-info) !important; }
+.kpi-green { border-top-color: var(--vv-success) !important; }
+.kpi-red { border-top-color: var(--vv-danger) !important; }
+
+.vv-suite-card > span,
+.command-insight-card > span,
+.system-action > span {
+  color: var(--vv-accent) !important;
+}
+
+input,
+select,
+textarea {
+  color: var(--vv-text) !important;
+  background: #0e1316 !important;
+  border-color: rgba(173, 197, 207, 0.2) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(79, 209, 255, 0.72) !important;
+  box-shadow: 0 0 0 3px rgba(79, 209, 255, 0.1) !important;
+}
+
+.login-page,
+.vv-entry-sequence {
+  background: #0b0d0f !important;
+}
+
+.login-page .login-card {
+  background: linear-gradient(155deg, #181d21, #111518) !important;
+  border-color: rgba(79, 209, 255, 0.28) !important;
+}
+
+.login-page .login-logo-box {
+  background: #090c0e !important;
+}
+
+.vv-entry-ring-one { border-top-color: var(--vv-accent) !important; }
+.vv-entry-ring-two { border-right-color: var(--vv-warning) !important; }
+.vv-entry-scan { background: var(--vv-accent) !important; box-shadow: 0 0 18px rgba(79, 209, 255, 0.36) !important; }
+
+@media (min-width: 1800px) {
+  .page-section {
+    max-width: none !important;
+  }
+
+  .app-shell > .main,
+  .staff-portal .app-shell > .main,
+  .customer-portal .app-shell > .main {
+    padding-inline: clamp(42px, 3vw, 72px) !important;
+  }
+
+  .home-command-hero {
+    grid-template-columns: minmax(0, 1fr) 146px !important;
+  }
+
+  .vv-suite-grid,
+  .admin-workhub-grid,
+  .system-action-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --vv-sidebar-width: 300px;
+  }
+
+  .sidebar,
+  .sidebar.vv-sidebar,
+  .staff-portal .sidebar,
+  .customer-portal .sidebar {
+    top: 0 !important;
+    bottom: 0 !important;
+    width: min(calc(100vw - 52px), var(--vv-sidebar-width)) !important;
+    max-width: var(--vv-sidebar-width) !important;
+    height: 100dvh !important;
+    padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    transform: translate3d(-110%, 0, 0) !important;
+    background: linear-gradient(180deg, #11171b, #090c0f) !important;
+    border-right-color: rgba(79, 209, 255, 0.25) !important;
+    border-radius: 0 14px 14px 0 !important;
+    box-shadow: 24px 0 70px rgba(0, 0, 0, 0.56) !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
+    transition: transform 220ms cubic-bezier(0.22, 0.78, 0.22, 1) !important;
+  }
+
+  .sidebar.is-open,
+  body.mobile-menu-open .sidebar,
+  html.mobile-menu-open .sidebar,
+  body.mobile-menu-open .sidebar.vv-sidebar,
+  html.mobile-menu-open .sidebar.vv-sidebar {
+    transform: translate3d(0, 0, 0) !important;
+    pointer-events: auto !important;
+  }
+
+  .sidebar-close {
+    display: grid !important;
+  }
+
+  .sidebar .brand,
+  .sidebar.vv-sidebar .shell-brand,
+  .staff-portal .sidebar .brand,
+  .customer-portal .sidebar .brand {
+    min-height: 52px !important;
+    margin: 0 48px 10px 0 !important;
+    padding: 7px !important;
+    background: rgba(79, 209, 255, 0.065) !important;
+  }
+
+  .staff-sidebar-profile {
+    min-height: 52px !important;
+    margin: 0 0 10px !important;
+    padding: 7px !important;
+  }
+
+  .sidebar-nav {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    padding: 0 4px 10px 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .sidebar-footer {
+    position: relative !important;
+    flex: 0 0 auto !important;
+    bottom: auto !important;
+    padding-top: 9px !important;
+  }
+
+  .mobile-sidebar-backdrop,
+  .mobile-sidebar-backdrop.is-open {
+    display: block !important;
+    background: rgba(3, 6, 8, 0.76) !important;
+  }
+
+  .mobile-sidebar-backdrop.is-open,
+  body.mobile-menu-open .mobile-sidebar-backdrop,
+  html.mobile-menu-open .mobile-sidebar-backdrop {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .app-shell > .main,
+  .staff-portal .app-shell > .main,
+  .customer-portal .app-shell > .main {
+    width: 100% !important;
+    margin-left: 0 !important;
+    padding: 10px 12px 88px !important;
+  }
+
+  .topbar,
+  .vv-topbar,
+  .staff-portal .topbar {
+    top: 6px !important;
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) auto !important;
+    gap: 10px !important;
+    min-height: 64px !important;
+    padding: 8px 10px !important;
+  }
+
+  .topbar-menu-btn,
+  .mobile-menu-btn {
+    color: var(--vv-text) !important;
+    background: rgba(79, 209, 255, 0.08) !important;
+    border-color: rgba(79, 209, 255, 0.3) !important;
+  }
+
+  .topbar-menu-btn span,
+  .mobile-menu-btn span {
+    background: var(--vv-accent) !important;
+  }
+
+  .staff-portal .mobile-menu-btn {
+    top: max(15px, env(safe-area-inset-top)) !important;
+    left: 20px !important;
+  }
+
+  .staff-portal .topbar {
+    padding-left: 58px !important;
+  }
+
+  .mobile-bottom-nav,
+  .admin-mobile-bottom-nav,
+  .staff-mobile-bottom-nav {
+    background: rgba(17, 22, 25, 0.97) !important;
+    border-color: rgba(79, 209, 255, 0.22) !important;
+  }
+
+  .mobile-bottom-nav .mobile-bottom-primary,
+  .admin-mobile-bottom-nav .mobile-bottom-primary,
+  .staff-mobile-bottom-nav .mobile-bottom-primary {
+    color: #061116 !important;
+    background: var(--vv-accent) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .home-command-hero {
+    grid-template-columns: 1fr !important;
+    padding: 20px !important;
+  }
+
+  .home-command-copy h1 {
+    margin-bottom: 16px !important;
+    font-size: clamp(1.72rem, 8vw, 2.25rem) !important;
+  }
+
+  .home-command-actions {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dashboard-action-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  .command-pill {
+    min-height: 48px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .topbar-actions,
+  .staff-top-actions {
+    gap: 5px !important;
+  }
+
+  .notification-panel,
+  .notification-dropdown {
+    top: 76px !important;
+    right: 10px !important;
+    left: 10px !important;
+  }
+
+  .dialog-panel,
+  .modal,
+  .modal-content {
+    border-top-color: rgba(79, 209, 255, 0.34) !important;
+  }
+}
+
+@media (max-width: 420px) {
+  .sidebar,
+  .sidebar.vv-sidebar,
+  .staff-portal .sidebar,
+  .customer-portal .sidebar {
+    width: min(calc(100vw - 44px), 286px) !important;
+  }
+
+  .sidebar .nav-btn,
+  .sidebar .nav-sub-btn,
+  .sidebar .nav-group-toggle,
+  .staff-portal .sidebar .nav-btn,
+  .staff-portal .sidebar .nav-sub-btn {
+    min-height: 40px !important;
+    font-size: 0.78rem !important;
   }
 }

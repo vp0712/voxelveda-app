@@ -93,10 +93,12 @@ function syncMobileMenuState(shouldOpen) {
   document.body.classList.toggle('vv-scroll-locked', shouldOpen);
   const sidebar = document.querySelector('.sidebar');
   const backdrop = document.querySelector('.mobile-sidebar-backdrop');
+  sidebar?.classList.toggle('is-open', shouldOpen);
+  backdrop?.classList.toggle('is-open', shouldOpen);
   document.querySelectorAll('.mobile-menu-btn, .topbar-menu-btn').forEach((btn) => {
     btn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
   });
-  if (sidebar) sidebar.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+  if (sidebar) sidebar.setAttribute('aria-hidden', isMobileShellViewport() && !shouldOpen ? 'true' : 'false');
   if (backdrop) backdrop.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
 }
 
@@ -116,6 +118,14 @@ function closeMobileMenuOnCompact() {
 
 document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') toggleMobileMenu(false);
+});
+
+window.addEventListener('resize', () => {
+  if (!isMobileShellViewport()) {
+    toggleMobileMenu(false);
+  } else if (!document.body.classList.contains('mobile-menu-open')) {
+    document.querySelector('.sidebar')?.setAttribute('aria-hidden', 'true');
+  }
 });
 
 function enhanceResponsiveTables() {
