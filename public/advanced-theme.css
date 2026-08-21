@@ -3116,3 +3116,103 @@ table tbody tr:hover td {
     min-width: 0 !important;
   }
 }
+
+/* ========================================================================== */
+/* Viewport reliability: notifications and high-resolution operations canvas. */
+/* ========================================================================== */
+
+.topbar,
+.vv-topbar,
+.topbar-actions,
+.notification-center {
+  overflow: visible !important;
+}
+
+.notification-panel,
+.notification-dropdown {
+  position: fixed !important;
+  top: 92px !important;
+  right: 24px !important;
+  left: auto !important;
+  width: min(410px, calc(100vw - 32px)) !important;
+  min-width: min(330px, calc(100vw - 32px)) !important;
+  max-width: 410px !important;
+  max-height: min(620px, calc(100dvh - 112px)) !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  z-index: 10020 !important;
+  overscroll-behavior: contain;
+}
+
+.notification-panel-head,
+.notification-list,
+.notification-item,
+.notification-empty {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+}
+
+.notification-item,
+.notification-item * {
+  min-width: 0 !important;
+  overflow-wrap: anywhere;
+}
+
+@media (min-width: 1600px) {
+  html {
+    font-size: 17px !important;
+  }
+
+  .page-section {
+    max-width: 2040px !important;
+  }
+
+  .app-shell > .main,
+  .staff-portal .app-shell > .main,
+  .customer-portal .app-shell > .main {
+    padding-right: clamp(34px, 2.6vw, 60px) !important;
+    padding-left: clamp(34px, 2.6vw, 60px) !important;
+  }
+
+  #dashboardSection .home-command-hero {
+    min-height: 230px !important;
+    padding: 30px 34px !important;
+  }
+
+  #dashboardSection .home-command-copy h1 {
+    font-size: 2.65rem !important;
+  }
+
+  #dashboardSection .vv-suite-panel {
+    padding: 28px !important;
+  }
+
+  #dashboardSection .vv-suite-grid {
+    gap: 14px !important;
+  }
+
+  #dashboardSection .vv-suite-card {
+    min-height: 128px !important;
+    padding: 17px !important;
+  }
+
+  #dashboardSection .metric-grid > .card {
+    min-height: 150px !important;
+    padding: 24px !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .notification-panel,
+  .notification-dropdown {
+    top: calc(max(68px, env(safe-area-inset-top) + 58px)) !important;
+    right: 10px !important;
+    left: 10px !important;
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    max-height: calc(100dvh - max(84px, env(safe-area-inset-top) + 74px)) !important;
+    border-radius: 10px !important;
+  }
+}
