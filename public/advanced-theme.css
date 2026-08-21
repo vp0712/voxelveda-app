@@ -1,4 +1,4 @@
-/* Voxel Veda Forge UI 2026-08-20
+/* Voxel Veda Titanium UI 2026-08-20
    Final shared presentation layer. Loaded after the historical application CSS. */
 
 :root {
@@ -1246,6 +1246,812 @@ textarea:focus { border-color: var(--vv-accent) !important; }
   .staff-suite-panel { padding: 15px !important; }
 }
 
+/* ========================================================================== */
+/* Titanium workspace: final cross-portal presentation layer                  */
+/* ========================================================================== */
+
+:root {
+  --vv-bg: #0d1117;
+  --vv-bg-raised: #121821;
+  --vv-surface: #171e28;
+  --vv-surface-2: #1d2632;
+  --vv-surface-3: #263240;
+  --vv-line: rgba(143, 170, 196, 0.2);
+  --vv-line-strong: rgba(106, 183, 255, 0.52);
+  --vv-text: #f5f8fb;
+  --vv-muted: #b1bfcc;
+  --vv-soft: #8495a5;
+  --vv-accent: #6ab7ff;
+  --vv-accent-strong: #438fd8;
+  --vv-info: #a79af8;
+  --vv-warning: #ffbd69;
+  --vv-danger: #ff7185;
+  --vv-success: #49d6a5;
+  --vv-sidebar-width: 264px;
+  --vv-topbar-height: 74px;
+  --vv-radius: 7px;
+  --vv-shadow: 0 18px 44px rgba(0, 0, 0, 0.32);
+}
+
+html {
+  font-size: 16px !important;
+}
+
+body,
+body.staff-portal,
+body.customer-portal {
+  color: var(--vv-text) !important;
+  background:
+    linear-gradient(135deg, rgba(106, 183, 255, 0.055), transparent 32%),
+    linear-gradient(315deg, rgba(255, 189, 105, 0.035), transparent 28%),
+    var(--vv-bg) !important;
+}
+
+body::before {
+  opacity: 0.72 !important;
+  background-image:
+    linear-gradient(rgba(143, 170, 196, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(143, 170, 196, 0.025) 1px, transparent 1px) !important;
+  background-size: 72px 72px !important;
+}
+
+body::after {
+  opacity: 0.01 !important;
+}
+
+/* The former page-wide QR launcher is intentionally retired. */
+.global-qr-button,
+.global-qr-backdrop {
+  display: none !important;
+}
+
+.sidebar,
+.sidebar.vv-sidebar,
+.staff-portal .sidebar,
+.customer-portal .sidebar {
+  background: linear-gradient(180deg, #141b24 0%, #0f141b 100%) !important;
+  border-right: 1px solid rgba(143, 170, 196, 0.24) !important;
+  box-shadow: 16px 0 38px rgba(0, 0, 0, 0.28) !important;
+}
+
+.sidebar .brand,
+.sidebar.vv-sidebar .shell-brand,
+.staff-portal .sidebar .brand,
+.customer-portal .sidebar .brand,
+.staff-sidebar-profile {
+  min-height: 64px !important;
+  background: linear-gradient(145deg, rgba(106, 183, 255, 0.12), rgba(167, 154, 248, 0.045)) !important;
+  border-color: rgba(106, 183, 255, 0.24) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+}
+
+.sidebar .brand .logo-img,
+.sidebar.vv-sidebar .shell-brand .logo-img,
+.staff-portal .sidebar .brand .logo-img,
+.customer-portal .sidebar .brand .logo-img {
+  width: 46px !important;
+  height: 46px !important;
+  min-width: 46px !important;
+  flex-basis: 46px !important;
+  background: #0a0e14 !important;
+  border-color: rgba(143, 170, 196, 0.2) !important;
+}
+
+.sidebar .brand h1 {
+  font-size: 0.94rem !important;
+}
+
+.sidebar .brand p {
+  font-size: 0.7rem !important;
+}
+
+.nav-section-label {
+  margin-top: 17px !important;
+  color: #91a1b0 !important;
+  font-size: 0.64rem !important;
+}
+
+.sidebar .nav-btn,
+.sidebar .nav-sub-btn,
+.sidebar .nav-group-toggle,
+.staff-portal .sidebar .nav-btn,
+.staff-portal .sidebar .nav-sub-btn {
+  min-height: 42px !important;
+  margin-bottom: 5px !important;
+  padding: 9px 11px !important;
+  color: #dce5ed !important;
+  background: rgba(255, 255, 255, 0.018) !important;
+  border-color: rgba(143, 170, 196, 0.17) !important;
+  font-size: 0.82rem !important;
+  font-weight: 720 !important;
+}
+
+.sidebar .nav-btn:hover,
+.sidebar .nav-sub-btn:hover,
+.sidebar .nav-group-toggle:hover {
+  color: #fff !important;
+  background: rgba(106, 183, 255, 0.09) !important;
+  border-color: rgba(106, 183, 255, 0.32) !important;
+}
+
+.sidebar .nav-btn.active,
+.sidebar .nav-sub-btn.active,
+.staff-portal .sidebar .nav-btn.active,
+.staff-portal .sidebar .nav-sub-btn.active {
+  color: #07111c !important;
+  background: linear-gradient(135deg, #8dcbff, #6ab7ff 58%, #a79af8) !important;
+  box-shadow: inset 3px 0 0 #fff, 0 9px 20px rgba(67, 143, 216, 0.22) !important;
+}
+
+.sidebar .nav-group {
+  background: rgba(8, 13, 19, 0.32) !important;
+  border-color: rgba(143, 170, 196, 0.17) !important;
+}
+
+.sidebar-nav {
+  scrollbar-color: rgba(106, 183, 255, 0.38) transparent !important;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(106, 183, 255, 0.38) !important;
+}
+
+.sidebar-footer {
+  background: linear-gradient(180deg, transparent, #0f141b 28%) !important;
+}
+
+.logout-btn {
+  min-height: 44px !important;
+  color: #ffd9df !important;
+  background: rgba(255, 113, 133, 0.11) !important;
+  border-color: rgba(255, 113, 133, 0.35) !important;
+}
+
+.app-shell > .main,
+.staff-portal .app-shell > .main,
+.customer-portal .app-shell > .main {
+  padding: 20px clamp(24px, 2.5vw, 52px) 54px !important;
+}
+
+.page-section {
+  width: min(100%, 1880px) !important;
+  max-width: 1880px !important;
+  margin-inline: auto !important;
+}
+
+.topbar,
+.vv-topbar,
+.staff-portal .topbar {
+  min-height: var(--vv-topbar-height) !important;
+  padding: 11px 14px !important;
+  background: rgba(22, 29, 39, 0.97) !important;
+  border-color: rgba(143, 170, 196, 0.22) !important;
+  box-shadow: 0 15px 36px rgba(0, 0, 0, 0.24) !important;
+}
+
+.topbar::after,
+.vv-topbar::after {
+  background: linear-gradient(90deg, transparent, var(--vv-accent), var(--vv-warning), transparent) !important;
+}
+
+.topbar-title h2,
+.topbar > div:first-child h2 {
+  font-size: 1.28rem !important;
+}
+
+.topbar-title p,
+.topbar > div:first-child p {
+  font-size: 0.79rem !important;
+}
+
+.section-head {
+  min-height: 78px !important;
+  margin-bottom: 18px !important;
+  padding: 14px 16px !important;
+  background: linear-gradient(100deg, rgba(106, 183, 255, 0.075), rgba(23, 30, 40, 0.72) 42%, rgba(255, 189, 105, 0.035)) !important;
+  border: 1px solid rgba(143, 170, 196, 0.16) !important;
+  border-left: 3px solid var(--vv-accent) !important;
+  border-radius: var(--vv-radius) !important;
+}
+
+.section-head h2 {
+  margin: 0 0 5px !important;
+  font-size: 1.34rem !important;
+}
+
+.section-head p {
+  margin: 0 !important;
+  color: var(--vv-muted) !important;
+  font-size: 0.86rem !important;
+}
+
+.card,
+.vv-suite-panel,
+.admin-workhub-control,
+.staff-work-panel,
+.staff-suite-panel,
+.workforce-intelligence-panel,
+.roster-generator-card,
+.supplier-intelligence-card,
+.stock-table-card,
+.table-wrap,
+.dialog-panel,
+.modal,
+.modal-content,
+.login-card,
+.public-card,
+.settings-qr-frame,
+.qr-tool-card,
+.announcement-panel {
+  background: linear-gradient(145deg, rgba(28, 37, 49, 0.985), rgba(20, 27, 36, 0.985)) !important;
+  border-color: rgba(143, 170, 196, 0.2) !important;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.19) !important;
+}
+
+.metric-grid {
+  gap: 14px !important;
+  margin-bottom: 22px !important;
+}
+
+.metric-grid > .card {
+  position: relative !important;
+  min-height: 126px !important;
+  padding: 20px !important;
+  overflow: hidden !important;
+}
+
+.metric-grid > .card::before {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 auto 0 0 !important;
+  width: 3px !important;
+  background: var(--vv-accent) !important;
+}
+
+.metric-grid > .card:nth-child(2)::before {
+  background: var(--vv-warning) !important;
+}
+
+.metric-grid > .card:nth-child(3)::before {
+  background: var(--vv-success) !important;
+}
+
+.metric-grid > .card h3 {
+  color: var(--vv-muted) !important;
+  font-size: 0.78rem !important;
+  text-transform: uppercase !important;
+}
+
+.metric-grid > .card p {
+  margin-top: 17px !important;
+}
+
+.metric-grid > .card strong {
+  color: var(--vv-text) !important;
+  font-size: 1.62rem !important;
+}
+
+.primary-btn,
+.small-btn,
+.topbar-quick-action,
+.login-btn,
+button.primary-btn {
+  color: #07111c !important;
+  background: linear-gradient(135deg, #8dcbff, #6ab7ff 62%, #a79af8) !important;
+  border-color: transparent !important;
+  box-shadow: 0 9px 22px rgba(67, 143, 216, 0.2) !important;
+}
+
+.secondary-btn,
+.icon-btn,
+.quick-pill,
+.profile-chip,
+.notification-bell,
+.staff-task-alert {
+  color: var(--vv-text) !important;
+  background: rgba(10, 15, 22, 0.48) !important;
+  border-color: rgba(143, 170, 196, 0.26) !important;
+}
+
+.danger-btn {
+  color: #ffe7eb !important;
+  background: rgba(255, 113, 133, 0.16) !important;
+  border-color: rgba(255, 113, 133, 0.4) !important;
+}
+
+.primary-btn,
+.secondary-btn,
+.small-btn,
+.danger-btn,
+.topbar-quick-action {
+  min-height: 40px !important;
+  padding: 8px 13px !important;
+  border-radius: 7px !important;
+  font-size: 0.78rem !important;
+  font-weight: 760 !important;
+}
+
+.table-wrap {
+  padding: 18px !important;
+  overflow-x: auto !important;
+}
+
+.table-wrap > h3 {
+  margin: 2px 0 18px !important;
+  font-size: 1.1rem !important;
+}
+
+table {
+  min-width: 920px !important;
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  height: 46px !important;
+  padding: 11px 10px !important;
+  color: #a9c4dc !important;
+  background: #111923 !important;
+  border-bottom-color: rgba(106, 183, 255, 0.34) !important;
+  font-size: 0.68rem !important;
+}
+
+tbody td {
+  min-height: 58px !important;
+  padding: 12px 10px !important;
+  color: #e3eaf0 !important;
+  border-bottom-color: rgba(143, 170, 196, 0.13) !important;
+  font-size: 0.79rem !important;
+  line-height: 1.4 !important;
+}
+
+tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.014) !important;
+}
+
+tbody tr:hover td {
+  background: rgba(106, 183, 255, 0.055) !important;
+}
+
+#invoiceTableBody td:last-child {
+  min-width: 390px !important;
+}
+
+#invoiceTableBody td:last-child .small-btn,
+#invoiceTableBody td:last-child .secondary-btn,
+#invoiceTableBody td:last-child .danger-btn {
+  min-height: 34px !important;
+  margin: 3px 2px !important;
+  padding: 6px 9px !important;
+  font-size: 0.7rem !important;
+  box-shadow: none !important;
+}
+
+#invoiceTableBody td:last-child .secondary-btn {
+  color: #dce8f2 !important;
+  background: rgba(8, 13, 19, 0.52) !important;
+}
+
+input,
+select,
+textarea {
+  min-height: 42px !important;
+  color: var(--vv-text) !important;
+  background: #101720 !important;
+  border-color: rgba(143, 170, 196, 0.27) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(106, 183, 255, 0.82) !important;
+  box-shadow: 0 0 0 3px rgba(106, 183, 255, 0.12) !important;
+}
+
+.dialog-backdrop,
+.modal-backdrop {
+  background: rgba(3, 6, 10, 0.79) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+}
+
+.dialog-panel.wide-dialog,
+.dialog-panel.manual-invoice-dialog,
+.dialog-panel.wide-dialog.manual-invoice-dialog {
+  width: min(1180px, calc(100vw - 42px)) !important;
+  max-width: 1180px !important;
+  max-height: min(860px, calc(100dvh - 42px)) !important;
+  padding: 0 !important;
+  overflow: auto !important;
+}
+
+.manual-invoice-dialog > h3 {
+  margin: 0 !important;
+  padding: 18px 20px !important;
+  background: #121a24 !important;
+  border-bottom: 1px solid rgba(143, 170, 196, 0.2) !important;
+}
+
+.manual-invoice-dialog .stock-dialog-grid {
+  grid-template-columns: minmax(300px, 0.38fr) minmax(0, 1fr) !important;
+  gap: 16px !important;
+  padding: 18px 20px !important;
+}
+
+.manual-invoice-dialog .dialog-card {
+  padding: 16px !important;
+  background: rgba(10, 16, 23, 0.38) !important;
+  border-color: rgba(143, 170, 196, 0.2) !important;
+}
+
+.manual-invoice-dialog .invoice-item-row {
+  grid-template-columns: minmax(240px, 1fr) 92px 132px 94px !important;
+  gap: 10px !important;
+}
+
+.manual-invoice-dialog .dialog-actions {
+  position: sticky !important;
+  bottom: 0 !important;
+  z-index: 3 !important;
+  margin: 0 !important;
+  padding: 12px 20px !important;
+  background: rgba(16, 23, 32, 0.98) !important;
+  border-top: 1px solid rgba(143, 170, 196, 0.2) !important;
+}
+
+.gst-control-panel {
+  background: rgba(106, 183, 255, 0.06) !important;
+  border-color: rgba(106, 183, 255, 0.3) !important;
+}
+
+.gst-toggle-track {
+  border-color: rgba(106, 183, 255, 0.55) !important;
+}
+
+.gst-toggle input:checked + .gst-toggle-track::after {
+  background: var(--vv-accent) !important;
+}
+
+.manual-invoice-summary div {
+  background: rgba(9, 14, 20, 0.4) !important;
+  border-color: rgba(143, 170, 196, 0.22) !important;
+}
+
+.manual-invoice-summary .manual-invoice-total {
+  background: linear-gradient(135deg, rgba(106, 183, 255, 0.16), rgba(167, 154, 248, 0.1)) !important;
+  border-color: rgba(106, 183, 255, 0.42) !important;
+}
+
+.login-page .login-card {
+  background: linear-gradient(155deg, #1b2430, #121821) !important;
+  border-color: rgba(106, 183, 255, 0.32) !important;
+}
+
+@media (min-width: 1800px) {
+  .page-section {
+    width: min(100%, 1980px) !important;
+    max-width: 1980px !important;
+  }
+
+  .metric-grid > .card {
+    min-height: 136px !important;
+  }
+}
+
+/* Titanium authority: deliberately last so historical overrides cannot leak. */
+:root {
+  --vv-bg: #0d1117;
+  --vv-bg-raised: #121821;
+  --vv-surface: #171e28;
+  --vv-surface-2: #1d2632;
+  --vv-surface-3: #263240;
+  --vv-line: rgba(143, 170, 196, 0.2);
+  --vv-line-strong: rgba(106, 183, 255, 0.52);
+  --vv-text: #f5f8fb;
+  --vv-muted: #b1bfcc;
+  --vv-soft: #8495a5;
+  --vv-accent: #6ab7ff;
+  --vv-accent-strong: #438fd8;
+  --vv-info: #a79af8;
+  --vv-warning: #ffbd69;
+  --vv-danger: #ff7185;
+  --vv-success: #49d6a5;
+  --vv-sidebar-width: 264px;
+}
+
+body,
+body.staff-portal,
+body.customer-portal {
+  background:
+    linear-gradient(135deg, rgba(106, 183, 255, 0.055), transparent 32%),
+    linear-gradient(315deg, rgba(255, 189, 105, 0.035), transparent 28%),
+    var(--vv-bg) !important;
+}
+
+.global-qr-button,
+.global-qr-backdrop {
+  display: none !important;
+}
+
+.sidebar,
+.sidebar.vv-sidebar,
+.staff-portal .sidebar,
+.customer-portal .sidebar {
+  background: linear-gradient(180deg, #141b24 0%, #0f141b 100%) !important;
+  border-right-color: rgba(143, 170, 196, 0.24) !important;
+}
+
+.sidebar .brand,
+.sidebar.vv-sidebar .shell-brand,
+.staff-portal .sidebar .brand,
+.customer-portal .sidebar .brand,
+.staff-sidebar-profile {
+  background: linear-gradient(145deg, rgba(106, 183, 255, 0.12), rgba(167, 154, 248, 0.045)) !important;
+  border-color: rgba(106, 183, 255, 0.24) !important;
+}
+
+.sidebar .nav-btn,
+.sidebar .nav-sub-btn,
+.sidebar .nav-group-toggle,
+.staff-portal .sidebar .nav-btn,
+.staff-portal .sidebar .nav-sub-btn {
+  color: #dce5ed !important;
+  background: rgba(255, 255, 255, 0.018) !important;
+  border-color: rgba(143, 170, 196, 0.17) !important;
+}
+
+.sidebar .nav-btn:hover,
+.sidebar .nav-sub-btn:hover,
+.sidebar .nav-group-toggle:hover {
+  color: #fff !important;
+  background: rgba(106, 183, 255, 0.09) !important;
+  border-color: rgba(106, 183, 255, 0.32) !important;
+}
+
+.sidebar .nav-btn.active,
+.sidebar .nav-sub-btn.active,
+.staff-portal .sidebar .nav-btn.active,
+.staff-portal .sidebar .nav-sub-btn.active {
+  color: #07111c !important;
+  background: linear-gradient(135deg, #8dcbff, #6ab7ff 58%, #a79af8) !important;
+  box-shadow: inset 3px 0 0 #fff, 0 9px 20px rgba(67, 143, 216, 0.22) !important;
+}
+
+.sidebar .nav-group {
+  background: rgba(8, 13, 19, 0.32) !important;
+  border-color: rgba(143, 170, 196, 0.17) !important;
+}
+
+.sidebar-footer {
+  background: linear-gradient(180deg, transparent, #0f141b 28%) !important;
+}
+
+.topbar,
+.vv-topbar,
+.staff-portal .topbar {
+  background: rgba(22, 29, 39, 0.97) !important;
+  border-color: rgba(143, 170, 196, 0.22) !important;
+}
+
+.topbar::after,
+.vv-topbar::after {
+  background: linear-gradient(90deg, transparent, var(--vv-accent), var(--vv-warning), transparent) !important;
+}
+
+.section-head {
+  background: linear-gradient(100deg, rgba(106, 183, 255, 0.075), rgba(23, 30, 40, 0.72) 42%, rgba(255, 189, 105, 0.035)) !important;
+  border-color: rgba(143, 170, 196, 0.16) !important;
+  border-left-color: var(--vv-accent) !important;
+}
+
+.home-command-hero {
+  background:
+    linear-gradient(105deg, rgba(106, 183, 255, 0.09), transparent 44%),
+    linear-gradient(155deg, #1b2530, #141a22) !important;
+  border-color: rgba(143, 170, 196, 0.2) !important;
+  border-left-color: var(--vv-accent) !important;
+}
+
+.card,
+.vv-suite-panel,
+.admin-workhub-control,
+.staff-work-panel,
+.staff-suite-panel,
+.workforce-intelligence-panel,
+.roster-generator-card,
+.supplier-intelligence-card,
+.stock-table-card,
+.table-wrap,
+.dialog-panel,
+.modal,
+.modal-content,
+.login-card,
+.public-card,
+.settings-qr-frame,
+.qr-tool-card,
+.announcement-panel {
+  background: linear-gradient(145deg, rgba(28, 37, 49, 0.985), rgba(20, 27, 36, 0.985)) !important;
+  border-color: rgba(143, 170, 196, 0.2) !important;
+}
+
+.vv-suite-card,
+.command-insight-card,
+.system-action,
+.staff-action-card,
+.roster-signal-card,
+.roster-week-card {
+  background: rgba(255, 255, 255, 0.025) !important;
+  border-color: rgba(143, 170, 196, 0.18) !important;
+}
+
+.primary-btn,
+.small-btn,
+.topbar-quick-action,
+.login-btn,
+button.primary-btn {
+  color: #07111c !important;
+  background: linear-gradient(135deg, #8dcbff, #6ab7ff 62%, #a79af8) !important;
+  border-color: transparent !important;
+}
+
+.secondary-btn,
+.icon-btn,
+.quick-pill,
+.profile-chip,
+.notification-bell,
+.staff-task-alert {
+  color: var(--vv-text) !important;
+  background: rgba(10, 15, 22, 0.48) !important;
+  border-color: rgba(143, 170, 196, 0.26) !important;
+}
+
+input,
+select,
+textarea {
+  color: var(--vv-text) !important;
+  background: #101720 !important;
+  border-color: rgba(143, 170, 196, 0.27) !important;
+}
+
+.login-page,
+.vv-entry-sequence {
+  background: #0d1117 !important;
+}
+
+.login-page .login-card {
+  background: linear-gradient(155deg, #1b2430, #121821) !important;
+  border-color: rgba(106, 183, 255, 0.32) !important;
+}
+
+@media (max-width: 1023px) {
+  .sidebar,
+  .sidebar.vv-sidebar,
+  .staff-portal .sidebar,
+  .customer-portal .sidebar {
+    background: linear-gradient(180deg, #18212c, #0e141c) !important;
+    border-right-color: rgba(106, 183, 255, 0.34) !important;
+  }
+
+  .topbar,
+  .vv-topbar,
+  .staff-portal .topbar {
+    background: rgba(20, 28, 38, 0.98) !important;
+  }
+
+  .mobile-bottom-nav,
+  .admin-mobile-bottom-nav,
+  .staff-mobile-bottom-nav {
+    background: rgba(20, 28, 38, 0.98) !important;
+    border-color: rgba(106, 183, 255, 0.28) !important;
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 768px) {
+  .manual-invoice-dialog .stock-dialog-grid {
+    grid-template-columns: 280px minmax(0, 1fr) !important;
+  }
+
+  .manual-invoice-dialog .invoice-item-row {
+    grid-template-columns: minmax(190px, 1fr) 76px 108px !important;
+  }
+
+  .manual-invoice-dialog .invoice-remove-btn {
+    grid-column: 1 / -1 !important;
+    width: auto !important;
+    justify-self: end !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --vv-sidebar-width: 300px;
+  }
+
+  .sidebar,
+  .sidebar.vv-sidebar,
+  .staff-portal .sidebar,
+  .customer-portal .sidebar {
+    background: linear-gradient(180deg, #18212c, #0e141c) !important;
+    border-right-color: rgba(106, 183, 255, 0.34) !important;
+  }
+
+  .topbar,
+  .vv-topbar,
+  .staff-portal .topbar {
+    background: rgba(20, 28, 38, 0.98) !important;
+  }
+
+  .app-shell > .main,
+  .staff-portal .app-shell > .main,
+  .customer-portal .app-shell > .main {
+    padding: 10px 12px 92px !important;
+  }
+
+  .page-section {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+@media (max-width: 767px) {
+  html {
+    font-size: 15px !important;
+  }
+
+  .section-head {
+    align-items: stretch !important;
+    min-height: 0 !important;
+    padding: 14px !important;
+  }
+
+  .section-head > div:last-child {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    width: 100% !important;
+  }
+
+  .section-head button {
+    width: 100% !important;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .metric-grid > .card {
+    min-height: 108px !important;
+  }
+
+  .table-wrap {
+    padding: 12px !important;
+  }
+
+  .dialog-panel.wide-dialog,
+  .dialog-panel.manual-invoice-dialog,
+  .dialog-panel.wide-dialog.manual-invoice-dialog {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(100dvh - env(safe-area-inset-top)) !important;
+    border-radius: 12px 12px 0 0 !important;
+  }
+
+  .manual-invoice-dialog .stock-dialog-grid,
+  .manual-invoice-dialog .invoice-item-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .manual-invoice-dialog .invoice-remove-btn {
+    width: 100% !important;
+  }
+
+  .manual-invoice-summary {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -1833,5 +2639,480 @@ textarea:focus {
   .staff-portal .sidebar .nav-sub-btn {
     min-height: 40px !important;
     font-size: 0.78rem !important;
+  }
+}
+
+/* ========================================================================== */
+/* Titanium authority: this block intentionally remains last in the cascade.  */
+/* ========================================================================== */
+
+:root {
+  --vv-bg: #0c1016;
+  --vv-bg-raised: #111821;
+  --vv-surface: #171f2a;
+  --vv-surface-2: #1c2733;
+  --vv-surface-3: #253341;
+  --vv-line: rgba(146, 168, 190, 0.22);
+  --vv-line-strong: rgba(105, 181, 247, 0.5);
+  --vv-text: #f4f7fa;
+  --vv-muted: #b6c2cd;
+  --vv-soft: #8798a8;
+  --vv-accent: #69b5f7;
+  --vv-accent-strong: #408cd0;
+  --vv-info: #a79af8;
+  --vv-warning: #f4b65f;
+  --vv-danger: #f16d7f;
+  --vv-success: #49d2a1;
+  --vv-sidebar-width: 264px;
+}
+
+html {
+  font-size: 16px !important;
+}
+
+body,
+body.staff-portal,
+body.customer-portal {
+  color: var(--vv-text) !important;
+  background:
+    linear-gradient(120deg, rgba(105, 181, 247, 0.055), transparent 34%),
+    linear-gradient(315deg, rgba(244, 182, 95, 0.025), transparent 24%),
+    var(--vv-bg) !important;
+}
+
+body::after {
+  opacity: 0.01 !important;
+}
+
+.global-qr-button,
+.global-qr-backdrop,
+.global-qr-floating {
+  display: none !important;
+}
+
+.sidebar,
+.sidebar.vv-sidebar,
+.staff-portal .sidebar,
+.customer-portal .sidebar {
+  width: var(--vv-sidebar-width) !important;
+  background: linear-gradient(180deg, #151d27 0%, #0f151d 100%) !important;
+  border-right: 1px solid rgba(146, 168, 190, 0.24) !important;
+  box-shadow: 16px 0 42px rgba(0, 0, 0, 0.24) !important;
+}
+
+.sidebar .brand,
+.sidebar.vv-sidebar .shell-brand,
+.staff-portal .sidebar .brand,
+.customer-portal .sidebar .brand,
+.staff-sidebar-profile {
+  background: #1a2430 !important;
+  border-color: rgba(105, 181, 247, 0.25) !important;
+  box-shadow: 0 10px 24px rgba(2, 7, 13, 0.2) !important;
+}
+
+.sidebar .brand .logo-img,
+.sidebar.vv-sidebar .shell-brand .logo-img,
+.staff-portal .sidebar .brand .logo-img,
+.customer-portal .sidebar .brand .logo-img {
+  background: #0d131a !important;
+  border-color: rgba(146, 168, 190, 0.17) !important;
+}
+
+.nav-section-label {
+  color: #8496a7 !important;
+}
+
+.sidebar .nav-btn,
+.sidebar .nav-sub-btn,
+.sidebar .nav-group-toggle,
+.staff-portal .sidebar .nav-btn,
+.staff-portal .sidebar .nav-sub-btn {
+  min-height: 42px !important;
+  color: #dce5ed !important;
+  background: rgba(255, 255, 255, 0.018) !important;
+  border-color: rgba(146, 168, 190, 0.17) !important;
+}
+
+.sidebar .nav-btn:hover,
+.sidebar .nav-sub-btn:hover,
+.sidebar .nav-group-toggle:hover {
+  color: #fff !important;
+  background: rgba(105, 181, 247, 0.09) !important;
+  border-color: rgba(105, 181, 247, 0.31) !important;
+}
+
+.sidebar .nav-btn.active,
+.sidebar .nav-sub-btn.active,
+.staff-portal .sidebar .nav-btn.active,
+.staff-portal .sidebar .nav-sub-btn.active {
+  color: #07111b !important;
+  background: #79c2ff !important;
+  border-color: transparent !important;
+  box-shadow: inset 3px 0 0 #f5f9fc, 0 8px 20px rgba(64, 140, 208, 0.22) !important;
+}
+
+.sidebar .nav-group {
+  background: rgba(8, 13, 19, 0.32) !important;
+  border-color: rgba(146, 168, 190, 0.17) !important;
+}
+
+.sidebar-footer {
+  background: linear-gradient(180deg, transparent, #0f151d 28%) !important;
+  border-top-color: rgba(146, 168, 190, 0.17) !important;
+}
+
+.app-shell > .main,
+.staff-portal .app-shell > .main,
+.customer-portal .app-shell > .main {
+  padding: 18px clamp(22px, 2.4vw, 48px) 56px !important;
+}
+
+.page-section {
+  width: 100% !important;
+  max-width: 1760px !important;
+  margin-right: auto !important;
+  margin-left: auto !important;
+}
+
+.topbar,
+.vv-topbar,
+.staff-portal .topbar {
+  min-height: 72px !important;
+  background: rgba(23, 31, 42, 0.97) !important;
+  border-color: rgba(146, 168, 190, 0.22) !important;
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.23) !important;
+}
+
+.topbar::after,
+.vv-topbar::after {
+  background: linear-gradient(90deg, transparent, var(--vv-accent), var(--vv-warning), transparent) !important;
+}
+
+.section-head {
+  padding: 18px 20px !important;
+  background: #141c26 !important;
+  border: 1px solid rgba(146, 168, 190, 0.18) !important;
+  border-left: 3px solid var(--vv-accent) !important;
+}
+
+.home-command-hero {
+  background: #19232e !important;
+  border-color: rgba(146, 168, 190, 0.21) !important;
+  border-left-color: var(--vv-accent) !important;
+  box-shadow: 0 22px 52px rgba(0, 0, 0, 0.24) !important;
+}
+
+.card,
+.vv-suite-panel,
+.admin-workhub-control,
+.staff-work-panel,
+.staff-suite-panel,
+.workforce-intelligence-panel,
+.roster-generator-card,
+.supplier-intelligence-card,
+.stock-table-card,
+.table-wrap,
+.dialog-panel,
+.modal,
+.modal-content,
+.login-card,
+.public-card,
+.settings-qr-frame,
+.qr-tool-card,
+.announcement-panel {
+  background: #171f2a !important;
+  border-color: rgba(146, 168, 190, 0.2) !important;
+  border-radius: 7px !important;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.19) !important;
+}
+
+.metric-grid > .card {
+  min-height: 130px !important;
+  padding: 20px !important;
+  border-top: 2px solid rgba(105, 181, 247, 0.72) !important;
+}
+
+.metric-grid > .card:nth-child(3n + 2) {
+  border-top-color: rgba(244, 182, 95, 0.78) !important;
+}
+
+.metric-grid > .card:nth-child(3n) {
+  border-top-color: rgba(73, 210, 161, 0.72) !important;
+}
+
+.metric-grid .card strong,
+.metric-value {
+  font-size: clamp(1.48rem, 2vw, 2rem) !important;
+}
+
+.vv-suite-card,
+.command-insight-card,
+.system-action,
+.staff-action-card,
+.roster-signal-card,
+.roster-week-card {
+  background: #1b2531 !important;
+  border-color: rgba(146, 168, 190, 0.18) !important;
+  border-radius: 6px !important;
+}
+
+.primary-btn,
+.small-btn,
+.topbar-quick-action,
+.login-btn,
+button.primary-btn {
+  color: #07111b !important;
+  background: #79c2ff !important;
+  border-color: transparent !important;
+  box-shadow: 0 9px 20px rgba(64, 140, 208, 0.19) !important;
+}
+
+.primary-btn:hover,
+.small-btn:hover,
+.topbar-quick-action:hover,
+.login-btn:hover {
+  background: #9bd2ff !important;
+}
+
+.secondary-btn,
+.icon-btn,
+.quick-pill,
+.profile-chip,
+.notification-bell,
+.staff-task-alert {
+  color: var(--vv-text) !important;
+  background: #202b37 !important;
+  border-color: rgba(146, 168, 190, 0.28) !important;
+}
+
+input,
+select,
+textarea {
+  color: var(--vv-text) !important;
+  background: #101720 !important;
+  border-color: rgba(146, 168, 190, 0.29) !important;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--vv-accent) !important;
+  box-shadow: 0 0 0 3px rgba(105, 181, 247, 0.13) !important;
+}
+
+.table-wrap {
+  padding: 18px !important;
+}
+
+.table-scroll,
+.responsive-table-shell {
+  border: 1px solid rgba(146, 168, 190, 0.17) !important;
+  border-radius: 6px !important;
+}
+
+table {
+  font-size: 0.82rem !important;
+}
+
+table th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  min-height: 48px !important;
+  color: #9ec9ec !important;
+  background: #202a36 !important;
+  border-bottom-color: rgba(105, 181, 247, 0.27) !important;
+}
+
+table td {
+  min-height: 54px !important;
+  border-bottom-color: rgba(146, 168, 190, 0.14) !important;
+}
+
+table tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.018) !important;
+}
+
+table tbody tr:hover td {
+  background: rgba(105, 181, 247, 0.055) !important;
+}
+
+.invoice-action-cell {
+  min-width: 420px !important;
+  gap: 7px !important;
+}
+
+.invoice-action-cell button {
+  min-width: 62px !important;
+  min-height: 38px !important;
+}
+
+.dialog-backdrop,
+.modal-backdrop {
+  background: rgba(3, 6, 10, 0.82) !important;
+  backdrop-filter: blur(5px) !important;
+  -webkit-backdrop-filter: blur(5px) !important;
+}
+
+.dialog-panel.wide-dialog.manual-invoice-dialog,
+.dialog-panel.manual-invoice-dialog {
+  width: min(1180px, calc(100vw - 42px)) !important;
+  max-width: 1180px !important;
+  max-height: min(860px, calc(100dvh - 42px)) !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+
+.manual-invoice-dialog > h3 {
+  margin: 0 !important;
+  padding: 18px 20px !important;
+  background: #202a36 !important;
+  border-bottom: 1px solid rgba(146, 168, 190, 0.2) !important;
+}
+
+.manual-invoice-dialog .stock-dialog-grid {
+  grid-template-columns: minmax(300px, 0.38fr) minmax(0, 1fr) !important;
+  gap: 16px !important;
+  padding: 18px 20px !important;
+}
+
+.manual-invoice-dialog .dialog-card {
+  min-width: 0 !important;
+  padding: 16px !important;
+  background: #121a24 !important;
+  border-color: rgba(146, 168, 190, 0.2) !important;
+}
+
+.manual-invoice-dialog .invoice-item-row {
+  grid-template-columns: minmax(210px, 1fr) 82px 116px 92px !important;
+  gap: 10px !important;
+  min-width: 0 !important;
+  align-items: end !important;
+}
+
+.manual-invoice-dialog .invoice-item-row > * {
+  min-width: 0 !important;
+}
+
+.manual-invoice-dialog .invoice-remove-btn {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 42px !important;
+  margin: 0 !important;
+  padding: 8px !important;
+}
+
+.manual-invoice-dialog .dialog-actions {
+  position: sticky !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  z-index: 4 !important;
+  margin: 0 !important;
+  padding: 13px 20px !important;
+  background: #1e2833 !important;
+  border-top: 1px solid rgba(146, 168, 190, 0.2) !important;
+}
+
+.login-page,
+.vv-entry-sequence {
+  background: #0c1016 !important;
+}
+
+.login-page .login-card {
+  background: #18222d !important;
+  border-color: rgba(105, 181, 247, 0.33) !important;
+}
+
+@media (max-width: 1100px) and (min-width: 768px) {
+  .manual-invoice-dialog .stock-dialog-grid {
+    grid-template-columns: 260px minmax(0, 1fr) !important;
+  }
+
+  .manual-invoice-dialog .invoice-item-row {
+    grid-template-columns: minmax(180px, 1fr) 76px 108px !important;
+  }
+
+  .manual-invoice-dialog .invoice-remove-btn {
+    grid-column: 1 / -1 !important;
+    width: 120px !important;
+    justify-self: end !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  :root {
+    --vv-sidebar-width: min(78vw, 300px);
+  }
+
+  .sidebar,
+  .sidebar.vv-sidebar,
+  .staff-portal .sidebar,
+  .customer-portal .sidebar {
+    background: linear-gradient(180deg, #19232e, #0f161e) !important;
+    border-right-color: rgba(105, 181, 247, 0.35) !important;
+  }
+
+  .app-shell > .main,
+  .staff-portal .app-shell > .main,
+  .customer-portal .app-shell > .main {
+    padding: 10px 12px 92px !important;
+  }
+
+  .topbar,
+  .vv-topbar,
+  .staff-portal .topbar {
+    min-height: 64px !important;
+    background: rgba(23, 31, 42, 0.98) !important;
+  }
+
+  .mobile-bottom-nav,
+  .admin-mobile-bottom-nav,
+  .staff-mobile-bottom-nav {
+    background: rgba(23, 31, 42, 0.98) !important;
+    border-color: rgba(105, 181, 247, 0.28) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  html {
+    font-size: 15px !important;
+  }
+
+  .section-head {
+    padding: 14px !important;
+  }
+
+  .section-head > div:last-child,
+  .section-head > div:last-child > button {
+    width: 100% !important;
+  }
+
+  .metric-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dialog-panel.wide-dialog,
+  .dialog-panel.manual-invoice-dialog,
+  .dialog-panel.wide-dialog.manual-invoice-dialog {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: calc(100dvh - env(safe-area-inset-top)) !important;
+    border-radius: 10px 10px 0 0 !important;
+  }
+
+  .manual-invoice-dialog .stock-dialog-grid,
+  .manual-invoice-dialog .invoice-item-row,
+  .manual-invoice-summary {
+    grid-template-columns: 1fr !important;
+  }
+
+  .manual-invoice-dialog .invoice-remove-btn {
+    width: 100% !important;
+  }
+
+  .invoice-action-cell {
+    min-width: 0 !important;
   }
 }

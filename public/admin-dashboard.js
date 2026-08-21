@@ -1973,7 +1973,7 @@ async function loadRFQs() {
         <td>${escapeHtml(r.material || '-')}</td>
         <td>${escapeHtml(r.quantity || 0)}</td>
         <td>${statusBadge(status)}</td>
-        <td>
+        <td class="register-action-cell">
           <button class="small-btn" onclick="updateRFQ(${r.id}, 'approve')">Approve</button>
           <button class="secondary-btn" onclick="updateRFQ(${r.id}, 'reject')">Reject</button>
           ${canInvoice ? `<button class="small-btn" onclick="createInvoiceFromRFQ(${r.id})">${status === 'quoted' ? 'Open Invoice' : 'Invoice'}</button>` : ''}
@@ -2455,7 +2455,7 @@ async function loadInvoices() {
         <td class="money-positive">${escapeHtml(formatMoney(invoice.paid_amount))}</td>
         <td class="${Number(invoice.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(invoice.balance_due))}</td>
         <td>${statusBadge(invoice.status)}</td>
-        <td>
+        <td class="register-action-cell invoice-action-cell">
           <button class="small-btn" onclick="invoiceAction(${invoice.id}, 'approve')">Approve</button>
           <button class="small-btn" onclick="openSendInvoiceDialog(${invoice.id})">Send</button>
           <button class="small-btn" onclick="openInvoicePaymentDialog(${invoice.id})">Payment</button>
