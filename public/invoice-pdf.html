@@ -4,16 +4,68 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Invoice | Voxel Veda</title>
-<link rel="stylesheet" href="/style.css?v=20260704-aurora-graphite" />
   <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #0b1118;
+      color: #eef4f8;
+      letter-spacing: 0;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      min-width: 0;
+      min-height: 100%;
+      margin: 0;
+      overflow-x: clip;
+      background: #0b1118;
+    }
+
+    body { min-height: 100dvh; }
+
+    button {
+      min-height: 40px;
+      padding: 9px 14px;
+      border: 1px solid #33485b;
+      border-radius: 6px;
+      background: #17222d;
+      color: #f4f8fb;
+      font: inherit;
+      font-size: 0.86rem;
+      font-weight: 750;
+      letter-spacing: 0;
+      cursor: pointer;
+      transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+    }
+
+    button:hover { border-color: #6eb5e7; background: #213141; }
+    button:active { transform: translateY(1px); }
+    button:focus-visible { outline: 3px solid rgba(105, 181, 247, 0.28); outline-offset: 2px; }
+
+    .primary-btn {
+      border-color: #69b5f7;
+      background: #69b5f7;
+      color: #081018;
+    }
+
+    .primary-btn:hover { border-color: #8bc6f7; background: #8bc6f7; }
+
+    .muted-text {
+      margin: 4px 0 0;
+      color: #9fb0bf;
+      font-size: 0.82rem;
+    }
+
     .invoice-view-shell {
-      min-height: 100vh;
-      padding: 16px;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      align-content: start;
-      gap: 14px;
-      background: linear-gradient(180deg, #07111f, #020617);
+      min-height: 100dvh;
+      padding: 18px clamp(14px, 2.4vw, 36px) 42px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      background: #0b1118;
     }
 
     .invoice-view-top {
@@ -24,17 +76,19 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      min-height: 72px;
-      padding: 12px 16px;
-      border: 1px solid rgba(45, 212, 191, 0.22);
-      border-radius: 16px;
-      background: rgba(15, 23, 42, 0.96);
-      box-shadow: 0 16px 44px rgba(0, 0, 0, 0.28);
+      width: min(1180px, 100%);
+      min-height: 66px;
+      margin: 0 auto;
+      padding: 11px 14px;
+      border: 1px solid #28394a;
+      border-radius: 8px;
+      background: rgba(20, 29, 38, 0.97);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.24);
     }
 
     .invoice-view-top h1 {
       margin: 0;
-      font-size: 20px;
+      font-size: clamp(1rem, 2vw, 1.25rem);
     }
 
     .invoice-view-actions {
@@ -47,10 +101,11 @@
       width: min(1020px, 100%);
       margin: 0 auto;
       overflow: hidden;
-      border-radius: 20px;
+      border: 1px solid #d6dee7;
+      border-radius: 8px;
       background: #ffffff;
       color: #0f172a;
-      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+      box-shadow: 0 28px 72px rgba(0, 0, 0, 0.38);
     }
 
     .invoice-document-head {
@@ -58,9 +113,9 @@
       grid-template-columns: 1fr auto;
       gap: 18px;
       padding: 26px;
-      background: #07111f;
+      background: #101923;
       color: #ffffff;
-      border-bottom: 4px solid #12b3c7;
+      border-bottom: 4px solid #69b5f7;
     }
 
     .invoice-document-head img {
@@ -101,14 +156,14 @@
 
     .invoice-panel {
       border: 1px solid #d7dee8;
-      border-radius: 14px;
+      border-radius: 6px;
       padding: 16px;
       background: #f8fafc;
     }
 
     .invoice-panel h3 {
       margin: 0 0 10px;
-      color: #0b4f6c;
+      color: #315f83;
       font-size: 13px;
       text-transform: uppercase;
     }
@@ -154,7 +209,7 @@
       justify-self: end;
       width: min(320px, 100%);
       border: 1px solid #d7dee8;
-      border-radius: 14px;
+      border-radius: 6px;
       overflow: hidden;
       background: #f8fafc;
     }
@@ -186,7 +241,7 @@
       gap: 16px;
       align-items: center;
       border: 1px solid #d7dee8;
-      border-radius: 14px;
+      border-radius: 6px;
       padding: 14px;
       background: #f8fafc;
       color: #475569;
@@ -194,7 +249,7 @@
     }
 
     .invoice-privacy-card strong {
-      color: #0b4f6c;
+      color: #315f83;
       display: block;
       margin-bottom: 4px;
     }
@@ -205,13 +260,13 @@
       object-fit: contain;
       background: #ffffff;
       border: 1px solid #d7dee8;
-      border-radius: 12px;
+      border-radius: 6px;
       padding: 8px;
     }
 
     .invoice-privacy-url {
       margin-top: 8px;
-      color: #0b4f6c;
+      color: #315f83;
       font-size: 11px;
       font-weight: 800;
       overflow-wrap: anywhere;
@@ -225,17 +280,12 @@
     }
 
     #invoicePreview {
-      align-self: start;
+      flex: 0 0 auto;
     }
 
     @media (min-width: 1440px) {
-      .invoice-view-shell {
-        padding: 18px clamp(24px, 3vw, 56px) 40px;
-      }
-
       .invoice-view-top {
-        width: min(1520px, 100%);
-        margin: 0 auto;
+        width: min(1380px, 100%);
       }
 
       .invoice-document {
@@ -245,7 +295,8 @@
 
     @media (max-width: 700px) {
       .invoice-view-shell {
-        padding: 10px;
+        padding: 10px 10px calc(22px + env(safe-area-inset-bottom));
+        gap: 10px;
       }
 
       .invoice-view-top,
@@ -260,12 +311,15 @@
         align-items: stretch;
         position: relative;
         min-height: 0;
+        padding: 12px;
       }
 
       .invoice-view-actions {
         display: grid;
-        grid-template-columns: 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
+      .invoice-view-actions button:last-child { grid-column: 1 / -1; }
 
       .invoice-title {
         text-align: left;
@@ -292,7 +346,7 @@
 
       .invoice-items tr {
         border: 1px solid #e5eaf0;
-        border-radius: 12px;
+        border-radius: 6px;
         margin-bottom: 10px;
         overflow: hidden;
       }
@@ -306,18 +360,28 @@
 
       .invoice-items td::before {
         content: attr(data-label);
-        color: #0b4f6c;
+        color: #315f83;
         font-size: 11px;
         font-weight: 900;
         text-transform: uppercase;
       }
+
+      .invoice-view-actions button {
+        width: 100%;
+        min-width: 0;
+        padding-inline: 8px;
+        font-size: 0.78rem;
+      }
+
+      .invoice-document-head img { width: 96px; }
+      .invoice-privacy-card img { justify-self: start; }
     }
   </style>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
   <link rel="manifest" href="/site.webmanifest?v=20260703-brand" />
-  <meta name="theme-color" content="#22d3ee" />
+  <meta name="theme-color" content="#101923" />
   <meta property="og:site_name" content="Voxel Veda" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <meta property="og:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />

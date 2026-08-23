@@ -3216,3 +3216,336 @@ table tbody tr:hover td {
     border-radius: 10px !important;
   }
 }
+
+/* ========================================================================== */
+/* Shell and invoice authority: one mobile drawer model, one invoice language. */
+/* ========================================================================== */
+
+html,
+body {
+  max-width: 100%;
+  overflow-x: clip !important;
+}
+
+#invoiceSection .section-head {
+  padding: 18px 20px !important;
+  background: linear-gradient(135deg, rgba(31, 42, 54, 0.98), rgba(20, 28, 37, 0.98)) !important;
+  border: 1px solid rgba(105, 181, 247, 0.24) !important;
+  border-left: 3px solid var(--vv-accent) !important;
+}
+
+#invoiceSection .metric-grid > .card {
+  min-height: 128px !important;
+  padding: 20px !important;
+  background: linear-gradient(145deg, #1d2732, #151d26) !important;
+  border-color: rgba(146, 168, 190, 0.18) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.035) !important;
+}
+
+#invoiceSection .metric-grid > .card strong {
+  font-size: clamp(1.45rem, 2.2vw, 2rem) !important;
+  color: #f4f8fb !important;
+}
+
+#invoiceSection .table-wrap {
+  background: #151d26 !important;
+  border-color: rgba(146, 168, 190, 0.2) !important;
+}
+
+#invoiceSection .table-wrap > h3 {
+  margin: 0 0 14px !important;
+  color: #f4f8fb !important;
+}
+
+#invoiceSection table {
+  min-width: 1180px !important;
+}
+
+#invoiceSection table th {
+  color: #b9d7ee !important;
+  background: #202b37 !important;
+}
+
+#invoiceSection .invoice-action-cell {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(66px, 1fr)) !important;
+  align-items: stretch !important;
+  min-width: 330px !important;
+  gap: 6px !important;
+}
+
+#invoiceSection .invoice-action-cell button {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  padding: 7px 8px !important;
+  border-radius: 6px !important;
+  font-size: 0.72rem !important;
+}
+
+@media (max-width: 1023px) {
+  .app-shell,
+  .staff-portal .app-shell,
+  .customer-portal .app-shell {
+    z-index: auto !important;
+    isolation: auto !important;
+  }
+
+  html.mobile-menu-open,
+  body.mobile-menu-open,
+  body.vv-scroll-locked {
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+
+  .sidebar,
+  .sidebar.vv-sidebar,
+  .staff-portal .sidebar,
+  .customer-portal .sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    z-index: 20020 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    width: min(84vw, 304px) !important;
+    max-width: 304px !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    padding: calc(12px + env(safe-area-inset-top)) 10px calc(10px + env(safe-area-inset-bottom)) !important;
+    overflow: hidden !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: none !important;
+    transform: translate3d(-106%, 0, 0) !important;
+    background: #10171f !important;
+    border: 0 !important;
+    border-right: 1px solid rgba(105, 181, 247, 0.3) !important;
+    border-radius: 0 10px 10px 0 !important;
+    box-shadow: 22px 0 64px rgba(0, 0, 0, 0.62) !important;
+    transition: transform 210ms cubic-bezier(0.22, 0.78, 0.22, 1) !important;
+  }
+
+  .sidebar.is-open,
+  body.mobile-menu-open .sidebar,
+  html.mobile-menu-open .sidebar {
+    pointer-events: auto !important;
+    transform: translate3d(0, 0, 0) !important;
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 20010 !important;
+    display: block !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    background: rgba(2, 5, 8, 0.72) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transition: opacity 180ms ease, visibility 180ms ease !important;
+  }
+
+  .mobile-sidebar-backdrop.is-open,
+  body.mobile-menu-open .mobile-sidebar-backdrop,
+  html.mobile-menu-open .mobile-sidebar-backdrop {
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+  }
+
+  .sidebar-close {
+    top: calc(11px + env(safe-area-inset-top)) !important;
+    right: 10px !important;
+    z-index: 3 !important;
+    display: grid !important;
+    width: 38px !important;
+    height: 38px !important;
+    min-width: 38px !important;
+    min-height: 38px !important;
+    border-radius: 6px !important;
+  }
+
+  .sidebar .brand,
+  .sidebar.vv-sidebar .shell-brand,
+  .staff-portal .sidebar .brand,
+  .customer-portal .sidebar .brand {
+    flex: 0 0 auto !important;
+    min-height: 54px !important;
+    margin: 0 44px 10px 0 !important;
+    padding: 6px 7px !important;
+    overflow: hidden !important;
+  }
+
+  .sidebar .brand .logo-img,
+  .sidebar.vv-sidebar .shell-brand .logo-img,
+  .staff-portal .sidebar .brand .logo-img,
+  .customer-portal .sidebar .brand .logo-img {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    flex: 0 0 42px !important;
+    object-fit: contain !important;
+  }
+
+  .sidebar-nav,
+  .staff-portal .sidebar nav {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    padding: 0 3px 10px 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    scrollbar-width: thin !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .sidebar-footer {
+    position: static !important;
+    flex: 0 0 auto !important;
+    margin-top: auto !important;
+    padding: 9px 0 0 !important;
+  }
+
+  .topbar-menu-btn,
+  .mobile-menu-btn {
+    position: relative !important;
+    z-index: 12 !important;
+    display: inline-flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .staff-portal .mobile-menu-btn {
+    position: fixed !important;
+    z-index: 19000 !important;
+  }
+
+  .app-shell > .main,
+  .staff-portal .app-shell > .main,
+  .customer-portal .app-shell > .main {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+  }
+
+  #invoiceSection .table-wrap {
+    padding: 14px !important;
+    overflow: hidden !important;
+  }
+
+  #invoiceSection .table-wrap > table {
+    display: block !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    overscroll-behavior-inline: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+}
+
+@media (max-width: 767px) {
+  html:has(.dialog-backdrop.active, .modal-backdrop.active),
+  body:has(.dialog-backdrop.active, .modal-backdrop.active) {
+    width: 100% !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    overscroll-behavior: none !important;
+  }
+
+  body #dialogBackdrop.dialog-backdrop.active,
+  body .dialog-backdrop.active,
+  body .modal-backdrop.active {
+    z-index: 40000 !important;
+    align-items: center !important;
+    justify-items: center !important;
+    padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)) !important;
+    padding-inline: 8px !important;
+    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+  }
+
+  .dialog-panel,
+  .dialog-panel.wide-dialog,
+  .dialog-panel.manual-invoice-dialog,
+  .dialog-panel.wide-dialog.manual-invoice-dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: 720px !important;
+    height: calc(100dvh - max(20px, env(safe-area-inset-top) + env(safe-area-inset-bottom))) !important;
+    max-height: calc(100dvh - max(20px, env(safe-area-inset-top) + env(safe-area-inset-bottom))) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    border-radius: 8px !important;
+  }
+
+  .dialog-panel > h3,
+  .manual-invoice-dialog > h3 {
+    flex: 0 0 auto !important;
+    min-height: 54px !important;
+    margin: 0 !important;
+    padding: 15px 16px !important;
+    line-height: 1.4 !important;
+  }
+
+  .dialog-panel > #dialogBody,
+  .manual-invoice-dialog > #dialogBody {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .manual-invoice-dialog .stock-dialog-grid {
+    gap: 12px !important;
+    padding: 12px !important;
+  }
+
+  .manual-invoice-dialog .dialog-card {
+    padding: 14px !important;
+  }
+
+  .manual-invoice-dialog .dialog-actions {
+    position: static !important;
+    flex: 0 0 auto !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 8px !important;
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom)) !important;
+  }
+
+  .manual-invoice-dialog .dialog-actions button {
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 44px !important;
+    margin: 0 !important;
+  }
+
+  #invoiceSection .section-head > div:last-child {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  #invoiceSection .section-head button {
+    width: 100% !important;
+  }
+
+  #invoiceSection .metric-grid > .card {
+    min-height: 110px !important;
+  }
+
+  #invoiceSection .invoice-action-cell {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    min-width: 0 !important;
+  }
+}

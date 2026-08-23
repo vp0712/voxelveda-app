@@ -373,6 +373,24 @@ function closeResponsiveOverlaysForViewport() {
   }
 }
 
+function installMobileShellControls() {
+  document.querySelectorAll('[data-mobile-menu-action]').forEach((control) => {
+    if (control.dataset.mobileMenuBound === 'true') return;
+    control.dataset.mobileMenuBound = 'true';
+    control.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      const action = control.dataset.mobileMenuAction;
+      if (action === 'close') toggleMobileMenu(false);
+      else if (action === 'open') toggleMobileMenu(true);
+      else toggleMobileMenu();
+    });
+  });
+
+  const sidebar = document.getElementById('primarySidebar');
+  if (sidebar) sidebar.setAttribute('aria-hidden', isMobileShellViewport() ? 'true' : 'false');
+}
+
 function startResponsiveTableObserver() {
   normalizeActionButtons();
   enhanceResponsiveTables();
@@ -7322,6 +7340,7 @@ async function loadSelectedStaffTimesheets() {
 async function bootAdminDashboard() {
   try {
     installAccessDeniedHandler();
+    installMobileShellControls();
     normalizeActionButtons();
     setupNavigation();
     openAdminViewFromUrl();

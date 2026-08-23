@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
 <link rel="stylesheet" href="/style.css?v=20260816-invoice-delivery-ux"/>
-  <link rel="stylesheet" href="/advanced-theme.css?v=20260821-viewport-reliability" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260824-mobile-shell-v4" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -21,11 +21,11 @@
   <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /></head>
 
 <body>
-  <div class="mobile-sidebar-backdrop" onclick="toggleMobileMenu(false)"></div>
+  <div class="mobile-sidebar-backdrop" data-mobile-menu-action="close" aria-hidden="true"></div>
 
   <div class="app-shell">
     <aside id="primarySidebar" class="sidebar vv-sidebar" aria-label="Voxel Veda navigation">
-      <button class="sidebar-close" type="button" aria-label="Close menu" onclick="toggleMobileMenu(false)">&times;</button>
+      <button class="sidebar-close" type="button" aria-label="Close menu" data-mobile-menu-action="close">&times;</button>
       <div class="brand shell-brand">
         <img src="/Frame 1.png?v=20260703-brand" class="logo-img" alt="Voxel Veda Logo">
         <div>
@@ -96,7 +96,7 @@
     </aside>
     <main class="main">
       <header class="topbar vv-topbar">
-        <button class="topbar-menu-btn" type="button" aria-label="Open menu" aria-expanded="false" onclick="toggleMobileMenu()">
+        <button class="topbar-menu-btn" type="button" aria-label="Open menu" aria-controls="primarySidebar" aria-expanded="false" data-mobile-menu-action="toggle">
           <span></span>
           <span></span>
           <span></span>
@@ -1421,10 +1421,10 @@
     <button type="button" class="nav-btn" data-section="attendanceSection">Workforce</button>
     <button type="button" class="nav-btn" data-section="taskSection">Tasks</button>
     <button type="button" onclick="toggleNotificationPanel(event)">Alerts</button>
-    <button type="button" onclick="toggleMobileMenu(true)">More</button>
+    <button type="button" data-mobile-menu-action="open">More</button>
   </nav>
   <div id="toast" class="toast"></div>
 
-  <script src="/admin-dashboard.js?v=20260821-titanium-ui"></script>
+  <script src="/admin-dashboard.js?v=20260824-mobile-shell-v4"></script>
 </body>
 </html>
