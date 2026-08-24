@@ -21,7 +21,7 @@ function redirectToLogin(req, res) {
   return res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo)}`);
 }
 
-function pageAuth({ adminOnly = false } = {}) {
+function pageAuth({ adminOnly = false, workspaceOnly = false } = {}) {
   return async (req, res, next) => {
     try {
       const token = getRequestToken(req);
@@ -39,7 +39,15 @@ function pageAuth({ adminOnly = false } = {}) {
       if (!user || Number(user.active) === 0) return redirectToLogin(req, res);
 
       const role = String(user.role || decoded.role || 'staff').trim().toLowerCase();
-      if (adminOnly && role !== 'admin') {
+      const permissions = parsePermissions(user.permissions);
+      const isSystemAdmin = ['admin', 'super_admin'].includes(role);
+      const isFinanceRole = ['finance_admin', 'finance_user', 'accountant'].includes(role);
+      const canUseOperationsWorkspace = isSystemAdmin
+        || isFinanceRole
+        || permissions.includes('finance')
+        || permissions.includes('tasks');
+
+      if ((adminOnly && !isSystemAdmin) || (workspaceOnly && !canUseOperationsWorkspace)) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
         return res.status(403).sendFile(path.join(__dirname, '..', 'public', '403.html'));
       }
@@ -49,7 +57,7 @@ function pageAuth({ adminOnly = false } = {}) {
         email: user.email || decoded.email,
         username: user.username || decoded.username,
         role,
-        permissions: parsePermissions(user.permissions)
+        permissions
       };
       return next();
     } catch {

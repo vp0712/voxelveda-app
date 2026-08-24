@@ -5,6 +5,11 @@ const { ensureUserLifecycleSchema } = require('../services/userLifecycleService'
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
 const { logAudit } = require('../services/auditService');
 
+const ALLOWED_ROLES = [
+  'admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant',
+  'manager', 'sales', 'production', 'viewer', 'view_only', 'staff'
+];
+
 const ALL_PERMISSIONS = [
   'dashboard',
   'rfqs',
@@ -40,7 +45,17 @@ const ALL_PERMISSIONS = [
   'compliance',
   'compliance_input',
   'competitors',
-  'competitors_input'
+  'competitors_input',
+  'finance',
+  'finance_input',
+  'finance_setup',
+  'finance_post_transaction',
+  'finance_create_journal',
+  'finance_lock_period',
+  'finance_reconcile',
+  'finance_export',
+  'finance_view_payroll',
+  'finance_void'
 ];
 
 function parsePermissions(value) {
@@ -85,9 +100,7 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ message: 'Password must be at least 6 characters' });
     }
 
-    const allowedRoles = ['admin', 'sales', 'production', 'viewer', 'staff'];
-
-    if (!allowedRoles.includes(role)) {
+    if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -173,9 +186,7 @@ exports.updateUserAccess = async (req, res) => {
       return res.status(400).json({ message: 'You cannot disable your own account' });
     }
 
-    const allowedRoles = ['admin', 'sales', 'production', 'viewer', 'staff'];
-
-    if (!allowedRoles.includes(role)) {
+    if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 
@@ -227,9 +238,7 @@ exports.updateUser = async (req, res) => {
       return res.status(400).json({ message: 'You cannot disable your own account' });
     }
 
-    const allowedRoles = ['admin', 'sales', 'production', 'viewer', 'staff'];
-
-    if (!allowedRoles.includes(role)) {
+    if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
 

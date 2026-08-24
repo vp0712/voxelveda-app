@@ -14,7 +14,7 @@ module.exports = function requirePermission(permission) {
   return (req, res, next) => {
     const role = String(req.user?.role || '').trim().toLowerCase();
 
-    if (role === 'admin') {
+    if (['admin', 'super_admin'].includes(role)) {
       return next();
     }
 

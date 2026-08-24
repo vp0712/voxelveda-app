@@ -66,7 +66,7 @@ module.exports = function requireInputPermission(required) {
     }
 
     const role = String(req.user?.role || '').trim().toLowerCase();
-    if (role === 'admin') return next();
+    if (['admin', 'super_admin'].includes(role)) return next();
 
     const permissions = parsePermissions(req.user?.permissions);
     const requiredPermissions = resolveRequired(required, req);

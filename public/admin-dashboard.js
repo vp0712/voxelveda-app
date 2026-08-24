@@ -45,6 +45,37 @@ let attendanceFirstLoad = true;
 let shiftQrTimer = null;
 let shiftQrCountdownTimer = null;
 let shiftQrSecondsLeft = 20;
+const financeState = {
+  years: [],
+  selectedYearId: null,
+  overview: null,
+  setup: null,
+  issues: [],
+  issueFilter: '',
+  transactionPage: 1,
+  transactionLimit: 25,
+  transactionTotal: 0,
+  transactionRows: [],
+  searchTimer: null,
+  reports: null,
+  activeTab: 'overview',
+  billPage: 1,
+  billLimit: 25,
+  billTotal: 0,
+  billRows: [],
+  billSearchTimer: null,
+  bankAccounts: [],
+  selectedBankAccountId: null,
+  bankTransactions: [],
+  periods: [],
+  accountantQueries: [],
+  assets: []
+};
+const FINANCE_TRANSACTION_TYPES = [
+  'SALE', 'CUSTOMER_PAYMENT', 'EXPENSE', 'SUPPLIER_BILL', 'SUPPLIER_PAYMENT',
+  'PAYROLL', 'REFUND', 'TRANSFER', 'ASSET_PURCHASE', 'OWNER_CONTRIBUTION',
+  'OWNER_DRAWING', 'JOURNAL_ADJUSTMENT', 'OTHER'
+];
 const registerPagerState = {};
 const REGISTER_PAGE_SIZES = [10, 25, 50, 100, 200];
 
@@ -60,6 +91,16 @@ const ACCESS_OPTIONS = [
   { id: 'suppliers_input', label: 'Suppliers Input/Edit' },
   { id: 'expenses', label: 'Expenses' },
   { id: 'expenses_input', label: 'Expenses Input/Edit' },
+  { id: 'finance', label: 'Finance' },
+  { id: 'finance_input', label: 'Finance Draft Input/Edit' },
+  { id: 'finance_setup', label: 'Finance Setup' },
+  { id: 'finance_post_transaction', label: 'Post Finance Transactions' },
+  { id: 'finance_create_journal', label: 'Create Journals' },
+  { id: 'finance_lock_period', label: 'Lock Financial Periods' },
+  { id: 'finance_reconcile', label: 'Bank Reconciliation' },
+  { id: 'finance_export', label: 'Finance Export' },
+  { id: 'finance_view_payroll', label: 'View Payroll Finance' },
+  { id: 'finance_void', label: 'Void Posted Transactions' },
   { id: 'compliance', label: 'Compliance & Licences' },
   { id: 'compliance_input', label: 'Compliance Input/Edit' },
   { id: 'competitors', label: 'Competitors & Industry' },
@@ -717,7 +758,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
-  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog');
+  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog', 'finance-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -755,6 +796,7 @@ function setupNavigation() {
 
       if (btn.dataset.section === 'customerSection') loadCustomers();
       if (btn.dataset.section === 'supplierSection') loadSuppliers();
+      if (btn.dataset.section === 'financeSection') loadFinanceWorkspace();
       if (btn.dataset.section === 'expenseSection') loadExpenses();
       if (btn.dataset.section === 'competitorSection') loadCompetitors();
       if (btn.dataset.section === 'complianceSection') loadComplianceEntries();
@@ -786,17 +828,8 @@ function goSection(sectionId) {
 }
 
 function openAdminViewFromUrl() {
-  const view = new URLSearchParams(window.location.search).get('view');
-  if (!view) return;
-  const sections = {
-    rfqs: 'rfqSection', invoices: 'invoiceSection', customers: 'customerSection',
-    suppliers: 'supplierSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
-    packaging: 'packagingSection', expenses: 'expenseSection', workforce: 'attendanceSection',
-    timesheets: 'attendanceSection', roster: 'rosterSection', staff: 'staffSection',
-    compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection',
-    meetings: 'meetingSection', tasks: 'taskSection'
-  };
-  if (sections[view]) window.setTimeout(() => goSection(sections[view]), 0);
+  const section = requestedAdminSection();
+  if (section && canAccessAdminSection(section)) window.setTimeout(() => goSection(section), 0);
 }
 
 function renderCompanyForms() {
@@ -1187,23 +1220,90 @@ function previewCompanyFormRecord(recordId) {
 
 function hasCurrentPermission(permission) {
   const permissions = Array.isArray(currentUser.permissions) ? currentUser.permissions : [];
-  return currentRole === 'admin' || permissions.includes(permission);
+  return ['admin', 'super_admin'].includes(currentRole) || permissions.includes(permission);
 }
 
-function configureTaskManagerView() {
-  if (currentRole === 'admin') return;
+const ADMIN_SECTION_ACCESS = Object.freeze({
+  dashboardSection: ['dashboard'],
+  rfqSection: ['rfqs'],
+  invoiceSection: ['invoices'],
+  customerSection: ['customers'],
+  supplierSection: ['suppliers'],
+  competitorSection: ['competitors'],
+  stockSection: ['stock', 'stock_in'],
+  stockUsageSection: ['stock', 'stock_out'],
+  rawMaterialSection: ['stock', 'raw_material'],
+  packagingSection: ['stock', 'packaging'],
+  meetingSection: ['meetings'],
+  financeSection: ['finance'],
+  expenseSection: ['expenses'],
+  taskSection: ['tasks'],
+  attendanceSection: ['attendance'],
+  rosterSection: ['roster'],
+  staffSection: ['staff'],
+  complianceSection: ['compliance'],
+  companyFormsSection: ['compliance', 'settings'],
+  settingsSection: ['settings']
+});
 
-  document.querySelectorAll('.nav-btn').forEach((btn) => {
-    btn.classList.toggle('hidden-section', btn.dataset.section !== 'taskSection');
+function canAccessAdminSection(sectionId) {
+  if (['admin', 'super_admin'].includes(currentRole)) return true;
+  return (ADMIN_SECTION_ACCESS[sectionId] || []).some((permission) => hasCurrentPermission(permission));
+}
+
+function requestedAdminSection() {
+  const view = new URLSearchParams(window.location.search).get('view');
+  const sections = {
+    rfqs: 'rfqSection', invoices: 'invoiceSection', customers: 'customerSection',
+    suppliers: 'supplierSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
+    packaging: 'packagingSection', finance: 'financeSection', expenses: 'expenseSection', workforce: 'attendanceSection',
+    timesheets: 'attendanceSection', roster: 'rosterSection', staff: 'staffSection',
+    compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection',
+    meetings: 'meetingSection', tasks: 'taskSection'
+  };
+  return sections[view] || '';
+}
+
+function configureRestrictedWorkspaceView() {
+  if (['admin', 'super_admin'].includes(currentRole)) return;
+
+  document.querySelectorAll('.nav-btn[data-section]').forEach((btn) => {
+    btn.classList.toggle('hidden-section', !canAccessAdminSection(btn.dataset.section));
   });
-  document.querySelectorAll('.nav-group').forEach((group) => {
-    const hasTaskButton = group.querySelector('[data-section="taskSection"]');
-    group.classList.toggle('hidden-section', !hasTaskButton);
+  document.querySelectorAll('.nav-btn[data-permission]').forEach((btn) => {
+    btn.classList.toggle('hidden-section', !hasCurrentPermission(btn.dataset.permission));
   });
   document.querySelectorAll('.page-section').forEach((section) => {
-    section.classList.toggle('hidden-section', section.id !== 'taskSection');
+    section.classList.toggle('hidden-section', !canAccessAdminSection(section.id));
   });
-  document.querySelector('[data-section="taskSection"]')?.classList.add('active');
+  document.querySelectorAll('.nav-group').forEach((group) => {
+    const visibleChild = [...group.querySelectorAll('.nav-btn')]
+      .some((button) => !button.classList.contains('hidden-section'));
+    group.classList.toggle('hidden-section', !visibleChild);
+  });
+  document.querySelectorAll('.nav-section-label').forEach((label) => {
+    let node = label.nextElementSibling;
+    let hasVisibleItem = false;
+    while (node && !node.classList.contains('nav-section-label')) {
+      if (!node.classList.contains('hidden-section')) hasVisibleItem = true;
+      node = node.nextElementSibling;
+    }
+    label.classList.toggle('hidden-section', !hasVisibleItem);
+  });
+
+  document.querySelector('.topbar-quick-action')?.classList.toggle(
+    'hidden-section',
+    !hasCurrentPermission('invoices_input')
+  );
+  document.querySelector('.profile-chip')?.classList.toggle(
+    'hidden-section',
+    !hasCurrentPermission('staff')
+  );
+
+  const allowedSections = Object.keys(ADMIN_SECTION_ACCESS).filter(canAccessAdminSection);
+  const requested = requestedAdminSection();
+  const target = requested && allowedSections.includes(requested) ? requested : allowedSections[0];
+  if (target) window.setTimeout(() => goSection(target), 0);
 }
 
 async function loadMe() {
@@ -1223,30 +1323,51 @@ async function loadMe() {
 
   const role = String(data.user.role || '').trim().toLowerCase();
 
-  if (role !== 'admin') {
-    currentUser = { ...data.user, role };
-    currentRole = role;
-    localStorage.setItem('user', JSON.stringify(currentUser));
-    localStorage.setItem('role', role);
-    if (!hasCurrentPermission('tasks')) {
-      alert('Access denied. Admin only.');
-      window.location.replace('/dashboard');
-      return null;
-    }
-
-    el.innerText = `${data.user.name} | ${data.user.email} | task control`;
-    syncTopbarUser(currentUser);
-    configureTaskManagerView();
-    return data.user;
-  }
-
   currentUser = { ...data.user, role };
   currentRole = role;
   localStorage.setItem('user', JSON.stringify(currentUser));
   localStorage.setItem('role', role);
+
+  if (!['admin', 'super_admin'].includes(role)) {
+    const hasWorkspaceSection = Object.keys(ADMIN_SECTION_ACCESS).some(canAccessAdminSection);
+    if (!hasWorkspaceSection) {
+      window.location.replace('/dashboard');
+      return null;
+    }
+    el.innerText = `${data.user.name} | ${data.user.email} | ${role.replaceAll('_', ' ')}`;
+    syncTopbarUser(currentUser);
+    configureRestrictedWorkspaceView();
+    return data.user;
+  }
+
   el.innerText = `${data.user.name} | ${data.user.email} | ${role}`;
   syncTopbarUser(currentUser);
   return data.user;
+}
+
+async function loadRestrictedWorkspaceData() {
+  const jobs = [];
+  if (hasCurrentPermission('dashboard')) jobs.push(loadDashboardStats());
+  if (hasCurrentPermission('rfqs')) jobs.push(loadRFQs());
+  if (hasCurrentPermission('invoices')) jobs.push(loadInvoices());
+  if (hasCurrentPermission('customers')) jobs.push(loadCustomers());
+  if (hasCurrentPermission('suppliers')) jobs.push(loadSuppliers());
+  if (hasCurrentPermission('finance')) jobs.push(loadFinanceWorkspace());
+  if (hasCurrentPermission('expenses')) jobs.push(loadExpenses());
+  if (hasCurrentPermission('competitors')) jobs.push(loadCompetitors());
+  if (hasCurrentPermission('compliance')) jobs.push(loadComplianceEntries());
+  if (hasCurrentPermission('stock') || hasCurrentPermission('stock_in')) jobs.push(loadStock());
+  if (hasCurrentPermission('stock') || hasCurrentPermission('stock_out')) jobs.push(loadStockUsage());
+  if (hasCurrentPermission('stock') || hasCurrentPermission('raw_material')) jobs.push(loadMaterials('raw_material'));
+  if (hasCurrentPermission('stock') || hasCurrentPermission('packaging')) jobs.push(loadMaterials('packaging'));
+  if (hasCurrentPermission('meetings')) jobs.push(loadMeetings());
+  if (hasCurrentPermission('roster')) jobs.push(loadRoster());
+  if (hasCurrentPermission('attendance')) jobs.push(loadAttendance(), loadTimesheets());
+  if (hasCurrentPermission('tasks')) jobs.push(loadTasks(), loadAnnouncements());
+  if (hasCurrentPermission('staff')) jobs.push(loadStaff(), loadAdminStaffMessages(), loadAdminWorkHubRequests());
+  if (hasCurrentPermission('settings')) jobs.push(loadSettings());
+  await Promise.all(jobs);
+  renderNotificationDropdown();
 }
 
 async function loadDashboardStats() {
@@ -5247,7 +5368,12 @@ async function openAddStaff() {
             <option value="staff">Staff</option>
             <option value="sales">Sales</option>
             <option value="production">Production</option>
+            <option value="manager">Manager</option>
+            <option value="finance_user">Finance User</option>
+            <option value="finance_admin">Finance Admin</option>
+            <option value="accountant">Accountant</option>
             <option value="viewer">Viewer</option>
+            <option value="view_only">View Only</option>
           </select>
         </label>
       </div>
@@ -5369,8 +5495,14 @@ async function openEditStaffDialog(userId) {
             <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
             <option value="sales" ${user.role === 'sales' ? 'selected' : ''}>Sales</option>
             <option value="production" ${user.role === 'production' ? 'selected' : ''}>Production</option>
+            <option value="manager" ${user.role === 'manager' ? 'selected' : ''}>Manager</option>
+            <option value="finance_user" ${user.role === 'finance_user' ? 'selected' : ''}>Finance User</option>
+            <option value="finance_admin" ${user.role === 'finance_admin' ? 'selected' : ''}>Finance Admin</option>
+            <option value="accountant" ${user.role === 'accountant' ? 'selected' : ''}>Accountant</option>
             <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+            <option value="view_only" ${user.role === 'view_only' ? 'selected' : ''}>View Only</option>
             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+            <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
           </select>
         </label>
         <label class="form-field">
@@ -5449,8 +5581,14 @@ async function openAccessDialog(userId) {
           <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
           <option value="sales" ${user.role === 'sales' ? 'selected' : ''}>Sales</option>
           <option value="production" ${user.role === 'production' ? 'selected' : ''}>Production</option>
+          <option value="manager" ${user.role === 'manager' ? 'selected' : ''}>Manager</option>
+          <option value="finance_user" ${user.role === 'finance_user' ? 'selected' : ''}>Finance User</option>
+          <option value="finance_admin" ${user.role === 'finance_admin' ? 'selected' : ''}>Finance Admin</option>
+          <option value="accountant" ${user.role === 'accountant' ? 'selected' : ''}>Accountant</option>
           <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+          <option value="view_only" ${user.role === 'view_only' ? 'selected' : ''}>View Only</option>
           <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+          <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
         </select>
         <select id="dialogAccessActive">
           <option value="1" ${user.active ? 'selected' : ''}>Active</option>
@@ -7337,24 +7475,1005 @@ async function loadSelectedStaffTimesheets() {
   }
 }
 
+function financeFormatDate(value) {
+  if (!value) return '-';
+  return formatDate(String(value).slice(0, 10));
+}
+
+function financeSelectedYear() {
+  return financeState.years.find((year) => Number(year.id) === Number(financeState.selectedYearId)) || null;
+}
+
+async function financeApi(path, options = {}) {
+  const request = {
+    ...options,
+    headers: { ...authHeaders(), ...(options.headers || {}) }
+  };
+  const response = await fetch(`/api/finance${path}`, request);
+  const data = await safeJson(response);
+  if (!response.ok) {
+    const error = new Error(data.message || 'Finance request failed.');
+    error.code = data.code || 'FINANCE_REQUEST_FAILED';
+    error.issues = Array.isArray(data.issues) ? data.issues : [];
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
+function financeErrorText(error) {
+  const details = (error?.issues || []).map((entry) => entry.message).filter(Boolean);
+  return [error?.message || 'Finance action failed.', ...details].join(' ');
+}
+
+function renderFinanceYears() {
+  const select = document.getElementById('financeYearSelect');
+  if (!select) return;
+  select.innerHTML = financeState.years.map((year) => `<option value="${Number(year.id)}">${escapeHtml(year.label)} | ${escapeHtml(year.status)}</option>`).join('');
+  if (financeState.selectedYearId) select.value = String(financeState.selectedYearId);
+}
+
+function renderFinanceOverview() {
+  const overview = financeState.overview;
+  if (!overview) return;
+  const year = overview.financial_year || {};
+  const cards = overview.cards || {};
+  const issues = overview.issues || {};
+  const readiness = Math.max(0, Math.min(100, Number(year.readiness_score || 0)));
+  setText('financeYearLabel', year.label || 'Financial year');
+  setText('financeYearPeriod', `${financeFormatDate(year.start_date)} to ${financeFormatDate(year.end_date)}`);
+  setText('financeReadinessValue', `${readiness}%`);
+  setText('financeYearStatus', year.status || 'OPEN');
+  const readinessBar = document.getElementById('financeReadinessBar');
+  if (readinessBar) readinessBar.style.width = `${readiness}%`;
+  const statusPill = document.getElementById('financeYearStatus');
+  if (statusPill) statusPill.dataset.status = String(year.status || '').toLowerCase();
+  setText('financeRecordedRevenue', formatMoney(cards.recorded_revenue || 0));
+  setText('financeRecordedExpenses', formatMoney(cards.recorded_expenses || 0));
+  setText('financeGrossResult', formatMoney(cards.gross_result || 0));
+  setText('financeGstPaid', formatMoney(cards.gst_paid || 0));
+  setText('financeReceivables', formatMoney(cards.outstanding_invoices || 0));
+  setText('financePayables', formatMoney(cards.outstanding_supplier_bills || 0));
+  setText('financeUnreconciled', Number(cards.unreconciled_transactions || 0));
+  setText('financePostedCount', `${Number(cards.posted_transactions || 0)} / ${Number(cards.finance_transactions || 0)}`);
+  setText('financeBlockingCount', Number(issues.BLOCKING_ERROR || 0));
+  setText('financeWarningCount', Number(issues.WARNING || 0));
+  setText('financeInfoCount', Number(issues.INFO || 0));
+  const totalIssues = Number(issues.BLOCKING_ERROR || 0) + Number(issues.WARNING || 0) + Number(issues.INFO || 0);
+  setText('financeIssueSummary', totalIssues
+    ? `${totalIssues} open item${totalIssues === 1 ? '' : 's'} require review before this year is ready to close.`
+    : 'No open finance exceptions are currently recorded for this year.');
+}
+
+function renderFinanceIssues() {
+  const panel = document.getElementById('financeIssueList');
+  if (!panel) return;
+  const rows = financeState.issueFilter
+    ? financeState.issues.filter((issue) => issue.severity === financeState.issueFilter)
+    : financeState.issues;
+  setText('financeIssueFilterLabel', financeState.issueFilter ? financeState.issueFilter.replaceAll('_', ' ') : 'All open issues');
+  if (!rows.length) {
+    panel.innerHTML = '<div class="empty-state compact">No open issues in this view.</div>';
+    return;
+  }
+  panel.innerHTML = rows.slice(0, 40).map((issue) => `
+    <article class="finance-issue-item ${escapeHtml(String(issue.severity || '').toLowerCase())}">
+      <div><span>${escapeHtml(String(issue.severity || '').replaceAll('_', ' '))}</span><strong>${escapeHtml(issue.title || 'Finance issue')}</strong></div>
+      <p>${escapeHtml(issue.message || '')}</p>
+      <div class="finance-issue-meta"><span>${escapeHtml(issue.module || 'finance')}</span><span>${escapeHtml(issue.record_type || 'record')} ${escapeHtml(issue.record_id || '')}</span></div>
+      <button type="button" class="text-btn" onclick="openFinanceIssueDialog(${Number(issue.id)})">Review</button>
+    </article>
+  `).join('');
+}
+
+function setFinanceIssueFilter(severity) {
+  financeState.issueFilter = severity || '';
+  renderFinanceIssues();
+}
+
+function renderFinanceTransactions(rows = [], page = 1, limit = 25, total = 0) {
+  const body = document.getElementById('financeTransactionBody');
+  if (!body) return;
+  const start = total ? ((page - 1) * limit) + 1 : 0;
+  const end = Math.min(page * limit, total);
+  setText('financeTransactionPageInfo', `${start}-${end} of ${total} transactions | oldest first`);
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="8"><div class="empty-state compact">No finance transactions match this view.</div></td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((row) => {
+    const canPost = row.status === 'READY';
+    const canEdit = ['DRAFT', 'INCOMPLETE', 'READY'].includes(row.status);
+    const canVoid = row.status === 'POSTED' && hasCurrentPermission('finance_void');
+    return `
+      <tr>
+        <td>${escapeHtml(financeFormatDate(row.effective_date))}<small class="finance-cell-note">${escapeHtml(row.financial_year || '')}</small></td>
+        <td><strong>${escapeHtml(row.transaction_uid || '-')}</strong><small class="finance-cell-note">${escapeHtml(row.reference || 'No external reference')}</small></td>
+        <td><span class="finance-type-chip">${escapeHtml(String(row.transaction_type || '').replaceAll('_', ' '))}</span><small class="finance-cell-note">${escapeHtml(row.description || '-')}</small></td>
+        <td>${escapeHtml(row.party_name || '-')}</td>
+        <td><strong>${escapeHtml(formatMoney(row.gross_amount || 0))}</strong></td>
+        <td>${escapeHtml(formatMoney(row.gst_amount || 0))}</td>
+        <td><span class="finance-status-pill" data-status="${escapeHtml(String(row.status || '').toLowerCase())}">${escapeHtml(row.status || '-')}</span></td>
+        <td><div class="finance-row-actions">
+          ${canEdit ? `<button type="button" class="secondary-btn" onclick="openFinanceTransactionDialog(${Number(row.id)})">Edit</button>` : ''}
+          ${canPost ? `<button type="button" class="primary-btn" onclick="confirmPostFinanceTransaction(${Number(row.id)}, '${escapeHtml(row.transaction_uid || '')}')">Post</button>` : ''}
+          ${canVoid ? `<button type="button" class="danger-btn" onclick="openFinanceVoidDialog(${Number(row.id)}, '${escapeHtml(row.transaction_uid || '')}')">Void</button>` : ''}
+          ${!canEdit && !canPost && !canVoid ? '<span class="finance-locked-label">Controlled record</span>' : ''}
+        </div></td>
+      </tr>`;
+  }).join('');
+  enhanceResponsiveTables();
+}
+
+function renderFinanceReports() {
+  const report = financeState.reports;
+  if (!report) return;
+  setText('financeTrialDebits', formatMoney(report.totals?.debit || 0));
+  setText('financeTrialCredits', formatMoney(report.totals?.credit || 0));
+  setText('financeNetResult', formatMoney(report.profit_loss?.net_result || 0));
+  const status = document.getElementById('financeTrialBalanceStatus');
+  if (status) {
+    status.textContent = report.totals?.balanced ? 'BALANCED' : `DIFFERENCE ${formatMoney(report.totals?.difference || 0)}`;
+    status.dataset.status = report.totals?.balanced ? 'balanced' : 'error';
+  }
+}
+
+async function loadFinanceTransactions(page = financeState.transactionPage) {
+  if (!financeState.selectedYearId) return;
+  financeState.transactionPage = Math.max(1, Number(page || 1));
+  const body = document.getElementById('financeTransactionBody');
+  if (body) body.innerHTML = '<tr><td colspan="8"><span class="table-loading-state">Loading finance transactions...</span></td></tr>';
+  const query = new URLSearchParams({
+    financial_year_id: String(financeState.selectedYearId),
+    page: String(financeState.transactionPage),
+    limit: String(financeState.transactionLimit)
+  });
+  const search = document.getElementById('financeTransactionSearch')?.value?.trim();
+  const type = document.getElementById('financeTransactionType')?.value;
+  const status = document.getElementById('financeTransactionStatus')?.value;
+  if (search) query.set('search', search);
+  if (type) query.set('type', type);
+  if (status) query.set('status', status);
+  try {
+    const data = await financeApi(`/transactions?${query.toString()}`);
+    financeState.transactionTotal = Number(data.total || 0);
+    financeState.transactionRows = data.transactions || [];
+    renderFinanceTransactions(financeState.transactionRows, data.page || financeState.transactionPage, data.limit || financeState.transactionLimit, financeState.transactionTotal);
+  } catch (error) {
+    if (body) body.innerHTML = `<tr><td colspan="8">${escapeHtml(financeErrorText(error))}</td></tr>`;
+  }
+}
+
+function changeFinanceTransactionPage(delta) {
+  const maxPage = Math.max(1, Math.ceil(financeState.transactionTotal / financeState.transactionLimit));
+  loadFinanceTransactions(Math.min(maxPage, Math.max(1, financeState.transactionPage + Number(delta || 0))));
+}
+
+function setFinanceTransactionLimit(value) {
+  financeState.transactionLimit = Math.min(100, Math.max(10, Number(value || 25)));
+  loadFinanceTransactions(1);
+}
+
+function queueFinanceTransactionSearch() {
+  clearTimeout(financeState.searchTimer);
+  financeState.searchTimer = setTimeout(() => loadFinanceTransactions(1), 280);
+}
+
+async function loadFinanceWorkspace() {
+  const section = document.getElementById('financeSection');
+  if (!section) return;
+  section.classList.add('is-loading');
+  try {
+    if (!financeState.years.length) {
+      const yearsData = await financeApi('/financial-years');
+      financeState.years = yearsData.financial_years || [];
+      const current = financeState.years.find((year) => {
+        const today = new Date().toISOString().slice(0, 10);
+        return today >= String(year.start_date).slice(0, 10) && today <= String(year.end_date).slice(0, 10);
+      });
+      financeState.selectedYearId = Number(current?.id || financeState.years[0]?.id || 0);
+      renderFinanceYears();
+    }
+    if (!financeState.selectedYearId) throw new Error('No financial year is configured.');
+    const yearQuery = `financial_year_id=${encodeURIComponent(financeState.selectedYearId)}`;
+    const [overview, setup, issueData, reports] = await Promise.all([
+      financeApi(`/overview?${yearQuery}`),
+      financeState.setup ? Promise.resolve(financeState.setup) : financeApi('/setup'),
+      financeApi(`/issues?${yearQuery}`),
+      financeApi(`/reports?${yearQuery}`)
+    ]);
+    financeState.overview = overview;
+    financeState.setup = setup;
+    financeState.issues = (issueData.issues || []).filter((issue) => ['OPEN', 'IN_PROGRESS'].includes(issue.status));
+    financeState.reports = reports;
+    renderFinanceOverview();
+    renderFinanceIssues();
+    renderFinanceReports();
+    const typeSelect = document.getElementById('financeTransactionType');
+    if (typeSelect && typeSelect.options.length === 1) {
+      typeSelect.insertAdjacentHTML('beforeend', FINANCE_TRANSACTION_TYPES.map((type) => `<option value="${type}">${type.replaceAll('_', ' ')}</option>`).join(''));
+    }
+    await loadFinanceTransactions(1);
+    await loadActiveFinanceTab();
+  } catch (error) {
+    showToast(financeErrorText(error));
+  } finally {
+    section.classList.remove('is-loading');
+  }
+}
+
+async function selectFinanceTab(tab) {
+  const allowed = ['overview', 'ledger', 'bills', 'banking', 'control'];
+  financeState.activeTab = allowed.includes(tab) ? tab : 'overview';
+  document.querySelectorAll('[data-finance-tab]').forEach((button) => {
+    const active = button.dataset.financeTab === financeState.activeTab;
+    button.classList.toggle('is-active', active);
+    button.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
+  document.querySelectorAll('[data-finance-panel]').forEach((panel) => {
+    panel.classList.toggle('is-active', panel.dataset.financePanel === financeState.activeTab);
+  });
+  await loadActiveFinanceTab();
+  enhanceResponsiveTables();
+}
+
+async function loadActiveFinanceTab() {
+  if (financeState.activeTab === 'bills') return loadFinanceSupplierBills(financeState.billPage);
+  if (financeState.activeTab === 'banking') return loadFinanceBankAccounts();
+  if (financeState.activeTab === 'control') return loadFinanceControlData();
+}
+
+function renderFinanceSupplierBills(rows = [], page = 1, limit = 25, total = 0) {
+  const body = document.getElementById('financeSupplierBillBody');
+  if (!body) return;
+  const start = total ? ((page - 1) * limit) + 1 : 0;
+  setText('financeBillPageInfo', `${start}-${Math.min(page * limit, total)} of ${total} supplier bills | oldest first`);
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="7"><div class="empty-state compact">No supplier bills match this view.</div></td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((row) => {
+    const editable = ['DRAFT', 'PENDING_APPROVAL'].includes(row.status);
+    const payable = ['APPROVED', 'PARTIALLY_PAID', 'OVERDUE'].includes(row.status) && Number(row.balance || 0) > 0;
+    return `<tr>
+      <td><strong>${escapeHtml(row.supplier_name || '-')}</strong><small class="finance-cell-note">${escapeHtml(row.supplier_invoice_no || row.bill_uid || '-')} | ${Number(row.item_count || 0)} line(s)</small></td>
+      <td>${financeFormatDate(row.issue_date)}<small class="finance-cell-note">Due ${financeFormatDate(row.due_date)}</small></td>
+      <td><strong>${formatMoney(row.total_amount || 0)}</strong></td><td>${formatMoney(row.paid_amount || 0)}</td><td><strong>${formatMoney(row.balance || 0)}</strong></td>
+      <td><span class="finance-status-pill" data-status="${escapeHtml(String(row.status || '').toLowerCase())}">${escapeHtml(String(row.status || '').replaceAll('_', ' '))}</span></td>
+      <td><div class="finance-row-actions finance-bill-actions">
+        ${editable ? `<button type="button" class="secondary-btn" onclick="openSupplierBillDialog(${Number(row.id)})">Edit</button>` : ''}
+        ${row.status === 'DRAFT' ? `<button type="button" class="primary-btn" onclick="openFinanceBillStatusDialog(${Number(row.id)}, 'PENDING_APPROVAL')">Submit</button>` : ''}
+        ${row.status === 'PENDING_APPROVAL' ? `<button type="button" class="primary-btn" onclick="openFinanceBillStatusDialog(${Number(row.id)}, 'APPROVED')">Approve</button>` : ''}
+        ${payable ? `<button type="button" class="primary-btn" onclick="openSupplierPaymentDialog(${Number(row.id)})">Pay</button>` : ''}
+        ${!['PAID', 'VOID'].includes(row.status) ? `<button type="button" class="danger-btn" onclick="openFinanceBillStatusDialog(${Number(row.id)}, 'VOID')">Void</button>` : ''}
+      </div></td></tr>`;
+  }).join('');
+  enhanceResponsiveTables();
+}
+
+async function loadFinanceSupplierBills(page = financeState.billPage) {
+  if (!financeState.selectedYearId) return;
+  financeState.billPage = Math.max(1, Number(page || 1));
+  const body = document.getElementById('financeSupplierBillBody');
+  if (body) body.innerHTML = '<tr><td colspan="7"><span class="table-loading-state">Loading supplier bills...</span></td></tr>';
+  const query = new URLSearchParams({ financial_year_id: String(financeState.selectedYearId), page: String(financeState.billPage), limit: String(financeState.billLimit) });
+  const search = document.getElementById('financeBillSearch')?.value?.trim();
+  const status = document.getElementById('financeBillStatus')?.value;
+  if (search) query.set('search', search);
+  if (status) query.set('status', status);
+  try {
+    const data = await financeApi(`/supplier-bills?${query}`);
+    financeState.billRows = data.bills || [];
+    financeState.billTotal = Number(data.total || 0);
+    renderFinanceSupplierBills(financeState.billRows, Number(data.page || 1), Number(data.limit || financeState.billLimit), financeState.billTotal);
+  } catch (error) {
+    if (body) body.innerHTML = `<tr><td colspan="7">${escapeHtml(financeErrorText(error))}</td></tr>`;
+  }
+}
+
+function changeFinanceBillPage(delta) {
+  const max = Math.max(1, Math.ceil(financeState.billTotal / financeState.billLimit));
+  loadFinanceSupplierBills(Math.min(max, Math.max(1, financeState.billPage + Number(delta || 0))));
+}
+
+function setFinanceBillLimit(value) {
+  financeState.billLimit = Math.min(100, Math.max(10, Number(value || 25)));
+  loadFinanceSupplierBills(1);
+}
+
+function queueFinanceBillSearch() {
+  clearTimeout(financeState.billSearchTimer);
+  financeState.billSearchTimer = setTimeout(() => loadFinanceSupplierBills(1), 280);
+}
+
+function financeSupplierOptions(selectedId = '') {
+  return supplierCache.filter((supplier) => !Number(supplier.deleted)).map((supplier) => `<option value="${Number(supplier.id)}" ${String(supplier.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(supplier.supplier_name || supplier.contact_name || `Supplier ${supplier.id}`)}</option>`).join('');
+}
+
+function financeBillLineHtml(line = {}, index = 0) {
+  return `<div class="finance-bill-line" data-finance-bill-line>
+    <label class="finance-line-description"><span>Description *</span><input data-field="description" value="${escapeHtml(line.description || '')}" placeholder="Material, service or operating cost"></label>
+    <label><span>Quantity *</span><input data-field="quantity" inputmode="decimal" value="${escapeHtml(line.quantity || '1')}"></label>
+    <label><span>Unit price *</span><input data-field="unit_price" inputmode="decimal" value="${escapeHtml(line.unit_price || '0.00')}"></label>
+    <label><span>Account</span><select data-field="account_id"><option value="">Review required</option>${financeAccountOptions(line.account_id)}</select></label>
+    <button type="button" class="icon-btn finance-remove-line" aria-label="Remove bill line" title="Remove bill line" onclick="this.closest('[data-finance-bill-line]').remove()">&times;</button>
+  </div>`;
+}
+
+function addFinanceBillLine(line = {}) {
+  document.getElementById('financeBillLines')?.insertAdjacentHTML('beforeend', financeBillLineHtml(line, document.querySelectorAll('[data-finance-bill-line]').length));
+}
+
+async function openSupplierBillDialog(id = 0) {
+  try {
+    if (!financeState.setup) financeState.setup = await financeApi('/setup');
+    if (!supplierCache.length) await loadSuppliers();
+    let bill = {};
+    let items = [{}];
+    if (id) {
+      const data = await financeApi(`/supplier-bills/${Number(id)}`);
+      bill = data.bill || {};
+      items = data.items?.length ? data.items : [{}];
+    }
+    showDialog(id ? 'Edit Supplier Bill' : 'Add Supplier Bill', `
+      <div class="finance-dialog-layout compact" data-finance-bill-id="${Number(id || 0)}">
+        <section class="dialog-card"><div class="finance-form-grid two-col">
+          <label><span>Supplier *</span><select id="financeBillSupplier"><option value="">Select supplier</option>${financeSupplierOptions(bill.supplier_id)}</select></label>
+          <label><span>Supplier invoice number *</span><input id="financeBillInvoiceNo" value="${escapeHtml(bill.supplier_invoice_no || '')}"></label>
+          <label><span>Issue date *</span><input id="financeBillIssueDate" type="date" value="${escapeHtml(String(bill.issue_date || new Date().toISOString().slice(0, 10)).slice(0, 10))}"></label>
+          <label><span>Due date</span><input id="financeBillDueDate" type="date" value="${escapeHtml(String(bill.due_date || '').slice(0, 10))}"></label>
+          <label><span>GST treatment *</span><select id="financeBillTax"><option value="">Select GST treatment</option>${financeTaxOptions(bill.tax_code || 'GST_ON_EXPENSES')}</select></label>
+          <label><span>Job / project reference</span><input id="financeBillJob" value="${escapeHtml(bill.job_reference || '')}"></label>
+          <label class="full"><span>Workflow</span><select id="financeBillSaveStatus"><option value="DRAFT" ${bill.status === 'DRAFT' ? 'selected' : ''}>Save draft</option><option value="PENDING_APPROVAL" ${bill.status === 'PENDING_APPROVAL' ? 'selected' : ''}>Submit for approval</option></select></label>
+        </div></section>
+        <section class="dialog-card"><div class="finance-panel-head"><div><h4>Bill lines</h4><p>Amounts are recalculated on the server using cent-safe rules.</p></div><button type="button" class="secondary-btn" onclick="addFinanceBillLine()">Add Line</button></div><div id="financeBillLines" class="finance-bill-lines">${items.map(financeBillLineHtml).join('')}</div></section>
+      </div>`, saveSupplierBill, id ? 'Update Bill' : 'Save Bill');
+    document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function saveSupplierBill() {
+  const wrapper = document.querySelector('[data-finance-bill-id]');
+  const items = [...document.querySelectorAll('[data-finance-bill-line]')].map((line) => ({
+    description: line.querySelector('[data-field="description"]')?.value,
+    quantity: line.querySelector('[data-field="quantity"]')?.value,
+    unit_price: line.querySelector('[data-field="unit_price"]')?.value,
+    account_id: line.querySelector('[data-field="account_id"]')?.value || null
+  }));
+  const payload = { id: Number(wrapper?.dataset.financeBillId || 0) || undefined, supplier_id: document.getElementById('financeBillSupplier')?.value, supplier_invoice_no: document.getElementById('financeBillInvoiceNo')?.value, issue_date: document.getElementById('financeBillIssueDate')?.value, due_date: document.getElementById('financeBillDueDate')?.value, tax_code: document.getElementById('financeBillTax')?.value, job_reference: document.getElementById('financeBillJob')?.value, status: document.getElementById('financeBillSaveStatus')?.value, items };
+  try {
+    const data = await financeApi('/supplier-bills', { method: 'POST', body: JSON.stringify(payload) });
+    hideDialog(); showToast(data.message || 'Supplier bill saved successfully.'); await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceBillStatusDialog(id, status) {
+  const label = String(status).replaceAll('_', ' ');
+  showDialog(`${label} Supplier Bill`, `<div class="finance-confirm-panel"><p>This action is audit logged and cannot silently rewrite approved accounting records.</p><label><span>Reason / approval note ${status === 'VOID' ? '*' : ''}</span><textarea id="financeBillStatusReason" rows="3"></textarea></label></div>`, () => updateFinanceBillStatus(id, status), label);
+}
+
+async function updateFinanceBillStatus(id, status) {
+  try {
+    const data = await financeApi(`/supplier-bills/${Number(id)}/status`, { method: 'POST', body: JSON.stringify({ status, reason: document.getElementById('financeBillStatusReason')?.value?.trim() }) });
+    hideDialog(); showToast(data.message || 'Supplier bill updated successfully.'); await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function openSupplierPaymentDialog(id) {
+  try {
+    if (!financeState.bankAccounts.length) await loadFinanceBankAccounts(false);
+    const row = financeState.billRows.find((bill) => Number(bill.id) === Number(id)) || {};
+    showDialog('Record Supplier Payment', `<div class="finance-confirm-panel" data-finance-payment-bill="${Number(id)}"><div class="finance-report-metrics"><div><span>Supplier</span><strong>${escapeHtml(row.supplier_name || '-')}</strong></div><div><span>Invoice</span><strong>${escapeHtml(row.supplier_invoice_no || '-')}</strong></div><div><span>Balance</span><strong>${formatMoney(row.balance || 0)}</strong></div></div><div class="finance-form-grid two-col"><label><span>Payment date *</span><input id="financePaymentDate" type="date" value="${new Date().toISOString().slice(0, 10)}"></label><label><span>Amount *</span><input id="financePaymentAmount" inputmode="decimal" value="${escapeHtml(row.balance || '')}"></label><label><span>Bank account</span><select id="financePaymentBank"><option value="">Not linked</option>${financeState.bankAccounts.map((account) => `<option value="${Number(account.id)}">${escapeHtml(account.nickname)}</option>`).join('')}</select></label><label><span>Payment method</span><input id="financePaymentMethod" value="Bank"></label><label class="full"><span>Reference</span><input id="financePaymentReference"></label><label class="full"><span>Notes</span><textarea id="financePaymentNotes" rows="2"></textarea></label></div></div>`, saveSupplierPayment, 'Post Payment');
+    document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function saveSupplierPayment() {
+  const billId = Number(document.querySelector('[data-finance-payment-bill]')?.dataset.financePaymentBill || 0);
+  const payload = { payment_date: document.getElementById('financePaymentDate')?.value, amount: document.getElementById('financePaymentAmount')?.value, bank_account_id: document.getElementById('financePaymentBank')?.value || null, payment_method: document.getElementById('financePaymentMethod')?.value, reference: document.getElementById('financePaymentReference')?.value, notes: document.getElementById('financePaymentNotes')?.value };
+  try {
+    const data = await financeApi(`/supplier-bills/${billId}/payments`, { method: 'POST', body: JSON.stringify(payload) });
+    hideDialog(); showToast(data.message || 'Supplier payment recorded successfully.'); await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function renderFinanceBankAccounts() {
+  const panel = document.getElementById('financeBankAccountList');
+  if (!panel) return;
+  if (!financeState.bankAccounts.length) {
+    panel.innerHTML = '<div class="empty-state compact">No bank accounts configured. Add a masked account to begin reconciliation.</div>';
+    return;
+  }
+  panel.innerHTML = financeState.bankAccounts.map((account) => `<button type="button" class="finance-account-item ${Number(account.id) === Number(financeState.selectedBankAccountId) ? 'is-active' : ''}" onclick="selectFinanceBankAccount(${Number(account.id)})"><span><strong>${escapeHtml(account.nickname)}</strong><small>${escapeHtml(account.institution || 'Institution not recorded')} | ${escapeHtml(account.account_number_masked || 'masked')}</small></span><span><strong>${Number(account.unreconciled_count || 0)}</strong><small>unreconciled</small></span></button>`).join('');
+}
+
+async function loadFinanceBankAccounts(loadTransactions = true) {
+  try {
+    const data = await financeApi('/bank-accounts');
+    financeState.bankAccounts = data.bank_accounts || [];
+    if (!financeState.selectedBankAccountId && financeState.bankAccounts.length) financeState.selectedBankAccountId = Number(financeState.bankAccounts[0].id);
+    if (financeState.selectedBankAccountId && !financeState.bankAccounts.some((entry) => Number(entry.id) === Number(financeState.selectedBankAccountId))) financeState.selectedBankAccountId = Number(financeState.bankAccounts[0]?.id || 0) || null;
+    renderFinanceBankAccounts();
+    const importButton = document.getElementById('financeBankImportButton');
+    if (importButton) importButton.disabled = !financeState.selectedBankAccountId;
+    if (loadTransactions && financeState.selectedBankAccountId) await loadFinanceBankTransactions();
+  } catch (error) {
+    const panel = document.getElementById('financeBankAccountList');
+    if (panel) panel.innerHTML = `<div class="empty-state compact">${escapeHtml(financeErrorText(error))}</div>`;
+  }
+}
+
+async function selectFinanceBankAccount(id) {
+  financeState.selectedBankAccountId = Number(id || 0) || null;
+  renderFinanceBankAccounts();
+  await loadFinanceBankTransactions();
+}
+
+function renderFinanceBankTransactions(rows) {
+  const body = document.getElementById('financeBankTransactionBody');
+  if (!body) return;
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="7"><div class="empty-state compact">No bank statement entries have been imported for this account.</div></td></tr>';
+    return;
+  }
+  body.innerHTML = rows.map((row) => `<tr><td>${financeFormatDate(row.transaction_date)}</td><td><strong>${escapeHtml(row.description || '-')}</strong><small class="finance-cell-note">${escapeHtml(row.reference || '')}</small></td><td>${Number(row.debit || 0) ? formatMoney(row.debit) : '-'}</td><td>${Number(row.credit || 0) ? formatMoney(row.credit) : '-'}</td><td>${formatMoney(row.matched_amount || 0)}</td><td><span class="finance-status-pill" data-status="${escapeHtml(String(row.reconciliation_status || '').toLowerCase())}">${escapeHtml(row.reconciliation_status || '-')}</span></td><td><div class="finance-row-actions">${!['RECONCILED', 'IGNORED'].includes(row.reconciliation_status) ? `<button type="button" class="primary-btn" onclick="openFinanceReconcileDialog(${Number(row.id)})">Match</button><button type="button" class="secondary-btn" onclick="openFinanceIgnoreDialog(${Number(row.id)})">Ignore</button>` : '<span class="finance-locked-label">Reviewed</span>'}</div></td></tr>`).join('');
+  enhanceResponsiveTables();
+}
+
+async function loadFinanceBankTransactions() {
+  if (!financeState.selectedBankAccountId) return;
+  const body = document.getElementById('financeBankTransactionBody');
+  if (body) body.innerHTML = '<tr><td colspan="7"><span class="table-loading-state">Loading bank entries...</span></td></tr>';
+  try {
+    const data = await financeApi(`/bank-accounts/${financeState.selectedBankAccountId}/transactions?limit=200`);
+    financeState.bankTransactions = data.bank_transactions || [];
+    const account = financeState.bankAccounts.find((entry) => Number(entry.id) === Number(financeState.selectedBankAccountId));
+    setText('financeBankPageInfo', `${account?.nickname || 'Bank account'} | ${Number(data.total || 0)} imported entries`);
+    renderFinanceBankTransactions(financeState.bankTransactions);
+  } catch (error) {
+    if (body) body.innerHTML = `<tr><td colspan="7">${escapeHtml(financeErrorText(error))}</td></tr>`;
+  }
+}
+
+function openFinanceBankAccountDialog() {
+  showDialog('Add Bank Account', `<div class="finance-dialog-layout compact"><section class="dialog-card"><div class="finance-form-grid two-col"><label><span>Account nickname *</span><input id="financeBankNickname" placeholder="Operating account"></label><label><span>Institution</span><input id="financeBankInstitution"></label><label><span>Masked BSB</span><input id="financeBankBsb" placeholder="***-***"></label><label><span>Masked account number</span><input id="financeBankNumber" placeholder="****1234"></label><label><span>Currency</span><input id="financeBankCurrency" value="AUD" maxlength="3"></label><label><span>Opening balance</span><input id="financeBankOpening" inputmode="decimal" value="0.00"></label></div></section></div>`, saveFinanceBankAccount, 'Save Account');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+}
+
+async function saveFinanceBankAccount() {
+  const payload = { nickname: document.getElementById('financeBankNickname')?.value, institution: document.getElementById('financeBankInstitution')?.value, bsb_masked: document.getElementById('financeBankBsb')?.value, account_number_masked: document.getElementById('financeBankNumber')?.value, currency: document.getElementById('financeBankCurrency')?.value, opening_balance: document.getElementById('financeBankOpening')?.value };
+  try {
+    const data = await financeApi('/bank-accounts', { method: 'POST', body: JSON.stringify(payload) });
+    hideDialog(); financeState.selectedBankAccountId = Number(data.bank_account_id); showToast(data.message || 'Bank account saved successfully.'); await loadFinanceBankAccounts();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function parseFinanceCsvLine(line) {
+  const values = []; let current = ''; let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '"' && line[index + 1] === '"' && quoted) { current += '"'; index += 1; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === ',' && !quoted) { values.push(current.trim()); current = ''; }
+    else current += char;
+  }
+  values.push(current.trim());
+  return values;
+}
+
+function financeCsvRows(text) {
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) throw new Error('The CSV needs a header row and at least one transaction.');
+  const headers = parseFinanceCsvLine(lines.shift()).map((value) => value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
+  const aliases = { date: 'transaction_date', transactiondate: 'transaction_date', details: 'description', narration: 'description', amount_debit: 'debit', withdrawal: 'debit', amount_credit: 'credit', deposit: 'credit', balance: 'running_balance' };
+  return lines.map((line) => {
+    const values = parseFinanceCsvLine(line); const row = {};
+    headers.forEach((header, index) => { row[aliases[header] || header] = values[index] ?? ''; });
+    return row;
+  });
+}
+
+function openFinanceBankImportDialog() {
+  if (!financeState.selectedBankAccountId) return showToast('Select a bank account first.');
+  showDialog('Import Bank Statement', `<div class="finance-dialog-layout compact"><section class="dialog-card"><div class="finance-form-grid"><label><span>CSV statement *</span><input id="financeBankCsvFile" type="file" accept=".csv,text/csv" onchange="loadFinanceBankCsvFile(this)"></label><label><span>CSV content</span><textarea id="financeBankCsvText" rows="10" placeholder="transaction_date,description,reference,debit,credit,running_balance"></textarea></label><p class="finance-report-note">Required columns: transaction_date, description, debit or credit. Duplicate rows are detected by a secure row hash.</p></div></section></div>`, saveFinanceBankImport, 'Import Statement');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+}
+
+async function loadFinanceBankCsvFile(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  document.getElementById('financeBankCsvText').value = await file.text();
+}
+
+async function saveFinanceBankImport() {
+  try {
+    const rows = financeCsvRows(document.getElementById('financeBankCsvText')?.value);
+    const filename = document.getElementById('financeBankCsvFile')?.files?.[0]?.name || 'pasted-statement.csv';
+    const data = await financeApi(`/bank-accounts/${financeState.selectedBankAccountId}/import`, { method: 'POST', body: JSON.stringify({ original_name: filename, rows }) });
+    hideDialog(); showToast(data.message || 'Bank statement imported successfully.'); await loadFinanceBankAccounts();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceReconcileDialog(id) {
+  const row = financeState.bankTransactions.find((entry) => Number(entry.id) === Number(id));
+  if (!row) return;
+  const amount = Math.abs(Number(row.credit || 0) - Number(row.debit || 0)).toFixed(2);
+  const posted = financeState.transactionRows.filter((entry) => ['POSTED', 'RECONCILED'].includes(entry.status));
+  showDialog('Match Bank Transaction', `<div class="finance-confirm-panel" data-bank-transaction-id="${Number(id)}"><div class="finance-report-metrics"><div><span>Date</span><strong>${financeFormatDate(row.transaction_date)}</strong></div><div><span>Description</span><strong>${escapeHtml(row.description || '-')}</strong></div><div><span>Amount</span><strong>${formatMoney(amount)}</strong></div></div><label><span>Posted ledger transaction *</span><select id="financeReconcileTransaction"><option value="">Select transaction</option>${posted.map((entry) => `<option value="${Number(entry.id)}">${escapeHtml(entry.transaction_uid)} | ${escapeHtml(entry.description || '')} | ${formatMoney(entry.gross_amount || 0)}</option>`).join('')}</select></label><label><span>Matched amount *</span><input id="financeReconcileAmount" inputmode="decimal" value="${amount}"></label><label><span>Review note</span><textarea id="financeReconcileNote" rows="2"></textarea></label></div>`, saveFinanceReconciliation, 'Save Match');
+}
+
+async function saveFinanceReconciliation() {
+  const id = Number(document.querySelector('[data-bank-transaction-id]')?.dataset.bankTransactionId || 0);
+  try {
+    const data = await financeApi(`/bank-transactions/${id}/reconcile`, { method: 'POST', body: JSON.stringify({ finance_transaction_id: document.getElementById('financeReconcileTransaction')?.value, matched_amount: document.getElementById('financeReconcileAmount')?.value, note: document.getElementById('financeReconcileNote')?.value }) });
+    hideDialog(); showToast(data.message || 'Bank transaction matched successfully.'); await loadFinanceBankAccounts();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceIgnoreDialog(id) {
+  showDialog('Ignore Bank Transaction', `<div class="finance-confirm-panel" data-bank-ignore-id="${Number(id)}"><p>The row remains in the audit trail and is excluded from the active reconciliation queue.</p><label><span>Reason *</span><textarea id="financeIgnoreReason" rows="3"></textarea></label></div>`, saveFinanceIgnoredTransaction, 'Ignore Entry');
+}
+
+async function saveFinanceIgnoredTransaction() {
+  const id = Number(document.querySelector('[data-bank-ignore-id]')?.dataset.bankIgnoreId || 0);
+  try {
+    const data = await financeApi(`/bank-transactions/${id}/ignore`, { method: 'POST', body: JSON.stringify({ reason: document.getElementById('financeIgnoreReason')?.value }) });
+    hideDialog(); showToast(data.message || 'Bank entry ignored.'); await loadFinanceBankAccounts();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function renderFinancePeriods() {
+  const body = document.getElementById('financePeriodBody');
+  if (!body) return;
+  if (!financeState.periods.length) {
+    body.innerHTML = '<tr><td colspan="5"><div class="empty-state compact">No accounting periods configured for this year.</div></td></tr>';
+    return;
+  }
+  body.innerHTML = financeState.periods.map((period) => `<tr><td><strong>${escapeHtml(period.period_key)}</strong><small class="finance-cell-note">${escapeHtml(period.financial_year_label || '')}</small></td><td>${financeFormatDate(period.start_date)}<small class="finance-cell-note">to ${financeFormatDate(period.end_date)}</small></td><td><span class="finance-status-pill" data-status="${escapeHtml(String(period.status || '').toLowerCase())}">${escapeHtml(period.status || '-')}</span></td><td>${period.locked_at ? financeFormatDate(period.locked_at) : '-'}</td><td><button type="button" class="secondary-btn" onclick="openFinancePeriodDialog(${Number(period.id)})">Control</button></td></tr>`).join('');
+  enhanceResponsiveTables();
+}
+
+function renderFinanceQueries() {
+  const panel = document.getElementById('financeQueryList');
+  if (!panel) return;
+  if (!financeState.accountantQueries.length) {
+    panel.innerHTML = '<div class="empty-state compact">No accountant questions recorded for this year.</div>';
+    return;
+  }
+  panel.innerHTML = financeState.accountantQueries.map((query) => `<article class="finance-issue-item info"><div><span>${escapeHtml(query.query_uid)}</span><strong>${escapeHtml(query.status)}</strong></div><p>${escapeHtml(query.question)}</p>${query.answer ? `<p><strong>Answer:</strong> ${escapeHtml(query.answer)}</p>` : ''}<div class="finance-issue-meta"><span>${escapeHtml(query.raised_by_name || 'User')}</span><span>${financeFormatDate(query.raised_at)}</span></div><button type="button" class="text-btn" onclick="openFinanceQueryDialog(${Number(query.id)})">${query.answer ? 'Review' : 'Answer'}</button></article>`).join('');
+}
+
+function renderFinanceAssets() {
+  const body = document.getElementById('financeAssetBody');
+  if (!body) return;
+  if (!financeState.assets.length) {
+    body.innerHTML = '<tr><td colspan="6"><div class="empty-state compact">No assets have been recorded.</div></td></tr>';
+    return;
+  }
+  body.innerHTML = financeState.assets.map((asset) => `<tr><td><strong>${escapeHtml(asset.asset_number)}</strong><small class="finance-cell-note">${escapeHtml(asset.description)}</small></td><td>${financeFormatDate(asset.purchase_date)}<small class="finance-cell-note">${escapeHtml(asset.supplier_name || '')}</small></td><td><strong>${formatMoney(asset.purchase_cost || 0)}</strong><small class="finance-cell-note">GST ${formatMoney(asset.gst_amount || 0)}</small></td><td>${escapeHtml(asset.location || '-')}</td><td><span class="finance-status-pill" data-status="${escapeHtml(String(asset.accounting_status || '').toLowerCase())}">${escapeHtml(String(asset.accounting_status || '').replaceAll('_', ' '))}</span></td><td><button type="button" class="secondary-btn" onclick="openFinanceAssetDialog(${Number(asset.id)})">Edit</button></td></tr>`).join('');
+  enhanceResponsiveTables();
+}
+
+async function loadFinanceControlData() {
+  if (!financeState.selectedYearId) return;
+  try {
+    const [periods, queries, assets] = await Promise.all([
+      financeApi(`/accounting-periods?financial_year_id=${financeState.selectedYearId}`),
+      financeApi(`/accountant-queries?financial_year_id=${financeState.selectedYearId}`),
+      financeApi('/assets')
+    ]);
+    financeState.periods = periods.accounting_periods || [];
+    financeState.accountantQueries = queries.queries || [];
+    financeState.assets = assets.assets || [];
+    renderFinancePeriods(); renderFinanceQueries(); renderFinanceAssets();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinancePeriodDialog(id) {
+  const period = financeState.periods.find((entry) => Number(entry.id) === Number(id));
+  if (!period) return;
+  showDialog('Accounting Period Control', `<div class="finance-confirm-panel" data-finance-period-id="${Number(id)}"><span class="panel-kicker">${escapeHtml(period.period_key)}</span><h4>${financeFormatDate(period.start_date)} to ${financeFormatDate(period.end_date)}</h4><label><span>New status</span><select id="financePeriodStatus"><option>OPEN</option><option>REVIEWING</option><option>READY</option><option>LOCKED</option></select></label><label><span>Reason</span><textarea id="financePeriodReason" rows="3"></textarea></label><label><span>Lock confirmation</span><input id="financePeriodConfirmation" placeholder="Type LOCK ${escapeHtml(period.period_key)} when locking"></label></div>`, saveFinancePeriodStatus, 'Update Period');
+  document.getElementById('financePeriodStatus').value = period.status || 'OPEN';
+}
+
+async function saveFinancePeriodStatus() {
+  const id = Number(document.querySelector('[data-finance-period-id]')?.dataset.financePeriodId || 0);
+  try {
+    const data = await financeApi(`/accounting-periods/${id}/status`, { method: 'POST', body: JSON.stringify({ status: document.getElementById('financePeriodStatus')?.value, reason: document.getElementById('financePeriodReason')?.value, confirmation: document.getElementById('financePeriodConfirmation')?.value }) });
+    hideDialog(); showToast(data.message || 'Accounting period updated successfully.'); await loadFinanceControlData();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceQueryDialog(id = 0) {
+  const query = financeState.accountantQueries.find((entry) => Number(entry.id) === Number(id)) || {};
+  showDialog(id ? 'Accountant Query' : 'New Accountant Query', `<div class="finance-confirm-panel" data-finance-query-id="${Number(id || 0)}">${id ? `<p><strong>Question:</strong> ${escapeHtml(query.question || '')}</p><label><span>Answer</span><textarea id="financeQueryAnswer" rows="4">${escapeHtml(query.answer || '')}</textarea></label><label><span>Status</span><select id="financeQueryStatus"><option>QUESTION</option><option>ANSWERED</option><option>RESOLVED</option></select></label>` : `<label><span>Question *</span><textarea id="financeQueryQuestion" rows="4" placeholder="Record the accounting treatment or evidence question"></textarea></label>`}</div>`, id ? saveFinanceQueryUpdate : saveFinanceQuery, id ? 'Save Response' : 'Create Query');
+  if (id) document.getElementById('financeQueryStatus').value = query.status || 'QUESTION';
+}
+
+async function saveFinanceQuery() {
+  try {
+    const data = await financeApi('/accountant-queries', { method: 'POST', body: JSON.stringify({ financial_year_id: financeState.selectedYearId, question: document.getElementById('financeQueryQuestion')?.value }) });
+    hideDialog(); showToast(data.message || 'Accountant query created.'); await loadFinanceControlData();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function saveFinanceQueryUpdate() {
+  const id = Number(document.querySelector('[data-finance-query-id]')?.dataset.financeQueryId || 0);
+  try {
+    const data = await financeApi(`/accountant-queries/${id}`, { method: 'POST', body: JSON.stringify({ answer: document.getElementById('financeQueryAnswer')?.value, status: document.getElementById('financeQueryStatus')?.value }) });
+    hideDialog(); showToast(data.message || 'Accountant query updated.'); await loadFinanceControlData();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function openFinanceAssetDialog(id = 0) {
+  try {
+    if (!supplierCache.length) await loadSuppliers();
+    const asset = financeState.assets.find((entry) => Number(entry.id) === Number(id)) || {};
+    showDialog(id ? 'Edit Asset' : 'Add Asset', `<div class="finance-dialog-layout compact" data-finance-asset-id="${Number(id || 0)}"><section class="dialog-card"><div class="finance-form-grid two-col"><label><span>Asset number *</span><input id="financeAssetNumber" value="${escapeHtml(asset.asset_number || '')}"></label><label><span>Description *</span><input id="financeAssetDescription" value="${escapeHtml(asset.description || '')}"></label><label><span>Category</span><input id="financeAssetCategory" value="${escapeHtml(asset.category || '')}"></label><label><span>Purchase date</span><input id="financeAssetDate" type="date" value="${escapeHtml(String(asset.purchase_date || '').slice(0, 10))}"></label><label><span>Supplier</span><select id="financeAssetSupplier"><option value="">Not linked</option>${financeSupplierOptions(asset.supplier_id)}</select></label><label><span>Purchase cost *</span><input id="financeAssetCost" inputmode="decimal" value="${escapeHtml(asset.purchase_cost || '0.00')}"></label><label><span>GST amount</span><input id="financeAssetGst" inputmode="decimal" value="${escapeHtml(asset.gst_amount || '0.00')}"></label><label><span>Net cost *</span><input id="financeAssetNet" inputmode="decimal" value="${escapeHtml(asset.net_cost || '0.00')}"></label><label><span>Serial number</span><input id="financeAssetSerial" value="${escapeHtml(asset.serial_number || '')}"></label><label><span>Location</span><input id="financeAssetLocation" value="${escapeHtml(asset.location || '')}"></label><label><span>Accounting status</span><select id="financeAssetStatus"><option>REVIEW_REQUIRED</option><option>CONFIRMED</option><option>DISPOSED</option></select></label><label><span>Useful life (months)</span><input id="financeAssetLife" inputmode="numeric" value="${escapeHtml(asset.useful_life_months || '')}"></label></div></section></div>`, saveFinanceAsset, id ? 'Update Asset' : 'Save Asset');
+    document.getElementById('financeAssetStatus').value = asset.accounting_status || 'REVIEW_REQUIRED';
+    document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function saveFinanceAsset() {
+  const payload = { id: Number(document.querySelector('[data-finance-asset-id]')?.dataset.financeAssetId || 0) || undefined, asset_number: document.getElementById('financeAssetNumber')?.value, description: document.getElementById('financeAssetDescription')?.value, category: document.getElementById('financeAssetCategory')?.value, purchase_date: document.getElementById('financeAssetDate')?.value, supplier_id: document.getElementById('financeAssetSupplier')?.value || null, purchase_cost: document.getElementById('financeAssetCost')?.value, gst_amount: document.getElementById('financeAssetGst')?.value, net_cost: document.getElementById('financeAssetNet')?.value, serial_number: document.getElementById('financeAssetSerial')?.value, location: document.getElementById('financeAssetLocation')?.value, accounting_status: document.getElementById('financeAssetStatus')?.value, useful_life_months: document.getElementById('financeAssetLife')?.value };
+  try {
+    const data = await financeApi('/assets', { method: 'POST', body: JSON.stringify(payload) });
+    hideDialog(); showToast(data.message || 'Asset saved successfully.'); await loadFinanceControlData();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function selectFinanceYear(value) {
+  financeState.selectedYearId = Number(value || 0);
+  financeState.transactionPage = 1;
+  financeState.issueFilter = '';
+  await loadFinanceWorkspace();
+}
+
+function financeAccountOptions(selectedId = '') {
+  return (financeState.setup?.accounts || []).filter((account) => Number(account.active) === 1).map((account) => `
+    <option value="${Number(account.id)}" ${String(account.id) === String(selectedId) ? 'selected' : ''}>${escapeHtml(account.account_code)} | ${escapeHtml(account.account_name)}</option>
+  `).join('');
+}
+
+function financeTaxOptions(selectedCode = '') {
+  return (financeState.setup?.tax_codes || []).filter((code) => Number(code.active) === 1).map((code) => `
+    <option value="${escapeHtml(code.code)}" ${code.code === selectedCode ? 'selected' : ''}>${escapeHtml(code.code.replaceAll('_', ' '))}</option>
+  `).join('');
+}
+
+function financeMoneyCents(value) {
+  const raw = String(value ?? '').replace(/[$,\s]/g, '');
+  if (!/^-?\d+(\.\d{0,2})?$/.test(raw)) return null;
+  const negative = raw.startsWith('-');
+  const [whole, fraction = ''] = raw.replace('-', '').split('.');
+  const cents = (Number(whole) * 100) + Number(fraction.padEnd(2, '0'));
+  return negative ? -cents : cents;
+}
+
+function financeAmountFromCents(cents) {
+  return (Number(cents || 0) / 100).toFixed(2);
+}
+
+function calculateFinanceGstFromGross() {
+  const grossInput = document.getElementById('financeTxnGross');
+  const netInput = document.getElementById('financeTxnNet');
+  const gstInput = document.getElementById('financeTxnGst');
+  const taxInput = document.getElementById('financeTxnTax');
+  const gross = financeMoneyCents(grossInput?.value);
+  if (gross === null || gross < 0 || !netInput || !gstInput) return;
+  const taxCode = taxInput?.value || '';
+  const taxable = ['GST_ON_INCOME', 'GST_ON_EXPENSES'].includes(taxCode);
+  const rate = Number(financeState.setup?.settings?.default_gst_rate || 10);
+  const gst = taxable ? Math.round(gross * rate / (100 + rate)) : 0;
+  netInput.value = financeAmountFromCents(gross - gst);
+  gstInput.value = financeAmountFromCents(gst);
+  renderFinanceEntryCompleteness();
+}
+
+function renderFinanceEntryCompleteness() {
+  const panel = document.getElementById('financeEntryCompleteness');
+  if (!panel) return;
+  const net = financeMoneyCents(document.getElementById('financeTxnNet')?.value);
+  const gst = financeMoneyCents(document.getElementById('financeTxnGst')?.value);
+  const gross = financeMoneyCents(document.getElementById('financeTxnGross')?.value);
+  const checks = [
+    ['Date', Boolean(document.getElementById('financeTxnDate')?.value)],
+    ['Description', Boolean(document.getElementById('financeTxnDescription')?.value?.trim())],
+    ['Debit account', Boolean(document.getElementById('financeTxnDebit')?.value)],
+    ['Credit account', Boolean(document.getElementById('financeTxnCredit')?.value)],
+    ['GST treatment', Boolean(document.getElementById('financeTxnTax')?.value)],
+    ['Amount equation', net !== null && gst !== null && gross !== null && net + gst === gross]
+  ];
+  const ready = checks.every((check) => check[1]);
+  panel.innerHTML = `<strong>${ready ? 'Ready for validation' : 'Draft incomplete'}</strong>${checks.map((check) => `<span class="${check[1] ? 'ok' : 'missing'}">${check[1] ? '&#10003;' : '&#215;'} ${escapeHtml(check[0])}</span>`).join('')}`;
+}
+
+async function openFinanceTransactionDialog(id = 0) {
+  if (!financeState.setup) {
+    try { financeState.setup = await financeApi('/setup'); } catch (error) { showToast(financeErrorText(error)); return; }
+  }
+  let row = null;
+  if (id) {
+    try {
+      row = financeState.transactionRows.find((item) => Number(item.id) === Number(id)) || null;
+      if (!row) {
+        const data = await financeApi(`/transactions/${Number(id)}`);
+        row = data.transaction || null;
+      }
+      if (!row) throw new Error('Finance transaction was not found.');
+    } catch (error) { showToast(financeErrorText(error)); return; }
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const body = `
+    <div class="finance-dialog-layout" data-finance-transaction-id="${Number(row?.id || 0)}">
+      <section class="dialog-card">
+        <h4>Transaction identity</h4>
+        <div class="finance-form-grid two-col">
+          <label><span>Effective date *</span><input id="financeTxnDate" type="date" value="${escapeHtml(String(row?.effective_date || today).slice(0, 10))}" oninput="renderFinanceEntryCompleteness()"></label>
+          <label><span>Type *</span><select id="financeTxnType" onchange="renderFinanceEntryCompleteness()">${FINANCE_TRANSACTION_TYPES.map((type) => `<option value="${type}" ${type === row?.transaction_type ? 'selected' : ''}>${type.replaceAll('_', ' ')}</option>`).join('')}</select></label>
+          <label><span>Reference</span><input id="financeTxnReference" value="${escapeHtml(row?.reference || '')}" placeholder="Bank, invoice or bill reference"></label>
+          <label><span>Customer / supplier</span><input id="financeTxnParty" value="${escapeHtml(row?.party_name || '')}" placeholder="Party name"></label>
+          <label class="full"><span>Description *</span><input id="financeTxnDescription" value="${escapeHtml(row?.description || '')}" placeholder="Business purpose and transaction detail" oninput="renderFinanceEntryCompleteness()"></label>
+          <label><span>Category</span><input id="financeTxnCategory" value="${escapeHtml(row?.category || '')}" placeholder="Reporting category"></label>
+          <label><span>Job / project</span><input id="financeTxnJob" value="${escapeHtml(row?.job_reference || '')}" placeholder="Optional job reference"></label>
+        </div>
+      </section>
+      <section class="dialog-card">
+        <h4>Accounting allocation</h4>
+        <div class="finance-form-grid two-col">
+          <label><span>Debit account *</span><select id="financeTxnDebit" onchange="renderFinanceEntryCompleteness()"><option value="">Select debit account</option>${financeAccountOptions(row?.debit_account_id)}</select></label>
+          <label><span>Credit account *</span><select id="financeTxnCredit" onchange="renderFinanceEntryCompleteness()"><option value="">Select credit account</option>${financeAccountOptions(row?.credit_account_id)}</select></label>
+          <label><span>GST treatment *</span><select id="financeTxnTax" onchange="calculateFinanceGstFromGross()"><option value="">Select GST treatment</option>${financeTaxOptions(row?.tax_code)}</select></label>
+          <label><span>Payment method</span><input id="financeTxnPaymentMethod" value="${escapeHtml(row?.payment_method || '')}" placeholder="Bank, card, cash or account"></label>
+        </div>
+        <div class="finance-amount-grid">
+          <label><span>Net amount *</span><input id="financeTxnNet" inputmode="decimal" value="${escapeHtml(row?.net_amount || '0.00')}" oninput="renderFinanceEntryCompleteness()"></label>
+          <label><span>GST amount *</span><input id="financeTxnGst" inputmode="decimal" value="${escapeHtml(row?.gst_amount || '0.00')}" oninput="renderFinanceEntryCompleteness()"></label>
+          <label><span>Gross amount *</span><input id="financeTxnGross" inputmode="decimal" value="${escapeHtml(row?.gross_amount || '0.00')}" oninput="renderFinanceEntryCompleteness()"></label>
+          <button type="button" class="secondary-btn" onclick="calculateFinanceGstFromGross()">Calculate GST</button>
+        </div>
+        <label><span>Notes</span><textarea id="financeTxnNotes" rows="3" placeholder="Approval, evidence or review notes">${escapeHtml(row?.notes || '')}</textarea></label>
+      </section>
+      <aside id="financeEntryCompleteness" class="finance-entry-completeness"></aside>
+      <button type="button" class="secondary-btn finance-ready-action" onclick="saveFinanceTransaction('READY')">Validate & Mark Ready</button>
+    </div>`;
+  showDialog(row ? 'Edit Finance Transaction' : 'Add Finance Transaction', body, () => saveFinanceTransaction('DRAFT'), 'Save Draft');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+  renderFinanceEntryCompleteness();
+}
+
+function collectFinanceTransaction(status) {
+  const wrapper = document.querySelector('[data-finance-transaction-id]');
+  return {
+    id: Number(wrapper?.dataset.financeTransactionId || 0) || undefined,
+    effective_date: document.getElementById('financeTxnDate')?.value,
+    type: document.getElementById('financeTxnType')?.value,
+    reference: document.getElementById('financeTxnReference')?.value?.trim(),
+    party_name: document.getElementById('financeTxnParty')?.value?.trim(),
+    description: document.getElementById('financeTxnDescription')?.value?.trim(),
+    category: document.getElementById('financeTxnCategory')?.value?.trim(),
+    job_reference: document.getElementById('financeTxnJob')?.value?.trim(),
+    debit_account_id: Number(document.getElementById('financeTxnDebit')?.value || 0) || null,
+    credit_account_id: Number(document.getElementById('financeTxnCredit')?.value || 0) || null,
+    tax_code: document.getElementById('financeTxnTax')?.value,
+    payment_method: document.getElementById('financeTxnPaymentMethod')?.value?.trim(),
+    net_amount: document.getElementById('financeTxnNet')?.value,
+    gst_amount: document.getElementById('financeTxnGst')?.value,
+    gross_amount: document.getElementById('financeTxnGross')?.value,
+    notes: document.getElementById('financeTxnNotes')?.value?.trim(),
+    document_count: 0,
+    status
+  };
+}
+
+async function saveFinanceTransaction(status = 'DRAFT') {
+  const primary = document.getElementById('dialogPrimaryBtn');
+  if (primary) primary.disabled = true;
+  try {
+    const data = await financeApi('/transactions', { method: 'POST', body: JSON.stringify(collectFinanceTransaction(status)) });
+    hideDialog();
+    showToast(data.message || 'Finance transaction saved successfully.');
+    await loadFinanceWorkspace();
+  } catch (error) {
+    const issues = (error.issues || []).map((issue) => `<li><strong>${escapeHtml(issue.severity || 'ERROR')}</strong> ${escapeHtml(issue.message || '')}</li>`).join('');
+    const panel = document.getElementById('financeEntryCompleteness');
+    if (panel) panel.innerHTML = `<strong>${escapeHtml(error.message || 'Cannot continue')}</strong>${issues ? `<ul>${issues}</ul>` : ''}`;
+    showToast(financeErrorText(error));
+  } finally {
+    if (primary) primary.disabled = false;
+  }
+}
+
+function confirmPostFinanceTransaction(id, uid) {
+  showDialog('Post Finance Transaction', `
+    <div class="finance-confirm-panel"><span class="panel-kicker">Controlled Posting</span><h4>${escapeHtml(uid || `Transaction ${id}`)}</h4><p>Posting creates an official balanced journal. The transaction can no longer be edited directly after posting.</p><p>Confirm that the accounts, GST treatment and evidence have been reviewed.</p></div>
+  `, () => postFinanceTransaction(id), 'Post Transaction');
+}
+
+async function postFinanceTransaction(id) {
+  try {
+    const data = await financeApi(`/transactions/${Number(id)}/post`, { method: 'POST', body: '{}' });
+    hideDialog();
+    showToast(data.message || 'Finance transaction posted successfully.');
+    await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceVoidDialog(id, uid) {
+  showDialog('Void Posted Transaction', `
+    <div class="finance-confirm-panel">
+      <span class="panel-kicker">Controlled Reversal</span>
+      <h4>${escapeHtml(uid || `Transaction ${id}`)}</h4>
+      <p>The original record will be preserved and a balanced reversal journal will be posted. This action is audit logged.</p>
+      <label><span>Void reason *</span><textarea id="financeVoidReason" rows="4" placeholder="Explain the correction and supporting evidence"></textarea></label>
+    </div>
+  `, () => voidFinanceTransaction(id), 'Post Reversal');
+}
+
+async function voidFinanceTransaction(id) {
+  const reason = document.getElementById('financeVoidReason')?.value?.trim();
+  if (!reason) return showToast('Enter a reason before voiding this transaction.');
+  try {
+    const data = await financeApi(`/transactions/${Number(id)}/void`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
+    hideDialog();
+    showToast(data.message || 'Transaction voided with a controlled reversal.');
+    await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceIssueDialog(id) {
+  const issue = financeState.issues.find((item) => Number(item.id) === Number(id));
+  if (!issue) return;
+  const canIgnore = issue.severity !== 'BLOCKING_ERROR';
+  showDialog('Review Finance Issue', `
+    <div class="finance-confirm-panel">
+      <span class="finance-status-pill" data-status="${escapeHtml(String(issue.severity || '').toLowerCase())}">${escapeHtml(String(issue.severity || '').replaceAll('_', ' '))}</span>
+      <h4>${escapeHtml(issue.title || 'Finance issue')}</h4><p>${escapeHtml(issue.message || '')}</p>
+      <label><span>Resolution / review note *</span><textarea id="financeIssueReason" rows="4" placeholder="Describe the check performed and evidence reviewed"></textarea></label>
+      <div class="card-actions"><button type="button" class="secondary-btn" onclick="updateFinanceIssue(${Number(id)}, 'IN_PROGRESS')">Mark In Progress</button>${canIgnore ? `<button type="button" class="secondary-btn" onclick="updateFinanceIssue(${Number(id)}, 'IGNORED')">Ignore With Reason</button>` : ''}</div>
+    </div>
+  `, () => updateFinanceIssue(id, 'RESOLVED'), 'Resolve Issue');
+}
+
+async function updateFinanceIssue(id, status) {
+  const reason = document.getElementById('financeIssueReason')?.value?.trim() || (status === 'IN_PROGRESS' ? 'Review started.' : '');
+  if (['RESOLVED', 'IGNORED'].includes(status) && !reason) { showToast('Enter a review reason before continuing.'); return; }
+  try {
+    const data = await financeApi(`/issues/${Number(id)}`, { method: 'POST', body: JSON.stringify({ status, reason }) });
+    hideDialog();
+    showToast(data.message || 'Finance issue updated successfully.');
+    await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function runFinanceHealthCheck() {
+  if (!financeState.selectedYearId) return;
+  try {
+    showToast('Finance health check is running.');
+    const data = await financeApi(`/financial-years/${financeState.selectedYearId}/check`, { method: 'POST', body: '{}' });
+    showToast(data.message || 'Financial-year health check completed successfully.');
+    await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceSetupDialog() {
+  const settings = financeState.setup?.settings || {};
+  const gstValue = settings.gst_registered === null || settings.gst_registered === undefined ? '' : String(Number(settings.gst_registered));
+  showDialog('Finance Setup', `
+    <div class="finance-dialog-layout compact">
+      <section class="dialog-card"><h4>Company finance settings</h4><p class="muted-text">Confirm these settings with your accountant. The app will not infer GST registration or entity treatment.</p>
+        <div class="finance-form-grid two-col">
+          <label><span>Default currency</span><input id="financeSetupCurrency" maxlength="3" value="${escapeHtml(settings.default_currency || 'AUD')}"></label>
+          <label><span>GST registered *</span><select id="financeSetupGst"><option value="" ${gstValue === '' ? 'selected' : ''}>Not confirmed</option><option value="1" ${gstValue === '1' ? 'selected' : ''}>Yes</option><option value="0" ${gstValue === '0' ? 'selected' : ''}>No</option></select></label>
+          <label><span>Default GST rate %</span><input id="financeSetupRate" inputmode="decimal" value="${escapeHtml(settings.default_gst_rate || '10.00')}"></label>
+          <label><span>Amounts include GST</span><select id="financeSetupInclusive"><option value="1" ${Number(settings.amounts_include_gst) ? 'selected' : ''}>Yes</option><option value="0" ${!Number(settings.amounts_include_gst) ? 'selected' : ''}>No</option></select></label>
+          <label><span>Receipt required above</span><input id="financeSetupReceipt" inputmode="decimal" value="${escapeHtml(settings.receipt_required_above ?? '')}" placeholder="Optional threshold"></label>
+          <label><span>Accountant email</span><input id="financeSetupAccountant" type="email" value="${escapeHtml(settings.accountant_email || '')}"></label>
+          <label class="full"><span>Entity type</span><input id="financeSetupEntity" value="${escapeHtml(settings.entity_type || '')}" placeholder="Confirm with accountant"></label>
+        </div>
+      </section>
+    </div>
+  `, saveFinanceSetup, 'Save for Review');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+}
+
+async function saveFinanceSetup() {
+  const gstRaw = document.getElementById('financeSetupGst')?.value;
+  const payload = {
+    default_currency: document.getElementById('financeSetupCurrency')?.value,
+    gst_registered: gstRaw === '' ? null : gstRaw === '1',
+    default_gst_rate: document.getElementById('financeSetupRate')?.value,
+    amounts_include_gst: document.getElementById('financeSetupInclusive')?.value === '1',
+    receipt_required_above: document.getElementById('financeSetupReceipt')?.value,
+    accountant_email: document.getElementById('financeSetupAccountant')?.value,
+    entity_type: document.getElementById('financeSetupEntity')?.value
+  };
+  try {
+    const data = await financeApi('/setup', { method: 'POST', body: JSON.stringify(payload) });
+    financeState.setup = null;
+    hideDialog();
+    showToast(data.message || 'Finance setup saved successfully.');
+    await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function openFinanceYearDialog() {
+  const year = financeSelectedYear();
+  if (!year) return;
+  showDialog('Financial Year Control', `
+    <div class="finance-confirm-panel">
+      <span class="panel-kicker">${escapeHtml(year.label)}</span><h4>${financeFormatDate(year.start_date)} to ${financeFormatDate(year.end_date)}</h4>
+      <p>Run the health check before changing status. Locking is blocked while critical issues remain and preserves an audit trail.</p>
+      <label><span>New status</span><select id="financeYearNewStatus"><option>OPEN</option><option>REVIEWING</option><option>READY_TO_CLOSE</option><option>LOCKED</option><option>ARCHIVED</option></select></label>
+      <label><span>Reason</span><textarea id="financeYearReason" rows="3" placeholder="Required for locking or unlocking"></textarea></label>
+      <label><span>Lock confirmation</span><input id="financeYearConfirmation" placeholder="Type LOCK ${escapeHtml(year.label)} when locking"></label>
+    </div>
+  `, saveFinanceYearStatus, 'Update Status');
+  document.getElementById('financeYearNewStatus').value = year.status || 'OPEN';
+}
+
+async function saveFinanceYearStatus() {
+  const year = financeSelectedYear();
+  if (!year) return;
+  const payload = {
+    status: document.getElementById('financeYearNewStatus')?.value,
+    reason: document.getElementById('financeYearReason')?.value?.trim(),
+    confirmation: document.getElementById('financeYearConfirmation')?.value?.trim()
+  };
+  try {
+    const data = await financeApi(`/financial-years/${year.id}/status`, { method: 'POST', body: JSON.stringify(payload) });
+    hideDialog();
+    financeState.years = [];
+    showToast(data.message || 'Financial-year status updated successfully.');
+    await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function downloadFinanceExport(kind) {
+  if (!financeState.selectedYearId) return;
+  try {
+    const response = await fetch(`/api/finance/exports/${encodeURIComponent(kind)}?financial_year_id=${encodeURIComponent(financeState.selectedYearId)}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!response.ok) {
+      const data = await safeJson(response);
+      throw new Error(data.message || 'Finance export failed.');
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get('Content-Disposition') || '';
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const filename = match?.[1] || `Voxel-Veda-${financeSelectedYear()?.label || 'Finance'}-${kind}`;
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    showToast('Finance export downloaded successfully.');
+  } catch (error) { showToast(error.message || 'Finance export failed.'); }
+}
+
 async function bootAdminDashboard() {
   try {
     installAccessDeniedHandler();
     installMobileShellControls();
     normalizeActionButtons();
     setupNavigation();
-    openAdminViewFromUrl();
     startResponsiveTableObserver();
 
     const user = await loadMe();
     if (!user || redirectingToLogin) return;
 
-    if (currentRole !== 'admin' && hasCurrentPermission('tasks')) {
-      await Promise.all([
-        loadStaff(),
-        loadTasks(),
-        loadAnnouncements()
-      ]);
+    openAdminViewFromUrl();
+
+    if (!['admin', 'super_admin'].includes(currentRole)) {
+      await loadRestrictedWorkspaceData();
       return;
     }
 
@@ -7367,6 +8486,7 @@ async function bootAdminDashboard() {
       loadStaff(),
       loadCustomers(),
       loadSuppliers(),
+      loadFinanceWorkspace(),
       loadExpenses(),
       loadCompetitors(),
       loadComplianceEntries(),

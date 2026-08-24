@@ -24,6 +24,7 @@ const attendanceController = require('./controllers/attendanceController');
 const complianceRoutes = require('./routes/complianceRoutes');
 const competitorRoutes = require('./routes/competitorRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const financeRoutes = require('./routes/financeRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
@@ -114,7 +115,7 @@ app.get('/429', noIndex, (req, res) => res.status(429).sendFile(path.join(public
 app.get('/500', noIndex, (req, res) => res.status(500).sendFile(path.join(publicDir, '500.html')));
 app.get('/maintenance', noIndex, (req, res) => res.status(503).sendFile(path.join(publicDir, 'maintenance.html')));
 
-app.get('/admin', noIndex, pageAuth({ adminOnly: true }), sendPage('admin-dashboard.html'));
+app.get('/admin', noIndex, pageAuth({ workspaceOnly: true }), sendPage('admin-dashboard.html'));
 app.get('/dashboard', noIndex, pageAuth(), sendPage('staff-dashboard.html'));
 app.get('/invoice/view', noIndex, pageAuth(), sendPage('invoice-pdf.html'));
 
@@ -132,12 +133,18 @@ app.get('/shift-qr.html', redirectPreservingQuery('/attendance-terminal'));
 const protectedModuleRoutes = [
   '/rfqs', '/invoices', '/customers', '/suppliers', '/stock', '/raw-material',
   '/packaging', '/expenses', '/workforce', '/timesheets', '/roster', '/staff',
-  '/compliance', '/forms', '/settings', '/meetings', '/tasks'
+  '/finance', '/financial-years', '/compliance', '/forms', '/settings', '/meetings', '/tasks'
 ];
 
 app.get(protectedModuleRoutes, noIndex, pageAuth(), (req, res) => {
   const routeName = req.path.replace(/^\//, '');
-  const portal = req.user.role === 'admin' ? '/admin' : '/dashboard';
+  const permissions = Array.isArray(req.user.permissions) ? req.user.permissions : [];
+  const workspaceRoles = ['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'];
+  const portal = workspaceRoles.includes(req.user.role)
+    || permissions.includes('finance')
+    || permissions.includes('tasks')
+    ? '/admin'
+    : '/dashboard';
   return res.redirect(302, `${portal}?view=${encodeURIComponent(routeName)}`);
 });
 
@@ -218,6 +225,7 @@ app.use('/api/roster', auth, requirePermission('roster'), rosterRoutes);
 app.get('/api/suppliers/files/:id/view', auth, requirePermission('suppliers'), supplierController.viewSupplierFile);
 app.use('/api/suppliers', auth, requirePermission('suppliers'), supplierRoutes);
 app.use('/api/expenses', auth, requirePermission('expenses'), expenseRoutes);
+app.use('/api/finance', auth, requirePermission('finance'), financeRoutes);
 app.use('/api/compliance', auth, requirePermission('compliance'), requireInputPermission('compliance_input'), complianceRoutes);
 app.use('/api/competitors', auth, requirePermission('competitors'), requireInputPermission('competitors_input'), competitorRoutes);
 app.use('/api/access-attempts', auth, require('./routes/accessAttemptRoutes'));

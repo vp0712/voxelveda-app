@@ -13,6 +13,7 @@ console.log('Server starting...');
 const app = require('./app');
 const { isEmailConfigured, verifyConnection } = require('./services/emailService');
 const { processEmailQueue } = require('./services/emailQueue');
+const { ensureFinanceSchema } = require('./services/financeSchema');
 const {
   startWeeklyTimesheetScheduler,
   stopWeeklyTimesheetScheduler
@@ -30,6 +31,10 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`Server running on ${HOST}:${PORT}`);
   console.log(`Local entry: http://localhost:${PORT}/`);
 });
+
+ensureFinanceSchema()
+  .then(() => console.log('Finance foundation schema ready.'))
+  .catch((error) => console.error('Finance schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {

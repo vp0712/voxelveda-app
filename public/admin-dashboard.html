@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
 <link rel="stylesheet" href="/style.css?v=20260816-invoice-delivery-ux"/>
-  <link rel="stylesheet" href="/advanced-theme.css?v=20260824-mobile-shell-v4" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260824-finance-workspace-v1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -61,6 +61,7 @@
         <button class="nav-btn" data-icon="MI" data-title="Meetings & Inspections" data-section="meetingSection">Meetings & Inspections</button>
 
         <span class="nav-section-label">Finance</span>
+        <button class="nav-btn" data-icon="FN" data-title="Finance" data-section="financeSection">Finance</button>
         <button class="nav-btn" data-icon="$" data-title="Expenses" data-section="expenseSection">Expenses</button>
 
         <span class="nav-section-label">Company</span>
@@ -79,7 +80,7 @@
             <span class="nav-group-caret">v</span>
           </summary>
           <div class="nav-submenu">
-            <button class="nav-btn nav-sub-btn" data-icon="QR" type="button" onclick="openSystemPage('/attendance-terminal')">Attendance Gate</button>
+            <button class="nav-btn nav-sub-btn" data-icon="QR" data-permission="attendance" type="button" onclick="openSystemPage('/attendance-terminal')">Attendance Gate</button>
             <button class="nav-btn nav-sub-btn" data-icon="TS" data-title="Timesheets" data-section="attendanceSection">Timesheets</button>
             <button class="nav-btn nav-sub-btn" data-icon="RO" data-title="Roster" data-section="rosterSection">Roster</button>
             <button class="nav-btn nav-sub-btn" data-icon="ST" data-title="Staff" data-section="staffSection">Staff</button>
@@ -107,7 +108,7 @@
           <p id="adminInfo">Loading user...</p>
         </div>
         <div class="topbar-actions">
-          <button class="topbar-quick-action" type="button" onclick="goSection('invoiceSection')">New Invoice</button>
+          <button class="topbar-quick-action" data-permission="invoices_input" type="button" onclick="goSection('invoiceSection')">New Invoice</button>
           <div class="notification-center">
             <button id="notificationBell" class="notification-bell" type="button" aria-label="Open notifications" aria-expanded="false" onclick="toggleNotificationPanel(event)">
               <span class="bell-mark">!</span>
@@ -1098,6 +1099,177 @@
 
         <div id="competitorRegister" class="forms-library">
           <div class="card">Loading competitors...</div>
+        </div>
+      </section>
+
+      <!-- FINANCE -->
+      <section id="financeSection" class="page-section hidden-section finance-workspace">
+        <div class="section-head finance-page-head">
+          <div>
+            <span class="panel-kicker">Finance Control</span>
+            <h2>Accounting & Financial Years</h2>
+            <p>Review recorded activity, post balanced transactions, resolve exceptions and prepare accountant-ready reports.</p>
+          </div>
+          <div class="card-actions finance-head-actions">
+            <button type="button" class="secondary-btn" onclick="runFinanceHealthCheck()">Run Health Check</button>
+            <button type="button" class="secondary-btn" onclick="openFinanceSetupDialog()">Finance Setup</button>
+            <button type="button" class="primary-btn" onclick="openFinanceTransactionDialog()">Add Transaction</button>
+          </div>
+        </div>
+
+        <div class="finance-period-bar">
+          <label>
+            <span>Financial year</span>
+            <select id="financeYearSelect" onchange="selectFinanceYear(this.value)">
+              <option value="">Loading years...</option>
+            </select>
+          </label>
+          <div class="finance-period-identity">
+            <strong id="financeYearLabel">Financial year</strong>
+            <span id="financeYearPeriod">Period loading...</span>
+          </div>
+          <div class="finance-readiness" aria-label="Financial year readiness">
+            <div>
+              <span>Readiness</span>
+              <strong id="financeReadinessValue">0%</strong>
+            </div>
+            <div class="finance-readiness-track"><span id="financeReadinessBar"></span></div>
+          </div>
+          <span id="financeYearStatus" class="finance-status-pill">OPEN</span>
+        </div>
+
+        <nav class="finance-tab-bar" aria-label="Finance workspace views">
+          <button type="button" class="finance-tab is-active" data-finance-tab="overview" onclick="selectFinanceTab('overview')">Overview</button>
+          <button type="button" class="finance-tab" data-finance-tab="ledger" onclick="selectFinanceTab('ledger')">Ledger</button>
+          <button type="button" class="finance-tab" data-finance-tab="bills" onclick="selectFinanceTab('bills')">Supplier Bills</button>
+          <button type="button" class="finance-tab" data-finance-tab="banking" onclick="selectFinanceTab('banking')">Banking</button>
+          <button type="button" class="finance-tab" data-finance-tab="control" onclick="selectFinanceTab('control')">Period Control</button>
+        </nav>
+
+        <div class="finance-tab-panel is-active" data-finance-panel="overview">
+        <div class="finance-metric-grid">
+          <article class="finance-metric-card"><span>Recorded Revenue</span><strong id="financeRecordedRevenue">$0.00</strong><small>Operational receipts in selected year</small></article>
+          <article class="finance-metric-card"><span>Recorded Expenses</span><strong id="financeRecordedExpenses">$0.00</strong><small>Expense register in selected year</small></article>
+          <article class="finance-metric-card"><span>Gross Result</span><strong id="financeGrossResult">$0.00</strong><small>Revenue less recorded expenses</small></article>
+          <article class="finance-metric-card"><span>GST Paid</span><strong id="financeGstPaid">$0.00</strong><small>Input GST recorded</small></article>
+          <article class="finance-metric-card"><span>Receivables</span><strong id="financeReceivables">$0.00</strong><small>Outstanding customer invoices</small></article>
+          <article class="finance-metric-card"><span>Payables</span><strong id="financePayables">$0.00</strong><small>Outstanding supplier bills</small></article>
+          <article class="finance-metric-card"><span>Unreconciled</span><strong id="financeUnreconciled">0</strong><small>Posted ledger transactions</small></article>
+          <article class="finance-metric-card"><span>Posted / Total</span><strong id="financePostedCount">0 / 0</strong><small>Finance transaction lifecycle</small></article>
+        </div>
+
+        <div class="finance-alert-band">
+          <div>
+            <span class="panel-kicker">Exception Control</span>
+            <h3>Finance Issues</h3>
+            <p id="financeIssueSummary">Run the health check to identify year-end blockers and warnings.</p>
+          </div>
+          <div class="finance-alert-counts">
+            <button type="button" class="finance-alert-count blocking" onclick="setFinanceIssueFilter('BLOCKING_ERROR')"><strong id="financeBlockingCount">0</strong><span>Blocking</span></button>
+            <button type="button" class="finance-alert-count warning" onclick="setFinanceIssueFilter('WARNING')"><strong id="financeWarningCount">0</strong><span>Warnings</span></button>
+            <button type="button" class="finance-alert-count info" onclick="setFinanceIssueFilter('INFO')"><strong id="financeInfoCount">0</strong><span>Information</span></button>
+          </div>
+        </div>
+        </div>
+
+        <div class="finance-tab-panel" data-finance-panel="ledger">
+        <div class="finance-main-grid">
+          <section class="finance-register-panel">
+            <div class="finance-panel-head">
+              <div>
+                <h3>Transaction Register</h3>
+                <p id="financeTransactionPageInfo">Loading finance transactions...</p>
+              </div>
+              <div class="card-actions">
+                <button type="button" class="secondary-btn" onclick="changeFinanceTransactionPage(-1)">Previous</button>
+                <button type="button" class="secondary-btn" onclick="changeFinanceTransactionPage(1)">Next</button>
+              </div>
+            </div>
+            <div class="finance-filter-grid">
+              <input id="financeTransactionSearch" type="search" placeholder="Search reference, party or description" oninput="queueFinanceTransactionSearch()" />
+              <select id="financeTransactionType" onchange="loadFinanceTransactions(1)"><option value="">All transaction types</option></select>
+              <select id="financeTransactionStatus" onchange="loadFinanceTransactions(1)">
+                <option value="">All statuses</option><option>DRAFT</option><option>INCOMPLETE</option><option>READY</option><option>POSTED</option><option>RECONCILED</option><option>LOCKED</option><option>VOID</option>
+              </select>
+              <select id="financeTransactionLimit" onchange="setFinanceTransactionLimit(this.value)"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
+            </div>
+            <div class="table-wrap finance-table-wrap">
+              <table>
+                <thead><tr><th>Date</th><th>Reference</th><th>Type / Description</th><th>Party</th><th>Gross</th><th>GST</th><th>Status</th><th>Action</th></tr></thead>
+                <tbody id="financeTransactionBody"><tr><td colspan="8">Loading transactions...</td></tr></tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside class="finance-side-stack">
+            <section class="finance-side-panel">
+              <div class="finance-panel-head"><div><h3>Issue Centre</h3><p id="financeIssueFilterLabel">All open issues</p></div><button type="button" class="text-btn" onclick="setFinanceIssueFilter('')">Clear</button></div>
+              <div id="financeIssueList" class="finance-issue-list"><div class="empty-state compact">No finance issues loaded.</div></div>
+            </section>
+            <section class="finance-side-panel">
+              <div class="finance-panel-head"><div><h3>Accountant Outputs</h3><p>Generated from posted journals only.</p></div></div>
+              <div class="finance-integrity-row"><span>Trial Balance</span><strong id="financeTrialBalanceStatus">Not checked</strong></div>
+              <div class="finance-report-metrics">
+                <div><span>Debits</span><strong id="financeTrialDebits">$0.00</strong></div>
+                <div><span>Credits</span><strong id="financeTrialCredits">$0.00</strong></div>
+                <div><span>Net Result</span><strong id="financeNetResult">$0.00</strong></div>
+              </div>
+              <div class="finance-output-actions">
+                <button type="button" class="secondary-btn" onclick="downloadFinanceExport('trial-balance.csv')">Trial Balance CSV</button>
+                <button type="button" class="secondary-btn" onclick="downloadFinanceExport('accountant-review.pdf')">Accountant PDF</button>
+                <button type="button" class="primary-btn" onclick="openFinanceYearDialog()">Review / Lock Year</button>
+              </div>
+              <p class="finance-report-note">Draft reports are for review. Final tax and accounting decisions remain with an authorised accountant.</p>
+            </section>
+          </aside>
+        </div>
+        </div>
+
+        <div class="finance-tab-panel" data-finance-panel="bills">
+          <section class="finance-register-panel">
+            <div class="finance-panel-head">
+              <div><h3>Supplier Bills & Payments</h3><p>Capture supplier invoices, approve them, and record controlled payments against the payable ledger.</p></div>
+              <button type="button" class="primary-btn" onclick="openSupplierBillDialog()">Add Supplier Bill</button>
+            </div>
+            <div class="finance-filter-grid finance-bill-filters">
+              <input id="financeBillSearch" type="search" placeholder="Search supplier or invoice number" oninput="queueFinanceBillSearch()" />
+              <select id="financeBillStatus" onchange="loadFinanceSupplierBills(1)"><option value="">All bill statuses</option><option>DRAFT</option><option>PENDING_APPROVAL</option><option>APPROVED</option><option>PARTIALLY_PAID</option><option>PAID</option><option>OVERDUE</option><option>VOID</option></select>
+              <select id="financeBillLimit" onchange="setFinanceBillLimit(this.value)"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
+            </div>
+            <p id="financeBillPageInfo" class="finance-register-note">Supplier bills have not been loaded.</p>
+            <div class="table-wrap finance-table-wrap"><table><thead><tr><th>Supplier / Invoice</th><th>Dates</th><th>Total</th><th>Paid</th><th>Balance</th><th>Status</th><th>Action</th></tr></thead><tbody id="financeSupplierBillBody"><tr><td colspan="7">Open this view to load supplier bills.</td></tr></tbody></table></div>
+            <div class="finance-pager"><button type="button" class="secondary-btn" onclick="changeFinanceBillPage(-1)">Previous</button><button type="button" class="secondary-btn" onclick="changeFinanceBillPage(1)">Next</button></div>
+          </section>
+        </div>
+
+        <div class="finance-tab-panel" data-finance-panel="banking">
+          <div class="finance-banking-layout">
+            <section class="finance-side-panel">
+              <div class="finance-panel-head"><div><h3>Bank Accounts</h3><p>Masked account register used for imports and reconciliation.</p></div><button type="button" class="primary-btn" onclick="openFinanceBankAccountDialog()">Add Account</button></div>
+              <div id="financeBankAccountList" class="finance-account-list"><div class="empty-state compact">No bank accounts loaded.</div></div>
+            </section>
+            <section class="finance-register-panel">
+              <div class="finance-panel-head"><div><h3>Reconciliation Queue</h3><p id="financeBankPageInfo">Select a bank account.</p></div><button type="button" class="secondary-btn" id="financeBankImportButton" onclick="openFinanceBankImportDialog()" disabled>Import Statement</button></div>
+              <div class="table-wrap finance-table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Matched</th><th>Status</th><th>Action</th></tr></thead><tbody id="financeBankTransactionBody"><tr><td colspan="7">Select a bank account to review imported entries.</td></tr></tbody></table></div>
+            </section>
+          </div>
+        </div>
+
+        <div class="finance-tab-panel" data-finance-panel="control">
+          <div class="finance-control-grid">
+            <section class="finance-register-panel">
+              <div class="finance-panel-head"><div><h3>Accounting Periods</h3><p>Monthly review and lock control for the selected financial year.</p></div></div>
+              <div class="table-wrap finance-table-wrap"><table><thead><tr><th>Period</th><th>Dates</th><th>Status</th><th>Locked</th><th>Action</th></tr></thead><tbody id="financePeriodBody"><tr><td colspan="5">Open this view to load periods.</td></tr></tbody></table></div>
+            </section>
+            <section class="finance-side-panel">
+              <div class="finance-panel-head"><div><h3>Accountant Queries</h3><p>Questions and responses attached to the selected year.</p></div><button type="button" class="primary-btn" onclick="openFinanceQueryDialog()">New Query</button></div>
+              <div id="financeQueryList" class="finance-issue-list"><div class="empty-state compact">No queries loaded.</div></div>
+            </section>
+            <section class="finance-register-panel finance-assets-panel">
+              <div class="finance-panel-head"><div><h3>Asset Register</h3><p>Track acquisition value and accounting-review status.</p></div><button type="button" class="primary-btn" onclick="openFinanceAssetDialog()">Add Asset</button></div>
+              <div class="table-wrap finance-table-wrap"><table><thead><tr><th>Asset</th><th>Purchase</th><th>Cost</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody id="financeAssetBody"><tr><td colspan="6">Open this view to load assets.</td></tr></tbody></table></div>
+            </section>
+          </div>
         </div>
       </section>
 

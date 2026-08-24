@@ -12,7 +12,8 @@ async function redirectSavedSession() {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (!res.ok) throw new Error('Saved session is no longer valid');
-    window.location.replace(role === 'admin' ? '/admin' : '/dashboard');
+    const savedUser = JSON.parse(user);
+    window.location.replace(hasOperationsWorkspaceAccess(role, savedUser) ? '/admin' : '/dashboard');
     return true;
   } catch {
     localStorage.removeItem('token');
@@ -22,12 +23,21 @@ async function redirectSavedSession() {
   }
 }
 
-function safeReturnTo(role) {
+function hasOperationsWorkspaceAccess(role, user = {}) {
+  const normalizedRole = String(role || '').trim().toLowerCase();
+  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
+  return ['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(normalizedRole)
+    || permissions.includes('finance')
+    || permissions.includes('tasks');
+}
+
+function safeReturnTo(role, user = {}) {
+  const operationsAccess = hasOperationsWorkspaceAccess(role, user);
   const value = new URLSearchParams(window.location.search).get('returnTo');
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return role === 'admin' ? '/admin' : '/dashboard';
+    return operationsAccess ? '/admin' : '/dashboard';
   }
-  if (role !== 'admin' && value.startsWith('/admin')) return '/dashboard';
+  if (!operationsAccess && value.startsWith('/admin')) return '/dashboard';
   return value;
 }
 
@@ -90,7 +100,7 @@ async function login() {
     loginStatus.innerText = 'Login successful. Redirecting...';
     loginStatus.style.color = '#22c55e';
 
-    window.location.href = safeReturnTo(role);
+    window.location.href = safeReturnTo(role, data.user);
   } catch (err) {
     console.error('LOGIN ERROR:', err);
     loginStatus.innerText = 'Server error. Check backend terminal.';
