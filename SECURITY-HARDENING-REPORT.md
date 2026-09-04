@@ -38,3 +38,12 @@ Before deploying, configure a unique `JWT_SECRET` of at least 32 characters, lea
 7. Add integration security tests, dependency/secret/SAST CI, Railway environment separation, backup/restore evidence, and operational rotation runbooks.
 
 This report records implemented controls and known gaps; it is not a certification or a claim of perfect security.
+
+## Phase 2 authentication lifecycle
+
+- Browser authentication moved away from `localStorage`; the JWT is returned only as a Secure, HttpOnly session cookie.
+- Staff creation now produces an INVITED account and sends a one-time 24-hour activation link instead of creating or sharing a temporary password.
+- Password reset uses a generic response, a single-use 30-minute token, immediate session revocation for administrator resets, and strong password validation.
+- Raw action tokens are never stored in the database or email queue. Only SHA-256 token hashes are stored, and links use URL fragments so tokens do not enter HTTP access logs.
+- Users can view active sessions, identify their current session, revoke individual sessions, revoke all other sessions, and change their password from `/security`.
+- Disabling or terminating an account revokes both sessions and outstanding invitation/reset tokens.

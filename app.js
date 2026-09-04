@@ -43,8 +43,11 @@ const auth = require('./middleware/auth');
 const app = express();
 const publicDir = path.join(__dirname, 'public');
 const noStorePublicAssets = new Set([
+  'login.js',
   'admin-dashboard.js',
   'staff.js',
+  'auth-lifecycle.js',
+  'security-page.js',
   'style.css',
   'advanced-theme.css',
   'mobile-shell.js',
@@ -109,6 +112,8 @@ app.get('/terms', sendPage('terms.html'));
 app.get('/support', sendPage('support.html'));
 app.get('/forgot-password', noIndex, sendPage('forgot-password.html'));
 app.get('/reset-password', noIndex, sendPage('reset-password.html'));
+app.get('/accept-invite', noIndex, sendPage('accept-invite.html'));
+app.get('/security', noIndex, pageAuth(), sendPage('security.html'));
 app.get('/attendance-terminal', noIndex, sendPage('shift-qr.html'));
 app.get('/401', noIndex, (req, res) => res.status(401).sendFile(path.join(publicDir, '401.html')));
 app.get('/403', noIndex, (req, res) => res.status(403).sendFile(path.join(publicDir, '403.html')));

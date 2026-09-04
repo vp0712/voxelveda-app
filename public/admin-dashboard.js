@@ -1,11 +1,13 @@
-const token = localStorage.getItem('token');
+const token = '';
+localStorage.removeItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 let currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
 let redirectingToLogin = false;
 
-if (!token) redirectToLogin('Please login to continue.');
+if (!currentUser.id) redirectToLogin('Please login to continue.');
 
-if (currentRole && currentRole !== 'admin') {
+if (currentRole && !['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(currentRole)
+  && !currentUser.permissions?.includes('finance') && !currentUser.permissions?.includes('tasks')) {
   alert('Access denied. Admin only.');
   window.location.href = '/dashboard';
 }
@@ -177,7 +179,7 @@ const COMPANY_FORM_VERSION = '20260725-engineering-form-pack';
 function authHeaders() {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`
+    Authorization: 'Bearer '
   };
 }
 
@@ -726,7 +728,7 @@ function saveSeenAccessAttempts(ids) {
 }
 
 async function loadAccessAttempts() {
-  if (currentRole !== 'admin') return;
+  if (!['admin', 'super_admin'].includes(currentRole)) return;
 
   const res = await fetch('/api/access-attempts', {
     headers: { Authorization: `Bearer ${token}` }
@@ -5359,10 +5361,6 @@ async function openAddStaff() {
           <input id="dialogStaffUsername" placeholder="Example: neel_17" autocomplete="username" />
         </label>
         <label class="form-field">
-          <span>Temporary password</span>
-          <input id="dialogStaffPassword" type="text" placeholder="Minimum 6 characters" autocomplete="new-password" />
-        </label>
-        <label class="form-field">
           <span>Role</span>
           <select id="dialogStaffRole">
             <option value="staff">Staff</option>
@@ -5386,18 +5384,17 @@ async function openAddStaff() {
       </label>
       <h4>Section Access</h4>
       ${accessCheckboxes(['dashboard', 'tasks', 'attendance'])}
-      <p class="status-note">Email and username are separate login options. Staff can sign in with either one.</p>
+      <p class="status-note">A single-use invitation will be sent to the work email. Administrators never create or share staff passwords.</p>
     `,
     async () => {
       const name = document.getElementById('dialogStaffName')?.value.trim();
       const username = document.getElementById('dialogStaffUsername')?.value.trim();
       const email = document.getElementById('dialogStaffEmail')?.value.trim();
-      const password = document.getElementById('dialogStaffPassword')?.value;
       const role = document.getElementById('dialogStaffRole')?.value;
       const permissions = collectAccess();
 
-      if (!name || !username || !email || !password || !role) {
-        showToast('Name, username, email, password and role are required');
+      if (!name || !username || !email || !role) {
+        showToast('Name, username, email and role are required');
         return;
       }
 
@@ -5406,15 +5403,10 @@ async function openAddStaff() {
         return;
       }
 
-      if (password.length < 6) {
-        showToast('Temporary password must be at least 6 characters');
-        return;
-      }
-
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ name, username, email, password, role, permissions })
+        body: JSON.stringify({ name, username, email, role, permissions })
       });
 
       const data = await safeJson(res);
@@ -5428,7 +5420,7 @@ async function openAddStaff() {
       showToast(data.message || 'Staff user created');
       await loadStaff();
     },
-    'Create Staff'
+    'Send Secure Invitation'
   );
 
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'staff-access-dialog');
@@ -5635,25 +5627,17 @@ async function openAccessDialog(userId) {
 
 async function openPasswordResetDialog(userId) {
   showDialog(
-    'Reset Staff Password',
+    'Send Password Reset',
     `
       <p class="status-note">
-        Passwords are stored securely and cannot be viewed later. Set a new temporary password here and give it to the staff member.
+        This revokes the user’s sessions and sends a single-use reset link to their work email. The link expires after 30 minutes.
       </p>
-      <input id="dialogNewPassword" type="text" placeholder="New temporary password" />
     `,
     async () => {
-      const password = document.getElementById('dialogNewPassword')?.value.trim();
-
-      if (!password || password.length < 6) {
-        showToast('Temporary password must be at least 6 characters');
-        return;
-      }
-
       const res = await fetch(`/api/users/${userId}/reset-password`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ password })
+        body: JSON.stringify({})
       });
 
       const data = await safeJson(res);
@@ -5667,7 +5651,7 @@ async function openPasswordResetDialog(userId) {
       showToast(data.message || 'Password reset');
       await loadStaff();
     },
-    'Reset Password'
+    'Send Reset Link'
   );
 }
 

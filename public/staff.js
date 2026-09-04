@@ -1,11 +1,12 @@
-const token = localStorage.getItem('token');
+const token = '';
+localStorage.removeItem('token');
 let currentUser = JSON.parse(localStorage.getItem('user') || '{}');
 let currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
 let redirectingToLogin = false;
 
-if (!token) redirectToLogin('Please login to continue.');
+if (!currentUser.id) redirectToLogin('Please login to continue.');
 
-if (currentRole === 'admin') {
+if (['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(currentRole)) {
   window.location.href = '/admin';
 }
 
@@ -55,7 +56,7 @@ const clockOutMessages = [
 function authHeaders() {
   return {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${token}`
+    Authorization: 'Bearer '
   };
 }
 
