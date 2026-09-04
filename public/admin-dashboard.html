@@ -1280,7 +1280,10 @@
             <h2>Company Expenses</h2>
             <p>Bill history, GST position, financial-year expense analysis and payable control.</p>
           </div>
-          <button onclick="openExpenseDialog()" class="primary-btn">Add Expense</button>
+          <div class="card-actions">
+            <button onclick="openRecordExpensePaymentDialog()" class="secondary-btn">Record Payment</button>
+            <button onclick="openExpenseDialog()" class="primary-btn">Add Expense</button>
+          </div>
         </div>
 
         <div class="metric-grid">
@@ -1299,6 +1302,18 @@
           <div class="card">
             <h3>GST Position</h3>
             <p><strong id="expenseGstPosition">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Total Paid</h3>
+            <p><strong id="expenseTotalPaid">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Outstanding Debt</h3>
+            <p><strong id="expenseOutstandingDebt">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Overdue Debt</h3>
+            <p><strong id="expenseOverdueDebt">$0.00</strong></p>
           </div>
         </div>
 
@@ -1344,12 +1359,15 @@
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Due</th>
                 <th>Supplier</th>
                 <th>Category</th>
                 <th>Invoice / Bill</th>
                 <th>Ex GST</th>
                 <th>GST</th>
                 <th>Total</th>
+                <th>Paid</th>
+                <th>Balance</th>
                 <th>Status</th>
                 <th>Bill</th>
                 <th>Action</th>
