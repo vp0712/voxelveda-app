@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
+const money = require('../utils/money');
+const { paymentState, validatePaymentAmount } = require('../services/expensePaymentDomain');
+const { logAudit } = require('../services/auditService');
 
 async function ensureExpenseTables() {
   await pool.query(`
@@ -23,6 +26,30 @@ async function ensureExpenseTables() {
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
       deleted TINYINT(1) NOT NULL DEFAULT 0
+    )
+  `);
+
+  await pool.query('ALTER TABLE expenses ADD COLUMN due_date DATE NULL AFTER expense_date').catch(() => {});
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS expense_payments (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      expense_id INT NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      payment_date DATE NOT NULL,
+      payment_method VARCHAR(80) NOT NULL,
+      account_name VARCHAR(180) NULL,
+      reference VARCHAR(180) NULL,
+      notes TEXT NULL,
+      idempotency_key VARCHAR(80) NULL,
+      created_by INT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      voided_by INT NULL,
+      voided_at DATETIME NULL,
+      void_reason TEXT NULL,
+      UNIQUE KEY uniq_expense_payment_idempotency (idempotency_key),
+      INDEX idx_expense_payments_expense (expense_id, payment_date),
+      INDEX idx_expense_payments_voided (expense_id, voided_at)
     )
   `);
 
@@ -85,7 +112,9 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
   const [rows] = await pool.query(
     `
     SELECT e.*, cu.name AS created_by_name, uu.name AS updated_by_name,
-      COALESCE(f.file_count, 0) AS file_count
+      COALESCE(f.file_count, 0) AS file_count,
+      COALESCE(p.payment_count, 0) AS payment_count,
+      COALESCE(p.payment_total, 0) AS recorded_payment_total
     FROM expenses e
     LEFT JOIN users cu ON cu.id = e.created_by
     LEFT JOIN users uu ON uu.id = e.updated_by
@@ -95,6 +124,12 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
       WHERE deleted = 0
       GROUP BY expense_id
     ) f ON f.expense_id = e.id
+    LEFT JOIN (
+      SELECT expense_id, COUNT(*) AS payment_count, SUM(amount) AS payment_total
+      FROM expense_payments
+      WHERE voided_at IS NULL
+      GROUP BY expense_id
+    ) p ON p.expense_id = e.id
     ${where}
     ORDER BY e.id ASC
     LIMIT ? OFFSET ?
@@ -126,10 +161,20 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
     rows.forEach((row) => {
       row.files = filesByExpense[String(row.id)] || [];
       row.file_count = row.files.length;
+      const state = paymentState(row, row.recorded_payment_total, row.payment_count);
+      row.total_paid = Number(state.totalPaid);
+      row.balance_due = Number(state.balanceDue);
+      row.calculated_status = state.status;
+      row.status = state.status;
     });
   } else {
     rows.forEach((row) => {
       row.files = [];
+      const state = paymentState(row, row.recorded_payment_total, row.payment_count);
+      row.total_paid = Number(state.totalPaid);
+      row.balance_due = Number(state.balanceDue);
+      row.calculated_status = state.status;
+      row.status = state.status;
     });
   }
 
@@ -154,10 +199,29 @@ async function getExpenseSummary(fy = '') {
     SELECT
       COALESCE(SUM(total_amount), 0) AS total_expense,
       COALESCE(SUM(gst_amount), 0) AS gst_paid,
-      COUNT(*) AS expense_count
-    FROM expenses
-    WHERE deleted = 0
-    ${expenseDateWhere}
+      COUNT(*) AS expense_count,
+      COALESCE(SUM(
+        GREATEST(e.total_amount - CASE
+          WHEN COALESCE(p.payment_count, 0) > 0 THEN COALESCE(p.payment_total, 0)
+          WHEN LOWER(COALESCE(e.status, '')) IN ('paid','settled','complete','completed','reimbursed','closed') THEN e.total_amount
+          ELSE 0 END, 0)
+      ), 0) AS outstanding_debt,
+      COALESCE(SUM(CASE
+        WHEN COALESCE(p.payment_count, 0) > 0 THEN LEAST(e.total_amount, COALESCE(p.payment_total, 0))
+        WHEN LOWER(COALESCE(e.status, '')) IN ('paid','settled','complete','completed','reimbursed','closed') THEN e.total_amount
+        ELSE 0 END), 0) AS total_paid,
+      COALESCE(SUM(CASE WHEN e.due_date < CURDATE() THEN
+        GREATEST(e.total_amount - CASE
+          WHEN COALESCE(p.payment_count, 0) > 0 THEN COALESCE(p.payment_total, 0)
+          WHEN LOWER(COALESCE(e.status, '')) IN ('paid','settled','complete','completed','reimbursed','closed') THEN e.total_amount
+          ELSE 0 END, 0) ELSE 0 END), 0) AS overdue_debt
+    FROM expenses e
+    LEFT JOIN (
+      SELECT expense_id, COUNT(*) AS payment_count, SUM(amount) AS payment_total
+      FROM expense_payments WHERE voided_at IS NULL GROUP BY expense_id
+    ) p ON p.expense_id = e.id
+    WHERE e.deleted = 0
+    ${expenseDateWhere.replace(/expense_date/g, 'e.expense_date')}
     `,
     expenseDateParams
   );
@@ -207,6 +271,9 @@ async function getExpenseSummary(fy = '') {
     end: hasFinancialYear ? bounds.end : null,
     expense_count: Number(expenses.expense_count || 0),
     total_expense: Number(expenses.total_expense || 0),
+    outstanding_debt: Number(expenses.outstanding_debt || 0),
+    overdue_debt: Number(expenses.overdue_debt || 0),
+    total_paid: Number(expenses.total_paid || 0),
     gst_paid: Number(expenses.gst_paid || 0),
     gst_collected: Number(invoices.gst_collected || 0),
     gst_position: Number(invoices.gst_collected || 0) - Number(expenses.gst_paid || 0),
@@ -241,6 +308,7 @@ exports.saveExpense = async (req, res) => {
 
     const id = Number(req.body.id || 0);
     const expenseDate = String(req.body.expense_date || '').trim();
+    const dueDate = String(req.body.due_date || '').trim() || null;
     const supplierName = String(req.body.supplier_name || '').trim();
     const category = String(req.body.category || '').trim();
     const description = String(req.body.description || '').trim();
@@ -250,7 +318,7 @@ exports.saveExpense = async (req, res) => {
     const gstRate = cleanMoney(req.body.gst_rate);
     const gstAmount = cleanMoney(req.body.gst_amount || (amountExGst * (gstRate / 100)));
     const totalAmount = cleanMoney(req.body.total_amount || (amountExGst + gstAmount));
-    const status = String(req.body.status || 'paid').trim().toLowerCase();
+    const status = String(req.body.status || 'unpaid').trim().toLowerCase();
     const notes = String(req.body.notes || '').trim();
 
     if (!expenseDate || !supplierName || !description) {
@@ -262,15 +330,19 @@ exports.saveExpense = async (req, res) => {
     }
 
     if (id) {
+      const [[paymentTotals]] = await pool.query('SELECT COALESCE(SUM(amount), 0) AS paid FROM expense_payments WHERE expense_id = ? AND voided_at IS NULL', [id]);
+      if (money.toCents(paymentTotals.paid) > money.toCents(totalAmount)) {
+        return res.status(400).json({ message: 'Bill total cannot be less than payments already recorded' });
+      }
       const [result] = await pool.query(
         `
         UPDATE expenses
-        SET expense_date = ?, supplier_name = ?, category = ?, description = ?, invoice_no = ?,
+        SET expense_date = ?, due_date = ?, supplier_name = ?, category = ?, description = ?, invoice_no = ?,
             payment_method = ?, amount_ex_gst = ?, gst_rate = ?, gst_amount = ?, total_amount = ?,
             status = ?, notes = ?, updated_by = ?
         WHERE id = ? AND deleted = 0
         `,
-        [expenseDate, supplierName, category, description, invoiceNo, paymentMethod, amountExGst, gstRate, gstAmount, totalAmount, status, notes, req.user.id, id]
+        [expenseDate, dueDate, supplierName, category, description, invoiceNo, paymentMethod, amountExGst, gstRate, gstAmount, totalAmount, status, notes, req.user.id, id]
       );
 
       if (result.affectedRows === 0) return res.status(404).json({ message: 'Expense not found' });
@@ -280,11 +352,11 @@ exports.saveExpense = async (req, res) => {
     const [result] = await pool.query(
       `
       INSERT INTO expenses
-      (expense_date, supplier_name, category, description, invoice_no, payment_method,
+      (expense_date, due_date, supplier_name, category, description, invoice_no, payment_method,
        amount_ex_gst, gst_rate, gst_amount, total_amount, status, notes, created_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      [expenseDate, supplierName, category, description, invoiceNo, paymentMethod, amountExGst, gstRate, gstAmount, totalAmount, status, notes, req.user.id]
+      [expenseDate, dueDate, supplierName, category, description, invoiceNo, paymentMethod, amountExGst, gstRate, gstAmount, totalAmount, status, notes, req.user.id]
     );
 
     res.json({ message: 'Expense saved successfully', expense_id: result.insertId });
@@ -292,6 +364,105 @@ exports.saveExpense = async (req, res) => {
     console.error('saveExpense error:', error);
     res.status(500).json({ message: 'Failed to save expense', error: error.message });
   }
+};
+
+exports.getExpensePayments = async (req, res) => {
+  try {
+    await ensureExpenseTables();
+    const expenseId = Number(req.params.id || 0);
+    const [[expense]] = await pool.query('SELECT * FROM expenses WHERE id = ? AND deleted = 0 LIMIT 1', [expenseId]);
+    if (!expense) return res.status(404).json({ message: 'Expense not found' });
+    const [payments] = await pool.query(`
+      SELECT ep.*, u.name AS created_by_name, vu.name AS voided_by_name
+      FROM expense_payments ep
+      LEFT JOIN users u ON u.id = ep.created_by
+      LEFT JOIN users vu ON vu.id = ep.voided_by
+      WHERE ep.expense_id = ? ORDER BY ep.payment_date DESC, ep.id DESC
+    `, [expenseId]);
+    const active = payments.filter((entry) => !entry.voided_at);
+    const paid = active.reduce((sum, entry) => money.add(sum, entry.amount), '0.00');
+    const state = paymentState(expense, paid, active.length);
+    res.json({ expense: { ...expense, total_paid: Number(state.totalPaid), balance_due: Number(state.balanceDue), status: state.status }, payments });
+  } catch (error) {
+    console.error('getExpensePayments error:', error);
+    res.status(500).json({ message: 'Failed to load expense payments', error: error.message });
+  }
+};
+
+exports.recordExpensePayment = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await ensureExpenseTables();
+    const expenseId = Number(req.params.id || 0);
+    const paymentDate = String(req.body.payment_date || '').trim();
+    const paymentMethod = String(req.body.payment_method || '').trim();
+    const accountName = String(req.body.account_name || '').trim();
+    const reference = String(req.body.reference || '').trim();
+    const notes = String(req.body.notes || '').trim();
+    const idempotencyKey = String(req.body.idempotency_key || '').trim() || null;
+    if (!expenseId || !paymentDate || !paymentMethod || !accountName) {
+      return res.status(400).json({ message: 'Expense, payment date, payment method and paid-from account are required' });
+    }
+
+    await connection.beginTransaction();
+    const [[expense]] = await connection.query('SELECT * FROM expenses WHERE id = ? AND deleted = 0 FOR UPDATE', [expenseId]);
+    if (!expense) { await connection.rollback(); return res.status(404).json({ message: 'Expense not found' }); }
+    const [[totals]] = await connection.query('SELECT COUNT(*) AS payment_count, COALESCE(SUM(amount), 0) AS payment_total FROM expense_payments WHERE expense_id = ? AND voided_at IS NULL', [expenseId]);
+    const state = paymentState(expense, totals.payment_total, totals.payment_count);
+    let amount;
+    try { amount = validatePaymentAmount(req.body.amount, state.balanceDue); }
+    catch (error) { await connection.rollback(); return res.status(400).json({ message: error.message }); }
+
+    const [result] = await connection.query(`
+      INSERT INTO expense_payments
+      (expense_id, amount, payment_date, payment_method, account_name, reference, notes, idempotency_key, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [expenseId, amount, paymentDate, paymentMethod, accountName || null, reference || null, notes || null, idempotencyKey, req.user.id]);
+    const newPaid = money.add(state.totalPaid, amount);
+    const newState = paymentState({ ...expense, status: 'unpaid' }, newPaid, Number(totals.payment_count || 0) + 1);
+    await connection.query('UPDATE expenses SET status = ?, payment_method = ?, updated_by = ? WHERE id = ?', [newState.status, paymentMethod, req.user.id, expenseId]);
+    await logAudit(connection, {
+      actorId: req.user.id, action: 'PAYMENT_RECORDED', module: 'expenses', recordType: 'expense_payment', recordId: result.insertId,
+      oldValue: { balance_due: state.balanceDue }, newValue: { expense_id: expenseId, amount, total_paid: newState.totalPaid, balance_due: newState.balanceDue },
+      ipAddress: req.ip, userAgent: req.get('user-agent')
+    });
+    await connection.commit();
+    res.json({ message: 'Payment recorded successfully', payment_id: result.insertId, total_paid: Number(newState.totalPaid), balance_due: Number(newState.balanceDue), status: newState.status });
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'This payment has already been recorded' });
+    console.error('recordExpensePayment error:', error);
+    res.status(500).json({ message: 'Failed to record payment', error: error.message });
+  } finally { connection.release(); }
+};
+
+exports.voidExpensePayment = async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    await ensureExpenseTables();
+    const paymentId = Number(req.params.paymentId || 0);
+    const reason = String(req.body.reason || '').trim();
+    if (!paymentId || !reason) return res.status(400).json({ message: 'Payment and reversal reason are required' });
+    await connection.beginTransaction();
+    const [[payment]] = await connection.query('SELECT * FROM expense_payments WHERE id = ? FOR UPDATE', [paymentId]);
+    if (!payment) { await connection.rollback(); return res.status(404).json({ message: 'Payment not found' }); }
+    if (payment.voided_at) { await connection.rollback(); return res.status(409).json({ message: 'Payment is already reversed' }); }
+    await connection.query('UPDATE expense_payments SET voided_by = ?, voided_at = NOW(), void_reason = ? WHERE id = ?', [req.user.id, reason, paymentId]);
+    const [[expense]] = await connection.query('SELECT * FROM expenses WHERE id = ? FOR UPDATE', [payment.expense_id]);
+    const [[totals]] = await connection.query('SELECT COUNT(*) AS payment_count, COALESCE(SUM(amount), 0) AS payment_total FROM expense_payments WHERE expense_id = ? AND voided_at IS NULL', [payment.expense_id]);
+    const state = paymentState({ ...expense, status: 'unpaid' }, totals.payment_total, totals.payment_count);
+    await connection.query('UPDATE expenses SET status = ?, updated_by = ? WHERE id = ?', [state.status, req.user.id, payment.expense_id]);
+    await logAudit(connection, {
+      actorId: req.user.id, action: 'PAYMENT_REVERSED', module: 'expenses', recordType: 'expense_payment', recordId: paymentId,
+      oldValue: payment, newValue: { void_reason: reason, balance_due: state.balanceDue }, ipAddress: req.ip, userAgent: req.get('user-agent')
+    });
+    await connection.commit();
+    res.json({ message: 'Payment reversed successfully', balance_due: Number(state.balanceDue), status: state.status });
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    console.error('voidExpensePayment error:', error);
+    res.status(500).json({ message: 'Failed to reverse payment', error: error.message });
+  } finally { connection.release(); }
 };
 
 exports.deleteExpense = async (req, res) => {
