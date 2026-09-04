@@ -47,6 +47,7 @@ const noStorePublicAssets = new Set([
   'admin-dashboard.js',
   'staff.js',
   'auth-lifecycle.js',
+  'mfa.js',
   'security-page.js',
   'style.css',
   'advanced-theme.css',
@@ -113,7 +114,8 @@ app.get('/support', sendPage('support.html'));
 app.get('/forgot-password', noIndex, sendPage('forgot-password.html'));
 app.get('/reset-password', noIndex, sendPage('reset-password.html'));
 app.get('/accept-invite', noIndex, sendPage('accept-invite.html'));
-app.get('/security', noIndex, pageAuth(), sendPage('security.html'));
+app.get('/mfa', noIndex, sendPage('mfa.html'));
+app.get('/security', noIndex, pageAuth({ allowMfaSetup: true }), sendPage('security.html'));
 app.get('/attendance-terminal', noIndex, sendPage('shift-qr.html'));
 app.get('/401', noIndex, (req, res) => res.status(401).sendFile(path.join(publicDir, '401.html')));
 app.get('/403', noIndex, (req, res) => res.status(403).sendFile(path.join(publicDir, '403.html')));

@@ -3,7 +3,7 @@ const path = require('path');
 
 const files = [
   'app.js', 'server.js', 'config/urls.js',
-  'controllers/attendanceController.js', 'controllers/authController.js', 'controllers/securityAuthController.js', 'controllers/emailController.js',
+  'controllers/attendanceController.js', 'controllers/authController.js', 'controllers/securityAuthController.js', 'controllers/mfaController.js', 'controllers/emailController.js',
   'controllers/invoiceController.js', 'controllers/materialController.js', 'controllers/timesheetWorkflowController.js',
   'controllers/financeController.js', 'controllers/financeOperationsController.js',
   'middleware/auth.js', 'middleware/pageAuth.js', 'middleware/securityMiddleware.js',
@@ -13,11 +13,11 @@ const files = [
   'services/emailTemplates.js', 'services/notificationService.js',
   'services/timesheetWorkflowService.js', 'services/userLifecycleService.js',
   'services/financeDomain.js', 'services/financeSchema.js', 'services/passwordPolicy.js',
-  'services/securitySchema.js', 'services/sessionService.js', 'services/authActionTokenService.js',
+  'services/securitySchema.js', 'services/sessionService.js', 'services/authSessionService.js', 'services/authActionTokenService.js', 'services/mfaService.js',
   'services/securityEmailService.js', 'config/security.js',
   'services/weeklyTimesheetScheduler.js', 'services/workforceSchema.js',
   'utils/session.js', 'utils/tokenRevocation.js', 'utils/money.js',
-  'public/login.js', 'public/auth-lifecycle.js', 'public/security-page.js',
+  'public/login.js', 'public/auth-lifecycle.js', 'public/mfa.js', 'public/security-page.js',
   'public/admin-dashboard.js', 'public/staff.js', 'public/qr-widget.js',
   'public/service-worker.js'
 ];
