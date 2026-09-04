@@ -23,6 +23,9 @@ async function validateSession(token, decoded) {
      WHERE id = ? AND token_hash = ? AND revoked_at IS NULL AND expires_at > NOW() LIMIT 1`,
     [decoded.jti, hashToken(token)]
   );
+  if (session) {
+    await pool.query('UPDATE auth_sessions SET last_seen_at = NOW() WHERE id = ? AND last_seen_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)', [session.id]);
+  }
   return session || null;
 }
 
@@ -43,6 +46,25 @@ async function revokeUserSessions(userId, reason) {
   );
 }
 
+async function listUserSessions(userId) {
+  await ensureSecuritySchema();
+  const [rows] = await pool.query(
+    `SELECT id, assurance_level, ip_address, user_agent, created_at, last_seen_at, expires_at
+     FROM auth_sessions WHERE user_id = ? AND revoked_at IS NULL AND expires_at > NOW()
+     ORDER BY last_seen_at DESC`, [userId]
+  );
+  return rows;
+}
+
+async function revokeSessionById(userId, sessionId, reason = 'USER_REVOKED') {
+  await ensureSecuritySchema();
+  const [result] = await pool.query(
+    `UPDATE auth_sessions SET revoked_at = NOW(), revoke_reason = ?
+     WHERE id = ? AND user_id = ? AND revoked_at IS NULL`, [reason, sessionId, userId]
+  );
+  return result.affectedRows > 0;
+}
+
 async function logSecurityEvent(entry) {
   await ensureSecuritySchema();
   await pool.query(
@@ -56,4 +78,4 @@ async function logSecurityEvent(entry) {
   );
 }
 
-module.exports = { createSession, validateSession, revokeSession, revokeUserSessions, logSecurityEvent };
+module.exports = { createSession, validateSession, revokeSession, revokeUserSessions, listUserSessions, revokeSessionById, logSecurityEvent };

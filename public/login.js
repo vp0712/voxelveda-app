@@ -1,18 +1,13 @@
 async function redirectSavedSession() {
-  const token = localStorage.getItem('token');
-  const role = String(localStorage.getItem('role') || '').trim().toLowerCase();
-  const user = localStorage.getItem('user');
-
-  if (!token || !role || !user) return false;
-
   try {
-    const res = await fetch('/api/auth/session', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
     if (!res.ok) throw new Error('Saved session is no longer valid');
-    const savedUser = JSON.parse(user);
+    const data = await res.json();
+    const savedUser = data.user || {};
+    const role = String(savedUser.role || '').toLowerCase();
+    localStorage.removeItem('token');
+    localStorage.setItem('user', JSON.stringify(savedUser));
+    localStorage.setItem('role', role);
     window.location.replace(hasOperationsWorkspaceAccess(role, savedUser) ? '/admin' : '/dashboard');
     return true;
   } catch {
@@ -85,22 +80,22 @@ async function login() {
       return;
     }
 
-    if (!data.token || !data.user || !data.user.role) {
-      loginStatus.innerText = 'Login response missing token/user/role.';
+    if (!data.user || !data.user.role) {
+      loginStatus.innerText = 'Login response missing user details.';
       loginStatus.style.color = '#f87171';
       return;
     }
 
     const role = String(data.user.role).trim().toLowerCase();
 
-    localStorage.setItem('token', data.token);
+    localStorage.removeItem('token');
     localStorage.setItem('user', JSON.stringify({ ...data.user, role }));
     localStorage.setItem('role', role);
 
     loginStatus.innerText = 'Login successful. Redirecting...';
     loginStatus.style.color = '#22c55e';
 
-    window.location.href = safeReturnTo(role, data.user);
+    window.location.href = data.requires_password_change ? '/security?password_change=required' : safeReturnTo(role, data.user);
   } catch (err) {
     console.error('LOGIN ERROR:', err);
     loginStatus.innerText = 'Server error. Check backend terminal.';

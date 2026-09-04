@@ -6,7 +6,8 @@ const { ensureWorkforceSchema } = require('../services/workforceSchema');
 const { logAudit } = require('../services/auditService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { revokeUserSessions, logSecurityEvent } = require('../services/sessionService');
-const { validatePassword } = require('../services/passwordPolicy');
+const { issueToken, revokeUserActionTokens } = require('../services/authActionTokenService');
+const { queueSecurityLink } = require('../services/securityEmailService');
 
 const ALLOWED_ROLES = [
   'admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant',
@@ -103,21 +104,17 @@ exports.createUser = async (req, res) => {
     await ensureSecuritySchema();
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
-    const password = String(req.body.password || '');
     const role = normalizeRole(req.body.role || 'staff');
     const username = String(req.body.username || email.split('@')[0] || '').trim().toLowerCase();
     const permissions = parsePermissions(req.body.permissions);
 
-    if (!name || !username || !email || !password || !role) {
-      return res.status(400).json({ message: 'Name, username, email, password and role are required' });
+    if (!name || !username || !email || !role) {
+      return res.status(400).json({ message: 'Name, username, email and role are required' });
     }
 
     if (!isValidEmail(email)) {
       return res.status(400).json({ message: 'Valid email address is required' });
     }
-
-    const passwordCheck = validatePassword(password, { email, username, name });
-    if (!passwordCheck.valid) return res.status(400).json({ message: passwordCheck.errors[0] });
 
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
@@ -134,17 +131,29 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const disabledPassword = await bcrypt.hash(crypto.randomBytes(48).toString('base64url'), 12);
 
     const [result] = await pool.query(
       `INSERT INTO users
        (name, username, email, password, role, permissions, active, password_reset_required)
-       VALUES (?, ?, ?, ?, ?, ?, 1, 1)`,
-      [name, username, email, hashedPassword, role, JSON.stringify(permissions)]
+       VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
+      [name, username, email, disabledPassword, role, JSON.stringify(permissions)]
     );
 
-    res.json({
-      message: 'Staff user created successfully',
+    await pool.query("UPDATE users SET account_status = 'INVITED' WHERE id = ?", [result.insertId]);
+    const inviteToken = await issueToken({ userId: result.insertId, type: 'INVITE', minutes: 1440, createdBy: req.user.id });
+    let invitationDelivered = true;
+    try {
+      await queueSecurityLink({ user: { id: result.insertId, name, email }, token: inviteToken, type: 'INVITE', createdBy: req.user.id });
+    } catch (deliveryError) {
+      invitationDelivered = false;
+      console.error('Invitation delivery failed:', deliveryError.message);
+    }
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: result.insertId, eventType: 'USER_INVITED', req });
+
+    res.status(invitationDelivered ? 200 : 202).json({
+      message: invitationDelivered ? 'Secure invitation sent' : 'User created, but email delivery failed. Use Resend Invitation after checking SMTP.',
+      invitation_delivered: invitationDelivered,
       user_id: result.insertId
     });
   } catch (error) {
@@ -169,6 +178,8 @@ exports.getUsers = async (req, res) => {
         role,
         permissions,
         active,
+        account_status,
+        last_login_at,
         password_reset_required,
         last_password_reset_at
       FROM users
@@ -187,7 +198,7 @@ exports.getUsers = async (req, res) => {
     console.error('getUsers error:', error);
     res.status(500).json({
       message: 'Failed to load users',
-      error: error.message
+      request_id: req.requestId || null
     });
   }
 };
@@ -226,7 +237,8 @@ exports.updateUserAccess = async (req, res) => {
     }
 
     await revokeUserSessions(userId, 'ACCESS_CHANGED');
-    await pool.query('UPDATE users SET session_version = session_version + 1, account_status = ? WHERE id = ?', [active ? 'ACTIVE' : 'DISABLED', userId]);
+    if (!active) await revokeUserActionTokens(userId);
+    await pool.query("UPDATE users SET session_version = session_version + 1, account_status = CASE WHEN account_status = 'INVITED' AND ? = 1 THEN 'INVITED' ELSE ? END WHERE id = ?", [active ? 1 : 0, active ? 'ACTIVE' : 'DISABLED', userId]);
     await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'ROLE_OR_PERMISSION_CHANGED', req });
 
     res.json({ message: 'User access updated successfully' });
@@ -298,7 +310,8 @@ exports.updateUser = async (req, res) => {
     }
 
     await revokeUserSessions(userId, 'ACCOUNT_CHANGED');
-    await pool.query('UPDATE users SET session_version = session_version + 1, account_status = ? WHERE id = ?', [active ? 'ACTIVE' : 'DISABLED', userId]);
+    if (!active) await revokeUserActionTokens(userId);
+    await pool.query("UPDATE users SET session_version = session_version + 1, account_status = CASE WHEN account_status = 'INVITED' AND ? = 1 THEN 'INVITED' ELSE ? END WHERE id = ?", [active ? 1 : 0, active ? 'ACTIVE' : 'DISABLED', userId]);
 
     res.json({ message: 'Staff details updated successfully' });
   } catch (error) {
@@ -315,30 +328,23 @@ exports.resetUserPassword = async (req, res) => {
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
     const userId = Number(req.params.id);
-    const newPassword = String(req.body.password || '').trim();
+    if (!userId) return res.status(400).json({ message: 'User ID is required' });
 
-    if (!userId || !newPassword) {
-      return res.status(400).json({ message: 'User ID and new password are required' });
-    }
-
-    const [[targetUser]] = await pool.query('SELECT id, name, username, email, role FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    const [[targetUser]] = await pool.query('SELECT id, name, username, email, role, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
     if (!targetUser) return res.status(404).json({ message: 'User not found' });
+    if (['SUSPENDED', 'DISABLED', 'TERMINATED'].includes(String(targetUser.account_status || '').toUpperCase())) {
+      return res.status(409).json({ message: 'Enable and review this account before resetting its password' });
+    }
     const authorityError = await assertRoleAuthority(req, userId, targetUser.role);
     if (authorityError) return res.status(403).json({ message: authorityError });
-    const passwordCheck = validatePassword(newPassword, targetUser);
-    if (!passwordCheck.valid) return res.status(400).json({ message: passwordCheck.errors[0] });
-
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
     const [result] = await pool.query(
       `UPDATE users
-       SET password = ?,
-           password_reset_required = 1,
+       SET password_reset_required = 1,
            last_password_reset_at = NOW(),
            session_version = session_version + 1,
-           account_status = 'ACTIVE'
+           account_status = 'PASSWORD_RESET_REQUIRED'
        WHERE id = ? AND deleted_at IS NULL`,
-      [hashedPassword, userId]
+      [userId]
     );
 
     if (result.affectedRows === 0) {
@@ -346,10 +352,12 @@ exports.resetUserPassword = async (req, res) => {
     }
 
     await revokeUserSessions(userId, 'PASSWORD_RESET');
+    const resetToken = await issueToken({ userId, type: 'PASSWORD_RESET', minutes: 30, createdBy: req.user.id });
+    await queueSecurityLink({ user: targetUser, token: resetToken, type: 'PASSWORD_RESET', createdBy: req.user.id });
     await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'PASSWORD_RESET', req });
 
     res.json({
-      message: 'Temporary password set. Existing sessions were revoked and the user must change it at next sign-in.'
+      message: 'Secure password-reset link queued. Existing sessions were revoked.'
     });
   } catch (error) {
     console.error('resetUserPassword error:', error);
@@ -357,6 +365,28 @@ exports.resetUserPassword = async (req, res) => {
       message: 'Failed to reset password',
       request_id: req.requestId || null
     });
+  }
+};
+
+exports.resendUserInvitation = async (req, res) => {
+  try {
+    await ensureSecuritySchema();
+    const userId = Number(req.params.id);
+    const [[user]] = await pool.query(
+      `SELECT id, name, email, role, account_status FROM users
+       WHERE id = ? AND deleted_at IS NULL LIMIT 1`, [userId]
+    );
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const authorityError = await assertRoleAuthority(req, userId, user.role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    if (user.account_status !== 'INVITED') return res.status(409).json({ message: 'Only invited accounts can receive a replacement invitation' });
+    const token = await issueToken({ userId, type: 'INVITE', minutes: 1440, createdBy: req.user.id });
+    await queueSecurityLink({ user, token, type: 'INVITE', createdBy: req.user.id });
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'INVITATION_REISSUED', req });
+    return res.json({ message: 'A new invitation was queued; the previous link is no longer valid.' });
+  } catch (error) {
+    console.error('resendUserInvitation error:', error.message);
+    return res.status(500).json({ message: 'Unable to resend invitation' });
   }
 };
 
@@ -451,6 +481,7 @@ exports.deleteUser = async (req, res) => {
 
     await connection.commit();
     await revokeUserSessions(userId, 'ACCOUNT_TERMINATED');
+    await revokeUserActionTokens(userId);
     await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'USER_TERMINATED', req });
     return res.json({
       message: 'User account deleted. Login access was removed and historical records were preserved.'

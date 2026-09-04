@@ -75,7 +75,7 @@ exports.login = async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT id, name, username, email, password, role, permissions, active,
-              account_status, failed_login_count, locked_until, session_version
+              account_status, failed_login_count, locked_until, session_version, password_reset_required
        FROM users
        WHERE (LOWER(email) = ? OR LOWER(username) = ?)
          AND deleted_at IS NULL
@@ -90,7 +90,7 @@ exports.login = async (req, res) => {
 
     const user = rows[0];
 
-    const blockedStates = ['LOCKED', 'SUSPENDED', 'DISABLED', 'TERMINATED'];
+    const blockedStates = ['INVITED', 'PASSWORD_RESET_REQUIRED', 'LOCKED', 'SUSPENDED', 'DISABLED', 'TERMINATED'];
     if (Number(user.active) === 0 || blockedStates.includes(String(user.account_status || '').toUpperCase()) || (user.locked_until && new Date(user.locked_until) > new Date())) {
       await logSecurityEvent({ targetUserId: user.id, eventType: 'LOGIN_FAILURE', result: 'DENIED', req, metadata: { reason: 'ACCOUNT_UNAVAILABLE' } });
       return res.status(401).json({ message: 'Invalid email or password' });
@@ -109,7 +109,7 @@ exports.login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
-    const cleanUser = {
+    const sessionUser = {
       id: user.id,
       name: user.name || 'User',
       username: user.username || user.email,
@@ -120,13 +120,13 @@ exports.login = async (req, res) => {
     };
 
     const sessionId = crypto.randomUUID();
-    const token = createToken(cleanUser, sessionId);
+    const token = createToken(sessionUser, sessionId);
     const decoded = jwt.decode(token);
     await createSession({
       id: sessionId,
       token,
       userId: user.id,
-      sessionVersion: cleanUser.session_version,
+      sessionVersion: sessionUser.session_version,
       expiresAt: new Date(Number(decoded.exp) * 1000),
       req
     });
@@ -137,8 +137,15 @@ exports.login = async (req, res) => {
 
     res.json({
       message: 'Login successful',
-      token,
-      user: cleanUser
+      user: {
+        id: sessionUser.id,
+        name: sessionUser.name,
+        username: sessionUser.username,
+        email: sessionUser.email,
+        role: sessionUser.role,
+        permissions: sessionUser.permissions
+      },
+      requires_password_change: Number(user.password_reset_required) === 1
     });
   } catch (err) {
     console.error('LOGIN ERROR:', err);
