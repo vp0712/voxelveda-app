@@ -47,3 +47,12 @@ This report records implemented controls and known gaps; it is not a certificati
 - Raw action tokens are never stored in the database or email queue. Only SHA-256 token hashes are stored, and links use URL fragments so tokens do not enter HTTP access logs.
 - Users can view active sessions, identify their current session, revoke individual sessions, revoke all other sessions, and change their password from `/security`.
 - Disabling or terminating an account revokes both sessions and outstanding invitation/reset tokens.
+
+## Phase 3 multi-factor authentication
+
+- TOTP authenticator MFA is mandatory by default for `SUPER_ADMIN`, `ADMIN`, `FINANCE_ADMIN`, `ACCOUNTANT`, and `HR` roles and optional for other staff.
+- TOTP secrets use AES-256-GCM application-level encryption with a production-only environment key; the key is not stored in the database.
+- Password verification creates a five-minute, hash-only MFA challenge. An authenticated session is issued only after successful MFA and records assurance level 2.
+- Ten high-entropy, single-use recovery codes are generated at enrollment, stored only as keyed hashes, and displayed once.
+- Existing level-1 privileged sessions are blocked from application APIs until MFA enrollment is completed.
+- Passkeys are deliberately not represented as active: the current dependency set has no audited WebAuthn verification library. This remains a Phase 3 follow-up rather than a fake frontend control.

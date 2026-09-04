@@ -11,6 +11,12 @@ function validateSecurityEnvironment() {
   if (production && process.env.ALLOW_LEGACY_QUERY_TOKENS === 'true') failures.push('query-string authentication tokens are forbidden in production');
   if (production && process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') failures.push('admin bootstrap must be disabled after secure provisioning');
   if (production && String(process.env.CORS_ORIGINS || '').includes('*')) failures.push('wildcard CORS is forbidden in production');
+  if (production) {
+    const mfaKey = String(process.env.MFA_ENCRYPTION_KEY || '').trim();
+    let decodedLength = 0;
+    try { decodedLength = /^[a-f0-9]{64}$/i.test(mfaKey) ? Buffer.from(mfaKey, 'hex').length : Buffer.from(mfaKey, 'base64').length; } catch { decodedLength = 0; }
+    if (decodedLength !== 32) failures.push('MFA_ENCRYPTION_KEY must be a unique 32-byte hex or base64 secret');
+  }
   if (failures.length) throw new Error(`Security configuration invalid: ${failures.join('; ')}`);
 }
 

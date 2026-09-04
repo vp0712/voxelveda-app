@@ -5,6 +5,7 @@ const { getRequestToken, safeReturnTo } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { validateSession } = require('../services/sessionService');
+const { requiresMfa } = require('../services/mfaService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -22,7 +23,7 @@ function redirectToLogin(req, res) {
   return res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo)}`);
 }
 
-function pageAuth({ adminOnly = false, workspaceOnly = false } = {}) {
+function pageAuth({ adminOnly = false, workspaceOnly = false, allowMfaSetup = false } = {}) {
   return async (req, res, next) => {
     try {
       const token = getRequestToken(req);
@@ -34,7 +35,7 @@ function pageAuth({ adminOnly = false, workspaceOnly = false } = {}) {
       const session = await validateSession(token, decoded);
       if (!session) return redirectToLogin(req, res);
       const [[user]] = await pool.query(
-        `SELECT id, email, username, role, permissions, active, account_status, session_version
+        `SELECT id, email, username, role, permissions, active, account_status, session_version, mfa_enabled
          FROM users
          WHERE id = ? AND deleted_at IS NULL
          LIMIT 1`,
@@ -44,6 +45,10 @@ function pageAuth({ adminOnly = false, workspaceOnly = false } = {}) {
       if (!user || Number(user.active) === 0 || blocked.includes(String(user.account_status).toUpperCase()) || Number(user.session_version) !== Number(session.session_version)) return redirectToLogin(req, res);
 
       const role = String(user.role || decoded.role || 'staff').trim().toLowerCase();
+      if (!allowMfaSetup && (requiresMfa(role) || Number(user.mfa_enabled) === 1) && Number(session.assurance_level || 1) < 2) {
+        if (Number(user.mfa_enabled) !== 1) return res.redirect(302, '/security?mfa_setup=required');
+        return res.redirect(302, '/login?message=Multi-factor%20verification%20is%20required');
+      }
       const permissions = parsePermissions(user.permissions);
       const isSystemAdmin = ['admin', 'super_admin'].includes(role);
       const isFinanceRole = ['finance_admin', 'finance_user', 'accountant'].includes(role);

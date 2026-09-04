@@ -1,12 +1,12 @@
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const pool = require('../config/db');
 const { getRequestToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
-const { createSession, revokeSession, logSecurityEvent } = require('../services/sessionService');
+const { revokeSession, logSecurityEvent } = require('../services/sessionService');
 const { validatePassword } = require('../services/passwordPolicy');
+const { createAuthenticatedSession } = require('../services/authSessionService');
+const { issueLoginChallenge, requiresMfa } = require('../services/mfaService');
 
 function normalizeRole(role) {
   return String(role || 'staff').trim().toLowerCase();
@@ -38,30 +38,6 @@ function publicUsernameFromEmail(email) {
   return `${base}_${String(Date.now()).slice(-5)}`;
 }
 
-function sessionDuration(role) {
-  const privileged = ['super_admin', 'admin', 'finance_admin', 'accountant'].includes(normalizeRole(role));
-  return privileged ? (process.env.PRIVILEGED_SESSION_EXPIRES_IN || '2h') : (process.env.JWT_EXPIRES_IN || '8h');
-}
-
-function createToken(user, sessionId) {
-  if (!process.env.JWT_SECRET) {
-    throw new Error('JWT_SECRET is missing in .env');
-  }
-
-  return jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      username: user.username,
-      role: normalizeRole(user.role),
-      permissions: parsePermissions(user.permissions),
-      session_version: Number(user.session_version || 1)
-    },
-    process.env.JWT_SECRET,
-    { expiresIn: sessionDuration(user.role), jwtid: sessionId }
-  );
-}
-
 exports.login = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
@@ -75,7 +51,7 @@ exports.login = async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT id, name, username, email, password, role, permissions, active,
-              account_status, failed_login_count, locked_until, session_version, password_reset_required
+              account_status, failed_login_count, locked_until, session_version, password_reset_required, mfa_enabled
        FROM users
        WHERE (LOWER(email) = ? OR LOWER(username) = ?)
          AND deleted_at IS NULL
@@ -119,32 +95,28 @@ exports.login = async (req, res) => {
       session_version: Number(user.session_version || 1)
     };
 
-    const sessionId = crypto.randomUUID();
-    const token = createToken(sessionUser, sessionId);
-    const decoded = jwt.decode(token);
-    await createSession({
-      id: sessionId,
-      token,
-      userId: user.id,
-      sessionVersion: sessionUser.session_version,
-      expiresAt: new Date(Number(decoded.exp) * 1000),
-      req
-    });
-    await pool.query('UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = NOW() WHERE id = ?', [user.id]);
-    await logSecurityEvent({ actorId: user.id, targetUserId: user.id, sessionId, eventType: 'LOGIN_SUCCESS', req });
+    if (Number(user.mfa_enabled) === 1 || requiresMfa(user.role)) {
+      clearSessionCookie(req, res);
+      const setupRequired = Number(user.mfa_enabled) !== 1;
+      if (setupRequired) await pool.query("UPDATE users SET account_status = 'MFA_SETUP_REQUIRED' WHERE id = ?", [user.id]);
+      const challengeToken = await issueLoginChallenge(user.id, setupRequired ? 'MFA_SETUP' : 'MFA_VERIFY', req);
+      await logSecurityEvent({ actorId: user.id, targetUserId: user.id, eventType: setupRequired ? 'MFA_SETUP_REQUIRED' : 'MFA_CHALLENGE_ISSUED', req });
+      return res.status(202).json({
+        message: setupRequired ? 'Multi-factor authentication setup is required.' : 'Multi-factor authentication is required.',
+        mfa_required: true,
+        mfa_setup_required: setupRequired,
+        challenge_token: challengeToken,
+        expires_in: 300
+      });
+    }
 
-    setSessionCookie(req, res, token);
+    const session = await createAuthenticatedSession({ user: sessionUser, req, res, assuranceLevel: 1 });
+    await pool.query('UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = NOW() WHERE id = ?', [user.id]);
+    await logSecurityEvent({ actorId: user.id, targetUserId: user.id, sessionId: session.sessionId, eventType: 'LOGIN_SUCCESS', req });
 
     res.json({
       message: 'Login successful',
-      user: {
-        id: sessionUser.id,
-        name: sessionUser.name,
-        username: sessionUser.username,
-        email: sessionUser.email,
-        role: sessionUser.role,
-        permissions: sessionUser.permissions
-      },
+      user: session.user,
       requires_password_change: Number(user.password_reset_required) === 1
     });
   } catch (err) {

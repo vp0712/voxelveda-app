@@ -4,13 +4,13 @@ const { ensureSecuritySchema } = require('./securitySchema');
 
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
-async function createSession({ id, token, userId, sessionVersion, expiresAt, req }) {
+async function createSession({ id, token, userId, sessionVersion, assuranceLevel = 1, expiresAt, req }) {
   await ensureSecuritySchema();
   await pool.query(
     `INSERT INTO auth_sessions
      (id, user_id, token_hash, assurance_level, session_version, ip_address, user_agent, expires_at)
-     VALUES (?, ?, ?, 1, ?, ?, ?, ?)`,
-    [id, userId, hashToken(token), sessionVersion, req.ip || null, String(req.get('user-agent') || '').slice(0, 255), expiresAt]
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [id, userId, hashToken(token), assuranceLevel, sessionVersion, req.ip || null, String(req.get('user-agent') || '').slice(0, 255), expiresAt]
   );
 }
 

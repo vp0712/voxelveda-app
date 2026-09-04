@@ -53,7 +53,7 @@ function showLoginMessageFromUrl() {
 async function login() {
   const loginStatus = document.getElementById('loginStatus');
   const email = document.getElementById('email')?.value.trim();
-  const password = document.getElementById('password')?.value.trim();
+  const password = document.getElementById('password')?.value;
 
   if (!email || !password) {
     loginStatus.innerText = 'Email and password are required.';
@@ -77,6 +77,15 @@ async function login() {
     if (!res.ok) {
       loginStatus.innerText = data.message || 'Login failed.';
       loginStatus.style.color = '#f87171';
+      return;
+    }
+
+    if (data.mfa_required && data.challenge_token) {
+      sessionStorage.setItem('vv_mfa_challenge', data.challenge_token);
+      sessionStorage.setItem('vv_mfa_setup', data.mfa_setup_required ? '1' : '0');
+      const returnTo = new URLSearchParams(window.location.search).get('returnTo') || '';
+      sessionStorage.setItem('vv_mfa_return_to', returnTo);
+      window.location.href = `/mfa?setup=${data.mfa_setup_required ? '1' : '0'}`;
       return;
     }
 

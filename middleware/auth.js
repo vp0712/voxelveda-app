@@ -4,6 +4,7 @@ const { getRequestToken } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { validateSession } = require('../services/sessionService');
+const { requiresMfa } = require('../services/mfaService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -41,7 +42,7 @@ module.exports = async (req, res, next) => {
     if (!session) return res.status(401).json({ message: 'Session has ended. Please sign in again.' });
 
     const [[freshUser]] = await pool.query(
-      `SELECT id, email, username, role, permissions, active, account_status, session_version
+      `SELECT id, email, username, role, permissions, active, account_status, session_version, mfa_enabled
        FROM users
        WHERE id = ? AND deleted_at IS NULL
        LIMIT 1`,
@@ -63,6 +64,15 @@ module.exports = async (req, res, next) => {
       permissions: parsePermissions(freshUser.permissions)
     };
     req.session = { id: session.id, assuranceLevel: Number(session.assurance_level || 1) };
+
+    const mfaRequired = requiresMfa(req.user.role) || Number(freshUser.mfa_enabled) === 1;
+    if (mfaRequired && req.session.assuranceLevel < 2) {
+      const setupRequired = Number(freshUser.mfa_enabled) !== 1;
+      const setupPaths = ['/api/auth/mfa/status', '/api/auth/mfa/enroll/start', '/api/auth/mfa/enroll/confirm'];
+      if (!(setupRequired && setupPaths.includes(req.originalUrl.split('?')[0]))) {
+        return res.status(403).json({ message: 'Multi-factor authentication is required', code: 'MFA_REQUIRED', setup_required: setupRequired });
+      }
+    }
 
     next();
   } catch (err) {

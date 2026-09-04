@@ -179,6 +179,8 @@ exports.getUsers = async (req, res) => {
         permissions,
         active,
         account_status,
+        mfa_enabled,
+        last_mfa_update_at,
         last_login_at,
         password_reset_required,
         last_password_reset_at
