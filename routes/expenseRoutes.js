@@ -26,8 +26,11 @@ const storage = multer.diskStorage({
 const upload = multer(secureMulterOptions(storage, 12));
 
 router.get('/', expenseController.getExpenses);
+router.get('/:id/payments', expenseController.getExpensePayments);
 router.get('/files/:id/view', expenseController.viewExpenseFile);
 router.post('/', requireInputPermission('expenses_input'), expenseController.saveExpense);
+router.post('/:id/payments', requireInputPermission('expenses_input'), expenseController.recordExpensePayment);
+router.post('/payments/:paymentId/void', requireInputPermission('expenses_input'), expenseController.voidExpensePayment);
 router.post('/delete', requireInputPermission('expenses_input'), expenseController.deleteExpense);
 router.post('/:id/files', requireInputPermission('expenses_input'), upload.single('file'), expenseController.saveExpenseFile);
 router.post('/files/delete', requireInputPermission('expenses_input'), expenseController.deleteExpenseFile);

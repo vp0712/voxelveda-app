@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
 <link rel="stylesheet" href="/style.css?v=20260816-invoice-delivery-ux"/>
+<link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
   <link rel="stylesheet" href="/advanced-theme.css?v=20260824-finance-workspace-v1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
@@ -1280,7 +1281,10 @@
             <h2>Company Expenses</h2>
             <p>Bill history, GST position, financial-year expense analysis and payable control.</p>
           </div>
-          <button onclick="openExpenseDialog()" class="primary-btn">Add Expense</button>
+          <div class="card-actions">
+            <button onclick="openRecordExpensePaymentDialog()" class="secondary-btn">Record Payment</button>
+            <button onclick="openExpenseDialog()" class="primary-btn">Add Expense</button>
+          </div>
         </div>
 
         <div class="metric-grid">
@@ -1299,6 +1303,18 @@
           <div class="card">
             <h3>GST Position</h3>
             <p><strong id="expenseGstPosition">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Total Paid</h3>
+            <p><strong id="expenseTotalPaid">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Outstanding Debt</h3>
+            <p><strong id="expenseOutstandingDebt">$0.00</strong></p>
+          </div>
+          <div class="card">
+            <h3>Overdue Debt</h3>
+            <p><strong id="expenseOverdueDebt">$0.00</strong></p>
           </div>
         </div>
 
@@ -1344,12 +1360,15 @@
             <thead>
               <tr>
                 <th>Date</th>
+                <th>Due</th>
                 <th>Supplier</th>
                 <th>Category</th>
                 <th>Invoice / Bill</th>
                 <th>Ex GST</th>
                 <th>GST</th>
                 <th>Total</th>
+                <th>Paid</th>
+                <th>Balance</th>
                 <th>Status</th>
                 <th>Bill</th>
                 <th>Action</th>
@@ -1598,5 +1617,6 @@
   <div id="toast" class="toast"></div>
 
   <script src="/admin-dashboard.js?v=20260824-mobile-shell-v4"></script>
+  <script src="/expense-payments.js?v=20260904"></script>
 </body>
 </html>

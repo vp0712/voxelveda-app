@@ -59,6 +59,27 @@ async function ensureDashboardTables() {
       deleted TINYINT(1) NOT NULL DEFAULT 0
     )
   `);
+  await pool.query('ALTER TABLE expenses ADD COLUMN due_date DATE NULL AFTER expense_date').catch(() => {});
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS expense_payments (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      expense_id INT NOT NULL,
+      amount DECIMAL(12,2) NOT NULL,
+      payment_date DATE NOT NULL,
+      payment_method VARCHAR(80) NOT NULL,
+      account_name VARCHAR(180) NULL,
+      reference VARCHAR(180) NULL,
+      notes TEXT NULL,
+      idempotency_key VARCHAR(80) NULL,
+      created_by INT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      voided_by INT NULL,
+      voided_at DATETIME NULL,
+      void_reason TEXT NULL,
+      UNIQUE KEY uniq_expense_payment_idempotency (idempotency_key),
+      INDEX idx_expense_payments_expense (expense_id, payment_date)
+    )
+  `);
 }
 
 exports.getDashboardStats = async (req, res) => {
@@ -132,55 +153,58 @@ exports.getDashboardStats = async (req, res) => {
       ORDER BY month_key ASC
     `, [fyStart, fyEnd, fyStart, fyEnd]);
 
-    const paidStatusSql = `LOWER(COALESCE(status, '')) IN ('paid', 'settled', 'complete', 'completed')`;
+    const paidStatusSql = `LOWER(COALESCE(e.status, '')) IN ('paid', 'settled', 'complete', 'completed', 'reimbursed', 'closed')`;
+    const paidAmountSql = `CASE WHEN COALESCE(p.payment_count, 0) > 0 THEN LEAST(e.total_amount, COALESCE(p.payment_total, 0)) WHEN ${paidStatusSql} THEN e.total_amount ELSE 0 END`;
+    const balanceDueSql = `GREATEST(e.total_amount - (${paidAmountSql}), 0)`;
+    const paymentJoinSql = `LEFT JOIN (SELECT expense_id, COUNT(*) AS payment_count, SUM(amount) AS payment_total FROM expense_payments WHERE voided_at IS NULL GROUP BY expense_id) p ON p.expense_id = e.id`;
     const [[supplierPayableSummary]] = await pool.query(`
       SELECT
         COUNT(*) AS bill_count,
-        COUNT(DISTINCT NULLIF(TRIM(supplier_name), '')) AS supplier_count,
-        COALESCE(SUM(CASE WHEN ${paidStatusSql} THEN total_amount ELSE 0 END), 0) AS paid_value,
-        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) THEN total_amount ELSE 0 END), 0) AS pending_value,
-        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) AND DATE_ADD(expense_date, INTERVAL 30 DAY) < CURDATE() THEN total_amount ELSE 0 END), 0) AS overdue_value,
-        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) AND DATE_ADD(expense_date, INTERVAL 30 DAY) >= CURDATE() THEN total_amount ELSE 0 END), 0) AS upcoming_value,
-        SUM(CASE WHEN NOT (${paidStatusSql}) THEN 1 ELSE 0 END) AS pending_count,
-        MIN(CASE WHEN NOT (${paidStatusSql}) THEN DATE_ADD(expense_date, INTERVAL 30 DAY) ELSE NULL END) AS next_due_date
-      FROM expenses
-      WHERE deleted = 0
-      AND expense_date BETWEEN ? AND ?
+        COUNT(DISTINCT NULLIF(TRIM(e.supplier_name), '')) AS supplier_count,
+        COALESCE(SUM(${paidAmountSql}), 0) AS paid_value,
+        COALESCE(SUM(${balanceDueSql}), 0) AS pending_value,
+        COALESCE(SUM(CASE WHEN ${balanceDueSql} > 0 AND COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) < CURDATE() THEN ${balanceDueSql} ELSE 0 END), 0) AS overdue_value,
+        COALESCE(SUM(CASE WHEN ${balanceDueSql} > 0 AND COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) >= CURDATE() THEN ${balanceDueSql} ELSE 0 END), 0) AS upcoming_value,
+        SUM(CASE WHEN ${balanceDueSql} > 0 THEN 1 ELSE 0 END) AS pending_count,
+        MIN(CASE WHEN ${balanceDueSql} > 0 THEN COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) ELSE NULL END) AS next_due_date
+      FROM expenses e
+      ${paymentJoinSql}
+      WHERE e.deleted = 0
+      AND e.expense_date BETWEEN ? AND ?
     `, [fyStart, fyEnd]);
 
     const [[nextSupplierPayment]] = await pool.query(`
       SELECT
-        COALESCE(NULLIF(TRIM(supplier_name), ''), 'Unassigned supplier') AS supplier_name,
-        category,
-        invoice_no,
-        total_amount,
-        expense_date,
-        DATE_ADD(expense_date, INTERVAL 30 DAY) AS due_date
-      FROM expenses
-      WHERE deleted = 0
-      AND expense_date BETWEEN ? AND ?
-      AND NOT (${paidStatusSql})
-      ORDER BY DATE_ADD(expense_date, INTERVAL 30 DAY) ASC, id ASC
+        COALESCE(NULLIF(TRIM(e.supplier_name), ''), 'Unassigned supplier') AS supplier_name,
+        e.category, e.invoice_no, e.total_amount, ${balanceDueSql} AS balance_due, e.expense_date,
+        COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) AS due_date
+      FROM expenses e
+      ${paymentJoinSql}
+      WHERE e.deleted = 0
+      AND e.expense_date BETWEEN ? AND ?
+      AND ${balanceDueSql} > 0
+      ORDER BY COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) ASC, e.id ASC
       LIMIT 1
     `, [fyStart, fyEnd]);
 
     const [supplierCategories] = await pool.query(`
       SELECT
         CASE
-          WHEN LOWER(COALESCE(category, '')) LIKE '%raw%' THEN 'Raw Material'
-          WHEN LOWER(COALESCE(category, '')) LIKE '%pack%' THEN 'Packaging'
-          WHEN LOWER(COALESCE(category, '')) LIKE '%fuel%' THEN 'Fuel'
-          WHEN LOWER(COALESCE(category, '')) LIKE '%machin%' THEN 'Machinery'
-          WHEN LOWER(COALESCE(category, '')) LIKE '%tool%' THEN 'Tools'
-          WHEN LOWER(COALESCE(category, '')) LIKE '%freight%' OR LOWER(COALESCE(category, '')) LIKE '%delivery%' THEN 'Freight'
-          ELSE COALESCE(NULLIF(TRIM(category), ''), 'Other')
+          WHEN LOWER(COALESCE(e.category, '')) LIKE '%raw%' THEN 'Raw Material'
+          WHEN LOWER(COALESCE(e.category, '')) LIKE '%pack%' THEN 'Packaging'
+          WHEN LOWER(COALESCE(e.category, '')) LIKE '%fuel%' THEN 'Fuel'
+          WHEN LOWER(COALESCE(e.category, '')) LIKE '%machin%' THEN 'Machinery'
+          WHEN LOWER(COALESCE(e.category, '')) LIKE '%tool%' THEN 'Tools'
+          WHEN LOWER(COALESCE(e.category, '')) LIKE '%freight%' OR LOWER(COALESCE(e.category, '')) LIKE '%delivery%' THEN 'Freight'
+          ELSE COALESCE(NULLIF(TRIM(e.category), ''), 'Other')
         END AS category,
         COUNT(*) AS bill_count,
-        COALESCE(SUM(CASE WHEN ${paidStatusSql} THEN total_amount ELSE 0 END), 0) AS paid_value,
-        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) THEN total_amount ELSE 0 END), 0) AS pending_value
-      FROM expenses
-      WHERE deleted = 0
-      AND expense_date BETWEEN ? AND ?
+        COALESCE(SUM(${paidAmountSql}), 0) AS paid_value,
+        COALESCE(SUM(${balanceDueSql}), 0) AS pending_value
+      FROM expenses e
+      ${paymentJoinSql}
+      WHERE e.deleted = 0
+      AND e.expense_date BETWEEN ? AND ?
       GROUP BY 1
       ORDER BY pending_value DESC, paid_value DESC
       LIMIT 8
@@ -188,14 +212,15 @@ exports.getDashboardStats = async (req, res) => {
 
     const [supplierExposure] = await pool.query(`
       SELECT
-        COALESCE(NULLIF(TRIM(supplier_name), ''), 'Unassigned supplier') AS supplier_name,
+        COALESCE(NULLIF(TRIM(e.supplier_name), ''), 'Unassigned supplier') AS supplier_name,
         COUNT(*) AS bill_count,
-        COALESCE(SUM(CASE WHEN ${paidStatusSql} THEN total_amount ELSE 0 END), 0) AS paid_value,
-        COALESCE(SUM(CASE WHEN NOT (${paidStatusSql}) THEN total_amount ELSE 0 END), 0) AS pending_value,
-        MIN(CASE WHEN NOT (${paidStatusSql}) THEN DATE_ADD(expense_date, INTERVAL 30 DAY) ELSE NULL END) AS next_due_date
-      FROM expenses
-      WHERE deleted = 0
-      AND expense_date BETWEEN ? AND ?
+        COALESCE(SUM(${paidAmountSql}), 0) AS paid_value,
+        COALESCE(SUM(${balanceDueSql}), 0) AS pending_value,
+        MIN(CASE WHEN ${balanceDueSql} > 0 THEN COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) ELSE NULL END) AS next_due_date
+      FROM expenses e
+      ${paymentJoinSql}
+      WHERE e.deleted = 0
+      AND e.expense_date BETWEEN ? AND ?
       GROUP BY 1
       ORDER BY pending_value DESC, paid_value DESC
       LIMIT 6
@@ -203,18 +228,17 @@ exports.getDashboardStats = async (req, res) => {
 
     const [upcomingSupplierPayments] = await pool.query(`
       SELECT
-        id,
-        COALESCE(NULLIF(TRIM(supplier_name), ''), 'Unassigned supplier') AS supplier_name,
-        COALESCE(NULLIF(TRIM(category), ''), 'Other') AS category,
-        invoice_no,
-        total_amount,
-        expense_date,
-        DATE_ADD(expense_date, INTERVAL 30 DAY) AS due_date
-      FROM expenses
-      WHERE deleted = 0
-      AND expense_date BETWEEN ? AND ?
-      AND NOT (${paidStatusSql})
-      ORDER BY DATE_ADD(expense_date, INTERVAL 30 DAY) ASC, total_amount DESC
+        e.id,
+        COALESCE(NULLIF(TRIM(e.supplier_name), ''), 'Unassigned supplier') AS supplier_name,
+        COALESCE(NULLIF(TRIM(e.category), ''), 'Other') AS category,
+        e.invoice_no, e.total_amount, ${balanceDueSql} AS balance_due, e.expense_date,
+        COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) AS due_date
+      FROM expenses e
+      ${paymentJoinSql}
+      WHERE e.deleted = 0
+      AND e.expense_date BETWEEN ? AND ?
+      AND ${balanceDueSql} > 0
+      ORDER BY COALESCE(e.due_date, DATE_ADD(e.expense_date, INTERVAL 30 DAY)) ASC, ${balanceDueSql} DESC
       LIMIT 6
     `, [fyStart, fyEnd]);
 
