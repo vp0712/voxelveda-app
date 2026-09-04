@@ -8,6 +8,7 @@ const {
   validateJournal,
   blockingIssues
 } = require('../services/financeDomain');
+const { paymentState, validatePaymentAmount } = require('../services/expensePaymentDomain');
 
 function issueCodes(result) {
   return result.issues.map((entry) => entry.code);
@@ -17,6 +18,25 @@ function run() {
   assert.equal(money.add('1,200.10', '99.90'), '1300.00');
   assert.equal(money.gstFromGross('1250.00', '10'), '113.64');
   assert.equal(money.percentageOf('1000.00', '10'), '100.00');
+
+  assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid', due_date: '2099-01-01' }), {
+    totalPaid: '0.00', balanceDue: '5000.00', status: 'unpaid'
+  });
+  assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'paid' }), {
+    totalPaid: '5000.00', balanceDue: '0.00', status: 'paid'
+  });
+  assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid', due_date: '2099-01-01' }, '2000.00', 1), {
+    totalPaid: '2000.00', balanceDue: '3000.00', status: 'partially_paid'
+  });
+  assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid', due_date: '2020-01-01' }, '2000.00', 1, '2026-01-01'), {
+    totalPaid: '2000.00', balanceDue: '3000.00', status: 'overdue'
+  });
+  assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid' }, '5000.00', 2), {
+    totalPaid: '5000.00', balanceDue: '0.00', status: 'paid'
+  });
+  assert.equal(validatePaymentAmount('3000', '3000'), '3000.00');
+  assert.throws(() => validatePaymentAmount('3000.01', '3000'), /cannot exceed/);
+  assert.throws(() => validatePaymentAmount('0', '3000'), /greater than zero/);
 
   assert.equal(dateOnly(new Date('2026-08-24T00:00:00.000Z')), '2026-08-24');
   assert.equal(dateOnly('2026-08-24T13:45:00.000Z'), '2026-08-24');
