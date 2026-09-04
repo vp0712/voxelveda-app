@@ -13,11 +13,11 @@ const {
 
 const router = express.Router();
 
-router.get('/', authMiddleware, requireRole('admin'), getUsers);
-router.post('/', authMiddleware, requireRole('admin'), createUser);
-router.post('/:id', authMiddleware, requireRole('admin'), updateUser);
-router.post('/:id/access', authMiddleware, requireRole('admin'), updateUserAccess);
-router.post('/:id/reset-password', authMiddleware, requireRole('admin'), resetUserPassword);
-router.delete('/:id', authMiddleware, requireRole('admin'), deleteUser);
+router.get('/', authMiddleware, requireRole('admin', 'super_admin'), getUsers);
+router.post('/', authMiddleware, requireRole('admin', 'super_admin'), createUser);
+router.post('/:id', authMiddleware, requireRole('admin', 'super_admin'), updateUser);
+router.post('/:id/access', authMiddleware, requireRole('admin', 'super_admin'), updateUserAccess);
+router.post('/:id/reset-password', authMiddleware, requireRole('admin', 'super_admin'), resetUserPassword);
+router.delete('/:id', authMiddleware, requireRole('admin', 'super_admin'), deleteUser);
 
 module.exports = router;

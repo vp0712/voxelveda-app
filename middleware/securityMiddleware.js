@@ -43,6 +43,7 @@ function rateLimit({ windowMs = WINDOW_MS, max = GENERAL_LIMIT, keyPrefix = 'glo
 
 function securityHeaders(req, res, next) {
   const requestId = req.headers['x-request-id'] || crypto.randomUUID();
+  req.requestId = String(requestId).slice(0, 80);
   res.setHeader('X-Request-Id', requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -80,6 +81,16 @@ function securityHeaders(req, res, next) {
   }
 
   next();
+}
+
+function csrfProtection(req, res, next) {
+  if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  const hasSessionCookie = String(req.headers.cookie || '').includes('vv_session=');
+  const hasBearer = String(req.headers.authorization || '').startsWith('Bearer ');
+  if (!hasSessionCookie || hasBearer) return next();
+  const origin = String(req.headers.origin || '');
+  if (origin && allowedOrigins().includes(origin)) return next();
+  return res.status(403).json({ message: 'Request origin could not be verified' });
 }
 
 function allowedOrigins() {
@@ -148,6 +159,7 @@ function authRateLimit() {
 module.exports = {
   authRateLimit,
   corsOptions,
+  csrfProtection,
   rateLimit,
   securityHeaders,
   safeErrorHandler

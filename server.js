@@ -10,6 +10,9 @@ if (result.error && process.env.NODE_ENV !== 'production') {
 
 console.log('Server starting...');
 
+const { validateSecurityEnvironment } = require('./config/security');
+validateSecurityEnvironment();
+
 const app = require('./app');
 const { isEmailConfigured, verifyConnection } = require('./services/emailService');
 const { processEmailQueue } = require('./services/emailQueue');
@@ -19,10 +22,8 @@ const {
   stopWeeklyTimesheetScheduler
 } = require('./services/weeklyTimesheetScheduler');
 
-try {
+if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') {
   require('./utils/seedAdmin')();
-} catch (err) {
-  console.error('Admin seed failed:', err.message);
 }
 
 const PORT = Number(process.env.PORT || 5001);

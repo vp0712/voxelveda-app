@@ -17,16 +17,21 @@ function parseCookies(header = '') {
 
 function getRequestToken(req) {
   const authHeader = String(req.headers.authorization || '');
-  if (authHeader.startsWith('Bearer ')) return authHeader.slice(7).trim();
+  if (authHeader.startsWith('Bearer ')) {
+    const bearer = authHeader.slice(7).trim();
+    if (bearer && bearer !== 'null' && bearer !== 'undefined') return bearer;
+  }
   const cookieToken = parseCookies(req.headers.cookie)[SESSION_COOKIE];
   if (cookieToken) return cookieToken;
-  // Temporary compatibility for existing invoice links. New links use cookies or headers.
-  return String(req.query?.token || '').trim();
+  if (process.env.NODE_ENV !== 'production' && process.env.ALLOW_LEGACY_QUERY_TOKENS === 'true') {
+    return String(req.query?.token || '').trim();
+  }
+  return '';
 }
 
-function expiresInMs(value = process.env.JWT_EXPIRES_IN || '30d') {
+function expiresInMs(value = process.env.JWT_EXPIRES_IN || '8h') {
   const match = String(value).trim().match(/^(\d+)([smhd])$/i);
-  if (!match) return 30 * 24 * 60 * 60 * 1000;
+  if (!match) return 8 * 60 * 60 * 1000;
   const units = { s: 1000, m: 60000, h: 3600000, d: 86400000 };
   return Number(match[1]) * units[match[2].toLowerCase()];
 }

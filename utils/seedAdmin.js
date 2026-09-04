@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
+const { validatePassword } = require('../services/passwordPolicy');
 
 async function seedAdmin() {
   try {
@@ -15,8 +16,12 @@ async function seedAdmin() {
     await pool.query(`ALTER TABLE users ADD COLUMN deleted_by INT NULL`).catch(() => {});
     await pool.query(`ALTER TABLE users ADD COLUMN deletion_reason VARCHAR(255) NULL`).catch(() => {});
 
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@test.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || '123456';
+    if (process.env.NODE_ENV === 'production') throw new Error('Admin bootstrap is prohibited in production');
+    const adminEmail = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+    const adminPassword = String(process.env.ADMIN_PASSWORD || '');
+    if (!adminEmail || !adminPassword) throw new Error('ADMIN_EMAIL and ADMIN_PASSWORD are required for explicit bootstrap');
+    const passwordCheck = validatePassword(adminPassword, { email: adminEmail, username: 'admin', name: 'Admin' });
+    if (!passwordCheck.valid) throw new Error(passwordCheck.errors[0]);
 
     const [existing] = await pool.query(
       'SELECT id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',

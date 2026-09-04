@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
 const { logAudit } = require('../services/auditService');
+const { ensureSecuritySchema } = require('../services/securitySchema');
+const { revokeUserSessions, logSecurityEvent } = require('../services/sessionService');
+const { validatePassword } = require('../services/passwordPolicy');
 
 const ALLOWED_ROLES = [
   'admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant',
@@ -78,9 +81,26 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
 
+function isSuperAdmin(req) {
+  return String(req.user?.role || '').toLowerCase() === 'super_admin';
+}
+
+async function assertRoleAuthority(req, targetUserId, requestedRole) {
+  if (requestedRole === 'super_admin' && !isSuperAdmin(req)) return 'Only a super administrator can grant that role';
+  if (Number(req.user.id) === Number(targetUserId) && requestedRole && requestedRole !== req.user.role) {
+    return 'You cannot change your own role';
+  }
+  if (targetUserId) {
+    const [[target]] = await pool.query('SELECT role FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [targetUserId]);
+    if (target?.role === 'super_admin' && !isSuperAdmin(req)) return 'Only a super administrator can manage that account';
+  }
+  return null;
+}
+
 exports.createUser = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
@@ -96,13 +116,14 @@ exports.createUser = async (req, res) => {
       return res.status(400).json({ message: 'Valid email address is required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
+    const passwordCheck = validatePassword(password, { email, username, name });
+    if (!passwordCheck.valid) return res.status(400).json({ message: passwordCheck.errors[0] });
 
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
+    const authorityError = await assertRoleAuthority(req, null, role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
 
     const [existing] = await pool.query(
       'SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1',
@@ -130,7 +151,7 @@ exports.createUser = async (req, res) => {
     console.error('createUser error:', error);
     res.status(500).json({
       message: 'Failed to create user',
-      error: error.message
+      request_id: req.requestId || null
     });
   }
 };
@@ -138,6 +159,7 @@ exports.createUser = async (req, res) => {
 exports.getUsers = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     const [rows] = await pool.query(
       `SELECT
         id,
@@ -173,14 +195,16 @@ exports.getUsers = async (req, res) => {
 exports.updateUserAccess = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     const userId = Number(req.params.id);
     const role = normalizeRole(req.body.role || 'staff');
     const active = req.body.active === undefined ? true : Boolean(req.body.active);
     const permissions = parsePermissions(req.body.permissions);
-
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
     }
+    const authorityError = await assertRoleAuthority(req, userId, role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
 
     if (Number(req.user.id) === userId && active === false) {
       return res.status(400).json({ message: 'You cannot disable your own account' });
@@ -201,12 +225,16 @@ exports.updateUserAccess = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    await revokeUserSessions(userId, 'ACCESS_CHANGED');
+    await pool.query('UPDATE users SET session_version = session_version + 1, account_status = ? WHERE id = ?', [active ? 'ACTIVE' : 'DISABLED', userId]);
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'ROLE_OR_PERMISSION_CHANGED', req });
+
     res.json({ message: 'User access updated successfully' });
   } catch (error) {
     console.error('updateUserAccess error:', error);
     res.status(500).json({
       message: 'Failed to update access',
-      error: error.message
+      request_id: req.requestId || null
     });
   }
 };
@@ -214,6 +242,7 @@ exports.updateUserAccess = async (req, res) => {
 exports.updateUser = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     const userId = Number(req.params.id);
     const name = String(req.body.name || '').trim();
     const username = String(req.body.username || '').trim().toLowerCase();
@@ -221,10 +250,11 @@ exports.updateUser = async (req, res) => {
     const role = normalizeRole(req.body.role || 'staff');
     const active = req.body.active === undefined ? true : Boolean(req.body.active);
     const permissions = parsePermissions(req.body.permissions);
-
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
     }
+    const authorityError = await assertRoleAuthority(req, userId, role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
 
     if (!name || !username || !email || !role) {
       return res.status(400).json({ message: 'Name, username, email and role are required' });
@@ -267,12 +297,15 @@ exports.updateUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    await revokeUserSessions(userId, 'ACCOUNT_CHANGED');
+    await pool.query('UPDATE users SET session_version = session_version + 1, account_status = ? WHERE id = ?', [active ? 'ACTIVE' : 'DISABLED', userId]);
+
     res.json({ message: 'Staff details updated successfully' });
   } catch (error) {
     console.error('updateUser error:', error);
     res.status(500).json({
       message: 'Failed to update staff details',
-      error: error.message
+      request_id: req.requestId || null
     });
   }
 };
@@ -280,6 +313,7 @@ exports.updateUser = async (req, res) => {
 exports.resetUserPassword = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     const userId = Number(req.params.id);
     const newPassword = String(req.body.password || '').trim();
 
@@ -287,9 +321,12 @@ exports.resetUserPassword = async (req, res) => {
       return res.status(400).json({ message: 'User ID and new password are required' });
     }
 
-    if (newPassword.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
+    const [[targetUser]] = await pool.query('SELECT id, name, username, email, role FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    if (!targetUser) return res.status(404).json({ message: 'User not found' });
+    const authorityError = await assertRoleAuthority(req, userId, targetUser.role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    const passwordCheck = validatePassword(newPassword, targetUser);
+    if (!passwordCheck.valid) return res.status(400).json({ message: passwordCheck.errors[0] });
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
@@ -297,7 +334,9 @@ exports.resetUserPassword = async (req, res) => {
       `UPDATE users
        SET password = ?,
            password_reset_required = 1,
-           last_password_reset_at = NOW()
+           last_password_reset_at = NOW(),
+           session_version = session_version + 1,
+           account_status = 'ACTIVE'
        WHERE id = ? AND deleted_at IS NULL`,
       [hashedPassword, userId]
     );
@@ -306,14 +345,17 @@ exports.resetUserPassword = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    await revokeUserSessions(userId, 'PASSWORD_RESET');
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'PASSWORD_RESET', req });
+
     res.json({
-      message: 'Password reset successfully. Share the new temporary password with the staff member.'
+      message: 'Temporary password set. Existing sessions were revoked and the user must change it at next sign-in.'
     });
   } catch (error) {
     console.error('resetUserPassword error:', error);
     res.status(500).json({
       message: 'Failed to reset password',
-      error: error.message
+      request_id: req.requestId || null
     });
   }
 };
@@ -333,6 +375,7 @@ exports.deleteUser = async (req, res) => {
   let connection;
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     await ensureWorkforceSchema();
     connection = await pool.getConnection();
     await connection.beginTransaction();
@@ -348,6 +391,11 @@ exports.deleteUser = async (req, res) => {
     if (!target) {
       await connection.rollback();
       return res.status(404).json({ message: 'User account not found' });
+    }
+
+    if (target.role === 'super_admin' && !isSuperAdmin(req)) {
+      await connection.rollback();
+      return res.status(403).json({ message: 'Only a super administrator can manage that account' });
     }
 
     if (String(target.role || '').toLowerCase() === 'admin') {
@@ -402,6 +450,8 @@ exports.deleteUser = async (req, res) => {
     });
 
     await connection.commit();
+    await revokeUserSessions(userId, 'ACCOUNT_TERMINATED');
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'USER_TERMINATED', req });
     return res.json({
       message: 'User account deleted. Login access was removed and historical records were preserved.'
     });
