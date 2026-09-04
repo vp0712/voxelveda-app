@@ -1,9 +1,12 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const pool = require('../config/db');
 const { getRequestToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
-const { revoke } = require('../utils/tokenRevocation');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
+const { ensureSecuritySchema } = require('../services/securitySchema');
+const { createSession, revokeSession, logSecurityEvent } = require('../services/sessionService');
+const { validatePassword } = require('../services/passwordPolicy');
 
 function normalizeRole(role) {
   return String(role || 'staff').trim().toLowerCase();
@@ -35,7 +38,12 @@ function publicUsernameFromEmail(email) {
   return `${base}_${String(Date.now()).slice(-5)}`;
 }
 
-function createToken(user) {
+function sessionDuration(role) {
+  const privileged = ['super_admin', 'admin', 'finance_admin', 'accountant'].includes(normalizeRole(role));
+  return privileged ? (process.env.PRIVILEGED_SESSION_EXPIRES_IN || '2h') : (process.env.JWT_EXPIRES_IN || '8h');
+}
+
+function createToken(user, sessionId) {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET is missing in .env');
   }
@@ -46,16 +54,18 @@ function createToken(user) {
       email: user.email,
       username: user.username,
       role: normalizeRole(user.role),
-      permissions: parsePermissions(user.permissions)
+      permissions: parsePermissions(user.permissions),
+      session_version: Number(user.session_version || 1)
     },
     process.env.JWT_SECRET,
-    { expiresIn: process.env.JWT_EXPIRES_IN || '30d' }
+    { expiresIn: sessionDuration(user.role), jwtid: sessionId }
   );
 }
 
 exports.login = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
 
@@ -64,7 +74,8 @@ exports.login = async (req, res) => {
     }
 
     const [rows] = await pool.query(
-      `SELECT id, name, username, email, password, role, permissions, active
+      `SELECT id, name, username, email, password, role, permissions, active,
+              account_status, failed_login_count, locked_until, session_version
        FROM users
        WHERE (LOWER(email) = ? OR LOWER(username) = ?)
          AND deleted_at IS NULL
@@ -73,18 +84,28 @@ exports.login = async (req, res) => {
     );
 
     if (!rows.length) {
+      await logSecurityEvent({ eventType: 'LOGIN_FAILURE', result: 'DENIED', req, metadata: { reason: 'INVALID_CREDENTIALS' } });
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     const user = rows[0];
 
-    if (Number(user.active) === 0) {
-      return res.status(403).json({ message: 'Account disabled. Contact admin.' });
+    const blockedStates = ['LOCKED', 'SUSPENDED', 'DISABLED', 'TERMINATED'];
+    if (Number(user.active) === 0 || blockedStates.includes(String(user.account_status || '').toUpperCase()) || (user.locked_until && new Date(user.locked_until) > new Date())) {
+      await logSecurityEvent({ targetUserId: user.id, eventType: 'LOGIN_FAILURE', result: 'DENIED', req, metadata: { reason: 'ACCOUNT_UNAVAILABLE' } });
+      return res.status(401).json({ message: 'Invalid email or password' });
     }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
 
     if (!passwordMatch) {
+      const attempts = Number(user.failed_login_count || 0) + 1;
+      const lockMinutes = attempts >= 10 ? Math.min(60, Math.pow(2, Math.floor((attempts - 10) / 2))) : 0;
+      await pool.query(
+        'UPDATE users SET failed_login_count = ?, locked_until = IF(? > 0, DATE_ADD(NOW(), INTERVAL ? MINUTE), locked_until) WHERE id = ?',
+        [attempts, lockMinutes, lockMinutes, user.id]
+      );
+      await logSecurityEvent({ targetUserId: user.id, eventType: 'LOGIN_FAILURE', result: 'DENIED', req, metadata: { reason: 'INVALID_CREDENTIALS', temporary_lock: lockMinutes > 0 } });
       return res.status(401).json({ message: 'Invalid email or password' });
     }
 
@@ -94,10 +115,23 @@ exports.login = async (req, res) => {
       username: user.username || user.email,
       email: user.email,
       role: normalizeRole(user.role),
-      permissions: parsePermissions(user.permissions)
+      permissions: parsePermissions(user.permissions),
+      session_version: Number(user.session_version || 1)
     };
 
-    const token = createToken(cleanUser);
+    const sessionId = crypto.randomUUID();
+    const token = createToken(cleanUser, sessionId);
+    const decoded = jwt.decode(token);
+    await createSession({
+      id: sessionId,
+      token,
+      userId: user.id,
+      sessionVersion: cleanUser.session_version,
+      expiresAt: new Date(Number(decoded.exp) * 1000),
+      req
+    });
+    await pool.query('UPDATE users SET failed_login_count = 0, locked_until = NULL, last_login_at = NOW() WHERE id = ?', [user.id]);
+    await logSecurityEvent({ actorId: user.id, targetUserId: user.id, sessionId, eventType: 'LOGIN_SUCCESS', req });
 
     setSessionCookie(req, res, token);
 
@@ -117,6 +151,7 @@ exports.login = async (req, res) => {
 exports.register = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
@@ -132,9 +167,8 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'Valid email address is required' });
     }
 
-    if (password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters' });
-    }
+    const passwordCheck = validatePassword(password, { email, username, name });
+    if (!passwordCheck.valid) return res.status(400).json({ message: passwordCheck.errors[0] });
 
     const allowedRoles = ['admin', 'staff', 'sales', 'production', 'viewer'];
 
@@ -262,7 +296,7 @@ exports.customerRegister = async (req, res) => {
 
 exports.logout = async (req, res) => {
   const token = getRequestToken(req);
-  if (token) revoke(token);
+  if (token) await revokeSession(token, 'LOGOUT').catch(() => {});
   clearSessionCookie(req, res);
   return res.json({ message: 'Logout successful' });
 };

@@ -32,6 +32,7 @@ const pageAuth = require('./middleware/pageAuth');
 const urls = require('./config/urls');
 const {
   corsOptions,
+  csrfProtection,
   rateLimit,
   securityHeaders,
   safeErrorHandler
@@ -58,6 +59,7 @@ app.use(cors(corsOptions()));
 app.use(rateLimit());
 app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: process.env.FORM_BODY_LIMIT || '1mb' }));
+app.use(csrfProtection);
 
 app.get('/api/health', (req, res) => {
   res.json({

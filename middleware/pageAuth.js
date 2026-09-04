@@ -2,8 +2,9 @@ const path = require('path');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getRequestToken, safeReturnTo } = require('../utils/session');
-const { isRevoked } = require('../utils/tokenRevocation');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
+const { ensureSecuritySchema } = require('../services/securitySchema');
+const { validateSession } = require('../services/sessionService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -25,18 +26,22 @@ function pageAuth({ adminOnly = false, workspaceOnly = false } = {}) {
   return async (req, res, next) => {
     try {
       const token = getRequestToken(req);
-      if (!token || isRevoked(token) || !process.env.JWT_SECRET) return redirectToLogin(req, res);
+      if (!token || !process.env.JWT_SECRET) return redirectToLogin(req, res);
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       await ensureUserLifecycleSchema();
+      await ensureSecuritySchema();
+      const session = await validateSession(token, decoded);
+      if (!session) return redirectToLogin(req, res);
       const [[user]] = await pool.query(
-        `SELECT id, email, username, role, permissions, active
+        `SELECT id, email, username, role, permissions, active, account_status, session_version
          FROM users
          WHERE id = ? AND deleted_at IS NULL
          LIMIT 1`,
         [decoded.id]
       );
-      if (!user || Number(user.active) === 0) return redirectToLogin(req, res);
+      const blocked = ['LOCKED', 'SUSPENDED', 'DISABLED', 'TERMINATED'];
+      if (!user || Number(user.active) === 0 || blocked.includes(String(user.account_status).toUpperCase()) || Number(user.session_version) !== Number(session.session_version)) return redirectToLogin(req, res);
 
       const role = String(user.role || decoded.role || 'staff').trim().toLowerCase();
       const permissions = parsePermissions(user.permissions);

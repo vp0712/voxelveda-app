@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
 const { getRequestToken } = require('../utils/session');
-const { isRevoked } = require('../utils/tokenRevocation');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
+const { ensureSecuritySchema } = require('../services/securitySchema');
+const { validateSession } = require('../services/sessionService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -26,10 +27,6 @@ module.exports = async (req, res, next) => {
       });
     }
 
-    if (isRevoked(token)) {
-      return res.status(401).json({ message: 'Session has ended. Please sign in again.' });
-    }
-
     if (!process.env.JWT_SECRET) {
       return res.status(500).json({
         message: 'JWT_SECRET missing in server .env'
@@ -39,16 +36,20 @@ module.exports = async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
     await ensureUserLifecycleSchema();
+    await ensureSecuritySchema();
+    const session = await validateSession(token, decoded);
+    if (!session) return res.status(401).json({ message: 'Session has ended. Please sign in again.' });
 
     const [[freshUser]] = await pool.query(
-      `SELECT id, email, username, role, permissions, active
+      `SELECT id, email, username, role, permissions, active, account_status, session_version
        FROM users
        WHERE id = ? AND deleted_at IS NULL
        LIMIT 1`,
       [decoded.id]
     );
 
-    if (!freshUser || Number(freshUser.active) === 0) {
+    const blocked = ['LOCKED', 'SUSPENDED', 'DISABLED', 'TERMINATED'];
+    if (!freshUser || Number(freshUser.active) === 0 || blocked.includes(String(freshUser.account_status).toUpperCase()) || Number(freshUser.session_version) !== Number(session.session_version)) {
       return res.status(401).json({
         message: 'Account disabled or no longer available'
       });
@@ -61,6 +62,7 @@ module.exports = async (req, res, next) => {
       role: String(freshUser.role || decoded.role || 'staff').trim().toLowerCase(),
       permissions: parsePermissions(freshUser.permissions)
     };
+    req.session = { id: session.id, assuranceLevel: Number(session.assurance_level || 1) };
 
     next();
   } catch (err) {
