@@ -1,0 +1,3 @@
+@media (max-width: 760px) {
+  .expense-table-wrap table { min-width: 1180px; }
+}
