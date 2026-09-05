@@ -65,7 +65,7 @@ async function run() {
 
     console.log('Checking private files and API errors...');
     const upload = await request(base, '/uploads/private-test.pdf');
-    if (upload.status !== 401) throw new Error(`anonymous upload returned ${upload.status}`);
+    if (upload.status !== 404) throw new Error(`retired raw upload route returned ${upload.status}`);
     const missingApi = await request(base, '/api/not-a-real-route');
     if (missingApi.status !== 404 || !String(missingApi.headers.get('content-type')).includes('application/json')) {
       throw new Error('unknown API route did not return JSON 404');
