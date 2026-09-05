@@ -1,0 +1,44 @@
+.step-up-backdrop[hidden] { display: none !important; }
+.step-up-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(2, 8, 18, .82);
+  backdrop-filter: blur(8px);
+}
+.step-up-panel {
+  width: min(100%, 520px);
+  padding: 28px;
+  border: 1px solid rgba(56, 189, 248, .32);
+  border-radius: 18px;
+  background: #071525;
+  color: #e7f2fb;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .5);
+}
+.step-up-panel h2 { margin: 6px 0 10px; font-size: clamp(1.35rem, 4vw, 1.9rem); }
+.step-up-panel > p:not(.step-up-eyebrow) { color: #a9bdcc; line-height: 1.5; }
+.step-up-eyebrow { margin: 0; color: #38bdf8; font-size: .75rem; font-weight: 800; letter-spacing: .16em; }
+.step-up-review { margin: 20px 0; border: 1px solid #20364a; border-radius: 12px; overflow: hidden; }
+.step-up-review div { display: grid; grid-template-columns: 42% 1fr; gap: 12px; padding: 11px 14px; border-bottom: 1px solid #20364a; }
+.step-up-review div:last-child { border-bottom: 0; }
+.step-up-review dt { color: #91a7b8; }
+.step-up-review dd { margin: 0; font-weight: 700; }
+.step-up-required { color: #fbbf24; }
+.step-up-panel label { display: grid; gap: 7px; margin: 14px 0; color: #c9dae6; font-weight: 700; }
+.step-up-panel input { width: 100%; box-sizing: border-box; padding: 12px 13px; border: 1px solid #31506a; border-radius: 10px; background: #0b2135; color: #fff; }
+.step-up-panel input:focus { outline: 2px solid #38bdf8; outline-offset: 1px; }
+.step-up-status { min-height: 22px; color: #fca5a5; }
+.step-up-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.step-up-actions button { padding: 11px 16px; border-radius: 10px; border: 1px solid #31506a; font-weight: 800; cursor: pointer; }
+.step-up-cancel { background: transparent; color: #c9dae6; }
+.step-up-confirm { background: #0ea5e9; border-color: #0ea5e9 !important; color: #03121e; }
+.step-up-confirm:disabled { opacity: .55; cursor: wait; }
+@media (max-width: 560px) {
+  .step-up-panel { padding: 21px; }
+  .step-up-review div { grid-template-columns: 1fr; gap: 3px; }
+  .step-up-actions { flex-direction: column-reverse; }
+  .step-up-actions button { width: 100%; }
+}

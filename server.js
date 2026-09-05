@@ -17,6 +17,7 @@ const app = require('./app');
 const { isEmailConfigured, verifyConnection } = require('./services/emailService');
 const { processEmailQueue } = require('./services/emailQueue');
 const { ensureFinanceSchema } = require('./services/financeSchema');
+const { ensureSecuritySchema } = require('./services/securitySchema');
 const {
   startWeeklyTimesheetScheduler,
   stopWeeklyTimesheetScheduler
@@ -36,6 +37,10 @@ const server = app.listen(PORT, HOST, () => {
 ensureFinanceSchema()
   .then(() => console.log('Finance foundation schema ready.'))
   .catch((error) => console.error('Finance schema initialization failed:', error.message));
+
+ensureSecuritySchema()
+  .then(() => console.log('Security schema ready.'))
+  .catch((error) => console.error('Security schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {

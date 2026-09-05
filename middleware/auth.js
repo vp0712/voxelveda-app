@@ -63,7 +63,12 @@ module.exports = async (req, res, next) => {
       role: String(freshUser.role || decoded.role || 'staff').trim().toLowerCase(),
       permissions: parsePermissions(freshUser.permissions)
     };
-    req.session = { id: session.id, assuranceLevel: Number(session.assurance_level || 1) };
+    req.session = {
+      id: session.id,
+      assuranceLevel: Number(session.assurance_level || 1),
+      stepUpVerifiedAt: session.step_up_verified_at || null,
+      stepUpMethod: session.step_up_method || null
+    };
 
     const mfaRequired = requiresMfa(req.user.role) || Number(freshUser.mfa_enabled) === 1;
     if (mfaRequired && req.session.assuranceLevel < 2) {
