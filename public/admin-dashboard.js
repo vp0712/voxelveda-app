@@ -4970,25 +4970,27 @@ async function loadStaff() {
       key: 'staff',
       tbody,
       rows: users,
-      colspan: 8,
+      colspan: 9,
       emptyMessage: 'No staff users found.',
       onChange: loadStaff,
       rowRenderer: (u) => `
         <tr>
-          <td>${escapeHtml(u.id)}</td>
+          <td><strong>${escapeHtml(u.employee_number || `VV-${String(u.id).padStart(6, '0')}`)}</strong><small class="user-uuid">${escapeHtml(u.user_uuid || '')}</small></td>
           <td>${escapeHtml(u.name)}</td>
           <td>${escapeHtml(u.username || '-')}</td>
           <td>${escapeHtml(u.email)}</td>
           <td>${escapeHtml(u.role)}</td>
           <td>${escapeHtml(String(u.role).toLowerCase() === 'admin' ? 'All sections' : accessLabels(parseAccess(u.permissions)).join(', ') || 'No extra access')}</td>
-          <td>${statusBadge(u.active ? 'active' : 'disabled')}</td>
+          <td>${statusBadge(String(u.account_status || (u.active ? 'ACTIVE' : 'DISABLED')).toLowerCase())}</td>
+          <td><span class="security-posture ${u.mfa_enabled ? 'secure' : 'warning'}">${u.mfa_enabled ? 'MFA' : 'No MFA'}</span><small>${Number(u.active_session_count || 0)} sessions</small></td>
           <td>
             <div class="staff-account-actions">
               <button class="small-btn" onclick="openEditStaffDialog(${u.id})">Edit</button>
               <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
               <button class="secondary-btn" onclick="openPasswordResetDialog(${u.id})">Reset Password</button>
+              ${Number(u.id) === Number(currentUser.id) ? '' : `<button class="secondary-btn" onclick="openUserSecurityDialog(${u.id})">Security Actions</button>`}
               ${hasCurrentPermission('VIEW_PAYROLL_BANKING') ? `<button class="secondary-btn" onclick="openBankDetailDialog('EMPLOYEE', ${u.id})">Payroll Bank</button>` : ''}
-              ${Number(u.id) === Number(currentUser.id) ? '' : `<button class="danger-btn" onclick="openDeleteStaffDialog(${u.id})">Delete Account</button>`}
+              ${Number(u.id) === Number(currentUser.id) ? '' : `<button class="danger-btn" onclick="openTerminateStaffDialog(${u.id})">Terminate Access</button>`}
             </div>
           </td>
         </tr>
@@ -5654,6 +5656,9 @@ async function openAccessDialog(userId) {
       </label>
       <h4>Allowed Sections</h4>
       ${accessCheckboxes(parseAccess(user.permissions))}
+      <section id="permissionDifferencePreview" class="permission-difference-preview" aria-live="polite">
+        <strong>Permission difference</strong><p>Change the role or grants to preview access added and removed.</p>
+      </section>
       <label class="form-field">
         <span>Reason</span>
         <input id="dialogAccessReason" maxlength="255" placeholder="Why is this access changing?" />
@@ -5691,6 +5696,21 @@ async function openAccessDialog(userId) {
     'Update Access'
   );
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'staff-access-dialog');
+  const refreshPreview = async () => {
+    const role = document.getElementById('dialogAccessRole')?.value || 'staff';
+    const permissions = collectAccess();
+    const target = document.getElementById('permissionDifferencePreview');
+    if (!target) return;
+    const previewRes = await fetch(`/api/users/${userId}/access/preview`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ role, permissions }) });
+    const preview = await safeJson(previewRes);
+    if (!previewRes.ok) { target.innerHTML = `<strong>Permission difference</strong><p>${escapeHtml(preview.message || 'Preview unavailable')}</p>`; return; }
+    const added = (preview.added || []).map((item) => `<li>+ ${escapeHtml(item)}${(preview.high_risk_added || []).includes(item) ? ' <b>HIGH RISK</b>' : ''}</li>`).join('') || '<li>None</li>';
+    const removed = (preview.removed || []).map((item) => `<li>− ${escapeHtml(item)}</li>`).join('') || '<li>None</li>';
+    target.innerHTML = `<strong>Permission difference</strong><div><span>Added</span><ul>${added}</ul><span>Removed</span><ul>${removed}</ul></div>`;
+  };
+  document.getElementById('dialogAccessRole')?.addEventListener('change', refreshPreview);
+  document.querySelectorAll('.dialog-panel input[type="checkbox"]').forEach((input) => input.addEventListener('change', refreshPreview));
+  refreshPreview();
 }
 
 async function openPasswordResetDialog(userId) {
@@ -5723,7 +5743,7 @@ async function openPasswordResetDialog(userId) {
   );
 }
 
-function openDeleteStaffDialog(userId) {
+function openTerminateStaffDialog(userId) {
   const user = staffCache.find((item) => Number(item.id) === Number(userId));
   if (!user) {
     showToast('User not found');
@@ -5731,47 +5751,90 @@ function openDeleteStaffDialog(userId) {
   }
 
   showDialog(
-    `Delete Account: ${user.name || user.email}`,
+    `Terminate Access: ${user.name || user.email}`,
     `
       <div class="account-delete-warning">
-        <strong>This permanently removes login access.</strong>
-        <p>The account will disappear from Staff Management. Existing timesheets, approvals, stock records and audit history will remain linked to an anonymous system ID.</p>
+        <strong>This immediately terminates every form of access.</strong>
+        <p>The account remains visible for audit and historical records. Sessions, invitations, API tokens and trusted devices are revoked.</p>
       </div>
       <label class="form-field">
-        <span>Reason (optional)</span>
+        <span>Termination reason</span>
         <textarea id="deleteStaffReason" rows="3" placeholder="Employment ended, duplicate account, account created in error"></textarea>
       </label>
       <label class="form-field">
-        <span>Type DELETE to confirm</span>
-        <input id="deleteStaffConfirmation" autocomplete="off" placeholder="DELETE" />
+        <span>Type TERMINATE to confirm</span>
+        <input id="deleteStaffConfirmation" autocomplete="off" placeholder="TERMINATE" />
       </label>
     `,
     async () => {
       const confirmation = document.getElementById('deleteStaffConfirmation')?.value.trim();
       const reason = document.getElementById('deleteStaffReason')?.value.trim();
-      if (confirmation !== 'DELETE') {
-        showToast('Type DELETE to confirm account deletion');
+      if (confirmation !== 'TERMINATE' || !reason) {
+        showToast('Enter a reason and type TERMINATE');
         return;
       }
 
-      const res = await fetch(`/api/users/${Number(userId)}`, {
-        method: 'DELETE',
+      const res = await fetch(`/api/users/${Number(userId)}/account-state`, {
+        method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ reason })
+        body: JSON.stringify({ state: 'TERMINATED', reason })
       });
       const data = await safeJson(res);
       if (!res.ok) {
-        showToast(data.message || 'Account deletion failed');
+        showToast(data.message || 'Account termination failed');
         return;
       }
 
       hideDialog();
-      showToast(data.message || 'User account deleted');
+      showToast(data.message || 'User access terminated');
       await loadStaff();
     },
-    'Delete Account'
+    'Terminate Access'
   );
   document.querySelector('.dialog-panel')?.classList.add('account-delete-dialog');
+}
+
+async function runUserSecurityAction(userId, action) {
+  const reason = document.getElementById('userSecurityReason')?.value.trim();
+  if (!reason) { showToast('Enter a security reason'); return; }
+  const actions = {
+    revoke_sessions: { url: `/api/users/${userId}/revoke-sessions`, body: { reason } },
+    compromise: { url: `/api/users/${userId}/compromised`, body: { reason } },
+    revoke_invite: { url: `/api/users/${userId}/revoke-invitation`, body: { reason } },
+    suspend: { url: `/api/users/${userId}/account-state`, body: { state: 'SUSPENDED', reason } },
+    activate: { url: `/api/users/${userId}/account-state`, body: { state: 'ACTIVE', reason } },
+    review: { url: `/api/users/${userId}/access-review`, body: { decision: 'APPROVED', reason } }
+  };
+  const selected = actions[action];
+  if (!selected) return;
+  const res = await fetch(selected.url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(selected.body) });
+  const data = await safeJson(res);
+  if (!res.ok) { showToast(data.message || 'Security action failed'); return; }
+  hideDialog();
+  showToast(data.message || 'Security action completed');
+  await loadStaff();
+}
+
+function openUserSecurityDialog(userId) {
+  const user = staffCache.find((item) => Number(item.id) === Number(userId));
+  if (!user) { showToast('User not found'); return; }
+  showDialog(`Security Actions: ${user.name || user.email}`, `
+    <div class="security-action-summary">
+      <strong>${escapeHtml(user.employee_number || `VV-${String(user.id).padStart(6, '0')}`)}</strong>
+      <span>${escapeHtml(user.account_status || 'ACTIVE')} · ${user.mfa_enabled ? 'MFA enabled' : 'MFA not enabled'} · ${Number(user.active_session_count || 0)} active sessions</span>
+    </div>
+    <label class="form-field"><span>Mandatory reason</span><textarea id="userSecurityReason" rows="3" maxlength="500" placeholder="Incident, employment change, periodic review or administrator request"></textarea></label>
+    <div class="security-action-grid">
+      <button type="button" class="secondary-btn" onclick="runUserSecurityAction(${userId}, 'revoke_sessions')">Revoke Sessions</button>
+      <button type="button" class="secondary-btn" onclick="runUserSecurityAction(${userId}, 'revoke_invite')">Revoke Invitation</button>
+      <button type="button" class="secondary-btn" onclick="runUserSecurityAction(${userId}, 'review')">Record Access Review</button>
+      <button type="button" class="secondary-btn" onclick="runUserSecurityAction(${userId}, 'activate')">Reactivate</button>
+      <button type="button" class="danger-btn" onclick="runUserSecurityAction(${userId}, 'suspend')">Suspend Account</button>
+      <button type="button" class="danger-btn" onclick="runUserSecurityAction(${userId}, 'compromise')">Mark Compromised</button>
+    </div>
+    <p class="status-note">Mark Compromised revokes every session, invitation, reset token, API token, trusted device, MFA enrollment and recovery code.</p>
+  `, hideDialog, 'Close');
+  document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'security-action-dialog');
 }
 
 async function loadSettings() {

@@ -10,6 +10,11 @@ const { issueToken, revokeUserActionTokens } = require('../services/authActionTo
 const { queueSecurityLink } = require('../services/securityEmailService');
 const { HIGH_RISK_PERMISSIONS, LEGACY_PERMISSION_MAP, PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
 const { canonicalPermission, hasPermission } = require('../services/authorizationService');
+const {
+  ACCOUNT_STATES, permissionDifference, revokeEveryCredential, transitionAccount
+} = require('../services/userSecurityService');
+
+const PRIVILEGED_MFA_ROLES = new Set(['super_admin', 'admin', 'finance_admin', 'accountant', 'hr']);
 
 const ALLOWED_ROLES = [
   'admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant',
@@ -197,7 +202,10 @@ exports.createUser = async (req, res) => {
       [name, username, email, disabledPassword, role, JSON.stringify(permissions), department, managerId, JSON.stringify(accessScope)]
     );
 
-    await pool.query("UPDATE users SET account_status = 'INVITED' WHERE id = ?", [result.insertId]);
+    await pool.query(
+      "UPDATE users SET account_status = 'INVITED', user_uuid = COALESCE(user_uuid, UUID()), employee_number = COALESCE(employee_number, CONCAT('VV-', LPAD(id, 6, '0'))) WHERE id = ?",
+      [result.insertId]
+    );
     const inviteToken = await issueToken({ userId: result.insertId, type: 'INVITE', minutes: 1440, createdBy: req.user.id });
     let invitationDelivered = true;
     try {
@@ -229,6 +237,8 @@ exports.getUsers = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT
         id,
+        user_uuid,
+        employee_number,
         name,
         username,
         email,
@@ -244,6 +254,11 @@ exports.getUsers = async (req, res) => {
         last_login_at,
         password_reset_required,
         last_password_reset_at
+        ,created_at
+        ,last_password_change_at
+        ,last_security_review_at
+        ,security_compromised_at
+        ,(SELECT COUNT(*) FROM auth_sessions s WHERE s.user_id = users.id AND s.revoked_at IS NULL AND s.expires_at > NOW()) AS active_session_count
       FROM users
       WHERE deleted_at IS NULL
       ORDER BY id ASC`
@@ -272,6 +287,25 @@ exports.getPermissionCatalog = (req, res) => {
     high_risk_permissions: [...HIGH_RISK_PERMISSIONS],
     role_templates: ROLE_TEMPLATES
   });
+};
+
+exports.previewPermissionDifference = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const role = normalizeRole(req.body.role);
+    const overrides = parsePermissions(req.body.permissions);
+    if (!userId || !ALLOWED_ROLES.includes(role)) return res.status(400).json({ message: 'Valid user and role are required' });
+    const [[target]] = await pool.query('SELECT role, permissions FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    const authorityError = await assertRoleAuthority(req, userId, role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    const previous = [...new Set([...(ROLE_TEMPLATES[normalizeRole(target.role)] || []), ...parsePermissions(target.permissions)])];
+    const proposed = [...new Set([...(ROLE_TEMPLATES[role] || []), ...overrides])];
+    return res.json({ current_role: normalizeRole(target.role), proposed_role: role, ...permissionDifference(previous, proposed), high_risk_added: permissionDifference(previous, proposed).added.filter((item) => HIGH_RISK_PERMISSIONS.has(item)) });
+  } catch (error) {
+    console.error('previewPermissionDifference error:', error.message);
+    return res.status(500).json({ message: 'Unable to preview access change' });
+  }
 };
 
 exports.updateUserAccess = async (req, res) => {
@@ -307,10 +341,14 @@ exports.updateUserAccess = async (req, res) => {
     }
 
     const [[before]] = await pool.query(
-      'SELECT role, permissions, active FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      'SELECT role, permissions, active, mfa_enabled, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [userId]
     );
     if (!before) return res.status(404).json({ message: 'User not found' });
+    const accessDifference = permissionDifference(
+      [...new Set([...(ROLE_TEMPLATES[normalizeRole(before.role)] || []), ...parsePermissions(before.permissions)])],
+      [...new Set([...(ROLE_TEMPLATES[role] || []), ...permissions])]
+    );
 
     const [result] = await pool.query(
       `UPDATE users
@@ -324,8 +362,11 @@ exports.updateUserAccess = async (req, res) => {
     }
 
     await revokeUserSessions(userId, 'ACCESS_CHANGED');
-    if (!active) await revokeUserActionTokens(userId);
-    await pool.query("UPDATE users SET session_version = session_version + 1, account_status = CASE WHEN account_status = 'INVITED' AND ? = 1 THEN 'INVITED' ELSE ? END WHERE id = ?", [active ? 1 : 0, active ? 'ACTIVE' : 'DISABLED', userId]);
+    if (!active) await revokeEveryCredential(pool, userId, 'ACCESS_DISABLED');
+    const nextAccountStatus = !active
+      ? 'DISABLED'
+      : (before.account_status === 'INVITED' ? 'INVITED' : (PRIVILEGED_MFA_ROLES.has(role) && Number(before.mfa_enabled) !== 1 ? 'MFA_SETUP_REQUIRED' : 'ACTIVE'));
+    await pool.query('UPDATE users SET session_version = session_version + 1, account_status = ? WHERE id = ?', [nextAccountStatus, userId]);
     await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'ROLE_OR_PERMISSION_CHANGED', req });
     await logAudit(pool, {
       actorId: req.user.id,
@@ -339,13 +380,121 @@ exports.updateUserAccess = async (req, res) => {
       userAgent: req.get('user-agent')
     });
 
-    res.json({ message: 'User access updated successfully' });
+    res.json({ message: 'User access updated successfully', permission_difference: accessDifference });
   } catch (error) {
     console.error('updateUserAccess error:', error);
     res.status(500).json({
       message: 'Failed to update access',
       request_id: req.requestId || null
     });
+  }
+};
+
+exports.changeAccountState = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const state = String(req.body.state || '').toUpperCase();
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!userId || !ACCOUNT_STATES.includes(state)) return res.status(400).json({ message: 'Valid user and account state are required' });
+    if (Number(req.user.id) === userId) return res.status(403).json({ message: 'You cannot change your own account state' });
+    const [[target]] = await pool.query('SELECT role FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    const authorityError = await assertRoleAuthority(req, userId, target.role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    if (normalizeRole(target.role) === 'super_admin' && ['LOCKED', 'SUSPENDED', 'DISABLED', 'TERMINATED'].includes(state)) {
+      const [[remaining]] = await pool.query("SELECT COUNT(*) AS total FROM users WHERE role = 'super_admin' AND active = 1 AND deleted_at IS NULL");
+      if (Number(remaining.total || 0) <= 1) return res.status(409).json({ message: 'The last active super administrator cannot be disabled or terminated' });
+    }
+    if (state === 'TERMINATED' && !hasPermission(req.user, 'MANAGE_ROLES')) return res.status(403).json({ message: 'Role-management permission is required to terminate access' });
+    const result = await transitionAccount({ actorId: req.user.id, targetUserId: userId, state, reason, req });
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: `USER_${state}`, req, metadata: { previous_state: result.before.account_status, reason } });
+    return res.json({ message: `Account state changed to ${state}.`, state, sessions_revoked: state !== 'ACTIVE' });
+  } catch (error) {
+    console.error('changeAccountState error:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Account state could not be changed' });
+  }
+};
+
+exports.markAccountCompromised = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!userId || !reason) return res.status(400).json({ message: 'User and incident reason are required' });
+    if (Number(req.user.id) === userId) return res.status(403).json({ message: 'Use another authorised administrator for your own compromised account' });
+    const [[target]] = await pool.query('SELECT role FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    const authorityError = await assertRoleAuthority(req, userId, target.role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    await transitionAccount({ actorId: req.user.id, targetUserId: userId, state: 'LOCKED', reason, req, compromised: true });
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'ACCOUNT_COMPROMISED', req, metadata: { reason } });
+    return res.json({ message: 'Account locked. Sessions, action tokens, API tokens, trusted devices, MFA and recovery codes were revoked.' });
+  } catch (error) {
+    console.error('markAccountCompromised error:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Compromised-account response failed' });
+  }
+};
+
+exports.revokeInvitation = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!userId || !reason) return res.status(400).json({ message: 'User and reason are required' });
+    const [[user]] = await pool.query('SELECT role, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const authorityError = await assertRoleAuthority(req, userId, user.role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    if (user.account_status !== 'INVITED') return res.status(409).json({ message: 'This account does not have a pending invitation' });
+    await revokeUserActionTokens(userId);
+    await transitionAccount({ actorId: req.user.id, targetUserId: userId, state: 'DISABLED', reason, req });
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'INVITATION_REVOKED', req, metadata: { reason } });
+    return res.json({ message: 'Invitation revoked and account disabled.' });
+  } catch (error) {
+    console.error('revokeInvitation error:', error.message);
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Invitation could not be revoked' });
+  }
+};
+
+exports.forceRevokeSessions = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!userId || !reason) return res.status(400).json({ message: 'User and reason are required' });
+    const [[target]] = await pool.query('SELECT role FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    const authorityError = await assertRoleAuthority(req, userId, target.role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    await revokeUserSessions(userId, 'ADMIN_REVOKED');
+    await pool.query('UPDATE users SET session_version = session_version + 1 WHERE id = ?', [userId]);
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'SESSION_REVOKED', req, metadata: { reason } });
+    return res.json({ message: 'All active sessions were revoked.' });
+  } catch (error) {
+    console.error('forceRevokeSessions error:', error.message);
+    return res.status(500).json({ message: 'Sessions could not be revoked' });
+  }
+};
+
+exports.completeAccessReview = async (req, res) => {
+  try {
+    const userId = Number(req.params.id);
+    const decision = String(req.body.decision || '').trim().toUpperCase();
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!userId || !['APPROVED', 'CHANGES_REQUIRED'].includes(decision) || !reason) return res.status(400).json({ message: 'Decision and review reason are required' });
+    if (Number(req.user.id) === userId) return res.status(403).json({ message: 'Privileged users cannot approve their own access review' });
+    const [[target]] = await pool.query('SELECT role, permissions FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    if (!target) return res.status(404).json({ message: 'User not found' });
+    if (!['super_admin', 'admin', 'finance_admin', 'accountant', 'hr'].includes(normalizeRole(target.role))) return res.status(409).json({ message: 'Access reviews are reserved for privileged accounts' });
+    const authorityError = await assertRoleAuthority(req, userId, target.role);
+    if (authorityError) return res.status(403).json({ message: authorityError });
+    await pool.query(
+      'INSERT INTO privileged_access_reviews (user_id, reviewer_id, role_snapshot, permissions_snapshot, decision, reason) VALUES (?, ?, ?, ?, ?, ?)',
+      [userId, req.user.id, normalizeRole(target.role), JSON.stringify(parsePermissions(target.permissions)), decision, reason]
+    );
+    await pool.query('UPDATE users SET last_security_review_at = NOW() WHERE id = ?', [userId]);
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'PRIVILEGED_ACCESS_REVIEWED', req, metadata: { decision, reason } });
+    return res.json({ message: 'Privileged access review recorded.', decision });
+  } catch (error) {
+    console.error('completeAccessReview error:', error.message);
+    return res.status(500).json({ message: 'Access review could not be recorded' });
   }
 };
 
@@ -362,7 +511,7 @@ exports.updateUser = async (req, res) => {
     }
 
     const [[before]] = await pool.query(
-      'SELECT name, username, email, role, permissions, active, department, manager_id, access_scope FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      'SELECT name, username, email, role, permissions, active, department, manager_id, access_scope, mfa_enabled, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [userId]
     );
     if (!before) return res.status(404).json({ message: 'User not found' });
@@ -454,8 +603,11 @@ exports.updateUser = async (req, res) => {
     }
 
     await revokeUserSessions(userId, 'ACCOUNT_CHANGED');
-    if (!active) await revokeUserActionTokens(userId);
-    await pool.query("UPDATE users SET session_version = session_version + 1, account_status = CASE WHEN account_status = 'INVITED' AND ? = 1 THEN 'INVITED' ELSE ? END WHERE id = ?", [active ? 1 : 0, active ? 'ACTIVE' : 'DISABLED', userId]);
+    if (!active) await revokeEveryCredential(pool, userId, 'ACCESS_DISABLED');
+    const nextAccountStatus = !active
+      ? 'DISABLED'
+      : (before.account_status === 'INVITED' ? 'INVITED' : (PRIVILEGED_MFA_ROLES.has(role) && Number(before.mfa_enabled) !== 1 ? 'MFA_SETUP_REQUIRED' : 'ACTIVE'));
+    await pool.query('UPDATE users SET session_version = session_version + 1, account_status = ? WHERE id = ?', [nextAccountStatus, userId]);
     await logAudit(pool, {
       actorId: req.user.id,
       action: 'USER_RECORD_CHANGED',
