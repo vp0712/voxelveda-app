@@ -47,7 +47,7 @@ async function setPasswordFromToken(req, res, type) {
     if (!check.valid) { await connection.rollback(); return res.status(400).json({ message: check.errors[0] }); }
     const passwordHash = await bcrypt.hash(password, 12);
     await connection.query(
-      `UPDATE users SET password = ?, active = 1, account_status = 'ACTIVE', password_reset_required = 0,
+      `UPDATE users SET password = ?, active = 1, account_status = 'ACTIVE', password_reset_required = 0, security_compromised_at = NULL,
        failed_login_count = 0, locked_until = NULL, last_password_change_at = NOW(), session_version = session_version + 1 WHERE id = ?`,
       [passwordHash, user.id]
     );

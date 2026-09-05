@@ -13,7 +13,7 @@ const files = [
   'services/emailTemplates.js', 'services/notificationService.js',
   'services/timesheetWorkflowService.js', 'services/userLifecycleService.js',
   'services/financeDomain.js', 'services/financeSchema.js', 'services/financeEncryptionService.js', 'services/highRiskFinanceSchema.js', 'services/passwordPolicy.js',
-  'services/securitySchema.js', 'services/sessionService.js', 'services/authSessionService.js', 'services/authActionTokenService.js', 'services/mfaService.js', 'services/authorizationService.js', 'services/stepUpService.js',
+  'services/securitySchema.js', 'services/sessionService.js', 'services/authSessionService.js', 'services/authActionTokenService.js', 'services/mfaService.js', 'services/authorizationService.js', 'services/stepUpService.js', 'services/userSecurityService.js',
   'services/securityEmailService.js', 'config/security.js', 'config/permissionCatalog.js',
   'services/weeklyTimesheetScheduler.js', 'services/workforceSchema.js',
   'utils/session.js', 'utils/tokenRevocation.js', 'utils/money.js',
