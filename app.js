@@ -26,6 +26,7 @@ const competitorRoutes = require('./routes/competitorRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const emailRoutes = require('./routes/emailRoutes');
+const highRiskFinanceRoutes = require('./routes/highRiskFinanceRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
 const { hasAnyPermission, hasPermission } = require('./services/authorizationService');
@@ -252,6 +253,7 @@ app.get('/api/suppliers/files/:id/view', auth, requirePermission('VIEW_SUPPLIERS
 app.use('/api/suppliers', auth, requirePermission('VIEW_SUPPLIERS'), supplierRoutes);
 app.use('/api/expenses', auth, requirePermission('VIEW_FINANCE'), expenseRoutes);
 app.use('/api/finance', auth, requirePermission('VIEW_FINANCE'), financeRoutes);
+app.use('/api/high-risk-finance', auth, highRiskFinanceRoutes);
 app.use('/api/compliance', auth, requirePermission('VIEW_COMPLIANCE'), requireInputPermission('EDIT_COMPLIANCE'), complianceRoutes);
 app.use('/api/competitors', auth, requirePermission('VIEW_CUSTOMERS'), requireInputPermission('EDIT_CUSTOMERS'), competitorRoutes);
 app.use('/api/access-attempts', auth, require('./routes/accessAttemptRoutes'));

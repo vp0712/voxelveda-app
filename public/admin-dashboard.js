@@ -63,6 +63,7 @@ const financeState = {
   bankAccounts: [],
   selectedBankAccountId: null,
   bankTransactions: [],
+  riskApprovals: [],
   periods: [],
   accountantQueries: [],
   assets: []
@@ -96,6 +97,11 @@ const ACCESS_OPTIONS = [
   { id: 'finance_reconcile', label: 'Bank Reconciliation' },
   { id: 'finance_export', label: 'Finance Export' },
   { id: 'finance_view_payroll', label: 'View Payroll Finance' },
+  { id: 'VIEW_PAYROLL_BANKING', label: 'View Payroll Banking (High Risk)' },
+  { id: 'APPROVE_PAYROLL_BANK_CHANGE', label: 'Approve Payroll Bank Changes (High Risk)' },
+  { id: 'VIEW_BANK_DETAILS', label: 'Reveal Supplier Bank Details (High Risk)' },
+  { id: 'EDIT_BANK_DETAILS', label: 'Request Supplier Bank Changes (High Risk)' },
+  { id: 'APPROVE_PAYMENT', label: 'Approve High-Risk Payments' },
   { id: 'finance_void', label: 'Void Posted Transactions' },
   { id: 'compliance', label: 'Compliance & Licences' },
   { id: 'compliance_input', label: 'Compliance Input/Edit' },
@@ -3375,6 +3381,7 @@ function renderSuppliers() {
         </td>
         <td>
           <button class="icon-btn" onclick="openSupplierDialog(${supplier.id})">Edit</button>
+          ${hasCurrentPermission('VIEW_BANKING') ? `<button class="icon-btn" onclick="openBankDetailDialog('SUPPLIER', ${supplier.id})">Banking</button>` : ''}
           <button class="icon-btn" onclick="openSupplierFileDialog(${supplier.id})">Upload</button>
           <button class="icon-btn danger-icon" onclick="deleteSupplier(${supplier.id})">Delete</button>
         </td>
@@ -4980,6 +4987,7 @@ async function loadStaff() {
               <button class="small-btn" onclick="openEditStaffDialog(${u.id})">Edit</button>
               <button class="small-btn" onclick="openAccessDialog(${u.id})">Access</button>
               <button class="secondary-btn" onclick="openPasswordResetDialog(${u.id})">Reset Password</button>
+              ${hasCurrentPermission('VIEW_PAYROLL_BANKING') ? `<button class="secondary-btn" onclick="openBankDetailDialog('EMPLOYEE', ${u.id})">Payroll Bank</button>` : ''}
               ${Number(u.id) === Number(currentUser.id) ? '' : `<button class="danger-btn" onclick="openDeleteStaffDialog(${u.id})">Delete Account</button>`}
             </div>
           </td>
@@ -7545,6 +7553,18 @@ async function financeApi(path, options = {}) {
   return data;
 }
 
+async function highRiskFinanceApi(path, options = {}) {
+  const response = await fetch(`/api/high-risk-finance${path}`, { ...options, headers: { ...authHeaders(), ...(options.headers || {}) } });
+  const data = await safeJson(response);
+  if (!response.ok) {
+    const error = new Error(data.message || 'High-risk finance request failed.');
+    error.code = data.code || 'HIGH_RISK_FINANCE_REQUEST_FAILED';
+    error.status = response.status;
+    throw error;
+  }
+  return data;
+}
+
 function financeErrorText(error) {
   const details = (error?.issues || []).map((entry) => entry.message).filter(Boolean);
   return [error?.message || 'Finance action failed.', ...details].join(' ');
@@ -7763,7 +7783,7 @@ async function selectFinanceTab(tab) {
 
 async function loadActiveFinanceTab() {
   if (financeState.activeTab === 'bills') return loadFinanceSupplierBills(financeState.billPage);
-  if (financeState.activeTab === 'banking') return loadFinanceBankAccounts();
+  if (financeState.activeTab === 'banking') return Promise.all([loadFinanceBankAccounts(), loadHighRiskApprovals()]);
   if (financeState.activeTab === 'control') return loadFinanceControlData();
 }
 
@@ -7917,7 +7937,132 @@ async function saveSupplierPayment() {
   const payload = { payment_date: document.getElementById('financePaymentDate')?.value, amount: document.getElementById('financePaymentAmount')?.value, bank_account_id: document.getElementById('financePaymentBank')?.value || null, payment_method: document.getElementById('financePaymentMethod')?.value, reference: document.getElementById('financePaymentReference')?.value, notes: document.getElementById('financePaymentNotes')?.value };
   try {
     const data = await financeApi(`/supplier-bills/${billId}/payments`, { method: 'POST', body: JSON.stringify(payload) });
-    hideDialog(); showToast(data.message || 'Supplier payment recorded successfully.'); await loadFinanceWorkspace();
+    hideDialog(); showToast(data.message || 'Supplier payment recorded successfully.');
+    if (data.code === 'DUAL_APPROVAL_REQUIRED') await loadHighRiskApprovals();
+    await loadFinanceWorkspace();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function bankDetailPath(subjectType, subjectId) {
+  return String(subjectType).toUpperCase() === 'EMPLOYEE'
+    ? `/employees/${Number(subjectId)}/bank-details`
+    : `/suppliers/${Number(subjectId)}/bank-details`;
+}
+
+async function openBankDetailDialog(subjectType, subjectId) {
+  try {
+    const source = subjectType === 'EMPLOYEE' ? staffCache : supplierCache;
+    const record = source.find((row) => Number(row.id) === Number(subjectId)) || {};
+    const label = subjectType === 'EMPLOYEE' ? (record.name || record.email || `Employee ${subjectId}`) : (record.supplier_name || `Supplier ${subjectId}`);
+    const data = await highRiskFinanceApi(bankDetailPath(subjectType, subjectId));
+    const active = data.bank_detail;
+    const pending = data.pending_change;
+    const warning = active?.recently_changed
+      ? '<div class="finance-risk-banner high"><strong>BANK DETAILS RECENTLY CHANGED</strong><span>Payments to this account require independent review.</span></div>'
+      : '';
+    const current = active
+      ? `<div class="finance-bank-summary"><span>${escapeHtml(active.bank_name || 'Bank')}</span><strong>${escapeHtml(active.account_number_masked || '••••')}</strong><small>Activated ${escapeHtml(formatDateTime(active.activated_at))}</small>${hasCurrentPermission(subjectType === 'EMPLOYEE' ? 'VIEW_PAYROLL_BANKING' : 'VIEW_BANK_DETAILS') ? `<button type="button" class="secondary-btn" onclick="revealBankDetails('${subjectType}', ${Number(subjectId)})">Reveal after verification</button>` : ''}</div>`
+      : '<div class="empty-state compact">No approved bank details recorded.</div>';
+    const pendingPanel = pending
+      ? `<div class="finance-risk-banner medium"><strong>CHANGE AWAITING APPROVAL</strong><span>${escapeHtml(pending.bank_name || 'Bank')} ${escapeHtml(pending.account_number_masked || '')} — ${escapeHtml(pending.reason || '')}</span></div>`
+      : '';
+    showDialog(`Restricted Banking — ${escapeHtml(label || '')}`, `<div class="finance-dialog-layout compact" data-bank-subject-type="${subjectType}" data-bank-subject-id="${Number(subjectId)}">${warning}${pendingPanel}<section class="dialog-card"><h4>Current approved details</h4>${current}</section><section class="dialog-card"><h4>Request a change</h4><p class="finance-report-note">The values are encrypted before storage. A different authorised person must approve the request.</p><div class="finance-form-grid two-col"><label><span>Bank</span><input id="riskBankName" maxlength="160"></label><label><span>Account name *</span><input id="riskAccountName" maxlength="160" autocomplete="off"></label><label><span>BSB *</span><input id="riskBsb" inputmode="numeric" maxlength="7" autocomplete="off"></label><label><span>Account number *</span><input id="riskAccountNumber" inputmode="numeric" maxlength="12" autocomplete="off"></label><label class="full"><span>Reason for change *</span><textarea id="riskBankReason" rows="3" maxlength="500"></textarea></label></div></section></div>`, submitBankDetailChange, 'Submit for Approval');
+    document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'finance-dialog');
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function submitBankDetailChange() {
+  const wrapper = document.querySelector('[data-bank-subject-type]');
+  const subjectType = wrapper?.dataset.bankSubjectType;
+  const subjectId = Number(wrapper?.dataset.bankSubjectId || 0);
+  const payload = {
+    bank_name: document.getElementById('riskBankName')?.value,
+    account_name: document.getElementById('riskAccountName')?.value,
+    bsb: document.getElementById('riskBsb')?.value,
+    account_number: document.getElementById('riskAccountNumber')?.value,
+    reason: document.getElementById('riskBankReason')?.value
+  };
+  try {
+    const data = await highRiskFinanceApi(`${bankDetailPath(subjectType, subjectId)}/change-requests`, { method: 'POST', body: JSON.stringify(payload) });
+    hideDialog(); showToast(data.message); await loadHighRiskApprovals();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function revealBankDetails(subjectType, subjectId) {
+  try {
+    const source = subjectType === 'EMPLOYEE' ? staffCache : supplierCache;
+    const record = source.find((row) => Number(row.id) === Number(subjectId)) || {};
+    const label = subjectType === 'EMPLOYEE' ? (record.name || record.email || `Employee ${subjectId}`) : (record.supplier_name || `Supplier ${subjectId}`);
+    const data = await highRiskFinanceApi(`${bankDetailPath(subjectType, subjectId)}/reveal`, { method: 'POST', body: '{}' });
+    const value = data.bank_detail || {};
+    showDialog(`Restricted Details — ${escapeHtml(label || '')}`, `<div class="finance-risk-banner high"><strong>CONFIDENTIAL BANKING INFORMATION</strong><span>${escapeHtml(data.warning || '')}</span></div><div class="finance-report-metrics"><div><span>Bank</span><strong>${escapeHtml(value.bank_name || '-')}</strong></div><div><span>Account name</span><strong>${escapeHtml(value.account_name || '-')}</strong></div><div><span>BSB</span><strong>${escapeHtml(value.bsb || '-')}</strong></div><div><span>Account number</span><strong>${escapeHtml(value.account_number || '-')}</strong></div></div>`, hideDialog, 'Close');
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+function parseRiskReasons(value) {
+  if (Array.isArray(value)) return value;
+  try { const parsed = JSON.parse(value || '[]'); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
+}
+
+function riskReasonLabel(value) {
+  const labels = { HIGH_VALUE_PAYMENT: 'High-value payment', SUPPLIER_BANK_DETAILS_RECENTLY_CHANGED: 'Supplier bank details recently changed' };
+  return labels[value] || String(value || '').replaceAll('_', ' ');
+}
+
+function renderHighRiskApprovals(bankChanges, payments) {
+  const panel = document.getElementById('financeRiskApprovalList');
+  if (!panel) return;
+  const rows = [];
+  bankChanges.forEach((row) => rows.push(`<article class="finance-risk-item"><div><span class="finance-status-pill" data-status="pending">${escapeHtml(row.subject_type)} BANK CHANGE</span><strong>${escapeHtml(row.subject_label || `${row.subject_type} ${row.subject_id}`)} — ${escapeHtml(row.bank_name || 'Bank')} ${escapeHtml(row.account_number_masked || '')}</strong><small>Requested by ${escapeHtml(row.initiated_by_name || `User ${row.initiated_by}`)} — ${escapeHtml(row.reason || '')}</small></div><div class="finance-row-actions">${Number(row.initiated_by) === Number(currentUser.id) ? '<span class="finance-locked-label">Awaiting another approver</span>' : `<button type="button" class="primary-btn" onclick="reviewBankDetailRequest('${row.id}', 'APPROVE')">Approve</button><button type="button" class="danger-btn" onclick="reviewBankDetailRequest('${row.id}', 'REJECT')">Reject</button>`}</div></article>`));
+  payments.forEach((row) => {
+    const reasons = parseRiskReasons(row.risk_reasons).map(riskReasonLabel).join(' • ');
+    const actions = row.status === 'APPROVED' && Number(row.initiated_by) === Number(currentUser.id)
+      ? `<button type="button" class="primary-btn" onclick="executeApprovedPayment('${row.id}')">Execute approved payment</button>`
+      : row.status === 'PENDING' && Number(row.initiated_by) !== Number(currentUser.id) && hasCurrentPermission('APPROVE_PAYMENT')
+        ? `<button type="button" class="primary-btn" onclick="reviewPaymentRequest('${row.id}', 'APPROVE')">Approve</button><button type="button" class="danger-btn" onclick="reviewPaymentRequest('${row.id}', 'REJECT')">Reject</button>`
+        : '<span class="finance-locked-label">Awaiting independent action</span>';
+    rows.push(`<article class="finance-risk-item"><div><span class="finance-status-pill" data-status="${escapeHtml(String(row.status || '').toLowerCase())}">${escapeHtml(row.status || 'PENDING')} PAYMENT</span><strong>${escapeHtml(row.supplier_name || '-')} — ${formatMoney(row.amount || 0)}</strong><small>${escapeHtml(row.bill_uid || row.supplier_invoice_no || '')} • ${escapeHtml(reasons)}</small></div><div class="finance-row-actions">${actions}</div></article>`);
+  });
+  panel.innerHTML = rows.join('') || '<div class="empty-state compact">No high-risk requests need action.</div>';
+}
+
+async function loadHighRiskApprovals() {
+  const panel = document.getElementById('financeRiskApprovalList');
+  if (!panel) return;
+  if (!['APPROVE_PAYMENT', 'APPROVE_PAYROLL_BANK_CHANGE', 'POST_TRANSACTION'].some((permission) => hasCurrentPermission(permission))) {
+    panel.innerHTML = '<div class="empty-state compact">No approval-queue permission assigned.</div>';
+    return;
+  }
+  try {
+    const statuses = await Promise.all(['PENDING', 'APPROVED'].map((status) => highRiskFinanceApi(`/approvals?status=${status}`)));
+    const bankChanges = statuses.flatMap((entry) => entry.bank_changes || []).filter((row) => row.status === 'PENDING');
+    const payments = statuses.flatMap((entry) => entry.payments || []).filter((row) => row.status === 'PENDING' || (row.status === 'APPROVED' && Number(row.initiated_by) === Number(currentUser.id)));
+    renderHighRiskApprovals(bankChanges, payments);
+  } catch (error) { panel.innerHTML = `<div class="empty-state compact">${escapeHtml(financeErrorText(error))}</div>`; }
+}
+
+async function reviewBankDetailRequest(id, decision) {
+  const reason = decision === 'REJECT' ? prompt('Enter the rejection reason:') : '';
+  if (decision === 'REJECT' && !reason) return;
+  try {
+    const data = await highRiskFinanceApi(`/bank-detail-change-requests/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) });
+    showToast(data.message); await loadHighRiskApprovals();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function reviewPaymentRequest(id, decision) {
+  const reason = decision === 'REJECT' ? prompt('Enter the rejection reason:') : '';
+  if (decision === 'REJECT' && !reason) return;
+  try {
+    const data = await highRiskFinanceApi(`/payment-approvals/${encodeURIComponent(id)}/review`, { method: 'POST', body: JSON.stringify({ decision, reason }) });
+    showToast(data.message); await loadHighRiskApprovals();
+  } catch (error) { showToast(financeErrorText(error)); }
+}
+
+async function executeApprovedPayment(id) {
+  try {
+    const data = await highRiskFinanceApi(`/payment-approvals/${encodeURIComponent(id)}/execute`, { method: 'POST', body: '{}' });
+    showToast(data.message || 'Approved payment executed.'); await loadFinanceWorkspace();
   } catch (error) { showToast(financeErrorText(error)); }
 }
 
