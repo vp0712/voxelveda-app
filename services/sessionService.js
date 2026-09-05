@@ -18,7 +18,8 @@ async function validateSession(token, decoded) {
   if (!decoded?.jti) return null;
   await ensureSecuritySchema();
   const [[session]] = await pool.query(
-    `SELECT id, user_id, assurance_level, session_version, expires_at
+    `SELECT id, user_id, assurance_level, session_version, expires_at,
+            step_up_verified_at, step_up_method
      FROM auth_sessions
      WHERE id = ? AND token_hash = ? AND revoked_at IS NULL AND expires_at > NOW() LIMIT 1`,
     [decoded.jti, hashToken(token)]
@@ -65,6 +66,17 @@ async function revokeSessionById(userId, sessionId, reason = 'USER_REVOKED') {
   return result.affectedRows > 0;
 }
 
+async function markSessionStepUp(userId, sessionId, method = 'PASSWORD_TOTP') {
+  await ensureSecuritySchema();
+  const [result] = await pool.query(
+    `UPDATE auth_sessions
+     SET assurance_level = 3, step_up_verified_at = NOW(), step_up_method = ?
+     WHERE id = ? AND user_id = ? AND revoked_at IS NULL AND expires_at > NOW()`,
+    [String(method).slice(0, 40), sessionId, userId]
+  );
+  return result.affectedRows > 0;
+}
+
 async function logSecurityEvent(entry) {
   await ensureSecuritySchema();
   await pool.query(
@@ -78,4 +90,7 @@ async function logSecurityEvent(entry) {
   );
 }
 
-module.exports = { createSession, validateSession, revokeSession, revokeUserSessions, listUserSessions, revokeSessionById, logSecurityEvent };
+module.exports = {
+  createSession, validateSession, revokeSession, revokeUserSessions, listUserSessions,
+  revokeSessionById, markSessionStepUp, logSecurityEvent
+};

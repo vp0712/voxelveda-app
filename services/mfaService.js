@@ -226,6 +226,38 @@ async function getMfaSecret(userId) {
   return record?.secret_ciphertext ? decrypt(record.secret_ciphertext) : null;
 }
 
+async function verifyAuthenticatedTotp(userId, code) {
+  await ensureSecuritySchema();
+  const connection = await pool.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [[record]] = await connection.query(
+      'SELECT secret_ciphertext, last_used_step FROM user_mfa_totp WHERE user_id = ? FOR UPDATE',
+      [userId]
+    );
+    const matchedStep = record?.secret_ciphertext
+      ? matchingTotpStep(decrypt(record.secret_ciphertext), code)
+      : null;
+    const valid = matchedStep !== null
+      && (record.last_used_step === null || matchedStep > Number(record.last_used_step));
+    if (!valid) {
+      await connection.rollback();
+      return false;
+    }
+    await connection.query(
+      'UPDATE user_mfa_totp SET last_used_step = ? WHERE user_id = ?',
+      [matchedStep, userId]
+    );
+    await connection.commit();
+    return true;
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
 async function regenerateRecoveryCodes(userId, code) {
   const secret = await getMfaSecret(userId);
   if (!secret || !verifyTotp(secret, code)) return null;
@@ -250,6 +282,7 @@ async function disableMfa(userId, code) {
 
 module.exports = {
   beginAuthenticatedSetup, beginChallengeSetup, completeAuthenticatedSetup, completeChallengeSetup,
-  disableMfa, issueLoginChallenge, regenerateRecoveryCodes, requiresMfa, verifyLoginChallenge, verifyTotp, getMfaSecret,
+  disableMfa, issueLoginChallenge, regenerateRecoveryCodes, requiresMfa, verifyLoginChallenge,
+  verifyAuthenticatedTotp, verifyTotp, getMfaSecret,
   _test: { base32Decode, totp }
 };

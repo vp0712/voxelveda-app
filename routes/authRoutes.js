@@ -6,6 +6,7 @@ const auth = require('../middleware/auth');
 const { authRateLimit } = require('../middleware/securityMiddleware');
 const securityAuthController = require('../controllers/securityAuthController');
 const mfaController = require('../controllers/mfaController');
+const stepUpController = require('../controllers/stepUpController');
 
 /* ================= AUTH ================= */
 
@@ -34,5 +35,7 @@ router.post('/mfa/enroll/start', authRateLimit(), auth, mfaController.beginEnrol
 router.post('/mfa/enroll/confirm', authRateLimit(), auth, mfaController.confirmEnrollment);
 router.post('/mfa/recovery/regenerate', authRateLimit(), auth, mfaController.regenerateRecoveryCodes);
 router.delete('/mfa', authRateLimit(), auth, mfaController.disable);
+router.get('/step-up/status', auth, stepUpController.status);
+router.post('/step-up', authRateLimit(), auth, stepUpController.verify);
 
 module.exports = router;

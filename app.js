@@ -50,6 +50,8 @@ const noStorePublicAssets = new Set([
   'auth-lifecycle.js',
   'mfa.js',
   'security-page.js',
+  'step-up.js',
+  'step-up.css',
   'style.css',
   'advanced-theme.css',
   'mobile-shell.js',

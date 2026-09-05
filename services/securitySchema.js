@@ -42,6 +42,8 @@ async function createSecuritySchema() {
     revoke_reason VARCHAR(100) NULL,
     INDEX idx_auth_sessions_user (user_id, revoked_at, expires_at)
   ) ENGINE=InnoDB`);
+  await tolerateDuplicate('ALTER TABLE auth_sessions ADD COLUMN step_up_verified_at DATETIME NULL');
+  await tolerateDuplicate('ALTER TABLE auth_sessions ADD COLUMN step_up_method VARCHAR(40) NULL');
 
   await pool.query(`CREATE TABLE IF NOT EXISTS security_events (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
