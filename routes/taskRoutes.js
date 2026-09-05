@@ -3,6 +3,7 @@ const router = express.Router();
 
 const taskController = require('../controllers/taskController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 
 /* ================= ADMIN TASKS ================= */
 
@@ -39,11 +40,11 @@ router.post('/announcements/update', requireInputPermission('tasks_input'), task
 
 router.post('/announcements/delete', requireInputPermission('tasks_input'), taskController.deleteAnnouncement);
 
-router.post('/', requireInputPermission('tasks_input'), taskController.createTask);
+router.post('/', requireAnyPermission('MANAGE_JOBS', 'MANAGE_TEAM_JOBS'), taskController.createTask);
 
-router.post('/update', requireInputPermission('tasks_input'), taskController.updateTask);
+router.post('/update', requireAnyPermission('MANAGE_JOBS', 'MANAGE_TEAM_JOBS'), taskController.updateTask);
 
-router.post('/delete', requireInputPermission('tasks_input'), taskController.deleteTask);
+router.post('/delete', requireAnyPermission('MANAGE_JOBS', 'MANAGE_TEAM_JOBS'), taskController.deleteTask);
 
 /* ================= SHARED TASK STATUS ================= */
 /* Admin and assigned staff can update task status */

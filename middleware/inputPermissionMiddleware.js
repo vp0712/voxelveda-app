@@ -1,16 +1,5 @@
 const pool = require('../config/db');
-
-function parsePermissions(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+const { hasAnyPermission } = require('../services/authorizationService');
 
 async function ensureAccessAttemptTable() {
   await pool.query(`
@@ -65,12 +54,8 @@ module.exports = function requireInputPermission(required) {
       return next();
     }
 
-    const role = String(req.user?.role || '').trim().toLowerCase();
-    if (['admin', 'super_admin'].includes(role)) return next();
-
-    const permissions = parsePermissions(req.user?.permissions);
     const requiredPermissions = resolveRequired(required, req);
-    const allowed = requiredPermissions.some((permission) => permissions.includes(permission));
+    const allowed = hasAnyPermission(req.user, requiredPermissions);
 
     if (allowed) return next();
 
@@ -78,8 +63,8 @@ module.exports = function requireInputPermission(required) {
 
     return res.status(403).json({
       accessDenied: true,
-      message: "You don't have access to input or change data in this section. Please contact admin.",
-      required_permissions: requiredPermissions
+      message: "You don't have access to change this data. Please contact an administrator.",
+      code: 'PERMISSION_DENIED'
     });
   };
 };

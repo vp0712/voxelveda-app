@@ -1,9 +1,9 @@
 const express = require('express');
 const controller = require('../controllers/emailController');
-const requireRole = require('../middleware/roleMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 
 const router = express.Router();
-router.use(requireRole('admin'));
+router.use(requireAnyPermission('MANAGE_COMPANY_EMAIL'));
 
 router.get('/config', controller.config);
 router.post('/verify', controller.verify);

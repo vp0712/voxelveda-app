@@ -11,10 +11,8 @@ function sendWorkflowError(res, error, fallback) {
 
 exports.list = async (req, res) => {
   try {
-    if (!workflow.canApprove(req.user)) {
-      return res.status(403).json({ message: 'Timesheet review permission is required.' });
-    }
     const timesheets = await workflow.listTimesheets({
+      user: req.user,
       status: req.query.status || 'ALL',
       userId: req.query.user_id,
       fromDate: req.query.from_date,
@@ -92,7 +90,7 @@ exports.amend = async (req, res) => {
 
 exports.payrollReady = async (req, res) => {
   try {
-    if (!workflow.canApprove(req.user)) {
+    if (!workflow.canViewPayroll(req.user)) {
       return res.status(403).json({ message: 'Payroll-ready access is required.' });
     }
     return res.json({ payroll_ready: await workflow.listPayrollReady() });

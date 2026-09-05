@@ -6,6 +6,7 @@ const { ensureUserLifecycleSchema } = require('../services/userLifecycleService'
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { validateSession } = require('../services/sessionService');
 const { requiresMfa } = require('../services/mfaService');
+const { hasAnyPermission, hasPermission } = require('../services/authorizationService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -50,14 +51,14 @@ function pageAuth({ adminOnly = false, workspaceOnly = false, allowMfaSetup = fa
         return res.redirect(302, '/login?message=Multi-factor%20verification%20is%20required');
       }
       const permissions = parsePermissions(user.permissions);
-      const isSystemAdmin = ['admin', 'super_admin'].includes(role);
-      const isFinanceRole = ['finance_admin', 'finance_user', 'accountant'].includes(role);
-      const canUseOperationsWorkspace = isSystemAdmin
-        || isFinanceRole
-        || permissions.includes('finance')
-        || permissions.includes('tasks');
+      const authorizationUser = { ...user, role, permissions };
+      const canAdminister = hasPermission(authorizationUser, 'MANAGE_USERS');
+      const canUseOperationsWorkspace = hasAnyPermission(authorizationUser, [
+        'VIEW_FINANCE', 'MANAGE_JOBS', 'MANAGE_TEAM_JOBS', 'VIEW_CUSTOMERS',
+        'VIEW_INVENTORY', 'VIEW_SUPPLIERS', 'VIEW_RFQS'
+      ]);
 
-      if ((adminOnly && !isSystemAdmin) || (workspaceOnly && !canUseOperationsWorkspace)) {
+      if ((adminOnly && !canAdminister) || (workspaceOnly && !canUseOperationsWorkspace)) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
         return res.status(403).sendFile(path.join(__dirname, '..', 'public', '403.html'));
       }

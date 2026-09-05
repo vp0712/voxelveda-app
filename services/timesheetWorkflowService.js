@@ -4,8 +4,8 @@ const { logAudit, logActivity } = require('./auditService');
 const { createNotification } = require('./notificationService');
 const { renderEmailTemplate } = require('./emailTemplates');
 const { queueEmail } = require('./emailQueue');
+const { canAccessUserRecord, hasAnyPermission, hasPermission, isManagerOf } = require('./authorizationService');
 
-const APPROVER_ROLES = new Set(['super_admin', 'admin', 'manager', 'supervisor']);
 const APPROVAL_READY = new Set(['PENDING_APPROVAL', 'CORRECTION_RESUBMITTED']);
 
 class WorkflowError extends Error {
@@ -16,17 +16,6 @@ class WorkflowError extends Error {
   }
 }
 
-function parsePermissions(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
 function normalizeStatus(value) {
   const status = String(value || 'DRAFT').trim().toUpperCase();
   if (status === 'OPEN') return 'PENDING_APPROVAL';
@@ -34,8 +23,21 @@ function normalizeStatus(value) {
 }
 
 function canApprove(user) {
-  const role = String(user?.role || '').trim().toLowerCase();
-  return APPROVER_ROLES.has(role) || parsePermissions(user?.permissions).includes('timesheet_approve');
+  return hasAnyPermission(user, ['APPROVE_TEAM_TIMESHEET', 'APPROVE_ALL_TIMESHEETS']);
+}
+
+async function canViewTimesheet(user, timesheet, connection = pool) {
+  return canAccessUserRecord(user, timesheet.user_id, {
+    own: 'VIEW_OWN_TIMESHEET',
+    team: 'VIEW_TEAM_TIMESHEET',
+    all: 'VIEW_ALL_TIMESHEETS',
+    connection
+  });
+}
+
+async function canApproveTimesheet(user, timesheet, connection = pool) {
+  if (hasPermission(user, 'APPROVE_ALL_TIMESHEETS')) return true;
+  return hasPermission(user, 'APPROVE_TEAM_TIMESHEET') && isManagerOf(user?.id, timesheet.user_id, connection);
 }
 
 function requestMeta(req) {
@@ -129,13 +131,17 @@ async function notifyAdmins(connection, timesheet, title, message, priority = 'n
     (user_id, type, title, message, priority, linked_module, linked_record_id)
     SELECT id, 'TIMESHEET', ?, ?, ?, 'timesheets', ?
     FROM users
-    WHERE active = 1 AND LOWER(role) IN ('admin', 'super_admin', 'manager', 'supervisor')
+    WHERE active = 1
+      AND (
+        LOWER(role) IN ('admin', 'super_admin', 'hr')
+        OR id = (SELECT manager_id FROM users WHERE id = ? LIMIT 1)
+      )
     `,
-    [title, message, priority, String(timesheet.id)]
+    [title, message, priority, String(timesheet.id), timesheet.user_id]
   );
 }
 
-async function listTimesheets({ status = 'ALL', userId, fromDate, toDate } = {}) {
+async function listTimesheets({ user, status = 'ALL', userId, fromDate, toDate } = {}) {
   await ensureWorkforceSchema();
   const params = [];
   const filters = [];
@@ -144,9 +150,23 @@ async function listTimesheets({ status = 'ALL', userId, fromDate, toDate } = {})
     filters.push('UPPER(wt.status) = ?');
     params.push(normalizedStatus);
   }
-  if (userId) {
+  if (hasPermission(user, 'VIEW_ALL_TIMESHEETS')) {
+    if (userId) {
+      filters.push('wt.user_id = ?');
+      params.push(Number(userId));
+    }
+  } else if (hasPermission(user, 'VIEW_TEAM_TIMESHEET')) {
+    filters.push('u.manager_id = ?');
+    params.push(Number(user.id));
+    if (userId) {
+      filters.push('wt.user_id = ?');
+      params.push(Number(userId));
+    }
+  } else if (hasPermission(user, 'VIEW_OWN_TIMESHEET')) {
     filters.push('wt.user_id = ?');
-    params.push(Number(userId));
+    params.push(Number(user.id));
+  } else {
+    throw new WorkflowError('Timesheet access is not enabled for your account.', 403, 'TIMESHEET_ACCESS_DENIED');
   }
   if (fromDate) {
     filters.push('wt.week_end >= ?');
@@ -187,8 +207,8 @@ async function getTimesheetDetail(id, user) {
     [id]
   );
   if (!timesheet) throw new WorkflowError('Timesheet not found.', 404, 'TIMESHEET_NOT_FOUND');
-  if (!canApprove(user) && Number(timesheet.user_id) !== Number(user?.id)) {
-    throw new WorkflowError('You can only view your own timesheets.', 403, 'TIMESHEET_ACCESS_DENIED');
+  if (!await canViewTimesheet(user, timesheet)) {
+    throw new WorkflowError('You do not have access to this timesheet.', 403, 'TIMESHEET_ACCESS_DENIED');
   }
   const summary = await calculateTimesheet(pool, timesheet);
   const [versions] = await pool.query(
@@ -213,7 +233,7 @@ async function submitTimesheet(id, user, req) {
   try {
     await connection.beginTransaction();
     const timesheet = await getLockedTimesheet(connection, id);
-    if (Number(timesheet.user_id) !== Number(user?.id) && !canApprove(user)) {
+    if (Number(timesheet.user_id) !== Number(user?.id) || !hasPermission(user, 'VIEW_OWN_TIMESHEET')) {
       throw new WorkflowError('You can only submit your own timesheet.', 403, 'TIMESHEET_ACCESS_DENIED');
     }
     if (!['DRAFT', 'CORRECTION_REQUIRED'].includes(timesheet.status)) {
@@ -251,13 +271,15 @@ async function submitTimesheet(id, user, req) {
 }
 
 async function approveTimesheet(id, user, options = {}, req) {
-  if (!canApprove(user)) throw new WorkflowError('Timesheet approval permission is required.', 403, 'TIMESHEET_APPROVAL_DENIED');
   await ensureWorkforceSchema();
   const connection = await pool.getConnection();
   let emailPayload;
   try {
     await connection.beginTransaction();
     const timesheet = await getLockedTimesheet(connection, id);
+    if (!await canApproveTimesheet(user, timesheet, connection)) {
+      throw new WorkflowError('You cannot approve a timesheet outside your authorised scope.', 403, 'TIMESHEET_APPROVAL_DENIED');
+    }
     if (timesheet.status === 'APPROVED') {
       throw new WorkflowError('Timesheet has already been approved.', 409, 'TIMESHEET_ALREADY_APPROVED');
     }
@@ -341,7 +363,6 @@ async function approveTimesheet(id, user, options = {}, req) {
 }
 
 async function reviewTimesheet(id, user, action, comments, req) {
-  if (!canApprove(user)) throw new WorkflowError('Timesheet review permission is required.', 403, 'TIMESHEET_REVIEW_DENIED');
   const cleanAction = String(action || '').toUpperCase();
   const toStatus = cleanAction === 'REJECT' ? 'REJECTED' : cleanAction === 'REQUEST_CORRECTION' ? 'CORRECTION_REQUIRED' : '';
   if (!toStatus) throw new WorkflowError('A valid review action is required.');
@@ -352,6 +373,9 @@ async function reviewTimesheet(id, user, action, comments, req) {
   try {
     await connection.beginTransaction();
     const timesheet = await getLockedTimesheet(connection, id);
+    if (!await canApproveTimesheet(user, timesheet, connection)) {
+      throw new WorkflowError('You cannot review a timesheet outside your authorised scope.', 403, 'TIMESHEET_REVIEW_DENIED');
+    }
     if (!APPROVAL_READY.has(timesheet.status)) {
       throw new WorkflowError('Only submitted timesheets can be reviewed.', 409, 'TIMESHEET_NOT_READY');
     }
@@ -398,7 +422,6 @@ async function reviewTimesheet(id, user, action, comments, req) {
 }
 
 async function amendApprovedTimesheet(id, user, options, req) {
-  if (!canApprove(user)) throw new WorkflowError('Timesheet amendment permission is required.', 403, 'TIMESHEET_AMEND_DENIED');
   const reason = String(options.reason || '').trim();
   const approvedHours = Number(options.approvedHours);
   if (!reason) throw new WorkflowError('An amendment reason is required.');
@@ -409,6 +432,9 @@ async function amendApprovedTimesheet(id, user, options, req) {
   try {
     await connection.beginTransaction();
     const timesheet = await getLockedTimesheet(connection, id);
+    if (!await canApproveTimesheet(user, timesheet, connection)) {
+      throw new WorkflowError('You cannot amend a timesheet outside your authorised scope.', 403, 'TIMESHEET_AMEND_DENIED');
+    }
     if (timesheet.status !== 'APPROVED') throw new WorkflowError('Only approved timesheets can be amended.', 409, 'TIMESHEET_NOT_APPROVED');
     const calculated = await calculateTimesheet(connection, timesheet);
     const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
@@ -454,9 +480,14 @@ async function listPayrollReady() {
   return rows;
 }
 
+function canViewPayroll(user) {
+  return hasPermission(user, 'VIEW_PAYROLL');
+}
+
 module.exports = {
   WorkflowError,
   canApprove,
+  canViewPayroll,
   normalizeStatus,
   listTimesheets,
   getTimesheetDetail,

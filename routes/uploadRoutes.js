@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const pool = require('../config/db');
 const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ const storage = multer.diskStorage({
 
 const upload = multer(secureMulterOptions(storage, 12));
 
-router.post('/rfq/:id', upload.single('file'), async (req, res) => {
+router.post('/rfq/:id', requireAnyPermission('EDIT_RFQS'), upload.single('file'), async (req, res) => {
   try {
     const rfqId = req.params.id;
 

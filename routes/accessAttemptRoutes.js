@@ -1,9 +1,9 @@
 const express = require('express');
-const requireRole = require('../middleware/roleMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const { getAccessAttempts } = require('../controllers/accessAttemptController');
 
 const router = express.Router();
 
-router.get('/', requireRole('admin'), getAccessAttempts);
+router.get('/', requireAnyPermission('VIEW_AUDIT_LOG'), getAccessAttempts);
 
 module.exports = router;

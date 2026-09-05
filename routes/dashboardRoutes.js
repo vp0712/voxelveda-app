@@ -1,6 +1,6 @@
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
-const requireRole = require('../middleware/roleMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const { getDashboardStats } = require('../controllers/dashboardController');
 
 const router = express.Router();
@@ -8,7 +8,7 @@ const router = express.Router();
 router.get(
   '/stats',
   authMiddleware,
-  requireRole('admin', 'sales', 'viewer'),
+  requireAnyPermission('VIEW_DASHBOARD'),
   getDashboardStats
 );
 

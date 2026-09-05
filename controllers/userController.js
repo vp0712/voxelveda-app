@@ -8,10 +8,12 @@ const { ensureSecuritySchema } = require('../services/securitySchema');
 const { revokeUserSessions, logSecurityEvent } = require('../services/sessionService');
 const { issueToken, revokeUserActionTokens } = require('../services/authActionTokenService');
 const { queueSecurityLink } = require('../services/securityEmailService');
+const { HIGH_RISK_PERMISSIONS, LEGACY_PERMISSION_MAP, PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
+const { canonicalPermission, hasPermission } = require('../services/authorizationService');
 
 const ALLOWED_ROLES = [
   'admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant',
-  'manager', 'sales', 'production', 'viewer', 'view_only', 'staff'
+  'hr', 'manager', 'supervisor', 'sales', 'production', 'viewer', 'view_only', 'staff'
 ];
 
 const ALL_PERMISSIONS = [
@@ -63,12 +65,13 @@ const ALL_PERMISSIONS = [
 ];
 
 function parsePermissions(value) {
+  const allowed = new Set([...ALL_PERMISSIONS, ...PERMISSIONS]);
   if (!value) return [];
-  if (Array.isArray(value)) return value.filter((item) => ALL_PERMISSIONS.includes(item));
+  if (Array.isArray(value)) return [...new Set(value.map((item) => String(item).trim()).filter((item) => allowed.has(item) || LEGACY_PERMISSION_MAP[item.toLowerCase()]))];
 
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed.filter((item) => ALL_PERMISSIONS.includes(item)) : [];
+    return Array.isArray(parsed) ? [...new Set(parsed.map((item) => String(item).trim()).filter((item) => allowed.has(item) || LEGACY_PERMISSION_MAP[item.toLowerCase()]))] : [];
   } catch {
     return [];
   }
@@ -84,6 +87,48 @@ function isValidEmail(value) {
 
 function isSuperAdmin(req) {
   return String(req.user?.role || '').toLowerCase() === 'super_admin';
+}
+
+function sanitizeAccessScope(value) {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('Access scope must be an object');
+  const allowed = new Set(['departments', 'project_ids']);
+  if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error('Access scope contains unsupported fields');
+  const departments = Array.isArray(value.departments)
+    ? [...new Set(value.departments.map((item) => String(item).trim()).filter(Boolean))].slice(0, 20)
+    : [];
+  const projectIds = Array.isArray(value.project_ids)
+    ? [...new Set(value.project_ids.map(Number).filter((item) => Number.isInteger(item) && item > 0))].slice(0, 100)
+    : [];
+  return { departments, project_ids: projectIds };
+}
+
+function parseAccessScope(value) {
+  if (!value) return {};
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(value); } catch { return {}; }
+}
+
+async function validateManager(managerId, targetUserId) {
+  if (!managerId) return null;
+  if (targetUserId && Number(managerId) === Number(targetUserId)) return 'A user cannot be their own manager';
+  const [[manager]] = await pool.query(
+    'SELECT id, role FROM users WHERE id = ? AND active = 1 AND deleted_at IS NULL LIMIT 1',
+    [managerId]
+  );
+  if (!manager) return 'Selected manager is not an active user';
+  if (!['manager', 'supervisor', 'admin', 'super_admin', 'hr'].includes(String(manager.role || '').toLowerCase())) {
+    return 'Selected user does not have a managerial role';
+  }
+  return null;
+}
+
+function containsHighRiskPermission(permissions) {
+  return permissions.some((permission) => canonicalPermission(permission).some((grant) => HIGH_RISK_PERMISSIONS.has(grant)));
+}
+
+function samePermissions(left, right) {
+  return JSON.stringify([...new Set(left)].sort()) === JSON.stringify([...new Set(right)].sort());
 }
 
 async function assertRoleAuthority(req, targetUserId, requestedRole) {
@@ -107,6 +152,12 @@ exports.createUser = async (req, res) => {
     const role = normalizeRole(req.body.role || 'staff');
     const username = String(req.body.username || email.split('@')[0] || '').trim().toLowerCase();
     const permissions = parsePermissions(req.body.permissions);
+    const department = String(req.body.department || '').trim().slice(0, 120) || null;
+    const managerId = Number(req.body.manager_id || 0) || null;
+    let accessScope;
+    try { accessScope = sanitizeAccessScope(req.body.access_scope); } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
 
     if (!name || !username || !email || !role) {
       return res.status(400).json({ message: 'Name, username, email and role are required' });
@@ -119,8 +170,14 @@ exports.createUser = async (req, res) => {
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
+    const managerError = await validateManager(managerId, null);
+    if (managerError) return res.status(400).json({ message: managerError });
     const authorityError = await assertRoleAuthority(req, null, role);
     if (authorityError) return res.status(403).json({ message: authorityError });
+    if ((role !== 'staff' || permissions.length) && !hasPermission(req.user, 'MANAGE_ROLES')) {
+      return res.status(403).json({ message: 'Role-management permission is required to assign roles or permission grants' });
+    }
+    if (!isSuperAdmin(req) && containsHighRiskPermission(permissions)) return res.status(403).json({ message: 'Only a super administrator can grant high-risk permissions' });
 
     const [existing] = await pool.query(
       'SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1',
@@ -135,9 +192,9 @@ exports.createUser = async (req, res) => {
 
     const [result] = await pool.query(
       `INSERT INTO users
-       (name, username, email, password, role, permissions, active, password_reset_required)
-       VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
-      [name, username, email, disabledPassword, role, JSON.stringify(permissions)]
+       (name, username, email, password, role, permissions, active, password_reset_required, department, manager_id, access_scope)
+       VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?)`,
+      [name, username, email, disabledPassword, role, JSON.stringify(permissions), department, managerId, JSON.stringify(accessScope)]
     );
 
     await pool.query("UPDATE users SET account_status = 'INVITED' WHERE id = ?", [result.insertId]);
@@ -177,6 +234,9 @@ exports.getUsers = async (req, res) => {
         email,
         role,
         permissions,
+        department,
+        manager_id,
+        access_scope,
         active,
         account_status,
         mfa_enabled,
@@ -193,7 +253,8 @@ exports.getUsers = async (req, res) => {
       users: rows.map((row) => ({
         ...row,
         active: Number(row.active) !== 0,
-        permissions: parsePermissions(row.permissions)
+        permissions: parsePermissions(row.permissions),
+        access_scope: parseAccessScope(row.access_scope)
       }))
     });
   } catch (error) {
@@ -205,19 +266,37 @@ exports.getUsers = async (req, res) => {
   }
 };
 
+exports.getPermissionCatalog = (req, res) => {
+  res.json({
+    permissions: PERMISSIONS,
+    high_risk_permissions: [...HIGH_RISK_PERMISSIONS],
+    role_templates: ROLE_TEMPLATES
+  });
+};
+
 exports.updateUserAccess = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
     const userId = Number(req.params.id);
+    if (typeof req.body.role !== 'string' || typeof req.body.active !== 'boolean' || !Array.isArray(req.body.permissions)) {
+      return res.status(400).json({ message: 'Role, account status and permission list are required' });
+    }
     const role = normalizeRole(req.body.role || 'staff');
-    const active = req.body.active === undefined ? true : Boolean(req.body.active);
+    const active = Boolean(req.body.active);
     const permissions = parsePermissions(req.body.permissions);
+    const reason = String(req.body.reason || '').trim().slice(0, 255);
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
     }
+    if (!reason) return res.status(400).json({ message: 'A reason is required for access changes' });
+    if (!hasPermission(req.user, 'MANAGE_ROLES')) {
+      return res.status(403).json({ message: 'Role-management permission is required for access changes' });
+    }
     const authorityError = await assertRoleAuthority(req, userId, role);
     if (authorityError) return res.status(403).json({ message: authorityError });
+    if (Number(req.user.id) === userId) return res.status(403).json({ message: 'You cannot modify your own role or permissions' });
+    if (req.body.permissions !== undefined && !isSuperAdmin(req) && containsHighRiskPermission(permissions)) return res.status(403).json({ message: 'Only a super administrator can grant high-risk permissions' });
 
     if (Number(req.user.id) === userId && active === false) {
       return res.status(400).json({ message: 'You cannot disable your own account' });
@@ -226,6 +305,12 @@ exports.updateUserAccess = async (req, res) => {
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
+
+    const [[before]] = await pool.query(
+      'SELECT role, permissions, active FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      [userId]
+    );
+    if (!before) return res.status(404).json({ message: 'User not found' });
 
     const [result] = await pool.query(
       `UPDATE users
@@ -242,6 +327,17 @@ exports.updateUserAccess = async (req, res) => {
     if (!active) await revokeUserActionTokens(userId);
     await pool.query("UPDATE users SET session_version = session_version + 1, account_status = CASE WHEN account_status = 'INVITED' AND ? = 1 THEN 'INVITED' ELSE ? END WHERE id = ?", [active ? 1 : 0, active ? 'ACTIVE' : 'DISABLED', userId]);
     await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'ROLE_OR_PERMISSION_CHANGED', req });
+    await logAudit(pool, {
+      actorId: req.user.id,
+      action: 'USER_ACCESS_CHANGED',
+      module: 'security',
+      recordType: 'user',
+      recordId: userId,
+      oldValue: { role: before.role, permissions: parsePermissions(before.permissions), active: Boolean(before.active) },
+      newValue: { role, permissions, active, reason },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
     res.json({ message: 'User access updated successfully' });
   } catch (error) {
@@ -261,14 +357,55 @@ exports.updateUser = async (req, res) => {
     const name = String(req.body.name || '').trim();
     const username = String(req.body.username || '').trim().toLowerCase();
     const email = String(req.body.email || '').trim().toLowerCase();
-    const role = normalizeRole(req.body.role || 'staff');
-    const active = req.body.active === undefined ? true : Boolean(req.body.active);
-    const permissions = parsePermissions(req.body.permissions);
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
     }
+
+    const [[before]] = await pool.query(
+      'SELECT name, username, email, role, permissions, active, department, manager_id, access_scope FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      [userId]
+    );
+    if (!before) return res.status(404).json({ message: 'User not found' });
+
+    const role = normalizeRole(req.body.role === undefined ? before.role : req.body.role);
+    const active = req.body.active === undefined ? Boolean(before.active) : Boolean(req.body.active);
+    const permissions = req.body.permissions === undefined ? parsePermissions(before.permissions) : parsePermissions(req.body.permissions);
+    const department = req.body.department === undefined
+      ? before.department
+      : (String(req.body.department || '').trim().slice(0, 120) || null);
+    const managerId = req.body.manager_id === undefined
+      ? (Number(before.manager_id || 0) || null)
+      : (Number(req.body.manager_id || 0) || null);
+    let accessScope;
+    try {
+      accessScope = req.body.access_scope === undefined
+        ? parseAccessScope(before.access_scope)
+        : sanitizeAccessScope(req.body.access_scope);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
+    }
+    const reason = String(req.body.reason || '').trim().slice(0, 255);
+    const accessChanged = role !== normalizeRole(before.role)
+      || active !== Boolean(before.active)
+      || !samePermissions(permissions, parsePermissions(before.permissions))
+      || department !== before.department
+      || managerId !== (Number(before.manager_id || 0) || null)
+      || JSON.stringify(accessScope) !== JSON.stringify(parseAccessScope(before.access_scope));
+    if (accessChanged && !reason) {
+      return res.status(400).json({ message: 'A reason is required when role, permissions or account status changes' });
+    }
+    if (accessChanged && !hasPermission(req.user, 'MANAGE_ROLES')) {
+      return res.status(403).json({ message: 'Role-management permission is required for access changes' });
+    }
     const authorityError = await assertRoleAuthority(req, userId, role);
     if (authorityError) return res.status(403).json({ message: authorityError });
+    if (Number(req.user.id) === userId && (
+      req.body.role !== undefined || req.body.permissions !== undefined || req.body.active !== undefined
+      || req.body.department !== undefined || req.body.manager_id !== undefined || req.body.access_scope !== undefined
+    )) {
+      return res.status(403).json({ message: 'You cannot modify your own role, permissions, account status or access scope' });
+    }
+    if (req.body.permissions !== undefined && !isSuperAdmin(req) && containsHighRiskPermission(permissions)) return res.status(403).json({ message: 'Only a super administrator can grant high-risk permissions' });
 
     if (!name || !username || !email || !role) {
       return res.status(400).json({ message: 'Name, username, email and role are required' });
@@ -285,6 +422,8 @@ exports.updateUser = async (req, res) => {
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
+    const managerError = await validateManager(managerId, userId);
+    if (managerError) return res.status(400).json({ message: managerError });
 
     const [existing] = await pool.query(
       'SELECT id FROM users WHERE (LOWER(email) = ? OR LOWER(username) = ?) AND id <> ? LIMIT 1',
@@ -302,9 +441,12 @@ exports.updateUser = async (req, res) => {
            email = ?,
            role = ?,
            permissions = ?,
-           active = ?
+           active = ?,
+           department = ?,
+           manager_id = ?,
+           access_scope = ?
        WHERE id = ? AND deleted_at IS NULL`,
-      [name, username, email, role, JSON.stringify(permissions), active ? 1 : 0, userId]
+      [name, username, email, role, JSON.stringify(permissions), active ? 1 : 0, department, managerId, JSON.stringify(accessScope), userId]
     );
 
     if (result.affectedRows === 0) {
@@ -314,6 +456,17 @@ exports.updateUser = async (req, res) => {
     await revokeUserSessions(userId, 'ACCOUNT_CHANGED');
     if (!active) await revokeUserActionTokens(userId);
     await pool.query("UPDATE users SET session_version = session_version + 1, account_status = CASE WHEN account_status = 'INVITED' AND ? = 1 THEN 'INVITED' ELSE ? END WHERE id = ?", [active ? 1 : 0, active ? 'ACTIVE' : 'DISABLED', userId]);
+    await logAudit(pool, {
+      actorId: req.user.id,
+      action: 'USER_RECORD_CHANGED',
+      module: 'staff',
+      recordType: 'user',
+      recordId: userId,
+      oldValue: { ...before, permissions: parsePermissions(before.permissions), access_scope: parseAccessScope(before.access_scope) },
+      newValue: { name, username, email, role, permissions, active, department, manager_id: managerId, access_scope: accessScope, reason: reason || null },
+      ipAddress: req.ip,
+      userAgent: req.get('user-agent')
+    });
 
     res.json({ message: 'Staff details updated successfully' });
   } catch (error) {
@@ -428,6 +581,11 @@ exports.deleteUser = async (req, res) => {
     if (target.role === 'super_admin' && !isSuperAdmin(req)) {
       await connection.rollback();
       return res.status(403).json({ message: 'Only a super administrator can manage that account' });
+    }
+
+    if (String(target.role || '').toLowerCase() !== 'staff' && !hasPermission(req.user, 'MANAGE_ROLES')) {
+      await connection.rollback();
+      return res.status(403).json({ message: 'Role-management permission is required to terminate this account' });
     }
 
     if (String(target.role || '').toLowerCase() === 'admin') {

@@ -9,6 +9,7 @@ const {
   isEmailTransportError
 } = require('../services/emailService');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
+const { hasPermission } = require('../services/authorizationService');
 
 const SHIFT_QR_WINDOW_SECONDS = 20;
 const SHIFT_QR_PREFIX = 'VVSHIFT';
@@ -76,7 +77,7 @@ function normalizeDateTime(value) {
 }
 
 function isAdmin(req) {
-  return String(req.user?.role || '').trim().toLowerCase() === 'admin';
+  return hasPermission(req.user, 'EDIT_ATTENDANCE');
 }
 
 function shiftQrSecret() {

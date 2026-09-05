@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const invoiceController = require('../controllers/invoiceController');
-const requireInputPermission = require('../middleware/inputPermissionMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 
 /* ================= GET ================= */
 
@@ -10,35 +10,35 @@ router.get('/', invoiceController.getInvoices);
 
 router.get('/statement/search', invoiceController.searchCustomerStatements);
 router.get('/statement/pdf', invoiceController.viewCustomerStatementPdf);
-router.post('/statement/send', requireInputPermission('invoices_input'), invoiceController.sendCustomerStatement);
+router.post('/statement/send', requireAnyPermission('SEND_COMPANY_EMAIL'), invoiceController.sendCustomerStatement);
 
 router.get('/:id', invoiceController.getInvoiceDetails);
 
 /* ================= CREATE ================= */
 
-router.post('/', requireInputPermission('invoices_input'), invoiceController.createInvoice);
+router.post('/', requireAnyPermission('EDIT_FINANCE'), invoiceController.createInvoice);
 
 /* ================= MANUAL INVOICE ================= */
 
-router.post('/manual', requireInputPermission('invoices_input'), invoiceController.createManualInvoice);
+router.post('/manual', requireAnyPermission('EDIT_FINANCE'), invoiceController.createManualInvoice);
 
 /* ================= STATUS ACTIONS ================= */
 
-router.post('/approve', requireInputPermission('invoices_input'), invoiceController.approveInvoice);
+router.post('/approve', requireAnyPermission('POST_TRANSACTION'), invoiceController.approveInvoice);
 
-router.post('/send', requireInputPermission('invoices_input'), invoiceController.sendInvoice);
+router.post('/send', requireAnyPermission('EDIT_FINANCE'), invoiceController.sendInvoice);
 
-router.post('/paid', requireInputPermission('invoices_input'), invoiceController.markInvoicePaid);
+router.post('/paid', requireAnyPermission('POST_TRANSACTION'), invoiceController.markInvoicePaid);
 
-router.post('/payment', requireInputPermission('invoices_input'), invoiceController.recordInvoicePayment);
+router.post('/payment', requireAnyPermission('POST_TRANSACTION'), invoiceController.recordInvoicePayment);
 
-router.post('/payment/delete', requireInputPermission('invoices_input'), invoiceController.deleteInvoicePayment);
+router.post('/payment/delete', requireAnyPermission('VOID_TRANSACTION'), invoiceController.deleteInvoicePayment);
 
-router.post('/reject', requireInputPermission('invoices_input'), invoiceController.rejectInvoice);
+router.post('/reject', requireAnyPermission('VOID_TRANSACTION'), invoiceController.rejectInvoice);
 
-router.post('/delete', requireInputPermission('invoices_input'), invoiceController.deleteInvoice);
+router.post('/delete', requireAnyPermission('VOID_TRANSACTION'), invoiceController.deleteInvoice);
 
-router.post('/edit', requireInputPermission('invoices_input'), invoiceController.editInvoice);
+router.post('/edit', requireAnyPermission('EDIT_FINANCE'), invoiceController.editInvoice);
 
 /* ================= PDF ================= */
 
