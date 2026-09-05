@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const expenseController = require('../controllers/expenseController');
-const requireInputPermission = require('../middleware/inputPermissionMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
@@ -28,11 +28,11 @@ const upload = multer(secureMulterOptions(storage, 12));
 router.get('/', expenseController.getExpenses);
 router.get('/:id/payments', expenseController.getExpensePayments);
 router.get('/files/:id/view', expenseController.viewExpenseFile);
-router.post('/', requireInputPermission('expenses_input'), expenseController.saveExpense);
-router.post('/:id/payments', requireInputPermission('expenses_input'), expenseController.recordExpensePayment);
-router.post('/payments/:paymentId/void', requireInputPermission('expenses_input'), expenseController.voidExpensePayment);
-router.post('/delete', requireInputPermission('expenses_input'), expenseController.deleteExpense);
-router.post('/:id/files', requireInputPermission('expenses_input'), upload.single('file'), expenseController.saveExpenseFile);
-router.post('/files/delete', requireInputPermission('expenses_input'), expenseController.deleteExpenseFile);
+router.post('/', requireAnyPermission('EDIT_FINANCE'), expenseController.saveExpense);
+router.post('/:id/payments', requireAnyPermission('POST_TRANSACTION'), expenseController.recordExpensePayment);
+router.post('/payments/:paymentId/void', requireAnyPermission('VOID_TRANSACTION'), expenseController.voidExpensePayment);
+router.post('/delete', requireAnyPermission('VOID_TRANSACTION'), expenseController.deleteExpense);
+router.post('/:id/files', requireAnyPermission('EDIT_FINANCE'), upload.single('file'), expenseController.saveExpenseFile);
+router.post('/files/delete', requireAnyPermission('EDIT_FINANCE'), expenseController.deleteExpenseFile);
 
 module.exports = router;

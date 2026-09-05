@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const pool = require('../config/db');
+const { hasPermission } = require('../services/authorizationService');
 const { companyProfile } = require('../config/companyProfile');
 const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
@@ -510,7 +511,7 @@ exports.saveTransaction = async (req, res) => {
     if (requestedStatus === 'READY' && blockers.length) {
       throw new FinanceError('This transaction is not ready.', 422, 'TRANSACTION_INCOMPLETE', validation.issues);
     }
-    if (req.body.tax_override && !['admin', 'super_admin', 'finance_admin'].includes(req.user.role)) {
+    if (req.body.tax_override && !hasPermission(req.user, 'OVERRIDE_TAX')) {
       throw new FinanceError('GST override requires Finance Admin permission.', 403, 'GST_OVERRIDE_FORBIDDEN');
     }
 

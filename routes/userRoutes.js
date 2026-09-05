@@ -1,9 +1,10 @@
 const express = require('express');
 const authMiddleware = require('../middleware/authMiddleware');
-const requireRole = require('../middleware/roleMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 
 const {
   createUser,
+  getPermissionCatalog,
   getUsers,
   updateUser,
   updateUserAccess,
@@ -14,12 +15,14 @@ const {
 
 const router = express.Router();
 
-router.get('/', authMiddleware, requireRole('admin', 'super_admin'), getUsers);
-router.post('/', authMiddleware, requireRole('admin', 'super_admin'), createUser);
-router.post('/:id', authMiddleware, requireRole('admin', 'super_admin'), updateUser);
-router.post('/:id/access', authMiddleware, requireRole('admin', 'super_admin'), updateUserAccess);
-router.post('/:id/reset-password', authMiddleware, requireRole('admin', 'super_admin'), resetUserPassword);
-router.post('/:id/resend-invitation', authMiddleware, requireRole('admin', 'super_admin'), resendUserInvitation);
-router.delete('/:id', authMiddleware, requireRole('admin', 'super_admin'), deleteUser);
+router.use(authMiddleware, requireAnyPermission('MANAGE_USERS'));
+router.get('/permissions/catalog', getPermissionCatalog);
+router.get('/', getUsers);
+router.post('/', createUser);
+router.post('/:id', updateUser);
+router.post('/:id/access', updateUserAccess);
+router.post('/:id/reset-password', resetUserPassword);
+router.post('/:id/resend-invitation', resendUserInvitation);
+router.delete('/:id', deleteUser);
 
 module.exports = router;

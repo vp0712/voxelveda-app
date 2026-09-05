@@ -28,6 +28,7 @@ const financeRoutes = require('./routes/financeRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
+const { hasAnyPermission, hasPermission } = require('./services/authorizationService');
 const pageAuth = require('./middleware/pageAuth');
 const urls = require('./config/urls');
 const {
@@ -92,6 +93,21 @@ function noIndex(req, res, next) {
   next();
 }
 
+function requireUploadPermission(req, res, next) {
+  const pathPermissions = [
+    { prefix: '/rfqs/', permission: 'VIEW_RFQS' },
+    { prefix: '/suppliers/', permission: 'VIEW_SUPPLIERS' },
+    { prefix: '/expenses/', permission: 'VIEW_FINANCE' },
+    { prefix: '/compliance/', permission: 'VIEW_COMPLIANCE' }
+  ];
+  const match = pathPermissions.find((entry) => req.path.startsWith(entry.prefix));
+  const required = match?.permission || 'VIEW_CONFIDENTIAL_FILES';
+  if (!hasPermission(req.user, required)) {
+    return res.status(403).json({ message: 'Access denied: this file is outside your authorised scope', code: 'PERMISSION_DENIED' });
+  }
+  return next();
+}
+
 function sendPage(filename) {
   return (req, res) => res.sendFile(path.join(publicDir, filename));
 }
@@ -147,11 +163,10 @@ const protectedModuleRoutes = [
 
 app.get(protectedModuleRoutes, noIndex, pageAuth(), (req, res) => {
   const routeName = req.path.replace(/^\//, '');
-  const permissions = Array.isArray(req.user.permissions) ? req.user.permissions : [];
-  const workspaceRoles = ['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'];
-  const portal = workspaceRoles.includes(req.user.role)
-    || permissions.includes('finance')
-    || permissions.includes('tasks')
+  const portal = hasAnyPermission(req.user, [
+    'VIEW_FINANCE', 'MANAGE_JOBS', 'MANAGE_TEAM_JOBS', 'VIEW_CUSTOMERS',
+    'VIEW_INVENTORY', 'VIEW_SUPPLIERS', 'VIEW_RFQS'
+  ])
     ? '/admin'
     : '/dashboard';
   return res.redirect(302, `${portal}?view=${encodeURIComponent(routeName)}`);
@@ -167,7 +182,7 @@ app.use(express.static(publicDir, {
     }
   }
 }));
-app.use('/invoices', noIndex, auth, express.static(path.join(__dirname, 'invoices'), {
+app.use('/invoices', noIndex, auth, requirePermission('VIEW_FINANCE'), express.static(path.join(__dirname, 'invoices'), {
   dotfiles: 'deny',
   index: false,
   setHeaders(res) {
@@ -176,7 +191,7 @@ app.use('/invoices', noIndex, auth, express.static(path.join(__dirname, 'invoice
     res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   }
 }));
-app.use('/uploads', noIndex, auth, express.static(path.join(__dirname, 'uploads'), {
+app.use('/uploads', noIndex, auth, requireUploadPermission, express.static(path.join(__dirname, 'uploads'), {
   dotfiles: 'deny',
   index: false,
   setHeaders(res) {
@@ -218,29 +233,29 @@ app.post('/api/public/rfq', rfqController.createRFQ);
 app.post('/api/public/ai-lead', aiLeadController.createLead);
 app.get('/api/public/shift-qr', attendanceController.publicShiftQrToken);
 
-app.use('/api/rfq', auth, requirePermission('rfqs'), rfqRoutes);
-app.use('/api/invoice', auth, requirePermission('invoices'), invoiceRoutes);
+app.use('/api/rfq', auth, requirePermission('VIEW_RFQS'), rfqRoutes);
+app.use('/api/invoice', auth, requirePermission('VIEW_FINANCE'), invoiceRoutes);
 app.use('/api/users', auth, userRoutes);
 app.use('/api/settings', auth, settingsRoutes);
-app.use('/api/email', auth, requirePermission('settings'), emailRoutes);
+app.use('/api/email', auth, requirePermission('MANAGE_COMPANY_EMAIL'), emailRoutes);
 app.use('/api/dashboard', auth, dashboardRoutes);
 app.use('/api/upload', auth, uploadRoutes);
 app.use('/api/tasks', auth, taskRoutes);
-app.use('/api/stock', auth, requirePermission('stock'), stockRoutes);
-app.use('/api/customers', auth, requirePermission('customers'), requireInputPermission('customers_input'), customerRoutes);
-app.use('/api/materials', auth, requirePermission('stock'), materialRoutes);
-app.use('/api/meetings', auth, requirePermission('meetings'), meetingRoutes);
-app.use('/api/roster', auth, requirePermission('roster'), rosterRoutes);
-app.get('/api/suppliers/files/:id/view', auth, requirePermission('suppliers'), supplierController.viewSupplierFile);
-app.use('/api/suppliers', auth, requirePermission('suppliers'), supplierRoutes);
-app.use('/api/expenses', auth, requirePermission('expenses'), expenseRoutes);
-app.use('/api/finance', auth, requirePermission('finance'), financeRoutes);
-app.use('/api/compliance', auth, requirePermission('compliance'), requireInputPermission('compliance_input'), complianceRoutes);
-app.use('/api/competitors', auth, requirePermission('competitors'), requireInputPermission('competitors_input'), competitorRoutes);
+app.use('/api/stock', auth, requirePermission('VIEW_INVENTORY'), stockRoutes);
+app.use('/api/customers', auth, requirePermission('VIEW_CUSTOMERS'), requireInputPermission('EDIT_CUSTOMERS'), customerRoutes);
+app.use('/api/materials', auth, requirePermission('VIEW_INVENTORY'), materialRoutes);
+app.use('/api/meetings', auth, requirePermission('VIEW_MEETINGS'), meetingRoutes);
+app.use('/api/roster', auth, requirePermission('VIEW_ATTENDANCE'), rosterRoutes);
+app.get('/api/suppliers/files/:id/view', auth, requirePermission('VIEW_SUPPLIERS'), supplierController.viewSupplierFile);
+app.use('/api/suppliers', auth, requirePermission('VIEW_SUPPLIERS'), supplierRoutes);
+app.use('/api/expenses', auth, requirePermission('VIEW_FINANCE'), expenseRoutes);
+app.use('/api/finance', auth, requirePermission('VIEW_FINANCE'), financeRoutes);
+app.use('/api/compliance', auth, requirePermission('VIEW_COMPLIANCE'), requireInputPermission('EDIT_COMPLIANCE'), complianceRoutes);
+app.use('/api/competitors', auth, requirePermission('VIEW_CUSTOMERS'), requireInputPermission('EDIT_CUSTOMERS'), competitorRoutes);
 app.use('/api/access-attempts', auth, require('./routes/accessAttemptRoutes'));
 
 try {
-  app.use('/api/attendance', auth, requirePermission('attendance'), require('./routes/attendanceRoutes'));
+  app.use('/api/attendance', auth, requirePermission('VIEW_ATTENDANCE'), require('./routes/attendanceRoutes'));
 } catch {
   console.log('Attendance routes not loaded.');
 }

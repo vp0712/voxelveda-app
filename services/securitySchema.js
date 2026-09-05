@@ -19,6 +19,10 @@ async function createSecuritySchema() {
   await tolerateDuplicate('ALTER TABLE users ADD COLUMN last_security_review_at DATETIME NULL');
   await tolerateDuplicate('ALTER TABLE users ADD COLUMN mfa_enabled TINYINT(1) NOT NULL DEFAULT 0');
   await tolerateDuplicate('ALTER TABLE users ADD COLUMN last_mfa_update_at DATETIME NULL');
+  await tolerateDuplicate('ALTER TABLE users ADD COLUMN department VARCHAR(120) NULL');
+  await tolerateDuplicate('ALTER TABLE users ADD COLUMN manager_id INT NULL');
+  await tolerateDuplicate('ALTER TABLE users ADD COLUMN access_scope JSON NULL');
+  await tolerateDuplicate('ALTER TABLE users ADD INDEX idx_users_manager (manager_id, active)');
   await tolerateDuplicate('ALTER TABLE users ADD UNIQUE INDEX uq_users_uuid (user_uuid)');
   await pool.query("UPDATE users SET user_uuid = UUID() WHERE user_uuid IS NULL OR user_uuid = ''");
   await pool.query("UPDATE users SET account_status = IF(active = 1, 'ACTIVE', 'DISABLED') WHERE account_status IS NULL OR account_status = ''");

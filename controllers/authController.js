@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
+const { effectivePermissions } = require('../services/authorizationService');
 const { getRequestToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
@@ -198,6 +199,7 @@ exports.me = async (req, res) => {
     }
 
     const user = rows[0];
+    const permissions = parsePermissions(user.permissions);
 
     res.json({
       user: {
@@ -206,7 +208,8 @@ exports.me = async (req, res) => {
         username: user.username || user.email,
         email: user.email,
         role: normalizeRole(user.role),
-        permissions: parsePermissions(user.permissions),
+        permissions,
+        effective_permissions: [...effectivePermissions({ role: user.role, permissions })],
         active: Number(user.active) !== 0
       }
     });

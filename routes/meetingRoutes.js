@@ -1,18 +1,17 @@
 const express = require('express');
-const requireRole = require('../middleware/roleMiddleware');
+const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const {
   listMeetings,
   listMyMeetings,
   saveMeeting,
   deleteMeeting
 } = require('../controllers/meetingController');
-const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 
 const router = express.Router();
 
-router.get('/', requireRole('admin'), listMeetings);
+router.get('/', requireAnyPermission('MANAGE_MEETINGS'), listMeetings);
 router.get('/my', listMyMeetings);
-router.post('/', requireRole('admin'), requireInputPermission('meetings_input'), saveMeeting);
-router.post('/delete', requireRole('admin'), requireInputPermission('meetings_input'), deleteMeeting);
+router.post('/', requireAnyPermission('MANAGE_MEETINGS'), saveMeeting);
+router.post('/delete', requireAnyPermission('MANAGE_MEETINGS'), deleteMeeting);
 
 module.exports = router;

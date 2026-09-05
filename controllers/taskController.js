@@ -1,23 +1,17 @@
 const pool = require('../config/db');
-
-function isAdmin(req) {
-  return String(req.user?.role || '').trim().toLowerCase() === 'admin';
-}
-
-function parsePermissions(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+const { hasAnyPermission, hasPermission, isManagerOf } = require('../services/authorizationService');
 
 function canManageTasks(req) {
-  return isAdmin(req) || parsePermissions(req.user?.permissions).includes('tasks');
+  return hasAnyPermission(req.user, ['MANAGE_JOBS', 'MANAGE_TEAM_JOBS']);
+}
+
+function canManageOrganizationWork(req) {
+  return hasPermission(req.user, 'MANAGE_JOBS');
+}
+
+async function canManageTaskTarget(req, targetUserId) {
+  if (hasPermission(req.user, 'MANAGE_JOBS')) return true;
+  return hasPermission(req.user, 'MANAGE_TEAM_JOBS') && isManagerOf(req.user?.id, targetUserId);
 }
 
 async function ensureAnnouncementTable() {
@@ -95,6 +89,7 @@ exports.getTasks = async (req, res) => {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
+    const teamOnly = !hasPermission(req.user, 'MANAGE_JOBS');
     const [rows] = await pool.query(`
       SELECT
         t.*,
@@ -103,11 +98,12 @@ exports.getTasks = async (req, res) => {
       FROM tasks t
       LEFT JOIN users u ON u.id = t.assigned_to
       WHERE IFNULL(t.deleted, 0) = 0
+      ${teamOnly ? 'AND u.manager_id = ?' : ''}
       ORDER BY
         CASE WHEN LOWER(t.status) = 'done' THEN 2 ELSE 1 END,
         t.due_date ASC,
         t.id ASC
-    `);
+    `, teamOnly ? [Number(req.user.id)] : []);
 
     res.json({ tasks: rows });
   } catch (err) {
@@ -186,8 +182,12 @@ exports.createTask = async (req, res) => {
       return res.status(404).json({ message: 'Assigned staff user not found' });
     }
 
-    if (String(staffRows[0].role || '').toLowerCase() === 'admin') {
-      return res.status(400).json({ message: 'Cannot assign staff task to admin user' });
+    if (!await canManageTaskTarget(req, assignedTo)) {
+      return res.status(403).json({ message: 'You can only assign tasks to staff in your authorised team.' });
+    }
+
+    if (['admin', 'super_admin'].includes(String(staffRows[0].role || '').toLowerCase())) {
+      return res.status(400).json({ message: 'Cannot assign a staff task to a privileged administrator' });
     }
 
     const [result] = await pool.query(
@@ -250,14 +250,17 @@ exports.getAssignableStaff = async (req, res) => {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
+    const teamOnly = !hasPermission(req.user, 'MANAGE_JOBS');
     const [rows] = await pool.query(
       `
       SELECT id, name, username, email, role, active
       FROM users
-      WHERE LOWER(role) <> 'admin'
+      WHERE LOWER(role) NOT IN ('admin', 'super_admin')
       AND IFNULL(active, 1) = 1
+      ${teamOnly ? 'AND manager_id = ?' : ''}
       ORDER BY name ASC, email ASC
-      `
+      `,
+      teamOnly ? [Number(req.user.id)] : []
     );
 
     res.json({ users: rows });
@@ -300,8 +303,14 @@ exports.updateTask = async (req, res) => {
     const [staffRows] = await pool.query('SELECT id, role FROM users WHERE id = ? LIMIT 1', [assignedTo]);
     if (!staffRows.length) return res.status(404).json({ message: 'Assigned staff user not found' });
 
-    if (String(staffRows[0].role || '').toLowerCase() === 'admin') {
-      return res.status(400).json({ message: 'Cannot assign staff task to admin user' });
+    const [[existingTask]] = await pool.query('SELECT assigned_to FROM tasks WHERE id = ? AND IFNULL(deleted, 0) = 0 LIMIT 1', [taskId]);
+    if (!existingTask) return res.status(404).json({ message: 'Task not found' });
+    if (!await canManageTaskTarget(req, existingTask.assigned_to) || !await canManageTaskTarget(req, assignedTo)) {
+      return res.status(403).json({ message: 'You can only update tasks within your authorised team.' });
+    }
+
+    if (['admin', 'super_admin'].includes(String(staffRows[0].role || '').toLowerCase())) {
+      return res.status(400).json({ message: 'Cannot assign a staff task to a privileged administrator' });
     }
 
     const startedAtSql = status === 'pending' ? 'NULL' : 'IFNULL(started_at, NOW())';
@@ -368,7 +377,7 @@ exports.updateTaskStatus = async (req, res) => {
 
     const task = taskRows[0];
 
-    if (!isAdmin(req) && Number(task.assigned_to) !== Number(req.user.id)) {
+    if (Number(task.assigned_to) !== Number(req.user.id) && !await canManageTaskTarget(req, task.assigned_to)) {
       return res.status(403).json({ message: 'You cannot update this task' });
     }
 
@@ -428,6 +437,12 @@ exports.deleteTask = async (req, res) => {
       return res.status(400).json({ message: 'Task ID is required' });
     }
 
+    const [[task]] = await pool.query('SELECT assigned_to FROM tasks WHERE id = ? AND IFNULL(deleted, 0) = 0 LIMIT 1', [taskId]);
+    if (!task) return res.status(404).json({ message: 'Task not found' });
+    if (!await canManageTaskTarget(req, task.assigned_to)) {
+      return res.status(403).json({ message: 'You can only delete tasks within your authorised team.' });
+    }
+
     const [result] = await pool.query(
       `
       UPDATE tasks
@@ -452,7 +467,7 @@ exports.deleteTask = async (req, res) => {
 
 exports.getAnnouncements = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
@@ -523,7 +538,7 @@ exports.getMyAnnouncements = async (req, res) => {
 
 exports.createAnnouncement = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
@@ -580,7 +595,7 @@ exports.createAnnouncement = async (req, res) => {
 
 exports.updateAnnouncement = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
@@ -637,7 +652,7 @@ exports.updateAnnouncement = async (req, res) => {
 
 exports.deleteAnnouncement = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
@@ -689,7 +704,7 @@ async function ensureStaffMessageTable() {
 
 exports.getStaffMessages = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
@@ -763,7 +778,7 @@ exports.createStaffMessage = async (req, res) => {
 
 exports.updateStaffMessage = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
@@ -788,7 +803,7 @@ exports.updateStaffMessage = async (req, res) => {
 
 exports.deleteStaffMessage = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
 
@@ -851,7 +866,7 @@ function normaliseStaffWorkType(type) {
 
 exports.getStaffWorkRequests = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
     await ensureStaffWorkRequestTable();
@@ -910,7 +925,7 @@ exports.createStaffWorkRequest = async (req, res) => {
 
 exports.updateStaffWorkRequest = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
     const id = Number(req.body.id || 0);
@@ -931,7 +946,7 @@ exports.updateStaffWorkRequest = async (req, res) => {
 
 exports.deleteStaffWorkRequest = async (req, res) => {
   try {
-    if (!canManageTasks(req)) {
+    if (!canManageOrganizationWork(req)) {
       return res.status(403).json({ message: 'Task control access is not enabled for your account' });
     }
     const id = Number(req.body.id || 0);

@@ -6,12 +6,6 @@ let redirectingToLogin = false;
 
 if (!currentUser.id) redirectToLogin('Please login to continue.');
 
-if (currentRole && !['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(currentRole)
-  && !currentUser.permissions?.includes('finance') && !currentUser.permissions?.includes('tasks')) {
-  alert('Access denied. Admin only.');
-  window.location.href = '/dashboard';
-}
-
 let rfqChartInstance = null;
 let invoiceChartInstance = null;
 let financeChartInstance = null;
@@ -1221,8 +1215,25 @@ function previewCompanyFormRecord(recordId) {
 }
 
 function hasCurrentPermission(permission) {
-  const permissions = Array.isArray(currentUser.permissions) ? currentUser.permissions : [];
-  return ['admin', 'super_admin'].includes(currentRole) || permissions.includes(permission);
+  const aliases = {
+    dashboard: 'VIEW_DASHBOARD', rfqs: 'VIEW_RFQS', rfqs_input: 'EDIT_RFQS',
+    invoices: 'VIEW_FINANCE', invoices_input: 'EDIT_FINANCE', customers: 'VIEW_CUSTOMERS',
+    customers_input: 'EDIT_CUSTOMERS', suppliers: 'VIEW_SUPPLIERS', suppliers_input: 'EDIT_SUPPLIERS',
+    finance: 'VIEW_FINANCE', finance_input: 'EDIT_FINANCE', expenses: 'VIEW_FINANCE',
+    expenses_input: 'EDIT_FINANCE', tasks: 'MANAGE_JOBS', tasks_input: 'MANAGE_JOBS',
+    attendance: 'VIEW_ATTENDANCE', attendance_input: 'EDIT_ATTENDANCE', roster: 'VIEW_ATTENDANCE',
+    roster_input: 'EDIT_ATTENDANCE', staff: 'MANAGE_USERS', settings: 'MANAGE_USERS',
+    meetings: 'VIEW_MEETINGS', meetings_input: 'MANAGE_MEETINGS', compliance: 'VIEW_COMPLIANCE',
+    compliance_input: 'EDIT_COMPLIANCE', competitors: 'VIEW_CUSTOMERS', stock: 'VIEW_INVENTORY',
+    stock_in: 'VIEW_INVENTORY', stock_out: 'VIEW_INVENTORY', raw_material: 'VIEW_INVENTORY',
+    packaging: 'VIEW_INVENTORY'
+  };
+  const permissions = Array.isArray(currentUser.effective_permissions)
+    ? currentUser.effective_permissions
+    : (Array.isArray(currentUser.permissions) ? currentUser.permissions : []);
+  const required = aliases[permission] || permission;
+  if (required === 'MANAGE_JOBS' && permissions.includes('MANAGE_TEAM_JOBS')) return true;
+  return permissions.includes(required) || permissions.includes(permission);
 }
 
 const ADMIN_SECTION_ACCESS = Object.freeze({
@@ -1249,7 +1260,6 @@ const ADMIN_SECTION_ACCESS = Object.freeze({
 });
 
 function canAccessAdminSection(sectionId) {
-  if (['admin', 'super_admin'].includes(currentRole)) return true;
   return (ADMIN_SECTION_ACCESS[sectionId] || []).some((permission) => hasCurrentPermission(permission));
 }
 
@@ -1267,8 +1277,6 @@ function requestedAdminSection() {
 }
 
 function configureRestrictedWorkspaceView() {
-  if (['admin', 'super_admin'].includes(currentRole)) return;
-
   document.querySelectorAll('.nav-btn[data-section]').forEach((btn) => {
     btn.classList.toggle('hidden-section', !canAccessAdminSection(btn.dataset.section));
   });
@@ -5343,6 +5351,17 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAdminWorkHubSummary();
 });
 
+function managerSelectOptions(selectedId = null, excludedUserId = null) {
+  const selected = Number(selectedId || 0);
+  const options = staffCache
+    .filter((user) => Number(user.id) !== Number(excludedUserId || 0)
+      && user.active
+      && ['manager', 'supervisor', 'admin', 'super_admin', 'hr'].includes(String(user.role || '').toLowerCase()))
+    .map((user) => `<option value="${Number(user.id)}" ${Number(user.id) === selected ? 'selected' : ''}>${escapeHtml(user.name || user.email)} (${escapeHtml(user.role || 'staff')})</option>`)
+    .join('');
+  return `<option value="">No manager</option>${options}`;
+}
+
 async function openAddStaff() {
   showDialog(
     'Add Staff Member',
@@ -5367,12 +5386,22 @@ async function openAddStaff() {
             <option value="sales">Sales</option>
             <option value="production">Production</option>
             <option value="manager">Manager</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="hr">HR</option>
             <option value="finance_user">Finance User</option>
             <option value="finance_admin">Finance Admin</option>
             <option value="accountant">Accountant</option>
             <option value="viewer">Viewer</option>
             <option value="view_only">View Only</option>
           </select>
+        </label>
+        <label class="form-field">
+          <span>Department</span>
+          <input id="dialogStaffDepartment" maxlength="120" placeholder="Example: Production" />
+        </label>
+        <label class="form-field">
+          <span>Direct manager</span>
+          <select id="dialogStaffManager">${managerSelectOptions()}</select>
         </label>
       </div>
       <label class="access-toggle-row">
@@ -5391,6 +5420,8 @@ async function openAddStaff() {
       const username = document.getElementById('dialogStaffUsername')?.value.trim();
       const email = document.getElementById('dialogStaffEmail')?.value.trim();
       const role = document.getElementById('dialogStaffRole')?.value;
+      const department = document.getElementById('dialogStaffDepartment')?.value.trim();
+      const manager_id = Number(document.getElementById('dialogStaffManager')?.value || 0) || null;
       const permissions = collectAccess();
 
       if (!name || !username || !email || !role) {
@@ -5406,7 +5437,7 @@ async function openAddStaff() {
       const res = await fetch('/api/users', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ name, username, email, role, permissions })
+        body: JSON.stringify({ name, username, email, role, permissions, department, manager_id })
       });
 
       const data = await safeJson(res);
@@ -5488,6 +5519,8 @@ async function openEditStaffDialog(userId) {
             <option value="sales" ${user.role === 'sales' ? 'selected' : ''}>Sales</option>
             <option value="production" ${user.role === 'production' ? 'selected' : ''}>Production</option>
             <option value="manager" ${user.role === 'manager' ? 'selected' : ''}>Manager</option>
+            <option value="supervisor" ${user.role === 'supervisor' ? 'selected' : ''}>Supervisor</option>
+            <option value="hr" ${user.role === 'hr' ? 'selected' : ''}>HR</option>
             <option value="finance_user" ${user.role === 'finance_user' ? 'selected' : ''}>Finance User</option>
             <option value="finance_admin" ${user.role === 'finance_admin' ? 'selected' : ''}>Finance Admin</option>
             <option value="accountant" ${user.role === 'accountant' ? 'selected' : ''}>Accountant</option>
@@ -5496,6 +5529,14 @@ async function openEditStaffDialog(userId) {
             <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
             <option value="super_admin" ${user.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
           </select>
+        </label>
+        <label class="form-field">
+          <span>Department</span>
+          <input id="editStaffDepartment" maxlength="120" value="${escapeHtml(user.department || '')}" />
+        </label>
+        <label class="form-field">
+          <span>Direct manager</span>
+          <select id="editStaffManager">${managerSelectOptions(user.manager_id, user.id)}</select>
         </label>
         <label class="form-field">
           <span>Status</span>
@@ -5514,6 +5555,10 @@ async function openEditStaffDialog(userId) {
       </label>
       <h4>Allowed Sections</h4>
       ${accessCheckboxes(parseAccess(user.permissions), 'editAccess')}
+      <label class="form-field">
+        <span>Access-change reason</span>
+        <input id="editStaffAccessReason" maxlength="255" placeholder="Required only when role, status or permissions change" />
+      </label>
       <p class="status-note">System ID is fixed so existing timesheets, tasks, stock records and audit history stay connected.</p>
     `,
     async () => {
@@ -5522,7 +5567,10 @@ async function openEditStaffDialog(userId) {
       const email = document.getElementById('editStaffEmail')?.value.trim();
       const role = document.getElementById('editStaffRole')?.value || 'staff';
       const active = document.getElementById('editStaffActive')?.value === '1';
+      const department = document.getElementById('editStaffDepartment')?.value.trim();
+      const manager_id = Number(document.getElementById('editStaffManager')?.value || 0) || null;
       const permissions = collectAccess();
+      const reason = document.getElementById('editStaffAccessReason')?.value.trim();
 
       if (!name || !username || !email || !role) {
         showToast('Name, username, email and role are required');
@@ -5532,7 +5580,7 @@ async function openEditStaffDialog(userId) {
       const updateRes = await fetch(`/api/users/${userId}`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ name, username, email, role, active, permissions })
+        body: JSON.stringify({ name, username, email, role, active, permissions, department, manager_id, access_scope: user.access_scope || {}, reason })
       });
 
       const updateData = await safeJson(updateRes);
@@ -5574,6 +5622,8 @@ async function openAccessDialog(userId) {
           <option value="sales" ${user.role === 'sales' ? 'selected' : ''}>Sales</option>
           <option value="production" ${user.role === 'production' ? 'selected' : ''}>Production</option>
           <option value="manager" ${user.role === 'manager' ? 'selected' : ''}>Manager</option>
+          <option value="supervisor" ${user.role === 'supervisor' ? 'selected' : ''}>Supervisor</option>
+          <option value="hr" ${user.role === 'hr' ? 'selected' : ''}>HR</option>
           <option value="finance_user" ${user.role === 'finance_user' ? 'selected' : ''}>Finance User</option>
           <option value="finance_admin" ${user.role === 'finance_admin' ? 'selected' : ''}>Finance Admin</option>
           <option value="accountant" ${user.role === 'accountant' ? 'selected' : ''}>Accountant</option>
@@ -5596,17 +5646,27 @@ async function openAccessDialog(userId) {
       </label>
       <h4>Allowed Sections</h4>
       ${accessCheckboxes(parseAccess(user.permissions))}
-      <p class="status-note">Admin role can access every section automatically.</p>
+      <label class="form-field">
+        <span>Reason</span>
+        <input id="dialogAccessReason" maxlength="255" placeholder="Why is this access changing?" />
+      </label>
+      <p class="status-note">Access is enforced by the server using the selected role template and approved permission grants.</p>
     `,
     async () => {
       const role = document.getElementById('dialogAccessRole')?.value || 'staff';
       const active = document.getElementById('dialogAccessActive')?.value === '1';
       const permissions = collectAccess();
+      const reason = document.getElementById('dialogAccessReason')?.value.trim();
+
+      if (!reason) {
+        showToast('Enter a reason for this access change');
+        return;
+      }
 
       const updateRes = await fetch(`/api/users/${userId}/access`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ role, active, permissions })
+        body: JSON.stringify({ role, active, permissions, reason })
       });
 
       const updateData = await safeJson(updateRes);
