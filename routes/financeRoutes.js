@@ -5,6 +5,7 @@ const requireInputPermission = require('../middleware/inputPermissionMiddleware'
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const requireStepUp = require('../middleware/stepUpMiddleware');
+const highRiskPaymentGuard = require('../middleware/highRiskPaymentMiddleware');
 
 const router = express.Router();
 
@@ -33,7 +34,7 @@ router.post('/supplier-bills', requireAnyPermission('EDIT_FINANCE'), operations.
 router.post('/supplier-bills/:id/status', requireInputPermission((req) => (
   String(req.body.status || '').toUpperCase() === 'VOID' ? 'VOID_TRANSACTION' : 'POST_TRANSACTION'
 )), requireStepUp('CHANGE_SUPPLIER_BILL_STATUS'), operations.updateSupplierBillStatus);
-router.post('/supplier-bills/:id/payments', requireAnyPermission('POST_TRANSACTION'), requireStepUp('RECORD_SUPPLIER_PAYMENT'), operations.recordSupplierPayment);
+router.post('/supplier-bills/:id/payments', requireAnyPermission('POST_TRANSACTION'), requireStepUp('RECORD_SUPPLIER_PAYMENT'), highRiskPaymentGuard, operations.recordSupplierPayment);
 
 router.get('/bank-accounts', requireAnyPermission('VIEW_BANKING'), operations.getBankAccounts);
 router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), operations.saveBankAccount);

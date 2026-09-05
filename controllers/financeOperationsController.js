@@ -321,6 +321,13 @@ exports.recordSupplierPayment = async (req, res) => {
     if (amountCents <= 0n) throw new FinanceError('Payment amount must be greater than zero.', 400, 'AMOUNT_REQUIRED');
     db = await pool.getConnection();
     await db.beginTransaction();
+    if (req.paymentApprovalId) {
+      const [[approval]] = await db.query(`SELECT * FROM payment_approval_requests WHERE id = ? FOR UPDATE`, [req.paymentApprovalId]);
+      if (!approval || approval.status !== 'APPROVED') throw new FinanceError('This payment approval is no longer valid.', 409, 'PAYMENT_NOT_APPROVED');
+      if (Number(approval.initiated_by) !== Number(req.user.id) || !approval.approved_by || Number(approval.approved_by) === Number(approval.initiated_by)) {
+        throw new FinanceError('Independent approval is required before payment execution.', 403, 'DUAL_APPROVAL_REQUIRED');
+      }
+    }
     const period = await yearAndPeriod(paymentDate, db);
     const [[bill]] = await db.query(
       `SELECT sb.*, s.supplier_name FROM supplier_bills sb JOIN suppliers s ON s.id = sb.supplier_id WHERE sb.id = ? FOR UPDATE`,
@@ -379,6 +386,10 @@ exports.recordSupplierPayment = async (req, res) => {
         journalResult.insertId, creditAccountId, `Payment ${paymentUid}`, amount, bill.supplier_id]
     );
     await logAudit(db, audit(req, { action: 'PAYMENT_RECORDED', module: 'finance', recordType: 'supplier_bill', recordId: bill.id, oldValue: { paid_amount: bill.paid_amount, status: bill.status }, newValue: { payment_uid: paymentUid, amount, paid_amount: money.fromCents(newPaidCents), status: nextStatus } }));
+    if (req.paymentApprovalId) {
+      await db.query(`UPDATE payment_approval_requests SET status = 'EXECUTED', executed_at = NOW() WHERE id = ? AND status = 'APPROVED'`, [req.paymentApprovalId]);
+      await logAudit(db, audit(req, { action: 'PAYMENT_EXECUTED', module: 'finance', recordType: 'payment_approval_request', recordId: req.paymentApprovalId, newValue: { payment_uid: paymentUid, supplier_bill_id: bill.id, amount } }));
+    }
     await db.commit();
     res.json({ message: 'Supplier payment recorded and posted to the ledger.', payment_uid: paymentUid, status: nextStatus });
   } catch (error) {
