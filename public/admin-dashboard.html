@@ -7,7 +7,7 @@
 <link rel="stylesheet" href="/style.css?v=20260816-invoice-delivery-ux"/>
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
 <link rel="stylesheet" href="/step-up.css?v=20260905"/>
-  <link rel="stylesheet" href="/advanced-theme.css?v=20260824-finance-workspace-v1" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260906-security-centre" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -90,6 +90,7 @@
         </details>
         <button class="nav-btn" data-icon="CL" data-title="Compliance & Licences" data-section="complianceSection">Compliance & Licences</button>
         <button class="nav-btn" data-icon="F" data-title="Company Forms" data-section="companyFormsSection">Company Forms</button>
+        <button class="nav-btn" data-icon="SC" data-title="Security" data-section="securitySection" data-permission="MANAGE_SECURITY">Security</button>
         <button class="nav-btn" data-icon="G" data-title="Settings" data-section="settingsSection">Settings</button>
       </nav>
 
@@ -1470,6 +1471,59 @@
         </div>
       </section>
 
+      <!-- SECURITY -->
+      <section id="securitySection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">Defence in depth</span>
+            <h2>Security Centre</h2>
+            <p>Live identity, session, audit and risk signals calculated from production records.</p>
+          </div>
+          <button type="button" class="secondary-btn" onclick="loadSecurityCentre()">Refresh Security</button>
+        </div>
+
+        <div class="security-readiness card">
+          <div>
+            <span class="eyebrow">Security readiness</span>
+            <strong id="securityReadinessScore">--%</strong>
+            <span id="securityReadinessLabel">Loading...</span>
+          </div>
+          <p id="securityReadinessDisclaimer">Operational indicator only; not a certification.</p>
+        </div>
+
+        <div class="metric-grid security-metric-grid">
+          <div class="card"><h3>Active Users</h3><p><strong id="securityActiveUsers">0</strong></p></div>
+          <div class="card"><h3>MFA Coverage</h3><p><strong id="securityMfaCoverage">0%</strong></p></div>
+          <div class="card"><h3>Privileged Users</h3><p><strong id="securityPrivilegedUsers">0</strong></p></div>
+          <div class="card"><h3>Failed Logins 24h</h3><p><strong id="securityFailedLogins">0</strong></p></div>
+          <div class="card"><h3>Locked Accounts</h3><p><strong id="securityLockedAccounts">0</strong></p></div>
+          <div class="card"><h3>Active Sessions</h3><p><strong id="securityActiveSessions">0</strong></p></div>
+          <div class="card"><h3>Stale Accounts</h3><p><strong id="securityStaleAccounts">0</strong></p></div>
+          <div class="card"><h3>Open Issues</h3><p><strong id="securityOpenIssues">0</strong></p></div>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head"><div><h3>Security Issues</h3><p>Prioritised findings based on current application data and configuration.</p></div></div>
+          <table><thead><tr><th>Severity</th><th>Issue</th><th>Detail</th><th>Count</th></tr></thead><tbody id="securityIssuesBody"><tr><td colspan="4">Loading...</td></tr></tbody></table>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head"><div><h3>Privileged Access</h3><p>MFA, session and security-review status for sensitive roles.</p></div></div>
+          <table><thead><tr><th>User</th><th>Role</th><th>Status</th><th>MFA</th><th>Sessions</th><th>Last Login</th><th>Last Review</th></tr></thead><tbody id="securityPrivilegedBody"><tr><td colspan="7">Loading...</td></tr></tbody></table>
+        </div>
+
+        <div class="security-ledger-grid">
+          <div class="card table-wrap">
+            <div class="section-head"><div><h3>Recent Security Events</h3><p>Authentication and high-risk control activity.</p></div></div>
+            <table><thead><tr><th>When</th><th>Event</th><th>Actor</th><th>Result</th><th>Request</th></tr></thead><tbody id="securityEventsBody"><tr><td colspan="5">Loading...</td></tr></tbody></table>
+          </div>
+          <div class="card table-wrap">
+            <div class="section-head"><div><h3>Audit Log</h3><p>Append-only business and administrator actions.</p></div></div>
+            <table><thead><tr><th>When</th><th>Action</th><th>Module</th><th>Actor</th><th>Record</th></tr></thead><tbody id="securityAuditBody"><tr><td colspan="5">Loading...</td></tr></tbody></table>
+          </div>
+        </div>
+      </section>
+
       <!-- SETTINGS -->
       <section id="settingsSection" class="page-section hidden-section">
         <div class="section-head">
@@ -1623,7 +1677,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260905"></script>
-  <script src="/admin-dashboard.js?v=20260824-mobile-shell-v4"></script>
+  <script src="/admin-dashboard.js?v=20260906-security-centre"></script>
   <script src="/expense-payments.js?v=20260904"></script>
 </body>
 </html>

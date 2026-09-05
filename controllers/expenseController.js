@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
+const { logSecurityEvent } = require('../services/sessionService');
+const { safeDispositionName } = require('../services/documentSecurityService');
 const money = require('../utils/money');
 const { paymentState, validatePaymentAmount } = require('../services/expensePaymentDomain');
 const { logAudit } = require('../services/auditService');
@@ -69,6 +71,9 @@ async function ensureExpenseTables() {
   `);
 
   await pool.query('ALTER TABLE expense_files ADD COLUMN file_data LONGBLOB NULL').catch(() => {});
+  await pool.query("ALTER TABLE expense_files ADD COLUMN classification VARCHAR(20) NOT NULL DEFAULT 'RESTRICTED'").catch(() => {});
+  await pool.query("ALTER TABLE expense_files ADD COLUMN scan_status VARCHAR(20) NOT NULL DEFAULT 'UNAVAILABLE'").catch(() => {});
+  await pool.query('ALTER TABLE expense_files ADD COLUMN size_bytes BIGINT NULL').catch(() => {});
 }
 
 function financialYearBounds(fy) {
@@ -141,7 +146,8 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
   if (ids.length) {
     const [files] = await pool.query(
       `
-      SELECT ef.*, u.name AS uploaded_by_name
+      SELECT ef.id, ef.expense_id, ef.original_name, ef.mime_type, ef.classification, ef.scan_status,
+             ef.size_bytes, ef.uploaded_by, ef.created_at, u.name AS uploaded_by_name
       FROM expense_files ef
       LEFT JOIN users u ON u.id = ef.uploaded_by
       WHERE ef.deleted = 0
@@ -154,7 +160,7 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
     const filesByExpense = files.reduce((acc, file) => {
       const key = String(file.expense_id);
       if (!acc[key]) acc[key] = [];
-      acc[key].push(file);
+      acc[key].push({ ...file, download_url: `/api/expenses/files/${file.id}/view` });
       return acc;
     }, {});
 
@@ -501,10 +507,10 @@ exports.saveExpenseFile = async (req, res) => {
     const [result] = await pool.query(
       `
       INSERT INTO expense_files
-      (expense_id, original_name, file_path, mime_type, file_data, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?)
+      (expense_id, original_name, file_path, mime_type, file_data, uploaded_by, classification, scan_status, size_bytes)
+      VALUES (?, ?, ?, ?, ?, ?, 'RESTRICTED', 'UNAVAILABLE', ?)
       `,
-      [expenseId, req.file.originalname, `/uploads/expenses/${req.file.filename}`, req.file.mimetype, fileData, req.user.id]
+      [expenseId, req.file.originalname, `/uploads/expenses/${req.file.filename}`, req.file.mimetype, fileData, req.user.id, Number(req.file.size || fileData?.length || 0)]
     );
 
     res.json({ message: 'Bill file uploaded successfully', file_id: result.insertId });
@@ -529,12 +535,13 @@ exports.viewExpenseFile = async (req, res) => {
     if (!file) return res.status(404).json({ message: 'Bill file not found' });
 
     const mimeType = file.mime_type || 'application/octet-stream';
-    const safeName = String(file.original_name || `expense-bill-${id}`).replace(/"/g, '');
+    const safeName = safeDispositionName(file.original_name || `expense-bill-${id}`);
     const dbBuffer = file.file_data && Buffer.isBuffer(file.file_data) ? file.file_data : null;
 
     if (dbBuffer && dbBuffer.length) {
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id, metadata: { module: 'expense', fileId: id, classification: 'RESTRICTED' } });
       return res.send(dbBuffer);
     }
 
@@ -542,6 +549,7 @@ exports.viewExpenseFile = async (req, res) => {
     if (filePath && filePath.includes(`${path.sep}uploads${path.sep}expenses${path.sep}`) && fs.existsSync(filePath)) {
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id, metadata: { module: 'expense', fileId: id, classification: 'RESTRICTED' } });
       return fs.createReadStream(filePath).pipe(res);
     }
 

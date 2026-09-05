@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { ensureSecuritySchema } = require('./securitySchema');
+const { redactSensitive } = require('../utils/securityRedaction');
 
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
@@ -86,7 +87,7 @@ async function logSecurityEvent(entry) {
     [entry.actorId || null, entry.targetUserId || null, entry.eventType, entry.result || 'SUCCESS',
       entry.req?.requestId || entry.req?.headers?.['x-request-id'] || null, entry.sessionId || null,
       entry.req?.ip || null, String(entry.req?.get?.('user-agent') || '').slice(0, 255),
-      entry.metadata ? JSON.stringify(entry.metadata) : null]
+      entry.metadata ? JSON.stringify(redactSensitive(entry.metadata)) : null]
   );
 }
 

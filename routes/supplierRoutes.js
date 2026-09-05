@@ -4,7 +4,7 @@ const path = require('path');
 const multer = require('multer');
 const supplierController = require('../controllers/supplierController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
-const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
+const { sanitizeUploadName, secureMulterOptions, validateUploadedFile } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
 const uploadDir = path.join(__dirname, '..', 'uploads', 'suppliers');
@@ -29,7 +29,7 @@ router.get('/', supplierController.getSuppliers);
 router.get('/files/:id/view', supplierController.viewSupplierFile);
 router.post('/', requireInputPermission('suppliers_input'), supplierController.saveSupplier);
 router.post('/delete', requireInputPermission('suppliers_input'), supplierController.deleteSupplier);
-router.post('/:id/files', requireInputPermission('suppliers_input'), upload.single('file'), supplierController.saveSupplierFile);
+router.post('/:id/files', requireInputPermission('suppliers_input'), upload.single('file'), validateUploadedFile, supplierController.saveSupplierFile);
 router.post('/files/delete', requireInputPermission('suppliers_input'), supplierController.deleteSupplierFile);
 
 module.exports = router;

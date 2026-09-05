@@ -19,6 +19,7 @@ const { processEmailQueue } = require('./services/emailQueue');
 const { ensureFinanceSchema } = require('./services/financeSchema');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
+const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
 const {
   startWeeklyTimesheetScheduler,
   stopWeeklyTimesheetScheduler
@@ -46,6 +47,10 @@ ensureSecuritySchema()
 ensureHighRiskFinanceSchema()
   .then(() => console.log('High-risk finance schema ready.'))
   .catch((error) => console.error('High-risk finance schema initialization failed:', error.message));
+
+ensureSecurityOperationsSchema()
+  .then(() => console.log('Security operations schema ready.'))
+  .catch((error) => console.error('Security operations schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {

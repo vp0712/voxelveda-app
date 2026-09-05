@@ -46,7 +46,7 @@ function securityHeaders(req, res, next) {
   req.requestId = String(requestId).slice(0, 80);
   res.setHeader('X-Request-Id', requestId);
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Permitted-Cross-Domain-Policies', 'none');
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(), payment=()');
@@ -58,7 +58,7 @@ function securityHeaders(req, res, next) {
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
-      "frame-ancestors 'self'",
+      "frame-ancestors 'none'",
       "form-action 'self'",
       "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
@@ -125,7 +125,7 @@ function corsOptions() {
       return callback(new Error('CORS origin not allowed'));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
     credentials: true,
     maxAge: 86400
   };
@@ -138,8 +138,9 @@ function safeErrorHandler(err, req, res, next) {
   console.error('Request error:', {
     requestId,
     method: req.method,
-    path: req.originalUrl,
-    message: err.message
+    path: req.path,
+    errorName: err.name,
+    errorCode: err.code || null
   });
   if (!req.path.startsWith('/api/') && req.accepts('html')) {
     const filename = [401, 403, 404, 429].includes(status) ? `${status}.html` : '500.html';

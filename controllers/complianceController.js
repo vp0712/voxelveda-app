@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
+const { logSecurityEvent } = require('../services/sessionService');
+const { safeDispositionName } = require('../services/documentSecurityService');
 
 const DEFAULT_ENTRIES = [
   {
@@ -128,7 +130,6 @@ async function ensureComplianceTables() {
       deleted TINYINT(1) NOT NULL DEFAULT 0
     )
   `);
-
   await pool.query(`
     CREATE TABLE IF NOT EXISTS compliance_files (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -144,6 +145,9 @@ async function ensureComplianceTables() {
       INDEX compliance_files_entry_id_idx (entry_id)
     )
   `);
+  await pool.query("ALTER TABLE compliance_files ADD COLUMN classification VARCHAR(20) NOT NULL DEFAULT 'CONFIDENTIAL'").catch(() => {});
+  await pool.query("ALTER TABLE compliance_files ADD COLUMN scan_status VARCHAR(20) NOT NULL DEFAULT 'UNAVAILABLE'").catch(() => {});
+  await pool.query('ALTER TABLE compliance_files ADD COLUMN size_bytes BIGINT NULL').catch(() => {});
 
   for (const entry of DEFAULT_ENTRIES) {
     const [existing] = await pool.query(
@@ -213,7 +217,8 @@ exports.getComplianceEntries = async (req, res) => {
     `);
 
     const [files] = await pool.query(`
-      SELECT cf.*, u.name AS uploaded_by_name
+      SELECT cf.id, cf.entry_id, cf.file_label, cf.file_type, cf.original_name, cf.mime_type,
+             cf.classification, cf.scan_status, cf.size_bytes, cf.uploaded_by, cf.created_at, u.name AS uploaded_by_name
       FROM compliance_files cf
       LEFT JOIN users u ON u.id = cf.uploaded_by
       WHERE cf.deleted = 0
@@ -231,7 +236,7 @@ exports.getComplianceEntries = async (req, res) => {
       entries: entries.map((entry) => ({
         ...entry,
         process_sheet_required: Number(entry.process_sheet_required) === 1,
-        files: filesByEntry[String(entry.id)] || []
+        files: (filesByEntry[String(entry.id)] || []).map((file) => ({ ...file, download_url: `/api/compliance/files/${file.id}/view` }))
       }))
     });
   } catch (error) {
@@ -328,16 +333,37 @@ exports.saveComplianceFile = async (req, res) => {
     const [result] = await pool.query(
       `
       INSERT INTO compliance_files
-      (entry_id, file_label, file_type, original_name, file_path, mime_type, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      (entry_id, file_label, file_type, original_name, file_path, mime_type, uploaded_by, classification, scan_status, size_bytes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, 'CONFIDENTIAL', 'UNAVAILABLE', ?)
       `,
-      [entryId, fileLabel, fileType, req.file.originalname, `/uploads/compliance/${req.file.filename}`, req.file.mimetype, req.user.id]
+      [entryId, fileLabel, fileType, req.file.originalname, `/uploads/compliance/${req.file.filename}`, req.file.mimetype, req.user.id, Number(req.file.size || 0)]
     );
 
     res.json({ message: 'Compliance file uploaded successfully', file_id: result.insertId });
   } catch (error) {
     console.error('saveComplianceFile error:', error);
     res.status(500).json({ message: 'Failed to upload compliance file', error: error.message });
+  }
+};
+
+exports.viewComplianceFile = async (req, res) => {
+  try {
+    await ensureComplianceTables();
+    const id = Number(req.params.id || 0);
+    if (!id) return res.status(400).json({ message: 'File ID is required' });
+    const [[file]] = await pool.query('SELECT original_name, file_path, mime_type, scan_status FROM compliance_files WHERE id = ? AND deleted = 0 LIMIT 1', [id]);
+    if (!file) return res.status(404).json({ message: 'Compliance file not found' });
+    if (['PENDING_SCAN', 'QUARANTINED'].includes(file.scan_status)) return res.status(423).json({ message: 'File is not available while security review is pending' });
+    const candidate = file.file_path ? path.resolve(__dirname, '..', file.file_path.replace(/^\//, '')) : '';
+    const root = path.resolve(__dirname, '..', 'uploads', 'compliance');
+    if (!candidate.startsWith(`${root}${path.sep}`) || !fs.existsSync(candidate)) return res.status(404).json({ message: 'Compliance file is no longer available' });
+    res.setHeader('Content-Type', file.mime_type || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `inline; filename="${safeDispositionName(file.original_name || `compliance-file-${id}`)}"`);
+    res.setHeader('Cache-Control', 'private, no-store');
+    await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id, metadata: { module: 'compliance', fileId: id, classification: 'CONFIDENTIAL' } });
+    return fs.createReadStream(candidate).pipe(res);
+  } catch (error) {
+    return res.status(500).json({ message: 'Failed to open compliance file' });
   }
 };
 

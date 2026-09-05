@@ -20,7 +20,7 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   if (
     url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin') ||
-    url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/uploads/') ||
+    url.pathname.startsWith('/dashboard') ||
     url.pathname.startsWith('/invoices/') || url.pathname.startsWith('/invoice/')
   ) return;
   if (PUBLIC_ASSETS.includes(url.pathname)) {

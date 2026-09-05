@@ -3,8 +3,9 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const pool = require('../config/db');
-const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
+const { sanitizeUploadName, secureMulterOptions, validateUploadedFile } = require('../middleware/uploadSecurity');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
+const { registerDocument } = require('../services/documentSecurityService');
 
 const router = express.Router();
 
@@ -26,7 +27,7 @@ const storage = multer.diskStorage({
 
 const upload = multer(secureMulterOptions(storage, 12));
 
-router.post('/rfq/:id', requireAnyPermission('EDIT_RFQS'), upload.single('file'), async (req, res) => {
+router.post('/rfq/:id', requireAnyPermission('EDIT_RFQS'), upload.single('file'), validateUploadedFile, async (req, res) => {
   try {
     const rfqId = req.params.id;
 
@@ -45,20 +46,24 @@ router.post('/rfq/:id', requireAnyPermission('EDIT_RFQS'), upload.single('file')
       });
     }
 
+    const document = await registerDocument({
+      module: 'rfq', recordType: 'rfq', recordId: rfqId,
+      uploadedBy: req.user.id, file: req.file, classification: 'CONFIDENTIAL'
+    });
+
     res.json({
       message: 'File uploaded successfully',
       file: {
         original_name: req.file.originalname,
-        filename: req.file.filename,
-        path: `/uploads/rfqs/${req.file.filename}`
+        id: document.id,
+        classification: document.classification,
+        scan_status: document.scan_status,
+        download_url: document.download_url
       }
     });
   } catch (err) {
     console.error('UPLOAD RFQ FILE ERROR:', err);
-    res.status(500).json({
-      message: 'Upload failed',
-      error: err.message
-    });
+    res.status(500).json({ message: 'Upload failed' });
   }
 });
 
