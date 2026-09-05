@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
+const { logSecurityEvent } = require('../services/sessionService');
+const { safeDispositionName } = require('../services/documentSecurityService');
 
 async function ensureSupplierTables() {
   await pool.query(`
@@ -42,6 +44,9 @@ async function ensureSupplierTables() {
   `);
 
   await pool.query('ALTER TABLE supplier_files ADD COLUMN file_data LONGBLOB NULL').catch(() => {});
+  await pool.query("ALTER TABLE supplier_files ADD COLUMN classification VARCHAR(20) NOT NULL DEFAULT 'CONFIDENTIAL'").catch(() => {});
+  await pool.query("ALTER TABLE supplier_files ADD COLUMN scan_status VARCHAR(20) NOT NULL DEFAULT 'UNAVAILABLE'").catch(() => {});
+  await pool.query('ALTER TABLE supplier_files ADD COLUMN size_bytes BIGINT NULL').catch(() => {});
 }
 
 exports.getSuppliers = async (req, res) => {
@@ -68,7 +73,8 @@ exports.getSuppliers = async (req, res) => {
     `);
 
     const [files] = await pool.query(`
-      SELECT sf.*, u.name AS uploaded_by_name
+      SELECT sf.id, sf.supplier_id, sf.file_type, sf.title, sf.notes, sf.original_name, sf.mime_type,
+             sf.classification, sf.scan_status, sf.size_bytes, sf.uploaded_by, sf.created_at, u.name AS uploaded_by_name
       FROM supplier_files sf
       LEFT JOIN users u ON u.id = sf.uploaded_by
       WHERE sf.deleted = 0
@@ -85,7 +91,7 @@ exports.getSuppliers = async (req, res) => {
     res.json({
       suppliers: suppliers.map((supplier) => ({
         ...supplier,
-        files: filesBySupplier[String(supplier.id)] || []
+        files: (filesBySupplier[String(supplier.id)] || []).map((file) => ({ ...file, download_url: `/api/suppliers/files/${file.id}/view` }))
       }))
     });
   } catch (error) {
@@ -190,8 +196,8 @@ exports.saveSupplierFile = async (req, res) => {
     const [result] = await pool.query(
       `
       INSERT INTO supplier_files
-      (supplier_id, file_type, title, notes, original_name, file_path, mime_type, file_data, uploaded_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (supplier_id, file_type, title, notes, original_name, file_path, mime_type, file_data, uploaded_by, classification, scan_status, size_bytes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'CONFIDENTIAL', 'UNAVAILABLE', ?)
       `,
       [
         supplierId,
@@ -202,7 +208,8 @@ exports.saveSupplierFile = async (req, res) => {
         `/uploads/suppliers/${req.file.filename}`,
         req.file.mimetype,
         fileData,
-        req.user.id
+        req.user.id,
+        Number(req.file.size || fileData?.length || 0)
       ]
     );
 
@@ -228,12 +235,13 @@ exports.viewSupplierFile = async (req, res) => {
     if (!file) return res.status(404).json({ message: 'Supplier file not found' });
 
     const mimeType = file.mime_type || 'application/octet-stream';
-    const safeName = String(file.original_name || `supplier-file-${id}`).replace(/"/g, '');
+    const safeName = safeDispositionName(file.original_name || `supplier-file-${id}`);
     const dbBuffer = file.file_data && Buffer.isBuffer(file.file_data) ? file.file_data : null;
 
     if (dbBuffer && dbBuffer.length) {
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id, metadata: { module: 'supplier', fileId: id, classification: 'CONFIDENTIAL' } });
       return res.send(dbBuffer);
     }
 
@@ -241,6 +249,7 @@ exports.viewSupplierFile = async (req, res) => {
     if (filePath && filePath.includes(`${path.sep}uploads${path.sep}suppliers${path.sep}`) && fs.existsSync(filePath)) {
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+      await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id, metadata: { module: 'supplier', fileId: id, classification: 'CONFIDENTIAL' } });
       return fs.createReadStream(filePath).pipe(res);
     }
 

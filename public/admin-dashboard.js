@@ -813,6 +813,7 @@ function setupNavigation() {
       if (btn.dataset.section === 'rosterSection') loadRoster();
       if (btn.dataset.section === 'shiftQrSection') loadShiftQr();
       if (btn.dataset.section === 'companyFormsSection') renderCompanyForms();
+      if (btn.dataset.section === 'securitySection') loadSecurityCentre();
       toggleMobileMenu(false);
     };
   });
@@ -1229,7 +1230,7 @@ function hasCurrentPermission(permission) {
     expenses_input: 'EDIT_FINANCE', tasks: 'MANAGE_JOBS', tasks_input: 'MANAGE_JOBS',
     attendance: 'VIEW_ATTENDANCE', attendance_input: 'EDIT_ATTENDANCE', roster: 'VIEW_ATTENDANCE',
     roster_input: 'EDIT_ATTENDANCE', staff: 'MANAGE_USERS', settings: 'MANAGE_USERS',
-    meetings: 'VIEW_MEETINGS', meetings_input: 'MANAGE_MEETINGS', compliance: 'VIEW_COMPLIANCE',
+    meetings: 'VIEW_MEETINGS', meetings_input: 'MANAGE_MEETINGS', compliance: 'VIEW_COMPLIANCE', security: 'MANAGE_SECURITY',
     compliance_input: 'EDIT_COMPLIANCE', competitors: 'VIEW_CUSTOMERS', stock: 'VIEW_INVENTORY',
     stock_in: 'VIEW_INVENTORY', stock_out: 'VIEW_INVENTORY', raw_material: 'VIEW_INVENTORY',
     packaging: 'VIEW_INVENTORY'
@@ -1262,7 +1263,8 @@ const ADMIN_SECTION_ACCESS = Object.freeze({
   staffSection: ['staff'],
   complianceSection: ['compliance'],
   companyFormsSection: ['compliance', 'settings'],
-  settingsSection: ['settings']
+  settingsSection: ['settings'],
+  securitySection: ['security']
 });
 
 function canAccessAdminSection(sectionId) {
@@ -1276,7 +1278,7 @@ function requestedAdminSection() {
     suppliers: 'supplierSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
     packaging: 'packagingSection', finance: 'financeSection', expenses: 'expenseSection', workforce: 'attendanceSection',
     timesheets: 'attendanceSection', roster: 'rosterSection', staff: 'staffSection',
-    compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection',
+    compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection', security: 'securitySection',
     meetings: 'meetingSection', tasks: 'taskSection'
   };
   return sections[view] || '';
@@ -1358,7 +1360,56 @@ async function loadMe() {
 
   el.innerText = `${data.user.name} | ${data.user.email} | ${role}`;
   syncTopbarUser(currentUser);
+  configureRestrictedWorkspaceView();
   return data.user;
+}
+
+function securitySeverityBadge(value) {
+  const severity = String(value || 'INFO').toUpperCase();
+  return `<span class="security-severity severity-${severity.toLowerCase()}">${escapeHtml(severity)}</span>`;
+}
+
+async function loadSecurityCentre() {
+  if (!hasCurrentPermission('MANAGE_SECURITY')) return;
+  try {
+    const [dashboardRes, eventsRes, auditRes, privilegedRes] = await Promise.all([
+      fetch('/api/security/dashboard', { credentials: 'same-origin' }),
+      fetch('/api/security/events?limit=20', { credentials: 'same-origin' }),
+      fetch('/api/security/audit?limit=20', { credentials: 'same-origin' }),
+      fetch('/api/security/privileged', { credentials: 'same-origin' })
+    ]);
+    if ([dashboardRes, eventsRes, auditRes, privilegedRes].some((response) => response.status === 401)) return redirectToLogin();
+    const [dashboard, events, audit, privileged] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes].map(safeJson));
+    if (!dashboardRes.ok) throw new Error(dashboard.message || 'Security dashboard unavailable');
+    const metrics = dashboard.metrics || {};
+    setText('securityReadinessScore', `${Number(dashboard.readiness?.score || 0)}%`);
+    setText('securityReadinessLabel', dashboard.readiness?.label || 'Review required');
+    setText('securityReadinessDisclaimer', dashboard.readiness?.disclaimer || 'Operational indicator only; not a certification.');
+    setText('securityActiveUsers', metrics.active_users || 0);
+    setText('securityMfaCoverage', `${metrics.mfa_coverage || 0}%`);
+    setText('securityPrivilegedUsers', metrics.privileged_users || 0);
+    setText('securityFailedLogins', metrics.failed_logins_24h || 0);
+    setText('securityLockedAccounts', metrics.locked_accounts || 0);
+    setText('securityActiveSessions', metrics.active_sessions || 0);
+    setText('securityStaleAccounts', metrics.stale_accounts || 0);
+    setText('securityOpenIssues', metrics.open_issues || 0);
+
+    const issueRows = dashboard.issues || [];
+    document.getElementById('securityIssuesBody').innerHTML = issueRows.length ? issueRows.map((item) => `
+      <tr><td>${securitySeverityBadge(item.severity)}</td><td><strong>${escapeHtml(item.title)}</strong></td><td>${escapeHtml(item.detail)}</td><td>${Number(item.count || 0)}</td></tr>
+    `).join('') : '<tr><td colspan="4">No current security issues detected by configured checks.</td></tr>';
+    document.getElementById('securityEventsBody').innerHTML = (events.events || []).length ? events.events.map((item) => `
+      <tr><td>${escapeHtml(formatDateTime(item.created_at))}</td><td>${escapeHtml(item.event_type)}</td><td>${escapeHtml(item.actor_name || 'System')}</td><td>${escapeHtml(item.result)}</td><td>${escapeHtml(item.request_id || '-')}</td></tr>
+    `).join('') : '<tr><td colspan="5">No security events recorded.</td></tr>';
+    document.getElementById('securityAuditBody').innerHTML = (audit.logs || []).length ? audit.logs.map((item) => `
+      <tr><td>${escapeHtml(formatDateTime(item.created_at))}</td><td>${escapeHtml(item.action)}</td><td>${escapeHtml(item.module || '-')}</td><td>${escapeHtml(item.actor_name || item.actor_email || 'System')}</td><td>${escapeHtml(item.record_id || '-')}</td></tr>
+    `).join('') : '<tr><td colspan="5">No audit activity recorded.</td></tr>';
+    document.getElementById('securityPrivilegedBody').innerHTML = (privileged.users || []).length ? privileged.users.map((user) => `
+      <tr><td><strong>${escapeHtml(user.name || user.email)}</strong><br><small>${escapeHtml(user.email)}</small></td><td>${escapeHtml(String(user.role || '').replaceAll('_', ' ').toUpperCase())}</td><td>${escapeHtml(user.account_status || '-')}</td><td>${Number(user.mfa_enabled) === 1 ? 'Enabled' : '<span class="security-warning">Required</span>'}</td><td>${Number(user.active_sessions || 0)}</td><td>${escapeHtml(formatDateTime(user.last_login_at))}</td><td>${escapeHtml(formatDateTime(user.last_security_review_at))}</td></tr>
+    `).join('') : '<tr><td colspan="7">No privileged users found.</td></tr>';
+  } catch (error) {
+    showToast(error.message || 'Security Centre could not be loaded');
+  }
 }
 
 async function loadRestrictedWorkspaceData() {
@@ -1382,6 +1433,7 @@ async function loadRestrictedWorkspaceData() {
   if (hasCurrentPermission('tasks')) jobs.push(loadTasks(), loadAnnouncements());
   if (hasCurrentPermission('staff')) jobs.push(loadStaff(), loadAdminStaffMessages(), loadAdminWorkHubRequests());
   if (hasCurrentPermission('settings')) jobs.push(loadSettings());
+  if (hasCurrentPermission('security')) jobs.push(loadSecurityCentre());
   await Promise.all(jobs);
   renderNotificationDropdown();
 }
@@ -3913,7 +3965,7 @@ function openExpenseFileDialog(id) {
   const fileRows = files.length ? files.map((file) => `
     <div class="file-row expense-file-row">
       <div>
-        <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.original_name || 'Expense bill')}</a>
+        <a href="${escapeHtml(file.download_url || `/api/expenses/files/${file.id}/view`)}" target="_blank" rel="noopener">${escapeHtml(file.original_name || 'Expense bill')}</a>
         <small>
           ${escapeHtml(file.mime_type || 'file')} |
           Uploaded ${escapeHtml(formatDateTime(file.created_at))}
@@ -4385,7 +4437,7 @@ function renderComplianceCard(entry) {
   const files = entry.files || [];
   const fileList = files.map((file) => `
     <div class="file-row">
-      <a href="${escapeHtml(file.file_path)}" target="_blank" rel="noopener">${escapeHtml(file.file_label || file.original_name)}</a>
+      <a href="${escapeHtml(file.download_url || `/api/compliance/files/${file.id}/view`)}" target="_blank" rel="noopener">${escapeHtml(file.file_label || file.original_name)}</a>
       <button class="mini-danger" onclick="deleteComplianceFile(${file.id})">Delete</button>
     </div>
     <small>${escapeHtml(complianceFileTypeLabel(file.file_type))} - Uploaded ${escapeHtml(formatDateTime(file.created_at))} by ${escapeHtml(file.uploaded_by_name || '-')}</small>

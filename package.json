@@ -9,7 +9,7 @@
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
     "typecheck": "node scripts/check-syntax.js",
-    "test": "node scripts/security-foundation-test.js && node scripts/auth-lifecycle-test.js && node scripts/mfa-foundation-test.js && node scripts/authorization-foundation-test.js && node scripts/step-up-authentication-test.js && node scripts/high-risk-finance-test.js && node scripts/secure-user-management-test.js && node scripts/finance-domain-test.js && node scripts/domain-smoke-test.js",
+    "test": "node scripts/security-foundation-test.js && node scripts/auth-lifecycle-test.js && node scripts/mfa-foundation-test.js && node scripts/authorization-foundation-test.js && node scripts/step-up-authentication-test.js && node scripts/high-risk-finance-test.js && node scripts/secure-user-management-test.js && node scripts/file-api-hardening-test.js && node scripts/security-dashboard-test.js && node scripts/finance-domain-test.js && node scripts/domain-smoke-test.js",
     "build": "npm run check",
     "cap:sync:ios": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios"

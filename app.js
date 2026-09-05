@@ -27,9 +27,11 @@ const expenseRoutes = require('./routes/expenseRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const emailRoutes = require('./routes/emailRoutes');
 const highRiskFinanceRoutes = require('./routes/highRiskFinanceRoutes');
+const documentSecurityRoutes = require('./routes/documentSecurityRoutes');
+const securityDashboardRoutes = require('./routes/securityDashboardRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
-const { hasAnyPermission, hasPermission } = require('./services/authorizationService');
+const { hasAnyPermission } = require('./services/authorizationService');
 const pageAuth = require('./middleware/pageAuth');
 const urls = require('./config/urls');
 const {
@@ -94,21 +96,6 @@ function noIndex(req, res, next) {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   res.setHeader('Cache-Control', 'private, no-store');
   next();
-}
-
-function requireUploadPermission(req, res, next) {
-  const pathPermissions = [
-    { prefix: '/rfqs/', permission: 'VIEW_RFQS' },
-    { prefix: '/suppliers/', permission: 'VIEW_SUPPLIERS' },
-    { prefix: '/expenses/', permission: 'VIEW_FINANCE' },
-    { prefix: '/compliance/', permission: 'VIEW_COMPLIANCE' }
-  ];
-  const match = pathPermissions.find((entry) => req.path.startsWith(entry.prefix));
-  const required = match?.permission || 'VIEW_CONFIDENTIAL_FILES';
-  if (!hasPermission(req.user, required)) {
-    return res.status(403).json({ message: 'Access denied: this file is outside your authorised scope', code: 'PERMISSION_DENIED' });
-  }
-  return next();
 }
 
 function sendPage(filename) {
@@ -194,16 +181,6 @@ app.use('/invoices', noIndex, auth, requirePermission('VIEW_FINANCE'), express.s
     res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
   }
 }));
-app.use('/uploads', noIndex, auth, requireUploadPermission, express.static(path.join(__dirname, 'uploads'), {
-  dotfiles: 'deny',
-  index: false,
-  setHeaders(res) {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('Cache-Control', 'private, no-store');
-    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-  }
-}));
-
 app.use('/api/auth', authRoutes);
 
 app.get('/api/qr', async (req, res) => {
@@ -243,6 +220,8 @@ app.use('/api/settings', auth, settingsRoutes);
 app.use('/api/email', auth, requirePermission('MANAGE_COMPANY_EMAIL'), emailRoutes);
 app.use('/api/dashboard', auth, dashboardRoutes);
 app.use('/api/upload', auth, uploadRoutes);
+app.use('/api/documents', auth, documentSecurityRoutes);
+app.use('/api/security', auth, securityDashboardRoutes);
 app.use('/api/tasks', auth, taskRoutes);
 app.use('/api/stock', auth, requirePermission('VIEW_INVENTORY'), stockRoutes);
 app.use('/api/customers', auth, requirePermission('VIEW_CUSTOMERS'), requireInputPermission('EDIT_CUSTOMERS'), customerRoutes);

@@ -5,7 +5,7 @@ const multer = require('multer');
 const expenseController = require('../controllers/expenseController');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const requireStepUp = require('../middleware/stepUpMiddleware');
-const { sanitizeUploadName, secureMulterOptions } = require('../middleware/uploadSecurity');
+const { sanitizeUploadName, secureMulterOptions, validateUploadedFile } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
 const uploadDir = path.join(__dirname, '..', 'uploads', 'expenses');
@@ -33,7 +33,7 @@ router.post('/', requireAnyPermission('EDIT_FINANCE'), expenseController.saveExp
 router.post('/:id/payments', requireAnyPermission('POST_TRANSACTION'), requireStepUp('RECORD_EXPENSE_PAYMENT'), expenseController.recordExpensePayment);
 router.post('/payments/:paymentId/void', requireAnyPermission('VOID_TRANSACTION'), requireStepUp('VOID_EXPENSE_PAYMENT'), expenseController.voidExpensePayment);
 router.post('/delete', requireAnyPermission('VOID_TRANSACTION'), requireStepUp('DELETE_EXPENSE'), expenseController.deleteExpense);
-router.post('/:id/files', requireAnyPermission('EDIT_FINANCE'), upload.single('file'), expenseController.saveExpenseFile);
+router.post('/:id/files', requireAnyPermission('EDIT_FINANCE'), upload.single('file'), validateUploadedFile, expenseController.saveExpenseFile);
 router.post('/files/delete', requireAnyPermission('EDIT_FINANCE'), expenseController.deleteExpenseFile);
 
 module.exports = router;

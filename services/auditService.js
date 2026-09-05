@@ -1,6 +1,8 @@
+const { redactSensitive } = require('../utils/securityRedaction');
+
 function serialize(value) {
   if (value === undefined || value === null) return null;
-  return typeof value === 'string' ? value : JSON.stringify(value);
+  return typeof value === 'string' ? value.slice(0, 4000) : JSON.stringify(redactSensitive(value));
 }
 
 async function logAudit(db, entry) {
@@ -16,8 +18,8 @@ async function logAudit(db, entry) {
       entry.module,
       entry.recordType || null,
       String(entry.recordId || ''),
-      serialize(entry.oldValue),
-      serialize(entry.newValue),
+      serialize(redactSensitive(entry.oldValue)),
+      serialize(redactSensitive(entry.newValue)),
       entry.ipAddress || null,
       entry.userAgent || null
     ]
@@ -37,7 +39,7 @@ async function logActivity(db, entry) {
       entry.eventType,
       entry.message || null,
       entry.actorId || null,
-      serialize(entry.metadata)
+      serialize(redactSensitive(entry.metadata))
     ]
   );
 }
