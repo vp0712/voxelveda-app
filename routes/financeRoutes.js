@@ -5,6 +5,7 @@ const requireInputPermission = require('../middleware/inputPermissionMiddleware'
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const requireStepUp = require('../middleware/stepUpMiddleware');
+const requireSensitiveExportApproval = require('../middleware/sensitiveExportMiddleware');
 const highRiskPaymentGuard = require('../middleware/highRiskPaymentMiddleware');
 
 const router = express.Router();
@@ -25,8 +26,8 @@ router.post('/transactions/:id/void', requireAnyPermission('VOID_TRANSACTION'), 
 router.get('/journals', controller.getJournals);
 router.post('/journals', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CREATE_MANUAL_JOURNAL'), controller.createJournal);
 router.get('/reports', controller.getReports);
-router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), controller.downloadTrialBalanceCsv);
-router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
+router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), controller.downloadTrialBalanceCsv);
+router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
 
 router.get('/supplier-bills', operations.getSupplierBills);
 router.get('/supplier-bills/:id', operations.getSupplierBill);

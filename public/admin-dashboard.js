@@ -1369,20 +1369,29 @@ function securitySeverityBadge(value) {
   return `<span class="security-severity severity-${severity.toLowerCase()}">${escapeHtml(severity)}</span>`;
 }
 
+function displayJsonList(value) {
+  if (Array.isArray(value)) return value.join(', ');
+  try { const parsed = JSON.parse(value || '[]'); return Array.isArray(parsed) ? parsed.join(', ') : ''; } catch { return ''; }
+}
+
 let securityIncidentCache = [];
 
 async function loadSecurityCentre() {
   if (!hasCurrentPermission('MANAGE_SECURITY')) return;
   try {
-    const [dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes] = await Promise.all([
+    const [dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes] = await Promise.all([
       fetch('/api/security/dashboard', { credentials: 'same-origin' }),
       fetch('/api/security/events?limit=20', { credentials: 'same-origin' }),
       fetch('/api/security/audit?limit=20', { credentials: 'same-origin' }),
       fetch('/api/security/privileged', { credentials: 'same-origin' }),
-      fetch('/api/security/incidents', { credentials: 'same-origin' })
+      fetch('/api/security/incidents', { credentials: 'same-origin' }),
+      fetch('/api/security/operations/summary', { credentials: 'same-origin' }),
+      fetch('/api/security/operations/catalog', { credentials: 'same-origin' }),
+      fetch('/api/security/operations/api-tokens', { credentials: 'same-origin' }),
+      fetch('/api/security/operations/exports', { credentials: 'same-origin' })
     ]);
-    if ([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes].some((response) => response.status === 401)) return redirectToLogin();
-    const [dashboard, events, audit, privileged, incidents] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes].map(safeJson));
+    if ([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes].some((response) => response.status === 401)) return redirectToLogin();
+    const [dashboard, events, audit, privileged, incidents, trust, trustCatalog, tokenData, exportData] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes].map(safeJson));
     if (!dashboardRes.ok) throw new Error(dashboard.message || 'Security dashboard unavailable');
     const metrics = dashboard.metrics || {};
     setText('securityReadinessScore', `${Number(dashboard.readiness?.score || 0)}%`);
@@ -1397,6 +1406,34 @@ async function loadSecurityCentre() {
     setText('securityStaleAccounts', metrics.stale_accounts || 0);
     setText('securityOpenIssues', metrics.open_issues || 0);
     setText('securityOpenIncidents', metrics.open_incidents || 0);
+
+    const trustMetrics = trust.metrics || {};
+    setText('trustApiTokens', trustMetrics.active_api_tokens || 0);
+    setText('trustWebhooks', trustMetrics.active_webhooks || 0);
+    setText('trustPendingExports', trustMetrics.pending_exports || 0);
+    setText('trustLegalHolds', trustMetrics.legal_holds || 0);
+    setText('trustScanReview', trustMetrics.documents_requiring_scan_review || 0);
+    setText('trustBackups', trustMetrics.verified_backups_7d || 0);
+    setText('trustAlertRules', trustMetrics.active_alert_rules || 0);
+    setText('trustDevices', trustMetrics.trusted_devices || 0);
+    const controlLabels = {
+      webhook_signing_configured: 'Signed webhooks', malware_provider_configured: 'Malware scanner',
+      backup_provider_attested: 'Backup provider', outbound_allowlist_configured: 'Outbound allowlist'
+    };
+    document.getElementById('operationalControlStatus').innerHTML = Object.entries(controlLabels).map(([key, label]) =>
+      `<span class="security-posture ${trust.controls?.[key] ? 'secure' : 'warning'}">${escapeHtml(label)} · ${trust.controls?.[key] ? 'Configured' : 'Restricted'}</span>`
+    ).join('');
+    document.getElementById('securityApiTokensBody').innerHTML = (tokenData.tokens || []).length ? tokenData.tokens.map((token) => `
+      <tr><td><strong>${escapeHtml(token.token_name)}</strong><br><small>${escapeHtml(token.token_prefix || '')}…</small></td><td>${escapeHtml(token.user_name || token.user_email)}</td><td>${escapeHtml(displayJsonList(token.scopes_json))}</td><td>${escapeHtml(formatDateTime(token.expires_at))}</td><td>${escapeHtml(formatDateTime(token.last_used_at))}</td></tr>
+    `).join('') : '<tr><td colspan="5">No scoped API tokens.</td></tr>';
+    const governanceRows = [
+      ...(trustCatalog.retention || []).map((item) => ['Retention', `${item.data_category} · ${item.retention_days} days`, Number(item.active) ? 'Active' : 'Disabled']),
+      ...(trustCatalog.secrets || []).map((item) => ['Secret', `${item.secret_name} · ${item.key_version}`, item.status]),
+      ...(trustCatalog.backups || []).map((item) => ['Backup', `${item.provider} · ${formatDateTime(item.backup_completed_at)}`, item.status]),
+      ...(trustCatalog.alerts || []).map((item) => ['Alert', item.display_name, Number(item.active) ? item.severity : 'Disabled']),
+      ...(exportData.requests || []).map((item) => ['Export', `${item.export_type} · ${item.requested_by_name || 'Unknown'}`, item.status === 'PENDING_APPROVAL' ? `<button class="small-btn" onclick="approveSensitiveExport('${escapeHtml(item.id)}')">Approve</button>` : item.status])
+    ];
+    document.getElementById('securityGovernanceBody').innerHTML = governanceRows.length ? governanceRows.slice(0, 30).map((item) => `<tr><td>${escapeHtml(item[0])}</td><td>${escapeHtml(item[1])}</td><td>${item[0] === 'Export' && String(item[2]).includes('<button') ? item[2] : escapeHtml(item[2])}</td></tr>`).join('') : '<tr><td colspan="3">No governance records yet.</td></tr>';
 
     const issueRows = dashboard.issues || [];
     document.getElementById('securityIssuesBody').innerHTML = issueRows.length ? issueRows.map((item) => `
@@ -1418,6 +1455,53 @@ async function loadSecurityCentre() {
   } catch (error) {
     showToast(error.message || 'Security Centre could not be loaded');
   }
+}
+
+function openApiTokenDialog() {
+  const users = staffCache.map((user) => `<option value="${Number(user.id)}">${escapeHtml(user.name || user.email)} · ${escapeHtml(user.role || '')}</option>`).join('');
+  const tomorrow = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  showDialog('Create Scoped API Token', `
+    <div class="finance-risk-banner high"><strong>SENSITIVE CREDENTIAL</strong><span>The token is displayed once. Grant only the minimum permissions and use a short expiry.</span></div>
+    <label>User<select id="apiTokenUser">${users}</select></label>
+    <label>Token name<input id="apiTokenName" maxlength="120" placeholder="Inventory integration"></label>
+    <label>Permission scopes<textarea id="apiTokenScopes" rows="4" placeholder="VIEW_INVENTORY, EDIT_INVENTORY"></textarea></label>
+    <label>Expiry date<input id="apiTokenExpiry" type="date" value="${tomorrow}"></label>`, async () => {
+      const response = await fetch('/api/security/operations/api-tokens', { method: 'POST', headers: authHeaders(), body: JSON.stringify({
+        user_id: Number(document.getElementById('apiTokenUser').value), name: document.getElementById('apiTokenName').value,
+        scopes: document.getElementById('apiTokenScopes').value.split(',').map((item) => item.trim()).filter(Boolean),
+        expires_at: `${document.getElementById('apiTokenExpiry').value}T23:59:59.000Z`
+      }) });
+      const data = await safeJson(response);
+      if (!response.ok) return showToast(data.message || 'API token could not be created');
+      showDialog('Copy Token Now', `<div class="finance-risk-banner high"><strong>DISPLAYED ONCE</strong><span>Store this in the integration secret manager. It cannot be recovered.</span></div><label>API token<textarea readonly rows="4">${escapeHtml(data.token)}</textarea></label>`, async () => { hideDialog(); await loadSecurityCentre(); }, 'I Saved It');
+    }, 'Create Token');
+}
+
+function openSensitiveExportDialog() {
+  showDialog('Request Sensitive Export', `
+    <div class="finance-risk-banner high"><strong>DUAL CONTROL</strong><span>A different authorised user must approve this request within 30 minutes.</span></div>
+    <label>Export type<select id="sensitiveExportType"><option>FINANCE</option><option>BANKING</option><option>PAYROLL</option><option>STAFF</option><option>CUSTOMERS</option><option>ACCOUNTANT_PACK</option></select></label>
+    <label>Business reason<textarea id="sensitiveExportReason" rows="4" maxlength="500"></textarea></label>`, async () => {
+      const response = await fetch('/api/security/operations/exports', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ export_type: document.getElementById('sensitiveExportType').value, reason: document.getElementById('sensitiveExportReason').value, parameters: {} }) });
+      const data = await safeJson(response); showToast(data.message || 'Export request failed'); if (response.ok) { hideDialog(); await loadSecurityCentre(); }
+    }, 'Request Approval');
+}
+
+function approveSensitiveExport(id) {
+  showDialog('Approve Sensitive Export', `
+    <div class="finance-risk-banner high"><strong>INDEPENDENT APPROVAL</strong><span>You cannot approve your own request. Review the export purpose before continuing.</span></div>
+    <label>Approval reason<textarea id="sensitiveExportApprovalReason" rows="4" maxlength="500"></textarea></label>
+    <label>Type APPROVE SENSITIVE EXPORT<input id="sensitiveExportApprovalConfirmation" autocomplete="off"></label>`, async () => {
+      const response = await fetch(`/api/security/operations/exports/${encodeURIComponent(id)}/approve`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ reason: document.getElementById('sensitiveExportApprovalReason').value, confirmation: document.getElementById('sensitiveExportApprovalConfirmation').value }) });
+      const data = await safeJson(response); showToast(data.message || 'Approval failed'); if (response.ok) { hideDialog(); await loadSecurityCentre(); }
+    }, 'Approve Export');
+}
+
+async function createOperationalEvidence() {
+  const response = await fetch('/api/security/operations/evidence/snapshots', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ days: 30 }) });
+  const data = await safeJson(response);
+  showToast(response.ok ? `Evidence snapshot created: ${String(data.content_sha256 || '').slice(0, 12)}…` : (data.message || 'Evidence snapshot failed'));
+  if (response.ok) await loadSecurityCentre();
 }
 
 function openSecurityIncidentDialog() {

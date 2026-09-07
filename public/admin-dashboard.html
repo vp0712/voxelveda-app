@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260816-invoice-delivery-ux"/>
+<link rel="stylesheet" href="/style.css?v=20260907-operational-trust"/>
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
 <link rel="stylesheet" href="/step-up.css?v=20260905"/>
   <link rel="stylesheet" href="/advanced-theme.css?v=20260906-security-centre" />
@@ -1508,6 +1508,32 @@
           <div class="card"><h3>Open Incidents</h3><p><strong id="securityOpenIncidents">0</strong></p></div>
         </div>
 
+        <div class="card operational-trust-panel">
+          <div class="section-head">
+            <div><span class="eyebrow">Phases 14–25</span><h3>Operational Trust Controls</h3><p>Integration credentials, export approvals, retention, recovery evidence and data-loss controls.</p></div>
+            <div class="section-actions">
+              <button type="button" class="primary-btn" onclick="openApiTokenDialog()">Create Scoped Token</button>
+              <button type="button" class="secondary-btn" onclick="openSensitiveExportDialog()">Request Export</button>
+              <button type="button" class="secondary-btn" onclick="createOperationalEvidence()">Snapshot Evidence</button>
+            </div>
+          </div>
+          <div class="metric-grid security-metric-grid">
+            <div class="card"><h3>API Tokens</h3><p><strong id="trustApiTokens">0</strong></p></div>
+            <div class="card"><h3>Webhook Sources</h3><p><strong id="trustWebhooks">0</strong></p></div>
+            <div class="card"><h3>Pending Exports</h3><p><strong id="trustPendingExports">0</strong></p></div>
+            <div class="card"><h3>Legal Holds</h3><p><strong id="trustLegalHolds">0</strong></p></div>
+            <div class="card"><h3>Scan Review</h3><p><strong id="trustScanReview">0</strong></p></div>
+            <div class="card"><h3>Verified Backups</h3><p><strong id="trustBackups">0</strong></p></div>
+            <div class="card"><h3>Alert Rules</h3><p><strong id="trustAlertRules">0</strong></p></div>
+            <div class="card"><h3>Trusted Devices</h3><p><strong id="trustDevices">0</strong></p></div>
+          </div>
+          <div id="operationalControlStatus" class="security-control-strip">Loading control status…</div>
+          <div class="security-ledger-grid">
+            <div class="table-wrap"><h4>Scoped API Tokens</h4><table><thead><tr><th>Name</th><th>User</th><th>Scopes</th><th>Expires</th><th>Last Used</th></tr></thead><tbody id="securityApiTokensBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+            <div class="table-wrap"><h4>Governance Register</h4><table><thead><tr><th>Control</th><th>Record</th><th>Status</th></tr></thead><tbody id="securityGovernanceBody"><tr><td colspan="3">Loading…</td></tr></tbody></table></div>
+          </div>
+        </div>
+
         <div class="card table-wrap">
           <div class="section-head"><div><h3>Security Issues</h3><p>Prioritised findings based on current application data and configuration.</p></div></div>
           <table><thead><tr><th>Severity</th><th>Issue</th><th>Detail</th><th>Count</th></tr></thead><tbody id="securityIssuesBody"><tr><td colspan="4">Loading...</td></tr></tbody></table>
@@ -1688,7 +1714,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260905"></script>
-  <script src="/admin-dashboard.js?v=20260906-security-centre"></script>
+  <script src="/admin-dashboard.js?v=20260907-operational-trust"></script>
   <script src="/expense-payments.js?v=20260904"></script>
 </body>
 </html>

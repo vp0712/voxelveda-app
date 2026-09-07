@@ -13,6 +13,11 @@
 - [ ] Confirm required database and JWT variables exist.
 - [ ] Generate a unique 32-byte `SHIFT_QR_SIGNING_KEY`; never reuse another application secret.
 - [ ] Run `npm run readiness:check` against the intended production environment before rollout.
+- [ ] Apply `migrations/20260907_operational_trust.sql` or verify `Operational trust schema ready.` in deployment logs.
+- [ ] Leave `DUAL_CONTROL_EXPORTS=false` until two different authorised users have tested request, approval and one-time consumption.
+- [ ] Configure `WEBHOOK_SIGNING_KEY` only when signed integrations are enabled; record its version without storing its value in the database.
+- [ ] Keep `OUTBOUND_ALLOWED_HOSTS` empty unless a backend integration needs an exact reviewed HTTPS hostname.
+- [ ] Do not configure `MALWARE_SCANNER_PROVIDER` or `BACKUP_STATUS_PROVIDER=configured` without real provider-backed evidence.
 - [ ] Add custom-domain variables from `.env.example`.
 - [ ] Keep `FORCE_CANONICAL_HOST=false`.
 - [ ] Deploy and monitor build/runtime logs.

@@ -44,6 +44,8 @@ function assessProductionReadiness(env = process.env) {
   if (production && !validHttpsUrl(env.APP_URL || env.PUBLIC_APP_URL)) failures.push('APP_URL must be an HTTPS production URL');
 
   if (production && !env.MALWARE_SCANNER_PROVIDER) warnings.push('MALWARE_SCANNER_PROVIDER is not configured; uploads remain unavailable for automated malware scanning');
+  if (production && !env.WEBHOOK_SIGNING_KEY) warnings.push('WEBHOOK_SIGNING_KEY is not configured; signed integration webhooks remain disabled');
+  if (production && !env.OUTBOUND_ALLOWED_HOSTS) warnings.push('OUTBOUND_ALLOWED_HOSTS is empty; backend URL fetches remain deny-by-default');
   if (production && env.BACKUP_STATUS_PROVIDER !== 'configured') warnings.push('Database backup status is not attested by a configured provider');
   if (production && env.RATE_LIMIT_STORE !== 'redis') warnings.push('Rate limiting is process-local; configure a shared Redis-backed limiter before scaling beyond one replica');
   if (production && env.FORCE_CANONICAL_HOST !== 'true') warnings.push('Canonical-host enforcement remains disabled until custom-domain DNS and TLS are verified');

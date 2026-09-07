@@ -4,7 +4,7 @@ const path = require('path');
 const pool = require('../config/db');
 const { hasPermission } = require('./authorizationService');
 const { ensureSecurityOperationsSchema } = require('./securityOperationsSchema');
-const { currentScanStatus } = require('./malwareScanService');
+const { currentScanStatus, queueDocumentScan } = require('./malwareScanService');
 const { logSecurityEvent } = require('./sessionService');
 
 const UPLOAD_ROOT = path.resolve(__dirname, '..', 'uploads');
@@ -20,15 +20,17 @@ async function registerDocument({ module, recordType, recordId, ownerUserId, upl
   const id = crypto.randomUUID();
   const safePath = safeStoredPath(file.path);
   if (!safePath) throw Object.assign(new Error('Upload storage path rejected'), { status: 400 });
+  const scanStatus = currentScanStatus();
   await pool.query(
     `INSERT INTO secure_documents
      (id, module, record_type, record_id, owner_user_id, uploaded_by, original_name, stored_name,
       storage_path, mime_type, size_bytes, classification, scan_status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [id, module, recordType, String(recordId), ownerUserId || null, uploadedBy, file.originalname,
-      file.filename, safePath, file.mimetype, Number(file.size || 0), classification, currentScanStatus()]
+      file.filename, safePath, file.mimetype, Number(file.size || 0), classification, scanStatus]
   );
-  return { id, classification, scan_status: currentScanStatus(), download_url: `/api/documents/${id}/download` };
+  if (scanStatus === 'PENDING_SCAN') await queueDocumentScan(id, uploadedBy);
+  return { id, classification, scan_status: scanStatus, download_url: `/api/documents/${id}/download` };
 }
 
 async function getAuthorisedDocument(user, id) {

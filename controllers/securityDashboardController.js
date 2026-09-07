@@ -2,6 +2,7 @@ const pool = require('../config/db');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { ensureSecurityOperationsSchema } = require('../services/securityOperationsSchema');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
+const { ensureOperationalTrustSchema } = require('../services/operationalTrustSchema');
 const { redactSensitive } = require('../utils/securityRedaction');
 const { assessProductionReadiness } = require('../config/productionReadiness');
 
@@ -9,7 +10,7 @@ const PRIVILEGED_ROLES = ['super_admin', 'admin', 'finance_admin', 'accountant',
 const HIGH_RISK_EVENTS = ['ROLE_CHANGED', 'PERMISSION_CHANGED', 'USER_DISABLED', 'ACCOUNT_TERMINATED', 'BANK_DETAILS_CHANGED', 'PAYMENT_APPROVED', 'SENSITIVE_EXPORT', 'MFA_DISABLED', 'SECURITY_SETTING_CHANGED'];
 
 async function ensureSchemas() {
-  await Promise.all([ensureSecuritySchema(), ensureSecurityOperationsSchema(), ensureWorkforceSchema()]);
+  await Promise.all([ensureSecuritySchema(), ensureSecurityOperationsSchema(), ensureOperationalTrustSchema(), ensureWorkforceSchema()]);
 }
 
 function safePage(query) {
@@ -59,6 +60,12 @@ async function collectIssues() {
   }
   const [[criticalIncidents]] = await pool.query("SELECT COUNT(*) AS count FROM security_incidents WHERE severity = 'CRITICAL' AND status NOT IN ('RESOLVED','CLOSED')");
   if (Number(criticalIncidents.count)) issues.push(issue('open-critical-incidents', 'CRITICAL', 'Critical security incidents remain open', 'Review containment and recovery evidence in the Incident Response register.', Number(criticalIncidents.count)));
+  const [[unverifiedBackups]] = await pool.query("SELECT COUNT(*) AS count FROM backup_attestations WHERE status = 'VERIFIED' AND backup_completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+  if (!Number(unverifiedBackups.count)) issues.push(issue('backup-evidence-stale', 'HIGH', 'No recent verified backup evidence', 'Record provider-backed backup evidence and test restoration. Do not rely on an unverified status badge.'));
+  const [[pendingExports]] = await pool.query("SELECT COUNT(*) AS count FROM sensitive_export_requests WHERE status = 'PENDING_APPROVAL' AND expires_at > NOW()");
+  if (Number(pendingExports.count)) issues.push(issue('pending-sensitive-exports', 'MEDIUM', 'Sensitive exports await independent approval', 'Review or allow the requests to expire.', Number(pendingExports.count)));
+  const [[staleSecrets]] = await pool.query("SELECT COUNT(*) AS count FROM security_secret_inventory WHERE rotated_at IS NULL OR rotated_at < DATE_SUB(NOW(), INTERVAL rotate_after_days DAY)");
+  if (Number(staleSecrets.count)) issues.push(issue('secret-rotation-overdue', 'HIGH', 'Security secret rotation reviews are overdue', 'Rotate through the deployment secret manager and record metadata only.', Number(staleSecrets.count)));
   return issues;
 }
 

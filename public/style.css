@@ -13677,3 +13677,28 @@ html.mobile-menu-open main {
 .security-action-summary { display:flex; flex-direction:column; gap:5px; }
 .security-action-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 @media (max-width:620px) { .security-action-grid { grid-template-columns:1fr; } }
+.operational-trust-panel {
+  border: 1px solid rgba(65, 211, 193, .28);
+  background: linear-gradient(145deg, rgba(5, 28, 39, .96), rgba(9, 18, 31, .98));
+}
+
+.security-control-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin: 1rem 0;
+  padding: .9rem;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, .2);
+}
+
+.operational-trust-panel .table-wrap {
+  min-width: 0;
+  overflow-x: auto;
+}
+
+@media (max-width: 760px) {
+  .security-control-strip { align-items: stretch; flex-direction: column; }
+  .operational-trust-panel .section-actions { width: 100%; }
+  .operational-trust-panel .section-actions button { width: 100%; }
+}

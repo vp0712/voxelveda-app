@@ -10,7 +10,7 @@ const valid = {
   ALLOW_LEGACY_QUERY_TOKENS: 'false', ENABLE_ADMIN_BOOTSTRAP: 'false',
   ALLOW_PUBLIC_ADMIN_REGISTRATION: 'false', DEBUG_AUTH_BYPASS: 'false',
   RATE_LIMIT_STORE: 'redis', MALWARE_SCANNER_PROVIDER: 'clamav', BACKUP_STATUS_PROVIDER: 'configured',
-  FORCE_CANONICAL_HOST: 'true'
+  FORCE_CANONICAL_HOST: 'true', WEBHOOK_SIGNING_KEY: 'w'.repeat(48), OUTBOUND_ALLOWED_HOSTS: 'api.example.com'
 };
 
 assert.equal(secretBytes(key(9)), 32);
