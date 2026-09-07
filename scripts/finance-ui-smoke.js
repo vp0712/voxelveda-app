@@ -2,8 +2,12 @@ const { chromium } = require('playwright');
 const fs = require('fs');
 
 const baseUrl = String(process.env.UI_BASE_URL || 'http://localhost:5001').replace(/\/$/, '');
-const email = process.env.UI_ADMIN_EMAIL || 'admin@test.com';
-const password = process.env.UI_ADMIN_PASSWORD || '123456';
+const email = String(process.env.UI_ADMIN_EMAIL || '').trim();
+const password = String(process.env.UI_ADMIN_PASSWORD || '');
+
+if (!email || !password) {
+  throw new Error('UI_ADMIN_EMAIL and UI_ADMIN_PASSWORD must be supplied through the test environment');
+}
 
 const viewports = [
   { name: 'phone-360', width: 360, height: 800 },
@@ -22,9 +26,8 @@ async function authenticate(page) {
     data: { email, password }
   });
   const payload = await response.json();
-  assert(response.ok() && payload.token && payload.user, `Login failed: ${payload.message || response.status()}`);
-  await page.addInitScript(({ token, user }) => {
-    localStorage.setItem('token', token);
+  assert(response.ok() && payload.user, `Login failed: ${payload.message || response.status()}`);
+  await page.addInitScript(({ user }) => {
     localStorage.setItem('user', JSON.stringify(user));
     localStorage.setItem('role', user.role);
   }, payload);

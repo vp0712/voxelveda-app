@@ -1369,17 +1369,20 @@ function securitySeverityBadge(value) {
   return `<span class="security-severity severity-${severity.toLowerCase()}">${escapeHtml(severity)}</span>`;
 }
 
+let securityIncidentCache = [];
+
 async function loadSecurityCentre() {
   if (!hasCurrentPermission('MANAGE_SECURITY')) return;
   try {
-    const [dashboardRes, eventsRes, auditRes, privilegedRes] = await Promise.all([
+    const [dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes] = await Promise.all([
       fetch('/api/security/dashboard', { credentials: 'same-origin' }),
       fetch('/api/security/events?limit=20', { credentials: 'same-origin' }),
       fetch('/api/security/audit?limit=20', { credentials: 'same-origin' }),
-      fetch('/api/security/privileged', { credentials: 'same-origin' })
+      fetch('/api/security/privileged', { credentials: 'same-origin' }),
+      fetch('/api/security/incidents', { credentials: 'same-origin' })
     ]);
-    if ([dashboardRes, eventsRes, auditRes, privilegedRes].some((response) => response.status === 401)) return redirectToLogin();
-    const [dashboard, events, audit, privileged] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes].map(safeJson));
+    if ([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes].some((response) => response.status === 401)) return redirectToLogin();
+    const [dashboard, events, audit, privileged, incidents] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes].map(safeJson));
     if (!dashboardRes.ok) throw new Error(dashboard.message || 'Security dashboard unavailable');
     const metrics = dashboard.metrics || {};
     setText('securityReadinessScore', `${Number(dashboard.readiness?.score || 0)}%`);
@@ -1393,6 +1396,7 @@ async function loadSecurityCentre() {
     setText('securityActiveSessions', metrics.active_sessions || 0);
     setText('securityStaleAccounts', metrics.stale_accounts || 0);
     setText('securityOpenIssues', metrics.open_issues || 0);
+    setText('securityOpenIncidents', metrics.open_incidents || 0);
 
     const issueRows = dashboard.issues || [];
     document.getElementById('securityIssuesBody').innerHTML = issueRows.length ? issueRows.map((item) => `
@@ -1407,9 +1411,93 @@ async function loadSecurityCentre() {
     document.getElementById('securityPrivilegedBody').innerHTML = (privileged.users || []).length ? privileged.users.map((user) => `
       <tr><td><strong>${escapeHtml(user.name || user.email)}</strong><br><small>${escapeHtml(user.email)}</small></td><td>${escapeHtml(String(user.role || '').replaceAll('_', ' ').toUpperCase())}</td><td>${escapeHtml(user.account_status || '-')}</td><td>${Number(user.mfa_enabled) === 1 ? 'Enabled' : '<span class="security-warning">Required</span>'}</td><td>${Number(user.active_sessions || 0)}</td><td>${escapeHtml(formatDateTime(user.last_login_at))}</td><td>${escapeHtml(formatDateTime(user.last_security_review_at))}</td></tr>
     `).join('') : '<tr><td colspan="7">No privileged users found.</td></tr>';
+    securityIncidentCache = incidents.incidents || [];
+    document.getElementById('securityIncidentsBody').innerHTML = securityIncidentCache.length ? securityIncidentCache.map((incident) => `
+      <tr><td>${securitySeverityBadge(incident.severity)}</td><td><strong>${escapeHtml(incident.title)}</strong><br><small>${escapeHtml(incident.summary || '')}</small></td><td>${statusBadge(String(incident.status || '').toLowerCase())}</td><td>${escapeHtml(incident.commander_name || incident.opened_by_name || '-')}</td><td>${escapeHtml(formatDateTime(incident.opened_at))}</td><td>${Number(incident.action_count || 0)}</td><td><button class="small-btn" onclick="openIncidentActionDialog('${escapeHtml(incident.id)}')">Manage</button></td></tr>
+    `).join('') : '<tr><td colspan="7">No security incidents recorded.</td></tr>';
   } catch (error) {
     showToast(error.message || 'Security Centre could not be loaded');
   }
+}
+
+function openSecurityIncidentDialog() {
+  showDialog('Open Security Incident', `
+    <div class="dialog-card">
+      <p class="finance-report-note">Use this for suspected compromise, unauthorised access, data exposure or another security event. Do not include passwords, tokens or full bank details.</p>
+      <label>Incident title<input id="securityIncidentTitle" maxlength="180" placeholder="Short factual title"></label>
+      <label>Severity<select id="securityIncidentSeverity"><option>CRITICAL</option><option>HIGH</option><option selected>MEDIUM</option><option>LOW</option></select></label>
+      <label>Scope<select id="securityIncidentScope"><option>ACCOUNT</option><option>FINANCE</option><option>DOCUMENT</option><option>APPLICATION</option><option>ORGANISATION</option></select></label>
+      <label>Known facts<textarea id="securityIncidentSummary" maxlength="2000" rows="5" placeholder="What was observed, when, and which systems may be affected"></textarea></label>
+    </div>`, async () => {
+      const response = await fetch('/api/security/incidents', { method: 'POST', headers: authHeaders(), body: JSON.stringify({
+        title: document.getElementById('securityIncidentTitle').value,
+        severity: document.getElementById('securityIncidentSeverity').value,
+        scope: document.getElementById('securityIncidentScope').value,
+        summary: document.getElementById('securityIncidentSummary').value
+      }) });
+      const data = await safeJson(response);
+      if (!response.ok) return showToast(data.message || 'Incident could not be opened');
+      hideDialog(); showToast(data.message); await loadSecurityCentre();
+    }, 'Open Incident');
+}
+
+async function openIncidentActionDialog(id) {
+  const response = await fetch(`/api/security/incidents/${encodeURIComponent(id)}`, { credentials: 'same-origin' });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Incident could not be loaded');
+  const incident = data.incident || {};
+  const userOptions = staffCache.filter((user) => Number(user.id) !== Number(currentUser.id)).map((user) => `<option value="${Number(user.id)}">${escapeHtml(user.name || user.email)} · ${escapeHtml(user.role || '')}</option>`).join('');
+  const actionRows = (data.actions || []).map((action) => `<li><strong>${escapeHtml(action.action_type)}</strong> · ${escapeHtml(action.actor_name || 'System')} · ${escapeHtml(formatDateTime(action.created_at))}<br><span>${escapeHtml(action.reason)}</span></li>`).join('');
+  showDialog(`Incident · ${escapeHtml(incident.title || '')}`, `
+    <div class="security-incident-dialog">
+      <section class="dialog-card"><p>${securitySeverityBadge(incident.severity)} ${statusBadge(String(incident.status || '').toLowerCase())}</p><p>${escapeHtml(incident.summary || '')}</p></section>
+      <section class="dialog-card"><h4>Append investigation note</h4><textarea id="incidentNote" rows="3" maxlength="1000"></textarea><button class="secondary-btn" type="button" onclick="submitIncidentNote('${escapeHtml(id)}')">Add Note</button></section>
+      <section class="dialog-card"><h4>Account containment and recovery</h4><select id="incidentTargetUser"><option value="">Select affected user</option>${userOptions}</select><textarea id="incidentUserReason" rows="3" maxlength="1000" placeholder="Evidence and reason"></textarea><div class="hero-actions"><button class="danger-btn" type="button" onclick="containIncidentUser('${escapeHtml(id)}')">Contain Account</button><button class="secondary-btn" type="button" onclick="prepareIncidentRecovery('${escapeHtml(id)}')">Start Recovery</button></div></section>
+      <section class="dialog-card"><h4>Incident status</h4><select id="incidentNextStatus"><option>INVESTIGATING</option><option>CONTAINED</option><option>RESOLVED</option><option>CLOSED</option></select><textarea id="incidentStatusReason" rows="2" maxlength="1000" placeholder="Decision and supporting evidence"></textarea><button class="secondary-btn" type="button" onclick="changeIncidentStatus('${escapeHtml(id)}')">Update Status</button></section>
+      <section class="dialog-card"><h4>Immutable action history</h4><ol class="incident-history">${actionRows || '<li>No actions recorded.</li>'}</ol></section>
+    </div>`, hideDialog, 'Close');
+}
+
+async function incidentActionRequest(url, body) {
+  const response = await fetch(url, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
+  const data = await safeJson(response);
+  showToast(data.message || (response.ok ? 'Security action completed' : 'Security action failed'));
+  if (response.ok) { hideDialog(); await loadSecurityCentre(); }
+  return response.ok;
+}
+
+function submitIncidentNote(id) { return incidentActionRequest(`/api/security/incidents/${encodeURIComponent(id)}/notes`, { note: document.getElementById('incidentNote').value }); }
+function containIncidentUser(id) { return incidentActionRequest(`/api/security/incidents/${encodeURIComponent(id)}/contain-user`, { target_user_id: Number(document.getElementById('incidentTargetUser').value), reason: document.getElementById('incidentUserReason').value }); }
+function prepareIncidentRecovery(id) { return incidentActionRequest(`/api/security/incidents/${encodeURIComponent(id)}/prepare-recovery`, { target_user_id: Number(document.getElementById('incidentTargetUser').value), reason: document.getElementById('incidentUserReason').value }); }
+function changeIncidentStatus(id) { return incidentActionRequest(`/api/security/incidents/${encodeURIComponent(id)}/status`, { status: document.getElementById('incidentNextStatus').value, reason: document.getElementById('incidentStatusReason').value }); }
+
+function openOrganisationRevokeDialog() {
+  const incidentOptions = securityIncidentCache.filter((incident) => !['RESOLVED', 'CLOSED'].includes(incident.status)).map((incident) => `<option value="${escapeHtml(incident.id)}">${escapeHtml(incident.severity)} · ${escapeHtml(incident.title)}</option>`).join('');
+  showDialog('Emergency Organisation Sign-out', `
+    <div class="finance-risk-banner high"><strong>CRITICAL INCIDENT ACTION</strong><span>This revokes every active session, including yours. Every person must sign in again.</span></div>
+    <label>Active incident<select id="organisationRevokeIncident"><option value="">Select incident</option>${incidentOptions}</select></label>
+    <label>Emergency reason<textarea id="organisationRevokeReason" rows="4" maxlength="1000"></textarea></label>
+    <label>Type REVOKE ALL SESSIONS<input id="organisationRevokeConfirmation" autocomplete="off"></label>`, async () => {
+      const ok = await incidentActionRequest('/api/security/emergency/revoke-all-sessions', {
+        incident_id: document.getElementById('organisationRevokeIncident').value,
+        reason: document.getElementById('organisationRevokeReason').value,
+        confirmation: document.getElementById('organisationRevokeConfirmation').value
+      });
+      if (ok) window.location.assign('/login?message=Organisation%20sessions%20were%20revoked');
+    }, 'Revoke Every Session');
+}
+
+async function downloadSecurityReport() {
+  const response = await fetch('/api/security/report.csv', { credentials: 'same-origin' });
+  if (!response.ok) { const data = await safeJson(response); return showToast(data.message || 'Security report export failed'); }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `Voxel-Veda-Security-Review-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+  showToast('Security report exported and audited');
 }
 
 async function loadRestrictedWorkspaceData() {
