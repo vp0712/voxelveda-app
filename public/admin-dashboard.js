@@ -8304,7 +8304,14 @@ function parseRiskReasons(value) {
 }
 
 function riskReasonLabel(value) {
-  const labels = { HIGH_VALUE_PAYMENT: 'High-value payment', SUPPLIER_BANK_DETAILS_RECENTLY_CHANGED: 'Supplier bank details recently changed' };
+  const labels = {
+    HIGH_VALUE_PAYMENT: 'High-value payment',
+    SUPPLIER_BANK_DETAILS_RECENTLY_CHANGED: 'Supplier bank details recently changed',
+    FIRST_PAYMENT_TO_CURRENT_BANK_DETAILS: 'First payment to current bank details',
+    POSSIBLE_DUPLICATE_PAYMENT: 'Possible duplicate payment',
+    SUPPLIER_PAYMENT_VELOCITY: 'Unusual supplier payment frequency',
+    SUPPLIER_BANK_DETAILS_NOT_VERIFIED: 'Supplier bank details are not verified'
+  };
   return labels[value] || String(value || '').replaceAll('_', ' ');
 }
 
@@ -8320,7 +8327,9 @@ function renderHighRiskApprovals(bankChanges, payments) {
       : row.status === 'PENDING' && Number(row.initiated_by) !== Number(currentUser.id) && hasCurrentPermission('APPROVE_PAYMENT')
         ? `<button type="button" class="primary-btn" onclick="reviewPaymentRequest('${row.id}', 'APPROVE')">Approve</button><button type="button" class="danger-btn" onclick="reviewPaymentRequest('${row.id}', 'REJECT')">Reject</button>`
         : '<span class="finance-locked-label">Awaiting independent action</span>';
-    rows.push(`<article class="finance-risk-item"><div><span class="finance-status-pill" data-status="${escapeHtml(String(row.status || '').toLowerCase())}">${escapeHtml(row.status || 'PENDING')} PAYMENT</span><strong>${escapeHtml(row.supplier_name || '-')} — ${formatMoney(row.amount || 0)}</strong><small>${escapeHtml(row.bill_uid || row.supplier_invoice_no || '')} • ${escapeHtml(reasons)}</small></div><div class="finance-row-actions">${actions}</div></article>`);
+    const risk = `${row.risk_level || 'REVIEW'} RISK · ${Number(row.risk_score || 0)}/100`;
+    const expiry = row.expires_at ? ` · expires ${financeFormatDate(row.expires_at)}` : '';
+    rows.push(`<article class="finance-risk-item"><div><span class="finance-status-pill" data-status="${escapeHtml(String(row.status || '').toLowerCase())}">${escapeHtml(row.status || 'PENDING')} PAYMENT</span><strong>${escapeHtml(row.supplier_name || '-')} — ${formatMoney(row.amount || 0)}</strong><small>${escapeHtml(row.bill_uid || row.supplier_invoice_no || '')} · ${escapeHtml(risk)}${escapeHtml(expiry)}<br>${escapeHtml(reasons)}</small></div><div class="finance-row-actions">${actions}</div></article>`);
   });
   panel.innerHTML = rows.join('') || '<div class="empty-state compact">No high-risk requests need action.</div>';
 }

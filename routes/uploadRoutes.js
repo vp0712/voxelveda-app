@@ -27,6 +27,10 @@ const storage = multer.diskStorage({
 
 const upload = multer(secureMulterOptions(storage, 12));
 
+async function removeUploadedFile(file) {
+  if (file?.path) await fs.promises.unlink(file.path).catch(() => {});
+}
+
 router.post('/rfq/:id', requireAnyPermission('EDIT_RFQS'), upload.single('file'), validateUploadedFile, async (req, res) => {
   try {
     const rfqId = req.params.id;
@@ -41,6 +45,7 @@ router.post('/rfq/:id', requireAnyPermission('EDIT_RFQS'), upload.single('file')
     );
 
     if (!rfqRows.length) {
+      await removeUploadedFile(req.file);
       return res.status(404).json({
         message: `RFQ #${rfqId} not found. Use a real RFQ ID.`
       });
@@ -62,6 +67,7 @@ router.post('/rfq/:id', requireAnyPermission('EDIT_RFQS'), upload.single('file')
       }
     });
   } catch (err) {
+    await removeUploadedFile(req.file);
     console.error('UPLOAD RFQ FILE ERROR:', err);
     res.status(500).json({ message: 'Upload failed' });
   }

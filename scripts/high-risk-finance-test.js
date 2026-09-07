@@ -23,6 +23,7 @@ const routes = read('routes/highRiskFinanceRoutes.js');
 const financeRoutes = read('routes/financeRoutes.js');
 const controller = read('controllers/highRiskFinanceController.js');
 const guard = read('middleware/highRiskPaymentMiddleware.js');
+const paymentRisk = read('services/paymentRiskService.js');
 const schema = read('migrations/20260905_high_risk_finance.sql');
 const client = read('public/admin-dashboard.js');
 
@@ -34,7 +35,8 @@ assert.match(controller, /SELF_APPROVAL_FORBIDDEN/);
 assert.match(controller, /BANK_DETAILS_VIEWED/);
 assert.match(controller, /PAYROLL_BANK_DETAILS_VIEWED/);
 assert.match(controller, /status = 'SUPERSEDED'/);
-assert.match(guard, /SUPPLIER_BANK_DETAILS_RECENTLY_CHANGED/);
+assert.match(paymentRisk, /SUPPLIER_BANK_DETAILS_RECENTLY_CHANGED/);
+assert.match(guard, /assessSupplierPayment/);
 assert.match(guard, /DUAL_APPROVAL_REQUIRED/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS sensitive_bank_details/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS bank_detail_change_requests/);

@@ -51,6 +51,13 @@ async function collectIssues() {
     issues.push(issue('malware-scanner-unavailable', 'MEDIUM', 'Malware scanner not configured', 'Uploaded files are type-validated but are not malware-scanned.', Math.max(1, Number(unscanned.count))));
   }
 
+  const [[cspViolations]] = await pool.query("SELECT COUNT(*) AS count FROM security_policy_violations WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+  if (Number(cspViolations.count)) {
+    issues.push(issue('csp-report-only-violations', Number(cspViolations.count) >= 25 ? 'HIGH' : 'MEDIUM',
+      'Strict CSP readiness violations detected',
+      'Review inline script and external-resource reports before promoting the report-only policy to enforcement.', Number(cspViolations.count)));
+  }
+
   if (!process.env.ALLOWED_ORIGINS && !process.env.CORS_ORIGINS && !process.env.APP_ORIGIN) {
     issues.push(issue('cors-default-origins', 'LOW', 'Explicit production origins not configured', 'Set ALLOWED_ORIGINS so production trust boundaries are deployment-controlled.'));
   }

@@ -2,6 +2,12 @@ const pool = require('../config/db');
 
 let schemaPromise;
 
+async function tolerateDuplicate(sql) {
+  try { await pool.query(sql); } catch (error) {
+    if (!['ER_DUP_FIELDNAME', 'ER_DUP_KEYNAME'].includes(error?.code)) throw error;
+  }
+}
+
 async function createHighRiskFinanceSchema() {
   await pool.query(`CREATE TABLE IF NOT EXISTS sensitive_bank_details (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -67,6 +73,13 @@ async function createHighRiskFinanceSchema() {
     INDEX idx_payment_approval_status (status, initiated_at),
     INDEX idx_payment_approval_bill (supplier_bill_id, status)
   ) ENGINE=InnoDB`);
+
+  await tolerateDuplicate("ALTER TABLE payment_approval_requests ADD COLUMN risk_score INT NOT NULL DEFAULT 0 AFTER risk_reasons");
+  await tolerateDuplicate("ALTER TABLE payment_approval_requests ADD COLUMN risk_level VARCHAR(20) NOT NULL DEFAULT 'LOW' AFTER risk_score");
+  await tolerateDuplicate('ALTER TABLE payment_approval_requests ADD COLUMN risk_snapshot JSON NULL AFTER risk_level');
+  await tolerateDuplicate('ALTER TABLE payment_approval_requests ADD COLUMN bank_detail_id BIGINT NULL AFTER risk_snapshot');
+  await tolerateDuplicate('ALTER TABLE payment_approval_requests ADD COLUMN expires_at DATETIME NULL AFTER initiated_at');
+  await tolerateDuplicate('ALTER TABLE payment_approval_requests ADD INDEX idx_payment_approval_expiry (status, expires_at)');
 }
 
 async function ensureHighRiskFinanceSchema() {

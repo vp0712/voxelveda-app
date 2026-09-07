@@ -35,7 +35,7 @@ function sendError(res, error, fallback) {
     return res.status(error.statusCode).json({ message: error.message, code: error.code, issues: error.issues });
   }
   console.error(`${fallback}:`, error);
-  return res.status(500).json({ message: fallback, error: error.message });
+  return res.status(500).json({ message: fallback, code: 'FINANCE_OPERATION_ERROR' });
 }
 
 function dateOnlyText(value) {

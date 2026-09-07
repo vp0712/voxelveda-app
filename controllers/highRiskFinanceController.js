@@ -4,6 +4,7 @@ const { logAudit } = require('../services/auditService');
 const { decryptSensitive, encryptSensitive, KEY_VERSION, maskAccount } = require('../services/financeEncryptionService');
 const { ensureHighRiskFinanceSchema } = require('../services/highRiskFinanceSchema');
 const { hasPermission } = require('../services/authorizationService');
+const { queueSecurityEvent } = require('../services/securityEventOutboxService');
 
 const SUBJECTS = new Set(['SUPPLIER', 'EMPLOYEE']);
 
@@ -102,6 +103,10 @@ exports.requestBankDetailChange = async (req, res) => {
       recordType: 'bank_detail_change_request', recordId: id,
       newValue: { subject_type: subjectType, subject_id: subjectId, bank_name: input.bankName, account_number_masked: maskAccount(input.accountNumber.slice(-4)), reason: input.reason, status: 'PENDING' }
     }));
+    await queueSecurityEvent('BANK_DETAILS_CHANGE_REQUESTED', {
+      actor_id: req.user.id, subject_type: subjectType, subject_id: subjectId,
+      request_id: id, bank_ending: input.accountNumber.slice(-4), status: 'PENDING'
+    }, db);
     await db.commit();
     return res.status(202).json({ message: 'Bank-detail change submitted for independent approval.', request_id: id, status: 'PENDING' });
   } catch (error) {
@@ -140,6 +145,7 @@ exports.revealBankDetails = async (req, res) => {
 exports.listApprovalQueue = async (req, res) => {
   try {
     await ensureHighRiskFinanceSchema();
+    await pool.query("UPDATE payment_approval_requests SET status = 'EXPIRED' WHERE status = 'PENDING' AND expires_at IS NOT NULL AND expires_at <= NOW()");
     const status = String(req.query.status || 'PENDING').toUpperCase();
     if (!['PENDING', 'APPROVED', 'REJECTED', 'EXECUTED'].includes(status)) throw controlledError('Invalid approval status.');
     const bankTypes = [];
@@ -208,6 +214,11 @@ exports.reviewBankDetailChange = async (req, res) => {
       module: request.subject_type === 'EMPLOYEE' ? 'payroll' : 'finance', recordType: 'bank_detail_change_request', recordId: request.id,
       oldValue: { status: 'PENDING' }, newValue: { status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', subject_type: request.subject_type, subject_id: request.subject_id, account_number_masked: maskAccount(request.account_last_four), reason: rejectionReason || request.reason }
     }));
+    await queueSecurityEvent(decision === 'APPROVE' ? 'BANK_DETAILS_CHANGED' : 'BANK_DETAILS_CHANGE_REJECTED', {
+      actor_id: req.user.id, request_id: request.id, subject_type: request.subject_type,
+      subject_id: request.subject_id, bank_ending: request.account_last_four,
+      status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED'
+    }, db);
     await db.commit();
     return res.json({ message: decision === 'APPROVE' ? 'Bank details approved and activated.' : 'Bank-detail change rejected.', status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED' });
   } catch (error) {
@@ -229,7 +240,21 @@ exports.reviewPaymentApproval = async (req, res) => {
     const [[request]] = await db.query(`SELECT * FROM payment_approval_requests WHERE id = ? FOR UPDATE`, [req.params.id]);
     if (!request) throw controlledError('Payment approval request not found.', 404, 'PAYMENT_APPROVAL_NOT_FOUND');
     if (request.status !== 'PENDING') throw controlledError('This payment request has already been reviewed.', 409, 'PAYMENT_ALREADY_REVIEWED');
+    if (request.expires_at && new Date(request.expires_at) <= new Date()) {
+      throw controlledError('This payment approval expired. Submit a new payment request for a fresh risk assessment.', 409, 'PAYMENT_APPROVAL_EXPIRED');
+    }
     if (Number(request.initiated_by) === Number(req.user.id)) throw controlledError('The payment initiator cannot approve their own request.', 403, 'SELF_APPROVAL_FORBIDDEN');
+    if (request.bank_detail_id) {
+      const [[currentBank]] = await db.query(
+        `SELECT sbd.id FROM sensitive_bank_details sbd
+         JOIN supplier_bills sb ON sb.supplier_id = sbd.subject_id
+         WHERE sb.id = ? AND sbd.subject_type = 'SUPPLIER' AND sbd.status = 'ACTIVE'
+         ORDER BY sbd.activated_at DESC, sbd.id DESC LIMIT 1`, [request.supplier_bill_id]
+      );
+      if (!currentBank || Number(currentBank.id) !== Number(request.bank_detail_id)) {
+        throw controlledError('Supplier bank details changed after this request was assessed. Submit a new payment request.', 409, 'PAYMENT_BANK_DETAILS_CHANGED');
+      }
+    }
     if (decision === 'APPROVE') {
       await db.query(`UPDATE payment_approval_requests SET status = 'APPROVED', approved_by = ?, approved_at = NOW() WHERE id = ? AND status = 'PENDING'`, [req.user.id, request.id]);
     } else {
@@ -239,6 +264,10 @@ exports.reviewPaymentApproval = async (req, res) => {
       action: decision === 'APPROVE' ? 'PAYMENT_APPROVED' : 'PAYMENT_REJECTED', module: 'finance', recordType: 'payment_approval_request', recordId: request.id,
       oldValue: { status: 'PENDING' }, newValue: { status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', amount: request.amount, supplier_bill_id: request.supplier_bill_id, reason: reason || null }
     }));
+    await queueSecurityEvent(decision === 'APPROVE' ? 'PAYMENT_APPROVED' : 'PAYMENT_REJECTED', {
+      actor_id: req.user.id, request_id: request.id, supplier_bill_id: request.supplier_bill_id,
+      amount: request.amount, risk_level: request.risk_level, risk_score: request.risk_score
+    }, db);
     await db.commit();
     return res.json({ message: decision === 'APPROVE' ? 'Payment approved. The initiator can now execute it.' : 'Payment request rejected.', status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED' });
   } catch (error) {
@@ -253,8 +282,18 @@ exports.prepareApprovedPayment = async (req, res, next) => {
     const [[request]] = await pool.query(`SELECT * FROM payment_approval_requests WHERE id = ?`, [req.params.id]);
     if (!request) throw controlledError('Payment approval request not found.', 404, 'PAYMENT_APPROVAL_NOT_FOUND');
     if (request.status !== 'APPROVED') throw controlledError('This payment is not approved for execution.', 409, 'PAYMENT_NOT_APPROVED');
+    if (request.expires_at && new Date(request.expires_at) <= new Date()) throw controlledError('This payment approval has expired.', 409, 'PAYMENT_APPROVAL_EXPIRED');
     if (Number(request.initiated_by) !== Number(req.user.id)) throw controlledError('Only the original initiator can execute this approved payment.', 403, 'PAYMENT_EXECUTOR_MISMATCH');
     if (!request.approved_by || Number(request.approved_by) === Number(request.initiated_by)) throw controlledError('Independent approval is required.', 409, 'DUAL_APPROVAL_REQUIRED');
+    if (request.bank_detail_id) {
+      const [[currentBank]] = await pool.query(
+        `SELECT sbd.id FROM sensitive_bank_details sbd
+         JOIN supplier_bills sb ON sb.supplier_id = sbd.subject_id
+         WHERE sb.id = ? AND sbd.subject_type = 'SUPPLIER' AND sbd.status = 'ACTIVE'
+         ORDER BY sbd.activated_at DESC, sbd.id DESC LIMIT 1`, [request.supplier_bill_id]
+      );
+      if (!currentBank || Number(currentBank.id) !== Number(request.bank_detail_id)) throw controlledError('Supplier bank details changed after approval. A new review is required.', 409, 'PAYMENT_BANK_DETAILS_CHANGED');
+    }
     req.params.id = String(request.supplier_bill_id);
     req.body = {
       payment_date: request.payment_date,

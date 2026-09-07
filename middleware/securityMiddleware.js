@@ -70,6 +70,23 @@ function securityHeaders(req, res, next) {
       "worker-src 'self' blob:"
     ].join('; ')
   );
+  res.setHeader(
+    'Content-Security-Policy-Report-Only',
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self' https://cdn.jsdelivr.net",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src 'self' data: https://fonts.gstatic.com",
+      "img-src 'self' data: blob:",
+      "connect-src 'self'",
+      "worker-src 'self' blob:",
+      'report-uri /api/security/csp-report'
+    ].join('; ')
+  );
 
   if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
     res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
@@ -83,14 +100,47 @@ function securityHeaders(req, res, next) {
   next();
 }
 
+function safeApiResponses(req, res, next) {
+  const sendJson = res.json.bind(res);
+  res.json = (payload) => {
+    if (res.statusCode < 500 || !req.path.startsWith('/api/') || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      return sendJson(payload);
+    }
+    const safe = { ...payload };
+    delete safe.error;
+    delete safe.stack;
+    delete safe.sql;
+    delete safe.sqlMessage;
+    safe.requestId = safe.requestId || req.requestId;
+    return sendJson(safe);
+  };
+  next();
+}
+
 function csrfProtection(req, res, next) {
   if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method)) return next();
+  if (req.path === '/api/security/csp-report') return next();
   const hasSessionCookie = String(req.headers.cookie || '').includes('vv_session=');
-  const hasBearer = String(req.headers.authorization || '').startsWith('Bearer ');
+  const authorization = String(req.headers.authorization || '');
+  const hasBearer = authorization.startsWith('Bearer ') && authorization.slice(7).trim().length > 0;
   if (!hasSessionCookie || hasBearer) return next();
+  const fetchSite = String(req.headers['sec-fetch-site'] || '').toLowerCase();
+  if (fetchSite === 'cross-site') return res.status(403).json({ message: 'Cross-site request rejected' });
   const origin = String(req.headers.origin || '');
   if (origin && allowedOrigins().includes(origin)) return next();
+  const referer = String(req.headers.referer || '');
+  try {
+    if (!origin && referer && allowedOrigins().includes(new URL(referer).origin)) return next();
+  } catch {}
   return res.status(403).json({ message: 'Request origin could not be verified' });
+}
+
+function enforceHttps(req, res, next) {
+  if (process.env.NODE_ENV !== 'production' || req.path === '/api/health' || req.secure || req.headers['x-forwarded-proto'] === 'https') return next();
+  if (!['GET', 'HEAD'].includes(req.method)) return res.status(400).json({ message: 'HTTPS is required for this request' });
+  const host = String(req.headers.host || '').replace(/[\r\n]/g, '');
+  if (!host) return res.status(400).json({ message: 'HTTPS is required' });
+  return res.redirect(308, `https://${host}${req.originalUrl}`);
 }
 
 function allowedOrigins() {
@@ -161,7 +211,9 @@ module.exports = {
   authRateLimit,
   corsOptions,
   csrfProtection,
+  enforceHttps,
   rateLimit,
+  safeApiResponses,
   securityHeaders,
   safeErrorHandler
 };

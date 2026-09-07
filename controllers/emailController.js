@@ -134,7 +134,7 @@ exports.process = async (req, res) => {
     return res.json({ message: 'Email queue processed.', outcomes });
   } catch (error) {
     console.error('EMAIL QUEUE PROCESS ERROR:', error);
-    return res.status(500).json({ message: error.message || 'Unable to process the email queue.' });
+    return res.status(500).json({ message: 'Unable to process the email queue.', code: 'EMAIL_QUEUE_ERROR' });
   }
 };
 
