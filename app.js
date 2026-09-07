@@ -32,6 +32,7 @@ const securityDashboardRoutes = require('./routes/securityDashboardRoutes');
 const securityIncidentRoutes = require('./routes/securityIncidentRoutes');
 const operationalTrustRoutes = require('./routes/operationalTrustRoutes');
 const continuousAssuranceRoutes = require('./routes/continuousAssuranceRoutes');
+const securityGovernanceRoutes = require('./routes/securityGovernanceRoutes');
 const integrationWebhookRoutes = require('./routes/integrationWebhookRoutes');
 const securityTelemetryController = require('./controllers/securityTelemetryController');
 const requirePermission = require('./middleware/permissionMiddleware');
@@ -70,6 +71,8 @@ const noStorePublicAssets = new Set([
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+// Avoid complex qs parsing for untrusted query/form input. JSON remains the API contract.
+app.set('query parser', 'simple');
 
 app.use(enforceHttps);
 app.use(securityHeaders);
@@ -81,7 +84,7 @@ app.use(express.json({
   type: ['application/json', 'application/csp-report', 'application/reports+json'],
   verify(req, res, buffer) { req.rawBody = Buffer.from(buffer); }
 }));
-app.use(express.urlencoded({ extended: true, limit: process.env.FORM_BODY_LIMIT || '1mb' }));
+app.use(express.urlencoded({ extended: false, limit: process.env.FORM_BODY_LIMIT || '1mb' }));
 app.use(csrfProtection);
 
 app.post('/api/security/csp-report', rateLimit({ windowMs: 60000, max: 30, keyPrefix: 'csp-report' }), securityTelemetryController.recordCspViolation);
@@ -241,6 +244,7 @@ app.use('/api/security', auth, securityDashboardRoutes);
 app.use('/api/security', auth, securityIncidentRoutes);
 app.use('/api/security/operations', auth, operationalTrustRoutes);
 app.use('/api/security/assurance', auth, continuousAssuranceRoutes);
+app.use('/api/security/governance', auth, securityGovernanceRoutes);
 app.use('/api/tasks', auth, taskRoutes);
 app.use('/api/stock', auth, requirePermission('VIEW_INVENTORY'), stockRoutes);
 app.use('/api/customers', auth, requirePermission('VIEW_CUSTOMERS'), requireInputPermission('EDIT_CUSTOMERS'), customerRoutes);

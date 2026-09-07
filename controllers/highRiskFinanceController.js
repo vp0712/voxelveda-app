@@ -5,16 +5,17 @@ const { decryptSensitive, encryptSensitive, KEY_VERSION, maskAccount } = require
 const { ensureHighRiskFinanceSchema } = require('../services/highRiskFinanceSchema');
 const { hasPermission } = require('../services/authorizationService');
 const { queueSecurityEvent } = require('../services/securityEventOutboxService');
+const secureLogger = require('../utils/secureLogger');
 
 const SUBJECTS = new Set(['SUPPLIER', 'EMPLOYEE']);
 
 function audit(req, values) {
-  return { actorId: req.user?.id, ipAddress: req.ip, userAgent: req.get('user-agent'), ...values };
+  return { actorId: req.user?.id, ipAddress: req.ip, userAgent: req.get('user-agent'), requestId: req.requestId, sessionId: req.session?.id, ...values };
 }
 
 function fail(res, error, fallback) {
   if (error?.statusCode) return res.status(error.statusCode).json({ message: error.message, code: error.code });
-  console.error(`${fallback}:`, error);
+  secureLogger.error('HIGH_RISK_FINANCE_FAILURE', { fallback, error });
   return res.status(500).json({ message: fallback, code: 'HIGH_RISK_FINANCE_ERROR' });
 }
 

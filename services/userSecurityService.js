@@ -1,5 +1,7 @@
 const pool = require('../config/db');
 const { ensureSecuritySchema } = require('./securitySchema');
+const { ensureSecurityGovernanceSchema } = require('./securityGovernanceSchema');
+const crypto = require('crypto');
 
 const ACCOUNT_STATES = Object.freeze([
   'INVITED', 'ACTIVE', 'PASSWORD_RESET_REQUIRED', 'MFA_SETUP_REQUIRED',
@@ -41,8 +43,64 @@ async function revokeEveryCredential(connection, userId, reason) {
   );
 }
 
-async function transitionAccount({ actorId, targetUserId, state, reason, req, compromised = false }) {
+const OWNERSHIP_TARGETS = Object.freeze([
+  { table: 'secure_documents', column: 'owner_user_id', active: 'deleted_at IS NULL' },
+  { table: 'service_accounts', column: 'owner_user_id', active: "status='ACTIVE'" },
+  { table: 'security_risk_exceptions', column: 'owner_id', active: "status IN ('PENDING_APPROVAL','APPROVED')" },
+  { table: 'tasks', column: 'assigned_to', active: 'IFNULL(deleted,0)=0' },
+  { table: 'assets', column: 'assigned_to', active: '1=1' }
+]);
+
+async function tableExists(connection, table) {
+  const [[row]] = await connection.query(
+    'SELECT COUNT(*) count FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name=?', [table]
+  );
+  return Number(row.count) > 0;
+}
+
+async function transferOwnedRecords(connection, sourceUserId, destinationUserId, actorId, reason) {
+  const counts = {};
+  for (const target of OWNERSHIP_TARGETS) {
+    if (!await tableExists(connection, target.table)) continue;
+    const [[row]] = await connection.query(
+      `SELECT COUNT(*) count FROM ${target.table} WHERE ${target.column}=? AND ${target.active}`, [sourceUserId]
+    );
+    counts[target.table] = Number(row.count || 0);
+  }
+  const total = Object.values(counts).reduce((sum, value) => sum + value, 0);
+  if (total && !destinationUserId) {
+    const error = Object.assign(new Error('Active record ownership must be transferred before termination'), {
+      statusCode: 409, code: 'OWNERSHIP_TRANSFER_REQUIRED', ownershipCounts: counts
+    });
+    throw error;
+  }
+  if (!destinationUserId) return counts;
+  const [[destination]] = await connection.query(
+    `SELECT id FROM users WHERE id=? AND active=1 AND deleted_at IS NULL
+     AND account_status NOT IN ('LOCKED','SUSPENDED','DISABLED','TERMINATED') LIMIT 1`, [destinationUserId]
+  );
+  if (!destination || Number(destinationUserId) === Number(sourceUserId)) {
+    throw Object.assign(new Error('Ownership destination must be a different active user'), { statusCode: 400 });
+  }
+  for (const target of OWNERSHIP_TARGETS) {
+    if (!(target.table in counts) || !counts[target.table]) continue;
+    await connection.query(
+      `UPDATE ${target.table} SET ${target.column}=? WHERE ${target.column}=? AND ${target.active}`,
+      [destinationUserId, sourceUserId]
+    );
+  }
+  await connection.query(
+    `INSERT INTO ownership_transfer_events
+     (id,source_user_id,destination_user_id,transfer_reason,transferred_counts_json,transferred_by)
+     VALUES (?,?,?,?,?,?)`,
+    [crypto.randomUUID(), sourceUserId, destinationUserId, String(reason).slice(0, 500), JSON.stringify(counts), actorId]
+  );
+  return counts;
+}
+
+async function transitionAccount({ actorId, targetUserId, state, reason, req, compromised = false, transferToUserId = null }) {
   await ensureSecuritySchema();
+  await ensureSecurityGovernanceSchema();
   const nextState = normalizeAccountState(state);
   if (!ACCOUNT_STATES.includes(nextState)) throw Object.assign(new Error('Invalid account state'), { statusCode: 400 });
   if (!String(reason || '').trim()) throw Object.assign(new Error('A reason is required'), { statusCode: 400 });
@@ -59,13 +117,19 @@ async function transitionAccount({ actorId, targetUserId, state, reason, req, co
       throw Object.assign(new Error('Complete the controlled password-reset recovery before restoring this compromised account'), { statusCode: 409 });
     }
 
+    const ownershipTransfers = nextState === 'TERMINATED'
+      ? await transferOwnedRecords(connection, targetUserId, Number(transferToUserId || 0) || null, actorId, reason)
+      : {};
     const active = nextState === 'ACTIVE' || nextState === 'PASSWORD_RESET_REQUIRED' || nextState === 'MFA_SETUP_REQUIRED';
     await connection.query(
       `UPDATE users SET account_status = ?, active = ?, session_version = session_version + 1,
        password_reset_required = CASE WHEN ? THEN 1 ELSE password_reset_required END,
-       security_compromised_at = CASE WHEN ? THEN NOW() ELSE security_compromised_at END
+       security_compromised_at = CASE WHEN ? THEN NOW() ELSE security_compromised_at END,
+       terminated_at = CASE WHEN ? THEN NOW() ELSE terminated_at END,
+       terminated_by = CASE WHEN ? THEN ? ELSE terminated_by END
        WHERE id = ?`,
-      [nextState, active ? 1 : 0, compromised || nextState === 'PASSWORD_RESET_REQUIRED', compromised, targetUserId]
+      [nextState, active ? 1 : 0, compromised || nextState === 'PASSWORD_RESET_REQUIRED', compromised,
+        nextState === 'TERMINATED', nextState === 'TERMINATED', actorId, targetUserId]
     );
     if (!active || compromised || nextState === 'PASSWORD_RESET_REQUIRED') {
       await revokeEveryCredential(connection, targetUserId, compromised ? 'ACCOUNT_COMPROMISED' : `ACCOUNT_${nextState}`);
@@ -84,7 +148,7 @@ async function transitionAccount({ actorId, targetUserId, state, reason, req, co
         String(req?.get?.('user-agent') || '').slice(0, 255)]
     );
     await connection.commit();
-    return { before, state: nextState, active };
+    return { before, state: nextState, active, ownershipTransfers };
   } catch (error) {
     await connection.rollback().catch(() => {});
     throw error;
@@ -95,5 +159,5 @@ async function transitionAccount({ actorId, targetUserId, state, reason, req, co
 
 module.exports = {
   ACCOUNT_STATES, DISALLOWED_LOGIN_STATES, normalizeAccountState,
-  permissionDifference, revokeEveryCredential, transitionAccount
+  permissionDifference, revokeEveryCredential, transitionAccount, transferOwnedRecords
 };

@@ -175,7 +175,7 @@ function corsOptions() {
       return callback(new Error('CORS origin not allowed'));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Impersonation-Context'],
     credentials: true,
     maxAge: 86400
   };

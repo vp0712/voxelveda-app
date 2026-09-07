@@ -49,6 +49,9 @@ function assessProductionReadiness(env = process.env) {
   if (production && env.BACKUP_STATUS_PROVIDER !== 'configured') warnings.push('Database backup status is not attested by a configured provider');
   if (production && env.RATE_LIMIT_STORE !== 'redis') warnings.push('Rate limiting is process-local; configure a shared Redis-backed limiter before scaling beyond one replica');
   if (production && env.FORCE_CANONICAL_HOST !== 'true') warnings.push('Canonical-host enforcement remains disabled until custom-domain DNS and TLS are verified');
+  if (production && String(env.DB_USER || '').toLowerCase() === 'root') warnings.push('Application database identity is root; provision and attest a least-privilege application user');
+  if (production && !env.DB_USER && !env.DATABASE_URL) failures.push('A production database identity or connection URL is required');
+  if (production && env.DB_TLS_REQUIRED !== 'true') warnings.push('Database transport TLS is not explicitly attested; verify the provider connection path and record evidence');
 
   return { production, ready: failures.length === 0, failures, warnings };
 }
