@@ -1,5 +1,6 @@
 const express = require('express');
 const controller = require('../controllers/securityGovernanceController');
+const enterpriseControlPlaneRoutes = require('./enterpriseControlPlaneRoutes');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const { bodyContract } = require('../middleware/requestContractMiddleware');
 const { rateLimit } = require('../middleware/securityMiddleware');
@@ -21,5 +22,8 @@ router.post('/break-glass/:id/revoke', ...action('MANAGE_BREAK_GLASS', 'REVOKE_B
 router.post('/impersonation', ...action('USE_SUPPORT_IMPERSONATION', 'START_SUPPORT_IMPERSONATION', ['target_user_id','reason','duration_minutes'], ['target_user_id','reason']), controller.startImpersonation);
 router.post('/impersonation/:id/end', ...action('USE_SUPPORT_IMPERSONATION', 'END_SUPPORT_IMPERSONATION', ['reason'], ['reason']), controller.endImpersonation);
 router.post('/database-attestations', ...action('ATTEST_DATABASE_SECURITY', 'ATTEST_DATABASE_SECURITY', ['database_identity','privilege_scope','tls_in_use','least_privilege_verified','provider_evidence_reference','status','valid_for_days'], ['database_identity','privilege_scope','tls_in_use','least_privilege_verified','provider_evidence_reference','status']), controller.attestDatabaseSecurity);
+
+// Enterprise phases 71-140. Authentication is already enforced at /api/security/governance.
+router.use('/enterprise', enterpriseControlPlaneRoutes);
 
 module.exports = router;
