@@ -39,3 +39,6 @@ jobs:
 
       - name: Run automated tests
         run: npm test
+
+      - name: Block high and critical production dependency findings
+        run: npm run security:audit

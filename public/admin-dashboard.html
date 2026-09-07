@@ -1479,7 +1479,12 @@
             <h2>Security Centre</h2>
             <p>Live identity, session, audit and risk signals calculated from production records.</p>
           </div>
-          <button type="button" class="secondary-btn" onclick="loadSecurityCentre()">Refresh Security</button>
+          <div class="section-actions">
+            <button type="button" class="primary-btn" onclick="openSecurityIncidentDialog()">Open Incident</button>
+            <button type="button" class="secondary-btn" onclick="downloadSecurityReport()">Export Security Report</button>
+            <button type="button" class="danger-btn" onclick="openOrganisationRevokeDialog()">Emergency Sign-out</button>
+            <button type="button" class="secondary-btn" onclick="loadSecurityCentre()">Refresh Security</button>
+          </div>
         </div>
 
         <div class="security-readiness card">
@@ -1500,11 +1505,17 @@
           <div class="card"><h3>Active Sessions</h3><p><strong id="securityActiveSessions">0</strong></p></div>
           <div class="card"><h3>Stale Accounts</h3><p><strong id="securityStaleAccounts">0</strong></p></div>
           <div class="card"><h3>Open Issues</h3><p><strong id="securityOpenIssues">0</strong></p></div>
+          <div class="card"><h3>Open Incidents</h3><p><strong id="securityOpenIncidents">0</strong></p></div>
         </div>
 
         <div class="card table-wrap">
           <div class="section-head"><div><h3>Security Issues</h3><p>Prioritised findings based on current application data and configuration.</p></div></div>
           <table><thead><tr><th>Severity</th><th>Issue</th><th>Detail</th><th>Count</th></tr></thead><tbody id="securityIssuesBody"><tr><td colspan="4">Loading...</td></tr></tbody></table>
+        </div>
+
+        <div class="card table-wrap">
+          <div class="section-head"><div><h3>Incident Response</h3><p>Controlled containment, recovery and resolution records. Actions are append-only and require server authorization.</p></div></div>
+          <table><thead><tr><th>Severity</th><th>Incident</th><th>Status</th><th>Commander</th><th>Opened</th><th>Actions</th><th></th></tr></thead><tbody id="securityIncidentsBody"><tr><td colspan="7">Loading...</td></tr></tbody></table>
         </div>
 
         <div class="card table-wrap">

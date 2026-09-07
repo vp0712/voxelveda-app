@@ -81,7 +81,9 @@ function isAdmin(req) {
 }
 
 function shiftQrSecret() {
-  return process.env.JWT_SECRET || process.env.SESSION_SECRET || 'voxelveda-shift-secret';
+  const secret = process.env.SHIFT_QR_SIGNING_KEY || (process.env.NODE_ENV === 'production' ? '' : process.env.JWT_SECRET);
+  if (!secret) throw new Error('SHIFT_QR_SIGNING_KEY is not configured');
+  return secret;
 }
 
 function signShiftPeriod(period) {

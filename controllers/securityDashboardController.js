@@ -3,6 +3,7 @@ const { ensureSecuritySchema } = require('../services/securitySchema');
 const { ensureSecurityOperationsSchema } = require('../services/securityOperationsSchema');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
 const { redactSensitive } = require('../utils/securityRedaction');
+const { assessProductionReadiness } = require('../config/productionReadiness');
 
 const PRIVILEGED_ROLES = ['super_admin', 'admin', 'finance_admin', 'accountant', 'hr'];
 const HIGH_RISK_EVENTS = ['ROLE_CHANGED', 'PERMISSION_CHANGED', 'USER_DISABLED', 'ACCOUNT_TERMINATED', 'BANK_DETAILS_CHANGED', 'PAYMENT_APPROVED', 'SENSITIVE_EXPORT', 'MFA_DISABLED', 'SECURITY_SETTING_CHANGED'];
@@ -52,6 +53,12 @@ async function collectIssues() {
   if (!process.env.ALLOWED_ORIGINS && !process.env.CORS_ORIGINS && !process.env.APP_ORIGIN) {
     issues.push(issue('cors-default-origins', 'LOW', 'Explicit production origins not configured', 'Set ALLOWED_ORIGINS so production trust boundaries are deployment-controlled.'));
   }
+  const readiness = assessProductionReadiness(process.env);
+  for (const [index, warning] of readiness.warnings.entries()) {
+    issues.push(issue(`production-readiness-${index}`, warning.includes('backup') ? 'HIGH' : 'MEDIUM', 'Production readiness control incomplete', warning));
+  }
+  const [[criticalIncidents]] = await pool.query("SELECT COUNT(*) AS count FROM security_incidents WHERE severity = 'CRITICAL' AND status NOT IN ('RESOLVED','CLOSED')");
+  if (Number(criticalIncidents.count)) issues.push(issue('open-critical-incidents', 'CRITICAL', 'Critical security incidents remain open', 'Review containment and recovery evidence in the Incident Response register.', Number(criticalIncidents.count)));
   return issues;
 }
 
@@ -67,7 +74,8 @@ exports.dashboard = async (req, res, next) => {
       pool.query("SELECT COUNT(*) AS count FROM users WHERE account_status = 'LOCKED' OR locked_until > NOW()"),
       pool.query('SELECT COUNT(*) AS count FROM auth_sessions WHERE revoked_at IS NULL AND expires_at > NOW()'),
       pool.query('SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL AND COALESCE(last_login_at, created_at) < DATE_SUB(NOW(), INTERVAL 90 DAY)'),
-      pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE event_type IN (${HIGH_RISK_EVENTS.map(() => '?').join(',')}) AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, HIGH_RISK_EVENTS)
+      pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE event_type IN (${HIGH_RISK_EVENTS.map(() => '?').join(',')}) AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, HIGH_RISK_EVENTS),
+      pool.query("SELECT COUNT(*) AS count FROM security_incidents WHERE status NOT IN ('RESOLVED','CLOSED')")
     ]);
     const issues = await collectIssues();
     const deductions = { CRITICAL: 20, HIGH: 10, MEDIUM: 5, LOW: 2, INFO: 0 };
@@ -80,7 +88,7 @@ exports.dashboard = async (req, res, next) => {
         mfa_coverage: Number(mfa.total) ? Math.round((Number(mfa.enabled || 0) / Number(mfa.total)) * 100) : 100,
         failed_logins_24h: Number(rows[3][0][0].count), locked_accounts: Number(rows[4][0][0].count),
         active_sessions: Number(rows[5][0][0].count), stale_accounts: Number(rows[6][0][0].count),
-        high_risk_actions_24h: Number(rows[7][0][0].count), open_issues: issues.length
+        high_risk_actions_24h: Number(rows[7][0][0].count), open_incidents: Number(rows[8][0][0].count), open_issues: issues.length
       },
       readiness: { score, label: score >= 90 ? 'Strong' : score >= 75 ? 'Needs attention' : 'Action required', disclaimer: 'Operational readiness indicator only; not a security certification.' },
       issues: issues.slice(0, 8)

@@ -11,6 +11,8 @@
 ## Railway deployment
 
 - [ ] Confirm required database and JWT variables exist.
+- [ ] Generate a unique 32-byte `SHIFT_QR_SIGNING_KEY`; never reuse another application secret.
+- [ ] Run `npm run readiness:check` against the intended production environment before rollout.
 - [ ] Add custom-domain variables from `.env.example`.
 - [ ] Keep `FORCE_CANONICAL_HOST=false`.
 - [ ] Deploy and monitor build/runtime logs.
@@ -31,3 +33,5 @@
 - [ ] Monitor 4xx/5xx rates and authentication failures.
 - [ ] Keep the Railway fallback available during the migration window.
 - [ ] Record deployment commit, Railway deployment ID and test results.
+- [ ] Confirm `Security operations schema ready.` and `/api/health` HTTP 200 in Railway network logs.
+- [ ] Verify incident creation, security-report access denial for non-authorised roles and step-up enforcement without executing emergency revocation.
