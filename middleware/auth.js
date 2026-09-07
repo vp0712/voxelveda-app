@@ -72,8 +72,15 @@ module.exports = async (req, res, next) => {
       email: freshUser.email || decoded.email,
       username: freshUser.username || decoded.username,
       role: String(freshUser.role || decoded.role || 'staff').trim().toLowerCase(),
-      permissions: parsePermissions(freshUser.permissions)
+      permissions: parsePermissions(freshUser.permissions),
+      temporary_permissions: []
     };
+    try {
+      const [temporary] = await pool.query("SELECT permission_name FROM privileged_access_requests WHERE user_id=? AND status='ACTIVE' AND starts_at<=NOW() AND expires_at>NOW()", [freshUser.id]);
+      req.user.temporary_permissions = temporary.map((grant) => grant.permission_name);
+    } catch (error) {
+      if (error?.code !== 'ER_NO_SUCH_TABLE') throw error;
+    }
     req.session = {
       id: session.id,
       assuranceLevel: Number(session.assurance_level || 1),

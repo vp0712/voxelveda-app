@@ -21,6 +21,7 @@ const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
 const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
 const { ensureOperationalTrustSchema } = require('./services/operationalTrustSchema');
+const { ensureAssuranceSchema } = require('./services/assuranceSchema');
 const {
   startWeeklyTimesheetScheduler,
   stopWeeklyTimesheetScheduler
@@ -56,6 +57,10 @@ ensureSecurityOperationsSchema()
 ensureOperationalTrustSchema()
   .then(() => console.log('Operational trust schema ready.'))
   .catch((error) => console.error('Operational trust schema initialization failed:', error.message));
+
+ensureAssuranceSchema()
+  .then(() => console.log('Continuous assurance schema ready.'))
+  .catch((error) => console.error('Continuous assurance schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {
