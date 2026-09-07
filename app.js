@@ -33,6 +33,7 @@ const securityIncidentRoutes = require('./routes/securityIncidentRoutes');
 const operationalTrustRoutes = require('./routes/operationalTrustRoutes');
 const continuousAssuranceRoutes = require('./routes/continuousAssuranceRoutes');
 const integrationWebhookRoutes = require('./routes/integrationWebhookRoutes');
+const securityTelemetryController = require('./controllers/securityTelemetryController');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
 const { hasAnyPermission } = require('./services/authorizationService');
@@ -41,7 +42,9 @@ const urls = require('./config/urls');
 const {
   corsOptions,
   csrfProtection,
+  enforceHttps,
   rateLimit,
+  safeApiResponses,
   securityHeaders,
   safeErrorHandler
 } = require('./middleware/securityMiddleware');
@@ -68,15 +71,20 @@ const noStorePublicAssets = new Set([
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 
+app.use(enforceHttps);
 app.use(securityHeaders);
+app.use(safeApiResponses);
 app.use(cors(corsOptions()));
 app.use(rateLimit());
 app.use(express.json({
   limit: process.env.JSON_BODY_LIMIT || '1mb',
+  type: ['application/json', 'application/csp-report', 'application/reports+json'],
   verify(req, res, buffer) { req.rawBody = Buffer.from(buffer); }
 }));
 app.use(express.urlencoded({ extended: true, limit: process.env.FORM_BODY_LIMIT || '1mb' }));
 app.use(csrfProtection);
+
+app.post('/api/security/csp-report', rateLimit({ windowMs: 60000, max: 30, keyPrefix: 'csp-report' }), securityTelemetryController.recordCspViolation);
 
 app.get('/api/health', (req, res) => {
   res.json({

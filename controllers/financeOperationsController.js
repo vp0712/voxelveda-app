@@ -29,7 +29,7 @@ function fail(res, error, message) {
     return res.status(409).json({ message: 'A matching finance record already exists.', code: 'DUPLICATE_RECORD' });
   }
   console.error(`${message}:`, error);
-  return res.status(500).json({ message, error: error.message });
+  return res.status(500).json({ message, code: 'FINANCE_OPERATION_ERROR' });
 }
 
 function dateOnlyText(value) {
@@ -324,8 +324,21 @@ exports.recordSupplierPayment = async (req, res) => {
     if (req.paymentApprovalId) {
       const [[approval]] = await db.query(`SELECT * FROM payment_approval_requests WHERE id = ? FOR UPDATE`, [req.paymentApprovalId]);
       if (!approval || approval.status !== 'APPROVED') throw new FinanceError('This payment approval is no longer valid.', 409, 'PAYMENT_NOT_APPROVED');
+      if (approval.expires_at && new Date(approval.expires_at) <= new Date()) throw new FinanceError('This payment approval expired before execution.', 409, 'PAYMENT_APPROVAL_EXPIRED');
       if (Number(approval.initiated_by) !== Number(req.user.id) || !approval.approved_by || Number(approval.approved_by) === Number(approval.initiated_by)) {
         throw new FinanceError('Independent approval is required before payment execution.', 403, 'DUAL_APPROVAL_REQUIRED');
+      }
+      if (approval.bank_detail_id) {
+        const [[currentBank]] = await db.query(
+          `SELECT sbd.id FROM sensitive_bank_details sbd
+           JOIN supplier_bills sb ON sb.supplier_id = sbd.subject_id
+           WHERE sb.id = ? AND sbd.subject_type = 'SUPPLIER' AND sbd.status = 'ACTIVE'
+           ORDER BY sbd.activated_at DESC, sbd.id DESC LIMIT 1 FOR UPDATE`,
+          [approval.supplier_bill_id]
+        );
+        if (!currentBank || Number(currentBank.id) !== Number(approval.bank_detail_id)) {
+          throw new FinanceError('Supplier bank details changed after approval. Submit and approve a new payment request.', 409, 'PAYMENT_BANK_DETAILS_CHANGED');
+        }
       }
     }
     const period = await yearAndPeriod(paymentDate, db);

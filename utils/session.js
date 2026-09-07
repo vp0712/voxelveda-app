@@ -43,7 +43,7 @@ function cookieOptions(req) {
   const options = {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production' || req.secure || req.headers['x-forwarded-proto'] === 'https',
-    sameSite: 'lax',
+    sameSite: 'strict',
     path: '/',
     maxAge: expiresInMs()
   };
