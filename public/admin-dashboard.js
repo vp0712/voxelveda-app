@@ -1379,7 +1379,7 @@ let securityIncidentCache = [];
 async function loadSecurityCentre() {
   if (!hasCurrentPermission('MANAGE_SECURITY')) return;
   try {
-    const [dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes] = await Promise.all([
+    const [dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes, governanceRes, governanceCatalogRes] = await Promise.all([
       fetch('/api/security/dashboard', { credentials: 'same-origin' }),
       fetch('/api/security/events?limit=20', { credentials: 'same-origin' }),
       fetch('/api/security/audit?limit=20', { credentials: 'same-origin' }),
@@ -1389,10 +1389,12 @@ async function loadSecurityCentre() {
       fetch('/api/security/operations/catalog', { credentials: 'same-origin' }),
       fetch('/api/security/operations/api-tokens', { credentials: 'same-origin' }),
       fetch('/api/security/operations/exports', { credentials: 'same-origin' }),
-      fetch('/api/security/assurance/summary', { credentials: 'same-origin' })
+      fetch('/api/security/assurance/summary', { credentials: 'same-origin' }),
+      fetch('/api/security/governance/summary', { credentials: 'same-origin' }),
+      fetch('/api/security/governance/catalog', { credentials: 'same-origin' })
     ]);
-    if ([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes].some((response) => response.status === 401)) return redirectToLogin();
-    const [dashboard, events, audit, privileged, incidents, trust, trustCatalog, tokenData, exportData, assurance] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes].map(safeJson));
+    if ([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes, governanceRes, governanceCatalogRes].some((response) => response.status === 401)) return redirectToLogin();
+    const [dashboard, events, audit, privileged, incidents, trust, trustCatalog, tokenData, exportData, assurance, governance, governanceCatalog] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes, governanceRes, governanceCatalogRes].map(safeJson));
     if (!dashboardRes.ok) throw new Error(dashboard.message || 'Security dashboard unavailable');
     const metrics = dashboard.metrics || {};
     setText('securityReadinessScore', `${Number(dashboard.readiness?.score || 0)}%`);
@@ -1435,6 +1437,24 @@ async function loadSecurityCentre() {
     setText('assuranceAuditSeals', assuranceMetrics.audit_integrity_checkpoints || 0);
     const assuranceLabels = { distributed_rate_limit:'Distributed rate limit', webauthn_ready:'Passkey environment', event_delivery_configured:'Event delivery', key_rotation_support:'Key rotation registry' };
     document.getElementById('assuranceControlStatus').innerHTML = Object.entries(assuranceLabels).map(([key,label]) => `<span class="security-posture ${assurance.controls?.[key]?'secure':'warning'}">${escapeHtml(label)} · ${assurance.controls?.[key]?'Configured':'Restricted'}</span>`).join('');
+    const governanceMetrics = governance.metrics || {};
+    setText('governanceReadiness', `${governance.readiness?.score || 0}%`);
+    setText('governanceAuditChain', `${governanceMetrics.audit_chain_coverage || 0}%`);
+    setText('governanceBreakGlass', governanceMetrics.active_break_glass || 0);
+    setText('governancePending', governanceMetrics.pending_break_glass || 0);
+    setText('governanceImpersonations', governanceMetrics.active_impersonations || 0);
+    setText('governanceSensitiveFields', governanceMetrics.sensitive_fields_registered || 0);
+    setText('governanceStale60', governanceMetrics.stale_accounts_60d || 0);
+    setText('governanceStale90', governanceMetrics.stale_accounts_90d || 0);
+    const governanceLabels = {
+      request_contracts: 'Strict request contracts', settings_secret_boundary: 'Settings secret boundary',
+      audit_hash_chain: 'Audit hash chain', database_least_privilege_attested: 'Database posture evidence',
+      sensitive_data_registry: 'Sensitive-data register', break_glass_dual_control: 'Emergency dual control',
+      impersonation_read_only: 'Read-only support', termination_transfer_control: 'Ownership transfer'
+    };
+    document.getElementById('governanceControlStatus').innerHTML = Object.entries(governanceLabels).map(([key,label]) => `<span class="security-posture ${governance.controls?.[key]?'secure':'warning'}">${escapeHtml(label)} · ${governance.controls?.[key]?'Verified':'Review'}</span>`).join('');
+    document.getElementById('governanceBreakGlassBody').innerHTML = (governanceCatalog.break_glass || []).length ? governanceCatalog.break_glass.slice(0, 20).map((item) => `<tr><td>${escapeHtml(item.beneficiary_name || item.beneficiary_user_id)}</td><td>${escapeHtml(item.incident_reference)}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(formatDateTime(item.expires_at))}</td><td>${item.status === 'PENDING_APPROVAL' ? `<button class="small-btn" onclick="openBreakGlassApprovalDialog('${escapeHtml(item.id)}')">Review</button>` : item.status === 'ACTIVE' ? `<button class="small-btn" onclick="openBreakGlassRevokeDialog('${escapeHtml(item.id)}')">Revoke</button>` : ''}</td></tr>`).join('') : '<tr><td colspan="5">No emergency-access requests.</td></tr>';
+    document.getElementById('governanceImpersonationBody').innerHTML = (governanceCatalog.impersonations || []).length ? governanceCatalog.impersonations.slice(0, 20).map((item) => `<tr><td>${escapeHtml(item.actor_name || item.actor_user_id)}</td><td>${escapeHtml(item.target_name || item.target_user_id)}</td><td>${escapeHtml(item.status)}</td><td>${escapeHtml(formatDateTime(item.expires_at))}</td></tr>`).join('') : '<tr><td colspan="4">No delegated support sessions.</td></tr>';
     document.getElementById('securityApiTokensBody').innerHTML = (tokenData.tokens || []).length ? tokenData.tokens.map((token) => `
       <tr><td><strong>${escapeHtml(token.token_name)}</strong><br><small>${escapeHtml(token.token_prefix || '')}…</small></td><td>${escapeHtml(token.user_name || token.user_email)}</td><td>${escapeHtml(displayJsonList(token.scopes_json))}</td><td>${escapeHtml(formatDateTime(token.expires_at))}</td><td>${escapeHtml(formatDateTime(token.last_used_at))}</td></tr>
     `).join('') : '<tr><td colspan="5">No scoped API tokens.</td></tr>';
@@ -1467,6 +1487,74 @@ async function loadSecurityCentre() {
   } catch (error) {
     showToast(error.message || 'Security Centre could not be loaded');
   }
+}
+
+function governanceUserOptions() {
+  return staffCache.filter((user) => Number(user.active) !== 0).map((user) =>
+    `<option value="${Number(user.id)}">${escapeHtml(user.name || user.email)} · ${escapeHtml(String(user.role || '').replaceAll('_', ' '))}</option>`
+  ).join('');
+}
+
+async function verifyAuditIntegrity() {
+  const response = await fetch('/api/security/governance/audit-integrity/verify', { credentials: 'same-origin' });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || `Audit integrity failed near record ${data.failures?.[0]?.id || 'unknown'}`);
+  showDialog('Audit Integrity Verified', `<div class="finance-risk-banner"><strong>${Number(data.checked_records || 0)} RECORDS VERIFIED</strong><span>${escapeHtml(data.disclaimer || '')}</span></div><p>Range: ${escapeHtml(data.first_audit_id || '-')} to ${escapeHtml(data.last_audit_id || '-')}</p>`, hideDialog, 'Close');
+}
+
+function openBreakGlassDialog() {
+  showDialog('Request Emergency Access', `
+    <div class="finance-risk-banner high"><strong>DUAL CONTROL REQUIRED</strong><span>You cannot request access for yourself. A different super administrator must approve it, and banking/payroll permissions cannot be delegated.</span></div>
+    <label>Beneficiary<select id="breakGlassBeneficiary"><option value="">Select active user</option>${governanceUserOptions()}</select></label>
+    <label>Incident reference<input id="breakGlassIncident" maxlength="120" placeholder="INC-2026-001"></label>
+    <label>Safe permissions<textarea id="breakGlassPermissions" rows="3" placeholder="VIEW_SECURITY_EVIDENCE, VIEW_AUDIT_LOG"></textarea></label>
+    <label>Duration<select id="breakGlassDuration"><option value="15">15 minutes</option><option value="30" selected>30 minutes</option><option value="60">60 minutes</option></select></label>
+    <label>Detailed emergency reason<textarea id="breakGlassReason" rows="4" minlength="30" placeholder="Describe the incident, necessity and intended action"></textarea></label>`, async () => {
+      const response = await fetch('/api/security/governance/break-glass', { method: 'POST', headers: authHeaders(), body: JSON.stringify({
+        beneficiary_user_id: Number(document.getElementById('breakGlassBeneficiary').value),
+        incident_reference: document.getElementById('breakGlassIncident').value,
+        permissions: document.getElementById('breakGlassPermissions').value.split(',').map((value) => value.trim().toUpperCase()).filter(Boolean),
+        duration_minutes: Number(document.getElementById('breakGlassDuration').value),
+        reason: document.getElementById('breakGlassReason').value
+      }) });
+      const data = await safeJson(response);
+      if (!response.ok) return showToast(data.message || 'Emergency access request failed');
+      hideDialog(); showToast(data.message); await loadSecurityCentre();
+    }, 'Submit for Approval');
+}
+
+function openBreakGlassApprovalDialog(id) {
+  showDialog('Approve Emergency Access', `
+    <div class="finance-risk-banner high"><strong>INDEPENDENT APPROVAL</strong><span>Confirm the incident out-of-band. Requesters and beneficiaries cannot approve their own request.</span></div>
+    <label>Approval reason<textarea id="breakGlassApprovalReason" rows="4" minlength="20"></textarea></label>
+    <label>Type ACTIVATE EMERGENCY ACCESS<input id="breakGlassConfirmation" autocomplete="off"></label>`, async () => {
+      const response = await fetch(`/api/security/governance/break-glass/${encodeURIComponent(id)}/approve`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ approval_reason: document.getElementById('breakGlassApprovalReason').value, confirmation: document.getElementById('breakGlassConfirmation').value }) });
+      const data = await safeJson(response);
+      if (!response.ok) return showToast(data.message || 'Emergency access could not be approved');
+      hideDialog(); showToast(data.message); await loadSecurityCentre();
+    }, 'Activate Access');
+}
+
+function openBreakGlassRevokeDialog(id) {
+  showDialog('Revoke Emergency Access', '<label>Revocation reason<textarea id="breakGlassRevokeReason" rows="4" minlength="10"></textarea></label>', async () => {
+    const response = await fetch(`/api/security/governance/break-glass/${encodeURIComponent(id)}/revoke`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ reason: document.getElementById('breakGlassRevokeReason').value }) });
+    const data = await safeJson(response);
+    if (!response.ok) return showToast(data.message || 'Emergency access could not be revoked');
+    hideDialog(); showToast(data.message); await loadSecurityCentre();
+  }, 'Revoke Now');
+}
+
+function openImpersonationDialog() {
+  showDialog('Start Read-only Support', `
+    <div class="finance-risk-banner high"><strong>READ-ONLY AND AUDITED</strong><span>Restricted security, user, settings, finance, email and integration endpoints remain blocked. Super administrators cannot be impersonated.</span></div>
+    <label>Target user<select id="impersonationTarget"><option value="">Select user</option>${governanceUserOptions()}</select></label>
+    <label>Duration<select id="impersonationDuration"><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option></select></label>
+    <label>Detailed support reason<textarea id="impersonationReason" rows="4" minlength="30"></textarea></label>`, async () => {
+      const response = await fetch('/api/security/governance/impersonation', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ target_user_id: Number(document.getElementById('impersonationTarget').value), duration_minutes: Number(document.getElementById('impersonationDuration').value), reason: document.getElementById('impersonationReason').value }) });
+      const data = await safeJson(response);
+      if (!response.ok) return showToast(data.message || 'Read-only support context could not be created');
+      showDialog('Support Context Created', `<div class="finance-risk-banner high"><strong>DISPLAYED ONCE</strong><span>This short-lived context is bound to your current session. It cannot perform writes or access restricted modules.</span></div><label>Context token<textarea readonly rows="4">${escapeHtml(data.context_token)}</textarea></label>`, async () => { hideDialog(); await loadSecurityCentre(); }, 'I Saved It');
+    }, 'Create Read-only Context');
 }
 
 function openApiTokenDialog() {
@@ -5956,12 +6044,13 @@ async function openPasswordResetDialog(userId) {
       <p class="status-note">
         This revokes the user’s sessions and sends a single-use reset link to their work email. The link expires after 30 minutes.
       </p>
+      <label class="form-field"><span>Security reason</span><textarea id="passwordResetReason" rows="3" maxlength="500" placeholder="User request, suspected compromise or administrator recovery"></textarea></label>
     `,
     async () => {
       const res = await fetch(`/api/users/${userId}/reset-password`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({})
+        body: JSON.stringify({ reason: document.getElementById('passwordResetReason')?.value?.trim() || '' })
       });
 
       const data = await safeJson(res);
@@ -5986,6 +6075,8 @@ function openTerminateStaffDialog(userId) {
     return;
   }
 
+  const transferOptions = staffCache.filter((item) => Number(item.id) !== Number(userId) && item.active && !['LOCKED','SUSPENDED','DISABLED','TERMINATED'].includes(String(item.account_status || '').toUpperCase()))
+    .map((item) => `<option value="${Number(item.id)}">${escapeHtml(item.name || item.email)} · ${escapeHtml(item.department || item.role || 'Staff')}</option>`).join('');
   showDialog(
     `Terminate Access: ${user.name || user.email}`,
     `
@@ -5996,6 +6087,11 @@ function openTerminateStaffDialog(userId) {
       <label class="form-field">
         <span>Termination reason</span>
         <textarea id="deleteStaffReason" rows="3" placeholder="Employment ended, duplicate account, account created in error"></textarea>
+      </label>
+      <label class="form-field">
+        <span>Transfer active responsibilities to</span>
+        <select id="terminationTransferUser"><option value="">No transfer needed</option>${transferOptions}</select>
+        <small>If the user owns active records, termination will be blocked until a destination is selected.</small>
       </label>
       <label class="form-field">
         <span>Type TERMINATE to confirm</span>
@@ -6013,7 +6109,7 @@ function openTerminateStaffDialog(userId) {
       const res = await fetch(`/api/users/${Number(userId)}/account-state`, {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ state: 'TERMINATED', reason })
+        body: JSON.stringify({ state: 'TERMINATED', reason, transfer_to_user_id: Number(document.getElementById('terminationTransferUser')?.value || 0) || null })
       });
       const data = await safeJson(res);
       if (!res.ok) {

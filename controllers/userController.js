@@ -409,12 +409,15 @@ exports.changeAccountState = async (req, res) => {
       if (Number(remaining.total || 0) <= 1) return res.status(409).json({ message: 'The last active super administrator cannot be disabled or terminated' });
     }
     if (state === 'TERMINATED' && !hasPermission(req.user, 'MANAGE_ROLES')) return res.status(403).json({ message: 'Role-management permission is required to terminate access' });
-    const result = await transitionAccount({ actorId: req.user.id, targetUserId: userId, state, reason, req });
+    const result = await transitionAccount({
+      actorId: req.user.id, targetUserId: userId, state, reason, req,
+      transferToUserId: Number(req.body.transfer_to_user_id || 0) || null
+    });
     await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: `USER_${state}`, req, metadata: { previous_state: result.before.account_status, reason } });
-    return res.json({ message: `Account state changed to ${state}.`, state, sessions_revoked: state !== 'ACTIVE' });
+    return res.json({ message: `Account state changed to ${state}.`, state, sessions_revoked: state !== 'ACTIVE', ownership_transfers: result.ownershipTransfers });
   } catch (error) {
     console.error('changeAccountState error:', error.message);
-    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Account state could not be changed' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Account state could not be changed', code: error.code, ownership_counts: error.ownershipCounts });
   }
 };
 
@@ -639,7 +642,8 @@ exports.resetUserPassword = async (req, res) => {
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
     const userId = Number(req.params.id);
-    if (!userId) return res.status(400).json({ message: 'User ID is required' });
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!userId || reason.length < 10) return res.status(400).json({ message: 'User ID and a detailed reset reason are required' });
 
     const [[targetUser]] = await pool.query('SELECT id, name, username, email, role, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
     if (!targetUser) return res.status(404).json({ message: 'User not found' });
@@ -665,7 +669,12 @@ exports.resetUserPassword = async (req, res) => {
     await revokeUserSessions(userId, 'PASSWORD_RESET');
     const resetToken = await issueToken({ userId, type: 'PASSWORD_RESET', minutes: 30, createdBy: req.user.id });
     await queueSecurityLink({ user: targetUser, token: resetToken, type: 'PASSWORD_RESET', createdBy: req.user.id });
-    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'PASSWORD_RESET', req });
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'PASSWORD_RESET', req, metadata: { reason } });
+    await logAudit(pool, {
+      actorId: req.user.id, action: 'ADMIN_PASSWORD_RESET_REQUESTED', module: 'security', recordType: 'user', recordId: userId,
+      newValue: { reason }, ipAddress: req.ip, userAgent: req.get('user-agent'), requestId: req.requestId,
+      sessionId: req.session?.id, metadata: { delivery: 'single_use_link' }
+    });
 
     res.json({
       message: 'Secure password-reset link queued. Existing sessions were revoked.'
@@ -683,6 +692,8 @@ exports.resendUserInvitation = async (req, res) => {
   try {
     await ensureSecuritySchema();
     const userId = Number(req.params.id);
+    const reason = String(req.body.reason || '').trim().slice(0, 500);
+    if (!userId || reason.length < 10) return res.status(400).json({ message: 'User ID and a detailed reissue reason are required' });
     const [[user]] = await pool.query(
       `SELECT id, name, email, role, account_status FROM users
        WHERE id = ? AND deleted_at IS NULL LIMIT 1`, [userId]
@@ -693,7 +704,12 @@ exports.resendUserInvitation = async (req, res) => {
     if (user.account_status !== 'INVITED') return res.status(409).json({ message: 'Only invited accounts can receive a replacement invitation' });
     const token = await issueToken({ userId, type: 'INVITE', minutes: 1440, createdBy: req.user.id });
     await queueSecurityLink({ user, token, type: 'INVITE', createdBy: req.user.id });
-    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'INVITATION_REISSUED', req });
+    await logSecurityEvent({ actorId: req.user.id, targetUserId: userId, eventType: 'INVITATION_REISSUED', req, metadata: { reason } });
+    await logAudit(pool, {
+      actorId: req.user.id, action: 'INVITATION_REISSUED', module: 'security', recordType: 'user', recordId: userId,
+      newValue: { reason }, ipAddress: req.ip, userAgent: req.get('user-agent'), requestId: req.requestId,
+      sessionId: req.session?.id, metadata: { delivery: 'single_use_link' }
+    });
     return res.json({ message: 'A new invitation was queued; the previous link is no longer valid.' });
   } catch (error) {
     console.error('resendUserInvitation error:', error.message);

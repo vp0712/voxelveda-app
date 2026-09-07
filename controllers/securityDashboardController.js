@@ -3,14 +3,15 @@ const { ensureSecuritySchema } = require('../services/securitySchema');
 const { ensureSecurityOperationsSchema } = require('../services/securityOperationsSchema');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
 const { ensureOperationalTrustSchema } = require('../services/operationalTrustSchema');
+const { ensureSecurityGovernanceSchema } = require('../services/securityGovernanceSchema');
 const { redactSensitive } = require('../utils/securityRedaction');
 const { assessProductionReadiness } = require('../config/productionReadiness');
 
 const PRIVILEGED_ROLES = ['super_admin', 'admin', 'finance_admin', 'accountant', 'hr'];
-const HIGH_RISK_EVENTS = ['ROLE_CHANGED', 'PERMISSION_CHANGED', 'USER_DISABLED', 'ACCOUNT_TERMINATED', 'BANK_DETAILS_CHANGED', 'PAYMENT_APPROVED', 'SENSITIVE_EXPORT', 'MFA_DISABLED', 'SECURITY_SETTING_CHANGED'];
+const HIGH_RISK_EVENTS = ['ROLE_CHANGED', 'PERMISSION_CHANGED', 'USER_DISABLED', 'ACCOUNT_TERMINATED', 'BANK_DETAILS_CHANGED', 'PAYMENT_APPROVED', 'SENSITIVE_EXPORT', 'MFA_DISABLED', 'SECURITY_SETTING_CHANGED', 'BREAK_GLASS_ACTIVATED', 'IMPERSONATION_STARTED', 'DATABASE_SECURITY_ATTESTED'];
 
 async function ensureSchemas() {
-  await Promise.all([ensureSecuritySchema(), ensureSecurityOperationsSchema(), ensureOperationalTrustSchema(), ensureWorkforceSchema()]);
+  await Promise.all([ensureSecuritySchema(), ensureSecurityOperationsSchema(), ensureOperationalTrustSchema(), ensureWorkforceSchema(), ensureSecurityGovernanceSchema()]);
 }
 
 function safePage(query) {
@@ -30,9 +31,11 @@ async function collectIssues() {
   );
   if (Number(noMfa.count)) issues.push(issue('privileged-without-mfa', 'CRITICAL', 'Privileged users without MFA', 'Mandatory MFA enrolment is incomplete.', Number(noMfa.count)));
 
+  const staleReviewDays = Math.min(365, Math.max(30, Number(process.env.STALE_ACCOUNT_REVIEW_DAYS || 60)));
+  const staleHighRiskDays = Math.min(730, Math.max(staleReviewDays, Number(process.env.STALE_ACCOUNT_HIGH_RISK_DAYS || 90)));
   const [[stale]] = await pool.query(
     `SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL
-     AND COALESCE(last_login_at, created_at) < DATE_SUB(NOW(), INTERVAL 90 DAY)`
+     AND COALESCE(last_login_at, created_at) < DATE_SUB(NOW(), INTERVAL ? DAY)`, [staleHighRiskDays]
   );
   if (Number(stale.count)) issues.push(issue('stale-active-accounts', 'MEDIUM', 'Stale accounts remain active', 'Review accounts with no activity for more than 90 days.', Number(stale.count)));
 
@@ -73,6 +76,14 @@ async function collectIssues() {
   if (Number(pendingExports.count)) issues.push(issue('pending-sensitive-exports', 'MEDIUM', 'Sensitive exports await independent approval', 'Review or allow the requests to expire.', Number(pendingExports.count)));
   const [[staleSecrets]] = await pool.query("SELECT COUNT(*) AS count FROM security_secret_inventory WHERE rotated_at IS NULL OR rotated_at < DATE_SUB(NOW(), INTERVAL rotate_after_days DAY)");
   if (Number(staleSecrets.count)) issues.push(issue('secret-rotation-overdue', 'HIGH', 'Security secret rotation reviews are overdue', 'Rotate through the deployment secret manager and record metadata only.', Number(staleSecrets.count)));
+  const [[databasePosture]] = await pool.query("SELECT COUNT(*) count FROM database_security_attestations WHERE status='VERIFIED' AND tls_in_use=1 AND least_privilege_verified=1 AND expires_at>NOW()");
+  if (!Number(databasePosture.count)) issues.push(issue('database-least-privilege-unattested', 'HIGH', 'Database least privilege is not currently attested', 'Verify the provider database identity, transport protection and minimum grants; record evidence without credentials.'));
+  const [[activeBreakGlass]] = await pool.query("SELECT COUNT(*) count FROM break_glass_requests WHERE status='ACTIVE' AND expires_at>NOW()");
+  if (Number(activeBreakGlass.count)) issues.push(issue('break-glass-active', 'CRITICAL', 'Emergency access is active', 'Confirm the incident remains active and revoke emergency access immediately when containment work ends.', Number(activeBreakGlass.count)));
+  const [[activeImpersonation]] = await pool.query("SELECT COUNT(*) count FROM impersonation_contexts WHERE status='ACTIVE' AND ended_at IS NULL AND expires_at>NOW()");
+  if (Number(activeImpersonation.count)) issues.push(issue('support-impersonation-active', 'MEDIUM', 'Read-only support impersonation is active', 'Confirm the support session is expected and allow its short expiry or end it.', Number(activeImpersonation.count)));
+  const [[unchainedAudit]] = await pool.query("SELECT COUNT(*) count FROM audit_logs WHERE integrity_hash IS NULL AND created_at>=DATE_SUB(NOW(),INTERVAL 24 HOUR)");
+  if (Number(unchainedAudit.count)) issues.push(issue('audit-chain-coverage-gap', 'HIGH', 'Recent audit entries lack integrity hashes', 'Investigate legacy or bypass audit writers before relying on chain coverage.', Number(unchainedAudit.count)));
   return issues;
 }
 
@@ -87,7 +98,7 @@ exports.dashboard = async (req, res, next) => {
       pool.query("SELECT COUNT(*) AS count FROM security_events WHERE event_type = 'LOGIN_FAILURE' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"),
       pool.query("SELECT COUNT(*) AS count FROM users WHERE account_status = 'LOCKED' OR locked_until > NOW()"),
       pool.query('SELECT COUNT(*) AS count FROM auth_sessions WHERE revoked_at IS NULL AND expires_at > NOW()'),
-      pool.query('SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL AND COALESCE(last_login_at, created_at) < DATE_SUB(NOW(), INTERVAL 90 DAY)'),
+      pool.query('SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL AND COALESCE(last_login_at, created_at) < DATE_SUB(NOW(), INTERVAL ? DAY)', [Math.min(730, Math.max(60, Number(process.env.STALE_ACCOUNT_HIGH_RISK_DAYS || 90)))]),
       pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE event_type IN (${HIGH_RISK_EVENTS.map(() => '?').join(',')}) AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, HIGH_RISK_EVENTS),
       pool.query("SELECT COUNT(*) AS count FROM security_incidents WHERE status NOT IN ('RESOLVED','CLOSED')")
     ]);

@@ -1549,6 +1549,32 @@
           <div id="assuranceControlStatus" class="security-control-strip">Loading assurance status…</div>
         </div>
 
+        <div class="card operational-trust-panel">
+          <div class="section-head">
+            <div><span class="eyebrow">Phases 51–70</span><h3>Identity Governance</h3><p>Strict request contracts, audit integrity, emergency-access dual control, safe support impersonation and accountable termination.</p></div>
+            <div class="section-actions">
+              <button type="button" class="primary-btn" onclick="openBreakGlassDialog()">Request Emergency Access</button>
+              <button type="button" class="secondary-btn" onclick="openImpersonationDialog()">Start Read-only Support</button>
+              <button type="button" class="secondary-btn" onclick="verifyAuditIntegrity()">Verify Audit Chain</button>
+            </div>
+          </div>
+          <div class="metric-grid security-metric-grid">
+            <div class="card"><h3>Governance Readiness</h3><p><strong id="governanceReadiness">0%</strong></p></div>
+            <div class="card"><h3>Audit Chain</h3><p><strong id="governanceAuditChain">0%</strong></p></div>
+            <div class="card"><h3>Emergency Access</h3><p><strong id="governanceBreakGlass">0</strong></p></div>
+            <div class="card"><h3>Pending Approval</h3><p><strong id="governancePending">0</strong></p></div>
+            <div class="card"><h3>Impersonations</h3><p><strong id="governanceImpersonations">0</strong></p></div>
+            <div class="card"><h3>Sensitive Fields</h3><p><strong id="governanceSensitiveFields">0</strong></p></div>
+            <div class="card"><h3>Stale 60 Days</h3><p><strong id="governanceStale60">0</strong></p></div>
+            <div class="card"><h3>Stale 90 Days</h3><p><strong id="governanceStale90">0</strong></p></div>
+          </div>
+          <div id="governanceControlStatus" class="security-control-strip">Loading identity-governance status…</div>
+          <div class="security-ledger-grid">
+            <div class="table-wrap"><h4>Emergency Access Register</h4><table><thead><tr><th>Beneficiary</th><th>Incident</th><th>Status</th><th>Expires</th><th></th></tr></thead><tbody id="governanceBreakGlassBody"><tr><td colspan="5">Loading…</td></tr></tbody></table></div>
+            <div class="table-wrap"><h4>Delegated Support Register</h4><table><thead><tr><th>Administrator</th><th>Target</th><th>Status</th><th>Expires</th></tr></thead><tbody id="governanceImpersonationBody"><tr><td colspan="4">Loading…</td></tr></tbody></table></div>
+          </div>
+        </div>
+
         <div class="card table-wrap">
           <div class="section-head"><div><h3>Security Issues</h3><p>Prioritised findings based on current application data and configuration.</p></div></div>
           <table><thead><tr><th>Severity</th><th>Issue</th><th>Detail</th><th>Count</th></tr></thead><tbody id="securityIssuesBody"><tr><td colspan="4">Loading...</td></tr></tbody></table>

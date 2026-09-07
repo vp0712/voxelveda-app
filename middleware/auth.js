@@ -3,9 +3,10 @@ const pool = require('../config/db');
 const { getRequestToken } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
-const { validateSession } = require('../services/sessionService');
+const { logSecurityEvent, validateSession } = require('../services/sessionService');
 const { requiresMfa } = require('../services/mfaService');
 const { authenticateApiToken, isApiToken } = require('../services/apiTokenService');
+const { loadBreakGlassPermissions, parseJsonArray, resolveImpersonation } = require('../services/securityContextService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -73,7 +74,8 @@ module.exports = async (req, res, next) => {
       username: freshUser.username || decoded.username,
       role: String(freshUser.role || decoded.role || 'staff').trim().toLowerCase(),
       permissions: parsePermissions(freshUser.permissions),
-      temporary_permissions: []
+      temporary_permissions: [],
+      break_glass_permissions: []
     };
     try {
       const [temporary] = await pool.query("SELECT permission_name FROM privileged_access_requests WHERE user_id=? AND status='ACTIVE' AND starts_at<=NOW() AND expires_at>NOW()", [freshUser.id]);
@@ -97,8 +99,62 @@ module.exports = async (req, res, next) => {
       }
     }
 
+    if (req.authType !== 'api_token') {
+      const breakGlass = await loadBreakGlassPermissions(freshUser.id);
+      req.user.break_glass_permissions = breakGlass.permissions;
+      if (breakGlass.permissions.length) {
+        req.securityContext = {
+          ...(req.securityContext || {}),
+          breakGlass: true,
+          breakGlassRequestIds: breakGlass.requestIds,
+          breakGlassExpiresAt: breakGlass.expiresAt
+        };
+        res.setHeader('X-Break-Glass-Active', 'true');
+        await logSecurityEvent({
+          actorId: freshUser.id, targetUserId: freshUser.id, sessionId: req.session.id,
+          eventType: 'BREAK_GLASS_ACCESS_USED', req,
+          metadata: { request_ids: breakGlass.requestIds, method: req.method, path: String(req.originalUrl || '').split('?')[0] }
+        });
+      }
+
+      const impersonation = await resolveImpersonation(req, req.user, req.session);
+      if (impersonation) {
+        if (req.securityContext?.breakGlass) {
+          return res.status(403).json({ message: 'Break-glass access and impersonation cannot be combined', code: 'DELEGATED_CONTEXT_CONFLICT' });
+        }
+        const actor = { ...req.user };
+        req.actorUser = actor;
+        req.user = {
+          id: impersonation.target_user_id,
+          email: impersonation.email,
+          username: impersonation.username,
+          role: String(impersonation.role || 'staff').toLowerCase(),
+          permissions: parseJsonArray(impersonation.permissions),
+          temporary_permissions: [],
+          break_glass_permissions: []
+        };
+        req.securityContext = {
+          impersonation: true,
+          impersonationId: impersonation.id,
+          actorUserId: actor.id,
+          targetUserId: impersonation.target_user_id,
+          expiresAt: impersonation.expires_at
+        };
+        res.setHeader('X-Impersonation-Active', 'true');
+        res.setHeader('X-Impersonation-Mode', 'read-only');
+        await logSecurityEvent({
+          actorId: actor.id, targetUserId: impersonation.target_user_id, sessionId: req.session.id,
+          eventType: 'IMPERSONATION_ACCESS_USED', req,
+          metadata: { impersonation_id: impersonation.id, method: req.method, path: String(req.originalUrl || '').split('?')[0] }
+        });
+      }
+    }
+
     next();
   } catch (err) {
+    if (err?.statusCode === 403) {
+      return res.status(403).json({ message: err.message, code: err.code || 'SECURITY_CONTEXT_REJECTED' });
+    }
     return res.status(401).json({
       message: 'Invalid or expired token'
     });
