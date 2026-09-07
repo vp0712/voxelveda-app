@@ -10,6 +10,7 @@ const { issueToken, revokeUserActionTokens } = require('../services/authActionTo
 const { queueSecurityLink } = require('../services/securityEmailService');
 const { HIGH_RISK_PERMISSIONS, LEGACY_PERMISSION_MAP, PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
 const { canonicalPermission, hasPermission } = require('../services/authorizationService');
+const { assertNoSegregationConflicts } = require('../services/segregationPolicyService');
 const {
   ACCOUNT_STATES, permissionDifference, revokeEveryCredential, transitionAccount
 } = require('../services/userSecurityService');
@@ -183,6 +184,7 @@ exports.createUser = async (req, res) => {
       return res.status(403).json({ message: 'Role-management permission is required to assign roles or permission grants' });
     }
     if (!isSuperAdmin(req) && containsHighRiskPermission(permissions)) return res.status(403).json({ message: 'Only a super administrator can grant high-risk permissions' });
+    try { await assertNoSegregationConflicts(role, permissions); } catch (error) { return res.status(error.statusCode || 500).json({ message: error.message, conflicts: error.conflicts || [] }); }
 
     const [existing] = await pool.query(
       'SELECT id FROM users WHERE LOWER(email) = ? OR LOWER(username) = ? LIMIT 1',
@@ -331,6 +333,7 @@ exports.updateUserAccess = async (req, res) => {
     if (authorityError) return res.status(403).json({ message: authorityError });
     if (Number(req.user.id) === userId) return res.status(403).json({ message: 'You cannot modify your own role or permissions' });
     if (req.body.permissions !== undefined && !isSuperAdmin(req) && containsHighRiskPermission(permissions)) return res.status(403).json({ message: 'Only a super administrator can grant high-risk permissions' });
+    try { await assertNoSegregationConflicts(role, permissions); } catch (error) { return res.status(error.statusCode || 500).json({ message: error.message, conflicts: error.conflicts || [] }); }
 
     if (Number(req.user.id) === userId && active === false) {
       return res.status(400).json({ message: 'You cannot disable your own account' });
@@ -555,6 +558,7 @@ exports.updateUser = async (req, res) => {
       return res.status(403).json({ message: 'You cannot modify your own role, permissions, account status or access scope' });
     }
     if (req.body.permissions !== undefined && !isSuperAdmin(req) && containsHighRiskPermission(permissions)) return res.status(403).json({ message: 'Only a super administrator can grant high-risk permissions' });
+    try { await assertNoSegregationConflicts(role, permissions); } catch (error) { return res.status(error.statusCode || 500).json({ message: error.message, conflicts: error.conflicts || [] }); }
 
     if (!name || !username || !email || !role) {
       return res.status(400).json({ message: 'Name, username, email and role are required' });

@@ -8,6 +8,8 @@ const routes = read('routes/continuousAssuranceRoutes.js');
 const auth = read('middleware/auth.js');
 const authorization = read('services/authorizationService.js');
 const migration = read('migrations/20260907_continuous_assurance.sql');
+const segregation = read('services/segregationPolicyService.js');
+const userController = read('controllers/userController.js');
 
 for (const table of ['audit_integrity_checkpoints','privileged_access_requests','access_review_campaigns','access_review_decisions','segregation_policies','security_risk_exceptions','cryptographic_key_versions','service_accounts','security_event_outbox','resilience_exercises']) {
   assert(schema.includes(table), `runtime schema missing ${table}`);
@@ -26,4 +28,7 @@ assert(routes.includes("MANAGE_CONTINUOUS_ASSURANCE"));
 assert(auth.includes("expires_at>NOW()"));
 assert(auth.includes("status='ACTIVE'"));
 assert(authorization.includes('temporary_permissions'));
+assert(segregation.includes('assertNoSegregationConflicts'));
+assert(segregation.includes("WHERE active=1"));
+assert(userController.match(/assertNoSegregationConflicts/g).length >= 4, 'user creation and both access-update flows must enforce segregation policies');
 console.log('Continuous assurance tests passed.');

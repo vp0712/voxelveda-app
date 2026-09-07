@@ -14,7 +14,7 @@ const files = [
   'services/timesheetWorkflowService.js', 'services/userLifecycleService.js',
   'services/financeDomain.js', 'services/financeSchema.js', 'services/financeEncryptionService.js', 'services/highRiskFinanceSchema.js', 'services/passwordPolicy.js',
   'services/securitySchema.js', 'services/sessionService.js', 'services/authSessionService.js', 'services/authActionTokenService.js', 'services/mfaService.js', 'services/authorizationService.js', 'services/stepUpService.js', 'services/userSecurityService.js', 'services/securityOperationsSchema.js', 'services/documentSecurityService.js', 'services/malwareScanService.js',
-  'services/securityEmailService.js', 'services/operationalTrustSchema.js', 'services/assuranceSchema.js', 'services/securityEventOutboxService.js', 'services/apiTokenService.js', 'services/webhookSecurityService.js', 'services/outboundRequestPolicy.js', 'services/aiSecurityPolicy.js', 'services/securityAlertService.js', 'config/security.js', 'config/permissionCatalog.js',
+  'services/securityEmailService.js', 'services/operationalTrustSchema.js', 'services/assuranceSchema.js', 'services/securityEventOutboxService.js', 'services/segregationPolicyService.js', 'services/apiTokenService.js', 'services/webhookSecurityService.js', 'services/outboundRequestPolicy.js', 'services/aiSecurityPolicy.js', 'services/securityAlertService.js', 'config/security.js', 'config/permissionCatalog.js',
   'services/weeklyTimesheetScheduler.js', 'services/workforceSchema.js',
   'utils/session.js', 'utils/tokenRevocation.js', 'utils/money.js', 'utils/securityRedaction.js',
   'public/login.js', 'public/auth-lifecycle.js', 'public/mfa.js', 'public/security-page.js', 'public/step-up.js',
