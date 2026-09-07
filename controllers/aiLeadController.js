@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const { sendMail, missingSmtpKeys } = require('../services/emailService');
+const { sanitizeAiValue } = require('../services/aiSecurityPolicy');
 
 function clean(value, max = 800) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
@@ -59,11 +60,11 @@ exports.createLead = async (req, res) => {
   const email = clean(req.body.email, 180);
   const phone = clean(req.body.phone, 80);
   const company = clean(req.body.company, 160);
-  const need = clean(req.body.need, 1500);
+  const need = clean(sanitizeAiValue(req.body.need), 1500);
   const source = clean(req.body.source, 120) || 'Voxel Veda AI';
   const page = clean(req.body.page, 300);
   const transcript = Array.isArray(req.body.transcript)
-    ? req.body.transcript.map((item) => clean(item, 600)).filter(Boolean).slice(-12)
+    ? req.body.transcript.map((item) => clean(sanitizeAiValue(item), 600)).filter(Boolean).slice(-12)
     : [];
 
   if (!name || !email || !need) {

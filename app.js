@@ -30,6 +30,8 @@ const highRiskFinanceRoutes = require('./routes/highRiskFinanceRoutes');
 const documentSecurityRoutes = require('./routes/documentSecurityRoutes');
 const securityDashboardRoutes = require('./routes/securityDashboardRoutes');
 const securityIncidentRoutes = require('./routes/securityIncidentRoutes');
+const operationalTrustRoutes = require('./routes/operationalTrustRoutes');
+const integrationWebhookRoutes = require('./routes/integrationWebhookRoutes');
 const requirePermission = require('./middleware/permissionMiddleware');
 const requireInputPermission = require('./middleware/inputPermissionMiddleware');
 const { hasAnyPermission } = require('./services/authorizationService');
@@ -68,7 +70,10 @@ app.set('trust proxy', 1);
 app.use(securityHeaders);
 app.use(cors(corsOptions()));
 app.use(rateLimit());
-app.use(express.json({ limit: process.env.JSON_BODY_LIMIT || '1mb' }));
+app.use(express.json({
+  limit: process.env.JSON_BODY_LIMIT || '1mb',
+  verify(req, res, buffer) { req.rawBody = Buffer.from(buffer); }
+}));
 app.use(express.urlencoded({ extended: true, limit: process.env.FORM_BODY_LIMIT || '1mb' }));
 app.use(csrfProtection);
 
@@ -213,6 +218,7 @@ app.get('/api/qr', async (req, res) => {
 app.post('/api/public/rfq', rfqController.createRFQ);
 app.post('/api/public/ai-lead', aiLeadController.createLead);
 app.get('/api/public/shift-qr', attendanceController.publicShiftQrToken);
+app.use('/api/integrations/webhooks', integrationWebhookRoutes);
 
 app.use('/api/rfq', auth, requirePermission('VIEW_RFQS'), rfqRoutes);
 app.use('/api/invoice', auth, requirePermission('VIEW_FINANCE'), invoiceRoutes);
@@ -224,6 +230,7 @@ app.use('/api/upload', auth, uploadRoutes);
 app.use('/api/documents', auth, documentSecurityRoutes);
 app.use('/api/security', auth, securityDashboardRoutes);
 app.use('/api/security', auth, securityIncidentRoutes);
+app.use('/api/security/operations', auth, operationalTrustRoutes);
 app.use('/api/tasks', auth, taskRoutes);
 app.use('/api/stock', auth, requirePermission('VIEW_INVENTORY'), stockRoutes);
 app.use('/api/customers', auth, requirePermission('VIEW_CUSTOMERS'), requireInputPermission('EDIT_CUSTOMERS'), customerRoutes);

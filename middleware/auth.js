@@ -5,6 +5,7 @@ const { ensureUserLifecycleSchema } = require('../services/userLifecycleService'
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { validateSession } = require('../services/sessionService');
 const { requiresMfa } = require('../services/mfaService');
+const { authenticateApiToken, isApiToken } = require('../services/apiTokenService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -32,6 +33,16 @@ module.exports = async (req, res, next) => {
       return res.status(500).json({
         message: 'JWT_SECRET missing in server .env'
       });
+    }
+
+    if (isApiToken(token)) {
+      const integration = await authenticateApiToken(token, req);
+      if (!integration) return res.status(401).json({ message: 'Invalid, expired or revoked API token' });
+      req.user = integration.user;
+      req.authType = 'api_token';
+      req.apiTokenId = integration.tokenId;
+      req.session = null;
+      return next();
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);

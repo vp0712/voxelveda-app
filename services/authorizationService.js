@@ -18,7 +18,10 @@ function effectivePermissions(user) {
   const role = String(user?.role || '').trim().toLowerCase();
   const grants = new Set(ROLE_TEMPLATES[role] || []);
   for (const value of parsePermissions(user?.permissions)) for (const permission of canonicalPermission(value)) grants.add(permission);
-  return grants;
+  const boundary = parsePermissions(user?.permission_boundary);
+  if (!boundary.length) return grants;
+  const allowed = new Set(boundary.flatMap(canonicalPermission));
+  return new Set([...grants].filter((permission) => allowed.has(permission)));
 }
 
 function hasPermission(user, permission) {

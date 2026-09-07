@@ -4,7 +4,7 @@
 
 Critical findings included an unsafe default admin bootstrap, 30-day bearer tokens stored in browser storage, authentication tokens accepted from URLs, restart-sensitive in-memory logout revocation, no persistent account lock tracking, six-to-eight-character password rules, and ordinary administrators being able to grant privileged roles. Public customer registration also wrote directly to the internal users table.
 
-High-risk gaps still requiring later phases include MFA/passkeys, step-up authentication, dual control, field encryption, file classification and malware scanning, comprehensive record-level authorization, scoped export/download controls, password history, trusted-device management, and an administrator security dashboard.
+The current branch now includes MFA, step-up authentication, deny-by-default authorization, finance dual control, field encryption, secure document classification/downloads, incident response, an administrator Security Centre, scoped API tokens, signed-webhook controls, retention governance, sensitive-export approvals, SSRF protections, AI data filtering, secret-rotation metadata, backup evidence, malware quarantine and compliance evidence snapshots. Remaining external or specialised gaps are listed below and are not represented as completed controls.
 
 ## Implemented in Phase 1
 
@@ -55,4 +55,7 @@ This report records implemented controls and known gaps; it is not a certificati
 - Password verification creates a five-minute, hash-only MFA challenge. An authenticated session is issued only after successful MFA and records assurance level 2.
 - Ten high-entropy, single-use recovery codes are generated at enrollment, stored only as keyed hashes, and displayed once.
 - Existing level-1 privileged sessions are blocked from application APIs until MFA enrollment is completed.
-- Passkeys are deliberately not represented as active: the current dependency set has no audited WebAuthn verification library. This remains a Phase 3 follow-up rather than a fake frontend control.
+- Passkeys are deliberately not represented as active: the current dependency set has no audited WebAuthn verification library or completed relying-party ceremony design. This remains a follow-up rather than a fake frontend control.
+- Redis-backed distributed rate limiting remains required before scaling beyond one application replica.
+- Automated malware SAFE decisions remain disabled until an authenticated scanner adapter is configured and tested.
+- Backup readiness remains unverified until provider evidence and a real restoration exercise exist.
