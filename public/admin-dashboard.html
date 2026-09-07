@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260907-operational-trust"/>
+<link rel="stylesheet" href="/style.css?v=20260907-continuous-assurance"/>
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
 <link rel="stylesheet" href="/step-up.css?v=20260905"/>
   <link rel="stylesheet" href="/advanced-theme.css?v=20260906-security-centre" />
@@ -1534,6 +1534,21 @@
           </div>
         </div>
 
+        <div class="card operational-trust-panel">
+          <div class="section-head"><div><span class="eyebrow">Phases 26–35</span><h3>Continuous Assurance</h3><p>Time-limited privilege, access certification, audit integrity, segregation of duties, cryptographic inventory and recovery exercises.</p></div></div>
+          <div class="metric-grid security-metric-grid">
+            <div class="card"><h3>Active JIT Grants</h3><p><strong id="assuranceJitActive">0</strong></p></div>
+            <div class="card"><h3>Pending JIT</h3><p><strong id="assuranceJitPending">0</strong></p></div>
+            <div class="card"><h3>Open Reviews</h3><p><strong id="assuranceReviews">0</strong></p></div>
+            <div class="card"><h3>Overdue Reviews</h3><p><strong id="assuranceOverdue">0</strong></p></div>
+            <div class="card"><h3>Risk Exceptions</h3><p><strong id="assuranceExceptions">0</strong></p></div>
+            <div class="card"><h3>Service Accounts</h3><p><strong id="assuranceServiceAccounts">0</strong></p></div>
+            <div class="card"><h3>Event Outbox</h3><p><strong id="assuranceOutbox">0</strong></p></div>
+            <div class="card"><h3>Audit Seals</h3><p><strong id="assuranceAuditSeals">0</strong></p></div>
+          </div>
+          <div id="assuranceControlStatus" class="security-control-strip">Loading assurance status…</div>
+        </div>
+
         <div class="card table-wrap">
           <div class="section-head"><div><h3>Security Issues</h3><p>Prioritised findings based on current application data and configuration.</p></div></div>
           <table><thead><tr><th>Severity</th><th>Issue</th><th>Detail</th><th>Count</th></tr></thead><tbody id="securityIssuesBody"><tr><td colspan="4">Loading...</td></tr></tbody></table>
@@ -1714,7 +1729,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260905"></script>
-  <script src="/admin-dashboard.js?v=20260907-operational-trust"></script>
+  <script src="/admin-dashboard.js?v=20260907-continuous-assurance"></script>
   <script src="/expense-payments.js?v=20260904"></script>
 </body>
 </html>

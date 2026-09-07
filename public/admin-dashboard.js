@@ -1379,7 +1379,7 @@ let securityIncidentCache = [];
 async function loadSecurityCentre() {
   if (!hasCurrentPermission('MANAGE_SECURITY')) return;
   try {
-    const [dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes] = await Promise.all([
+    const [dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes] = await Promise.all([
       fetch('/api/security/dashboard', { credentials: 'same-origin' }),
       fetch('/api/security/events?limit=20', { credentials: 'same-origin' }),
       fetch('/api/security/audit?limit=20', { credentials: 'same-origin' }),
@@ -1388,10 +1388,11 @@ async function loadSecurityCentre() {
       fetch('/api/security/operations/summary', { credentials: 'same-origin' }),
       fetch('/api/security/operations/catalog', { credentials: 'same-origin' }),
       fetch('/api/security/operations/api-tokens', { credentials: 'same-origin' }),
-      fetch('/api/security/operations/exports', { credentials: 'same-origin' })
+      fetch('/api/security/operations/exports', { credentials: 'same-origin' }),
+      fetch('/api/security/assurance/summary', { credentials: 'same-origin' })
     ]);
-    if ([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes].some((response) => response.status === 401)) return redirectToLogin();
-    const [dashboard, events, audit, privileged, incidents, trust, trustCatalog, tokenData, exportData] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes].map(safeJson));
+    if ([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes].some((response) => response.status === 401)) return redirectToLogin();
+    const [dashboard, events, audit, privileged, incidents, trust, trustCatalog, tokenData, exportData, assurance] = await Promise.all([dashboardRes, eventsRes, auditRes, privilegedRes, incidentsRes, trustRes, trustCatalogRes, tokenRes, exportRes, assuranceRes].map(safeJson));
     if (!dashboardRes.ok) throw new Error(dashboard.message || 'Security dashboard unavailable');
     const metrics = dashboard.metrics || {};
     setText('securityReadinessScore', `${Number(dashboard.readiness?.score || 0)}%`);
@@ -1423,6 +1424,17 @@ async function loadSecurityCentre() {
     document.getElementById('operationalControlStatus').innerHTML = Object.entries(controlLabels).map(([key, label]) =>
       `<span class="security-posture ${trust.controls?.[key] ? 'secure' : 'warning'}">${escapeHtml(label)} · ${trust.controls?.[key] ? 'Configured' : 'Restricted'}</span>`
     ).join('');
+    const assuranceMetrics = assurance.metrics || {};
+    setText('assuranceJitActive', assuranceMetrics.active_jit_grants || 0);
+    setText('assuranceJitPending', assuranceMetrics.pending_jit_requests || 0);
+    setText('assuranceReviews', assuranceMetrics.open_access_reviews || 0);
+    setText('assuranceOverdue', assuranceMetrics.overdue_access_reviews || 0);
+    setText('assuranceExceptions', assuranceMetrics.active_risk_exceptions || 0);
+    setText('assuranceServiceAccounts', assuranceMetrics.active_service_accounts || 0);
+    setText('assuranceOutbox', assuranceMetrics.pending_security_events || 0);
+    setText('assuranceAuditSeals', assuranceMetrics.audit_integrity_checkpoints || 0);
+    const assuranceLabels = { distributed_rate_limit:'Distributed rate limit', webauthn_ready:'Passkey environment', event_delivery_configured:'Event delivery', key_rotation_support:'Key rotation registry' };
+    document.getElementById('assuranceControlStatus').innerHTML = Object.entries(assuranceLabels).map(([key,label]) => `<span class="security-posture ${assurance.controls?.[key]?'secure':'warning'}">${escapeHtml(label)} · ${assurance.controls?.[key]?'Configured':'Restricted'}</span>`).join('');
     document.getElementById('securityApiTokensBody').innerHTML = (tokenData.tokens || []).length ? tokenData.tokens.map((token) => `
       <tr><td><strong>${escapeHtml(token.token_name)}</strong><br><small>${escapeHtml(token.token_prefix || '')}…</small></td><td>${escapeHtml(token.user_name || token.user_email)}</td><td>${escapeHtml(displayJsonList(token.scopes_json))}</td><td>${escapeHtml(formatDateTime(token.expires_at))}</td><td>${escapeHtml(formatDateTime(token.last_used_at))}</td></tr>
     `).join('') : '<tr><td colspan="5">No scoped API tokens.</td></tr>';
