@@ -39,7 +39,8 @@ function validateField(field, value, values, evidenceByField = {}) {
       if (!Array.isArray(value) || value.some((item) => !field.allowed_values.includes(item))) errors.push('contains an unsupported value');
     } else if (!field.allowed_values.includes(value)) errors.push('unsupported value');
   }
-  if (field.requires_evidence && !(evidenceByField[field.key] || []).length) errors.push('evidence required');
+  const evidence = evidenceByField[field.key] || evidenceByField['*'] || [];
+  if (field.requires_evidence && !evidence.length) errors.push('evidence required');
   return errors;
 }
 
@@ -54,7 +55,7 @@ function validateRecord(definition, values, options = {}) {
     if (!field.key) continue;
     const fieldErrors = validateField(field, input[field.key], input, options.evidenceByField || {});
     for (const error of fieldErrors) {
-      const blocking = Boolean(field.blocking || field.required || field.required_when);
+      const blocking = Boolean(field.blocking || field.required || field.required_when || (field.requires_evidence && field.blocking !== false));
       if (blocking) blockingIssues += 1;
       issues.push({ field: field.key, label: field.label || field.key, error, blocking });
     }
