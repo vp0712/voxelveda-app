@@ -25,6 +25,7 @@ const { ensureAssuranceSchema } = require('./services/assuranceSchema');
 const { ensureSecurityGovernanceSchema } = require('./services/securityGovernanceSchema');
 const { ensureQmsSchema } = require('./services/qmsSchema');
 const { ensureQmsAdvancedSchema } = require('./services/qmsAdvancedSchema');
+const { ensureQmsQualityGovernanceSchema } = require('./services/qmsQualityGovernanceSchema');
 const {
   startWeeklyTimesheetScheduler,
   stopWeeklyTimesheetScheduler
@@ -76,6 +77,10 @@ ensureQmsSchema()
 ensureQmsAdvancedSchema()
   .then(() => console.log('QMS/MES operational schema ready.'))
   .catch((error) => console.error('QMS/MES operational schema initialization failed:', error.message));
+
+ensureQmsQualityGovernanceSchema()
+  .then(() => console.log('QMS quality-release governance schema ready.'))
+  .catch((error) => console.error('QMS quality-release governance schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {
