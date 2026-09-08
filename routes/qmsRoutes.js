@@ -1,6 +1,6 @@
 const express = require('express');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
-const { requireStepUp } = require('../middleware/stepUpMiddleware');
+const requireStepUp = require('../middleware/stepUpMiddleware');
 const qmsTransitionValidation = require('../middleware/qmsTransitionValidationMiddleware');
 const controller = require('../controllers/qms/recordController');
 const ops = require('../controllers/qmsOperationsController');
