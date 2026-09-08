@@ -118,3 +118,13 @@
 
   window.stepUpSecurity = { verify: requestVerification };
 })();
+
+// Load the controlled QMS/facility form catalogue only on the authenticated admin UI.
+document.addEventListener('DOMContentLoaded', () => {
+  if (!document.getElementById('companyFormsSection') || document.querySelector('script[data-controlled-forms]')) return;
+  const script = document.createElement('script');
+  script.src = '/controlled-forms.js?v=20260908-controlled-packs-r1';
+  script.defer = true;
+  script.dataset.controlledForms = 'true';
+  document.head.appendChild(script);
+});
