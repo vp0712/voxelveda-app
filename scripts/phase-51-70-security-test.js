@@ -75,7 +75,7 @@ async function main() {
   assert(files.users.includes('ownership_transfer_events'));
   assert(files.routes.match(/requireStepUp/g).length >= 2);
   assert(files.app.includes("app.set('query parser', 'simple')"));
-  assert(files.app.includes('extended: false'));
+  assert(/extended\s*:\s*false/.test(files.app));
 
   console.log('Phases 51-70 identity-governance tests passed.');
 }
