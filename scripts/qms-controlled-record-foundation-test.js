@@ -12,7 +12,7 @@ function expect(source, needle, message) {
 const schema = read('services/qmsSchema.js');
 const controller = read('controllers/qmsRecordController.js');
 const routes = read('routes/qmsRoutes.js');
-const app = read('app.js');
+const complianceRoutes = read('routes/complianceRoutes.js');
 const server = read('server.js');
 
 for (const table of ['qms_records','qms_record_revisions','qms_record_workflow_events','qms_record_signatures']) {
@@ -23,7 +23,7 @@ expect(controller, 'Separation of duties: the preparer cannot provide final appr
 expect(controller, 'QMS_RECORD_REVISED', 'QMS audit logging missing');
 expect(controller, 'signed_integrity_hash', 'QMS signature integrity binding missing');
 expect(routes, "requireStepUp(`qms:${target.toLowerCase()}`)", 'High-risk QMS transitions must require step-up authentication');
-expect(app, "app.use('/api/qms', auth, qmsRoutes);", 'QMS API not mounted');
+expect(complianceRoutes, "router.use('/qms', qmsRoutes);", 'QMS API not mounted under compliance');
 expect(server, 'ensureQmsSchema()', 'QMS schema not initialized at startup');
 
 console.log('QMS controlled-record foundation checks passed.');
