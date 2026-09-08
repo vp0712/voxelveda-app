@@ -1,7 +1,7 @@
 const express = require('express');
-const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const { requireStepUp } = require('../middleware/stepUpMiddleware');
+const qmsTransitionValidation = require('../middleware/qmsTransitionValidationMiddleware');
 const controller = require('../controllers/qmsRecordController');
 const ops = require('../controllers/qmsOperationsController');
 
@@ -22,7 +22,7 @@ router.get('/records/:id', controller.getRecord);
 router.post('/records', editQms, controller.createRecord);
 router.put('/records/:id', editQms, controller.updateRecord);
 router.post('/records/import-legacy', editQms, requireStepUp('qms:legacy-import'), ops.importLegacy);
-router.post('/records/:id/transition', reviewQms, (req, res, next) => {
+router.post('/records/:id/transition', reviewQms, qmsTransitionValidation, (req, res, next) => {
   const target = String(req.body?.status || '').toUpperCase();
   if (['APPROVED','CLOSED','VOID','SUPERSEDED'].includes(target)) {
     return requireStepUp(`qms:${target.toLowerCase()}`)(req, res, next);
