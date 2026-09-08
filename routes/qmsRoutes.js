@@ -7,6 +7,7 @@ const ops = require('../controllers/qmsOperationsController');
 const inspections = require('../controllers/qms/inspectionController');
 const release = require('../controllers/qms/qualityReleaseController');
 const governance = require('../controllers/qms/governanceController');
+const enterpriseRoutes = require('./qmsEnterpriseRoutes');
 
 const router = express.Router();
 const viewQms = requireAnyPermission('VIEW_QMS', 'VIEW_COMPLIANCE');
@@ -14,6 +15,7 @@ const editQms = requireAnyPermission('CREATE_QMS_RECORD', 'EDIT_QMS_RECORD', 'MA
 const reviewQms = requireAnyPermission('REVIEW_QMS', 'APPROVE_QMS', 'MANAGE_QMS', 'EDIT_COMPLIANCE');
 
 router.use(viewQms);
+router.use('/enterprise', enterpriseRoutes);
 
 router.get('/dashboard', ops.dashboard);
 router.get('/definitions', ops.listDefinitions);

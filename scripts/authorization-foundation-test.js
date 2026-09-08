@@ -52,7 +52,7 @@ assert.match(taskController, /MANAGE_TEAM_JOBS/);
 assert.match(expenseRoutes, /POST_TRANSACTION/);
 assert.match(expenseRoutes, /VOID_TRANSACTION/);
 assert.match(invoiceRoutes, /SEND_COMPANY_EMAIL/);
-assert.match(app, /app\.use\('\/api\/documents', auth, documentSecurityRoutes\)/);
+assert.match(app, /app\.use\('\/api\/documents',\s*auth,\s*documentSecurityRoutes\)/);
 assert(!app.includes("app.use('/uploads'"));
 assert.match(app, /requirePermission\('VIEW_FINANCE'\).*express\.static/);
 assert.match(uploadRoutes, /requireAnyPermission\('EDIT_RFQS'\)/);

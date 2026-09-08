@@ -39,7 +39,7 @@ expect(ops,'CAPA_CREATED','CAPA workflow missing');
 expect(routes,"requireAnyPermission('VIEW_QMS', 'VIEW_COMPLIANCE')",'Granular QMS read permission missing');
 expect(routes,"requireStepUp('qms:legacy-import')",'Legacy import step-up missing');
 expect(routes,"requireStepUp('qms:release-quality-hold')",'Quality-hold release step-up missing');
-expect(app,"app.use('/api/qms', auth, qmsRoutes);",'First-class /api/qms mount missing');
+if(!/app\.use\('\/api\/qms',\s*auth,\s*qmsRoutes\)/.test(app))throw new Error('First-class /api/qms mount missing');
 expect(server,'ensureQmsAdvancedSchema()','Operational QMS/MES schema startup ensure missing');
 
 console.log('QMS operational foundation checks passed.');
