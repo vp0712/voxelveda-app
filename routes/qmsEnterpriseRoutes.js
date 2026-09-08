@@ -3,6 +3,7 @@ const { requireAnyPermission } = require('../middleware/authorizationMiddleware'
 const requireStepUp = require('../middleware/stepUpMiddleware');
 const controller = require('../controllers/qmsEnterpriseController');
 const evidence = require('../controllers/qmsEvidenceController');
+const shopFloor = require('../controllers/qmsShopFloorController');
 const router = express.Router();
 router.get('/command-centre', controller.commandCentre);
 router.get('/audits', controller.listAudits);
@@ -30,4 +31,8 @@ router.post('/notifications/:id/acknowledge', controller.acknowledgeNotification
 router.get('/recall/material/:materialLotId', controller.recallImpact);
 router.get('/evidence/:type/:id', evidence.list);
 router.post('/evidence', requireAnyPermission('MANAGE_QMS','VIEW_SECURITY_EVIDENCE','EDIT_COMPLIANCE'), evidence.register);
+router.get('/shop-floor/jobs/:id', shopFloor.jobContext);
+router.get('/shop-floor/machines/:id', shopFloor.machineContext);
+router.get('/shop-floor/materials/:id', shopFloor.materialContext);
+router.post('/shop-floor/operations/:id/transition', requireAnyPermission('MANAGE_JOBS','MANAGE_TEAM_JOBS','EDIT_QMS_RECORD','EDIT_COMPLIANCE'), shopFloor.transitionOperation);
 module.exports = router;
