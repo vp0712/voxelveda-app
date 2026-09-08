@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 const complianceController = require('../controllers/complianceController');
+const qmsRoutes = require('./qmsRoutes');
 const { sanitizeUploadName, secureMulterOptions, validateUploadedFile } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
@@ -24,6 +25,7 @@ const storage = multer.diskStorage({
 
 const upload = multer(secureMulterOptions(storage, 15));
 
+router.use('/qms', qmsRoutes);
 router.get('/', complianceController.getComplianceEntries);
 router.get('/files/:id/view', complianceController.viewComplianceFile);
 router.post('/', complianceController.saveComplianceEntry);
