@@ -41,29 +41,35 @@
 
       <h1>Voxel Veda</h1>
 
-      <div id="loginStatus" class="status"></div>
+      <div id="loginStatus" class="status" role="status" aria-live="polite"></div>
 
-      <div class="login-field">
-        <label for="email">Work Email / User ID</label>
-        <input
-          type="text"
-          id="email"
-          placeholder="Enter work email or user ID"
-          autocomplete="username"
-        />
-      </div>
+      <form id="loginForm" novalidate>
+        <div class="login-field">
+          <label for="email">Work Email / User ID</label>
+          <input
+            type="text"
+            id="email"
+            placeholder="Enter work email or user ID"
+            autocomplete="username"
+            autocapitalize="none"
+            spellcheck="false"
+            required
+          />
+        </div>
 
-      <div class="login-field">
-        <label for="password">Password</label>
-        <input
-          type="password"
-          id="password"
-          placeholder="Enter your password"
-          autocomplete="current-password"
-        />
-      </div>
+        <div class="login-field">
+          <label for="password">Password</label>
+          <input
+            type="password"
+            id="password"
+            placeholder="Enter your password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
 
-      <button type="button" class="login-btn" onclick="login()">Sign In</button>
+        <button type="submit" id="loginButton" class="login-btn">Sign In</button>
+      </form>
 
       <div class="portal-links">
         <a href="/forgot-password">Forgot password</a>
@@ -75,6 +81,6 @@
     </section>
   </main>
 
-  <script src="/login.js?v=20260729-entry-sequence"></script>
+  <script src="/login.js?v=20260909-secure-session-v2"></script>
 </body>
 </html>
