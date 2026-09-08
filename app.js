@@ -22,6 +22,7 @@ const supplierRoutes = require('./routes/supplierRoutes');
 const supplierController = require('./controllers/supplierController');
 const attendanceController = require('./controllers/attendanceController');
 const complianceRoutes = require('./routes/complianceRoutes');
+const qmsRoutes = require('./routes/qmsRoutes');
 const competitorRoutes = require('./routes/competitorRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const financeRoutes = require('./routes/financeRoutes');
@@ -71,7 +72,6 @@ const noStorePublicAssets = new Set([
 
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-// Avoid complex qs parsing for untrusted query/form input. JSON remains the API contract.
 app.set('query parser', 'simple');
 
 app.use(enforceHttps);
@@ -90,22 +90,14 @@ app.use(csrfProtection);
 app.post('/api/security/csp-report', rateLimit({ windowMs: 60000, max: 30, keyPrefix: 'csp-report' }), securityTelemetryController.recordCspViolation);
 
 app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    service: 'voxel-veda-app',
-    timestamp: new Date().toISOString()
-  });
+  res.json({ status: 'ok', service: 'voxel-veda-app', timestamp: new Date().toISOString() });
 });
 
 app.use((req, res, next) => {
   if (process.env.FORCE_CANONICAL_HOST !== 'true' || req.path === '/api/health') return next();
-
   const currentHost = String(req.hostname || '').toLowerCase();
   const canonicalHost = new URL(urls.app).hostname;
-  const fallbackHost = String(
-    process.env.RAILWAY_FALLBACK_HOST || 'voxelveda-app-production.up.railway.app'
-  ).toLowerCase();
-
+  const fallbackHost = String(process.env.RAILWAY_FALLBACK_HOST || 'voxelveda-app-production.up.railway.app').toLowerCase();
   if (currentHost !== fallbackHost || currentHost === canonicalHost) return next();
   return res.redirect(302, new URL(req.originalUrl || '/', `${urls.app}/`).toString());
 });
@@ -115,11 +107,7 @@ function noIndex(req, res, next) {
   res.setHeader('Cache-Control', 'private, no-store');
   next();
 }
-
-function sendPage(filename) {
-  return (req, res) => res.sendFile(path.join(publicDir, filename));
-}
-
+function sendPage(filename) { return (req, res) => res.sendFile(path.join(publicDir, filename)); }
 function redirectPreservingQuery(target) {
   return (req, res) => {
     const queryIndex = req.originalUrl.indexOf('?');
@@ -168,31 +156,21 @@ const protectedModuleRoutes = [
   '/packaging', '/expenses', '/workforce', '/timesheets', '/roster', '/staff',
   '/finance', '/financial-years', '/compliance', '/forms', '/settings', '/meetings', '/tasks'
 ];
-
 app.get(protectedModuleRoutes, noIndex, pageAuth(), (req, res) => {
   const routeName = req.path.replace(/^\//, '');
-  const portal = hasAnyPermission(req.user, [
-    'VIEW_FINANCE', 'MANAGE_JOBS', 'MANAGE_TEAM_JOBS', 'VIEW_CUSTOMERS',
-    'VIEW_INVENTORY', 'VIEW_SUPPLIERS', 'VIEW_RFQS'
-  ])
-    ? '/admin'
-    : '/dashboard';
+  const portal = hasAnyPermission(req.user, ['VIEW_FINANCE', 'MANAGE_JOBS', 'MANAGE_TEAM_JOBS', 'VIEW_CUSTOMERS', 'VIEW_INVENTORY', 'VIEW_SUPPLIERS', 'VIEW_RFQS']) ? '/admin' : '/dashboard';
   return res.redirect(302, `${portal}?view=${encodeURIComponent(routeName)}`);
 });
 
 app.use(express.static(publicDir, {
-  dotfiles: 'deny',
-  index: false,
+  dotfiles: 'deny', index: false,
   setHeaders(res, filePath) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
-    if (noStorePublicAssets.has(path.basename(filePath))) {
-      res.setHeader('Cache-Control', 'no-store, max-age=0');
-    }
+    if (noStorePublicAssets.has(path.basename(filePath))) res.setHeader('Cache-Control', 'no-store, max-age=0');
   }
 }));
 app.use('/invoices', noIndex, auth, requirePermission('VIEW_FINANCE'), express.static(path.join(__dirname, 'invoices'), {
-  dotfiles: 'deny',
-  index: false,
+  dotfiles: 'deny', index: false,
   setHeaders(res) {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Cache-Control', 'private, no-store');
@@ -204,27 +182,12 @@ app.use('/api/auth', authRoutes);
 app.get('/api/qr', async (req, res) => {
   try {
     const data = String(req.query.data || '').trim();
-    if (!data || data.length > 1200) {
-      return res.status(400).json({ message: 'A valid QR data value is required.' });
-    }
-
-    const png = await QRCode.toBuffer(data, {
-      type: 'png',
-      errorCorrectionLevel: 'H',
-      margin: 8,
-      width: 1024,
-      color: {
-        dark: '#000000',
-        light: '#ffffff'
-      }
-    });
-
+    if (!data || data.length > 1200) return res.status(400).json({ message: 'A valid QR data value is required.' });
+    const png = await QRCode.toBuffer(data, { type: 'png', errorCorrectionLevel: 'H', margin: 8, width: 1024, color: { dark: '#000000', light: '#ffffff' } });
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=86400');
     return res.send(png);
-  } catch (err) {
-    return res.status(500).json({ message: 'QR code generation failed.' });
-  }
+  } catch (err) { return res.status(500).json({ message: 'QR code generation failed.' }); }
 });
 
 app.post('/api/public/rfq', rfqController.createRFQ);
@@ -256,23 +219,17 @@ app.use('/api/suppliers', auth, requirePermission('VIEW_SUPPLIERS'), supplierRou
 app.use('/api/expenses', auth, requirePermission('VIEW_FINANCE'), expenseRoutes);
 app.use('/api/finance', auth, requirePermission('VIEW_FINANCE'), financeRoutes);
 app.use('/api/high-risk-finance', auth, highRiskFinanceRoutes);
+app.use('/api/qms', auth, qmsRoutes);
 app.use('/api/compliance', auth, requirePermission('VIEW_COMPLIANCE'), requireInputPermission('EDIT_COMPLIANCE'), complianceRoutes);
 app.use('/api/competitors', auth, requirePermission('VIEW_CUSTOMERS'), requireInputPermission('EDIT_CUSTOMERS'), competitorRoutes);
 app.use('/api/access-attempts', auth, require('./routes/accessAttemptRoutes'));
 
-try {
-  app.use('/api/attendance', auth, requirePermission('VIEW_ATTENDANCE'), require('./routes/attendanceRoutes'));
-} catch {
-  console.log('Attendance routes not loaded.');
-}
+try { app.use('/api/attendance', auth, requirePermission('VIEW_ATTENDANCE'), require('./routes/attendanceRoutes')); }
+catch { console.log('Attendance routes not loaded.'); }
 
 app.use((req, res) => {
-  if (!req.path.startsWith('/api/') && req.accepts('html')) {
-    return res.status(404).sendFile(path.join(publicDir, '404.html'));
-  }
+  if (!req.path.startsWith('/api/') && req.accepts('html')) return res.status(404).sendFile(path.join(publicDir, '404.html'));
   return res.status(404).json({ message: 'Route not found' });
 });
-
 app.use(safeErrorHandler);
-
 module.exports = app;
