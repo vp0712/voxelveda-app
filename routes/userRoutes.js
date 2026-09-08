@@ -12,13 +12,13 @@ const {
   updateUserAccess,
   resetUserPassword,
   resendUserInvitation,
-  previewPermissionDifference,
   changeAccountState,
   markAccountCompromised,
   revokeInvitation,
   forceRevokeSessions,
   completeAccessReview
 } = require('../controllers/userController');
+const { previewPermissionDifference } = require('../controllers/userAccessPreviewController');
 
 const router = express.Router();
 
