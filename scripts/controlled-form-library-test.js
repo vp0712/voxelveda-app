@@ -23,7 +23,7 @@ assert(stepUp.includes('/controlled-forms.js?v=20260908-controlled-packs-r1'), '
 assert(!controlled.includes('AS9100 Certified') && !controlled.includes('ISO 9001 Certified') && !controlled.includes('DISP Certified'), 'Unverified certification claim found');
 
 const ids = [...controlled.matchAll(/form\('(VV-(?:FRM|REG)-\d+)'/g)].map((match) => match[1]);
-assert(ids.length === 47, `Expected 47 controlled digital forms/registers, found ${ids.length}`);
+assert(ids.length === 49, `Expected 49 controlled digital forms/registers, found ${ids.length}`);
 assert(new Set(ids).size === ids.length, 'Controlled form document IDs must be unique');
 
 console.log(`Controlled form library checks passed for ${ids.length} documents.`);
