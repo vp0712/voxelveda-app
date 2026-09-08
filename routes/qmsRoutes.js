@@ -2,7 +2,7 @@ const express = require('express');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const { requireStepUp } = require('../middleware/stepUpMiddleware');
 const qmsTransitionValidation = require('../middleware/qmsTransitionValidationMiddleware');
-const controller = require('../controllers/qmsRecordController');
+const controller = require('../controllers/qms/recordController');
 const ops = require('../controllers/qmsOperationsController');
 
 const router = express.Router();
@@ -22,6 +22,9 @@ router.get('/records/:id', controller.getRecord);
 router.post('/records', editQms, controller.createRecord);
 router.put('/records/:id', editQms, controller.updateRecord);
 router.post('/records/import-legacy', editQms, requireStepUp('qms:legacy-import'), ops.importLegacy);
+router.post('/records/:id/comments', editQms, controller.addComment);
+router.post('/records/:id/holds', requireAnyPermission('MANAGE_QMS', 'MANAGE_NCR', 'QUALITY_RELEASE', 'EDIT_COMPLIANCE'), controller.addRecordHold);
+router.post('/records/:id/holds/:holdId/release', requireAnyPermission('QUALITY_RELEASE', 'MANAGE_QMS', 'EDIT_COMPLIANCE'), requireStepUp('qms:release-record-hold'), controller.releaseRecordHold);
 router.post('/records/:id/transition', reviewQms, qmsTransitionValidation, (req, res, next) => {
   const target = String(req.body?.status || '').toUpperCase();
   if (['APPROVED','CLOSED','VOID','SUPERSEDED'].includes(target)) {
