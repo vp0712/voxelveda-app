@@ -313,6 +313,8 @@ function applyPermissionUI() {
   const canUseForms = hasStaffWorkAccess('forms');
   const canUseMessages = hasStaffWorkAccess('messages');
   const canUseWorkHub = canUseLeave || canUseAvailability || canUseDocuments || canUseForms || canUseMessages;
+  const role = String(getStoredUser().role || currentRole || '').trim().toLowerCase();
+  const canUseTrash = hasPermission('trash') || ['staff', 'production', 'sales', 'supervisor', 'manager', 'hr'].includes(role);
 
   setPermissionVisibility('.permission-sales', canUseSales);
   setPermissionVisibility('.permission-rfqs', canUseRfqs);
@@ -350,6 +352,7 @@ function applyPermissionUI() {
   setPermissionVisibility('.permission-documents', canUseDocuments);
   setPermissionVisibility('.permission-forms', canUseForms);
   setPermissionVisibility('.permission-messages', canUseMessages);
+  setPermissionVisibility('.permission-trash', canUseTrash);
 
   if (document.querySelector('.nav-btn.active.hidden-section')) {
     document.querySelector('[data-section="dashboardSection"]')?.click();
@@ -1614,6 +1617,7 @@ function setupStaffNavigation() {
       if (target === 'staffCompetitorSection') loadStaffCompetitors();
       if (target === 'meetingsSection') loadMyMeetings();
       if (target === 'rosterSection') loadMyRoster();
+      if (target === 'staffTrashSection') loadStaffTrash(1);
       toggleMobileMenu(false);
     });
   });
@@ -1657,6 +1661,7 @@ async function refreshVisibleStaffSection() {
   if (id === 'stockInSection') return loadStaffStock();
   if (id === 'stockOutSection') return loadStaffStockOut();
   if (id === 'staffExpenseSection') return loadStaffExpenses(staffExpensePage);
+  if (id === 'staffTrashSection') return loadStaffTrash(staffTrashState.page);
   return Promise.resolve();
 }
 
@@ -1670,7 +1675,7 @@ function openStaffViewFromUrl() {
     expenses: 'staffExpenseSection', workforce: 'timesheetSection', timesheets: 'timesheetSection',
     roster: 'rosterSection', meetings: 'meetingsSection', tasks: 'tasksSection',
     compliance: 'staffComplianceSection', competitors: 'staffCompetitorSection',
-    forms: 'formsSection', settings: 'profileSection'
+    forms: 'formsSection', settings: 'profileSection', trash: 'staffTrashSection'
   };
   if (sections[view]) window.setTimeout(() => goStaffSection(sections[view]), 0);
 }
@@ -3024,6 +3029,294 @@ function loadWorkHubModules() {
   renderStaffFormSubmissions();
   renderStaffMessages();
 }
+
+const staffTrashState = { items: [], page: 1, pages: 1, total: 0, loading: false };
+
+function staffTrashRetentionLabel(seconds) {
+  const remaining = Math.max(0, Number(seconds || 0));
+  if (remaining < 3600) return `${Math.max(1, Math.ceil(remaining / 60))} minutes remaining`;
+  if (remaining < 86400) return `${Math.ceil(remaining / 3600)} hours remaining`;
+  return `${Math.ceil(remaining / 86400)} days remaining`;
+}
+
+function renderStaffTrash() {
+  const list = document.getElementById('staffTrashList');
+  const summary = document.getElementById('staffTrashPageSummary');
+  const previous = document.getElementById('staffTrashPrevious');
+  const next = document.getElementById('staffTrashNext');
+  if (!list || !summary || !previous || !next) return;
+
+  summary.textContent = staffTrashState.loading
+    ? 'Loading recoverable items...'
+    : `${staffTrashState.total} record${staffTrashState.total === 1 ? '' : 's'} | Page ${staffTrashState.page} of ${staffTrashState.pages}`;
+  previous.disabled = staffTrashState.loading || staffTrashState.page <= 1;
+  next.disabled = staffTrashState.loading || staffTrashState.page >= staffTrashState.pages;
+
+  if (staffTrashState.loading) {
+    list.innerHTML = '<div class="empty-state">Loading Trash...</div>';
+    return;
+  }
+  if (!staffTrashState.items.length) {
+    list.innerHTML = '<div class="empty-state">No recoverable items match this view.</div>';
+    return;
+  }
+
+  list.innerHTML = staffTrashState.items.map((item) => `
+    <article class="staff-trash-item">
+      <div class="staff-trash-item-main">
+        <span class="trash-module-chip">${escapeHtml(item.source_module || 'Other')}</span>
+        <strong>${escapeHtml(item.entity_display_name || `${item.entity_type} #${item.entity_id}`)}</strong>
+        <small>Deleted ${escapeHtml(formatDateTime(item.deleted_at))}</small>
+        <small>${escapeHtml(item.delete_reason || 'No deletion reason recorded')}</small>
+      </div>
+      <div class="staff-trash-item-action">
+        <span class="trash-countdown ${Number(item.remaining_seconds || 0) < 86400 ? 'urgent' : ''}">${escapeHtml(staffTrashRetentionLabel(item.remaining_seconds))}</span>
+        <button class="primary-btn compact-btn" type="button" onclick="restoreStaffTrashItem(${Number(item.id)})">Restore</button>
+      </div>
+    </article>
+  `).join('');
+}
+
+async function loadStaffTrash(page = 1) {
+  staffTrashState.page = Math.max(1, Number(page || 1));
+  staffTrashState.loading = true;
+  renderStaffTrash();
+  try {
+    const params = new URLSearchParams({
+      page: String(staffTrashState.page),
+      limit: '20',
+      q: document.getElementById('staffTrashSearch')?.value.trim() || '',
+      module: document.getElementById('staffTrashModule')?.value || '',
+      sort: document.getElementById('staffTrashSort')?.value || 'deleted_desc'
+    });
+    const response = await fetch(`/api/trash?${params}`, { headers: authHeaders() });
+    const data = await safeJson(response);
+    if (!response.ok) throw new Error(data.message || 'Trash could not be loaded');
+    staffTrashState.items = data.items || [];
+    staffTrashState.page = Number(data.page || 1);
+    staffTrashState.pages = Number(data.pages || 1);
+    staffTrashState.total = Number(data.total || 0);
+  } catch (error) {
+    staffTrashState.items = [];
+    staffTrashState.pages = 1;
+    staffTrashState.total = 0;
+    showToast(error.message || 'Trash could not be loaded');
+  } finally {
+    staffTrashState.loading = false;
+    renderStaffTrash();
+  }
+}
+
+function scheduleStaffTrashSearch() {
+  clearTimeout(window.__staffTrashSearchTimer);
+  window.__staffTrashSearchTimer = setTimeout(() => loadStaffTrash(1), 250);
+}
+
+async function restoreStaffTrashItem(id) {
+  const response = await fetch(`/api/trash/${Number(id)}/restore`, { method: 'POST', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Item could not be restored');
+  showToast(data.message || 'Record restored successfully');
+  await Promise.allSettled([loadStaffTrash(staffTrashState.page), loadStaffNotifications(), refreshGrantedStaffData()]);
+}
+
+const staffNotificationState = { items: [], tab: 'all', category: '', unread: 0, loading: false };
+
+function staffNotificationAge(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return 'Now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+function renderStaffNotifications() {
+  const list = document.getElementById('staffNotificationList');
+  const empty = document.getElementById('staffNotificationEmpty');
+  const badge = document.getElementById('staffNotificationBadge');
+  const count = document.getElementById('staffNotificationCount');
+  if (!list || !empty || !badge || !count) return;
+  badge.textContent = staffNotificationState.unread > 99 ? '99+' : String(staffNotificationState.unread);
+  badge.classList.toggle('hidden-section', staffNotificationState.unread === 0);
+  count.textContent = staffNotificationState.loading ? 'Loading' : (staffNotificationState.unread ? `${staffNotificationState.unread} unread` : 'All caught up');
+  empty.style.display = !staffNotificationState.loading && !staffNotificationState.items.length ? 'block' : 'none';
+  list.innerHTML = staffNotificationState.items.map((item) => `
+    <article class="notification-item ${Number(item.is_read) ? 'is-read' : 'is-unread'}">
+      <button class="notification-open" type="button" onclick="openStaffNotification(${Number(item.id)})">
+        <span class="notification-dot ${escapeHtml(String(item.category || 'system').toLowerCase())}"></span>
+        <span class="notification-copy"><span class="notification-meta"><b>${escapeHtml(item.category || 'SYSTEM')}</b><time>${escapeHtml(staffNotificationAge(item.created_at))}</time></span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.message || '')}</small></span>
+      </button>
+      <div class="notification-actions"><button type="button" onclick="setStaffNotificationRead(${Number(item.id)}, ${Number(item.is_read) ? 'false' : 'true'})">${Number(item.is_read) ? 'Unread' : 'Read'}</button><button type="button" class="notification-remove" aria-label="Delete notification" onclick="deleteStaffNotification(${Number(item.id)})">&times;</button></div>
+    </article>
+  `).join('');
+}
+
+async function loadStaffNotifications() {
+  if (staffNotificationState.loading) return;
+  staffNotificationState.loading = true;
+  renderStaffNotifications();
+  try {
+    const params = new URLSearchParams({ tab: staffNotificationState.tab, category: staffNotificationState.category, limit: '40' });
+    const [listResponse, countResponse] = await Promise.all([
+      fetch(`/api/notifications?${params}`, { headers: authHeaders() }),
+      fetch('/api/notifications/unread-count', { headers: authHeaders() })
+    ]);
+    const listData = await safeJson(listResponse);
+    const countData = await safeJson(countResponse);
+    if (!listResponse.ok) throw new Error(listData.message || 'Notifications could not be loaded');
+    staffNotificationState.items = listData.notifications || [];
+    staffNotificationState.unread = countResponse.ok ? Number(countData.unread || 0) : staffNotificationState.items.filter((item) => !Number(item.is_read)).length;
+  } catch (error) {
+    staffNotificationState.items = [];
+  } finally {
+    staffNotificationState.loading = false;
+    renderStaffNotifications();
+  }
+}
+
+function closeStaffNotificationPanel() {
+  const panel = document.getElementById('staffNotificationPanel');
+  if (panel) panel.hidden = true;
+  document.getElementById('staffNotificationBell')?.setAttribute('aria-expanded', 'false');
+}
+
+function toggleStaffNotificationPanel(event) {
+  event?.stopPropagation?.();
+  const panel = document.getElementById('staffNotificationPanel');
+  if (!panel) return;
+  const open = panel.hidden;
+  panel.hidden = !open;
+  document.getElementById('staffNotificationBell')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) { toggleMobileMenu(false); loadStaffNotifications(); }
+}
+
+function setStaffNotificationTab(tab) {
+  staffNotificationState.tab = ['all', 'unread', 'important'].includes(tab) ? tab : 'all';
+  document.querySelectorAll('[data-staff-notification-tab]').forEach((button) => button.classList.toggle('active', button.dataset.staffNotificationTab === staffNotificationState.tab));
+  loadStaffNotifications();
+}
+
+function setStaffNotificationCategory(category) {
+  staffNotificationState.category = String(category || '').toUpperCase();
+  document.querySelectorAll('[data-staff-notification-category]').forEach((button) => button.classList.toggle('active', button.dataset.staffNotificationCategory === staffNotificationState.category));
+  loadStaffNotifications();
+}
+
+async function setStaffNotificationRead(id, read) {
+  const response = await fetch(`/api/notifications/${id}/${read ? 'read' : 'unread'}`, { method: 'PATCH', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notification could not be updated');
+  await loadStaffNotifications();
+}
+
+async function openStaffNotification(id) {
+  const item = staffNotificationState.items.find((notification) => Number(notification.id) === Number(id));
+  if (!item) return;
+  if (!Number(item.is_read)) await setStaffNotificationRead(id, true);
+  closeStaffNotificationPanel();
+  if (item.action_url && String(item.action_url).startsWith('/') && !String(item.action_url).startsWith('//')) window.location.assign(item.action_url);
+}
+
+function showStaffNotificationUndo(message, ids) {
+  let toast = document.getElementById('staffNotificationUndoToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'staffNotificationUndoToast';
+    toast.className = 'notification-undo-toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span>${escapeHtml(message)}</span><button type="button">Undo</button>`;
+  toast.classList.add('show');
+  toast.querySelector('button').onclick = () => restoreStaffNotifications(ids);
+  clearTimeout(window.__staffNotificationUndoTimer);
+  window.__staffNotificationUndoTimer = setTimeout(() => toast.classList.remove('show'), 8000);
+}
+
+async function restoreStaffNotifications(ids) {
+  const results = await Promise.all([...new Set((ids || []).map(Number).filter(Boolean))].map((id) => fetch(`/api/notifications/${id}/restore`, { method: 'POST', headers: authHeaders() })));
+  const restored = results.filter((response) => response.ok).length;
+  document.getElementById('staffNotificationUndoToast')?.classList.remove('show');
+  showToast(restored ? `${restored} notification${restored === 1 ? '' : 's'} restored` : 'Notification restore failed');
+  await loadStaffNotifications();
+}
+
+async function deleteStaffNotification(id) {
+  const response = await fetch(`/api/notifications/${id}`, { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ reason: 'Removed from Notification Centre' }) });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notification could not be removed');
+  showStaffNotificationUndo('Notification moved to Trash', [id]);
+  await loadStaffNotifications();
+}
+
+async function markAllStaffNotificationsRead() {
+  const response = await fetch('/api/notifications/mark-all-read', { method: 'POST', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notifications could not be updated');
+  await loadStaffNotifications();
+}
+
+async function clearStaffNotifications(scope) {
+  const response = await fetch(`/api/notifications/${scope === 'read' ? 'read' : 'all'}`, { method: 'DELETE', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok && response.status !== 207) return showToast(data.message || 'Notifications could not be cleared');
+  showStaffNotificationUndo(`${Number(data.deleted || 0)} notification${Number(data.deleted || 0) === 1 ? '' : 's'} moved to Trash`, data.deleted_ids || []);
+  await loadStaffNotifications();
+}
+
+async function openStaffNotificationPreferences() {
+  closeStaffNotificationPanel();
+  const response = await fetch('/api/notifications/preferences', { headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notification preferences could not be loaded');
+
+  const existing = new Map((data.preferences || []).map((item) => [String(item.category).toUpperCase(), item]));
+  const categories = ['FINANCE', 'PRODUCTION', 'QUALITY', 'SECURITY', 'HR', 'TASKS', 'SYSTEM'];
+  showStaffDialog('Notification Preferences', `
+    <p>Choose how each business area can contact you.</p>
+    <div class="notification-preference-list">
+      ${categories.map((category) => {
+        const preference = existing.get(category) || {};
+        const digest = String(preference.digest_frequency || 'IMMEDIATE').toUpperCase();
+        const quietStart = String(preference.quiet_hours_start || '').slice(0, 5);
+        const quietEnd = String(preference.quiet_hours_end || '').slice(0, 5);
+        return `<div class="notification-preference-row" data-staff-preference-category="${category}">
+          <strong>${category}</strong>
+          <label class="preference-switch"><span>In app</span><input data-staff-preference-field="in_app_enabled" type="checkbox" ${preference.in_app_enabled === undefined || Number(preference.in_app_enabled) ? 'checked' : ''}></label>
+          <label class="preference-switch"><span>Email</span><input data-staff-preference-field="email_enabled" type="checkbox" ${Number(preference.email_enabled) ? 'checked' : ''}></label>
+          <label class="preference-switch"><span>Push</span><input data-staff-preference-field="push_enabled" type="checkbox" ${Number(preference.push_enabled) ? 'checked' : ''}></label>
+          <select data-staff-preference-field="digest_frequency" aria-label="${category} digest frequency"><option value="IMMEDIATE" ${digest === 'IMMEDIATE' ? 'selected' : ''}>Immediate</option><option value="DAILY" ${digest === 'DAILY' ? 'selected' : ''}>Daily digest</option><option value="WEEKLY" ${digest === 'WEEKLY' ? 'selected' : ''}>Weekly digest</option><option value="OFF" ${digest === 'OFF' ? 'selected' : ''}>Off</option></select>
+          <label class="preference-time"><span>Quiet from</span><input data-staff-preference-field="quiet_hours_start" type="time" value="${escapeHtml(quietStart)}"></label>
+          <label class="preference-time"><span>Quiet until</span><input data-staff-preference-field="quiet_hours_end" type="time" value="${escapeHtml(quietEnd)}"></label>
+        </div>`;
+      }).join('')}
+    </div>
+  `, async () => {
+    const rows = [...document.querySelectorAll('[data-staff-preference-category]')];
+    const results = await Promise.all(rows.map((row) => fetch('/api/notifications/preferences', {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        category: row.dataset.staffPreferenceCategory,
+        in_app_enabled: row.querySelector('[data-staff-preference-field="in_app_enabled"]').checked,
+        email_enabled: row.querySelector('[data-staff-preference-field="email_enabled"]').checked,
+        push_enabled: row.querySelector('[data-staff-preference-field="push_enabled"]').checked,
+        digest_frequency: row.querySelector('[data-staff-preference-field="digest_frequency"]').value,
+        quiet_hours_start: row.querySelector('[data-staff-preference-field="quiet_hours_start"]').value || null,
+        quiet_hours_end: row.querySelector('[data-staff-preference-field="quiet_hours_end"]').value || null
+      })
+    })));
+    if (results.some((item) => !item.ok)) return showToast('Some notification preferences could not be saved');
+    hideStaffDialog();
+    showToast('Notification preferences saved successfully');
+  }, 'Save Preferences');
+}
+
+document.addEventListener('click', (event) => {
+  if (!event.target.closest?.('.notification-center')) closeStaffNotificationPanel();
+});
+
 /* ================= STARTUP ================= */
 
 async function bootStaffDashboard() {
@@ -3037,6 +3330,8 @@ async function bootStaffDashboard() {
     const user = await loadStaffInfo();
     if (!user || redirectingToLogin) return;
     updateStaffMissionBase();
+    loadStaffNotifications();
+    setInterval(loadStaffNotifications, 60000);
 
     applyPermissionUI();
     loadWorkHubModules();

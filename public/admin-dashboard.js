@@ -269,7 +269,10 @@ function toggleNotificationPanel(event) {
   const willOpen = panel.hidden;
   panel.hidden = !willOpen;
   if (bell) bell.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
-  if (willOpen) toggleMobileMenu(false);
+  if (willOpen) {
+    toggleMobileMenu(false);
+    loadNotificationCenter();
+  }
 }
 
 function openNotificationTarget(sectionId) {
@@ -345,6 +348,24 @@ function buildShellNotifications() {
   return list.slice(0, 8);
 }
 
+const notificationState = {
+  items: [],
+  tab: 'all',
+  category: '',
+  unread: 0,
+  loading: false
+};
+
+function notificationAge(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
+  if (seconds < 60) return 'Now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
 function renderNotificationDropdown() {
   const listEl = document.getElementById('notificationList');
   const emptyEl = document.getElementById('notificationEmpty');
@@ -352,21 +373,179 @@ function renderNotificationDropdown() {
   const countEl = document.getElementById('notificationPanelCount');
   if (!listEl || !emptyEl || !badgeEl || !countEl) return;
 
-  const notifications = buildShellNotifications();
-  badgeEl.innerText = notifications.length > 9 ? '9+' : String(notifications.length);
-  badgeEl.classList.toggle('hidden-section', notifications.length === 0);
-  countEl.innerText = notifications.length ? `${notifications.length} new` : 'All clear';
-  emptyEl.style.display = notifications.length ? 'none' : 'block';
+  const notifications = notificationState.items;
+  badgeEl.innerText = notificationState.unread > 99 ? '99+' : String(notificationState.unread);
+  badgeEl.classList.toggle('hidden-section', notificationState.unread === 0);
+  countEl.innerText = notificationState.loading ? 'Loading' : (notificationState.unread ? `${notificationState.unread} unread` : 'All caught up');
+  emptyEl.style.display = !notificationState.loading && !notifications.length ? 'block' : 'none';
+  emptyEl.textContent = notificationState.loading ? 'Loading notifications...' : 'No new notifications';
 
   listEl.innerHTML = notifications.map((item) => `
-    <button class="notification-item" type="button" onclick="openNotificationTarget('${escapeHtml(item.sectionId)}')">
-      <span class="notification-dot ${escapeHtml(item.type)}"></span>
-      <span>
-        <strong>${escapeHtml(item.title)}</strong>
-        <small>${escapeHtml(item.body)}</small>
-      </span>
-    </button>
+    <article class="notification-item ${Number(item.is_read) ? 'is-read' : 'is-unread'}">
+      <button class="notification-open" type="button" onclick="openNotification(${Number(item.id)})">
+        <span class="notification-dot ${escapeHtml(String(item.category || 'system').toLowerCase())}"></span>
+        <span class="notification-copy">
+          <span class="notification-meta"><b>${escapeHtml(item.category || 'SYSTEM')}</b><time>${escapeHtml(notificationAge(item.created_at))}</time></span>
+          <strong>${escapeHtml(item.title)}</strong>
+          <small>${escapeHtml(item.message || '')}</small>
+        </span>
+      </button>
+      <div class="notification-actions">
+        <button type="button" onclick="setNotificationRead(${Number(item.id)}, ${Number(item.is_read) ? 'false' : 'true'})">${Number(item.is_read) ? 'Unread' : 'Read'}</button>
+        <button type="button" class="notification-remove" aria-label="Delete ${escapeHtml(item.title)}" title="Move to Trash" onclick="deleteNotification(${Number(item.id)})">&times;</button>
+      </div>
+    </article>
   `).join('');
+}
+
+async function loadNotificationCenter() {
+  if (notificationState.loading) return;
+  notificationState.loading = true;
+  renderNotificationDropdown();
+  try {
+    const params = new URLSearchParams({ tab: notificationState.tab, category: notificationState.category, limit: '40' });
+    const [listResponse, countResponse] = await Promise.all([
+      fetch(`/api/notifications?${params}`, { headers: authHeaders() }),
+      fetch('/api/notifications/unread-count', { headers: authHeaders() })
+    ]);
+    const listData = await safeJson(listResponse);
+    const countData = await safeJson(countResponse);
+    if (!listResponse.ok) throw new Error(listData.message || 'Notifications could not be loaded');
+    notificationState.items = listData.notifications || [];
+    notificationState.unread = countResponse.ok ? Number(countData.unread || 0) : notificationState.items.filter((item) => !Number(item.is_read)).length;
+  } catch (error) {
+    notificationState.items = [];
+    showToast(error.message || 'Notifications could not be loaded');
+  } finally {
+    notificationState.loading = false;
+    renderNotificationDropdown();
+  }
+}
+
+function setNotificationTab(tab) {
+  notificationState.tab = ['all', 'unread', 'important'].includes(tab) ? tab : 'all';
+  document.querySelectorAll('[data-notification-tab]').forEach((button) => button.classList.toggle('active', button.dataset.notificationTab === notificationState.tab));
+  loadNotificationCenter();
+}
+
+function setNotificationCategory(category) {
+  notificationState.category = String(category || '').toUpperCase();
+  document.querySelectorAll('[data-notification-category]').forEach((button) => button.classList.toggle('active', button.dataset.notificationCategory === notificationState.category));
+  loadNotificationCenter();
+}
+
+async function setNotificationRead(id, read) {
+  const response = await fetch(`/api/notifications/${id}/${read ? 'read' : 'unread'}`, { method: 'PATCH', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notification could not be updated');
+  await loadNotificationCenter();
+}
+
+async function openNotification(id) {
+  const item = notificationState.items.find((notification) => Number(notification.id) === Number(id));
+  if (!item) return;
+  if (!Number(item.is_read)) await setNotificationRead(id, true);
+  closeNotificationPanel();
+  if (item.action_url && String(item.action_url).startsWith('/') && !String(item.action_url).startsWith('//')) {
+    window.location.assign(item.action_url);
+  }
+}
+
+function showNotificationUndo(message, ids) {
+  let toast = document.getElementById('notificationUndoToast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'notificationUndoToast';
+    toast.className = 'notification-undo-toast';
+    document.body.appendChild(toast);
+  }
+  toast.innerHTML = `<span>${escapeHtml(message)}</span><button type="button">Undo</button>`;
+  toast.classList.add('show');
+  toast.querySelector('button').onclick = () => restoreNotifications(ids);
+  clearTimeout(window.__notificationUndoTimer);
+  window.__notificationUndoTimer = setTimeout(() => toast.classList.remove('show'), 8000);
+}
+
+async function restoreNotifications(ids) {
+  const uniqueIds = [...new Set((ids || []).map(Number).filter(Boolean))];
+  const results = await Promise.all(uniqueIds.map((id) => fetch(`/api/notifications/${id}/restore`, { method: 'POST', headers: authHeaders() })));
+  const restored = results.filter((response) => response.ok).length;
+  document.getElementById('notificationUndoToast')?.classList.remove('show');
+  showToast(restored ? `${restored} notification${restored === 1 ? '' : 's'} restored` : 'Notification restore failed');
+  await loadNotificationCenter();
+}
+
+async function deleteNotification(id) {
+  const response = await fetch(`/api/notifications/${id}`, { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ reason: 'Removed from Notification Centre' }) });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notification could not be removed');
+  notificationState.items = notificationState.items.filter((item) => Number(item.id) !== Number(id));
+  notificationState.unread = Math.max(0, notificationState.unread - 1);
+  renderNotificationDropdown();
+  showNotificationUndo('Notification moved to Trash', [id]);
+  await loadNotificationCenter();
+}
+
+async function markAllNotificationsRead() {
+  const response = await fetch('/api/notifications/mark-all-read', { method: 'POST', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notifications could not be updated');
+  await loadNotificationCenter();
+}
+
+async function clearNotifications(scope) {
+  const response = await fetch(`/api/notifications/${scope === 'read' ? 'read' : 'all'}`, { method: 'DELETE', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok && response.status !== 207) return showToast(data.message || 'Notifications could not be cleared');
+  const ids = data.deleted_ids || [];
+  showNotificationUndo(`${Number(data.deleted || 0)} notification${Number(data.deleted || 0) === 1 ? '' : 's'} moved to Trash`, ids);
+  await loadNotificationCenter();
+}
+
+async function openNotificationPreferences() {
+  const response = await fetch('/api/notifications/preferences', { headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Notification preferences could not be loaded');
+  const existing = new Map((data.preferences || []).map((item) => [String(item.category).toUpperCase(), item]));
+  const categories = ['FINANCE', 'PRODUCTION', 'QUALITY', 'SECURITY', 'HR', 'TASKS', 'SYSTEM'];
+  showDialog('Notification Preferences', `
+    <p>Choose how each business area can contact you. Critical security retention rules remain enforced.</p>
+    <div class="notification-preference-list">
+      ${categories.map((category) => {
+        const preference = existing.get(category) || {};
+        const digest = String(preference.digest_frequency || 'IMMEDIATE').toUpperCase();
+        const quietStart = String(preference.quiet_hours_start || '').slice(0, 5);
+        const quietEnd = String(preference.quiet_hours_end || '').slice(0, 5);
+        return `<div class="notification-preference-row" data-preference-category="${category}">
+          <strong>${category}</strong>
+          <label class="preference-switch"><span>In app</span><input data-preference-field="in_app_enabled" type="checkbox" ${preference.in_app_enabled === undefined || Number(preference.in_app_enabled) ? 'checked' : ''}></label>
+          <label class="preference-switch"><span>Email</span><input data-preference-field="email_enabled" type="checkbox" ${Number(preference.email_enabled) ? 'checked' : ''}></label>
+          <label class="preference-switch"><span>Push</span><input data-preference-field="push_enabled" type="checkbox" ${Number(preference.push_enabled) ? 'checked' : ''}></label>
+          <select data-preference-field="digest_frequency" aria-label="${category} digest frequency"><option value="IMMEDIATE" ${digest === 'IMMEDIATE' ? 'selected' : ''}>Immediate</option><option value="DAILY" ${digest === 'DAILY' ? 'selected' : ''}>Daily digest</option><option value="WEEKLY" ${digest === 'WEEKLY' ? 'selected' : ''}>Weekly digest</option><option value="OFF" ${digest === 'OFF' ? 'selected' : ''}>Off</option></select>
+          <label class="preference-time"><span>Quiet from</span><input data-preference-field="quiet_hours_start" type="time" value="${escapeHtml(quietStart)}"></label>
+          <label class="preference-time"><span>Quiet until</span><input data-preference-field="quiet_hours_end" type="time" value="${escapeHtml(quietEnd)}"></label>
+        </div>`;
+      }).join('')}
+    </div>
+  `, async () => {
+    const rows = [...document.querySelectorAll('[data-preference-category]')];
+    const results = await Promise.all(rows.map((row) => fetch('/api/notifications/preferences', {
+      method: 'PATCH',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        category: row.dataset.preferenceCategory,
+        in_app_enabled: row.querySelector('[data-preference-field="in_app_enabled"]').checked,
+        email_enabled: row.querySelector('[data-preference-field="email_enabled"]').checked,
+        push_enabled: row.querySelector('[data-preference-field="push_enabled"]').checked,
+        digest_frequency: row.querySelector('[data-preference-field="digest_frequency"]').value,
+        quiet_hours_start: row.querySelector('[data-preference-field="quiet_hours_start"]').value || null,
+        quiet_hours_end: row.querySelector('[data-preference-field="quiet_hours_end"]').value || null
+      })
+    })));
+    if (results.some((item) => !item.ok)) return showToast('Some notification preferences could not be saved');
+    hideDialog();
+    showToast('Notification preferences saved successfully');
+  }, 'Save Preferences');
 }
 
 document.addEventListener('click', (event) => {
@@ -814,6 +993,7 @@ function setupNavigation() {
       if (btn.dataset.section === 'shiftQrSection') loadShiftQr();
       if (btn.dataset.section === 'companyFormsSection') renderCompanyForms();
       if (btn.dataset.section === 'securitySection') loadSecurityCentre();
+      if (btn.dataset.section === 'trashSection') loadTrash();
       toggleMobileMenu(false);
     };
   });
@@ -1221,6 +1401,128 @@ function previewCompanyFormRecord(recordId) {
   preview.document.close();
 }
 
+const trashState = window.trashState = { page: 1, pages: 1, total: 0, items: [], selected: new Set() };
+
+function trashRemaining(seconds) {
+  const value = Math.max(0, Number(seconds || 0));
+  if (value < 3600) return `${Math.max(1, Math.ceil(value / 60))} minutes remaining`;
+  if (value < 86400) return `${Math.ceil(value / 3600)} hours remaining`;
+  const days = Math.ceil(value / 86400);
+  return `${days} day${days === 1 ? '' : 's'} remaining`;
+}
+
+function renderTrash() {
+  const body = document.getElementById('trashTableBody');
+  const summary = document.getElementById('trashPageSummary');
+  const selected = document.getElementById('trashSelectionCount');
+  if (!body) return;
+  if (!trashState.items.length) {
+    body.innerHTML = '<tr><td colspan="8"><div class="empty-state">Trash is empty. Deleted eligible records will remain here for 15 days.</div></td></tr>';
+  } else {
+    body.innerHTML = trashState.items.map((item) => `
+      <tr>
+        <td><input type="checkbox" aria-label="Select ${escapeHtml(item.entity_display_name)}" ${trashState.selected.has(String(item.id)) ? 'checked' : ''} onchange="toggleTrashItem('${String(item.id)}', this.checked)"></td>
+        <td><strong>${escapeHtml(item.entity_display_name)}</strong><small class="table-subline">${escapeHtml(item.entity_type)} #${escapeHtml(item.entity_id)}</small></td>
+        <td><span class="trash-module-chip">${escapeHtml(item.source_module)}</span></td>
+        <td>${escapeHtml(item.deleted_by_name || item.deleted_by_email || 'System')}</td>
+        <td>${escapeHtml(formatDateTime(item.deleted_at))}</td>
+        <td><strong class="trash-retention ${Number(item.remaining_seconds) < 86400 ? 'urgent' : ''}">${escapeHtml(trashRemaining(item.remaining_seconds))}</strong>${Number(item.retention_hold) ? `<small class="table-subline">${escapeHtml(item.retention_hold_reason || 'Retention hold')}</small>` : ''}</td>
+        <td>${escapeHtml(item.delete_reason || 'No reason recorded')}${item.purge_error ? `<small class="table-subline trash-purge-error">Cleanup retry ${Number(item.purge_attempts || 0)}: ${escapeHtml(item.purge_error)}</small>` : ''}</td>
+        <td><div class="row-actions"><button type="button" class="secondary-btn" onclick="restoreTrash('${String(item.id)}')">Restore</button>${hasCurrentPermission('MANAGE_TRASH') ? `<button type="button" class="danger-btn" ${Number(item.retention_hold) ? 'disabled title="Retention hold"' : ''} onclick="confirmPermanentTrashDelete(['${String(item.id)}'], '${escapeHtml(item.entity_display_name)}')">Delete permanently</button>` : ''}</div></td>
+      </tr>
+    `).join('');
+  }
+  if (summary) summary.textContent = `${trashState.total} record${trashState.total === 1 ? '' : 's'} | Page ${trashState.page} of ${trashState.pages}`;
+  if (selected) selected.textContent = `${trashState.selected.size} selected`;
+  const selectAll = document.getElementById('trashSelectAll');
+  if (selectAll) selectAll.checked = Boolean(trashState.items.length) && trashState.items.every((item) => trashState.selected.has(String(item.id)));
+  enhanceResponsiveTables();
+}
+
+async function loadTrash(page = 1) {
+  const body = document.getElementById('trashTableBody');
+  if (body) body.innerHTML = '<tr><td colspan="8">Loading Trash...</td></tr>';
+  try {
+    const params = new URLSearchParams({
+      page: String(Math.max(1, Number(page || 1))),
+      limit: '25',
+      q: document.getElementById('trashSearch')?.value.trim() || '',
+      module: document.getElementById('trashModuleFilter')?.value || '',
+      sort: document.getElementById('trashSort')?.value || 'deleted_desc'
+    });
+    const response = await fetch(`/api/trash?${params}`, { headers: authHeaders() });
+    const data = await safeJson(response);
+    if (!response.ok) throw new Error(data.message || 'Trash could not be loaded');
+    trashState.page = Number(data.page || 1);
+    trashState.pages = Number(data.pages || 1);
+    trashState.total = Number(data.total || 0);
+    trashState.items = data.items || [];
+    trashState.selected.clear();
+    renderTrash();
+  } catch (error) {
+    if (body) body.innerHTML = `<tr><td colspan="8"><div class="empty-state error-state">${escapeHtml(error.message || 'Trash could not be loaded')}</div></td></tr>`;
+  }
+}
+
+function scheduleTrashSearch() {
+  clearTimeout(window.__trashSearchTimer);
+  window.__trashSearchTimer = setTimeout(() => loadTrash(1), 280);
+}
+
+function toggleTrashItem(id, checked) {
+  if (checked) trashState.selected.add(String(id)); else trashState.selected.delete(String(id));
+  renderTrash();
+}
+
+function toggleAllTrash(checked) {
+  trashState.items.forEach((item) => checked ? trashState.selected.add(String(item.id)) : trashState.selected.delete(String(item.id)));
+  renderTrash();
+}
+
+async function restoreTrash(id) {
+  const response = await fetch(`/api/trash/${encodeURIComponent(id)}/restore`, { method: 'POST', headers: authHeaders() });
+  const data = await safeJson(response);
+  if (!response.ok) return showToast(data.message || 'Record could not be restored');
+  showToast(data.message || 'Record restored successfully');
+  await loadTrash(trashState.page);
+}
+
+async function bulkRestoreTrash() {
+  const ids = [...trashState.selected];
+  if (!ids.length) return showToast('Select at least one Trash item');
+  const response = await fetch('/api/trash/bulk-restore', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ trash_ids: ids }) });
+  const data = await safeJson(response);
+  if (!response.ok && response.status !== 207) return showToast(data.message || 'Records could not be restored');
+  showToast(data.message || 'Selected records restored');
+  await loadTrash(trashState.page);
+}
+
+function confirmPermanentTrashDelete(ids, label = 'selected records') {
+  showDialog('Delete Permanently', `
+    <div class="finance-risk-banner high"><strong>HIGH-RISK ACTION</strong><span>This cannot be undone. Protected records under a retention hold will remain preserved.</span></div>
+    <p>You are permanently deleting <strong>${escapeHtml(label)}</strong>.</p>
+    <label>Reason<textarea id="trashPermanentReason" rows="3" placeholder="Why permanent deletion is required"></textarea></label>
+    <label>Type PERMANENTLY DELETE<input id="trashPermanentConfirmation" autocomplete="off" placeholder="PERMANENTLY DELETE"></label>
+  `, async () => {
+    const confirmation = document.getElementById('trashPermanentConfirmation')?.value || '';
+    const reason = document.getElementById('trashPermanentReason')?.value.trim() || '';
+    if (confirmation !== 'PERMANENTLY DELETE') return showToast('Type PERMANENTLY DELETE to confirm');
+    const url = ids.length === 1 ? `/api/trash/${encodeURIComponent(ids[0])}/permanent` : '/api/trash/bulk-delete';
+    const response = await fetch(url, { method: ids.length === 1 ? 'DELETE' : 'POST', headers: authHeaders(), body: JSON.stringify({ trash_ids: ids, confirmation, reason }) });
+    const data = await safeJson(response);
+    if (!response.ok && response.status !== 207) return showToast(data.message || 'Permanent deletion failed');
+    hideDialog();
+    showToast(data.message || 'Records permanently deleted');
+    await loadTrash(trashState.page);
+  }, 'Delete Permanently');
+}
+
+function bulkPermanentDeleteTrash() {
+  const ids = [...trashState.selected];
+  if (!ids.length) return showToast('Select at least one Trash item');
+  confirmPermanentTrashDelete(ids, `${ids.length} selected record${ids.length === 1 ? '' : 's'}`);
+}
+
 function hasCurrentPermission(permission) {
   const aliases = {
     dashboard: 'VIEW_DASHBOARD', rfqs: 'VIEW_RFQS', rfqs_input: 'EDIT_RFQS',
@@ -1233,7 +1535,7 @@ function hasCurrentPermission(permission) {
     meetings: 'VIEW_MEETINGS', meetings_input: 'MANAGE_MEETINGS', compliance: 'VIEW_COMPLIANCE', security: 'MANAGE_SECURITY',
     compliance_input: 'EDIT_COMPLIANCE', competitors: 'VIEW_CUSTOMERS', stock: 'VIEW_INVENTORY',
     stock_in: 'VIEW_INVENTORY', stock_out: 'VIEW_INVENTORY', raw_material: 'VIEW_INVENTORY',
-    packaging: 'VIEW_INVENTORY'
+    packaging: 'VIEW_INVENTORY', trash: 'VIEW_TRASH', trash_restore: 'RESTORE_TRASH', trash_manage: 'MANAGE_TRASH'
   };
   const permissions = Array.isArray(currentUser.effective_permissions)
     ? currentUser.effective_permissions
@@ -1263,6 +1565,7 @@ const ADMIN_SECTION_ACCESS = Object.freeze({
   staffSection: ['staff'],
   complianceSection: ['compliance'],
   companyFormsSection: ['compliance', 'settings'],
+  trashSection: ['trash'],
   settingsSection: ['settings'],
   securitySection: ['security']
 });
@@ -1279,7 +1582,7 @@ function requestedAdminSection() {
     packaging: 'packagingSection', finance: 'financeSection', expenses: 'expenseSection', workforce: 'attendanceSection',
     timesheets: 'attendanceSection', roster: 'rosterSection', staff: 'staffSection',
     compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection', security: 'securitySection',
-    meetings: 'meetingSection', tasks: 'taskSection'
+    meetings: 'meetingSection', tasks: 'taskSection', trash: 'trashSection'
   };
   return sections[view] || '';
 }
@@ -1290,6 +1593,9 @@ function configureRestrictedWorkspaceView() {
   });
   document.querySelectorAll('.nav-btn[data-permission]').forEach((btn) => {
     btn.classList.toggle('hidden-section', !hasCurrentPermission(btn.dataset.permission));
+  });
+  document.querySelectorAll('[data-permission="MANAGE_TRASH"]').forEach((element) => {
+    element.classList.toggle('hidden-section', !hasCurrentPermission('MANAGE_TRASH'));
   });
   document.querySelectorAll('.page-section').forEach((section) => {
     section.classList.toggle('hidden-section', !canAccessAdminSection(section.id));
@@ -9064,6 +9370,8 @@ async function bootAdminDashboard() {
     if (!user || redirectingToLogin) return;
 
     openAdminViewFromUrl();
+    loadNotificationCenter();
+    setInterval(loadNotificationCenter, 60000);
 
     if (!['admin', 'super_admin'].includes(currentRole)) {
       await loadRestrictedWorkspaceData();
@@ -9097,7 +9405,7 @@ async function bootAdminDashboard() {
     ]);
 
     await loadAccessAttempts();
-    renderNotificationDropdown();
+    await loadNotificationCenter();
     setInterval(loadAttendance, 15000);
     setInterval(loadAccessAttempts, 20000);
   } catch (err) {

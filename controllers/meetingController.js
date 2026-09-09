@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { moveToTrash } = require('../services/trashService');
 
 function parseIds(value) {
   if (!value) return [];
@@ -178,15 +179,13 @@ exports.deleteMeeting = async (req, res) => {
     const id = Number(req.body.id || req.params.id);
     if (!id) return res.status(400).json({ message: 'Meeting ID is required' });
 
-    const [result] = await pool.query(
-      'UPDATE meetings SET deleted = 1, updated_by = ? WHERE id = ?',
-      [req.user.id, id]
-    );
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Meeting not found' });
-    res.json({ message: 'Meeting removed successfully' });
+    const trash = await moveToTrash({
+      entityType: 'meeting', entityId: id, actorId: req.user.id,
+      reason: req.body.reason || 'Removed from Meetings', req
+    });
+    res.json({ message: 'Meeting moved to Trash', ...trash });
   } catch (err) {
     console.error('DELETE MEETING ERROR:', err);
-    res.status(500).json({ message: 'Meeting delete failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.message || 'Meeting delete failed', code: err.code });
   }
 };

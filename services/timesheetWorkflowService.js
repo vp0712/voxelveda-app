@@ -125,12 +125,12 @@ async function recordTransition(connection, timesheet, action, toStatus, actorId
 }
 
 async function notifyAdmins(connection, timesheet, title, message, priority = 'normal') {
-  await connection.query(
-    `
-    INSERT INTO notifications
-    (user_id, type, title, message, priority, linked_module, linked_record_id)
-    SELECT id, 'TIMESHEET', ?, ?, ?, 'timesheets', ?
-    FROM users
+    await connection.query(
+      `
+      INSERT INTO notifications
+      (user_id, type, category, title, message, priority, linked_module, linked_record_id, action_url)
+      SELECT id, 'TIMESHEET', 'HR', ?, ?, ?, 'timesheets', ?, '/admin?view=timesheets'
+      FROM users
     WHERE active = 1
       AND (
         LOWER(role) IN ('admin', 'super_admin', 'hr')
@@ -339,7 +339,7 @@ async function approveTimesheet(id, user, options = {}, req) {
     await createNotification(connection, {
       userId: timesheet.user_id, type: 'TIMESHEET_APPROVED', title: 'Timesheet approved',
       message: `Your timesheet for ${timesheet.week_start} to ${timesheet.week_end} was approved for ${approvedHours.toFixed(2)} hours.`,
-      priority: 'normal', linkedModule: 'timesheets', linkedRecordId: id
+      category: 'HR', priority: 'normal', linkedModule: 'timesheets', linkedRecordId: id, actionUrl: '/dashboard?view=timesheets'
     });
     await connection.commit();
 
@@ -399,7 +399,7 @@ async function reviewTimesheet(id, user, action, comments, req) {
     });
     await createNotification(connection, {
       userId: timesheet.user_id, type: `TIMESHEET_${toStatus}`, title: toStatus === 'REJECTED' ? 'Timesheet rejected' : 'Timesheet correction required',
-      message: comments, priority: 'high', linkedModule: 'timesheets', linkedRecordId: id
+      message: comments, category: 'HR', priority: 'high', linkedModule: 'timesheets', linkedRecordId: id, actionUrl: '/dashboard?view=timesheets'
     });
     await connection.commit();
 

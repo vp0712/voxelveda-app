@@ -1,5 +1,7 @@
 const pool = require('../config/db');
 const { hasAnyPermission, hasPermission, isManagerOf } = require('../services/authorizationService');
+const { moveToTrash } = require('../services/trashService');
+const { createNotification } = require('../services/notificationService');
 
 function canManageTasks(req) {
   return hasAnyPermission(req.user, ['MANAGE_JOBS', 'MANAGE_TEAM_JOBS']);
@@ -7,6 +9,16 @@ function canManageTasks(req) {
 
 function canManageOrganizationWork(req) {
   return hasPermission(req.user, 'MANAGE_JOBS');
+}
+
+async function notifyAdministrators(notification) {
+  const [admins] = await pool.query(
+    `SELECT id FROM users
+     WHERE LOWER(role) IN ('admin', 'super_admin') AND IFNULL(active, 1) = 1 AND deleted_at IS NULL`
+  );
+  for (const admin of admins) {
+    await createNotification(pool, { ...notification, userId: admin.id });
+  }
 }
 
 async function canManageTaskTarget(req, targetUserId) {
@@ -233,6 +245,18 @@ exports.createTask = async (req, res) => {
       [result.insertId]
     );
 
+    await createNotification(pool, {
+      userId: assignedTo,
+      type: 'task_assigned',
+      category: 'TASKS',
+      title: 'New task assigned',
+      message: `${title}${dueDate ? ` | Due ${dueDate}` : ''}`,
+      priority: priority === 'urgent' ? 'CRITICAL' : (priority === 'high' ? 'HIGH' : 'NORMAL'),
+      linkedModule: 'tasks',
+      linkedRecordId: result.insertId,
+      actionUrl: '/dashboard?view=tasks'
+    }).catch((error) => console.error('TASK ASSIGNMENT NOTIFICATION ERROR:', error.message));
+
     res.json({
       message: 'Task assigned successfully',
       task_id: result.insertId,
@@ -443,23 +467,14 @@ exports.deleteTask = async (req, res) => {
       return res.status(403).json({ message: 'You can only delete tasks within your authorised team.' });
     }
 
-    const [result] = await pool.query(
-      `
-      UPDATE tasks
-      SET deleted = 1
-      WHERE id = ?
-      `,
-      [taskId]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Task not found' });
-    }
-
-    res.json({ message: 'Task deleted successfully' });
+    const trash = await moveToTrash({
+      entityType: 'task', entityId: taskId, actorId: req.user.id,
+      reason: req.body.reason || 'Removed from Task Control', req
+    });
+    res.json({ message: 'Task moved to Trash', ...trash });
   } catch (err) {
     console.error('DELETE TASK ERROR FULL:', err);
-    res.status(500).json({ message: 'Task delete failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.message || 'Task delete failed', code: err.code });
   }
 };
 
@@ -586,6 +601,27 @@ exports.createAnnouncement = async (req, res) => {
       ]
     );
 
+    let notificationUserIds = targetUserIds;
+    if (audienceType === 'all') {
+      const [users] = await pool.query(
+        `SELECT id FROM users WHERE IFNULL(active, 1) = 1 AND deleted_at IS NULL AND LOWER(role) NOT IN ('admin', 'super_admin')`
+      );
+      notificationUserIds = users.map((user) => Number(user.id));
+    }
+    for (const userId of notificationUserIds) {
+      await createNotification(pool, {
+        userId,
+        type: 'announcement',
+        category: 'SYSTEM',
+        title,
+        message,
+        priority: priority === 'urgent' ? 'CRITICAL' : (priority === 'high' ? 'HIGH' : 'NORMAL'),
+        linkedModule: 'announcements',
+        linkedRecordId: result.insertId,
+        actionUrl: '/dashboard'
+      }).catch((error) => console.error('ANNOUNCEMENT NOTIFICATION ERROR:', error.message));
+    }
+
     res.json({ message: 'Announcement published successfully', announcement_id: result.insertId });
   } catch (err) {
     console.error('CREATE ANNOUNCEMENT ERROR FULL:', err);
@@ -661,16 +697,14 @@ exports.deleteAnnouncement = async (req, res) => {
     const id = Number(req.body.id || 0);
     if (!id) return res.status(400).json({ message: 'Announcement ID is required' });
 
-    const [result] = await pool.query(
-      'UPDATE announcements SET deleted = 1 WHERE id = ?',
-      [id]
-    );
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Announcement not found' });
-    res.json({ message: 'Announcement removed successfully' });
+    const trash = await moveToTrash({
+      entityType: 'announcement', entityId: id, actorId: req.user.id,
+      reason: req.body.reason || 'Removed from Announcements', req
+    });
+    res.json({ message: 'Announcement moved to Trash', ...trash });
   } catch (err) {
     console.error('DELETE ANNOUNCEMENT ERROR FULL:', err);
-    res.status(500).json({ message: 'Announcement delete failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.message || 'Announcement delete failed', code: err.code });
   }
 };
 
@@ -769,6 +803,17 @@ exports.createStaffMessage = async (req, res) => {
       [userId, priority, body]
     );
 
+    await notifyAdministrators({
+      type: 'staff_message',
+      category: 'TASKS',
+      title: 'New staff message',
+      message: `${req.user?.email || 'A staff member'} sent an operations message.`,
+      priority: String(priority).toLowerCase() === 'urgent' ? 'HIGH' : 'NORMAL',
+      linkedModule: 'staff_messages',
+      linkedRecordId: result.insertId,
+      actionUrl: '/admin?view=staff'
+    }).catch((error) => console.error('STAFF MESSAGE NOTIFICATION ERROR:', error.message));
+
     res.json({ message: 'Message sent to admin successfully', message_id: result.insertId });
   } catch (err) {
     console.error('CREATE STAFF MESSAGE ERROR FULL:', err);
@@ -812,16 +857,14 @@ exports.deleteStaffMessage = async (req, res) => {
 
     await ensureStaffMessageTable();
 
-    const [result] = await pool.query(
-      `UPDATE staff_messages SET deleted = 1 WHERE id = ?`,
-      [id]
-    );
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Message not found' });
-    res.json({ message: 'Message deleted successfully' });
+    const trash = await moveToTrash({
+      entityType: 'staff_message', entityId: id, actorId: req.user.id,
+      reason: req.body.reason || 'Removed from Staff Messages', req
+    });
+    res.json({ message: 'Message moved to Trash', ...trash });
   } catch (err) {
     console.error('DELETE STAFF MESSAGE ERROR FULL:', err);
-    res.status(500).json({ message: 'Message delete failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.message || 'Message delete failed', code: err.code });
   }
 };
 const STAFF_WORK_REQUEST_TYPES = new Set(['leave', 'availability', 'documents', 'forms']);
@@ -916,6 +959,16 @@ exports.createStaffWorkRequest = async (req, res) => {
       `INSERT INTO staff_work_requests (user_id, request_type, title, body, payload, status) VALUES (?, ?, ?, ?, ?, 'Open')`,
       [userId, requestType, title, body || null, payload]
     );
+    await notifyAdministrators({
+      type: 'staff_work_request',
+      category: 'HR',
+      title: `New ${requestType} request`,
+      message: `${req.user?.email || 'A staff member'} submitted: ${title}`,
+      priority: 'HIGH',
+      linkedModule: 'staff_work_requests',
+      linkedRecordId: result.insertId,
+      actionUrl: '/admin?view=staff'
+    }).catch((error) => console.error('WORK REQUEST NOTIFICATION ERROR:', error.message));
     res.json({ message: 'Request sent to admin successfully', request_id: result.insertId });
   } catch (err) {
     console.error('CREATE STAFF WORK REQUEST ERROR FULL:', err);
@@ -952,11 +1005,13 @@ exports.deleteStaffWorkRequest = async (req, res) => {
     const id = Number(req.body.id || 0);
     if (!id) return res.status(400).json({ message: 'Request ID is required' });
     await ensureStaffWorkRequestTable();
-    const [result] = await pool.query(`UPDATE staff_work_requests SET deleted = 1 WHERE id = ?`, [id]);
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Request not found' });
-    res.json({ message: 'Request deleted successfully' });
+    const trash = await moveToTrash({
+      entityType: 'staff_work_request', entityId: id, actorId: req.user.id,
+      reason: req.body.reason || 'Removed from Workforce Requests', req
+    });
+    res.json({ message: 'Request moved to Trash', ...trash });
   } catch (err) {
     console.error('DELETE STAFF WORK REQUEST ERROR FULL:', err);
-    res.status(500).json({ message: 'Request delete failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.message || 'Request delete failed', code: err.code });
   }
 };

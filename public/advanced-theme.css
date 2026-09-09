@@ -4238,3 +4238,29 @@ body {
   .security-ledger-grid { grid-template-columns: 1fr; }
   .security-readiness { align-items: flex-start; flex-direction: column; }
 }
+
+@media (max-width: 767px) {
+  #dialogBackdrop .dialog-panel,
+  #staffDialogBackdrop .dialog-panel {
+    display: flex !important;
+    flex-direction: column !important;
+    max-height: calc(100dvh - 20px) !important;
+    overflow: hidden !important;
+  }
+
+  #dialogBody,
+  #staffDialogBody {
+    min-height: 0 !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #dialogBackdrop .dialog-actions,
+  #staffDialogBackdrop .dialog-actions {
+    position: static !important;
+    bottom: auto !important;
+    flex: 0 0 auto !important;
+    flex-direction: row !important;
+    margin: 0 -16px !important;
+  }
+}

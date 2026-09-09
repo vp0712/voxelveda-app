@@ -28,6 +28,9 @@ const { ensureQmsAdvancedSchema } = require('./services/qmsAdvancedSchema');
 const { ensureQmsQualityGovernanceSchema } = require('./services/qmsQualityGovernanceSchema');
 const { ensureQmsEnterpriseCompletionSchema } = require('./services/qmsEnterpriseCompletionSchema');
 const { startWeeklyTimesheetScheduler, stopWeeklyTimesheetScheduler } = require('./services/weeklyTimesheetScheduler');
+const { ensureNotificationSchema } = require('./services/notificationSchema');
+const { ensureTrashSchema } = require('./services/trashSchema');
+const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
 
 if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') require('./utils/seedAdmin')();
 
@@ -49,6 +52,8 @@ ensureQmsSchema().then(() => console.log('QMS controlled-record schema ready.'))
 ensureQmsAdvancedSchema().then(() => console.log('QMS/MES operational schema ready.')).catch((error) => console.error('QMS/MES operational schema initialization failed:', error.message));
 ensureQmsQualityGovernanceSchema().then(() => console.log('QMS quality-release governance schema ready.')).catch((error) => console.error('QMS quality-release governance schema initialization failed:', error.message));
 ensureQmsEnterpriseCompletionSchema().then(() => console.log('QMS enterprise completion schema ready.')).catch((error) => console.error('QMS enterprise completion schema initialization failed:', error.message));
+ensureNotificationSchema().then(() => console.log('Notification Centre schema ready.')).catch((error) => console.error('Notification schema initialization failed:', error.message));
+ensureTrashSchema().then(() => console.log('Enterprise Trash schema ready.')).catch((error) => console.error('Trash schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {
@@ -67,7 +72,8 @@ if (isEmailConfigured()) {
 }
 
 startWeeklyTimesheetScheduler();
+startTrashPurgeScheduler();
 server.on('error', (err) => { console.error('Server error:', err.message); process.exit(1); });
-function shutdown(signal) { console.log(`${signal} received. Closing server.`); stopWeeklyTimesheetScheduler(); server.close(() => process.exit(0)); }
+function shutdown(signal) { console.log(`${signal} received. Closing server.`); stopWeeklyTimesheetScheduler(); stopTrashPurgeScheduler(); server.close(() => process.exit(0)); }
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
