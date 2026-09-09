@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const pool = require('../config/db');
+const { moveToTrash } = require('../services/trashService');
 const { logSecurityEvent } = require('../services/sessionService');
 const { safeDispositionName } = require('../services/documentSecurityService');
 
@@ -76,6 +77,7 @@ exports.getSuppliers = async (req, res) => {
       SELECT sf.id, sf.supplier_id, sf.file_type, sf.title, sf.notes, sf.original_name, sf.mime_type,
              sf.classification, sf.scan_status, sf.size_bytes, sf.uploaded_by, sf.created_at, u.name AS uploaded_by_name
       FROM supplier_files sf
+      JOIN suppliers s ON s.id = sf.supplier_id AND s.deleted = 0
       LEFT JOIN users u ON u.id = sf.uploaded_by
       WHERE sf.deleted = 0
       ORDER BY sf.created_at ASC, sf.id ASC
@@ -157,16 +159,14 @@ exports.deleteSupplier = async (req, res) => {
     const id = Number(req.body.id || 0);
     if (!id) return res.status(400).json({ message: 'Supplier ID is required' });
 
-    const [result] = await pool.query(
-      'UPDATE suppliers SET deleted = 1, updated_by = ? WHERE id = ?',
-      [req.user.id, id]
-    );
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Supplier not found' });
-    res.json({ message: 'Supplier deleted successfully' });
+    const trash = await moveToTrash({
+      entityType: 'supplier', entityId: id, actorId: req.user.id,
+      reason: req.body.reason || 'Removed from Suppliers', req
+    });
+    res.json({ message: 'Supplier moved to Trash', ...trash });
   } catch (error) {
     console.error('deleteSupplier error:', error);
-    res.status(500).json({ message: 'Failed to delete supplier', error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message || 'Failed to delete supplier', code: error.code });
   }
 };
 
@@ -228,7 +228,9 @@ exports.viewSupplierFile = async (req, res) => {
     if (!id) return res.status(400).json({ message: 'File ID is required' });
 
     const [[file]] = await pool.query(
-      'SELECT original_name, file_path, mime_type, file_data FROM supplier_files WHERE id = ? AND deleted = 0 LIMIT 1',
+      `SELECT sf.original_name, sf.file_path, sf.mime_type, sf.file_data
+       FROM supplier_files sf JOIN suppliers s ON s.id = sf.supplier_id
+       WHERE sf.id = ? AND sf.deleted = 0 AND s.deleted = 0 LIMIT 1`,
       [id]
     );
 
@@ -269,8 +271,13 @@ exports.deleteSupplierFile = async (req, res) => {
     const id = Number(req.body.id || 0);
     if (!id) return res.status(400).json({ message: 'File ID is required' });
 
-    const [rows] = await pool.query('SELECT file_path FROM supplier_files WHERE id = ? AND deleted = 0 LIMIT 1', [id]);
-    const [result] = await pool.query('UPDATE supplier_files SET deleted = 1 WHERE id = ?', [id]);
+    const [rows] = await pool.query(
+      `SELECT sf.file_path FROM supplier_files sf JOIN suppliers s ON s.id = sf.supplier_id
+       WHERE sf.id = ? AND sf.deleted = 0 AND s.deleted = 0 LIMIT 1`,
+      [id]
+    );
+    if (!rows.length) return res.status(404).json({ message: 'File not found' });
+    const [result] = await pool.query('UPDATE supplier_files SET deleted = 1 WHERE id = ? AND deleted = 0', [id]);
 
     if (result.affectedRows === 0) return res.status(404).json({ message: 'File not found' });
 

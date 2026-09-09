@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Voxel Veda Workforce Panel</title>
-<link rel="stylesheet" href="/style.css?v=20260816-action-confirmation" />
-  <link rel="stylesheet" href="/advanced-theme.css?v=20260824-mobile-shell-v4" />
+<link rel="stylesheet" href="/style.css?v=20260909-erp-wave1" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260909-erp-wave1" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -120,6 +120,7 @@
       <button class="nav-btn permission-meetings hidden-section" data-section="meetingsSection">Meetings & Inspections</button>
       <button class="nav-btn permission-compliance hidden-section" data-section="staffComplianceSection">Compliance & Licences</button>
       <button class="nav-btn permission-competitors hidden-section" data-section="staffCompetitorSection">Competitors & Industry</button>
+      <button class="nav-btn permission-trash hidden-section" data-section="staffTrashSection">Trash</button>
       </nav>
 
       <div class="sidebar-footer">
@@ -137,6 +138,36 @@
           <p id="staffInfo">Loading staff...</p>
         </div>
         <div class="staff-top-actions">
+          <div class="notification-center">
+            <button id="staffNotificationBell" class="notification-bell" type="button" aria-label="Open notifications" aria-expanded="false" onclick="toggleStaffNotificationPanel(event)">
+              <span class="bell-mark">!</span>
+              <span id="staffNotificationBadge" class="notification-badge hidden-section">0</span>
+            </button>
+            <div id="staffNotificationPanel" class="notification-panel" hidden>
+              <div class="notification-panel-head"><strong>Notification Centre</strong><span id="staffNotificationCount">0 new</span></div>
+              <div class="notification-tabs" role="tablist" aria-label="Notification filters">
+                <button class="active" type="button" data-staff-notification-tab="all" onclick="setStaffNotificationTab('all')">All</button>
+                <button type="button" data-staff-notification-tab="unread" onclick="setStaffNotificationTab('unread')">Unread</button>
+                <button type="button" data-staff-notification-tab="important" onclick="setStaffNotificationTab('important')">Important</button>
+              </div>
+              <div class="notification-tabs notification-category-tabs" role="tablist" aria-label="Notification categories">
+                <button class="active" type="button" data-staff-notification-category="" onclick="setStaffNotificationCategory('')">Every area</button>
+                <button type="button" data-staff-notification-category="HR" onclick="setStaffNotificationCategory('HR')">HR</button>
+                <button type="button" data-staff-notification-category="TASKS" onclick="setStaffNotificationCategory('TASKS')">Tasks</button>
+                <button type="button" data-staff-notification-category="QUALITY" onclick="setStaffNotificationCategory('QUALITY')">Quality</button>
+                <button type="button" data-staff-notification-category="PRODUCTION" onclick="setStaffNotificationCategory('PRODUCTION')">Production</button>
+                <button type="button" data-staff-notification-category="SYSTEM" onclick="setStaffNotificationCategory('SYSTEM')">System</button>
+              </div>
+              <div class="notification-toolbar">
+                <button type="button" onclick="markAllStaffNotificationsRead()">Mark all read</button>
+                <button type="button" onclick="clearStaffNotifications('read')">Clear read</button>
+                <button type="button" onclick="clearStaffNotifications('all')">Clear all</button>
+                <button type="button" onclick="openStaffNotificationPreferences()">Preferences</button>
+              </div>
+              <div id="staffNotificationList" class="notification-list"></div>
+              <div id="staffNotificationEmpty" class="notification-empty">No new notifications</div>
+            </div>
+          </div>
           <button class="staff-task-alert permission-tasks hidden-section" type="button" onclick="goStaffSection('tasksSection')" aria-label="Open task alerts">
             <span class="staff-task-alert-icon">!</span>
             <span>
@@ -913,6 +944,30 @@
         </div>
       </section>
 
+      <!-- TRASH -->
+      <section id="staffTrashSection" class="page-section hidden-section permission-trash">
+        <div class="section-head">
+          <div>
+            <h2>My Trash</h2>
+            <p>Recover your deleted items during their 15-day retention period.</p>
+          </div>
+          <button class="secondary-btn" type="button" onclick="loadStaffTrash(1)">Refresh</button>
+        </div>
+
+        <div class="card staff-trash-workspace">
+          <div class="trash-filter-bar staff-trash-filter-bar">
+            <label><span>Search</span><input id="staffTrashSearch" type="search" placeholder="Record, module or ID" oninput="scheduleStaffTrashSearch()" /></label>
+            <label><span>Module</span><select id="staffTrashModule" onchange="loadStaffTrash(1)"><option value="">All modules</option><option>Customers</option><option>Suppliers</option><option>Meetings</option><option>Tasks</option><option>Announcements</option><option>Messages</option><option>Workforce</option><option>Notifications</option></select></label>
+            <label><span>Sort</span><select id="staffTrashSort" onchange="loadStaffTrash(1)"><option value="deleted_desc">Newest deleted</option><option value="purge_asc">Purging soon</option><option value="deleted_asc">Oldest deleted</option></select></label>
+          </div>
+          <div id="staffTrashList" class="staff-trash-list"><div class="empty-state">Open Trash to load recoverable items.</div></div>
+          <div class="register-pagination trash-pagination">
+            <span id="staffTrashPageSummary">0 records</span>
+            <div><button id="staffTrashPrevious" type="button" class="secondary-btn" onclick="loadStaffTrash(Math.max(1, staffTrashState.page - 1))">Previous</button><button id="staffTrashNext" type="button" class="secondary-btn" onclick="loadStaffTrash(staffTrashState.page + 1)">Next</button></div>
+          </div>
+        </div>
+      </section>
+
       <!-- LEAVE REQUESTS -->
       <section id="leaveSection" class="page-section hidden-section permission-leave">
         <div class="section-head">
@@ -1126,6 +1181,6 @@
     </section>
   </div>
 
-  <script src="/staff.js?v=20260824-mobile-shell-v4"></script>
+  <script src="/staff.js?v=20260909-erp-wave1"></script>
 </body>
 </html>

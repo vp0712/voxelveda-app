@@ -14,22 +14,16 @@ const pool = mysql.createPool({
 async function testConnection() {
   try {
     const connection = await pool.getConnection();
-    console.log(`✅ MySQL CONNECTED SUCCESSFULLY ON ${process.env.DB_PORT || 3307}`);
+    console.log(`MySQL connected successfully on port ${process.env.DB_PORT || 3307}`);
     connection.release();
   } catch (err) {
-    console.error('❌ MySQL connection failed:', err.message);
+    console.error('MySQL connection failed:', err.message);
   }
 }
 
-pool.getConnection()
-  .then(conn => {
-    console.log("✅ MySQL CONNECTED SUCCESSFULLY");
-    conn.release();
-  })
-  .catch(err => {
-    console.error("❌ MySQL connection failed:", err.message);
-  });
-
-testConnection();
+const isServerEntry = require.main && /[\\/]server\.js$/i.test(require.main.filename);
+if (isServerEntry) {
+  testConnection();
+}
 
 module.exports = pool;

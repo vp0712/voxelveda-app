@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { moveToTrash } = require('../services/trashService');
 
 async function ensureCustomerTable() {
   await pool.query(`
@@ -104,15 +105,13 @@ exports.deleteCustomer = async (req, res) => {
     const id = Number(req.body.id || 0);
     if (!id) return res.status(400).json({ message: 'Customer ID is required' });
 
-    const [result] = await pool.query(
-      'UPDATE customers SET deleted = 1, updated_by = ? WHERE id = ?',
-      [req.user.id, id]
-    );
-
-    if (result.affectedRows === 0) return res.status(404).json({ message: 'Customer not found' });
-    res.json({ message: 'Customer deleted successfully' });
+    const trash = await moveToTrash({
+      entityType: 'customer', entityId: id, actorId: req.user.id,
+      reason: req.body.reason || 'Removed from Customers', req
+    });
+    res.json({ message: 'Customer moved to Trash', ...trash });
   } catch (error) {
     console.error('deleteCustomer error:', error);
-    res.status(500).json({ message: 'Failed to delete customer', error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.message || 'Failed to delete customer', code: error.code });
   }
 };

@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Voxel Veda Operations Control</title>
-<link rel="stylesheet" href="/style.css?v=20260907-continuous-assurance"/>
+<link rel="stylesheet" href="/style.css?v=20260909-erp-wave1"/>
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
 <link rel="stylesheet" href="/step-up.css?v=20260905"/>
-  <link rel="stylesheet" href="/advanced-theme.css?v=20260906-security-centre" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260909-erp-wave1" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
@@ -90,6 +90,7 @@
         </details>
         <button class="nav-btn" data-icon="CL" data-title="Compliance & Licences" data-section="complianceSection">Compliance & Licences</button>
         <button class="nav-btn" data-icon="F" data-title="Company Forms" data-section="companyFormsSection">Company Forms</button>
+        <button class="nav-btn" data-icon="TR" data-title="Trash" data-section="trashSection" data-permission="VIEW_TRASH">Trash</button>
         <button class="nav-btn" data-icon="SC" data-title="Security" data-section="securitySection" data-permission="MANAGE_SECURITY">Security</button>
         <button class="nav-btn" data-icon="G" data-title="Settings" data-section="settingsSection">Settings</button>
       </nav>
@@ -119,8 +120,29 @@
             </button>
             <div id="notificationPanel" class="notification-panel" hidden>
               <div class="notification-panel-head">
-                <strong>Operations Alerts</strong>
+                <strong>Notification Centre</strong>
                 <span id="notificationPanelCount">0 new</span>
+              </div>
+              <div class="notification-tabs" role="tablist" aria-label="Notification filters">
+                <button class="active" type="button" data-notification-tab="all" onclick="setNotificationTab('all')">All</button>
+                <button type="button" data-notification-tab="unread" onclick="setNotificationTab('unread')">Unread</button>
+                <button type="button" data-notification-tab="important" onclick="setNotificationTab('important')">Important</button>
+              </div>
+              <div class="notification-tabs notification-category-tabs" role="tablist" aria-label="Notification categories">
+                <button class="active" type="button" data-notification-category="" onclick="setNotificationCategory('')">Every area</button>
+                <button type="button" data-notification-category="FINANCE" onclick="setNotificationCategory('FINANCE')">Finance</button>
+                <button type="button" data-notification-category="PRODUCTION" onclick="setNotificationCategory('PRODUCTION')">Production</button>
+                <button type="button" data-notification-category="QUALITY" onclick="setNotificationCategory('QUALITY')">Quality</button>
+                <button type="button" data-notification-category="SECURITY" onclick="setNotificationCategory('SECURITY')">Security</button>
+                <button type="button" data-notification-category="HR" onclick="setNotificationCategory('HR')">HR</button>
+                <button type="button" data-notification-category="TASKS" onclick="setNotificationCategory('TASKS')">Tasks</button>
+                <button type="button" data-notification-category="SYSTEM" onclick="setNotificationCategory('SYSTEM')">System</button>
+              </div>
+              <div class="notification-toolbar">
+                <button type="button" onclick="markAllNotificationsRead()">Mark all read</button>
+                <button type="button" onclick="clearNotifications('read')">Clear read</button>
+                <button type="button" onclick="clearNotifications('all')">Clear all</button>
+                <button type="button" onclick="openNotificationPreferences()">Preferences</button>
               </div>
               <div id="notificationList" class="notification-list"></div>
               <div id="notificationEmpty" class="notification-empty">No new notifications</div>
@@ -1602,6 +1624,41 @@
         </div>
       </section>
 
+      <!-- TRASH -->
+      <section id="trashSection" class="page-section hidden-section">
+        <div class="section-head">
+          <div>
+            <span class="panel-kicker">Controlled Retention</span>
+            <h2>Enterprise Trash</h2>
+            <p>Eligible records remain recoverable for 15 days. Protected accounting, audit and final quality records cannot be destructively deleted.</p>
+          </div>
+          <button type="button" class="secondary-btn" onclick="loadTrash()">Refresh</button>
+        </div>
+
+        <div class="card trash-workspace">
+          <div class="trash-filter-bar">
+            <label><span>Search</span><input id="trashSearch" type="search" placeholder="Record, module or ID" oninput="scheduleTrashSearch()"></label>
+            <label><span>Module</span><select id="trashModuleFilter" onchange="loadTrash(1)"><option value="">All modules</option><option>Customers</option><option>Suppliers</option><option>Meetings</option><option>Tasks</option><option>Announcements</option><option>Messages</option><option>Workforce</option><option>Notifications</option></select></label>
+            <label><span>Sort</span><select id="trashSort" onchange="loadTrash(1)"><option value="deleted_desc">Newest deleted</option><option value="deleted_asc">Oldest deleted</option><option value="purge_asc">Purging soon</option><option value="purge_desc">Purging later</option></select></label>
+          </div>
+          <div class="trash-bulk-bar">
+            <span id="trashSelectionCount">0 selected</span>
+            <button type="button" class="secondary-btn" onclick="bulkRestoreTrash()">Restore selected</button>
+            <button type="button" class="danger-btn" data-permission="MANAGE_TRASH" onclick="bulkPermanentDeleteTrash()">Delete permanently</button>
+          </div>
+          <div class="table-wrap trash-table-wrap">
+            <table>
+              <thead><tr><th><input id="trashSelectAll" type="checkbox" aria-label="Select all Trash items" onchange="toggleAllTrash(this.checked)"></th><th>Record</th><th>Module</th><th>Deleted by</th><th>Deleted</th><th>Retention</th><th>Reason</th><th>Actions</th></tr></thead>
+              <tbody id="trashTableBody"><tr><td colspan="8">Open Trash to load recoverable records.</td></tr></tbody>
+            </table>
+          </div>
+          <div class="register-pagination trash-pagination">
+            <span id="trashPageSummary">0 records</span>
+            <div><button type="button" class="secondary-btn" onclick="loadTrash(Math.max(1, trashState.page - 1))">Previous</button><button type="button" class="secondary-btn" onclick="loadTrash(trashState.page + 1)">Next</button></div>
+          </div>
+        </div>
+      </section>
+
       <!-- SETTINGS -->
       <section id="settingsSection" class="page-section hidden-section">
         <div class="section-head">
@@ -1755,7 +1812,7 @@
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260905"></script>
-  <script src="/admin-dashboard.js?v=20260907-continuous-assurance"></script>
+  <script src="/admin-dashboard.js?v=20260909-erp-wave1"></script>
   <script src="/expense-payments.js?v=20260904"></script>
 </body>
 </html>
