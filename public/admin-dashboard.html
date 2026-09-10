@@ -45,6 +45,7 @@
         <button class="nav-btn" data-icon="I" data-title="Invoices" data-section="invoiceSection">Invoices</button>
         <button class="nav-btn" data-icon="C" data-title="Customers" data-section="customerSection">Customers</button>
         <button class="nav-btn" data-icon="S" data-title="Suppliers" data-section="supplierSection">Suppliers</button>
+        <button class="nav-btn" data-icon="PO" data-title="Procurement" data-section="procurementSection">Procurement</button>
 
         <span class="nav-section-label">Operations</span>
         <button class="nav-btn" data-icon="X" data-title="Competitors" data-section="competitorSection">Competitors</button>
@@ -1625,6 +1626,40 @@
         </div>
       </section>
 
+      <!-- PROCUREMENT -->
+      <section id="procurementSection" class="page-section hidden-section" data-procurement-root data-procurement-portal="admin">
+        <div class="section-head procurement-section-head">
+          <div>
+            <span class="panel-kicker">Source to Pay</span>
+            <h2>Procurement Control</h2>
+            <p>Requisitions, supplier quotes, purchase orders, receiving and bill matching in one governed workflow.</p>
+          </div>
+          <div class="section-actions" data-procurement-primary-actions></div>
+        </div>
+        <div class="procurement-summary" aria-label="Procurement summary">
+          <article><span>Requisitions pending</span><strong data-procurement-count="requisitions_pending">0</strong></article>
+          <article><span>Supplier RFQs open</span><strong data-procurement-count="supplier_rfqs_open">0</strong></article>
+          <article><span>Purchase orders open</span><strong data-procurement-count="purchase_orders_open">0</strong></article>
+          <article><span>Awaiting inspection</span><strong data-procurement-count="receipts_waiting_inspection">0</strong></article>
+          <article><span>Bill exceptions</span><strong data-procurement-count="bill_exceptions">0</strong></article>
+          <article><span>Credits pending</span><strong data-procurement-count="credits_pending">0</strong></article>
+        </div>
+        <div class="procurement-workspace">
+          <div class="procurement-toolbar">
+            <div class="procurement-tabs" role="tablist" aria-label="Procurement stages">
+              <button type="button" class="active" data-procurement-tab="requisitions">Requisitions</button>
+              <button type="button" data-procurement-tab="sourcing">Sourcing</button>
+              <button type="button" data-procurement-tab="orders">Purchase Orders</button>
+              <button type="button" data-procurement-tab="receiving">Receiving</button>
+              <button type="button" data-procurement-tab="matches">Bill Match</button>
+              <button type="button" data-procurement-tab="returns">Returns</button>
+            </div>
+            <button type="button" class="secondary-btn" data-procurement-refresh>Refresh</button>
+          </div>
+          <div class="procurement-list" data-procurement-list><div class="empty-state">Open Procurement to load the workspace.</div></div>
+        </div>
+      </section>
+
       <!-- APPROVALS -->
       <section id="approvalsSection" class="page-section hidden-section" data-workflow-root data-workflow-portal="admin">
         <div class="section-head">
@@ -1844,8 +1879,9 @@
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260905"></script>
-  <script src="/admin-dashboard.js?v=20260910-erp-wave2"></script>
+  <script src="/admin-dashboard.js?v=20260910-erp-wave3"></script>
   <script src="/workflow-ui.js?v=20260910-erp-wave2"></script>
+  <script src="/procurement-ui.js?v=20260910-erp-wave3"></script>
   <script src="/expense-payments.js?v=20260904"></script>
 </body>
 </html>

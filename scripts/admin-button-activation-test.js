@@ -5,6 +5,7 @@ const htmlPath = path.join(__dirname, '..', 'public', 'admin-dashboard.html');
 const jsPaths = [
   path.join(__dirname, '..', 'public', 'admin-dashboard.js'),
   path.join(__dirname, '..', 'public', 'workflow-ui.js'),
+  path.join(__dirname, '..', 'public', 'procurement-ui.js'),
   path.join(__dirname, '..', 'public', 'expense-payments.js'),
   path.join(__dirname, '..', 'public', 'step-up.js')
 ];
@@ -44,11 +45,13 @@ for (const match of html.matchAll(/<button\b([^>]*)>/gi)) {
   const hasInline = /\bonclick\s*=/i.test(attrs);
   const hasSection = /\bdata-section\s*=/i.test(attrs);
   const hasMobileAction = /\bdata-mobile-menu-action\s*=/i.test(attrs);
+  const hasProcurementAction = /\bdata-procurement-(?:action|tab|refresh)\b/i.test(attrs)
+    && /data-procurement-(?:action|tab|refresh)/.test(js);
   const id = (attrs.match(/\bid=["']([^"']+)["']/i) || [])[1];
   const className = (attrs.match(/\bclass=["']([^"']+)["']/i) || [])[1] || '';
   const hasIdListener = id && (new RegExp(`getElementById\\(['\"]${id}['\"]\\)`).test(js) || new RegExp(`#${id}\\b`).test(js));
   const hasClassListener = className.split(/\s+/).filter(Boolean).some((cls) => new RegExp(`\\.${cls}\\b`).test(js));
-  if (!(hasInline || hasSection || hasMobileAction || hasIdListener || hasClassListener)) {
+  if (!(hasInline || hasSection || hasMobileAction || hasProcurementAction || hasIdListener || hasClassListener)) {
     failures.push(`button has no detectable activation path${id ? `: #${id}` : ''}: ${attrs.trim().slice(0, 120)}`);
   }
 }
