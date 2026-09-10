@@ -4,6 +4,8 @@
 
 - [ ] `npm run check`
 - [ ] `npm test`
+- [ ] `npm run security:audit`
+- [ ] Regenerate `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json` with `npm run audit:inventory`.
 - [ ] Review `git diff --check` and `git diff --stat`.
 - [ ] Confirm `.env`, upload data, signing keys and generated Android files are not staged.
 - [ ] Search tracked files for passwords, private keys and obsolete public Railway links.
@@ -11,9 +13,11 @@
 ## Railway deployment
 
 - [ ] Confirm required database and JWT variables exist.
+- [ ] Confirm either `DATABASE_URL` or the discrete `DB_*` variables identify the intended MySQL database.
+- [ ] If `DB_TLS_REQUIRED=true`, keep `DB_TLS_REJECT_UNAUTHORIZED=true` and provide the private CA when the provider requires one.
 - [ ] Generate a unique 32-byte `SHIFT_QR_SIGNING_KEY`; never reuse another application secret.
 - [ ] Run `npm run readiness:check` against the intended production environment before rollout.
-- [ ] Apply `migrations/20260907_operational_trust.sql` or verify `Operational trust schema ready.` in deployment logs.
+- [ ] Verify startup logs show the migration schema version before any critical schema-ready messages and before `Server ready`.
 - [ ] Leave `DUAL_CONTROL_EXPORTS=false` until two different authorised users have tested request, approval and one-time consumption.
 - [ ] Configure `WEBHOOK_SIGNING_KEY` only when signed integrations are enabled; record its version without storing its value in the database.
 - [ ] Keep `OUTBOUND_ALLOWED_HOSTS` empty unless a backend integration needs an exact reviewed HTTPS hostname.
@@ -21,7 +25,9 @@
 - [ ] Add custom-domain variables from `.env.example`.
 - [ ] Keep `FORCE_CANONICAL_HOST=false`.
 - [ ] Deploy and monitor build/runtime logs.
-- [ ] Verify the Railway fallback `/api/health` first.
+- [ ] Verify `/api/health` returns HTTP 200 and contains liveness fields only.
+- [ ] Verify `/api/ready` returns HTTP 200, `ready: true`, the expected deployment SHA, and `20260911_enterprise_bootstrap_readiness` or a later schema version.
+- [ ] Verify anonymous `/api/security/readiness` access returns HTTP 401.
 - [ ] Test public pages and one admin/staff workflow on the fallback.
 
 ## Custom domain
@@ -38,5 +44,5 @@
 - [ ] Monitor 4xx/5xx rates and authentication failures.
 - [ ] Keep the Railway fallback available during the migration window.
 - [ ] Record deployment commit, Railway deployment ID and test results.
-- [ ] Confirm `Security operations schema ready.` and `/api/health` HTTP 200 in Railway network logs.
+- [ ] Confirm `Security operations schema ready.`, `/api/health` HTTP 200, and `/api/ready` HTTP 200 in Railway network logs.
 - [ ] Verify incident creation, security-report access denial for non-authorised roles and step-up enforcement without executing emergency revocation.

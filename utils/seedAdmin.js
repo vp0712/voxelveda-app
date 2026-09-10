@@ -43,6 +43,7 @@ async function seedAdmin() {
     console.log('✅ Admin user seeded successfully');
   } catch (err) {
     console.error('❌ Admin seed failed:', err.message);
+    throw err;
   }
 }
 

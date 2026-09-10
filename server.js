@@ -1,21 +1,21 @@
-const path = require('path');
+const path = require('node:path');
 const dotenv = require('dotenv');
 
 const envPath = path.join(__dirname, '.env');
-const result = dotenv.config({ path: envPath });
-
-if (result.error && process.env.NODE_ENV !== 'production') {
+const envResult = dotenv.config({ path: envPath });
+if (envResult.error && process.env.NODE_ENV !== 'production') {
   console.warn('.env file not loaded; using shell environment variables.');
 }
 
-console.log('Server starting...');
-
 const { validateSecurityEnvironment } = require('./config/security');
-validateSecurityEnvironment();
-
+const startupEnvironmentReadiness = validateSecurityEnvironment();
 const app = require('./app');
+const pool = require('./config/db');
 const { isEmailConfigured, verifyConnection } = require('./services/emailService');
-const { processEmailQueue } = require('./services/emailQueue');
+const { startEmailQueueWorker, stopEmailQueueWorker } = require('./services/emailQueueWorker');
+const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./services/databaseRuntimeService');
+const { runMigrations } = require('./services/migrationRunner');
+const { allowedHosts } = require('./services/outboundRequestPolicy');
 const { ensureFinanceSchema } = require('./services/financeSchema');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
@@ -27,59 +27,214 @@ const { ensureQmsSchema } = require('./services/qmsSchema');
 const { ensureQmsAdvancedSchema } = require('./services/qmsAdvancedSchema');
 const { ensureQmsQualityGovernanceSchema } = require('./services/qmsQualityGovernanceSchema');
 const { ensureQmsEnterpriseCompletionSchema } = require('./services/qmsEnterpriseCompletionSchema');
-const { startWeeklyTimesheetScheduler, stopWeeklyTimesheetScheduler } = require('./services/weeklyTimesheetScheduler');
 const { ensureNotificationSchema } = require('./services/notificationSchema');
 const { ensureTrashSchema } = require('./services/trashSchema');
-const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
 const { ensureWorkflowSchema } = require('./services/workflowSchema');
 const { ensureProcurementSchema } = require('./services/procurementSchema');
+const { ensureWorkforceSchema } = require('./services/workforceSchema');
+const { ensureEnterpriseControlPlaneSchema } = require('./services/enterpriseControlPlaneSchema');
+const { startWeeklyTimesheetScheduler, stopWeeklyTimesheetScheduler } = require('./services/weeklyTimesheetScheduler');
+const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
 const { startWorkflowSlaScheduler, stopWorkflowSlaScheduler } = require('./services/workflowEscalationService');
-
-if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') require('./utils/seedAdmin')();
+const {
+  CONTROL_STATES,
+  addWarning,
+  detailedReadiness,
+  markFailed,
+  markReady,
+  resetRuntimeState,
+  setControl,
+  setCriticalService,
+  setMigrations,
+  setPhase
+} = require('./services/runtimeState');
 
 const PORT = Number(process.env.PORT || 5001);
 const HOST = '0.0.0.0';
-const server = app.listen(PORT, HOST, () => {
-  console.log(`Server running on ${HOST}:${PORT}`);
-  console.log(`Local entry: http://localhost:${PORT}/`);
-});
+let server = null;
+let shuttingDown = false;
 
-ensureFinanceSchema().then(() => console.log('Finance foundation schema ready.')).catch((error) => console.error('Finance schema initialization failed:', error.message));
-ensureSecuritySchema().then(() => console.log('Security schema ready.')).catch((error) => console.error('Security schema initialization failed:', error.message));
-ensureHighRiskFinanceSchema().then(() => console.log('High-risk finance schema ready.')).catch((error) => console.error('High-risk finance schema initialization failed:', error.message));
-ensureSecurityOperationsSchema().then(() => console.log('Security operations schema ready.')).catch((error) => console.error('Security operations schema initialization failed:', error.message));
-ensureOperationalTrustSchema().then(() => console.log('Operational trust schema ready.')).catch((error) => console.error('Operational trust schema initialization failed:', error.message));
-ensureAssuranceSchema().then(() => console.log('Continuous assurance schema ready.')).catch((error) => console.error('Continuous assurance schema initialization failed:', error.message));
-ensureSecurityGovernanceSchema().then(() => console.log('Identity governance schema ready.')).catch((error) => console.error('Identity governance schema initialization failed:', error.message));
-ensureQmsSchema().then(() => console.log('QMS controlled-record schema ready.')).catch((error) => console.error('QMS schema initialization failed:', error.message));
-ensureQmsAdvancedSchema().then(() => console.log('QMS/MES operational schema ready.')).catch((error) => console.error('QMS/MES operational schema initialization failed:', error.message));
-ensureQmsQualityGovernanceSchema().then(() => console.log('QMS quality-release governance schema ready.')).catch((error) => console.error('QMS quality-release governance schema initialization failed:', error.message));
-ensureQmsEnterpriseCompletionSchema().then(() => console.log('QMS enterprise completion schema ready.')).catch((error) => console.error('QMS enterprise completion schema initialization failed:', error.message));
-ensureNotificationSchema().then(() => console.log('Notification Centre schema ready.')).catch((error) => console.error('Notification schema initialization failed:', error.message));
-ensureTrashSchema().then(() => console.log('Enterprise Trash schema ready.')).catch((error) => console.error('Trash schema initialization failed:', error.message));
-ensureWorkflowSchema().then(() => console.log('Workflow Engine schema ready.')).catch((error) => console.error('Workflow schema initialization failed:', error.message));
-ensureProcurementSchema().then(() => console.log('Procurement lifecycle schema ready.')).catch((error) => console.error('Procurement schema initialization failed:', error.message));
+async function initializeCriticalSchemas() {
+  const schemas = [
+    ['finance', 'Finance foundation schema ready.', () => ensureFinanceSchema()],
+    ['security', 'Security schema ready.', () => ensureSecuritySchema()],
+    ['high_risk_finance', 'High-risk finance schema ready.', () => ensureHighRiskFinanceSchema()],
+    ['security_operations', 'Security operations schema ready.', () => ensureSecurityOperationsSchema()],
+    ['operational_trust', 'Operational trust schema ready.', () => ensureOperationalTrustSchema()],
+    ['assurance', 'Continuous assurance schema ready.', () => ensureAssuranceSchema()],
+    ['security_governance', 'Identity governance schema ready.', () => ensureSecurityGovernanceSchema()],
+    ['qms', 'QMS controlled-record schema ready.', () => ensureQmsSchema()],
+    ['qms_operations', 'QMS/MES operational schema ready.', () => ensureQmsAdvancedSchema()],
+    ['qms_governance', 'QMS quality-release governance schema ready.', () => ensureQmsQualityGovernanceSchema()],
+    ['qms_completion', 'QMS enterprise completion schema ready.', () => ensureQmsEnterpriseCompletionSchema()],
+    ['notifications', 'Notification Centre schema ready.', () => ensureNotificationSchema()],
+    ['trash', 'Enterprise Trash schema ready.', () => ensureTrashSchema()],
+    ['workflow', 'Workflow Engine schema ready.', () => ensureWorkflowSchema()],
+    ['procurement', 'Procurement lifecycle schema ready.', () => ensureProcurementSchema()],
+    ['workforce', 'Workforce schema ready.', () => ensureWorkforceSchema()],
+    ['enterprise_control_plane', 'Enterprise control plane schema ready.', () => ensureEnterpriseControlPlaneSchema()]
+  ];
 
-let emailQueueBusy = false;
-async function runEmailQueue() {
-  if (emailQueueBusy || !isEmailConfigured()) return;
-  emailQueueBusy = true;
-  try { await processEmailQueue(Number(process.env.EMAIL_QUEUE_BATCH_SIZE || 10)); }
-  catch (error) { console.error('Email queue worker error:', error.message); }
-  finally { emailQueueBusy = false; }
+  for (const [key, message, initialize] of schemas) {
+    setCriticalService(`schema_${key}`, CONTROL_STATES.INITIALIZING);
+    try {
+      await initialize();
+      setCriticalService(`schema_${key}`, CONTROL_STATES.OPERATIONAL);
+      console.log(message);
+    } catch (error) {
+      setCriticalService(`schema_${key}`, CONTROL_STATES.FAILED, error.code || 'SCHEMA_INITIALIZATION_FAILED');
+      error.code = error.code || 'CRITICAL_SCHEMA_INITIALIZATION_FAILED';
+      throw error;
+    }
+  }
 }
 
-if (isEmailConfigured()) {
-  verifyConnection().then(() => console.log('Hostinger SMTP connection verified.')).catch((error) => console.error('Hostinger SMTP verification failed:', error.message));
-  const emailQueueTimer = setInterval(runEmailQueue, Number(process.env.EMAIL_QUEUE_INTERVAL_MS || 30000));
-  emailQueueTimer.unref();
-  setTimeout(runEmailQueue, 5000).unref();
+function configured(keys) {
+  return keys.every((key) => String(process.env[key] || '').trim());
 }
 
-startWeeklyTimesheetScheduler();
-startTrashPurgeScheduler();
-startWorkflowSlaScheduler();
-server.on('error', (err) => { console.error('Server error:', err.message); process.exit(1); });
-function shutdown(signal) { console.log(`${signal} received. Closing server.`); stopWeeklyTimesheetScheduler(); stopTrashPurgeScheduler(); stopWorkflowSlaScheduler(); server.close(() => process.exit(0)); }
-process.on('SIGINT', () => shutdown('SIGINT'));
-process.on('SIGTERM', () => shutdown('SIGTERM'));
+async function initializeServices() {
+  const redisConfigured = configured(['REDIS_URL']);
+  setControl('redis_limiter', redisConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.DEGRADED,
+    redisConfigured ? 'Redis settings are present; adapter verification is scheduled for Wave B' : 'Process-local limiter is active; do not scale to multiple replicas');
+
+  const scannerConfigured = configured(['MALWARE_SCANNER_PROVIDER']);
+  setControl('malware_scanner', scannerConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
+    scannerConfigured ? 'Provider is configured but no authenticated scan result has been verified' : 'No malware scanner provider configured');
+
+  const backupConfigured = String(process.env.BACKUP_STATUS_PROVIDER || '').toLowerCase() === 'configured';
+  setControl('backup_provider', backupConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
+    backupConfigured ? 'Provider metadata is configured; current backup evidence is checked separately' : 'No backup provider adapter configured');
+
+  const webhookConfigured = configured(['WEBHOOK_SIGNING_KEY']);
+  setControl('webhook_signing', webhookConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
+    webhookConfigured ? 'Signing key is configured; per-request verification remains authoritative' : 'Webhook signing key not configured');
+
+  setControl('outbound_request_policy', CONTROL_STATES.OPERATIONAL,
+    `Deny-by-default outbound policy loaded with ${allowedHosts().size} allowlisted host(s)`);
+
+  const canonicalConfigured = process.env.FORCE_CANONICAL_HOST === 'true';
+  setControl('canonical_domain', canonicalConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
+    canonicalConfigured ? 'Canonical redirect configured; external DNS/TLS evidence not verified by this process' : 'Canonical redirect disabled');
+
+  const webauthnConfigured = configured(['WEBAUTHN_RP_ID', 'WEBAUTHN_ORIGIN']);
+  setControl('webauthn', webauthnConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
+    webauthnConfigured ? 'WebAuthn settings present; no live ceremony adapter verified' : 'WebAuthn not configured');
+
+  const objectStorageConfigured = configured(['OBJECT_STORAGE_PROVIDER']) || configured(['S3_BUCKET', 'S3_ENDPOINT']);
+  setControl('object_storage', objectStorageConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
+    objectStorageConfigured ? 'Object storage settings present; adapter verification is scheduled for Wave D' : 'Durable object storage not configured');
+
+  if (!isEmailConfigured()) {
+    setControl('smtp', CONTROL_STATES.NOT_CONFIGURED, 'SMTP credentials are incomplete');
+    return;
+  }
+
+  setControl('smtp', CONTROL_STATES.INITIALIZING, 'Verifying SMTP provider connection');
+  try {
+    await verifyConnection();
+    setControl('smtp', CONTROL_STATES.EXTERNALLY_VERIFIED, 'SMTP provider accepted a verified transport connection');
+    console.log('SMTP connection verified.');
+  } catch (error) {
+    setControl('smtp', CONTROL_STATES.DEGRADED, error.code || 'SMTP_CONNECTION_FAILED');
+    addWarning('SMTP delivery is degraded; queued email remains available for retry after provider recovery');
+    console.warn('SMTP verification failed; startup will continue with queued delivery degraded.');
+  }
+}
+
+async function initializeWorkers() {
+  startWeeklyTimesheetScheduler();
+  startTrashPurgeScheduler();
+  startWorkflowSlaScheduler();
+  startEmailQueueWorker();
+  setCriticalService('background_workers', CONTROL_STATES.OPERATIONAL,
+    'Local schedulers initialized; distributed leases are scheduled for Wave B');
+}
+
+function listenApplication() {
+  return new Promise((resolve, reject) => {
+    server = app.listen(PORT, HOST);
+    const startupError = (error) => reject(error);
+    server.once('error', startupError);
+    server.once('listening', () => {
+      server.off('error', startupError);
+      server.on('error', (error) => {
+        markFailed(error, 'RUNTIME_HTTP_SERVER');
+        console.error(`Runtime HTTP server failed: ${error.code || 'HTTP_SERVER_FAILED'}`);
+        shutdown('HTTP_SERVER_ERROR', 1).catch(() => process.exit(1));
+      });
+      markReady();
+      console.log(`Server ready on ${HOST}:${PORT}`);
+      resolve(server);
+    });
+  });
+}
+
+async function bootstrap() {
+  resetRuntimeState();
+  console.log('Server bootstrap starting...');
+  try {
+    setPhase('VALIDATING_ENVIRONMENT');
+    startupEnvironmentReadiness.warnings.forEach(addWarning);
+
+    setPhase('CONNECTING_DATABASE');
+    await verifyDatabaseConnection(pool);
+    setCriticalService('database', CONTROL_STATES.OPERATIONAL);
+    console.log('Database connection ready.');
+
+    setPhase('RUNNING_MIGRATIONS');
+    setMigrations({ state: CONTROL_STATES.INITIALIZING });
+    const migrationResult = await runMigrations({ pool });
+    setMigrations({ state: CONTROL_STATES.OPERATIONAL, ...migrationResult });
+    setCriticalService('migrations', CONTROL_STATES.OPERATIONAL, migrationResult.schema_version || 'no migrations');
+    console.log(`Migrations ready at ${migrationResult.schema_version || 'unversioned'} (${migrationResult.applied} applied, ${migrationResult.skipped} verified).`);
+
+    setPhase('INITIALIZING_CRITICAL_SCHEMAS');
+    await initializeCriticalSchemas();
+    await refreshDatabaseAttestation(pool);
+
+    setPhase('INITIALIZING_SERVICES');
+    await initializeServices();
+
+    if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') {
+      await require('./utils/seedAdmin')();
+    }
+
+    setPhase('INITIALIZING_WORKERS');
+    await initializeWorkers();
+
+    setPhase('LISTENING');
+    return await listenApplication();
+  } catch (error) {
+    const failedPhase = detailedReadiness().phase;
+    markFailed(error, failedPhase);
+    stopEmailQueueWorker();
+    stopWeeklyTimesheetScheduler();
+    stopTrashPurgeScheduler();
+    stopWorkflowSlaScheduler();
+    await pool.end().catch(() => {});
+    console.error(`Startup failed during ${failedPhase}: ${error.code || 'STARTUP_FAILED'}`);
+    throw error;
+  }
+}
+
+async function shutdown(signal = 'shutdown', exitCode = 0) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log(`${signal} received. Closing server.`);
+  stopEmailQueueWorker();
+  stopWeeklyTimesheetScheduler();
+  stopTrashPurgeScheduler();
+  stopWorkflowSlaScheduler();
+  if (server?.listening) await new Promise((resolve) => server.close(resolve));
+  await pool.end().catch(() => {});
+  if (require.main === module) process.exit(exitCode);
+}
+
+if (require.main === module) {
+  bootstrap().catch(() => process.exit(1));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+}
+
+module.exports = { bootstrap, initializeCriticalSchemas, initializeServices, initializeWorkers, shutdown };
