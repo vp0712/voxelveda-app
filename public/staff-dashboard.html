@@ -52,6 +52,7 @@
       <nav class="sidebar-nav" aria-label="Staff sections">
       <button class="nav-btn active" data-section="dashboardSection">Home</button>
       <button class="nav-btn" data-section="profileSection">Profile</button>
+      <button class="nav-btn permission-approvals hidden-section" data-section="approvalsSection">My Approvals</button>
       <details class="nav-group permission-sales hidden-section" open>
         <summary class="nav-group-toggle">
           <span>Sales</span>
@@ -944,6 +945,33 @@
         </div>
       </section>
 
+      <!-- APPROVALS -->
+      <section id="approvalsSection" class="page-section hidden-section permission-approvals" data-workflow-root data-workflow-portal="staff">
+        <div class="section-head">
+          <div>
+            <h2>My Approvals</h2>
+            <p>Review assigned decisions and follow your submitted requests.</p>
+          </div>
+          <button type="button" class="primary-btn" data-workflow-create>Create Request</button>
+        </div>
+        <div class="workflow-summary" aria-label="Approval summary">
+          <article><span>Waiting for me</span><strong data-workflow-count="pending">0</strong></article>
+          <article><span>My active requests</span><strong data-workflow-count="requests">0</strong></article>
+          <article><span>Overdue</span><strong data-workflow-count="overdue">0</strong></article>
+        </div>
+        <div class="card workflow-workspace">
+          <div class="workflow-toolbar">
+            <div class="workflow-tabs" role="tablist" aria-label="Approval views">
+              <button type="button" class="active" data-workflow-tab="approvals">Assigned to me</button>
+              <button type="button" data-workflow-tab="requests">My requests</button>
+            </div>
+            <label><span>Area</span><select data-workflow-module><option value="">All areas</option></select></label>
+            <button type="button" class="secondary-btn" data-workflow-refresh>Refresh</button>
+          </div>
+          <div class="workflow-list" data-workflow-list><div class="empty-state">Open My Approvals to load your work.</div></div>
+        </div>
+      </section>
+
       <!-- TRASH -->
       <section id="staffTrashSection" class="page-section hidden-section permission-trash">
         <div class="section-head">
@@ -1155,7 +1183,7 @@
     <button type="button" data-section="timesheetSection" class="nav-btn permission-attendance hidden-section">Shift</button>
     <button type="button" class="mobile-bottom-primary permission-attendance hidden-section" onclick="openMissionShiftScanner()">QR</button>
     <button type="button" data-section="tasksSection" class="nav-btn permission-tasks hidden-section">Tasks</button>
-    <button type="button" class="nav-btn" data-section="profileSection">Profile</button>
+    <button type="button" class="nav-btn permission-approvals hidden-section" data-section="approvalsSection">Approvals</button>
   </nav>
   <div id="toast" class="toast"></div>
 
@@ -1181,6 +1209,7 @@
     </section>
   </div>
 
-  <script src="/staff.js?v=20260909-erp-wave1"></script>
+  <script src="/staff.js?v=20260910-erp-wave2"></script>
+  <script src="/workflow-ui.js?v=20260910-erp-wave2"></script>
 </body>
 </html>

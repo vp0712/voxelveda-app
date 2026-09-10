@@ -939,7 +939,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
-  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog', 'finance-dialog');
+  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog', 'finance-dialog', 'workflow-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -993,6 +993,7 @@ function setupNavigation() {
       if (btn.dataset.section === 'shiftQrSection') loadShiftQr();
       if (btn.dataset.section === 'companyFormsSection') renderCompanyForms();
       if (btn.dataset.section === 'securitySection') loadSecurityCentre();
+      if (btn.dataset.section === 'approvalsSection') window.VoxelWorkflowUI?.load();
       if (btn.dataset.section === 'trashSection') loadTrash();
       toggleMobileMenu(false);
     };
@@ -1535,7 +1536,9 @@ function hasCurrentPermission(permission) {
     meetings: 'VIEW_MEETINGS', meetings_input: 'MANAGE_MEETINGS', compliance: 'VIEW_COMPLIANCE', security: 'MANAGE_SECURITY',
     compliance_input: 'EDIT_COMPLIANCE', competitors: 'VIEW_CUSTOMERS', stock: 'VIEW_INVENTORY',
     stock_in: 'VIEW_INVENTORY', stock_out: 'VIEW_INVENTORY', raw_material: 'VIEW_INVENTORY',
-    packaging: 'VIEW_INVENTORY', trash: 'VIEW_TRASH', trash_restore: 'RESTORE_TRASH', trash_manage: 'MANAGE_TRASH'
+    packaging: 'VIEW_INVENTORY', trash: 'VIEW_TRASH', trash_restore: 'RESTORE_TRASH', trash_manage: 'MANAGE_TRASH',
+    approvals: 'VIEW_APPROVALS', approvals_create: 'CREATE_APPROVAL_REQUEST',
+    approvals_action: 'ACTION_APPROVALS', workflows_manage: 'MANAGE_WORKFLOWS'
   };
   const permissions = Array.isArray(currentUser.effective_permissions)
     ? currentUser.effective_permissions
@@ -1565,6 +1568,7 @@ const ADMIN_SECTION_ACCESS = Object.freeze({
   staffSection: ['staff'],
   complianceSection: ['compliance'],
   companyFormsSection: ['compliance', 'settings'],
+  approvalsSection: ['approvals'],
   trashSection: ['trash'],
   settingsSection: ['settings'],
   securitySection: ['security']
@@ -1582,7 +1586,7 @@ function requestedAdminSection() {
     packaging: 'packagingSection', finance: 'financeSection', expenses: 'expenseSection', workforce: 'attendanceSection',
     timesheets: 'attendanceSection', roster: 'rosterSection', staff: 'staffSection',
     compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection', security: 'securitySection',
-    meetings: 'meetingSection', tasks: 'taskSection', trash: 'trashSection'
+    meetings: 'meetingSection', tasks: 'taskSection', approvals: 'approvalsSection', trash: 'trashSection'
   };
   return sections[view] || '';
 }

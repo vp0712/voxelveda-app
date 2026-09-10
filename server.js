@@ -31,6 +31,8 @@ const { startWeeklyTimesheetScheduler, stopWeeklyTimesheetScheduler } = require(
 const { ensureNotificationSchema } = require('./services/notificationSchema');
 const { ensureTrashSchema } = require('./services/trashSchema');
 const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
+const { ensureWorkflowSchema } = require('./services/workflowSchema');
+const { startWorkflowSlaScheduler, stopWorkflowSlaScheduler } = require('./services/workflowEscalationService');
 
 if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') require('./utils/seedAdmin')();
 
@@ -54,6 +56,7 @@ ensureQmsQualityGovernanceSchema().then(() => console.log('QMS quality-release g
 ensureQmsEnterpriseCompletionSchema().then(() => console.log('QMS enterprise completion schema ready.')).catch((error) => console.error('QMS enterprise completion schema initialization failed:', error.message));
 ensureNotificationSchema().then(() => console.log('Notification Centre schema ready.')).catch((error) => console.error('Notification schema initialization failed:', error.message));
 ensureTrashSchema().then(() => console.log('Enterprise Trash schema ready.')).catch((error) => console.error('Trash schema initialization failed:', error.message));
+ensureWorkflowSchema().then(() => console.log('Workflow Engine schema ready.')).catch((error) => console.error('Workflow schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {
@@ -73,7 +76,8 @@ if (isEmailConfigured()) {
 
 startWeeklyTimesheetScheduler();
 startTrashPurgeScheduler();
+startWorkflowSlaScheduler();
 server.on('error', (err) => { console.error('Server error:', err.message); process.exit(1); });
-function shutdown(signal) { console.log(`${signal} received. Closing server.`); stopWeeklyTimesheetScheduler(); stopTrashPurgeScheduler(); server.close(() => process.exit(0)); }
+function shutdown(signal) { console.log(`${signal} received. Closing server.`); stopWeeklyTimesheetScheduler(); stopTrashPurgeScheduler(); stopWorkflowSlaScheduler(); server.close(() => process.exit(0)); }
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
