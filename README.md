@@ -27,3 +27,5 @@ The intended public origin is `https://app.voxelveda.com`. Keep `FORCE_CANONICAL
 See `CUSTOM-DOMAIN-SETUP.md`, `DEPLOYMENT-CHECKLIST.md`, and `docs/ENTERPRISE_DEEP_AUDIT.md`. Railway remains the application host; the custom domain changes the public address, not the hosting provider.
 
 Production startup is fail-closed. The process validates configuration, verifies MySQL, runs checksummed migrations under an advisory lock, initializes critical schemas, services, and workers, and only then binds the HTTP port. Do not replace `/api/ready` with a static environment-variable check.
+
+For databases created before the migration ledger, the runner records pre-Wave-A files as `BASELINED` only when all six established core tables are present and no immutable migration history exists. Fresh databases execute every migration, later migrations always execute normally, and both `APPLIED` and `BASELINED` checksums are immutable on subsequent runs. Run `npm run test:enterprise-wave-a:mysql-legacy` against a disposable-capable local MySQL instance to rehearse this adoption path.

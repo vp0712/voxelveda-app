@@ -16,7 +16,7 @@ const {
 } = require('../services/runtimeState');
 const { discoverMigrations, runMigrations, splitMigrationSql } = require('../services/migrationRunner');
 
-function migrationPool() {
+function migrationPool({ legacy = false } = {}) {
   const ledger = new Map();
   const executed = [];
   let lockHeld = false;
@@ -32,12 +32,20 @@ function migrationPool() {
         return [[{ released: 1 }], []];
       }
       if (normalized.startsWith('CREATE TABLE IF NOT EXISTS schema_migrations')) return [[], []];
+      if (normalized.startsWith("SELECT SUM(status IN ('APPLIED', 'BASELINED'))")) {
+        const immutable = [...ledger.values()].filter((row) => ['APPLIED', 'BASELINED'].includes(row.status)).length;
+        return [[{ immutable_count: immutable, total_count: ledger.size }], []];
+      }
+      if (normalized.startsWith('SELECT COUNT(*) AS marker_count FROM information_schema.tables')) {
+        return [[{ marker_count: legacy ? params.length : 0 }], []];
+      }
       if (normalized.startsWith('SELECT migration_id, checksum_sha256, status FROM schema_migrations')) {
         const row = ledger.get(params[0]);
         return [row ? [row] : [], []];
       }
       if (normalized.startsWith('INSERT INTO schema_migrations')) {
-        ledger.set(params[0], { migration_id: params[0], checksum_sha256: params[1], status: 'RUNNING' });
+        const status = normalized.includes("'BASELINED'") ? 'BASELINED' : 'RUNNING';
+        ledger.set(params[0], { migration_id: params[0], checksum_sha256: params[1], status });
         return [{ affectedRows: 1 }, []];
       }
       if (normalized.startsWith("UPDATE schema_migrations SET status = 'APPLIED'")) {
@@ -47,7 +55,7 @@ function migrationPool() {
       }
       if (normalized.startsWith("UPDATE schema_migrations SET status = 'FAILED'")) return [{ affectedRows: 1 }, []];
       if (normalized.startsWith('SELECT migration_id FROM schema_migrations')) {
-        const latest = [...ledger.values()].filter((row) => row.status === 'APPLIED').sort((a, b) => b.migration_id.localeCompare(a.migration_id))[0];
+        const latest = [...ledger.values()].filter((row) => ['APPLIED', 'BASELINED'].includes(row.status)).sort((a, b) => b.migration_id.localeCompare(a.migration_id))[0];
         return [latest ? [{ migration_id: latest.migration_id }] : [], []];
       }
       executed.push(normalized);
@@ -80,6 +88,43 @@ async function testMigrationRunner() {
     assert.equal(second.skipped, 2);
 
     fs.writeFileSync(path.join(directory, '20260101_first.sql'), 'CREATE TABLE first_table (id BIGINT);\n');
+    await assert.rejects(
+      () => runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } }),
+      (error) => error.code === 'MIGRATION_CHECKSUM_MISMATCH'
+    );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+async function testLegacyMigrationBaseline() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'voxelveda-wave-a-legacy-'));
+  try {
+    fs.writeFileSync(path.join(directory, '20260101_historical.sql'), 'CREATE TABLE old_table (id INT);\n');
+    fs.writeFileSync(path.join(directory, '20260911_enterprise_bootstrap_readiness.sql'), 'CREATE TABLE current_table (id INT);\n');
+    fs.writeFileSync(path.join(directory, '20260912_future.sql'), 'CREATE TABLE future_table (id INT);\n');
+    const mock = migrationPool({ legacy: true });
+    mock.ledger.set('20260101_historical', {
+      migration_id: '20260101_historical',
+      checksum_sha256: 'failed-before-baseline',
+      status: 'FAILED'
+    });
+
+    const result = await runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } });
+    assert.equal(result.baselined, 1);
+    assert.equal(result.applied, 2);
+    assert.equal(result.skipped, 0);
+    assert.equal(mock.ledger.get('20260101_historical').status, 'BASELINED');
+    assert.equal(mock.executed.some((sql) => sql.includes('old_table')), false);
+    assert.equal(mock.executed.some((sql) => sql.includes('current_table')), true);
+    assert.equal(mock.executed.some((sql) => sql.includes('future_table')), true);
+
+    const rerun = await runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } });
+    assert.equal(rerun.baselined, 0);
+    assert.equal(rerun.applied, 0);
+    assert.equal(rerun.skipped, 3);
+
+    fs.writeFileSync(path.join(directory, '20260101_historical.sql'), 'CREATE TABLE old_table (id BIGINT);\n');
     await assert.rejects(
       () => runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } }),
       (error) => error.code === 'MIGRATION_CHECKSUM_MISMATCH'
@@ -198,6 +243,7 @@ async function run() {
   testWiring();
   testDatabaseFailurePreventsListen();
   await testMigrationRunner();
+  await testLegacyMigrationBaseline();
   console.log('Enterprise Wave A bootstrap tests passed.');
 }
 

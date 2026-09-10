@@ -5,6 +5,8 @@ const { deploymentSha } = require('./runtimeState');
 
 const MIGRATION_FILE = /^\d{8}_[a-z0-9_]+\.sql$/i;
 const MIGRATION_LOCK = 'voxelveda:schema-migrations:v1';
+const LEGACY_BASELINE_BOUNDARY = '20260911_enterprise_bootstrap_readiness';
+const LEGACY_SCHEMA_MARKERS = Object.freeze(['users', 'customers', 'suppliers', 'invoices', 'rfqs', 'expenses']);
 
 class MigrationError extends Error {
   constructor(message, code = 'MIGRATION_FAILED', details = null) {
@@ -91,6 +93,40 @@ async function ensureMigrationLedger(connection) {
   `);
 }
 
+async function baselineLegacySchema(connection, migrations, env, logger) {
+  const [[ledgerState]] = await connection.query(`
+    SELECT
+      SUM(status IN ('APPLIED', 'BASELINED')) AS immutable_count,
+      COUNT(*) AS total_count
+    FROM schema_migrations
+  `);
+  if (Number(ledgerState?.immutable_count || 0) > 0) return 0;
+
+  const placeholders = LEGACY_SCHEMA_MARKERS.map(() => '?').join(', ');
+  const [[schemaState]] = await connection.query(
+    `SELECT COUNT(*) AS marker_count
+     FROM information_schema.tables
+     WHERE table_schema = DATABASE() AND table_name IN (${placeholders})`,
+    LEGACY_SCHEMA_MARKERS
+  );
+  if (Number(schemaState?.marker_count || 0) !== LEGACY_SCHEMA_MARKERS.length) return 0;
+
+  const historical = migrations.filter((migration) => migration.migration_id < LEGACY_BASELINE_BOUNDARY);
+  for (const migration of historical) {
+    await connection.query(
+      `INSERT INTO schema_migrations
+       (migration_id, checksum_sha256, deployment_sha, status, started_at, applied_at, duration_ms, error_code, error_message)
+       VALUES (?, ?, ?, 'BASELINED', NOW(), NOW(), 0, 'LEGACY_SCHEMA_ADOPTION', NULL)
+       ON DUPLICATE KEY UPDATE checksum_sha256 = VALUES(checksum_sha256), deployment_sha = VALUES(deployment_sha),
+       status = 'BASELINED', applied_at = NOW(), duration_ms = 0,
+       error_code = 'LEGACY_SCHEMA_ADOPTION', error_message = NULL`,
+      [migration.migration_id, migration.checksum_sha256, deploymentSha(env)]
+    );
+  }
+  if (historical.length) logger.info?.(`Legacy schema baseline recorded for ${historical.length} migration(s).`);
+  return historical.length;
+}
+
 function safeMigrationMessage(error) {
   return String(error?.message || 'Migration failed')
     .replace(/(password|secret|token)\s*[=:]\s*[^\s;]+/gi, '$1=[redacted]')
@@ -106,6 +142,7 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
   let lockAcquired = false;
   let current = null;
   let applied = 0;
+  let baselined = 0;
   let skipped = 0;
   try {
     const [[lock]] = await connection.query('SELECT GET_LOCK(?, ?) AS acquired', [MIGRATION_LOCK, timeout]);
@@ -114,6 +151,10 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
     }
     lockAcquired = true;
     await ensureMigrationLedger(connection);
+    baselined = await baselineLegacySchema(connection, migrations, env, logger);
+    const newlyBaselined = new Set(baselined
+      ? migrations.filter((migration) => migration.migration_id < LEGACY_BASELINE_BOUNDARY).map((migration) => migration.migration_id)
+      : []);
 
     for (const migration of migrations) {
       current = migration;
@@ -128,8 +169,8 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
           { migration_id: migration.migration_id }
         );
       }
-      if (existing?.status === 'APPLIED') {
-        skipped += 1;
+      if (['APPLIED', 'BASELINED'].includes(existing?.status)) {
+        if (!newlyBaselined.has(migration.migration_id)) skipped += 1;
         continue;
       }
 
@@ -167,12 +208,13 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
     }
 
     const [[latest]] = await connection.query(
-      "SELECT migration_id FROM schema_migrations WHERE status = 'APPLIED' ORDER BY migration_id DESC LIMIT 1"
+      "SELECT migration_id FROM schema_migrations WHERE status IN ('APPLIED', 'BASELINED') ORDER BY migration_id DESC LIMIT 1"
     );
     return {
       schema_version: latest?.migration_id || null,
       discovered: migrations.length,
       applied,
+      baselined,
       skipped
     };
   } catch (error) {
@@ -189,7 +231,10 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
 
 module.exports = {
   MIGRATION_LOCK,
+  LEGACY_BASELINE_BOUNDARY,
+  LEGACY_SCHEMA_MARKERS,
   MigrationError,
+  baselineLegacySchema,
   checksum,
   discoverMigrations,
   ensureMigrationLedger,

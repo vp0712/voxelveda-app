@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "baseline_sha": "a1fee06e4f878f8af9d7c18f52d983e57723b1f0",
+  "baseline_sha": "442d70e4278870de0b440c46a68928110b5fae91",
   "scope": [
     "/",
     "config/",
@@ -17,10 +17,10 @@
     ".github/workflows/"
   ],
   "totals": {
-    "text_source_files": 343,
+    "text_source_files": 344,
     "binary_assets": 50,
-    "text_bytes": 3365153,
-    "text_lines": 76403,
+    "text_bytes": 3372972,
+    "text_lines": 76553,
     "routes": 457,
     "migrations": 20,
     "worker_timer_sites": 43,
@@ -38,7 +38,7 @@
     "migrations": 20,
     "root_or_other": 24,
     "routes": 37,
-    "scripts": 43,
+    "scripts": 44,
     "services": 63
   },
   "routes": [
@@ -4861,14 +4861,14 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 219,
+      "line": 215,
       "evidence": "await pool.end().catch(() => {});"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 234,
+      "line": 233,
       "evidence": "await pool.end().catch(() => {});"
     },
     {
@@ -4952,14 +4952,14 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "services/migrationRunner.js",
-      "line": 160,
+      "line": 201,
       "evidence": ").catch(() => {});"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "services/migrationRunner.js",
-      "line": 185,
+      "line": 227,
       "evidence": "if (lockAcquired) await connection.query('SELECT RELEASE_LOCK(?) AS released', [MIGRATION_LOCK]).catch(() => {});"
     },
     {
@@ -5744,9 +5744,9 @@
     {
       "file": "docs/ENTERPRISE_DEEP_AUDIT.md",
       "category": "documentation",
-      "bytes": 17111,
-      "lines": 249,
-      "sha256": "ff6327a49c4646cc13f4dea3ef057120ea63be7863684bee103eb8507705a85f"
+      "bytes": 17250,
+      "lines": 250,
+      "sha256": "55e25426a81375014f2ec2f0d113cce52ac83b55f7f428127c8270fd92b89b95"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -6199,9 +6199,9 @@
     {
       "file": "package.json",
       "category": "root_or_other",
-      "bytes": 3778,
-      "lines": 52,
-      "sha256": "ab0592da50238d8f2c7997cef29db4d5fa158b8b71e5b98d0fdf6fe92c62f3d1"
+      "bytes": 3876,
+      "lines": 53,
+      "sha256": "0a07ec122e374a17a1679568f14037f99fc6c820d699d3371c6283afe51409ef"
     },
     {
       "file": "public/401.html",
@@ -6577,9 +6577,9 @@
     {
       "file": "README.md",
       "category": "root_or_other",
-      "bytes": 1604,
-      "lines": 30,
-      "sha256": "8b14e437332e2fadffa77cc8c4ccb50ebbfb11ad6164ad51e238a927957507b9"
+      "bytes": 2098,
+      "lines": 32,
+      "sha256": "135475c6c366269202a5ceea878cf1e6cf99dbbed55cf46abb423d8e8b60d487"
     },
     {
       "file": "ROUTE-MIGRATION.md",
@@ -6904,11 +6904,18 @@
       "sha256": "d1c333e8379332d2ebb9de19c5332312fcaa36e83d410c456bd52344b9bb044d"
     },
     {
+      "file": "scripts/enterprise-wave-a-mysql-legacy-test.js",
+      "category": "scripts",
+      "bytes": 2120,
+      "lines": 53,
+      "sha256": "1094b02b694bbeb4008d03020f3c66c2386e5e5ffad25c3925ea2d1e9809ea1a"
+    },
+    {
       "file": "scripts/enterprise-wave-a-test.js",
       "category": "scripts",
-      "bytes": 7948,
-      "lines": 208,
-      "sha256": "2827c5413a0c6dd5fa14c62c775c20ea6dc22d93bdf0ced0218813863d5dcec6"
+      "bytes": 10442,
+      "lines": 254,
+      "sha256": "faec93b410af32d7d540eef2e58d6473a203cf79bad254aef60467e66e57a75f"
     },
     {
       "file": "scripts/erp-wave1-trash-lifecycle-test.js",
@@ -7060,9 +7067,9 @@
     {
       "file": "scripts/production-readiness-test.js",
       "category": "scripts",
-      "bytes": 1883,
-      "lines": 35,
-      "sha256": "2e937ee36534a9576b06ee6c2b0f86eb74df8724ba5995d0600305738d9c8d25"
+      "bytes": 2110,
+      "lines": 38,
+      "sha256": "ba5b004563504a55ea5f4afd4abcd71e3fe1e67fd3da5b6ee0569401b8ae6ddb"
     },
     {
       "file": "scripts/qms-controlled-record-foundation-test.js",
@@ -7165,9 +7172,9 @@
     {
       "file": "server.js",
       "category": "root_or_other",
-      "bytes": 12311,
-      "lines": 245,
-      "sha256": "751f09afb706f55af454895c59221456625b681b72f493d7cbce6141eeb8b85c"
+      "bytes": 12264,
+      "lines": 244,
+      "sha256": "e5de428058a5b7d5f6d2faa8d8166970b1339b301bc77b9509e80bb7314ca91b"
     },
     {
       "file": "services/adaptiveRiskService.js",
@@ -7340,9 +7347,9 @@
     {
       "file": "services/migrationRunner.js",
       "category": "services",
-      "bytes": 7686,
-      "lines": 199,
-      "sha256": "056a7864c36ea047eb2e0f586527a0ecbba9acb5351fbe9a350d2966e5b44dc8"
+      "bytes": 9980,
+      "lines": 244,
+      "sha256": "736275511355e1cede4a257a985e8763b48300b31e6e30183d2eabc3ac4e91bc"
     },
     {
       "file": "services/notificationSchema.js",

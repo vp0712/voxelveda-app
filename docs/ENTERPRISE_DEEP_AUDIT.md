@@ -9,7 +9,7 @@
 - Binary policy: image, font, PDF, and archive bytes were not interpreted as source. Their path, type, size, and deployment presence are inventoried.
 - Machine-readable evidence: `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json`
 
-The deterministic inventory currently records 343 text/source files, 76,403 lines, 457 declared HTTP routes, 20 SQL migrations, 43 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
+The deterministic inventory currently records 344 text/source files, 76,553 lines, 457 declared HTTP routes, 20 SQL migrations, 43 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
 
 ## Local verification evidence
 
@@ -18,6 +18,7 @@ The deterministic inventory currently records 343 text/source files, 76,403 line
 - `npm run security:audit`: registry-backed audit passed with zero reported vulnerabilities.
 - Real local MySQL migration run: 20 discovered, 20 applied, schema version `20260911_enterprise_bootstrap_readiness`.
 - Real local MySQL repeat run: 20 discovered, 0 applied, 20 checksum-verified/skipped.
+- Real local legacy-schema rehearsal: 19 pre-Wave-A migrations baselined, 1 applied, then 20 checksum-protected entries skipped on repeat.
 - Local boot smoke: schemas completed before `Server ready`; `/api/health` returned 200, `/api/ready` returned 200/ready with the expected schema version, and anonymous detailed readiness returned 401.
 
 These results are local evidence only. CI, Railway deployment, production runtime, database TLS, SMTP, backup, malware scanner, Redis, DNS/TLS, WebAuthn, and object-storage provider verification remain separate states.

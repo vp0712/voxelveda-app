@@ -187,7 +187,7 @@ async function bootstrap() {
     const migrationResult = await runMigrations({ pool });
     setMigrations({ state: CONTROL_STATES.OPERATIONAL, ...migrationResult });
     setCriticalService('migrations', CONTROL_STATES.OPERATIONAL, migrationResult.schema_version || 'no migrations');
-    console.log(`Migrations ready at ${migrationResult.schema_version || 'unversioned'} (${migrationResult.applied} applied, ${migrationResult.skipped} verified).`);
+    console.log(`Migrations ready at ${migrationResult.schema_version || 'unversioned'} (${migrationResult.applied} applied, ${migrationResult.baselined || 0} baselined, ${migrationResult.skipped} verified).`);
 
     setPhase('INITIALIZING_CRITICAL_SCHEMAS');
     await initializeCriticalSchemas();
@@ -213,7 +213,10 @@ async function bootstrap() {
     stopTrashPurgeScheduler();
     stopWorkflowSlaScheduler();
     await pool.end().catch(() => {});
-    console.error(`Startup failed during ${failedPhase}: ${error.code || 'STARTUP_FAILED'}`);
+    const migrationContext = error?.details?.migration_id
+      ? ` migration=${error.details.migration_id} cause=${error.details.cause_code || 'unknown'}`
+      : '';
+    console.error(`Startup failed during ${failedPhase}: ${error.code || 'STARTUP_FAILED'}${migrationContext}`);
     throw error;
   }
 }
