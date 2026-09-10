@@ -30,6 +30,18 @@ async function run() {
     }
     const body = await health.json();
     if (body.status !== 'ok') throw new Error('health payload is invalid');
+    if ('ready' in body || 'database' in body || 'critical_services' in body) throw new Error('liveness route exposes readiness state');
+
+    console.log('Checking safe readiness route...');
+    const ready = await request(base, '/api/ready');
+    if (ready.status !== 503) throw new Error(`unbootstrapped readiness returned ${ready.status}`);
+    const readyBody = await ready.json();
+    if (readyBody.ready !== false || !('database' in readyBody) || !('critical_services' in readyBody)) throw new Error('readiness payload is invalid');
+    const readinessText = JSON.stringify(readyBody).toLowerCase();
+    if (readinessText.includes('password') || readinessText.includes('database_url') || readinessText.includes('hostname')) throw new Error('readiness payload contains sensitive configuration');
+
+    const readinessDetails = await request(base, '/api/security/readiness');
+    if (readinessDetails.status !== 401) throw new Error('detailed readiness is not authentication protected');
 
     console.log('Checking landing page...');
     const landing = await request(base, '/');

@@ -5,7 +5,7 @@ const { ensureWorkforceSchema } = require('../services/workforceSchema');
 const { ensureOperationalTrustSchema } = require('../services/operationalTrustSchema');
 const { ensureSecurityGovernanceSchema } = require('../services/securityGovernanceSchema');
 const { redactSensitive } = require('../utils/securityRedaction');
-const { assessProductionReadiness } = require('../config/productionReadiness');
+const { CONTROL_STATES, controlSnapshot } = require('../services/runtimeState');
 
 const PRIVILEGED_ROLES = ['super_admin', 'admin', 'finance_admin', 'accountant', 'hr'];
 const HIGH_RISK_EVENTS = ['ROLE_CHANGED', 'PERMISSION_CHANGED', 'USER_DISABLED', 'ACCOUNT_TERMINATED', 'BANK_DETAILS_CHANGED', 'PAYMENT_APPROVED', 'SENSITIVE_EXPORT', 'MFA_DISABLED', 'SECURITY_SETTING_CHANGED', 'BREAK_GLASS_ACTIVATED', 'IMPERSONATION_STARTED', 'DATABASE_SECURITY_ATTESTED'];
@@ -50,7 +50,8 @@ async function collectIssues() {
   if (Number(failed.count) >= 10) issues.push(issue('repeated-login-failures', 'HIGH', 'Repeated failed logins', 'Investigate the elevated failed-login volume in the last 24 hours.', Number(failed.count)));
 
   const [[unscanned]] = await pool.query("SELECT COUNT(*) AS count FROM secure_documents WHERE deleted_at IS NULL AND scan_status = 'UNAVAILABLE'");
-  if (!process.env.MALWARE_SCANNER_PROVIDER || Number(unscanned.count)) {
+  const controls = controlSnapshot();
+  if (![CONTROL_STATES.OPERATIONAL, CONTROL_STATES.EXTERNALLY_VERIFIED].includes(controls.malware_scanner.state) || Number(unscanned.count)) {
     issues.push(issue('malware-scanner-unavailable', 'MEDIUM', 'Malware scanner not configured', 'Uploaded files are type-validated but are not malware-scanned.', Math.max(1, Number(unscanned.count))));
   }
 
@@ -64,9 +65,20 @@ async function collectIssues() {
   if (!process.env.ALLOWED_ORIGINS && !process.env.CORS_ORIGINS && !process.env.APP_ORIGIN) {
     issues.push(issue('cors-default-origins', 'LOW', 'Explicit production origins not configured', 'Set ALLOWED_ORIGINS so production trust boundaries are deployment-controlled.'));
   }
-  const readiness = assessProductionReadiness(process.env);
-  for (const [index, warning] of readiness.warnings.entries()) {
-    issues.push(issue(`production-readiness-${index}`, warning.includes('backup') ? 'HIGH' : 'MEDIUM', 'Production readiness control incomplete', warning));
+  const controlSeverity = {
+    redis_limiter: 'HIGH', backup_provider: 'HIGH', database_tls: 'HIGH', database_least_privilege: 'HIGH',
+    malware_scanner: 'MEDIUM', smtp: 'MEDIUM', webhook_signing: 'MEDIUM', object_storage: 'MEDIUM',
+    canonical_domain: 'LOW', webauthn: 'LOW', outbound_request_policy: 'MEDIUM'
+  };
+  for (const [key, control] of Object.entries(controls)) {
+    if (['malware_scanner', 'database_least_privilege'].includes(key)) continue;
+    if ([CONTROL_STATES.OPERATIONAL, CONTROL_STATES.EXTERNALLY_VERIFIED].includes(control.state)) continue;
+    issues.push(issue(
+      `runtime-control-${key}`,
+      control.state === CONTROL_STATES.FAILED ? 'CRITICAL' : controlSeverity[key] || 'MEDIUM',
+      `Runtime control: ${key.replace(/_/g, ' ')}`,
+      control.detail || `Current state is ${control.state}.`
+    ));
   }
   const [[criticalIncidents]] = await pool.query("SELECT COUNT(*) AS count FROM security_incidents WHERE severity = 'CRITICAL' AND status NOT IN ('RESOLVED','CLOSED')");
   if (Number(criticalIncidents.count)) issues.push(issue('open-critical-incidents', 'CRITICAL', 'Critical security incidents remain open', 'Review containment and recovery evidence in the Incident Response register.', Number(criticalIncidents.count)));
@@ -116,6 +128,7 @@ exports.dashboard = async (req, res, next) => {
         high_risk_actions_24h: Number(rows[7][0][0].count), open_incidents: Number(rows[8][0][0].count), open_issues: issues.length
       },
       readiness: { score, label: score >= 90 ? 'Strong' : score >= 75 ? 'Needs attention' : 'Action required', disclaimer: 'Operational readiness indicator only; not a security certification.' },
+      controls: controlSnapshot(),
       issues: issues.slice(0, 8)
     });
   } catch (error) { next(error); }

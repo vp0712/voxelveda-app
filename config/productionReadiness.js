@@ -1,4 +1,5 @@
 const WEAK_SECRETS = new Set(['secret', 'changeme', 'password', 'jwt_secret', '123456', 'replace-with-a-long-random-secret']);
+const { buildDatabaseConfig } = require('./databaseConfig');
 
 function secretBytes(value) {
   const input = String(value || '').trim();
@@ -22,6 +23,13 @@ function assessProductionReadiness(env = process.env) {
   const mfa = String(env.MFA_ENCRYPTION_KEY || '').trim();
   const finance = String(env.FINANCE_ENCRYPTION_KEY || '').trim();
   const shiftQr = String(env.SHIFT_QR_SIGNING_KEY || '').trim();
+  let databaseConfig = null;
+
+  try {
+    databaseConfig = buildDatabaseConfig(env);
+  } catch (error) {
+    failures.push(`Database configuration is invalid: ${error.message}`);
+  }
 
   if (!jwt || jwt.length < 32 || WEAK_SECRETS.has(jwt.toLowerCase())) failures.push('JWT_SECRET must be a unique value of at least 32 characters');
   if (production && (!session || session.length < 32 || WEAK_SECRETS.has(session.toLowerCase()))) failures.push('SESSION_SECRET must be a unique value of at least 32 characters');
@@ -49,9 +57,14 @@ function assessProductionReadiness(env = process.env) {
   if (production && env.BACKUP_STATUS_PROVIDER !== 'configured') warnings.push('Database backup status is not attested by a configured provider');
   if (production && env.RATE_LIMIT_STORE !== 'redis') warnings.push('Rate limiting is process-local; configure a shared Redis-backed limiter before scaling beyond one replica');
   if (production && env.FORCE_CANONICAL_HOST !== 'true') warnings.push('Canonical-host enforcement remains disabled until custom-domain DNS and TLS are verified');
-  if (production && String(env.DB_USER || '').toLowerCase() === 'root') warnings.push('Application database identity is root; provision and attest a least-privilege application user');
+  let databaseUser = String(env.DB_USER || '').toLowerCase();
+  if (env.DATABASE_URL) {
+    try { databaseUser = decodeURIComponent(new URL(env.DATABASE_URL).username).toLowerCase(); } catch { databaseUser = ''; }
+  }
+  if (production && databaseUser === 'root') warnings.push('Application database identity is root; provision and attest a least-privilege application user');
   if (production && !env.DB_USER && !env.DATABASE_URL) failures.push('A production database identity or connection URL is required');
-  if (production && env.DB_TLS_REQUIRED !== 'true') warnings.push('Database transport TLS is not explicitly attested; verify the provider connection path and record evidence');
+  if (production && !databaseConfig?.summary.tls_requested) warnings.push('Database transport TLS is not requested; enable it and verify the active connection before claiming encrypted transport');
+  if (production && databaseConfig?.summary.tls_requested && !databaseConfig.summary.tls_certificate_verification) failures.push('Database TLS certificate verification cannot be disabled in production');
 
   return { production, ready: failures.length === 0, failures, warnings };
 }

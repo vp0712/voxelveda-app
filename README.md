@@ -16,10 +16,14 @@ Do not commit `.env`, credentials, signing keys, uploaded customer documents or 
 - Public: `/`, `/request-quote`, `/privacy`, `/terms`, `/support`
 - Authentication: `/login`, `/register`, `/forgot-password`, `/reset-password`
 - Protected: `/admin`, `/dashboard`, `/invoice/view`
-- Health: `/api/health`
+- Liveness: `/api/health`
+- Readiness: `/api/ready`
+- Restricted readiness detail: `/api/security/readiness`
 
 The intended public origin is `https://app.voxelveda.com`. Keep `FORCE_CANONICAL_HOST=false` until Railway confirms the custom domain and SSL are active.
 
 ## Deployment
 
-See `CUSTOM-DOMAIN-SETUP.md` and `DEPLOYMENT-CHECKLIST.md`. Railway remains the application host; the custom domain changes the public address, not the hosting provider.
+See `CUSTOM-DOMAIN-SETUP.md`, `DEPLOYMENT-CHECKLIST.md`, and `docs/ENTERPRISE_DEEP_AUDIT.md`. Railway remains the application host; the custom domain changes the public address, not the hosting provider.
+
+Production startup is fail-closed. The process validates configuration, verifies MySQL, runs checksummed migrations under an advisory lock, initializes critical schemas, services, and workers, and only then binds the HTTP port. Do not replace `/api/ready` with a static environment-variable check.

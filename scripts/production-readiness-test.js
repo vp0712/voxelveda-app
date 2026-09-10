@@ -20,12 +20,15 @@ assert.deepEqual(assessProductionReadiness(valid), { production: true, ready: tr
 for (const mutation of [
   { JWT_SECRET: 'secret' }, { SESSION_SECRET: valid.JWT_SECRET }, { ALLOWED_ORIGINS: '*' },
   { APP_URL: 'http://app.voxelveda.com' }, { TRUST_PROXY: 'false' }, { DEBUG_AUTH_BYPASS: 'true' },
-  { SHIFT_QR_SIGNING_KEY: '' }
+  { SHIFT_QR_SIGNING_KEY: '' }, { DB_TLS_REJECT_UNAUTHORIZED: 'false' }
 ]) {
   const result = assessProductionReadiness({ ...valid, ...mutation });
   assert.equal(result.ready, false, JSON.stringify(mutation));
   assert(result.failures.length > 0);
 }
+
+const urlConfigured = { ...valid, DB_USER: '', DATABASE_URL: 'mysqls://voxelveda_app:secret@db.example.com/voxelveda' };
+assert.equal(assessProductionReadiness(urlConfigured).ready, true);
 
 const honestWarnings = assessProductionReadiness({ ...valid, MALWARE_SCANNER_PROVIDER: '', BACKUP_STATUS_PROVIDER: 'unverified', RATE_LIMIT_STORE: 'memory', FORCE_CANONICAL_HOST: 'false' });
 assert.equal(honestWarnings.ready, true);
