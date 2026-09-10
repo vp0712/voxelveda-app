@@ -32,6 +32,7 @@ const { ensureNotificationSchema } = require('./services/notificationSchema');
 const { ensureTrashSchema } = require('./services/trashSchema');
 const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
 const { ensureWorkflowSchema } = require('./services/workflowSchema');
+const { ensureProcurementSchema } = require('./services/procurementSchema');
 const { startWorkflowSlaScheduler, stopWorkflowSlaScheduler } = require('./services/workflowEscalationService');
 
 if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') require('./utils/seedAdmin')();
@@ -57,6 +58,7 @@ ensureQmsEnterpriseCompletionSchema().then(() => console.log('QMS enterprise com
 ensureNotificationSchema().then(() => console.log('Notification Centre schema ready.')).catch((error) => console.error('Notification schema initialization failed:', error.message));
 ensureTrashSchema().then(() => console.log('Enterprise Trash schema ready.')).catch((error) => console.error('Trash schema initialization failed:', error.message));
 ensureWorkflowSchema().then(() => console.log('Workflow Engine schema ready.')).catch((error) => console.error('Workflow schema initialization failed:', error.message));
+ensureProcurementSchema().then(() => console.log('Procurement lifecycle schema ready.')).catch((error) => console.error('Procurement schema initialization failed:', error.message));
 
 let emailQueueBusy = false;
 async function runEmailQueue() {

@@ -268,6 +268,14 @@ function getEffectivePermissions() {
   if (permissions.has('CREATE_APPROVAL_REQUEST')) permissions.add('approvals_create');
   if (permissions.has('ACTION_APPROVALS')) permissions.add('approvals_action');
   if (permissions.has('MANAGE_WORKFLOWS')) permissions.add('workflows_manage');
+  if (permissions.has('VIEW_PROCUREMENT')) permissions.add('procurement');
+  if (permissions.has('CREATE_PURCHASE_REQUISITION')) permissions.add('procurement_requisition');
+  if (permissions.has('MANAGE_SUPPLIER_RFQ')) permissions.add('procurement_rfq');
+  if (permissions.has('CREATE_PURCHASE_ORDER')) permissions.add('procurement_po');
+  if (permissions.has('RECEIVE_PURCHASE_ORDER')) permissions.add('procurement_receiving');
+  if (permissions.has('INSPECT_GOODS_RECEIPT')) permissions.add('procurement_inspection');
+  if (permissions.has('MANAGE_SUPPLIER_BILL_MATCH')) permissions.add('procurement_bills');
+  if (permissions.has('MANAGE_PURCHASE_RETURNS')) permissions.add('procurement_returns');
 
   return permissions;
 }
@@ -324,6 +332,7 @@ function applyPermissionUI() {
   const role = String(getStoredUser().role || currentRole || '').trim().toLowerCase();
   const canUseTrash = hasPermission('trash') || ['staff', 'production', 'sales', 'supervisor', 'manager', 'hr'].includes(role);
   const canUseApprovals = hasPermission('approvals') || ['staff', 'production', 'sales', 'supervisor', 'manager', 'hr'].includes(role);
+  const canUseProcurement = hasPermission('procurement');
 
   setPermissionVisibility('.permission-sales', canUseSales);
   setPermissionVisibility('.permission-rfqs', canUseRfqs);
@@ -363,6 +372,7 @@ function applyPermissionUI() {
   setPermissionVisibility('.permission-messages', canUseMessages);
   setPermissionVisibility('.permission-trash', canUseTrash);
   setPermissionVisibility('.permission-approvals', canUseApprovals);
+  setPermissionVisibility('.permission-procurement', canUseProcurement);
 
   if (document.querySelector('.nav-btn.active.hidden-section')) {
     document.querySelector('[data-section="dashboardSection"]')?.click();
@@ -1119,7 +1129,7 @@ function hideStaffDialog() {
   stopShiftQrScanner();
   document.body.classList.remove('staff-dialog-open', 'shift-qr-dialog-open');
   document.getElementById('staffDialogBackdrop')?.classList.remove('shift-qr-dialog-backdrop');
-  document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('shift-qr-dialog-panel', 'workflow-dialog');
+  document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('shift-qr-dialog-panel', 'workflow-dialog', 'procurement-dialog');
   document.getElementById('staffDialogBackdrop')?.classList.remove('active');
 }
 
@@ -1631,6 +1641,7 @@ function setupStaffNavigation() {
       if (target === 'rosterSection') loadMyRoster();
       if (target === 'staffTrashSection') loadStaffTrash(1);
       if (target === 'approvalsSection') window.VoxelWorkflowUI?.load();
+      if (target === 'procurementSection') window.VoxelProcurementUI?.load();
       toggleMobileMenu(false);
     });
   });
@@ -1655,6 +1666,7 @@ async function refreshGrantedStaffData() {
   if (hasPermission('competitors')) jobs.push(loadStaffCompetitors());
   if (hasPermission('meetings')) jobs.push(loadMyMeetings());
   if (hasPermission('roster')) jobs.push(loadMyRoster());
+  if (hasPermission('procurement')) jobs.push(window.VoxelProcurementUI?.load());
   await Promise.allSettled(jobs);
 }
 
@@ -1676,6 +1688,7 @@ async function refreshVisibleStaffSection() {
   if (id === 'staffExpenseSection') return loadStaffExpenses(staffExpensePage);
   if (id === 'staffTrashSection') return loadStaffTrash(staffTrashState.page);
   if (id === 'approvalsSection') return window.VoxelWorkflowUI?.load() || Promise.resolve();
+  if (id === 'procurementSection') return window.VoxelProcurementUI?.load() || Promise.resolve();
   return Promise.resolve();
 }
 
@@ -1684,7 +1697,7 @@ function openStaffViewFromUrl() {
   if (!view) return;
   const sections = {
     rfqs: 'staffRfqSection', invoices: 'staffInvoiceSection', customers: 'staffCustomerSection',
-    suppliers: 'staffSupplierSection', stock: 'stockInSection', 'stock-in': 'stockInSection',
+    suppliers: 'staffSupplierSection', procurement: 'procurementSection', stock: 'stockInSection', 'stock-in': 'stockInSection',
     'stock-out': 'stockOutSection', 'raw-material': 'rawMaterialSection', packaging: 'packagingSection',
     expenses: 'staffExpenseSection', workforce: 'timesheetSection', timesheets: 'timesheetSection',
     roster: 'rosterSection', meetings: 'meetingsSection', tasks: 'tasksSection',

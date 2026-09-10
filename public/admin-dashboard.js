@@ -86,6 +86,14 @@ const ACCESS_OPTIONS = [
   { id: 'customers_input', label: 'Customers Input/Edit' },
   { id: 'suppliers', label: 'Suppliers' },
   { id: 'suppliers_input', label: 'Suppliers Input/Edit' },
+  { id: 'procurement', label: 'Procurement Workspace' },
+  { id: 'procurement_requisition', label: 'Create Purchase Requisitions' },
+  { id: 'procurement_rfq', label: 'Manage Supplier RFQs' },
+  { id: 'procurement_po', label: 'Create Purchase Orders' },
+  { id: 'procurement_receiving', label: 'Receive Purchase Orders' },
+  { id: 'procurement_inspection', label: 'Inspect Goods Receipts' },
+  { id: 'procurement_bills', label: 'Manage Supplier Bill Matching' },
+  { id: 'procurement_returns', label: 'Manage Purchase Returns' },
   { id: 'expenses', label: 'Expenses' },
   { id: 'expenses_input', label: 'Expenses Input/Edit' },
   { id: 'finance', label: 'Finance' },
@@ -939,7 +947,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
-  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog', 'finance-dialog', 'workflow-dialog');
+  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog', 'finance-dialog', 'workflow-dialog', 'procurement-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -994,6 +1002,7 @@ function setupNavigation() {
       if (btn.dataset.section === 'companyFormsSection') renderCompanyForms();
       if (btn.dataset.section === 'securitySection') loadSecurityCentre();
       if (btn.dataset.section === 'approvalsSection') window.VoxelWorkflowUI?.load();
+      if (btn.dataset.section === 'procurementSection') window.VoxelProcurementUI?.load();
       if (btn.dataset.section === 'trashSection') loadTrash();
       toggleMobileMenu(false);
     };
@@ -1538,7 +1547,11 @@ function hasCurrentPermission(permission) {
     stock_in: 'VIEW_INVENTORY', stock_out: 'VIEW_INVENTORY', raw_material: 'VIEW_INVENTORY',
     packaging: 'VIEW_INVENTORY', trash: 'VIEW_TRASH', trash_restore: 'RESTORE_TRASH', trash_manage: 'MANAGE_TRASH',
     approvals: 'VIEW_APPROVALS', approvals_create: 'CREATE_APPROVAL_REQUEST',
-    approvals_action: 'ACTION_APPROVALS', workflows_manage: 'MANAGE_WORKFLOWS'
+    approvals_action: 'ACTION_APPROVALS', workflows_manage: 'MANAGE_WORKFLOWS',
+    procurement: 'VIEW_PROCUREMENT', procurement_requisition: 'CREATE_PURCHASE_REQUISITION',
+    procurement_rfq: 'MANAGE_SUPPLIER_RFQ', procurement_po: 'CREATE_PURCHASE_ORDER',
+    procurement_receiving: 'RECEIVE_PURCHASE_ORDER', procurement_inspection: 'INSPECT_GOODS_RECEIPT',
+    procurement_bills: 'MANAGE_SUPPLIER_BILL_MATCH', procurement_returns: 'MANAGE_PURCHASE_RETURNS'
   };
   const permissions = Array.isArray(currentUser.effective_permissions)
     ? currentUser.effective_permissions
@@ -1554,6 +1567,7 @@ const ADMIN_SECTION_ACCESS = Object.freeze({
   invoiceSection: ['invoices'],
   customerSection: ['customers'],
   supplierSection: ['suppliers'],
+  procurementSection: ['procurement'],
   competitorSection: ['competitors'],
   stockSection: ['stock', 'stock_in'],
   stockUsageSection: ['stock', 'stock_out'],
@@ -1582,7 +1596,7 @@ function requestedAdminSection() {
   const view = new URLSearchParams(window.location.search).get('view');
   const sections = {
     rfqs: 'rfqSection', invoices: 'invoiceSection', customers: 'customerSection',
-    suppliers: 'supplierSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
+    suppliers: 'supplierSection', procurement: 'procurementSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
     packaging: 'packagingSection', finance: 'financeSection', expenses: 'expenseSection', workforce: 'attendanceSection',
     timesheets: 'attendanceSection', roster: 'rosterSection', staff: 'staffSection',
     compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection', security: 'securitySection',
@@ -2662,6 +2676,13 @@ function collectAccess() {
     invoices_input: ['invoices'],
     customers_input: ['customers'],
     suppliers_input: ['suppliers'],
+    procurement_requisition: ['procurement'],
+    procurement_rfq: ['procurement'],
+    procurement_po: ['procurement'],
+    procurement_receiving: ['procurement'],
+    procurement_inspection: ['procurement'],
+    procurement_bills: ['procurement'],
+    procurement_returns: ['procurement'],
     expenses_input: ['expenses'],
     compliance_input: ['compliance'],
     competitors_input: ['competitors'],
