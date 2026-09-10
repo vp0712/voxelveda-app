@@ -245,7 +245,10 @@ const PERMISSION_INPUT_PARENTS = {
 
 function getEffectivePermissions() {
   const user = getStoredUser();
-  const rawPermissions = Array.isArray(user.permissions) ? user.permissions : [];
+  const rawPermissions = [
+    ...(Array.isArray(user.permissions) ? user.permissions : []),
+    ...(Array.isArray(user.effective_permissions) ? user.effective_permissions : [])
+  ];
   const permissions = new Set(rawPermissions.filter(Boolean));
   const explicitlyGrantedStock = permissions.has('stock');
 
@@ -261,13 +264,18 @@ function getEffectivePermissions() {
     ['stock_in', 'stock_out', 'raw_material', 'packaging'].forEach((id) => permissions.add(id));
   }
 
+  if (permissions.has('VIEW_APPROVALS')) permissions.add('approvals');
+  if (permissions.has('CREATE_APPROVAL_REQUEST')) permissions.add('approvals_create');
+  if (permissions.has('ACTION_APPROVALS')) permissions.add('approvals_action');
+  if (permissions.has('MANAGE_WORKFLOWS')) permissions.add('workflows_manage');
+
   return permissions;
 }
 
 function hasPermission(permission) {
   const user = getStoredUser();
   const role = String(user.role || currentRole || '').trim().toLowerCase();
-  if (role === 'admin') return true;
+  if (['admin', 'super_admin'].includes(role)) return true;
 
   return getEffectivePermissions().has(permission);
 }
@@ -315,6 +323,7 @@ function applyPermissionUI() {
   const canUseWorkHub = canUseLeave || canUseAvailability || canUseDocuments || canUseForms || canUseMessages;
   const role = String(getStoredUser().role || currentRole || '').trim().toLowerCase();
   const canUseTrash = hasPermission('trash') || ['staff', 'production', 'sales', 'supervisor', 'manager', 'hr'].includes(role);
+  const canUseApprovals = hasPermission('approvals') || ['staff', 'production', 'sales', 'supervisor', 'manager', 'hr'].includes(role);
 
   setPermissionVisibility('.permission-sales', canUseSales);
   setPermissionVisibility('.permission-rfqs', canUseRfqs);
@@ -353,6 +362,7 @@ function applyPermissionUI() {
   setPermissionVisibility('.permission-forms', canUseForms);
   setPermissionVisibility('.permission-messages', canUseMessages);
   setPermissionVisibility('.permission-trash', canUseTrash);
+  setPermissionVisibility('.permission-approvals', canUseApprovals);
 
   if (document.querySelector('.nav-btn.active.hidden-section')) {
     document.querySelector('[data-section="dashboardSection"]')?.click();
@@ -1088,12 +1098,14 @@ function sendNativeMobileNotification(title, body) {
 
 function showStaffDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   const backdrop = document.getElementById('staffDialogBackdrop');
+  const panel = document.querySelector('#staffDialogBackdrop .dialog-panel');
   const titleEl = document.getElementById('staffDialogTitle');
   const bodyEl = document.getElementById('staffDialogBody');
   const primaryBtn = document.getElementById('staffDialogPrimaryBtn');
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
+  panel?.classList.remove('workflow-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
   primaryBtn.innerText = primaryText;
@@ -1107,7 +1119,7 @@ function hideStaffDialog() {
   stopShiftQrScanner();
   document.body.classList.remove('staff-dialog-open', 'shift-qr-dialog-open');
   document.getElementById('staffDialogBackdrop')?.classList.remove('shift-qr-dialog-backdrop');
-  document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('shift-qr-dialog-panel');
+  document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('shift-qr-dialog-panel', 'workflow-dialog');
   document.getElementById('staffDialogBackdrop')?.classList.remove('active');
 }
 
@@ -1618,6 +1630,7 @@ function setupStaffNavigation() {
       if (target === 'meetingsSection') loadMyMeetings();
       if (target === 'rosterSection') loadMyRoster();
       if (target === 'staffTrashSection') loadStaffTrash(1);
+      if (target === 'approvalsSection') window.VoxelWorkflowUI?.load();
       toggleMobileMenu(false);
     });
   });
@@ -1662,6 +1675,7 @@ async function refreshVisibleStaffSection() {
   if (id === 'stockOutSection') return loadStaffStockOut();
   if (id === 'staffExpenseSection') return loadStaffExpenses(staffExpensePage);
   if (id === 'staffTrashSection') return loadStaffTrash(staffTrashState.page);
+  if (id === 'approvalsSection') return window.VoxelWorkflowUI?.load() || Promise.resolve();
   return Promise.resolve();
 }
 
@@ -1675,7 +1689,7 @@ function openStaffViewFromUrl() {
     expenses: 'staffExpenseSection', workforce: 'timesheetSection', timesheets: 'timesheetSection',
     roster: 'rosterSection', meetings: 'meetingsSection', tasks: 'tasksSection',
     compliance: 'staffComplianceSection', competitors: 'staffCompetitorSection',
-    forms: 'formsSection', settings: 'profileSection', trash: 'staffTrashSection'
+    forms: 'formsSection', settings: 'profileSection', approvals: 'approvalsSection', trash: 'staffTrashSection'
   };
   if (sections[view]) window.setTimeout(() => goStaffSection(sections[view]), 0);
 }
