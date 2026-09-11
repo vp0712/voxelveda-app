@@ -17,6 +17,7 @@ const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./serv
 const { runMigrations } = require('./services/migrationRunner');
 const { allowedHosts } = require('./services/outboundRequestPolicy');
 const { getRateLimitService } = require('./services/rateLimitService');
+const { backgroundJobService } = require('./services/backgroundJobService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
@@ -163,12 +164,17 @@ async function initializeServices() {
 }
 
 async function initializeWorkers() {
-  startWeeklyTimesheetScheduler();
-  startTrashPurgeScheduler();
-  startWorkflowSlaScheduler();
-  startEmailQueueWorker();
+  setCriticalService('background_workers', CONTROL_STATES.INITIALIZING);
+  const framework = await backgroundJobService.initialize();
+  const started = [
+    startWeeklyTimesheetScheduler(),
+    startTrashPurgeScheduler(),
+    startWorkflowSlaScheduler(),
+    startEmailQueueWorker()
+  ].filter(Boolean).length;
   setCriticalService('background_workers', CONTROL_STATES.OPERATIONAL,
-    'Local schedulers initialized; distributed leases are scheduled for Wave B');
+    `${framework.registered_jobs} jobs registered with durable MySQL leases; ${started} schedulers enabled`);
+  console.log(`Background worker framework ready: ${framework.registered_jobs} jobs registered, ${started} schedulers enabled with durable MySQL leases.`);
 }
 
 function listenApplication() {

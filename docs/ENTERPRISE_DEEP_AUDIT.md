@@ -3,17 +3,17 @@
 ## Audit baseline
 
 - Repository: `vp0712/voxelveda-app`
-- Latest fetched `origin/main` at audit start: `090de950289b9c264e52e97198835803657ac825`
-- Audited source SHA: `090de950289b9c264e52e97198835803657ac825`
-- Audited source commit time: `2026-09-11T10:58:46+10:00`
-- Inventory generated at: `2026-09-11T10:58:46+10:00` (deterministic source commit time)
+- Latest fetched `origin/main` at audit start: `1e1a4bc589094e0a09a10f59363b00fb67e80b84`
+- Audited source SHA: `1e1a4bc589094e0a09a10f59363b00fb67e80b84`
+- Audited source commit time: `2026-09-11T17:57:07+10:00`
+- Inventory generated at: `2026-09-11T17:57:07+10:00` (deterministic source commit time)
 - Inventory generator version: `2.0.0`
-- Current remediation branch: `feature/wave-b-pr1-platform-guards`
+- Current remediation branch: `feature/wave-b-pr2-worker-safety`
 - Scope: root application files plus `config`, `controllers`, `controllers/qms`, `middleware`, `migrations`, `public`, `routes`, `scripts`, `services`, `utils`, `ios`, `android`, and `.github/workflows`.
 - Binary policy: image, font, PDF, and archive bytes were not interpreted as source. Their path, type, size, and deployment presence are inventoried.
 - Machine-readable evidence: `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json`
 
-The deterministic inventory currently records 344 text/source files, 76,582 lines, 457 declared HTTP routes, 20 SQL migrations, 43 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
+The deterministic inventory currently records 352 text/source files, 77,873 lines, 457 declared HTTP routes, 21 SQL migrations, 43 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
 
 ## Local verification evidence
 
@@ -25,18 +25,31 @@ The deterministic inventory currently records 344 text/source files, 76,582 line
 - Real local legacy-schema rehearsal: 19 pre-Wave-A migrations baselined, 1 applied, then 20 checksum-protected entries skipped on repeat.
 - Local boot smoke: schemas completed before `Server ready`; `/api/health` returned 200, `/api/ready` returned 200/ready with the expected schema version, and anonymous detailed readiness returned 401.
 
-Wave B PR 1 local evidence on `feature/wave-b-pr1-platform-guards`:
+Wave B PR 1 evidence:
 
 - `npm run check`: passed for 141 JavaScript files.
 - `npm test`: passed, including the focused Wave B PR 1 suite and every existing repository regression suite.
 - `npm run security:audit`: passed with zero reported vulnerabilities.
-- `npm run audit:inventory:check`: passed for audited source `090de950289b9c264e52e97198835803657ac825` and generator `2.0.0`.
+- `npm run audit:inventory:check`: passed for audited source `090de950289b9c264e52e97198835803657ac825` and generator `2.0.0` during implementation.
 - Real local legacy MySQL rehearsal: 21 migrations discovered, 19 baselined, 2 applied, the dedupe table and required columns verified, then all 21 checksum-verified/skipped on repeat.
 - Redis behavior is adapter-tested with separate simulated replicas sharing one atomic namespace. No live Redis provider has been configured or verified.
+- PR 31 passed CI and was merged at `1e1a4bc589094e0a09a10f59363b00fb67e80b84`.
+- Railway deployed the exact merged SHA successfully. Production applied `20260911_wave_b1_public_submission_dedupe`, reported 21 tracked migrations, returned healthy/ready with the exact SHA, denied anonymous detailed readiness, and enforced the new public request contracts.
+- Production rate limiting remains process-local and readiness reports `DEGRADED`; Railway is configured for one replica. Redis remains unconfigured and provider-unverified.
+
+Wave B PR 2 local evidence:
+
+- `npm run check`: passed for 146 JavaScript files.
+- `npm test`: passed, including all existing regression suites and the focused distributed-worker suite.
+- `npm run security:audit`: registry-backed audit passed with zero reported vulnerabilities.
+- `npm run audit:inventory:check`: passed for audited source `1e1a4bc589094e0a09a10f59363b00fb67e80b84` and generator `2.0.0`.
+- Real local legacy-MySQL rehearsal: all 22 migrations checksum-verified, the four worker tables were verified, and two services sharing MySQL proved one singleton execution while the competing replica received `lease_held`.
+- Simulated-replica tests verify active-lease exclusion, expired-lease crash takeover, exponential retry delay, attempt exhaustion, dead-letter creation, redaction, manual retry, and recovery from a blocked manual dispatch.
+- Railway CI, deployment SHA, runtime startup, migration, health, and readiness evidence remain pending until this change is reviewed and merged. Railway two-replica provider behavior remains explicitly unverified.
 
 Wave A was subsequently merged through PR 30 and deployed at exact SHA `090de950289b9c264e52e97198835803657ac825`. Production evidence showed the migration ledger recovering 18 legacy entries, checksum-verifying one existing entry, applying the Wave A migration, and reaching 17 critical schemas before `Server ready`. Public health and readiness returned the same SHA and anonymous detailed readiness was denied. Database TLS, Redis, backup, malware scanning, custom-domain DNS/TLS, WebAuthn, and object-storage provider verification remain separate and unverified unless identified below.
 
-The architecture inventory in this branch intentionally represents the pre-implementation source SHA above. PR 1 changes are not silently folded into that older baseline: `source_sha`, `generated_at`, and `generator_version` are explicit, and CI verifies that the source exists, is an ancestor of the branch, and is named by this audit.
+This refreshed architecture inventory represents merged main at `1e1a4bc589094e0a09a10f59363b00fb67e80b84`. New remediation changes are not silently folded into that baseline: `source_sha`, `generated_at`, and `generator_version` are explicit, and CI verifies that the source exists, is an ancestor of the branch, and is named by this audit.
 
 ## Assurance state
 
@@ -49,7 +62,7 @@ The architecture inventory in this branch intentionally represents the pre-imple
 | Liveness/readiness separation | Yes | Yes | Yes | Yes | Yes | Yes | Not applicable |
 | Restricted readiness detail | Yes | Yes | Yes | Yes | Yes | Yes | Not applicable |
 | SMTP runtime verification | Yes | Yes | Yes | Yes | Yes | Degraded/not configured | No |
-| Redis distributed limiter | Yes | Yes | Focused tests passed | Pending PR 1 CI | No | No | No |
+| Redis distributed limiter | Yes | Yes | Focused tests passed | Yes | Yes | Degraded: process-local memory store | No |
 | Malware scan adapter | Queue states only | No verified adapter | No | No | No | No | No |
 | Durable object storage adapter | No | No | No | No | No | No | No |
 
@@ -67,7 +80,7 @@ No deployment or provider state in this document should be promoted without rele
 - Recommended fix: Use one awaited bootstrap path: validate, connect, lock/migrate, initialize critical schemas/services/workers, then listen. Exit on a critical failure.
 - Test requirement: Assert source ordering, simulate migration failure, and verify that no listener is created.
 - External dependency: Railway startup/restart log verification.
-- Status: Fixed in Wave A; deployment proof pending.
+- Status: Fixed in Wave A and verified in production at `090de950289b9c264e52e97198835803657ac825` and again at `1e1a4bc589094e0a09a10f59363b00fb67e80b84`.
 
 ### A-002: No authoritative migration ledger or concurrency lock
 
@@ -79,7 +92,7 @@ No deployment or provider state in this document should be promoted without rele
 - Recommended fix: Ordered checksummed migrations under a MySQL advisory lock, with applied/failed status and deployment SHA.
 - Test requirement: First apply, second-run skip, checksum mismatch failure, lock release, ordered execution, and real-MySQL smoke.
 - External dependency: Production database migration during Railway deployment.
-- Status: Fixed in Wave A code; real deployment proof pending.
+- Status: Fixed in Wave A and verified by production migration-ledger recovery plus subsequent checksum-protected migrations.
 
 ### A-003: `DATABASE_URL` documented but ignored
 
@@ -163,7 +176,7 @@ No deployment or provider state in this document should be promoted without rele
 - Recommended fix: Introduce advisory/durable job leases, run records, retries, and dead-letter state before scaling.
 - Test requirement: Concurrent worker tests against real MySQL.
 - External dependency: Multi-replica Railway test environment.
-- Status: Deferred to Wave B. Readiness reports the limitation rather than claiming distributed operation.
+- Status: Fixed in Wave B PR 2 code with MySQL leases, ownership heartbeats, run/failure history, exponential retry, dead letters, permission- and step-up-protected manual retry, and an admin health API. Local simulated-replica and real-MySQL tests pass. CI, deployment, and Railway two-replica provider verification remain pending.
 
 ### A-010: CSP still permits inline scripts
 
