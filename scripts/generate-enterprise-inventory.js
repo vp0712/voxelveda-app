@@ -4,7 +4,8 @@ const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 
 const root = path.join(__dirname, '..');
-const excludedDirectories = new Set(['.git', 'node_modules', 'invoices', 'uploads']);
+const generatorVersion = '2.0.0';
+const excludedDirectories = new Set(['.git', '.npm-cache', 'coverage', 'node_modules', 'invoices', 'uploads']);
 const textExtensions = new Set([
   '.js', '.cjs', '.mjs', '.json', '.html', '.css', '.sql', '.md', '.yml', '.yaml',
   '.xml', '.plist', '.gradle', '.properties', '.swift', '.kt', '.java', '.toml', '.txt'
@@ -92,9 +93,15 @@ const securityControls = {
   readiness: sources.filter((file) => /(?:readiness|runtimeState|databaseRuntime|migrationRunner)/i.test(file.file)).map((file) => file.file)
 };
 
+const sourceSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+const generatedAt = execFileSync('git', ['show', '-s', '--format=%cI', sourceSha], { cwd: root, encoding: 'utf8' }).trim();
+
 const inventory = {
-  schema_version: 1,
-  baseline_sha: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim(),
+  schema_version: 2,
+  baseline_sha: sourceSha,
+  source_sha: sourceSha,
+  generated_at: generatedAt,
+  generator_version: generatorVersion,
   scope: ['/', 'config/', 'controllers/', 'middleware/', 'migrations/', 'public/', 'routes/', 'scripts/', 'services/', 'utils/', 'ios/', 'android/', '.github/workflows/'],
   totals: {
     text_source_files: sources.length,

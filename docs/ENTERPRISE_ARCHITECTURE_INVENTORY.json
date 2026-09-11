@@ -1,6 +1,9 @@
 {
-  "schema_version": 1,
-  "baseline_sha": "ba0eddd31a389a9039ad7edc0018054774ae38f6",
+  "schema_version": 2,
+  "baseline_sha": "090de950289b9c264e52e97198835803657ac825",
+  "source_sha": "090de950289b9c264e52e97198835803657ac825",
+  "generated_at": "2026-09-11T10:58:46+10:00",
+  "generator_version": "2.0.0",
   "scope": [
     "/",
     "config/",
@@ -19,7 +22,7 @@
   "totals": {
     "text_source_files": 344,
     "binary_assets": 50,
-    "text_bytes": 3374464,
+    "text_bytes": 3375238,
     "text_lines": 76582,
     "routes": 457,
     "migrations": 20,
@@ -5744,9 +5747,9 @@
     {
       "file": "docs/ENTERPRISE_DEEP_AUDIT.md",
       "category": "documentation",
-      "bytes": 17250,
+      "bytes": 17499,
       "lines": 250,
-      "sha256": "3fa8ee05ddb0b0fa5c1292d5360a3e18cfee87971917ca99ee0b16c8f7ff6ffa"
+      "sha256": "4587fd514993ed1a9e10c22ab6e9fd9dc9f93453a1b635f6e3d2d5edf544c3ba"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -6913,9 +6916,9 @@
     {
       "file": "scripts/enterprise-wave-a-test.js",
       "category": "scripts",
-      "bytes": 11241,
+      "bytes": 11507,
       "lines": 267,
-      "sha256": "ff9062fd2ee44153f4986674acb14b95a670e4e0173cc7a8e86f0a3a2ebb3f6e"
+      "sha256": "ea5341edc4d0e4ab6112ffc8d83f1e54af411c2d9ccdc821224c4d8ebe0f86f3"
     },
     {
       "file": "scripts/erp-wave1-trash-lifecycle-test.js",
@@ -7347,9 +7350,9 @@
     {
       "file": "services/migrationRunner.js",
       "category": "services",
-      "bytes": 10673,
+      "bytes": 10932,
       "lines": 260,
-      "sha256": "303c22d4f6934cb299378ecd27d6bf36ed4d357a1e876029ce3d3a92929721df"
+      "sha256": "1bcff6b74f16992940414e0c90c6a62d22341496ce29a4faac21d58c6ddd1714"
     },
     {
       "file": "services/notificationSchema.js",

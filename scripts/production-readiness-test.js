@@ -9,7 +9,7 @@ const valid = {
   APP_URL: 'https://app.voxelveda.com', TRUST_PROXY: 'true',
   ALLOW_LEGACY_QUERY_TOKENS: 'false', ENABLE_ADMIN_BOOTSTRAP: 'false',
   ALLOW_PUBLIC_ADMIN_REGISTRATION: 'false', DEBUG_AUTH_BYPASS: 'false',
-  RATE_LIMIT_STORE: 'redis', MALWARE_SCANNER_PROVIDER: 'clamav', BACKUP_STATUS_PROVIDER: 'configured',
+  RATE_LIMIT_STORE: 'redis', RATE_LIMIT_FAILURE_POLICY: 'deny', REDIS_URL: 'redis://redis.internal:6379', MALWARE_SCANNER_PROVIDER: 'clamav', BACKUP_STATUS_PROVIDER: 'configured',
   FORCE_CANONICAL_HOST: 'true', WEBHOOK_SIGNING_KEY: 'w'.repeat(48), OUTBOUND_ALLOWED_HOSTS: 'api.example.com',
   DB_USER: 'voxelveda_app', DB_TLS_REQUIRED: 'true'
 };
@@ -20,7 +20,8 @@ assert.deepEqual(assessProductionReadiness(valid), { production: true, ready: tr
 for (const mutation of [
   { JWT_SECRET: 'secret' }, { SESSION_SECRET: valid.JWT_SECRET }, { ALLOWED_ORIGINS: '*' },
   { APP_URL: 'http://app.voxelveda.com' }, { TRUST_PROXY: 'false' }, { DEBUG_AUTH_BYPASS: 'true' },
-  { SHIFT_QR_SIGNING_KEY: '' }, { DB_TLS_REJECT_UNAUTHORIZED: 'false' }
+  { SHIFT_QR_SIGNING_KEY: '' }, { DB_TLS_REJECT_UNAUTHORIZED: 'false' },
+  { RATE_LIMIT_STORE: 'redis', REDIS_URL: '' }, { RATE_LIMIT_FAILURE_POLICY: 'memory' }
 ]) {
   const result = assessProductionReadiness({ ...valid, ...mutation });
   assert.equal(result.ready, false, JSON.stringify(mutation));

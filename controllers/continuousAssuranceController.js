@@ -5,6 +5,7 @@ const { ensureAssuranceSchema } = require('../services/assuranceSchema');
 const { logAudit } = require('../services/auditService');
 const { logSecurityEvent } = require('../services/sessionService');
 const { queueSecurityEvent } = require('../services/securityEventOutboxService');
+const { getRateLimitService } = require('../services/rateLimitService');
 
 const DECISIONS = new Set(['CERTIFY', 'REVOKE', 'EXCEPTION']);
 const RESULTS = new Set(['PASSED', 'PARTIAL', 'FAILED']);
@@ -35,12 +36,13 @@ exports.summary = async (req, res, next) => {
     ];
     const rows = await Promise.all(queries.map((sql) => pool.query(sql)));
     const values = rows.map((row) => Number(row[0][0].count));
+    const limiterStatus = getRateLimitService().status();
     return res.json({ generated_at: new Date().toISOString(), metrics: {
       active_jit_grants: values[0], pending_jit_requests: values[1], open_access_reviews: values[2], overdue_access_reviews: values[3],
       active_risk_exceptions: values[4], active_service_accounts: values[5], pending_security_events: values[6],
       successful_resilience_exercises_180d: values[7], audit_integrity_checkpoints: values[8]
     }, controls: {
-      distributed_rate_limit: Boolean(process.env.REDIS_URL), webauthn_ready: Boolean(process.env.WEBAUTHN_RP_ID && process.env.WEBAUTHN_ORIGIN),
+      distributed_rate_limit: limiterStatus.distributed && limiterStatus.state === 'OPERATIONAL', webauthn_ready: Boolean(process.env.WEBAUTHN_RP_ID && process.env.WEBAUTHN_ORIGIN),
       event_delivery_configured: Boolean(process.env.SECURITY_EVENT_DESTINATION), key_rotation_support: true,
       note: 'External controls are reported configured only when production evidence exists.'
     }});

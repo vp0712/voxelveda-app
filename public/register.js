@@ -11,6 +11,12 @@ async function createCustomerAccount() {
     return;
   }
 
+  if (password.length < 14) {
+    status.innerText = 'Password must contain at least 14 characters.';
+    status.style.color = '#f87171';
+    return;
+  }
+
   if (!confirmPrivacy) {
     status.innerText = 'Please accept the privacy policy first.';
     status.style.color = '#f87171';
