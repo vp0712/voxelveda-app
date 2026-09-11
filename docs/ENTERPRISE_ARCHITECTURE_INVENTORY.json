@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "baseline_sha": "442d70e4278870de0b440c46a68928110b5fae91",
+  "baseline_sha": "ba0eddd31a389a9039ad7edc0018054774ae38f6",
   "scope": [
     "/",
     "config/",
@@ -19,8 +19,8 @@
   "totals": {
     "text_source_files": 344,
     "binary_assets": 50,
-    "text_bytes": 3372972,
-    "text_lines": 76553,
+    "text_bytes": 3374464,
+    "text_lines": 76582,
     "routes": 457,
     "migrations": 20,
     "worker_timer_sites": 43,
@@ -4952,14 +4952,14 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "services/migrationRunner.js",
-      "line": 201,
+      "line": 217,
       "evidence": ").catch(() => {});"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "services/migrationRunner.js",
-      "line": 227,
+      "line": 243,
       "evidence": "if (lockAcquired) await connection.query('SELECT RELEASE_LOCK(?) AS released', [MIGRATION_LOCK]).catch(() => {});"
     },
     {
@@ -5746,7 +5746,7 @@
       "category": "documentation",
       "bytes": 17250,
       "lines": 250,
-      "sha256": "55e25426a81375014f2ec2f0d113cce52ac83b55f7f428127c8270fd92b89b95"
+      "sha256": "3fa8ee05ddb0b0fa5c1292d5360a3e18cfee87971917ca99ee0b16c8f7ff6ffa"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -6913,9 +6913,9 @@
     {
       "file": "scripts/enterprise-wave-a-test.js",
       "category": "scripts",
-      "bytes": 10442,
-      "lines": 254,
-      "sha256": "faec93b410af32d7d540eef2e58d6473a203cf79bad254aef60467e66e57a75f"
+      "bytes": 11241,
+      "lines": 267,
+      "sha256": "ff9062fd2ee44153f4986674acb14b95a670e4e0173cc7a8e86f0a3a2ebb3f6e"
     },
     {
       "file": "scripts/erp-wave1-trash-lifecycle-test.js",
@@ -7347,9 +7347,9 @@
     {
       "file": "services/migrationRunner.js",
       "category": "services",
-      "bytes": 9980,
-      "lines": 244,
-      "sha256": "736275511355e1cede4a257a985e8763b48300b31e6e30183d2eabc3ac4e91bc"
+      "bytes": 10673,
+      "lines": 260,
+      "sha256": "303c22d4f6934cb299378ecd27d6bf36ed4d357a1e876029ce3d3a92929721df"
     },
     {
       "file": "services/notificationSchema.js",
