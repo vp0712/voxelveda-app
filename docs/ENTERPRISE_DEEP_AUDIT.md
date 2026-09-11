@@ -9,7 +9,7 @@
 - Binary policy: image, font, PDF, and archive bytes were not interpreted as source. Their path, type, size, and deployment presence are inventoried.
 - Machine-readable evidence: `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json`
 
-The deterministic inventory currently records 344 text/source files, 76,553 lines, 457 declared HTTP routes, 20 SQL migrations, 43 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
+The deterministic inventory currently records 344 text/source files, 76,582 lines, 457 declared HTTP routes, 20 SQL migrations, 43 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
 
 ## Local verification evidence
 

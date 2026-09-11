@@ -32,14 +32,17 @@ function migrationPool({ legacy = false } = {}) {
         return [[{ released: 1 }], []];
       }
       if (normalized.startsWith('CREATE TABLE IF NOT EXISTS schema_migrations')) return [[], []];
-      if (normalized.startsWith("SELECT SUM(status IN ('APPLIED', 'BASELINED'))")) {
-        const immutable = [...ledger.values()].filter((row) => ['APPLIED', 'BASELINED'].includes(row.status)).length;
-        return [[{ immutable_count: immutable, total_count: ledger.size }], []];
+      if (normalized.startsWith("SELECT SUM(migration_id >= ? AND status IN ('APPLIED', 'BASELINED'))")) {
+        const boundaryCount = [...ledger.values()].filter((row) => row.migration_id >= params[0] && ['APPLIED', 'BASELINED'].includes(row.status)).length;
+        return [[{ boundary_count: boundaryCount }], []];
       }
       if (normalized.startsWith('SELECT COUNT(*) AS marker_count FROM information_schema.tables')) {
         return [[{ marker_count: legacy ? params.length : 0 }], []];
       }
       if (normalized.startsWith('SELECT migration_id, checksum_sha256, status FROM schema_migrations')) {
+        if (normalized.includes('WHERE migration_id < ?')) {
+          return [[...ledger.values()].filter((row) => row.migration_id < params[0]), []];
+        }
         const row = ledger.get(params[0]);
         return [row ? [row] : [], []];
       }
@@ -100,12 +103,20 @@ async function testMigrationRunner() {
 async function testLegacyMigrationBaseline() {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'voxelveda-wave-a-legacy-'));
   try {
-    fs.writeFileSync(path.join(directory, '20260101_historical.sql'), 'CREATE TABLE old_table (id INT);\n');
+    fs.writeFileSync(path.join(directory, '20260101_applied.sql'), 'CREATE TABLE applied_table (id INT);\n');
+    fs.writeFileSync(path.join(directory, '20260102_historical.sql'), 'CREATE TABLE old_table (id INT);\n');
     fs.writeFileSync(path.join(directory, '20260911_enterprise_bootstrap_readiness.sql'), 'CREATE TABLE current_table (id INT);\n');
     fs.writeFileSync(path.join(directory, '20260912_future.sql'), 'CREATE TABLE future_table (id INT);\n');
     const mock = migrationPool({ legacy: true });
-    mock.ledger.set('20260101_historical', {
-      migration_id: '20260101_historical',
+    const discovered = discoverMigrations(directory);
+    const appliedMigration = discovered.find((migration) => migration.migration_id === '20260101_applied');
+    mock.ledger.set('20260101_applied', {
+      migration_id: '20260101_applied',
+      checksum_sha256: appliedMigration.checksum_sha256,
+      status: 'APPLIED'
+    });
+    mock.ledger.set('20260102_historical', {
+      migration_id: '20260102_historical',
       checksum_sha256: 'failed-before-baseline',
       status: 'FAILED'
     });
@@ -113,8 +124,10 @@ async function testLegacyMigrationBaseline() {
     const result = await runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } });
     assert.equal(result.baselined, 1);
     assert.equal(result.applied, 2);
-    assert.equal(result.skipped, 0);
-    assert.equal(mock.ledger.get('20260101_historical').status, 'BASELINED');
+    assert.equal(result.skipped, 1);
+    assert.equal(mock.ledger.get('20260101_applied').status, 'APPLIED');
+    assert.equal(mock.ledger.get('20260102_historical').status, 'BASELINED');
+    assert.equal(mock.executed.some((sql) => sql.includes('applied_table')), false);
     assert.equal(mock.executed.some((sql) => sql.includes('old_table')), false);
     assert.equal(mock.executed.some((sql) => sql.includes('current_table')), true);
     assert.equal(mock.executed.some((sql) => sql.includes('future_table')), true);
@@ -122,9 +135,9 @@ async function testLegacyMigrationBaseline() {
     const rerun = await runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } });
     assert.equal(rerun.baselined, 0);
     assert.equal(rerun.applied, 0);
-    assert.equal(rerun.skipped, 3);
+    assert.equal(rerun.skipped, 4);
 
-    fs.writeFileSync(path.join(directory, '20260101_historical.sql'), 'CREATE TABLE old_table (id BIGINT);\n');
+    fs.writeFileSync(path.join(directory, '20260102_historical.sql'), 'CREATE TABLE old_table (id BIGINT);\n');
     await assert.rejects(
       () => runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } }),
       (error) => error.code === 'MIGRATION_CHECKSUM_MISMATCH'

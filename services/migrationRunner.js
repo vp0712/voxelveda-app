@@ -94,13 +94,12 @@ async function ensureMigrationLedger(connection) {
 }
 
 async function baselineLegacySchema(connection, migrations, env, logger) {
-  const [[ledgerState]] = await connection.query(`
-    SELECT
-      SUM(status IN ('APPLIED', 'BASELINED')) AS immutable_count,
-      COUNT(*) AS total_count
-    FROM schema_migrations
-  `);
-  if (Number(ledgerState?.immutable_count || 0) > 0) return 0;
+  const [[ledgerState]] = await connection.query(
+    `SELECT SUM(migration_id >= ? AND status IN ('APPLIED', 'BASELINED')) AS boundary_count
+     FROM schema_migrations`,
+    [LEGACY_BASELINE_BOUNDARY]
+  );
+  if (Number(ledgerState?.boundary_count || 0) > 0) return [];
 
   const placeholders = LEGACY_SCHEMA_MARKERS.map(() => '?').join(', ');
   const [[schemaState]] = await connection.query(
@@ -109,10 +108,27 @@ async function baselineLegacySchema(connection, migrations, env, logger) {
      WHERE table_schema = DATABASE() AND table_name IN (${placeholders})`,
     LEGACY_SCHEMA_MARKERS
   );
-  if (Number(schemaState?.marker_count || 0) !== LEGACY_SCHEMA_MARKERS.length) return 0;
+  if (Number(schemaState?.marker_count || 0) !== LEGACY_SCHEMA_MARKERS.length) return [];
 
   const historical = migrations.filter((migration) => migration.migration_id < LEGACY_BASELINE_BOUNDARY);
+  const [existingRows] = await connection.query(
+    'SELECT migration_id, checksum_sha256, status FROM schema_migrations WHERE migration_id < ?',
+    [LEGACY_BASELINE_BOUNDARY]
+  );
+  const existingById = new Map(existingRows.map((row) => [row.migration_id, row]));
+  const baselinedIds = [];
   for (const migration of historical) {
+    const existing = existingById.get(migration.migration_id);
+    if (['APPLIED', 'BASELINED'].includes(existing?.status)) {
+      if (existing.checksum_sha256 !== migration.checksum_sha256) {
+        throw new MigrationError(
+          `Checksum mismatch for migration ${migration.migration_id}`,
+          'MIGRATION_CHECKSUM_MISMATCH',
+          { migration_id: migration.migration_id }
+        );
+      }
+      continue;
+    }
     await connection.query(
       `INSERT INTO schema_migrations
        (migration_id, checksum_sha256, deployment_sha, status, started_at, applied_at, duration_ms, error_code, error_message)
@@ -122,9 +138,10 @@ async function baselineLegacySchema(connection, migrations, env, logger) {
        error_code = 'LEGACY_SCHEMA_ADOPTION', error_message = NULL`,
       [migration.migration_id, migration.checksum_sha256, deploymentSha(env)]
     );
+    baselinedIds.push(migration.migration_id);
   }
-  if (historical.length) logger.info?.(`Legacy schema baseline recorded for ${historical.length} migration(s).`);
-  return historical.length;
+  if (baselinedIds.length) logger.info?.(`Legacy schema baseline recorded for ${baselinedIds.length} migration(s).`);
+  return baselinedIds;
 }
 
 function safeMigrationMessage(error) {
@@ -151,10 +168,9 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
     }
     lockAcquired = true;
     await ensureMigrationLedger(connection);
-    baselined = await baselineLegacySchema(connection, migrations, env, logger);
-    const newlyBaselined = new Set(baselined
-      ? migrations.filter((migration) => migration.migration_id < LEGACY_BASELINE_BOUNDARY).map((migration) => migration.migration_id)
-      : []);
+    const baselinedIds = await baselineLegacySchema(connection, migrations, env, logger);
+    baselined = baselinedIds.length;
+    const newlyBaselined = new Set(baselinedIds);
 
     for (const migration of migrations) {
       current = migration;
