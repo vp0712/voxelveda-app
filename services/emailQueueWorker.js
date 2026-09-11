@@ -1,37 +1,37 @@
 const { isEmailConfigured } = require('./emailService');
 const { processEmailQueue } = require('./emailQueue');
+const { backgroundJobService } = require('./backgroundJobService');
 
-let timer = null;
-let initialTimer = null;
-let busy = false;
+async function processEmailQueueCycle() {
+  const outcomes = await processEmailQueue(Number(process.env.EMAIL_QUEUE_BATCH_SIZE || 10));
+  return {
+    outcomes,
+    processed: outcomes.length,
+    failed: outcomes.filter((item) => ['FAILED', 'RETRY'].includes(String(item.status || '').toUpperCase())).length
+  };
+}
 
-async function runEmailQueue() {
-  if (busy || !isEmailConfigured()) return;
-  busy = true;
-  try {
-    await processEmailQueue(Number(process.env.EMAIL_QUEUE_BATCH_SIZE || 10));
-  } catch (error) {
-    console.error('Email queue worker error:', error.message);
-  } finally {
-    busy = false;
-  }
+const scheduler = backgroundJobService.createScheduler({
+  jobKey: 'email_queue_delivery',
+  description: 'Deliver queued company email with durable retry history',
+  handler: processEmailQueueCycle,
+  enabled: isEmailConfigured,
+  intervalMs: () => Number(process.env.EMAIL_QUEUE_INTERVAL_MS || 30000),
+  initialDelayMs: 5000,
+  leaseMs: 120000,
+  maxAttempts: Number(process.env.EMAIL_QUEUE_WORKER_MAX_ATTEMPTS || 8)
+});
+
+function runEmailQueue(options = {}) {
+  return scheduler.run(options);
 }
 
 function startEmailQueueWorker() {
-  if (timer || !isEmailConfigured()) return false;
-  timer = setInterval(runEmailQueue, Number(process.env.EMAIL_QUEUE_INTERVAL_MS || 30000));
-  timer.unref();
-  initialTimer = setTimeout(runEmailQueue, 5000);
-  initialTimer.unref();
-  return true;
+  return scheduler.start();
 }
 
 function stopEmailQueueWorker() {
-  if (timer) clearInterval(timer);
-  if (initialTimer) clearTimeout(initialTimer);
-  timer = null;
-  initialTimer = null;
-  busy = false;
+  scheduler.stop();
 }
 
-module.exports = { runEmailQueue, startEmailQueueWorker, stopEmailQueueWorker };
+module.exports = { processEmailQueueCycle, runEmailQueue, startEmailQueueWorker, stopEmailQueueWorker };

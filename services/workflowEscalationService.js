@@ -4,9 +4,7 @@ const { hasPermission } = require('./authorizationService');
 const { logAudit } = require('./auditService');
 const { createNotification } = require('./notificationService');
 const { ensureWorkflowSchema } = require('./workflowSchema');
-
-let timer = null;
-let running = false;
+const { backgroundJobService } = require('./backgroundJobService');
 
 async function loadCandidateUsers(db) {
   const [users] = await db.query(
@@ -132,41 +130,42 @@ async function processAssignment(row, eventType) {
 }
 
 async function processWorkflowSla() {
-  if (running) return { processed: 0, skipped: true };
-  running = true;
-  try {
-    await ensureWorkflowSchema();
-    const [rows] = await pool.query(
-      `SELECT a.id AS assignment_id, a.due_at
-       FROM workflow_assignments a
-       JOIN workflow_instances i ON i.id = a.instance_id
-       WHERE a.status = 'PENDING' AND i.status = 'PENDING'
-         AND a.due_at IS NOT NULL AND a.due_at <= DATE_ADD(NOW(), INTERVAL 2 HOUR)
-       ORDER BY a.due_at LIMIT 100`
-    );
-    let processed = 0;
-    for (const row of rows) {
-      const eventType = new Date(row.due_at).getTime() <= Date.now() ? 'BREACHED' : 'DUE_SOON';
-      if (await processAssignment(row, eventType)) processed += 1;
-    }
-    return { processed, skipped: false };
-  } finally {
-    running = false;
+  await ensureWorkflowSchema();
+  const [rows] = await pool.query(
+    `SELECT a.id AS assignment_id, a.due_at
+     FROM workflow_assignments a
+     JOIN workflow_instances i ON i.id = a.instance_id
+     WHERE a.status = 'PENDING' AND i.status = 'PENDING'
+       AND a.due_at IS NOT NULL AND a.due_at <= DATE_ADD(NOW(), INTERVAL 2 HOUR)
+     ORDER BY a.due_at LIMIT 100`
+  );
+  let processed = 0;
+  for (const row of rows) {
+    const eventType = new Date(row.due_at).getTime() <= Date.now() ? 'BREACHED' : 'DUE_SOON';
+    if (await processAssignment(row, eventType)) processed += 1;
   }
+  return { processed, skipped: false };
+}
+
+const scheduler = backgroundJobService.createScheduler({
+  jobKey: 'workflow_sla_escalation',
+  description: 'Notify and escalate overdue approval assignments',
+  handler: processWorkflowSla,
+  intervalMs: () => Math.max(60000, Number(process.env.WORKFLOW_SLA_INTERVAL_MS || 300000)),
+  initialDelayMs: 10000,
+  leaseMs: Number(process.env.WORKFLOW_SLA_LEASE_MS || 5 * 60 * 1000)
+});
+
+function runWorkflowSlaScheduler(options = {}) {
+  return scheduler.run(options);
 }
 
 function startWorkflowSlaScheduler() {
-  if (timer) return timer;
-  const intervalMs = Math.max(60000, Number(process.env.WORKFLOW_SLA_INTERVAL_MS || 300000));
-  timer = setInterval(() => processWorkflowSla().catch((error) => console.error('Workflow SLA scheduler failed:', error.message)), intervalMs);
-  timer.unref();
-  setTimeout(() => processWorkflowSla().catch((error) => console.error('Workflow SLA startup check failed:', error.message)), 10000).unref();
-  return timer;
+  return scheduler.start();
 }
 
 function stopWorkflowSlaScheduler() {
-  if (timer) clearInterval(timer);
-  timer = null;
+  scheduler.stop();
 }
 
-module.exports = { processWorkflowSla, startWorkflowSlaScheduler, stopWorkflowSlaScheduler };
+module.exports = { processWorkflowSla, runWorkflowSlaScheduler, startWorkflowSlaScheduler, stopWorkflowSlaScheduler };

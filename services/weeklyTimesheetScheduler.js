@@ -4,9 +4,8 @@ const { isEmailTransportError } = require('./emailService');
 const { brandedLayout } = require('./emailTemplates');
 const { ensureWorkforceSchema } = require('./workforceSchema');
 const { ensureUserLifecycleSchema } = require('./userLifecycleService');
+const { backgroundJobService } = require('./backgroundJobService');
 
-let schedulerTimer;
-let schedulerBusy = false;
 let lastCompletedRunKey = '';
 
 function enabled() {
@@ -271,9 +270,7 @@ async function queueClosedWeekTimesheets(options = {}) {
   return { skipped: false, queued, existing, recovered, invalid, staff: staffRows.length, period };
 }
 
-async function runScheduledWeeklyTimesheetEmails() {
-  if (schedulerBusy) return;
-  schedulerBusy = true;
+async function processScheduledWeeklyTimesheetEmails() {
   try {
     const result = await queueClosedWeekTimesheets();
     const runKey = result.period ? `${result.period.start}:${result.period.end}` : '';
@@ -281,29 +278,38 @@ async function runScheduledWeeklyTimesheetEmails() {
       console.log(`Weekly timesheet email run ${runKey}: ${result.queued} queued, ${result.recovered || 0} recovered, ${result.existing} already queued, ${result.invalid || 0} invalid emails.`);
     }
     if (!result.skipped) lastCompletedRunKey = runKey;
+    return result;
   } catch (error) {
-    console.error('Weekly timesheet email scheduler error:', error.message);
-  } finally {
-    schedulerBusy = false;
+    error.code = error.code || 'WEEKLY_TIMESHEET_SCHEDULER_FAILED';
+    throw error;
   }
 }
 
+const scheduler = backgroundJobService.createScheduler({
+  jobKey: 'weekly_timesheet_email',
+  description: 'Prepare and queue completed-week timesheets for eligible staff',
+  handler: processScheduledWeeklyTimesheetEmails,
+  enabled,
+  intervalMs: () => Math.max(60000, Number(process.env.WEEKLY_TIMESHEET_EMAIL_INTERVAL_MS || 900000)),
+  initialDelayMs: 10000,
+  leaseMs: Number(process.env.WEEKLY_TIMESHEET_LEASE_MS || 15 * 60 * 1000)
+});
+
+function runScheduledWeeklyTimesheetEmails(options = {}) {
+  return scheduler.run(options);
+}
+
 function startWeeklyTimesheetScheduler() {
-  if (!enabled() || schedulerTimer) return schedulerTimer;
-  const intervalMs = Math.max(60000, Number(process.env.WEEKLY_TIMESHEET_EMAIL_INTERVAL_MS || 900000));
-  schedulerTimer = setInterval(runScheduledWeeklyTimesheetEmails, intervalMs);
-  schedulerTimer.unref();
-  setTimeout(runScheduledWeeklyTimesheetEmails, 10000).unref();
-  return schedulerTimer;
+  return scheduler.start();
 }
 
 function stopWeeklyTimesheetScheduler() {
-  if (schedulerTimer) clearInterval(schedulerTimer);
-  schedulerTimer = null;
+  scheduler.stop();
 }
 
 module.exports = {
   latestCompletedWeek,
+  processScheduledWeeklyTimesheetEmails,
   queueClosedWeekTimesheets,
   runScheduledWeeklyTimesheetEmails,
   startWeeklyTimesheetScheduler,

@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "baseline_sha": "090de950289b9c264e52e97198835803657ac825",
-  "source_sha": "090de950289b9c264e52e97198835803657ac825",
-  "generated_at": "2026-09-11T10:58:46+10:00",
+  "baseline_sha": "1e1a4bc589094e0a09a10f59363b00fb67e80b84",
+  "source_sha": "1e1a4bc589094e0a09a10f59363b00fb67e80b84",
+  "generated_at": "2026-09-11T17:57:07+10:00",
   "generator_version": "2.0.0",
   "scope": [
     "/",
@@ -20,310 +20,310 @@
     ".github/workflows/"
   ],
   "totals": {
-    "text_source_files": 344,
+    "text_source_files": 352,
     "binary_assets": 50,
-    "text_bytes": 3375238,
-    "text_lines": 76582,
+    "text_bytes": 3435919,
+    "text_lines": 77873,
     "routes": 457,
-    "migrations": 20,
+    "migrations": 21,
     "worker_timer_sites": 43,
-    "findings": 313
+    "findings": 316
   },
   "category_counts": {
     "android": 3,
     "ci": 1,
     "config": 7,
     "controllers": 51,
-    "documentation": 16,
+    "documentation": 17,
     "frontend": 53,
     "ios": 9,
-    "middleware": 16,
-    "migrations": 20,
+    "middleware": 17,
+    "migrations": 21,
     "root_or_other": 24,
     "routes": 37,
-    "scripts": 44,
-    "services": 63
+    "scripts": 46,
+    "services": 66
   },
   "routes": [
     {
       "file": "app.js",
-      "line": 68,
+      "line": 82,
       "method": "POST",
       "path": "/api/security/csp-report"
     },
     {
       "file": "app.js",
-      "line": 69,
+      "line": 83,
       "method": "GET",
       "path": "/api/health"
     },
     {
       "file": "app.js",
-      "line": 70,
+      "line": 84,
       "method": "GET",
       "path": "/api/ready"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/login"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/register"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/request-quote"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/privacy"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/terms"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/support"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/forgot-password"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/reset-password"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/accept-invite"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/mfa"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/security"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/attendance-terminal"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/401"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/403"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/404"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/429"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/500"
     },
     {
       "file": "app.js",
-      "line": 75,
+      "line": 89,
       "method": "GET",
       "path": "/maintenance"
     },
     {
       "file": "app.js",
-      "line": 76,
+      "line": 90,
       "method": "GET",
       "path": "/admin"
     },
     {
       "file": "app.js",
-      "line": 76,
+      "line": 90,
       "method": "GET",
       "path": "/dashboard"
     },
     {
       "file": "app.js",
-      "line": 76,
+      "line": 90,
       "method": "GET",
       "path": "/quality"
     },
     {
       "file": "app.js",
-      "line": 76,
+      "line": 90,
       "method": "GET",
       "path": "/shop-floor"
     },
     {
       "file": "app.js",
-      "line": 76,
+      "line": 90,
       "method": "GET",
       "path": "/invoice/view"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/index.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/login.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/register.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/customer.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/privacy-policy.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/admin-dashboard.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/staff-dashboard.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/quality.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/shop-floor.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/dashboard.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/invoice-pdf.html"
     },
     {
       "file": "app.js",
-      "line": 77,
+      "line": 91,
       "method": "GET",
       "path": "/shift-qr.html"
     },
     {
       "file": "app.js",
-      "line": 78,
+      "line": 92,
       "method": "GET",
       "path": "/approvals"
     },
     {
       "file": "app.js",
-      "line": 85,
+      "line": 99,
       "method": "GET",
       "path": "/api/qr"
     },
     {
       "file": "app.js",
-      "line": 86,
+      "line": 100,
       "method": "POST",
       "path": "/api/public/rfq"
     },
     {
       "file": "app.js",
-      "line": 86,
+      "line": 100,
       "method": "POST",
       "path": "/api/public/ai-lead"
     },
     {
       "file": "app.js",
-      "line": 86,
+      "line": 100,
       "method": "GET",
       "path": "/api/public/shift-qr"
     },
     {
       "file": "app.js",
-      "line": 86,
+      "line": 100,
       "method": "GET",
       "path": "/api/public/qms/coc/:no/verify"
     },
     {
       "file": "app.js",
-      "line": 86,
+      "line": 100,
       "method": "GET",
       "path": "/api/qms/coc/:no/verify"
     },
     {
       "file": "app.js",
-      "line": 87,
+      "line": 101,
       "method": "GET",
       "path": "/api/suppliers/files/:id/view"
     },
@@ -455,127 +455,127 @@
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 13,
+      "line": 25,
       "method": "POST",
       "path": "/login"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 14,
+      "line": 26,
       "method": "POST",
       "path": "/password-reset/request"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 15,
+      "line": 27,
       "method": "POST",
       "path": "/password-reset/complete"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 16,
+      "line": 28,
       "method": "POST",
       "path": "/invitation/accept"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 17,
+      "line": 29,
       "method": "POST",
       "path": "/mfa/setup/start"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 18,
+      "line": 30,
       "method": "POST",
       "path": "/mfa/setup/confirm"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 19,
+      "line": 31,
       "method": "POST",
       "path": "/mfa/verify"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 20,
+      "line": 32,
       "method": "POST",
       "path": "/logout"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 21,
+      "line": 33,
       "method": "POST",
       "path": "/customer-register"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 28,
+      "line": 40,
       "method": "GET",
       "path": "/me"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 29,
+      "line": 41,
       "method": "POST",
       "path": "/change-password"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 30,
+      "line": 42,
       "method": "GET",
       "path": "/sessions"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 31,
+      "line": 43,
       "method": "DELETE",
       "path": "/sessions/:id"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 32,
+      "line": 44,
       "method": "POST",
       "path": "/sessions/revoke-others"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 33,
+      "line": 45,
       "method": "GET",
       "path": "/mfa/status"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 34,
+      "line": 46,
       "method": "POST",
       "path": "/mfa/enroll/start"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 35,
+      "line": 47,
       "method": "POST",
       "path": "/mfa/enroll/confirm"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 36,
+      "line": 48,
       "method": "POST",
       "path": "/mfa/recovery/regenerate"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 37,
+      "line": 49,
       "method": "DELETE",
       "path": "/mfa"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 38,
+      "line": 50,
       "method": "GET",
       "path": "/step-up/status"
     },
     {
       "file": "routes/authRoutes.js",
-      "line": 39,
+      "line": 51,
       "method": "POST",
       "path": "/step-up"
     },
@@ -3055,6 +3055,7 @@
       "docs/ENTERPRISE_DEEP_AUDIT.md",
       "DOMAIN-MIGRATION-AUDIT.md",
       "migrations/20260906_file_api_audit_security.sql",
+      "scripts/check-enterprise-audit-provenance.js",
       "scripts/injection-sink-audit.js",
       "services/auditIntegrityService.js",
       "services/auditService.js",
@@ -3331,7 +3332,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "controllers/authController.js",
-      "line": 281,
+      "line": 230,
       "evidence": "if (token) await revokeSession(token, 'LOGOUT').catch(() => {});"
     },
     {
@@ -4864,14 +4865,28 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 215,
+      "line": 235,
+      "evidence": "await getRateLimitService().close().catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "server.js",
+      "line": 236,
       "evidence": "await pool.end().catch(() => {});"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 233,
+      "line": 253,
+      "evidence": "await getRateLimitService().close().catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "server.js",
+      "line": 255,
       "evidence": "await pool.end().catch(() => {});"
     },
     {
@@ -5080,6 +5095,13 @@
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
+      "file": "services/rateLimitService.js",
+      "line": 192,
+      "evidence": "await redis.close().catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
       "file": "services/securityOperationsSchema.js",
       "line": 74,
       "evidence": "await pool.query(\"UPDATE expense_files SET classification = 'RESTRICTED' WHERE classification IS NULL OR classification = 'CONFIDENTIAL'\").catch(() => {});"
@@ -5278,16 +5300,16 @@
     {
       "file": ".env.example",
       "category": "root_or_other",
-      "bytes": 3146,
-      "lines": 100,
-      "sha256": "424a7c590e9c0702be394231576102272bb081edec7e82f641f1fdbc98ebcee2"
+      "bytes": 3627,
+      "lines": 116,
+      "sha256": "b650cdfd82e64051eed7c1dc755ff6876067e122a5e36f5c16f4edeb89206d37"
     },
     {
       "file": ".github/workflows/security-ci.yml",
       "category": "ci",
-      "bytes": 886,
-      "lines": 45,
-      "sha256": "b2e7824fe243eb1080e3589d7ddeb2b5efc7edc88c598ae9f37a9807bed9c10c"
+      "bytes": 1014,
+      "lines": 50,
+      "sha256": "2dde4432869f21a415980e24467a4210953de9d5c6b9d5e92c476fac1b072e2f"
     },
     {
       "file": "android/app/src/main/AndroidManifest.xml",
@@ -5313,9 +5335,9 @@
     {
       "file": "app.js",
       "category": "root_or_other",
-      "bytes": 12962,
-      "lines": 90,
-      "sha256": "0c0e75ac90b654d2b59e76b9aeb6f7d139868729d1419ff9dff088d76e1582fe"
+      "bytes": 13936,
+      "lines": 104,
+      "sha256": "02ecc830258cb52a1e3303d6aabd90a04e54ea714b64a145933c4c95e7dfa4a6"
     },
     {
       "file": "capacitor.config.json",
@@ -5355,9 +5377,9 @@
     {
       "file": "config/productionReadiness.js",
       "category": "config",
-      "bytes": 5891,
-      "lines": 79,
-      "sha256": "ff08283779076fcdb144b8264af47287b0c44427b202b1c1b3c09553ece60003"
+      "bytes": 6668,
+      "lines": 86,
+      "sha256": "3e908c12b9165b5306ab5905a43a615f643f1f10578ba151b34004941b9a9c96"
     },
     {
       "file": "config/security.js",
@@ -5397,9 +5419,9 @@
     {
       "file": "controllers/authController.js",
       "category": "controllers",
-      "bytes": 11165,
-      "lines": 292,
-      "sha256": "a3e95f21e8808364cffa10d4afe380a3240b6b39633d4ff1cedabf93615ad712"
+      "bytes": 9329,
+      "lines": 241,
+      "sha256": "1623f6f45ed1ec5a643bedc5a2a880a96702349e31ddb2459a955c72cde49b5b"
     },
     {
       "file": "controllers/competitorController.js",
@@ -5418,9 +5440,9 @@
     {
       "file": "controllers/continuousAssuranceController.js",
       "category": "controllers",
-      "bytes": 18032,
-      "lines": 114,
-      "sha256": "1e414b53018c19d8ec269de6c3c4ea5d13aeba9edf7b05454fcad69d9eca4c60"
+      "bytes": 18196,
+      "lines": 116,
+      "sha256": "acde3899f5cd95e28bf9562cee4685eb5a6a585470dffcaf725bc6830a6027d7"
     },
     {
       "file": "controllers/customerController.js",
@@ -5747,9 +5769,9 @@
     {
       "file": "docs/ENTERPRISE_DEEP_AUDIT.md",
       "category": "documentation",
-      "bytes": 17499,
-      "lines": 250,
-      "sha256": "4587fd514993ed1a9e10c22ab6e9fd9dc9f93453a1b635f6e3d2d5edf544c3ba"
+      "bytes": 19645,
+      "lines": 265,
+      "sha256": "704937bfc7c2f8bc6bfbe89d743fef501019dc906d54ae1c2a4000d1fc73ddfe"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -5782,9 +5804,9 @@
     {
       "file": "docs/PHASE_26_35_CONTINUOUS_ASSURANCE.md",
       "category": "documentation",
-      "bytes": 3746,
+      "bytes": 3844,
       "lines": 42,
-      "sha256": "6e45c6d8bfa44d6a6673d708ac7ceb5b62195537ee5c523d588563d7cf31cab1"
+      "sha256": "d56680ee7221dd8fb09f763c9f4eb59e21138611c6c5c2e8b729481cf949bd84"
     },
     {
       "file": "docs/PHASE_36_SEGREGATION_ENFORCEMENT.md",
@@ -5855,6 +5877,13 @@
       "bytes": 5079,
       "lines": 87,
       "sha256": "5e706ec7ef2ab1e2d1cf8fbd5a6bcb5cea6b78ed8c435ff782046c38413ef66f"
+    },
+    {
+      "file": "docs/WAVE_B_PR1_PLATFORM_GUARDS.md",
+      "category": "documentation",
+      "bytes": 3334,
+      "lines": 49,
+      "sha256": "63a22913a0928dc087c56e7bf30d4230744bb088686c4e19dc93ee9114d7325b"
     },
     {
       "file": "DOMAIN-MIGRATION-AUDIT.md",
@@ -5997,6 +6026,13 @@
       "sha256": "35c14be2e90c40e131327e91448f5f20296b0e83257f8729e80b6888b74a356e"
     },
     {
+      "file": "middleware/publicEndpointProtection.js",
+      "category": "middleware",
+      "bytes": 10354,
+      "lines": 215,
+      "sha256": "f48081fd1b37ad1cf8987f4581c080c9d57d019933a779d9bf1c977145077d27"
+    },
+    {
       "file": "middleware/qmsTransitionValidationMiddleware.js",
       "category": "middleware",
       "bytes": 1938,
@@ -6027,9 +6063,9 @@
     {
       "file": "middleware/securityMiddleware.js",
       "category": "middleware",
-      "bytes": 8321,
-      "lines": 220,
-      "sha256": "9a1fe60a0dd24e94e7c6d166cb5225a39f13f1f37c32fb6b99c3cceafedd2ecd"
+      "bytes": 11854,
+      "lines": 263,
+      "sha256": "e54124d8076fc11be3bce45c72f3d7eb2518a15429374a973a107b500ac1868d"
     },
     {
       "file": "middleware/sensitiveExportMiddleware.js",
@@ -6193,18 +6229,25 @@
       "sha256": "828623acb1ae2964be754248b49e1f90f305af5816e5b5bf3522381edcd1690c"
     },
     {
+      "file": "migrations/20260911_wave_b1_public_submission_dedupe.sql",
+      "category": "migrations",
+      "bytes": 802,
+      "lines": 19,
+      "sha256": "05b6b3eaeb66fbebb21e574647c2fc8350be4a9ffb05b131fb30ba778e52b09b"
+    },
+    {
       "file": "package-lock.json",
       "category": "root_or_other",
-      "bytes": 119716,
-      "lines": 3251,
-      "sha256": "2122b7caeb5c8602774187b7888f911fe5c457d3223922e6478db0b0b9ddd16c"
+      "bytes": 123128,
+      "lines": 3349,
+      "sha256": "2dc933e8e7151a10c883ea25de9ae6fc3299eba1af4295528b4da208726e6a93"
     },
     {
       "file": "package.json",
       "category": "root_or_other",
-      "bytes": 3876,
-      "lines": 53,
-      "sha256": "0a07ec122e374a17a1679568f14037f99fc6c820d699d3371c6283afe51409ef"
+      "bytes": 4122,
+      "lines": 57,
+      "sha256": "33572dfe883645f3e69d0505e9e5cd7e275a953e0ae28e14df955aeea560d0b8"
     },
     {
       "file": "public/401.html",
@@ -6426,16 +6469,16 @@
     {
       "file": "public/register.html",
       "category": "frontend",
-      "bytes": 2911,
+      "bytes": 2952,
       "lines": 66,
-      "sha256": "9740825d4990b3e5fd8c7a700355182c36253b764155d1526c043a19cd7aa39f"
+      "sha256": "fa4c03a3be264516f50db996c904e3e696d82d51e25d764808da8cd560195907"
     },
     {
       "file": "public/register.js",
       "category": "frontend",
-      "bytes": 1848,
-      "lines": 58,
-      "sha256": "784511d750fb0a42d147e11e7bad142c34dc65cbfb0f999f1914be0eba23580d"
+      "bytes": 2000,
+      "lines": 64,
+      "sha256": "eef8aa5c583b10cddfada74161e1d0177a394c6bcba3d1c57ad9f7c3ab003ab1"
     },
     {
       "file": "public/reset-password.html",
@@ -6608,9 +6651,9 @@
     {
       "file": "routes/authRoutes.js",
       "category": "routes",
-      "bytes": 2428,
-      "lines": 42,
-      "sha256": "e8fdc25eba2b223b29f0bce0f8344b5668f325b4e5fdd7edc15a2a1360955d74"
+      "bytes": 3197,
+      "lines": 54,
+      "sha256": "3fe7ab3606b7f8b48f4c5ae1f6beff3183b0f0ff20a1f19af9c230a1e09f7cb6"
     },
     {
       "file": "routes/competitorRoutes.js",
@@ -6872,6 +6915,13 @@
       "sha256": "aab613134f103edec77721f1ea3c7b65953e96d435e59cc4c3248417a358e9ee"
     },
     {
+      "file": "scripts/check-enterprise-audit-provenance.js",
+      "category": "scripts",
+      "bytes": 2377,
+      "lines": 49,
+      "sha256": "56311e685bea81ca96c22f7300addf698b484681d2ab65c3362e7e550d7091ea"
+    },
+    {
       "file": "scripts/check-production-readiness.js",
       "category": "scripts",
       "bytes": 474,
@@ -6881,9 +6931,9 @@
     {
       "file": "scripts/check-syntax.js",
       "category": "scripts",
-      "bytes": 5006,
+      "bytes": 5253,
       "lines": 42,
-      "sha256": "d9235af588985d1b9480e947335bd1095c5966bb3c139be1a8d80abde8951521"
+      "sha256": "ea2030cf7797fe717b2d025465dfe5f0bc347c3aea9c13028b02c01d519aa028"
     },
     {
       "file": "scripts/continuous-assurance-test.js",
@@ -6909,9 +6959,9 @@
     {
       "file": "scripts/enterprise-wave-a-mysql-legacy-test.js",
       "category": "scripts",
-      "bytes": 2120,
-      "lines": 53,
-      "sha256": "1094b02b694bbeb4008d03020f3c66c2386e5e5ffad25c3925ea2d1e9809ea1a"
+      "bytes": 2708,
+      "lines": 60,
+      "sha256": "81d8fc701bb861cb61bd252c76cf4b455db9e7542c319573a35398b17179373e"
     },
     {
       "file": "scripts/enterprise-wave-a-test.js",
@@ -6993,9 +7043,9 @@
     {
       "file": "scripts/generate-enterprise-inventory.js",
       "category": "scripts",
-      "bytes": 6853,
-      "lines": 127,
-      "sha256": "1f37cbd0fe341602d6d97b1bcb1aa85113f65959896a98d9770951ab47942e73"
+      "bytes": 7160,
+      "lines": 134,
+      "sha256": "16cc96a92cd324df2e124d89049380951065847525986207e1cbd6014fb99fe7"
     },
     {
       "file": "scripts/generate-quality-process-sheet.js",
@@ -7070,9 +7120,9 @@
     {
       "file": "scripts/production-readiness-test.js",
       "category": "scripts",
-      "bytes": 2110,
-      "lines": 38,
-      "sha256": "ba5b004563504a55ea5f4afd4abcd71e3fe1e67fd3da5b6ee0569401b8ae6ddb"
+      "bytes": 2275,
+      "lines": 39,
+      "sha256": "42eb9267136bf0309c483243e0ce69bbb4f357d5dead2cb4e1cbf61fea84ee42"
     },
     {
       "file": "scripts/qms-controlled-record-foundation-test.js",
@@ -7159,6 +7209,13 @@
       "sha256": "3a55b3cb731b89130d6b199a37d08098e78fa96402950a81a20a603a685df713"
     },
     {
+      "file": "scripts/wave-b-pr1-platform-guards-test.js",
+      "category": "scripts",
+      "bytes": 12083,
+      "lines": 240,
+      "sha256": "eb93af8b307553174909e9acc41f1d72662c800b0a3feeea94177cbbe1c33150"
+    },
+    {
       "file": "SECURITY-CHECKLIST.md",
       "category": "root_or_other",
       "bytes": 1998,
@@ -7175,9 +7232,9 @@
     {
       "file": "server.js",
       "category": "root_or_other",
-      "bytes": 12264,
-      "lines": 244,
-      "sha256": "e5de428058a5b7d5f6d2faa8d8166970b1339b301bc77b9509e80bb7314ca91b"
+      "bytes": 13559,
+      "lines": 266,
+      "sha256": "a22970eea7511f381e55489218a7ecfaa8b2c6c792fe77ae2e5bddac3b99fbe4"
     },
     {
       "file": "services/adaptiveRiskService.js",
@@ -7241,6 +7298,13 @@
       "bytes": 1930,
       "lines": 46,
       "sha256": "111785a7f6a3c3a16048026c9ea2cf880875b5b21894fdde8c5325826d47c67b"
+    },
+    {
+      "file": "services/botChallengeService.js",
+      "category": "services",
+      "bytes": 2610,
+      "lines": 71,
+      "sha256": "4b0f3ace1d318064cf5375d684f1249c242591758f63e74d632d50c5fcf39b22"
     },
     {
       "file": "services/databaseRuntimeService.js",
@@ -7411,6 +7475,13 @@
       "sha256": "bb979fa99986dd3f962a81111e7d84e1a795b0cbd100a2041eb907cbaa56546d"
     },
     {
+      "file": "services/publicSubmissionDedupeService.js",
+      "category": "services",
+      "bytes": 6448,
+      "lines": 173,
+      "sha256": "d0ae623383341676387e204fbcffb3cf732c1f1de421900669c7f49dc66f8388"
+    },
+    {
       "file": "services/qmsAdvancedSchema.js",
       "category": "services",
       "bytes": 32723,
@@ -7451,6 +7522,13 @@
       "bytes": 4035,
       "lines": 75,
       "sha256": "f329e81812a2e5ae6f3710ce5d8f5657678b48e2a9b016cf8d76219b8a0313fc"
+    },
+    {
+      "file": "services/rateLimitService.js",
+      "category": "services",
+      "bytes": 8986,
+      "lines": 267,
+      "sha256": "622961f6b12bb9fdf9cc99c4349f5653baa99c4be6ac9eda4dbf865b4a0d05f9"
     },
     {
       "file": "services/runtimeState.js",
