@@ -1,10 +1,25 @@
 const crypto = require('crypto');
 const path = require('path');
+const { getRateLimitService, positiveInteger } = require('../services/rateLimitService');
+const { CONTROL_STATES, markFailed, setControl, setCriticalService } = require('../services/runtimeState');
 
 const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const GENERAL_LIMIT = Number(process.env.RATE_LIMIT_MAX || 900);
-const AUTH_LIMIT = Number(process.env.AUTH_RATE_LIMIT_MAX || 25);
-const buckets = new Map();
+const RATE_LIMIT_POLICIES = Object.freeze({
+  authenticated_api: { windowMs: WINDOW_MS, max: GENERAL_LIMIT, keyPrefix: 'api' },
+  login: { windowMs: 15 * 60 * 1000, max: Number(process.env.LOGIN_RATE_LIMIT_MAX || 10), keyPrefix: 'auth:login' },
+  mfa: { windowMs: 15 * 60 * 1000, max: Number(process.env.MFA_RATE_LIMIT_MAX || 12), keyPrefix: 'auth:mfa' },
+  step_up: { windowMs: 15 * 60 * 1000, max: Number(process.env.STEP_UP_RATE_LIMIT_MAX || 10), keyPrefix: 'auth:step-up' },
+  password_reset: { windowMs: 60 * 60 * 1000, max: Number(process.env.PASSWORD_RESET_RATE_LIMIT_MAX || 6), keyPrefix: 'auth:password-reset' },
+  invitation: { windowMs: 15 * 60 * 1000, max: Number(process.env.INVITATION_RATE_LIMIT_MAX || 10), keyPrefix: 'auth:invitation' },
+  customer_registration: { windowMs: 60 * 60 * 1000, max: Number(process.env.CUSTOMER_REGISTRATION_RATE_LIMIT_MAX || 5), keyPrefix: 'public:customer-registration' },
+  public_rfq: { windowMs: 60 * 60 * 1000, max: Number(process.env.PUBLIC_RFQ_RATE_LIMIT_MAX || 10), keyPrefix: 'public:rfq' },
+  ai_lead: { windowMs: 60 * 60 * 1000, max: Number(process.env.AI_LEAD_RATE_LIMIT_MAX || 10), keyPrefix: 'public:ai-lead' },
+  shift_qr: { windowMs: 60 * 1000, max: Number(process.env.SHIFT_QR_RATE_LIMIT_MAX || 120), keyPrefix: 'public:shift-qr' },
+  qr_generation: { windowMs: 60 * 1000, max: Number(process.env.QR_GENERATION_RATE_LIMIT_MAX || 60), keyPrefix: 'public:qr-generation' },
+  coc_verification: { windowMs: 60 * 1000, max: Number(process.env.COC_VERIFY_RATE_LIMIT_MAX || 120), keyPrefix: 'public:coc-verification' },
+  csp_report: { windowMs: 60 * 1000, max: Number(process.env.CSP_REPORT_RATE_LIMIT_MAX || 30), keyPrefix: 'public:csp-report' }
+});
 
 function clientIp(req) {
   return String(req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown')
@@ -12,33 +27,53 @@ function clientIp(req) {
     .trim();
 }
 
-function rateLimit({ windowMs = WINDOW_MS, max = GENERAL_LIMIT, keyPrefix = 'global' } = {}) {
-  return (req, res, next) => {
-    const now = Date.now();
-    const key = `${keyPrefix}:${clientIp(req)}`;
-    const entry = buckets.get(key) || { count: 0, resetAt: now + windowMs };
+function rateLimit({ windowMs = WINDOW_MS, max = GENERAL_LIMIT, keyPrefix = 'api', keyGenerator = clientIp, skip } = {}) {
+  const duration = positiveInteger(windowMs, WINDOW_MS, 1000, 86400000);
+  const limit = positiveInteger(max, GENERAL_LIMIT, 1, 1000000);
+  return async (req, res, next) => {
+    if (typeof skip === 'function' && skip(req)) return next();
+    try {
+      const identity = String(keyGenerator(req) || 'unknown').slice(0, 512);
+      const entry = await getRateLimitService().consume(`${keyPrefix}:${identity}`, duration);
+      res.setHeader('RateLimit-Limit', String(limit));
+      res.setHeader('RateLimit-Remaining', String(Math.max(0, limit - entry.count)));
+      res.setHeader('RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
 
-    if (entry.resetAt <= now) {
-      entry.count = 0;
-      entry.resetAt = now + windowMs;
-    }
-
-    entry.count += 1;
-    buckets.set(key, entry);
-
-    res.setHeader('RateLimit-Limit', String(max));
-    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - entry.count)));
-    res.setHeader('RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
-
-    if (entry.count > max) {
+      if (entry.count <= limit) return next();
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil(entry.ttlMs / 1000))));
       if (!req.path.startsWith('/api/') && req.accepts('html')) {
         return res.status(429).sendFile(path.join(__dirname, '..', 'public', '429.html'));
       }
-      return res.status(429).json({ message: 'Too many requests. Please wait and try again.' });
+      return res.status(429).json({ code: 'RATE_LIMIT_EXCEEDED', message: 'Too many requests. Please wait and try again.' });
+    } catch (error) {
+      if (error.code !== 'RATE_LIMIT_STORE_UNAVAILABLE') return next(error);
+      setControl('redis_limiter', CONTROL_STATES.FAILED, error.causeCode || error.code);
+      setCriticalService('rate_limiter', CONTROL_STATES.FAILED, error.causeCode || error.code);
+      markFailed(error, 'RATE_LIMIT_RUNTIME');
+      res.setHeader('Retry-After', '30');
+      return res.status(503).json({
+        code: 'RATE_LIMIT_PROTECTION_UNAVAILABLE',
+        message: 'Request protection is temporarily unavailable. Please try again shortly.'
+      });
     }
-
-    next();
   };
+}
+
+function rateLimitPolicy(name) {
+  const policy = RATE_LIMIT_POLICIES[name];
+  if (!policy) throw new Error(`Unknown rate-limit policy: ${name}`);
+  return rateLimit(policy);
+}
+
+function authPolicyName(pathname) {
+  const route = String(pathname || '').toLowerCase();
+  if (route === '/login') return 'login';
+  if (route.includes('/mfa/')) return 'mfa';
+  if (route.includes('/step-up')) return 'step_up';
+  if (route.includes('/password-reset') || route.includes('/change-password')) return 'password_reset';
+  if (route.includes('/invitation')) return 'invitation';
+  if (route.includes('/customer-register')) return 'customer_registration';
+  return 'login';
 }
 
 function securityHeaders(req, res, next) {
@@ -175,7 +210,7 @@ function corsOptions() {
       return callback(new Error('CORS origin not allowed'));
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Impersonation-Context'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-CSRF-Token', 'X-Impersonation-Context', 'Idempotency-Key', 'X-Bot-Challenge-Token'],
     credentials: true,
     maxAge: 86400
   };
@@ -204,15 +239,23 @@ function safeErrorHandler(err, req, res, next) {
 }
 
 function authRateLimit() {
-  return rateLimit({ windowMs: 15 * 60 * 1000, max: AUTH_LIMIT, keyPrefix: 'auth' });
+  const middleware = Object.fromEntries(
+    ['login', 'mfa', 'step_up', 'password_reset', 'invitation', 'customer_registration']
+      .map((name) => [name, rateLimitPolicy(name)])
+  );
+  return (req, res, next) => middleware[authPolicyName(req.path)](req, res, next);
 }
 
 module.exports = {
+  RATE_LIMIT_POLICIES,
+  authPolicyName,
   authRateLimit,
+  clientIp,
   corsOptions,
   csrfProtection,
   enforceHttps,
   rateLimit,
+  rateLimitPolicy,
   safeApiResponses,
   securityHeaders,
   safeErrorHandler

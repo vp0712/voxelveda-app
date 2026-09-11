@@ -16,6 +16,7 @@ const { startEmailQueueWorker, stopEmailQueueWorker } = require('./services/emai
 const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./services/databaseRuntimeService');
 const { runMigrations } = require('./services/migrationRunner');
 const { allowedHosts } = require('./services/outboundRequestPolicy');
+const { getRateLimitService } = require('./services/rateLimitService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
@@ -94,9 +95,28 @@ function configured(keys) {
 }
 
 async function initializeServices() {
-  const redisConfigured = configured(['REDIS_URL']);
-  setControl('redis_limiter', redisConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.DEGRADED,
-    redisConfigured ? 'Redis settings are present; adapter verification is scheduled for Wave B' : 'Process-local limiter is active; do not scale to multiple replicas');
+  const limiter = getRateLimitService();
+  setControl('redis_limiter', CONTROL_STATES.INITIALIZING, 'Initializing configured rate-limit adapter');
+  setCriticalService('rate_limiter', CONTROL_STATES.INITIALIZING);
+  try {
+    const limiterStatus = await limiter.initialize();
+    const memoryInProduction = limiterStatus.provider === 'MEMORY' && process.env.NODE_ENV === 'production';
+    const runtimeControlState = limiterStatus.distributed
+      ? CONTROL_STATES.OPERATIONAL
+      : (memoryInProduction ? CONTROL_STATES.DEGRADED : CONTROL_STATES.OPERATIONAL);
+    const detail = limiterStatus.distributed
+      ? 'Redis adapter connected and completed a provider health operation'
+      : (memoryInProduction
+        ? 'Memory limiter is active for a single replica; configure Redis before horizontal scaling'
+        : 'Memory limiter is active for development or single-replica operation');
+    setControl('redis_limiter', runtimeControlState, detail);
+    setCriticalService('rate_limiter', runtimeControlState, detail);
+    if (memoryInProduction) addWarning('Rate limiting is process-local; keep one replica until a Redis provider is connected and health-verified');
+  } catch (error) {
+    setControl('redis_limiter', CONTROL_STATES.FAILED, error.code || 'RATE_LIMIT_INITIALIZATION_FAILED');
+    setCriticalService('rate_limiter', CONTROL_STATES.FAILED, error.code || 'RATE_LIMIT_INITIALIZATION_FAILED');
+    throw error;
+  }
 
   const scannerConfigured = configured(['MALWARE_SCANNER_PROVIDER']);
   setControl('malware_scanner', scannerConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
@@ -212,6 +232,7 @@ async function bootstrap() {
     stopWeeklyTimesheetScheduler();
     stopTrashPurgeScheduler();
     stopWorkflowSlaScheduler();
+    await getRateLimitService().close().catch(() => {});
     await pool.end().catch(() => {});
     const migrationContext = error?.details?.migration_id
       ? ` migration=${error.details.migration_id} cause=${error.details.cause_code || 'unknown'}`
@@ -229,6 +250,7 @@ async function shutdown(signal = 'shutdown', exitCode = 0) {
   stopWeeklyTimesheetScheduler();
   stopTrashPurgeScheduler();
   stopWorkflowSlaScheduler();
+  await getRateLimitService().close().catch(() => {});
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
   await pool.end().catch(() => {});
   if (require.main === module) process.exit(exitCode);

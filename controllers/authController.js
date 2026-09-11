@@ -128,60 +128,6 @@ exports.login = async (req, res) => {
   }
 };
 
-exports.register = async (req, res) => {
-  try {
-    await ensureUserLifecycleSchema();
-    await ensureSecuritySchema();
-    const name = String(req.body.name || '').trim();
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const password = String(req.body.password || '');
-    const role = normalizeRole(req.body.role || 'staff');
-    const username = String(req.body.username || email.split('@')[0] || '').trim().toLowerCase();
-    const permissions = parsePermissions(req.body.permissions);
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Name, email and password required' });
-    }
-
-    if (!isValidEmail(email)) {
-      return res.status(400).json({ message: 'Valid email address is required' });
-    }
-
-    const passwordCheck = validatePassword(password, { email, username, name });
-    if (!passwordCheck.valid) return res.status(400).json({ message: passwordCheck.errors[0] });
-
-    const allowedRoles = ['admin', 'staff', 'sales', 'production', 'viewer'];
-
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
-    }
-
-    const [existing] = await pool.query(
-      'SELECT id FROM users WHERE LOWER(email) = ? LIMIT 1',
-      [email]
-    );
-
-    if (existing.length) {
-      return res.status(409).json({ message: 'Email already registered' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    await pool.query(
-      `INSERT INTO users (name, username, email, password, role, permissions, active)
-       VALUES (?, ?, ?, ?, ?, ?, 1)`,
-      [name, username, email, hashedPassword, role, JSON.stringify(permissions)]
-    );
-
-    res.json({ message: 'User registered successfully' });
-  } catch (err) {
-    console.error('REGISTER ERROR:', err);
-    res.status(500).json({
-      message: 'Registration failed'
-    });
-  }
-};
-
 exports.me = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
@@ -237,9 +183,12 @@ exports.customerRegister = async (req, res) => {
       return res.status(400).json({ message: 'Valid email address is required' });
     }
 
-    if (password.length < 6) {
-      return res.status(400).json({ message: 'Password must be at least 6 characters' });
-    }
+    const passwordCheck = validatePassword(password, {
+      email,
+      name,
+      username: email.split('@')[0]
+    });
+    if (!passwordCheck.valid) return res.status(400).json({ message: passwordCheck.errors[0] });
 
     if (!confirmPrivacy) {
       return res.status(400).json({ message: 'Please accept the privacy policy before creating an account' });

@@ -29,13 +29,13 @@ Apply `migrations/20260907_continuous_assurance.sql`, or verify `Continuous assu
 
 No new variable is mandatory. Optional readiness signals are:
 
-- `REDIS_URL`: indicates a reviewed distributed rate-limit backend is available; current middleware remains process-local until that adapter is implemented and tested.
+- `RATE_LIMIT_STORE=redis` and `REDIS_URL`: select the shared atomic limiter. Runtime state remains non-operational until the adapter connects and completes a Redis health operation; configuration alone is not provider evidence.
 - `WEBAUTHN_RP_ID` and `WEBAUTHN_ORIGIN`: reserved readiness metadata only. This release does not claim passkey ceremonies are implemented.
 - `SECURITY_EVENT_DESTINATION`: identifies a reviewed destination adapter. Outbox delivery is not attempted without one.
 
 ## Remaining work
 
 - Implement and audit WebAuthn ceremonies before enabling passkeys.
-- Add a Redis-backed atomic limiter before increasing Railway replicas.
+- Configure and runtime-verify the implemented Redis-backed atomic limiter before increasing Railway replicas.
 - Implement authenticated outbox delivery with retry/dead-letter handling for the selected SIEM destination.
 - Schedule audit sealing through a controlled production job and export anchor digests to independent immutable storage.

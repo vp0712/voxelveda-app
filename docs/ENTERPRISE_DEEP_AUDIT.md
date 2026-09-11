@@ -3,8 +3,12 @@
 ## Audit baseline
 
 - Repository: `vp0712/voxelveda-app`
-- Latest fetched `origin/main` at audit start: `a1fee06e4f878f8af9d7c18f52d983e57723b1f0`
-- Wave A branch: `feature/enterprise-wave-a-bootstrap`
+- Latest fetched `origin/main` at audit start: `090de950289b9c264e52e97198835803657ac825`
+- Audited source SHA: `090de950289b9c264e52e97198835803657ac825`
+- Audited source commit time: `2026-09-11T10:58:46+10:00`
+- Inventory generated at: `2026-09-11T10:58:46+10:00` (deterministic source commit time)
+- Inventory generator version: `2.0.0`
+- Current remediation branch: `feature/wave-b-pr1-platform-guards`
 - Scope: root application files plus `config`, `controllers`, `controllers/qms`, `middleware`, `migrations`, `public`, `routes`, `scripts`, `services`, `utils`, `ios`, `android`, and `.github/workflows`.
 - Binary policy: image, font, PDF, and archive bytes were not interpreted as source. Their path, type, size, and deployment presence are inventoried.
 - Machine-readable evidence: `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json`
@@ -21,20 +25,31 @@ The deterministic inventory currently records 344 text/source files, 76,582 line
 - Real local legacy-schema rehearsal: 19 pre-Wave-A migrations baselined, 1 applied, then 20 checksum-protected entries skipped on repeat.
 - Local boot smoke: schemas completed before `Server ready`; `/api/health` returned 200, `/api/ready` returned 200/ready with the expected schema version, and anonymous detailed readiness returned 401.
 
-These results are local evidence only. CI, Railway deployment, production runtime, database TLS, SMTP, backup, malware scanner, Redis, DNS/TLS, WebAuthn, and object-storage provider verification remain separate states.
+Wave B PR 1 local evidence on `feature/wave-b-pr1-platform-guards`:
+
+- `npm run check`: passed for 141 JavaScript files.
+- `npm test`: passed, including the focused Wave B PR 1 suite and every existing repository regression suite.
+- `npm run security:audit`: passed with zero reported vulnerabilities.
+- `npm run audit:inventory:check`: passed for audited source `090de950289b9c264e52e97198835803657ac825` and generator `2.0.0`.
+- Real local legacy MySQL rehearsal: 21 migrations discovered, 19 baselined, 2 applied, the dedupe table and required columns verified, then all 21 checksum-verified/skipped on repeat.
+- Redis behavior is adapter-tested with separate simulated replicas sharing one atomic namespace. No live Redis provider has been configured or verified.
+
+Wave A was subsequently merged through PR 30 and deployed at exact SHA `090de950289b9c264e52e97198835803657ac825`. Production evidence showed the migration ledger recovering 18 legacy entries, checksum-verifying one existing entry, applying the Wave A migration, and reaching 17 critical schemas before `Server ready`. Public health and readiness returned the same SHA and anonymous detailed readiness was denied. Database TLS, Redis, backup, malware scanning, custom-domain DNS/TLS, WebAuthn, and object-storage provider verification remain separate and unverified unless identified below.
+
+The architecture inventory in this branch intentionally represents the pre-implementation source SHA above. PR 1 changes are not silently folded into that older baseline: `source_sha`, `generated_at`, and `generator_version` are explicit, and CI verifies that the source exists, is an ancestor of the branch, and is named by this audit.
 
 ## Assurance state
 
 | Control | Code present | Wired | Locally tested | CI verified | Deployed | Runtime verified | Provider verified |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ordered migration runner | Yes | Yes | Yes | Pending | No | Pending | Not applicable |
-| MySQL advisory migration lock | Yes | Yes | Yes | Pending | No | Pending | Not applicable |
-| `DATABASE_URL` parsing | Yes | Yes | Yes | Pending | No | Pending | Not applicable |
-| Database TLS enforcement | Yes | Yes | Yes | Pending | No | Pending | No |
-| Liveness/readiness separation | Yes | Yes | Yes | Pending | No | Pending | Not applicable |
-| Restricted readiness detail | Yes | Yes | Yes | Pending | No | Pending | Not applicable |
-| SMTP runtime verification | Yes | Yes | Syntax tested | Pending | No | Pending | No |
-| Redis distributed limiter | No | No | No | No | No | No | No |
+| Ordered migration runner | Yes | Yes | Yes | Yes | Yes | Yes | Not applicable |
+| MySQL advisory migration lock | Yes | Yes | Yes | Yes | Yes | Yes | Not applicable |
+| `DATABASE_URL` parsing | Yes | Yes | Yes | Yes | Yes | Yes | Not applicable |
+| Database TLS enforcement | Yes | Yes | Yes | Yes | Yes | Code path verified; active TLS not verified | No |
+| Liveness/readiness separation | Yes | Yes | Yes | Yes | Yes | Yes | Not applicable |
+| Restricted readiness detail | Yes | Yes | Yes | Yes | Yes | Yes | Not applicable |
+| SMTP runtime verification | Yes | Yes | Yes | Yes | Yes | Degraded/not configured | No |
+| Redis distributed limiter | Yes | Yes | Focused tests passed | Pending PR 1 CI | No | No | No |
 | Malware scan adapter | Queue states only | No verified adapter | No | No | No | No | No |
 | Durable object storage adapter | No | No | No | No | No | No | No |
 
@@ -172,7 +187,7 @@ No deployment or provider state in this document should be promoted without rele
 - Recommended fix: Add endpoint-specific limits, body contracts, dedupe, anti-enumeration, and a Redis adapter with a documented failure mode.
 - Test requirement: Boundary, bypass, expiry, shared-counter, and provider-failure tests.
 - External dependency: Redis before multi-replica production.
-- Status: Deferred to Wave B.
+- Status: Fixed in Wave B PR 1 code with endpoint policies, bounded contracts, Redis-capable counters, fail-closed production behavior, RFQ/AI dedupe, and a pluggable bot-challenge adapter. Redis provider verification remains pending and must not be inferred from configuration.
 
 ### A-012: Public customer registration bypasses the shared password policy
 
@@ -184,7 +199,7 @@ No deployment or provider state in this document should be promoted without rele
 - Recommended fix: Route every password creation/update path through `validatePassword` while preserving generic responses.
 - Test requirement: Registration, invite, reset, admin-created user, and change-password parity tests.
 - External dependency: None.
-- Status: Deferred to Wave B to avoid mixing auth behavior into bootstrap PR.
+- Status: Fixed in Wave B PR 1 code. Public registration now uses `validatePassword`, the public contract is bounded, the UI advertises the shared minimum, and the unrouted legacy registration export was removed.
 
 ### A-013: QMS and governance lists use fixed limits instead of pagination
 

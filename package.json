@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
     "typecheck": "node scripts/check-syntax.js",
@@ -13,6 +14,8 @@
     "test:enterprise-wave-a": "node scripts/enterprise-wave-a-test.js",
     "test:enterprise-wave-a:mysql-legacy": "node scripts/enterprise-wave-a-mysql-legacy-test.js",
     "audit:inventory": "node scripts/generate-enterprise-inventory.js",
+    "audit:inventory:check": "node scripts/check-enterprise-audit-provenance.js",
+    "test:wave-b-pr1": "node scripts/wave-b-pr1-platform-guards-test.js",
     "test:erp-wave1": "node scripts/erp-wave1-trash-notification-test.js && node scripts/erp-wave1-trash-lifecycle-test.js",
     "test:erp-wave2": "node scripts/erp-wave2-workflow-test.js && node scripts/erp-wave2-workflow-lifecycle-test.js",
     "test:erp-wave3": "node scripts/erp-wave3-procurement-test.js && node scripts/erp-wave3-procurement-lifecycle-test.js",
@@ -40,7 +43,8 @@
     "mysql2": "^3.24.3",
     "nodemailer": "^10.0.0",
     "pdfkit": "^0.18.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "redis": "^6.2.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.1",

@@ -51,11 +51,18 @@ function assessProductionReadiness(env = process.env) {
   if (production && origins.some((origin) => !validHttpsUrl(origin))) failures.push('production CORS origins must use HTTPS');
   if (production && !validHttpsUrl(env.APP_URL || env.PUBLIC_APP_URL)) failures.push('APP_URL must be an HTTPS production URL');
 
+  const rateLimitStore = String(env.RATE_LIMIT_STORE || 'memory').trim().toLowerCase();
+  const rateLimitFailurePolicy = String(env.RATE_LIMIT_FAILURE_POLICY || (production ? 'deny' : 'memory')).trim().toLowerCase();
+  if (!['memory', 'redis'].includes(rateLimitStore)) failures.push('RATE_LIMIT_STORE must be memory or redis');
+  if (!['deny', 'memory'].includes(rateLimitFailurePolicy)) failures.push('RATE_LIMIT_FAILURE_POLICY must be deny or memory');
+  if (rateLimitStore === 'redis' && !String(env.REDIS_URL || '').trim()) failures.push('REDIS_URL is required when RATE_LIMIT_STORE=redis');
+  if (production && rateLimitStore === 'redis' && rateLimitFailurePolicy !== 'deny') failures.push('Production Redis rate limiting must fail closed with RATE_LIMIT_FAILURE_POLICY=deny');
+
   if (production && !env.MALWARE_SCANNER_PROVIDER) warnings.push('MALWARE_SCANNER_PROVIDER is not configured; uploads remain unavailable for automated malware scanning');
   if (production && !env.WEBHOOK_SIGNING_KEY) warnings.push('WEBHOOK_SIGNING_KEY is not configured; signed integration webhooks remain disabled');
   if (production && !env.OUTBOUND_ALLOWED_HOSTS) warnings.push('OUTBOUND_ALLOWED_HOSTS is empty; backend URL fetches remain deny-by-default');
   if (production && env.BACKUP_STATUS_PROVIDER !== 'configured') warnings.push('Database backup status is not attested by a configured provider');
-  if (production && env.RATE_LIMIT_STORE !== 'redis') warnings.push('Rate limiting is process-local; configure a shared Redis-backed limiter before scaling beyond one replica');
+  if (production && rateLimitStore !== 'redis') warnings.push('Rate limiting is process-local; configure a shared Redis-backed limiter before scaling beyond one replica');
   if (production && env.FORCE_CANONICAL_HOST !== 'true') warnings.push('Canonical-host enforcement remains disabled until custom-domain DNS and TLS are verified');
   let databaseUser = String(env.DB_USER || '').toLowerCase();
   if (env.DATABASE_URL) {

@@ -2,7 +2,7 @@ const assert = require('node:assert');
 const crypto = require('node:crypto');
 const mysql = require('mysql2/promise');
 const { buildDatabaseConfig } = require('../config/databaseConfig');
-const { LEGACY_SCHEMA_MARKERS, runMigrations } = require('../services/migrationRunner');
+const { LEGACY_SCHEMA_MARKERS, discoverMigrations, runMigrations } = require('../services/migrationRunner');
 
 async function run() {
   const schema = `voxelveda_wave_a_legacy_${crypto.randomBytes(5).toString('hex')}`;
@@ -17,10 +17,11 @@ async function run() {
       await pool.query(`CREATE TABLE \`${table}\` (id INT PRIMARY KEY) ENGINE=InnoDB`);
     }
 
+    const expectedMigrations = discoverMigrations().length;
     const first = await runMigrations({ pool, logger: { info() {} }, env: { DEPLOYMENT_SHA: 'mysql-legacy-test' } });
-    assert.equal(first.discovered, 20);
+    assert.equal(first.discovered, expectedMigrations);
     assert.equal(first.baselined, 19);
-    assert.equal(first.applied, 1);
+    assert.equal(first.applied, expectedMigrations - first.baselined);
     assert.equal(first.skipped, 0);
 
     const [[counts]] = await pool.query(`
@@ -31,13 +32,19 @@ async function run() {
       FROM schema_migrations
     `);
     assert.equal(Number(counts.baselined), 19);
-    assert.equal(Number(counts.applied), 1);
+    assert.equal(Number(counts.applied), expectedMigrations - first.baselined);
     assert.equal(Number(counts.failed), 0);
+
+    const [dedupeColumns] = await pool.query('SHOW COLUMNS FROM public_submission_dedupe');
+    const dedupeColumnNames = new Set(dedupeColumns.map((column) => column.Field));
+    for (const required of ['submission_type', 'dedupe_key', 'payload_sha256', 'lock_token', 'status', 'expires_at']) {
+      assert(dedupeColumnNames.has(required), `missing public submission dedupe column: ${required}`);
+    }
 
     const second = await runMigrations({ pool, logger: { info() {} } });
     assert.equal(second.baselined, 0);
     assert.equal(second.applied, 0);
-    assert.equal(second.skipped, 20);
+    assert.equal(second.skipped, expectedMigrations);
     console.log('Enterprise Wave A legacy MySQL baseline test passed.');
   } finally {
     if (pool) await pool.end().catch(() => {});

@@ -37,6 +37,9 @@ jobs:
       - name: Run syntax checks
         run: npm run check
 
+      - name: Verify enterprise audit provenance
+        run: npm run audit:inventory:check
+
       - name: Run automated tests
         run: npm test
 
