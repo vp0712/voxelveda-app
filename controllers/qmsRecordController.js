@@ -1,7 +1,9 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { ensureQmsSchema } = require('../services/qmsSchema');
+const { ensureQmsAdvancedSchema } = require('../services/qmsAdvancedSchema');
 const { logAudit } = require('../services/auditService');
+const { loadEffectiveDefinition, respondDefinitionNotEffective } = require('../services/qmsDefinitionService');
 
 const MUTABLE = new Set(['DRAFT', 'REJECTED']);
 
@@ -65,7 +67,7 @@ async function getRecord(req, res, next) {
 
 async function createRecord(req, res, next) {
   try {
-    await ensureQmsSchema();
+    await Promise.all([ensureQmsSchema(), ensureQmsAdvancedSchema()]);
     const documentId = String(req.body.document_id || '').trim();
     const title = String(req.body.document_title || '').trim();
     const sourceRevision = String(req.body.source_revision || '1.0').trim();
@@ -86,6 +88,10 @@ async function createRecord(req, res, next) {
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
+      if (!await loadEffectiveDefinition(connection, documentId, sourceRevision, { lock: true })) {
+        await connection.rollback();
+        return respondDefinitionNotEffective(res, documentId, sourceRevision);
+      }
       const [result] = await connection.query('INSERT INTO qms_records (record_uuid,document_id,document_title,source_revision,values_json,owner_user_id,prepared_by,integrity_hash) VALUES (?,?,?,?,?,?,?,?)', [uuid, documentId, title, sourceRevision, JSON.stringify(values), who, who, hash]);
       const recordNo = `QMS-${new Date().getUTCFullYear()}-${String(result.insertId).padStart(6, '0')}`;
       await connection.query('UPDATE qms_records SET record_no=? WHERE id=?', [recordNo, result.insertId]);
@@ -139,7 +145,7 @@ async function transition(req, res, next) {
     CLOSED: ['SUPERSEDED']
   };
   try {
-    await ensureQmsSchema();
+    await Promise.all([ensureQmsSchema(), ensureQmsAdvancedSchema()]);
     const connection = await pool.getConnection();
     try {
       await connection.beginTransaction();
@@ -147,6 +153,11 @@ async function transition(req, res, next) {
       if (!current) { await connection.rollback(); return res.status(404).json({ message: 'Controlled record not found.' }); }
       if (!(allowed[current.status] || []).includes(target)) { await connection.rollback(); return res.status(409).json({ message: `Invalid QMS workflow transition ${current.status} → ${target}.` }); }
       if (['REJECTED','VOID','SUPERSEDED'].includes(target) && !reason) { await connection.rollback(); return res.status(400).json({ message: 'A reason is required for this transition.' }); }
+      if (['SUBMITTED', 'UNDER_REVIEW', 'APPROVED', 'CLOSED'].includes(target)
+        && !await loadEffectiveDefinition(connection, current.document_id, current.source_revision, { lock: true })) {
+        await connection.rollback();
+        return respondDefinitionNotEffective(res, current.document_id, current.source_revision);
+      }
       const who = actor(req);
       if (target === 'APPROVED' && who && Number(current.prepared_by) === who) { await connection.rollback(); return res.status(409).json({ message: 'Separation of duties: the preparer cannot provide final approval.' }); }
       const next = { ...current, status: target };

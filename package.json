@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js",
+    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
     "typecheck": "node scripts/check-syntax.js",
@@ -17,6 +17,7 @@
     "audit:inventory:check": "node scripts/check-enterprise-audit-provenance.js",
     "test:wave-b-pr1": "node scripts/wave-b-pr1-platform-guards-test.js",
     "test:wave-b-pr2": "node scripts/wave-b-pr2-worker-safety-test.js",
+    "test:wave-b-pr3": "node scripts/wave-b-pr3-qms-fail-closed-test.js",
     "test:erp-wave1": "node scripts/erp-wave1-trash-notification-test.js && node scripts/erp-wave1-trash-lifecycle-test.js",
     "test:erp-wave2": "node scripts/erp-wave2-workflow-test.js && node scripts/erp-wave2-workflow-lifecycle-test.js",
     "test:erp-wave3": "node scripts/erp-wave3-procurement-test.js && node scripts/erp-wave3-procurement-lifecycle-test.js",

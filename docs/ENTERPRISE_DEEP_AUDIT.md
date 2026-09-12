@@ -3,17 +3,17 @@
 ## Audit baseline
 
 - Repository: `vp0712/voxelveda-app`
-- Latest fetched `origin/main` at audit start: `1e1a4bc589094e0a09a10f59363b00fb67e80b84`
-- Audited source SHA: `1e1a4bc589094e0a09a10f59363b00fb67e80b84`
-- Audited source commit time: `2026-09-11T17:57:07+10:00`
-- Inventory generated at: `2026-09-11T17:57:07+10:00` (deterministic source commit time)
+- Latest fetched `origin/main` at audit start: `5606d28dbc35c35a9a610eab17d3f4b294a6be78`
+- Audited source SHA: `5606d28dbc35c35a9a610eab17d3f4b294a6be78`
+- Audited source commit time: `2026-09-12T06:14:29+10:00`
+- Inventory generated at: `2026-09-12T06:14:29+10:00` (deterministic source commit time)
 - Inventory generator version: `2.0.0`
-- Current remediation branch: `feature/wave-b-pr2-worker-safety`
+- Current remediation branch: `feature/wave-b-pr3-qms-fail-closed`
 - Scope: root application files plus `config`, `controllers`, `controllers/qms`, `middleware`, `migrations`, `public`, `routes`, `scripts`, `services`, `utils`, `ios`, `android`, and `.github/workflows`.
 - Binary policy: image, font, PDF, and archive bytes were not interpreted as source. Their path, type, size, and deployment presence are inventoried.
 - Machine-readable evidence: `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json`
 
-The deterministic inventory currently records 352 text/source files, 77,873 lines, 457 declared HTTP routes, 21 SQL migrations, 43 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
+The deterministic inventory currently records 359 text/source files, 79,045 lines, 459 declared HTTP routes, 22 SQL migrations, 39 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
 
 ## Local verification evidence
 
@@ -37,7 +37,7 @@ Wave B PR 1 evidence:
 - Railway deployed the exact merged SHA successfully. Production applied `20260911_wave_b1_public_submission_dedupe`, reported 21 tracked migrations, returned healthy/ready with the exact SHA, denied anonymous detailed readiness, and enforced the new public request contracts.
 - Production rate limiting remains process-local and readiness reports `DEGRADED`; Railway is configured for one replica. Redis remains unconfigured and provider-unverified.
 
-Wave B PR 2 local evidence:
+Wave B PR 2 evidence:
 
 - `npm run check`: passed for 146 JavaScript files.
 - `npm test`: passed, including all existing regression suites and the focused distributed-worker suite.
@@ -45,11 +45,24 @@ Wave B PR 2 local evidence:
 - `npm run audit:inventory:check`: passed for audited source `1e1a4bc589094e0a09a10f59363b00fb67e80b84` and generator `2.0.0`.
 - Real local legacy-MySQL rehearsal: all 22 migrations checksum-verified, the four worker tables were verified, and two services sharing MySQL proved one singleton execution while the competing replica received `lease_held`.
 - Simulated-replica tests verify active-lease exclusion, expired-lease crash takeover, exponential retry delay, attempt exhaustion, dead-letter creation, redaction, manual retry, and recovery from a blocked manual dispatch.
-- Railway CI, deployment SHA, runtime startup, migration, health, and readiness evidence remain pending until this change is reviewed and merged. Railway two-replica provider behavior remains explicitly unverified.
+- PR 32 passed CI and was merged at `5606d28dbc35c35a9a610eab17d3f4b294a6be78`.
+- Railway deployment `5705ae84-20e9-40b3-86ee-a21cab5c5f25` deployed the exact merged SHA successfully, applied the twenty-second migration, registered all four lease-backed workers, and returned healthy/ready.
+- Production remains configured as one Railway replica, so true two-replica provider behavior remains explicitly unverified.
+
+Wave B PR 3 local evidence:
+
+- The exact latest main baseline is `5606d28dbc35c35a9a610eab17d3f4b294a6be78`.
+- `npm run test:wave-b-pr3`: passed exact-definition resolver, fail-closed 409 middleware, blocking validation, route wiring, and guarded-creation source regressions.
+- `npm run check`: passed for 148 JavaScript files.
+- `npm test`: passed every repository regression suite, including QMS, security, identity, finance, workflow, procurement, source, secret, injection, and domain smoke checks.
+- `npm run security:audit`: registry-backed audit passed with zero reported vulnerabilities.
+- `npm run audit:inventory:check`: passed for audited source `5606d28dbc35c35a9a610eab17d3f4b294a6be78` and generator `2.0.0`.
+- Real local legacy-MySQL rehearsal: all 22 migrations checksum-verified successfully.
+- CI, merge, deployment, and runtime evidence remain pending until the corresponding gates complete.
 
 Wave A was subsequently merged through PR 30 and deployed at exact SHA `090de950289b9c264e52e97198835803657ac825`. Production evidence showed the migration ledger recovering 18 legacy entries, checksum-verifying one existing entry, applying the Wave A migration, and reaching 17 critical schemas before `Server ready`. Public health and readiness returned the same SHA and anonymous detailed readiness was denied. Database TLS, Redis, backup, malware scanning, custom-domain DNS/TLS, WebAuthn, and object-storage provider verification remain separate and unverified unless identified below.
 
-This refreshed architecture inventory represents merged main at `1e1a4bc589094e0a09a10f59363b00fb67e80b84`. New remediation changes are not silently folded into that baseline: `source_sha`, `generated_at`, and `generator_version` are explicit, and CI verifies that the source exists, is an ancestor of the branch, and is named by this audit.
+This refreshed architecture inventory represents merged main at `5606d28dbc35c35a9a610eab17d3f4b294a6be78`. New remediation changes are not silently folded into that baseline: `source_sha`, `generated_at`, and `generator_version` are explicit, and CI verifies that the source exists, is an ancestor of the branch, and is named by this audit.
 
 ## Assurance state
 
@@ -176,7 +189,7 @@ No deployment or provider state in this document should be promoted without rele
 - Recommended fix: Introduce advisory/durable job leases, run records, retries, and dead-letter state before scaling.
 - Test requirement: Concurrent worker tests against real MySQL.
 - External dependency: Multi-replica Railway test environment.
-- Status: Fixed in Wave B PR 2 code with MySQL leases, ownership heartbeats, run/failure history, exponential retry, dead letters, permission- and step-up-protected manual retry, and an admin health API. Local simulated-replica and real-MySQL tests pass. CI, deployment, and Railway two-replica provider verification remain pending.
+- Status: Fixed in Wave B PR 2 with MySQL leases, ownership heartbeats, run/failure history, exponential retry, dead letters, permission- and step-up-protected manual retry, and an admin health API. PR 32 passed CI and Railway deployed exact SHA `5606d28dbc35c35a9a610eab17d3f4b294a6be78`. Production is still one replica, so multi-replica provider verification remains pending.
 
 ### A-010: CSP still permits inline scripts
 
@@ -261,6 +274,18 @@ No deployment or provider state in this document should be promoted without rele
 - Test requirement: Playwright behavior and visual checks at required mobile/tablet/desktop viewports.
 - External dependency: Browser/device test matrix.
 - Status: Deferred to Wave E. The requested whole-app theme and layout redesign is explicitly the final presentation wave after functional remediation.
+
+### A-017: Controlled QMS records could bypass an absent form definition
+
+- Severity: Critical
+- File: `middleware/qmsTransitionValidationMiddleware.js`, `controllers/qms/recordController.js`, `controllers/qmsOperationsController.js`, and dormant `controllers/qmsRecordController.js`
+- Function: controlled-record creation, legacy import, and workflow transitions
+- Risk: A record whose exact document ID and source revision had no approved/effective definition could be created or progress through `SUBMITTED`, `UNDER_REVIEW`, `APPROVED`, or `CLOSED` without controlled-form validation.
+- Evidence: The baseline transition middleware explicitly executed `if (!version) return next()`. The active create and legacy-import paths also inserted records when no exact effective definition was resolved.
+- Recommended fix: Resolve the exact active document/revision centrally, require version status `APPROVED` or `EFFECTIVE`, lock the definition inside write transactions, and return HTTP 409 with `QMS_DEFINITION_NOT_EFFECTIVE` before any controlled write or transition.
+- Test requirement: Exact revision/status query assertions, missing-definition 409 behavior, blocking-field validation, active route wiring, and source regression checks for every record-creation path.
+- External dependency: Production runtime smoke after merge; no provider dependency and no schema migration required.
+- Status: Fixed in Wave B PR 3 code and focused local tests. Full CI, merge, Railway deployment, and production smoke evidence remain pending.
 
 ## Wave A release gates
 
