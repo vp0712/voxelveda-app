@@ -5,6 +5,7 @@ const { ensureQmsAdvancedSchema } = require('../services/qmsAdvancedSchema');
 const { validateRecord } = require('../services/qmsValidationService');
 const gates = require('../services/qmsGateService');
 const { logAudit } = require('../services/auditService');
+const { loadEffectiveDefinition, respondDefinitionNotEffective } = require('../services/qmsDefinitionService');
 
 function actor(req) { return Number(req.user?.id || req.user?.user_id || 0) || null; }
 function auditContext(req) {
@@ -84,6 +85,17 @@ async function importLegacy(req, res, next) {
     await ready();
     const records = Array.isArray(req.body.records) ? req.body.records.slice(0,250) : [];
     if (!records.length) return res.status(400).json({ message: 'records array is required.' });
+    const definitionReferences = new Map();
+    for (const legacy of records) {
+      const documentId = clean(legacy.document_id || legacy.documentId || legacy.formId || 'LEGACY-FORM',64);
+      const sourceRevision = clean(legacy.source_revision || legacy.revision || '1.0',32);
+      definitionReferences.set(`${documentId}\u0000${sourceRevision}`, { documentId, sourceRevision });
+    }
+    for (const reference of definitionReferences.values()) {
+      if (!await loadEffectiveDefinition(pool, reference.documentId, reference.sourceRevision)) {
+        return respondDefinitionNotEffective(res, reference.documentId, reference.sourceRevision);
+      }
+    }
     const imported = []; const skipped = [];
     for (const legacy of records) {
       const documentId = clean(legacy.document_id || legacy.documentId || legacy.formId || 'LEGACY-FORM',64);
@@ -98,6 +110,10 @@ async function importLegacy(req, res, next) {
       try {
         await connection.beginTransaction();
         const sourceRevision = clean(legacy.source_revision || legacy.revision || '1.0',32);
+        if (!await loadEffectiveDefinition(connection, documentId, sourceRevision, { lock: true })) {
+          await connection.rollback();
+          return respondDefinitionNotEffective(res, documentId, sourceRevision);
+        }
         const integrity = crypto.createHash('sha256').update(JSON.stringify({documentId,sourceRevision,values})).digest('hex');
         const [result] = await connection.query('INSERT INTO qms_records(record_uuid,document_id,document_title,source_revision,values_json,owner_user_id,prepared_by,integrity_hash) VALUES(?,?,?,?,?,?,?,?)',[uuid,documentId,title,sourceRevision,JSON.stringify(values),actor(req),actor(req),integrity]);
         const recordNo=idNo('QMS',result.insertId);

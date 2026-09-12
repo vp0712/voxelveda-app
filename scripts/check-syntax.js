@@ -12,7 +12,7 @@ const files = [
   'routes/notificationRoutes.js', 'routes/trashRoutes.js', 'routes/workflowRoutes.js', 'routes/procurementRoutes.js', 'routes/readinessRoutes.js', 'routes/backgroundJobRoutes.js',
   'routes/financeRoutes.js', 'routes/highRiskFinanceRoutes.js', 'routes/expenseRoutes.js', 'routes/invoiceRoutes.js', 'routes/taskRoutes.js', 'routes/userRoutes.js', 'routes/meetingRoutes.js', 'routes/rosterRoutes.js', 'routes/documentSecurityRoutes.js', 'routes/securityDashboardRoutes.js', 'routes/securityGovernanceRoutes.js', 'routes/operationalTrustRoutes.js', 'routes/continuousAssuranceRoutes.js', 'routes/integrationWebhookRoutes.js',
   'services/auditService.js', 'services/emailQueue.js', 'services/emailService.js', 'services/emailQueueWorker.js',
-  'services/databaseRuntimeService.js', 'services/migrationRunner.js', 'services/runtimeState.js', 'services/rateLimitService.js', 'services/botChallengeService.js', 'services/publicSubmissionDedupeService.js', 'services/backgroundJobStore.js', 'services/backgroundJobService.js',
+  'services/databaseRuntimeService.js', 'services/migrationRunner.js', 'services/runtimeState.js', 'services/rateLimitService.js', 'services/botChallengeService.js', 'services/publicSubmissionDedupeService.js', 'services/backgroundJobStore.js', 'services/backgroundJobService.js', 'services/qmsDefinitionService.js',
   'services/emailTemplates.js', 'services/notificationService.js',
   'services/notificationSchema.js', 'services/trashSchema.js', 'services/trashService.js', 'services/trashPurgeService.js',
   'services/workflowSchema.js', 'services/workflowService.js', 'services/workflowEscalationService.js',
@@ -25,7 +25,7 @@ const files = [
   'utils/session.js', 'utils/tokenRevocation.js', 'utils/money.js', 'utils/securityRedaction.js', 'utils/secureLogger.js',
   'public/login.js', 'public/auth-lifecycle.js', 'public/mfa.js', 'public/security-page.js', 'public/step-up.js',
   'public/admin-dashboard.js', 'public/staff.js', 'public/workflow-ui.js', 'public/procurement-ui.js', 'public/qr-widget.js',
-  'public/service-worker.js', 'scripts/enterprise-wave-a-test.js', 'scripts/wave-b-pr1-platform-guards-test.js', 'scripts/wave-b-pr2-worker-safety-test.js', 'scripts/generate-enterprise-inventory.js', 'scripts/check-enterprise-audit-provenance.js'
+  'public/service-worker.js', 'scripts/enterprise-wave-a-test.js', 'scripts/wave-b-pr1-platform-guards-test.js', 'scripts/wave-b-pr2-worker-safety-test.js', 'scripts/wave-b-pr3-qms-fail-closed-test.js', 'scripts/generate-enterprise-inventory.js', 'scripts/check-enterprise-audit-provenance.js'
 ];
 
 for (const file of files) {

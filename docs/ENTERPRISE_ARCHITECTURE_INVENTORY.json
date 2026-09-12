@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "baseline_sha": "1e1a4bc589094e0a09a10f59363b00fb67e80b84",
-  "source_sha": "1e1a4bc589094e0a09a10f59363b00fb67e80b84",
-  "generated_at": "2026-09-11T17:57:07+10:00",
+  "baseline_sha": "5606d28dbc35c35a9a610eab17d3f4b294a6be78",
+  "source_sha": "5606d28dbc35c35a9a610eab17d3f4b294a6be78",
+  "generated_at": "2026-09-12T06:14:29+10:00",
   "generator_version": "2.0.0",
   "scope": [
     "/",
@@ -20,310 +20,310 @@
     ".github/workflows/"
   ],
   "totals": {
-    "text_source_files": 352,
+    "text_source_files": 359,
     "binary_assets": 50,
-    "text_bytes": 3435919,
-    "text_lines": 77873,
-    "routes": 457,
-    "migrations": 21,
-    "worker_timer_sites": 43,
-    "findings": 316
+    "text_bytes": 3486149,
+    "text_lines": 79045,
+    "routes": 459,
+    "migrations": 22,
+    "worker_timer_sites": 39,
+    "findings": 323
   },
   "category_counts": {
     "android": 3,
     "ci": 1,
     "config": 7,
-    "controllers": 51,
-    "documentation": 17,
+    "controllers": 52,
+    "documentation": 18,
     "frontend": 53,
     "ios": 9,
     "middleware": 17,
-    "migrations": 21,
+    "migrations": 22,
     "root_or_other": 24,
-    "routes": 37,
-    "scripts": 46,
-    "services": 66
+    "routes": 38,
+    "scripts": 47,
+    "services": 68
   },
   "routes": [
     {
       "file": "app.js",
-      "line": 82,
+      "line": 83,
       "method": "POST",
       "path": "/api/security/csp-report"
     },
     {
       "file": "app.js",
-      "line": 83,
+      "line": 84,
       "method": "GET",
       "path": "/api/health"
     },
     {
       "file": "app.js",
-      "line": 84,
+      "line": 85,
       "method": "GET",
       "path": "/api/ready"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/login"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/register"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/request-quote"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/privacy"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/terms"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/support"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/forgot-password"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/reset-password"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/accept-invite"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/mfa"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/security"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/attendance-terminal"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/401"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/403"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/404"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/429"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/500"
     },
     {
       "file": "app.js",
-      "line": 89,
+      "line": 90,
       "method": "GET",
       "path": "/maintenance"
     },
     {
       "file": "app.js",
-      "line": 90,
+      "line": 91,
       "method": "GET",
       "path": "/admin"
     },
     {
       "file": "app.js",
-      "line": 90,
+      "line": 91,
       "method": "GET",
       "path": "/dashboard"
     },
     {
       "file": "app.js",
-      "line": 90,
+      "line": 91,
       "method": "GET",
       "path": "/quality"
     },
     {
       "file": "app.js",
-      "line": 90,
+      "line": 91,
       "method": "GET",
       "path": "/shop-floor"
     },
     {
       "file": "app.js",
-      "line": 90,
+      "line": 91,
       "method": "GET",
       "path": "/invoice/view"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/index.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/login.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/register.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/customer.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/privacy-policy.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/admin-dashboard.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/staff-dashboard.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/quality.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/shop-floor.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/dashboard.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/invoice-pdf.html"
     },
     {
       "file": "app.js",
-      "line": 91,
+      "line": 92,
       "method": "GET",
       "path": "/shift-qr.html"
     },
     {
       "file": "app.js",
-      "line": 92,
+      "line": 93,
       "method": "GET",
       "path": "/approvals"
     },
     {
       "file": "app.js",
-      "line": 99,
+      "line": 100,
       "method": "GET",
       "path": "/api/qr"
     },
     {
       "file": "app.js",
-      "line": 100,
+      "line": 101,
       "method": "POST",
       "path": "/api/public/rfq"
     },
     {
       "file": "app.js",
-      "line": 100,
+      "line": 101,
       "method": "POST",
       "path": "/api/public/ai-lead"
     },
     {
       "file": "app.js",
-      "line": 100,
+      "line": 101,
       "method": "GET",
       "path": "/api/public/shift-qr"
     },
     {
       "file": "app.js",
-      "line": 100,
+      "line": 101,
       "method": "GET",
       "path": "/api/public/qms/coc/:no/verify"
     },
     {
       "file": "app.js",
-      "line": 100,
+      "line": 101,
       "method": "GET",
       "path": "/api/qms/coc/:no/verify"
     },
     {
       "file": "app.js",
-      "line": 101,
+      "line": 102,
       "method": "GET",
       "path": "/api/suppliers/files/:id/view"
     },
@@ -578,6 +578,18 @@
       "line": 51,
       "method": "POST",
       "path": "/step-up"
+    },
+    {
+      "file": "routes/backgroundJobRoutes.js",
+      "line": 10,
+      "method": "GET",
+      "path": "/"
+    },
+    {
+      "file": "routes/backgroundJobRoutes.js",
+      "line": 11,
+      "method": "GET",
+      "path": "/dead-letters"
     },
     {
       "file": "routes/competitorRoutes.js",
@@ -2965,44 +2977,24 @@
       "evidence": "setInterval(loadStaffNotifications, 60000);"
     },
     {
-      "file": "services/emailQueueWorker.js",
-      "line": 22,
-      "evidence": "timer = setInterval(runEmailQueue, Number(process.env.EMAIL_QUEUE_INTERVAL_MS || 30000));"
+      "file": "scripts/wave-b-pr2-worker-safety-test.js",
+      "line": 235,
+      "evidence": "assert(!worker.includes('setInterval('), `${file} still owns a process-local interval`);"
     },
     {
-      "file": "services/emailQueueWorker.js",
-      "line": 24,
-      "evidence": "initialTimer = setTimeout(runEmailQueue, 5000);"
+      "file": "services/backgroundJobService.js",
+      "line": 194,
+      "evidence": "heartbeat = setInterval(() => {"
     },
     {
-      "file": "services/trashPurgeService.js",
-      "line": 41,
-      "evidence": "purgeTimer = setInterval(() => purgeExpiredTrash().catch((error) => console.error('Trash purge worker error:', error.message)), intervalMs);"
+      "file": "services/backgroundJobService.js",
+      "line": 250,
+      "evidence": "intervalTimer = setInterval(() => tick('SCHEDULED'), intervalMs);"
     },
     {
-      "file": "services/trashPurgeService.js",
-      "line": 43,
-      "evidence": "setTimeout(() => purgeExpiredTrash().catch((error) => console.error('Initial Trash purge failed:', error.message)), 15_000).unref();"
-    },
-    {
-      "file": "services/weeklyTimesheetScheduler.js",
-      "line": 294,
-      "evidence": "schedulerTimer = setInterval(runScheduledWeeklyTimesheetEmails, intervalMs);"
-    },
-    {
-      "file": "services/weeklyTimesheetScheduler.js",
-      "line": 296,
-      "evidence": "setTimeout(runScheduledWeeklyTimesheetEmails, 10000).unref();"
-    },
-    {
-      "file": "services/workflowEscalationService.js",
-      "line": 161,
-      "evidence": "timer = setInterval(() => processWorkflowSla().catch((error) => console.error('Workflow SLA scheduler failed:', error.message)), intervalMs);"
-    },
-    {
-      "file": "services/workflowEscalationService.js",
-      "line": 163,
-      "evidence": "setTimeout(() => processWorkflowSla().catch((error) => console.error('Workflow SLA startup check failed:', error.message)), 10000).unref();"
+      "file": "services/backgroundJobService.js",
+      "line": 252,
+      "evidence": "initialTimer = setTimeout(() => tick('STARTUP'), initialDelayMs);"
     }
   ],
   "security_controls": {
@@ -4865,28 +4857,28 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 235,
+      "line": 241,
       "evidence": "await getRateLimitService().close().catch(() => {});"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 236,
+      "line": 242,
       "evidence": "await pool.end().catch(() => {});"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 253,
+      "line": 259,
       "evidence": "await getRateLimitService().close().catch(() => {});"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "server.js",
-      "line": 255,
+      "line": 261,
       "evidence": "await pool.end().catch(() => {});"
     },
     {
@@ -4895,6 +4887,55 @@
       "file": "services/auditService.js",
       "line": 83,
       "evidence": "if (locked) await connection.query(\"SELECT RELEASE_LOCK('voxelveda_audit_chain')\").catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "services/backgroundJobService.js",
+      "line": 228,
+      "evidence": "await this.releaseLease(lease).catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "services/backgroundJobService.js",
+      "line": 327,
+      "evidence": "await this.store.reopenDeadLetter(id, actorId).catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "services/backgroundJobStore.js",
+      "line": 41,
+      "evidence": "await connection.rollback().catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "services/backgroundJobStore.js",
+      "line": 112,
+      "evidence": "await connection.rollback().catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "services/backgroundJobStore.js",
+      "line": 148,
+      "evidence": "await connection.rollback().catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "services/backgroundJobStore.js",
+      "line": 186,
+      "evidence": "await connection.rollback().catch(() => {});"
+    },
+    {
+      "kind": "swallowed_error",
+      "severity": "MEDIUM",
+      "file": "services/backgroundJobStore.js",
+      "line": 232,
+      "evidence": "await connection.rollback().catch(() => {});"
     },
     {
       "kind": "swallowed_error",
@@ -5110,7 +5151,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "services/trashPurgeService.js",
-      "line": 28,
+      "line": 23,
       "evidence": "await recordPurgeFailure(item.id, error).catch(() => {});"
     },
     {
@@ -5173,7 +5214,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "services/workflowEscalationService.js",
-      "line": 127,
+      "line": 125,
       "evidence": "await connection.rollback().catch(() => {});"
     },
     {
@@ -5300,9 +5341,9 @@
     {
       "file": ".env.example",
       "category": "root_or_other",
-      "bytes": 3627,
-      "lines": 116,
-      "sha256": "b650cdfd82e64051eed7c1dc755ff6876067e122a5e36f5c16f4edeb89206d37"
+      "bytes": 3977,
+      "lines": 126,
+      "sha256": "7834baa448ec4b9efc110b70c435c1ee5a96349305b354957fe2eeff2c482fb1"
     },
     {
       "file": ".github/workflows/security-ci.yml",
@@ -5335,9 +5376,9 @@
     {
       "file": "app.js",
       "category": "root_or_other",
-      "bytes": 13936,
-      "lines": 104,
-      "sha256": "02ecc830258cb52a1e3303d6aabd90a04e54ea714b64a145933c4c95e7dfa4a6"
+      "bytes": 14063,
+      "lines": 105,
+      "sha256": "548c67a29b45f2624d8e411cd19ce508ca43a3febd137016c60ffa16bbf14828"
     },
     {
       "file": "capacitor.config.json",
@@ -5370,9 +5411,9 @@
     {
       "file": "config/permissionCatalog.js",
       "category": "config",
-      "bytes": 9536,
+      "bytes": 9584,
       "lines": 102,
-      "sha256": "5a9bb8c857d11149a1aa5e3b14afc09c47f94b9c14380b0eacb3024ba619a434"
+      "sha256": "32b3afe1ac3a726f06a0fd0d1aef40dc1859603936cce04a1bf8263f2565cb77"
     },
     {
       "file": "config/productionReadiness.js",
@@ -5422,6 +5463,13 @@
       "bytes": 9329,
       "lines": 241,
       "sha256": "1623f6f45ed1ec5a643bedc5a2a880a96702349e31ddb2459a955c72cde49b5b"
+    },
+    {
+      "file": "controllers/backgroundJobController.js",
+      "category": "controllers",
+      "bytes": 3071,
+      "lines": 87,
+      "sha256": "ebfe89968bdd8841f6db9752637d452425a1c6f1ed67d612ba57410734b4de58"
     },
     {
       "file": "controllers/competitorController.js",
@@ -5769,9 +5817,9 @@
     {
       "file": "docs/ENTERPRISE_DEEP_AUDIT.md",
       "category": "documentation",
-      "bytes": 19645,
-      "lines": 265,
-      "sha256": "704937bfc7c2f8bc6bfbe89d743fef501019dc906d54ae1c2a4000d1fc73ddfe"
+      "bytes": 21637,
+      "lines": 278,
+      "sha256": "d5c81ceced8a6c1764e865cf735a6c72d6dbc840f0366c1638fd52c9dcbead62"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -5884,6 +5932,13 @@
       "bytes": 3334,
       "lines": 49,
       "sha256": "63a22913a0928dc087c56e7bf30d4230744bb088686c4e19dc93ee9114d7325b"
+    },
+    {
+      "file": "docs/WAVE_B_PR2_WORKER_SAFETY.md",
+      "category": "documentation",
+      "bytes": 1967,
+      "lines": 31,
+      "sha256": "91e02e35a588b1e852d78ecf88dbb77f6c4558101f8927c5c48e7d62bc3d8e56"
     },
     {
       "file": "DOMAIN-MIGRATION-AUDIT.md",
@@ -6236,6 +6291,13 @@
       "sha256": "05b6b3eaeb66fbebb21e574647c2fc8350be4a9ffb05b131fb30ba778e52b09b"
     },
     {
+      "file": "migrations/20260912_wave_b2_background_job_safety.sql",
+      "category": "migrations",
+      "bytes": 2774,
+      "lines": 69,
+      "sha256": "82dc37bef7eb1903129958f46828f3226d90acf5e99b26b6d331938209376497"
+    },
+    {
       "file": "package-lock.json",
       "category": "root_or_other",
       "bytes": 123128,
@@ -6245,9 +6307,9 @@
     {
       "file": "package.json",
       "category": "root_or_other",
-      "bytes": 4122,
-      "lines": 57,
-      "sha256": "33572dfe883645f3e69d0505e9e5cd7e275a953e0ae28e14df955aeea560d0b8"
+      "bytes": 4243,
+      "lines": 58,
+      "sha256": "1102eb9413f085b5c6aecbf843206cbe4f77e3cb365c1501d7759554e1e01b02"
     },
     {
       "file": "public/401.html",
@@ -6656,6 +6718,13 @@
       "sha256": "3fe7ab3606b7f8b48f4c5ae1f6beff3183b0f0ff20a1f19af9c230a1e09f7cb6"
     },
     {
+      "file": "routes/backgroundJobRoutes.js",
+      "category": "routes",
+      "bytes": 710,
+      "lines": 20,
+      "sha256": "afe729aa0b1761f052683bf699e82c8ee0aa4418480e4f7c1d43fff22a6415f7"
+    },
+    {
       "file": "routes/competitorRoutes.js",
       "category": "routes",
       "bytes": 425,
@@ -6931,9 +7000,9 @@
     {
       "file": "scripts/check-syntax.js",
       "category": "scripts",
-      "bytes": 5253,
+      "bytes": 5441,
       "lines": 42,
-      "sha256": "ea2030cf7797fe717b2d025465dfe5f0bc347c3aea9c13028b02c01d519aa028"
+      "sha256": "dc4e6a4c0d8d391c5b8fe207216f2045549a256e5854d1a77bcd117339b90c8f"
     },
     {
       "file": "scripts/continuous-assurance-test.js",
@@ -6959,9 +7028,9 @@
     {
       "file": "scripts/enterprise-wave-a-mysql-legacy-test.js",
       "category": "scripts",
-      "bytes": 2708,
-      "lines": 60,
-      "sha256": "81d8fc701bb861cb61bd252c76cf4b455db9e7542c319573a35398b17179373e"
+      "bytes": 4735,
+      "lines": 105,
+      "sha256": "4efc9d35bad102628b2222b93ad5b2e8b6f1d8123417da5f421b715bb4824c92"
     },
     {
       "file": "scripts/enterprise-wave-a-test.js",
@@ -7216,6 +7285,13 @@
       "sha256": "eb93af8b307553174909e9acc41f1d72662c800b0a3feeea94177cbbe1c33150"
     },
     {
+      "file": "scripts/wave-b-pr2-worker-safety-test.js",
+      "category": "scripts",
+      "bytes": 12188,
+      "lines": 247,
+      "sha256": "e85302165f99bb90b4d6ce4b88cf7537d24ddb3e77c5ef7491dca7ca864690a0"
+    },
+    {
       "file": "SECURITY-CHECKLIST.md",
       "category": "root_or_other",
       "bytes": 1998,
@@ -7232,9 +7308,9 @@
     {
       "file": "server.js",
       "category": "root_or_other",
-      "bytes": 13559,
-      "lines": 266,
-      "sha256": "a22970eea7511f381e55489218a7ecfaa8b2c6c792fe77ae2e5bddac3b99fbe4"
+      "bytes": 14009,
+      "lines": 272,
+      "sha256": "16a238baa7eba26b3ab14ff02b72abb58d0a85251a319d5023e5ffae3e39bf26"
     },
     {
       "file": "services/adaptiveRiskService.js",
@@ -7300,6 +7376,20 @@
       "sha256": "111785a7f6a3c3a16048026c9ea2cf880875b5b21894fdde8c5325826d47c67b"
     },
     {
+      "file": "services/backgroundJobService.js",
+      "category": "services",
+      "bytes": 13184,
+      "lines": 344,
+      "sha256": "e4fc3f61060e6927d321e7fcaad5ce8d350547b0f9c2b8cae189ce2357668425"
+    },
+    {
+      "file": "services/backgroundJobStore.js",
+      "category": "services",
+      "bytes": 11022,
+      "lines": 295,
+      "sha256": "bf835072c2457864eae8e943e3e18096e4a3c7eb81aaa45a6d30fb6e6b276821"
+    },
+    {
       "file": "services/botChallengeService.js",
       "category": "services",
       "bytes": 2610,
@@ -7330,9 +7420,9 @@
     {
       "file": "services/emailQueueWorker.js",
       "category": "services",
-      "bytes": 1019,
+      "bytes": 1225,
       "lines": 38,
-      "sha256": "3d5cd30f32593f44cf9f8ba7144eb3f715525b684840cbb1038fdd45a12b7696"
+      "sha256": "0f9fea88d96255d6288aaf0d2da33186f7788473f142401663274ad1f3fe6ec6"
     },
     {
       "file": "services/emailService.js",
@@ -7624,9 +7714,9 @@
     {
       "file": "services/trashPurgeService.js",
       "category": "services",
-      "bytes": 1992,
-      "lines": 54,
-      "sha256": "8a94c7a455d149fdf5772138318c218627b214ec11fbb8046078440b0ee6e7ba"
+      "bytes": 1798,
+      "lines": 52,
+      "sha256": "2c5b79d80b8176e3674e218fd7e7e7be9651003a296f79c9919335a6121b11ce"
     },
     {
       "file": "services/trashSchema.js",
@@ -7666,16 +7756,16 @@
     {
       "file": "services/weeklyTimesheetScheduler.js",
       "category": "services",
-      "bytes": 13751,
-      "lines": 312,
-      "sha256": "348cc2944ad31a6b90e517f5f97464c1f6941de65736a7ef240a9e7e8a957df0"
+      "bytes": 13865,
+      "lines": 318,
+      "sha256": "5da7c277aef4bfed133c10fba4cee22403a57275c17f837ebf6d1d858f02f0c1"
     },
     {
       "file": "services/workflowEscalationService.js",
       "category": "services",
-      "bytes": 7223,
-      "lines": 173,
-      "sha256": "cc9b9df85999362e48e2f8178df14a4d2eb47756f74e1577861e20f9c893cefa"
+      "bytes": 7108,
+      "lines": 172,
+      "sha256": "42b1f2233ec544bfde4851f88b0bc21c5ce98047d7f70c6c1f662a9897738f1b"
     },
     {
       "file": "services/workflowSchema.js",
