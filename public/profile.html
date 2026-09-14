@@ -39,9 +39,9 @@
           <button class="btn" id="choosePhotoBtn" type="button">Choose Photo</button>
           <button class="btn danger" id="removePhotoBtn" type="button">Remove Photo</button>
         </div>
-        <input id="cameraInput" type="file" accept="image/jpeg,image/png,image/webp" capture="user">
-        <input id="galleryInput" type="file" accept="image/jpeg,image/png,image/webp">
-        <p class="helper">Use your phone camera for a live profile photo, or choose an existing JPG, PNG or WebP image. Maximum 5 MB.</p>
+        <input id="cameraInput" type="file" accept="image/*" capture="user">
+        <input id="galleryInput" type="file" accept="image/*">
+        <p class="helper">Take a photo or choose one from your phone. Large phone photos are automatically resized and converted to a secure upload format before being sent.</p>
         <div class="completion">
           <div class="completionHead"><strong>Profile completeness</strong><span id="completionPercent">0%</span></div>
           <div class="completionTrack" aria-hidden="true"><i id="completionBar"></i></div>
@@ -69,6 +69,6 @@
       </article>
     </section>
   </main>
-  <script src="/profile.js?v=20260915-advanced-profile-r1" defer></script>
+  <script src="/profile.js?v=20260915-mobile-photo-fix-r2" defer></script>
 </body>
 </html>

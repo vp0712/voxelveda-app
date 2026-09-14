@@ -5,6 +5,9 @@ const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 const avatarEl = $('avatar');
 const initialsEl = $('initials');
+const MAX_SOURCE_PHOTO_BYTES = 20 * 1024 * 1024;
+const TARGET_UPLOAD_BYTES = 1400 * 1024;
+const MAX_PROFILE_DIMENSION = 1600;
 
 function setStatus(message = '', type = '') {
   statusEl.textContent = message;
@@ -43,14 +46,23 @@ async function readJson(response) {
 }
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {
-    credentials: 'same-origin',
-    ...options,
-    headers: {
-      ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
-      ...(options.headers || {})
+  let response;
+  try {
+    response = await fetch(path, {
+      credentials: 'same-origin',
+      ...options,
+      headers: {
+        ...(options.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
+        ...(options.headers || {})
+      }
+    });
+  } catch (error) {
+    const message = String(error?.message || '').toLowerCase();
+    if (message.includes('load failed') || message.includes('network') || message.includes('fetch')) {
+      throw new Error('Connection interrupted while sending the photo. Please try again.');
     }
-  });
+    throw error;
+  }
   const data = await readJson(response);
   if (!response.ok) throw new Error(data.message || 'Request failed');
   return data;
@@ -182,24 +194,70 @@ async function saveProfile(event) {
   }
 }
 
-function safeUploadName(file) {
-  const extension = file.type === 'image/png' ? 'png' : file.type === 'image/webp' ? 'webp' : 'jpg';
-  return `profile-${Date.now()}.${extension}`;
+function canvasToBlob(canvas, quality) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('Could not prepare this photo for upload.')), 'image/jpeg', quality);
+  });
+}
+
+function loadImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('This photo format cannot be processed on this phone. Try another photo or take a new one.'));
+    };
+    image.src = url;
+  });
+}
+
+async function prepareProfilePhoto(file) {
+  if (!file) throw new Error('Choose or take a photo first.');
+  if (file.size > MAX_SOURCE_PHOTO_BYTES) throw new Error('This photo is too large. Choose a photo under 20 MB.');
+  if (file.type && !file.type.startsWith('image/')) throw new Error('Choose an image file.');
+
+  const image = await loadImage(file);
+  const originalWidth = image.naturalWidth || image.width;
+  const originalHeight = image.naturalHeight || image.height;
+  if (!originalWidth || !originalHeight) throw new Error('The selected photo could not be read.');
+
+  const scale = Math.min(1, MAX_PROFILE_DIMENSION / Math.max(originalWidth, originalHeight));
+  const width = Math.max(1, Math.round(originalWidth * scale));
+  const height = Math.max(1, Math.round(originalHeight * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext('2d', { alpha: false });
+  if (!context) throw new Error('Your browser could not prepare the photo.');
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
+  context.drawImage(image, 0, 0, width, height);
+
+  let quality = 0.86;
+  let blob = await canvasToBlob(canvas, quality);
+  while (blob.size > TARGET_UPLOAD_BYTES && quality > 0.5) {
+    quality -= 0.08;
+    blob = await canvasToBlob(canvas, quality);
+  }
+  if (blob.size > 2 * 1024 * 1024) throw new Error('The photo is still too large after optimization. Try a different photo.');
+  return new File([blob], `profile-${Date.now()}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
 }
 
 async function uploadPhoto(file) {
   if (!file) return;
-  if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-    return setStatus('Choose a JPG, PNG or WebP image.', 'error');
-  }
-  if (file.size > 5 * 1024 * 1024) return setStatus('Profile photo must be 5 MB or smaller.', 'error');
-
   $('takePhotoBtn').disabled = true;
   $('choosePhotoBtn').disabled = true;
-  setStatus('Uploading profile photo…');
+  setStatus('Preparing photo…');
   try {
+    const preparedFile = await prepareProfilePhoto(file);
+    setStatus('Uploading profile photo…');
     const formData = new FormData();
-    formData.append('photo', file, safeUploadName(file));
+    formData.append('photo', preparedFile, preparedFile.name);
     const data = await api('/api/profile/photo', { method: 'POST', body: formData });
     if (currentProfile) {
       currentProfile.has_profile_photo = true;
@@ -209,7 +267,7 @@ async function uploadPhoto(file) {
     }
     setStatus('Profile photo updated successfully.', 'ok');
   } catch (error) {
-    setStatus(error.message, 'error');
+    setStatus(error.message || 'Profile photo could not be uploaded. Please try again.', 'error');
   } finally {
     $('takePhotoBtn').disabled = false;
     $('choosePhotoBtn').disabled = false;
