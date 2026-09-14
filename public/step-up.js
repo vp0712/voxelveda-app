@@ -181,7 +181,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (!document.querySelector('script[data-dashboard-profile-avatar]')) {
     const script = document.createElement('script');
-    script.src = '/dashboard-profile-avatar.js?v=20260915-avatar-r1';
+    script.src = '/dashboard-profile-avatar.js?v=20260915-avatar-r2';
     script.defer = true;
     script.dataset.dashboardProfileAvatar = 'true';
     document.head.appendChild(script);
