@@ -128,3 +128,65 @@ document.addEventListener('DOMContentLoaded', () => {
   script.dataset.controlledForms = 'true';
   document.head.appendChild(script);
 });
+
+// Universal profile entry points for authenticated admin and staff portals.
+document.addEventListener('DOMContentLoaded', () => {
+  const sidebar = document.querySelector('.sidebar-nav');
+  const footer = document.querySelector('.sidebar-footer');
+  const mobileNav = document.querySelector('.mobile-bottom-nav');
+  const profileChip = document.querySelector('.profile-chip');
+
+  const openProfile = (event) => {
+    event?.preventDefault?.();
+    window.location.assign('/profile');
+  };
+
+  if (profileChip) {
+    profileChip.onclick = openProfile;
+    profileChip.setAttribute('aria-label', 'Open My Profile');
+    profileChip.title = 'My Profile';
+  }
+
+  if (sidebar && !sidebar.querySelector('[data-my-profile-link]')) {
+    const existingLegacyProfile = sidebar.querySelector('[data-section="profileSection"]');
+    if (existingLegacyProfile) {
+      existingLegacyProfile.dataset.myProfileLink = 'true';
+      existingLegacyProfile.removeAttribute('data-section');
+      existingLegacyProfile.textContent = 'My Profile';
+      existingLegacyProfile.addEventListener('click', openProfile);
+    } else {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'nav-btn';
+      button.dataset.myProfileLink = 'true';
+      button.dataset.icon = 'ME';
+      button.dataset.title = 'My Profile';
+      button.textContent = 'My Profile';
+      button.addEventListener('click', openProfile);
+      const companyLabel = Array.from(sidebar.querySelectorAll('.nav-section-label')).find((node) => node.textContent.trim() === 'Company');
+      if (companyLabel?.nextSibling) sidebar.insertBefore(button, companyLabel.nextSibling);
+      else sidebar.appendChild(button);
+    }
+  }
+
+  if (footer && !footer.querySelector('[data-my-profile-footer]')) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'logout-btn';
+    button.dataset.myProfileFooter = 'true';
+    button.textContent = 'My Profile';
+    button.style.marginBottom = '8px';
+    button.addEventListener('click', openProfile);
+    footer.prepend(button);
+  }
+
+  if (mobileNav && !mobileNav.querySelector('[data-my-profile-mobile]')) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'nav-btn';
+    button.dataset.myProfileMobile = 'true';
+    button.textContent = 'Profile';
+    button.addEventListener('click', openProfile);
+    mobileNav.appendChild(button);
+  }
+});
