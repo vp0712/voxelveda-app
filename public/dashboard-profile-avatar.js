@@ -1,6 +1,4 @@
 (function () {
-  const PHOTO_URL = '/api/profile/photo';
-
   function initials(name) {
     return String(name || 'VV')
       .trim()
@@ -16,11 +14,11 @@
     const style = document.createElement('style');
     style.id = 'vvProfileAvatarStyles';
     style.textContent = `
-      .profile-chip{position:relative;overflow:hidden}
-      .vv-profile-avatar{position:absolute;inset:5px;border-radius:50%;overflow:hidden;background:#2fd3a2;display:grid;place-items:center;color:#04130f;font-weight:900;pointer-events:none}
-      .vv-profile-avatar img{width:100%;height:100%;object-fit:cover;display:block}
-      .vv-profile-avatar span{font-size:1rem;line-height:1}
-      .vv-profile-avatar-badge{position:absolute;right:2px;bottom:2px;width:10px;height:10px;border-radius:50%;background:#32d6c6;border:2px solid #0c1722;pointer-events:none}
+      .profile-chip{cursor:pointer}
+      #profileInitial.profile-initial{position:relative;overflow:hidden;display:grid;place-items:center;padding:0}
+      #profileInitial.profile-initial .vv-dashboard-avatar-img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+      #profileInitial.profile-initial.vv-has-photo{font-size:0;color:transparent;background:#122231}
+      #profileInitial.profile-initial.vv-has-photo::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16);pointer-events:none}
     `;
     document.head.appendChild(style);
   }
@@ -29,9 +27,20 @@
     return document.querySelector('.profile-chip');
   }
 
+  function findInitialTarget(chip) {
+    return chip?.querySelector('#profileInitial, .profile-initial') || null;
+  }
+
+  function renderFallback(target, profile) {
+    target.classList.remove('vv-has-photo');
+    target.replaceChildren(document.createTextNode(initials(profile?.name)));
+  }
+
   function renderChip(profile) {
     const chip = findChip();
-    if (!chip || !profile) return;
+    const target = findInitialTarget(chip);
+    if (!chip || !target || !profile) return;
+
     ensureStyles();
     chip.onclick = (event) => {
       event.preventDefault();
@@ -40,55 +49,53 @@
     chip.setAttribute('aria-label', `Open profile for ${profile.name || 'current user'}`);
     chip.title = 'My Profile';
 
-    let avatar = chip.querySelector('.vv-profile-avatar');
-    if (!avatar) {
-      avatar = document.createElement('span');
-      avatar.className = 'vv-profile-avatar';
-      chip.appendChild(avatar);
-    }
-    avatar.replaceChildren();
+    const nameLabel = chip.querySelector('#profileNameLabel');
+    if (nameLabel && profile.name) nameLabel.textContent = profile.name;
 
-    if (profile.has_profile_photo && profile.profile_photo_url) {
-      const image = document.createElement('img');
-      image.alt = '';
-      image.decoding = 'async';
-      image.src = `${profile.profile_photo_url}${profile.profile_photo_url.includes('?') ? '&' : '?'}t=${Date.now()}`;
-      image.onerror = () => {
-        avatar.replaceChildren();
-        const fallback = document.createElement('span');
-        fallback.textContent = initials(profile.name);
-        avatar.appendChild(fallback);
-      };
-      avatar.appendChild(image);
-    } else {
-      const fallback = document.createElement('span');
-      fallback.textContent = initials(profile.name);
-      avatar.appendChild(fallback);
+    if (!profile.has_profile_photo || !profile.profile_photo_url) {
+      renderFallback(target, profile);
+      return;
     }
 
-    if (!chip.querySelector('.vv-profile-avatar-badge')) {
-      const badge = document.createElement('span');
-      badge.className = 'vv-profile-avatar-badge';
-      badge.setAttribute('aria-hidden', 'true');
-      chip.appendChild(badge);
-    }
+    target.classList.add('vv-has-photo');
+    target.replaceChildren();
+    const image = document.createElement('img');
+    image.className = 'vv-dashboard-avatar-img';
+    image.alt = '';
+    image.decoding = 'async';
+    image.loading = 'eager';
+    image.src = `${profile.profile_photo_url}${profile.profile_photo_url.includes('?') ? '&' : '?'}t=${Date.now()}`;
+    image.onerror = () => renderFallback(target, profile);
+    target.appendChild(image);
   }
 
   async function refreshProfileAvatar() {
     const chip = findChip();
     if (!chip) return;
     try {
-      const response = await fetch('/api/profile', { credentials: 'same-origin', cache: 'no-store' });
+      const response = await fetch('/api/profile', {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        headers: { Accept: 'application/json' }
+      });
       if (!response.ok) return;
       const data = await response.json();
       renderChip(data.profile);
     } catch {}
   }
 
-  document.addEventListener('DOMContentLoaded', refreshProfileAvatar);
+  function scheduleRefreshes() {
+    refreshProfileAvatar();
+    [300, 900, 1800, 3200].forEach((delay) => setTimeout(refreshProfileAvatar, delay));
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scheduleRefreshes, { once: true });
+  else scheduleRefreshes();
+
   window.addEventListener('pageshow', refreshProfileAvatar);
+  window.addEventListener('focus', refreshProfileAvatar);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) refreshProfileAvatar();
   });
-  window.addEventListener('focus', refreshProfileAvatar);
+  window.addEventListener('vv:profile-photo-updated', refreshProfileAvatar);
 })();
