@@ -1,13 +1,8 @@
-const path = require('node:path');
 const pool = require('../config/db');
 const { logAudit } = require('../services/auditService');
 const { logSecurityEvent } = require('../services/sessionService');
 
-const ALLOWED_PHOTO_TYPES = new Map([
-  ['image/jpeg', ['.jpg', '.jpeg']],
-  ['image/png', ['.png']],
-  ['image/webp', ['.webp']]
-]);
+const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 function normalizeMobile(value) {
   const mobile = String(value || '').trim();
@@ -35,11 +30,6 @@ function validPhotoSignature(file) {
   return false;
 }
 
-function photoExtensionAllowed(file) {
-  const ext = path.extname(String(file?.originalname || '')).toLowerCase();
-  return (ALLOWED_PHOTO_TYPES.get(file?.mimetype) || []).includes(ext);
-}
-
 exports.getMyProfile = async (req, res) => {
   try {
     const userId = Number(req.user?.id);
@@ -48,7 +38,8 @@ exports.getMyProfile = async (req, res) => {
     const [[user]] = await pool.query(
       `SELECT u.id, u.user_uuid, u.employee_number, u.name, u.username, u.email, u.role,
               u.department, u.account_status, u.active,
-              p.mobile_number, p.profile_photo_mime, p.profile_photo_size, p.profile_photo_updated_at
+              p.mobile_number, p.profile_photo_mime, p.profile_photo_size, p.profile_photo_updated_at,
+              p.updated_at AS profile_updated_at
        FROM users u
        LEFT JOIN user_profiles p ON p.user_id = u.id
        WHERE u.id = ? AND u.deleted_at IS NULL
@@ -121,7 +112,7 @@ exports.uploadMyProfilePhoto = async (req, res) => {
     const userId = Number(req.user?.id);
     if (!userId) return res.status(401).json({ message: 'Authentication required' });
     if (!req.file) return res.status(400).json({ message: 'Select or take a profile photo first' });
-    if (!ALLOWED_PHOTO_TYPES.has(req.file.mimetype) || !photoExtensionAllowed(req.file) || !validPhotoSignature(req.file)) {
+    if (!ALLOWED_PHOTO_TYPES.has(req.file.mimetype) || !validPhotoSignature(req.file)) {
       return res.status(400).json({ message: 'Profile photo must be a genuine JPG, PNG or WebP image' });
     }
 
