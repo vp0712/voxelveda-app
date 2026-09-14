@@ -133,7 +133,6 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('DOMContentLoaded', () => {
   const sidebar = document.querySelector('.sidebar-nav');
   const footer = document.querySelector('.sidebar-footer');
-  const mobileNav = document.querySelector('.mobile-bottom-nav');
   const profileChip = document.querySelector('.profile-chip');
 
   const openProfile = (event) => {
@@ -180,13 +179,11 @@ document.addEventListener('DOMContentLoaded', () => {
     footer.prepend(button);
   }
 
-  if (mobileNav && !mobileNav.querySelector('[data-my-profile-mobile]')) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'nav-btn';
-    button.dataset.myProfileMobile = 'true';
-    button.textContent = 'Profile';
-    button.addEventListener('click', openProfile);
-    mobileNav.appendChild(button);
+  if (!document.querySelector('script[data-dashboard-profile-avatar]')) {
+    const script = document.createElement('script');
+    script.src = '/dashboard-profile-avatar.js?v=20260915-avatar-r1';
+    script.defer = true;
+    script.dataset.dashboardProfileAvatar = 'true';
+    document.head.appendChild(script);
   }
 });
