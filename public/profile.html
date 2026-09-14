@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>My Profile | Voxel Veda</title>
+  <link rel="icon" href="/favicon-32.png">
+  <style>
+    :root{color-scheme:dark;--bg:#071018;--panel:#0d1924;--panel2:#122231;--text:#f6f8fb;--muted:#97a8b7;--line:#213648;--accent:#32d6c6;--danger:#ff6b6b;--shadow:0 22px 60px rgba(0,0,0,.32)}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top right,#123044 0,transparent 34%),var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
+    button,input{font:inherit}.shell{width:min(960px,100%);margin:0 auto;padding:20px 16px 48px}.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:22px}.brand{display:flex;align-items:center;gap:12px}.brand img{width:44px;height:44px;object-fit:contain;border-radius:12px}.brand strong{display:block;font-size:17px}.brand span{font-size:12px;color:var(--muted)}
+    .back,.btn{appearance:none;border:1px solid var(--line);background:#10202d;color:var(--text);border-radius:12px;padding:11px 15px;text-decoration:none;cursor:pointer;font-weight:700}.btn:hover,.back:hover{border-color:#3b6279}.btn.primary{background:var(--accent);border-color:var(--accent);color:#031513}.btn.danger{color:#ffd9d9;border-color:#5a2f36;background:#26151a}.btn:disabled{opacity:.55;cursor:not-allowed}
+    .grid{display:grid;grid-template-columns:320px 1fr;gap:18px}.card{background:linear-gradient(180deg,rgba(18,34,49,.98),rgba(10,23,33,.98));border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);padding:22px}.photoCard{text-align:center}.avatarWrap{width:184px;height:184px;margin:5px auto 18px;border-radius:50%;background:#09141d;border:1px solid #2b4558;overflow:hidden;display:grid;place-items:center;position:relative}.avatarWrap img{width:100%;height:100%;object-fit:cover;display:none}.initials{font-size:58px;font-weight:900;color:#8edfd7}.roleBadge{display:inline-flex;padding:6px 10px;border:1px solid #295b5b;border-radius:999px;color:#9cf0e7;background:#0b2b2a;font-size:12px;font-weight:800;text-transform:capitalize}.photoActions{display:grid;gap:10px;margin-top:20px}.helper{font-size:12px;line-height:1.5;color:var(--muted);margin:14px 0 0}
+    h1{font-size:27px;margin:0 0 6px}h2{font-size:17px;margin:0 0 18px}.subtitle{margin:0 0 24px;color:var(--muted);font-size:14px}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:15px}.field{display:grid;gap:7px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:#b8c5d0;font-weight:800}.field input{width:100%;border:1px solid var(--line);background:#091722;color:var(--text);border-radius:11px;padding:12px 13px;outline:none}.field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(50,214,198,.12)}.field input[readonly]{opacity:.72;cursor:not-allowed}.formActions{display:flex;gap:10px;align-items:center;margin-top:20px}.status{min-height:21px;margin-top:14px;font-size:13px;color:var(--muted)}.status.ok{color:#8ff1b2}.status.error{color:#ff9b9b}.meta{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px;padding-top:18px;border-top:1px solid var(--line)}.meta div{font-size:12px;color:var(--muted)}.meta strong{display:block;color:#dfe8ef;margin-top:3px;font-size:13px}
+    #cameraInput,#galleryInput{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+    @media(max-width:740px){.shell{padding:14px 12px 36px}.grid{grid-template-columns:1fr}.card{padding:18px}.topbar{align-items:flex-start}.brand span{display:none}.avatarWrap{width:150px;height:150px}.formGrid{grid-template-columns:1fr}.field.full{grid-column:auto}.formActions{flex-direction:column}.formActions .btn{width:100%}.photoActions{grid-template-columns:1fr 1fr}.photoActions .danger{grid-column:1/-1}}
+    @media(max-width:390px){.photoActions{grid-template-columns:1fr}.photoActions .danger{grid-column:auto}.back{padding:9px 11px;font-size:13px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand"><img src="/voxel-veda-logo.png" alt="Voxel Veda"><div><strong>Voxel Veda</strong><span>Secure company profile</span></div></div>
+      <a class="back" id="backLink" href="/dashboard">← Dashboard</a>
+    </header>
+
+    <section class="grid" aria-label="User profile">
+      <article class="card photoCard">
+        <div class="avatarWrap" aria-label="Profile picture">
+          <img id="avatar" alt="Your profile picture">
+          <div id="initials" class="initials">VV</div>
+        </div>
+        <h2 id="displayName">My Profile</h2>
+        <span id="roleBadge" class="roleBadge">User</span>
+        <div class="photoActions">
+          <button class="btn primary" id="takePhotoBtn" type="button">Take Photo</button>
+          <button class="btn" id="choosePhotoBtn" type="button">Choose Photo</button>
+          <button class="btn danger" id="removePhotoBtn" type="button">Remove Photo</button>
+        </div>
+        <input id="cameraInput" type="file" accept="image/jpeg,image/png,image/webp" capture="user">
+        <input id="galleryInput" type="file" accept="image/jpeg,image/png,image/webp">
+        <p class="helper">Use your phone camera for a live profile photo, or choose an existing JPG, PNG or WebP image. Maximum 5 MB.</p>
+      </article>
+
+      <article class="card">
+        <h1>Edit Profile</h1>
+        <p class="subtitle">You can update your own profile. Your login email, username, role and employee number remain protected company fields.</p>
+        <form id="profileForm" novalidate>
+          <div class="formGrid">
+            <div class="field full"><label for="name">Full name</label><input id="name" name="name" maxlength="120" autocomplete="name" required></div>
+            <div class="field full"><label for="mobile">Mobile number</label><input id="mobile" name="mobile_number" maxlength="30" inputmode="tel" autocomplete="tel" placeholder="e.g. +61 4xx xxx xxx"></div>
+            <div class="field"><label for="email">Company email</label><input id="email" readonly></div>
+            <div class="field"><label for="username">Username</label><input id="username" readonly></div>
+            <div class="field"><label for="department">Department</label><input id="department" readonly></div>
+            <div class="field"><label for="employeeNumber">Employee number</label><input id="employeeNumber" readonly></div>
+          </div>
+          <div class="formActions"><button class="btn primary" id="saveBtn" type="submit">Save Changes</button></div>
+          <div id="status" class="status" role="status" aria-live="polite"></div>
+        </form>
+        <div class="meta"><div>Account status<strong id="accountStatus">—</strong></div><div>Profile photo<strong id="photoStatus">Not uploaded</strong></div></div>
+      </article>
+    </section>
+  </main>
+  <script src="/profile.js" defer></script>
+</body>
+</html>
