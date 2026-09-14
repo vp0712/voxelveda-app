@@ -5,6 +5,9 @@ const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
 const avatarEl = $('avatar');
 const initialsEl = $('initials');
+const avatarWrapEl = $('avatarWrap');
+const photoViewerEl = $('photoViewer');
+const viewerImageEl = $('viewerImage');
 const MAX_SOURCE_PHOTO_BYTES = 20 * 1024 * 1024;
 const TARGET_UPLOAD_BYTES = 1400 * 1024;
 const MAX_PROFILE_DIMENSION = 1600;
@@ -109,12 +112,36 @@ function updateCompletion(profile) {
     : 'Your profile is complete and ready for internal use.';
 }
 
+function closePhotoViewer() {
+  if (!photoViewerEl || photoViewerEl.hidden) return;
+  photoViewerEl.hidden = true;
+  photoViewerEl.setAttribute('aria-hidden', 'true');
+  viewerImageEl.classList.remove('zoomed');
+  viewerImageEl.removeAttribute('src');
+  document.body.style.overflow = '';
+  avatarWrapEl?.focus?.({ preventScroll: true });
+}
+
+function openPhotoViewer() {
+  if (!currentProfile?.has_profile_photo || !avatarEl?.src || avatarEl.style.display === 'none') return;
+  viewerImageEl.classList.remove('zoomed');
+  viewerImageEl.src = `${currentProfile.profile_photo_url}${currentProfile.profile_photo_url.includes('?') ? '&' : '?'}full=${Date.now()}`;
+  photoViewerEl.hidden = false;
+  photoViewerEl.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  $('viewerClose')?.focus?.({ preventScroll: true });
+}
+
 function renderPhoto(profile) {
   initialsEl.textContent = initials(profile.name);
   $('photoStatus').textContent = profile.has_profile_photo ? 'Uploaded' : 'Not uploaded';
   $('photoUpdated').textContent = displayDate(profile.profile_photo_updated_at);
   $('removePhotoBtn').disabled = !profile.has_profile_photo;
+  avatarWrapEl.classList.toggle('canOpen', Boolean(profile.has_profile_photo && profile.profile_photo_url));
+  avatarWrapEl.setAttribute('aria-disabled', profile.has_profile_photo ? 'false' : 'true');
+  avatarWrapEl.title = profile.has_profile_photo ? 'Tap to view full-size photo' : 'Upload a profile photo to enable full-size view';
   if (!profile.has_profile_photo || !profile.profile_photo_url) {
+    closePhotoViewer();
     avatarEl.removeAttribute('src');
     avatarEl.style.display = 'none';
     initialsEl.style.display = 'block';
@@ -301,6 +328,24 @@ $('choosePhotoBtn').addEventListener('click', () => $('galleryInput').click());
 $('removePhotoBtn').addEventListener('click', removePhoto);
 $('cameraInput').addEventListener('change', (event) => uploadPhoto(event.target.files?.[0]));
 $('galleryInput').addEventListener('change', (event) => uploadPhoto(event.target.files?.[0]));
+avatarWrapEl.addEventListener('click', openPhotoViewer);
+avatarWrapEl.addEventListener('keydown', (event) => {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault();
+    openPhotoViewer();
+  }
+});
+$('viewerClose').addEventListener('click', closePhotoViewer);
+photoViewerEl.addEventListener('click', (event) => {
+  if (event.target === photoViewerEl || event.target.classList.contains('photoViewerInner')) closePhotoViewer();
+});
+viewerImageEl.addEventListener('click', (event) => {
+  event.stopPropagation();
+  viewerImageEl.classList.toggle('zoomed');
+});
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') closePhotoViewer();
+});
 window.addEventListener('beforeunload', (event) => {
   if (!updateDirtyState()) return;
   event.preventDefault();
