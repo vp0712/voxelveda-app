@@ -6,6 +6,7 @@ function expect(source, needle, message) { if (!source.includes(needle)) throw n
 
 const wizard = read('public/finance-import-wizard.js');
 const styles = read('public/finance-import-wizard.css');
+const financeStyles = read('public/finance-intelligence.css');
 const readiness = read('public/finance-banking-readiness.js');
 
 expect(wizard, 'Import in 5 safe steps', 'Import wizard heading is missing.');
@@ -24,5 +25,11 @@ expect(styles, '.import-stepper', 'Wizard progress styling is missing.');
 expect(styles, '@media(max-width:700px)', 'Wizard must include mobile-specific layout.');
 expect(readiness, '/finance-import-wizard.js?v=20260916-wizard2', 'Readiness layer must load the versioned import wizard script.');
 expect(readiness, '/finance-import-wizard.css?v=20260916-wizard2', 'Readiness layer must load the versioned import wizard styles.');
+expect(financeStyles, '.review-table thead{display:none}', 'Mobile review must hide the desktop table header.');
+expect(financeStyles, ".review-table td:nth-child(4)::before{content:'Money out'}", 'Mobile review must label outgoing money clearly.');
+expect(financeStyles, ".review-table td:nth-child(5)::before{content:'Money in'}", 'Mobile review must label incoming money clearly.');
+expect(financeStyles, ".review-table td:nth-child(7)::before{content:'Status'}", 'Mobile review must label validation status clearly.');
+expect(financeStyles, '.review-dialog .dialog-actions{position:sticky', 'Mobile review actions must stay visible while scrolling.');
+expect(financeStyles, '.review-table .row-select{width:22px;height:22px', 'Mobile review include controls must be touch friendly.');
 
-console.log('Finance import wizard regression checks passed.');
+console.log('Finance import wizard and mobile review regression checks passed.');
