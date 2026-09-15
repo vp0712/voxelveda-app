@@ -4,6 +4,7 @@ const operations = require('../controllers/financeOperationsController');
 const intelligence = require('../controllers/financeIntelligenceController');
 const statementReview = require('../controllers/statementImportController');
 const transactionIntelligence = require('../controllers/financeTransactionIntelligenceController');
+const reconciliationCenter = require('../controllers/financeReconciliationCenterController');
 const bankingReadiness = require('../controllers/financeBankingReadinessController');
 const openBanking = require('../controllers/openBankingController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
@@ -35,7 +36,6 @@ router.get('/reports', controller.getReports);
 router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), controller.downloadTrialBalanceCsv);
 router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
 
-// Finance Intelligence: multi-account Personal/Business banking and statement history.
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
 router.post('/intelligence/accounts', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.saveAccount);
@@ -59,13 +59,14 @@ router.post('/intelligence/analyse', requireAnyPermission('VIEW_BANKING'), trans
 router.get('/intelligence/insights', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getInsights);
 router.post('/intelligence/insights/:id/apply', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), transactionIntelligence.applyInsight);
 router.post('/intelligence/insights/:id/dismiss', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.dismissInsight);
+router.get('/intelligence/reconciliation', requireAnyPermission('VIEW_BANKING'), reconciliationCenter.getCenter);
+router.get('/intelligence/reconciliation/:id/candidates', requireAnyPermission('VIEW_BANKING'), reconciliationCenter.getCandidates);
+router.post('/intelligence/reconciliation/:id/classify', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), reconciliationCenter.classify);
 
 router.get('/supplier-bills', operations.getSupplierBills);
 router.get('/supplier-bills/:id', operations.getSupplierBill);
 router.post('/supplier-bills', requireAnyPermission('EDIT_FINANCE'), operations.saveSupplierBill);
-router.post('/supplier-bills/:id/status', requireInputPermission((req) => (
-  String(req.body.status || '').toUpperCase() === 'VOID' ? 'VOID_TRANSACTION' : 'POST_TRANSACTION'
-)), requireStepUp('CHANGE_SUPPLIER_BILL_STATUS'), operations.updateSupplierBillStatus);
+router.post('/supplier-bills/:id/status', requireInputPermission((req) => (String(req.body.status || '').toUpperCase() === 'VOID' ? 'VOID_TRANSACTION' : 'POST_TRANSACTION')), requireStepUp('CHANGE_SUPPLIER_BILL_STATUS'), operations.updateSupplierBillStatus);
 router.post('/supplier-bills/:id/payments', requireAnyPermission('POST_TRANSACTION'), requireStepUp('RECORD_SUPPLIER_PAYMENT'), highRiskPaymentGuard, operations.recordSupplierPayment);
 
 router.get('/bank-accounts', requireAnyPermission('VIEW_BANKING'), operations.getBankAccounts);

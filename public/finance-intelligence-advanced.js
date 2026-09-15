@@ -4,6 +4,19 @@
   const escapeHtml = (input) => String(input ?? '').replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   let scope = 'ALL';
 
+  function installReconciliationButton() {
+    if ($('openReconciliationCenter')) return;
+    const host = document.querySelector('.actions.primary-actions');
+    if (!host) return;
+    const button = document.createElement('button');
+    button.id = 'openReconciliationCenter';
+    button.type = 'button';
+    button.textContent = 'Reconciliation Center';
+    button.addEventListener('click', () => { window.location.href = '/finance-reconciliation.html'; });
+    const review = $('openReviewQueue');
+    if (review?.nextSibling) host.insertBefore(button, review.nextSibling); else host.appendChild(button);
+  }
+
   // iOS Safari clears Event.currentTarget after an async listener yields.
   // Preserve the submitting form so the existing Add Account / Import handlers
   // can safely call currentTarget.reset() and query their submit buttons after await.
@@ -153,6 +166,7 @@
     if (action === 'insights') return $('intelligencePanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  installReconciliationButton();
   document.querySelectorAll('.scope').forEach((button) => button.addEventListener('click', () => {
     scope = String(button.dataset.scope || 'ALL').toUpperCase();
     loadInsights();
