@@ -1,0 +1,5 @@
+{
+  "ofx": "<STMTTRN><TRNTYPE>DEBIT<DTPOSTED>20260914000000<TRNAMT>-42.50<FITID>abc-1<NAME>Supplier One<MEMO>Material purchase</STMTTRN>",
+  "qif": "!Type:Bank\nD14/09/2026\nT-12.30\nPCafe\nMTeam meeting\n^",
+  "csv": "Date,Description,Amount,Balance\n2026-09-14,Example debit,-9.95,100.05"
+}

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>Finance Intelligence | Voxel Veda</title>
-  <link rel="stylesheet" href="/finance-intelligence.css">
+  <link rel="stylesheet" href="/finance-intelligence.css?v=20260915-statement-review">
 </head>
 <body>
   <main class="fi-shell">
@@ -13,7 +13,7 @@
       <div>
         <p class="eyebrow">VOXEL VEDA · FINANCE</p>
         <h1>Financial Command Center</h1>
-        <p class="muted">Personal and business accounts, statement history, reconciliation readiness and cash-flow intelligence.</p>
+        <p class="muted">Personal and business accounts, controlled statement ingestion, reconciliation readiness and cash-flow intelligence.</p>
       </div>
       <a class="ghost-button" href="/admin?view=finance">Back to Admin</a>
     </header>
@@ -28,8 +28,8 @@
       <button id="connectBank" class="primary">+ Connect Bank</button>
       <button id="addAccount">+ Add Account</button>
       <button id="importStatement">+ Import Statement</button>
+      <button id="openReviewQueue">Review Queue</button>
       <button id="refreshDashboard">Refresh</button>
-      <input id="statementFile" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" hidden>
     </section>
 
     <div id="notice" class="notice" hidden></div>
@@ -88,15 +88,34 @@
   </dialog>
 
   <dialog id="importDialog">
-    <form id="importForm" method="dialog" class="dialog-form">
+    <form id="importForm" method="dialog" class="dialog-form wide-dialog">
       <div class="dialog-head"><h2>Import bank statement</h2><button type="button" class="icon-button" data-close="importDialog">×</button></div>
       <label>Account<select id="importAccount" name="account_id" required></select></label>
       <label>Statement file<input id="importFile" name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" required></label>
-      <p class="helper">CSV import works in this first live release. PDF/OFX/QFX/QIF/XLSX are detected but will not be falsely marked as imported until their parser adapter is configured.</p>
-      <div class="dialog-actions"><button type="button" data-close="importDialog">Cancel</button><button type="submit" class="primary">Review & import</button></div>
+      <p class="helper">CSV, OFX, QFX and QIF are parsed locally. PDF and XLSX use pinned browser parsers and are staged as review data before any transaction is committed. PDF extraction is intentionally conservative and must be visually checked.</p>
+      <div class="dialog-actions"><button type="button" data-close="importDialog">Cancel</button><button type="submit" class="primary">Parse & review</button></div>
     </form>
   </dialog>
 
-  <script src="/finance-intelligence.js" defer></script>
+  <dialog id="reviewDialog">
+    <div class="dialog-form review-dialog">
+      <div class="dialog-head"><div><h2>Statement review</h2><p id="reviewSubtitle" class="helper"></p></div><button type="button" class="icon-button" data-close="reviewDialog">×</button></div>
+      <div id="reviewSummary" class="review-summary"></div>
+      <div class="table-wrap"><table class="review-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Status</th></tr></thead><tbody id="reviewRows"></tbody></table></div>
+      <p class="helper">Rejected and duplicate rows are excluded automatically. Warning rows stay selected but should be checked before commit.</p>
+      <div class="dialog-actions"><button id="rejectReview" type="button" class="danger">Reject statement</button><button id="commitReview" type="button" class="primary">Commit selected transactions</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="queueDialog">
+    <div class="dialog-form wide-dialog">
+      <div class="dialog-head"><h2>Statement review queue</h2><button type="button" class="icon-button" data-close="queueDialog">×</button></div>
+      <div id="reviewQueue" class="rows"></div>
+    </div>
+  </dialog>
+
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+  <script src="/finance-intelligence.js?v=20260915-statement-review" defer></script>
 </body>
 </html>
