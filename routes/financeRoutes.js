@@ -1,6 +1,7 @@
 const express = require('express');
 const controller = require('../controllers/financeController');
 const operations = require('../controllers/financeOperationsController');
+const intelligence = require('../controllers/financeIntelligenceController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -28,6 +29,16 @@ router.post('/journals', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CR
 router.get('/reports', controller.getReports);
 router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), controller.downloadTrialBalanceCsv);
 router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
+
+// Finance Intelligence: multi-account Personal/Business banking and statement history.
+router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
+router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
+router.post('/intelligence/accounts', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.saveAccount);
+router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), intelligence.importStatementRows);
+router.get('/intelligence/history-coverage', requireAnyPermission('VIEW_BANKING'), intelligence.getHistoryCoverage);
+router.get('/intelligence/data-quality', requireAnyPermission('VIEW_BANKING'), intelligence.getDataQuality);
+router.get('/intelligence/bank-connections', requireAnyPermission('VIEW_BANKING'), intelligence.getConnectionStatus);
+router.post('/intelligence/bank-connections/connect', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.startConnection);
 
 router.get('/supplier-bills', operations.getSupplierBills);
 router.get('/supplier-bills/:id', operations.getSupplierBill);
