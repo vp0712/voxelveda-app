@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const pool = require('../config/db');
 const { logAudit } = require('../services/auditService');
 const { FinanceError } = require('../services/financeDomain');
+const privacy = require('../services/financePrivacyService');
 
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -46,9 +47,18 @@ const CATEGORY_RULES = [
 
 function categorySuggestion(text) {
   for (const [category, pattern] of CATEGORY_RULES) {
-    if (pattern.test(text)) return { category, confidence: 0.9 };
+    if (pattern.test(text)) return { category, confidence: 0.9, source: 'BUILT_IN' };
   }
-  return { category: null, confidence: 0 };
+  return { category: null, confidence: 0, source: 'NONE' };
+}
+
+function matchingUserRule(merchant, rules) {
+  if (!merchant) return null;
+  const normalized = cleanMerchant(merchant);
+  return rules.find((rule) => {
+    const pattern = cleanMerchant(rule.merchant_pattern);
+    return pattern && (normalized === pattern || normalized.includes(pattern) || pattern.includes(normalized));
+  }) || null;
 }
 
 function median(values) {
@@ -76,21 +86,36 @@ function recurringFrequency(dates) {
   return null;
 }
 
+function validScope(value, allowNull = false) {
+  if (allowNull && (value === null || value === undefined || value === '')) return null;
+  const scope = String(value || '').toUpperCase();
+  if (!['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED'].includes(scope)) throw new FinanceError('Choose Personal, Voxel Veda, Mixed or Not sure.', 400, 'INVALID_SCOPE');
+  return scope;
+}
+
 exports.runAnalysis = async (req, res) => {
   let db;
   try {
     const scope = String(req.body.scope || 'ALL').toUpperCase();
-    const params = [];
-    const where = scope === 'ALL' ? '' : 'WHERE bt.ownership_scope=?';
-    if (scope !== 'ALL') params.push(scope);
+    if (!['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED'].includes(scope)) throw new FinanceError('Invalid finance scope.', 400, 'INVALID_SCOPE');
+    const params = [...privacy.visibilityParams(req)];
+    const clauses = [privacy.visibilitySql('ba')];
+    if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
     const [transactions] = await pool.query(
       `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.description, bt.merchant_name, bt.reference,
               bt.debit, bt.credit, bt.category, bt.ownership_scope, bt.is_internal_transfer,
               ba.nickname AS account_name, ba.ownership_scope AS account_scope
        FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-       ${where} ORDER BY bt.transaction_date ASC, bt.id ASC`, params
+       WHERE ${clauses.join(' AND ')} ORDER BY bt.transaction_date ASC, bt.id ASC`, params
     );
-    if (!transactions.length) return res.json({ message: 'No bank transactions are available to analyse yet.', analysed: 0 });
+    if (!transactions.length) return res.json({ message: 'No visible bank transactions are available to analyse yet.', analysed: 0 });
+
+    const [rules] = await pool.query(
+      `SELECT id, merchant_pattern, category, ownership_scope, priority
+         FROM finance_category_rules
+        WHERE created_by=? AND enabled=1
+        ORDER BY priority DESC, updated_at DESC, id DESC`, [privacy.userId(req)]
+    );
 
     const merchantGroups = new Map();
     for (const tx of transactions) {
@@ -101,14 +126,16 @@ exports.runAnalysis = async (req, res) => {
     }
 
     const transferPairs = new Map();
+    const paired = new Set();
     const transferCandidates = transactions.filter((tx) => Number(tx.debit || 0) > 0 || Number(tx.credit || 0) > 0);
     for (let i = 0; i < transferCandidates.length; i += 1) {
       const a = transferCandidates[i];
+      if (paired.has(a.id)) continue;
       const aAmount = Number(a.debit || 0) || Number(a.credit || 0);
       const aDirection = Number(a.debit || 0) > 0 ? 'OUT' : 'IN';
       for (let j = i + 1; j < transferCandidates.length; j += 1) {
         const b = transferCandidates[j];
-        if (a.bank_account_id === b.bank_account_id) continue;
+        if (paired.has(b.id) || a.bank_account_id === b.bank_account_id) continue;
         const bAmount = Number(b.debit || 0) || Number(b.credit || 0);
         const bDirection = Number(b.debit || 0) > 0 ? 'OUT' : 'IN';
         if (aDirection === bDirection) continue;
@@ -117,6 +144,7 @@ exports.runAnalysis = async (req, res) => {
         const pairUid = uid('XFER');
         transferPairs.set(a.id, pairUid);
         transferPairs.set(b.id, pairUid);
+        paired.add(a.id); paired.add(b.id);
         break;
       }
     }
@@ -127,11 +155,15 @@ exports.runAnalysis = async (req, res) => {
     let recurringCount = 0;
     let transferCount = 0;
     let anomalyCount = 0;
+    let savedRuleCount = 0;
 
     for (const tx of transactions) {
       const group = merchantGroups.get(tx.merchant_clean || `TX-${tx.id}`) || [tx];
       const text = `${tx.merchant_clean} ${tx.description || ''}`;
-      const category = categorySuggestion(text);
+      const userRule = matchingUserRule(tx.merchant_clean, rules);
+      const builtIn = categorySuggestion(text);
+      const category = userRule?.category ? { category: userRule.category, confidence: 0.99, source: 'SAVED_RULE' } : builtIn;
+      if (userRule) savedRuleCount += 1;
       const recurring = recurringFrequency(group.map((item) => item.transaction_date));
       if (recurring) recurringCount += 1;
       const transferUid = transferPairs.get(tx.id) || null;
@@ -142,19 +174,17 @@ exports.runAnalysis = async (req, res) => {
       const anomaly = med > 0 && group.length >= 3 && amount > med * 2.5 && amount - med > 50;
       if (anomaly) anomalyCount += 1;
       const accountScope = String(tx.account_scope || tx.ownership_scope || 'UNCLASSIFIED').toUpperCase();
-      let suggestedScope = accountScope;
-      let scopeConfidence = accountScope === 'UNCLASSIFIED' ? 0.35 : 0.95;
-      if (accountScope === 'MIXED' || accountScope === 'UNCLASSIFIED') {
+      let suggestedScope = userRule?.ownership_scope || accountScope;
+      let scopeConfidence = userRule?.ownership_scope ? 0.99 : (accountScope === 'UNCLASSIFIED' ? 0.35 : 0.95);
+      if (!userRule?.ownership_scope && (accountScope === 'MIXED' || accountScope === 'UNCLASSIFIED')) {
         const businessPattern = /(HOSTINGER|RAILWAY|ADOBE|AUTODESK|BUNNINGS|TOTAL TOOLS|COURIER|SHIPPING|FILAMENT|RESIN|MATERIAL|SUPPLIER)/i;
-        if (businessPattern.test(text)) {
-          suggestedScope = 'BUSINESS';
-          scopeConfidence = 0.82;
-        }
+        if (businessPattern.test(text)) { suggestedScope = 'BUSINESS'; scopeConfidence = 0.82; }
       }
       const explanationParts = [];
-      if (category.category) explanationParts.push(`Likely ${category.category} based on merchant/description.`);
+      if (userRule) explanationParts.push('Your saved merchant rule matched this transaction.');
+      else if (category.category) explanationParts.push(`Likely ${category.category} based on merchant/description.`);
       if (recurring) explanationParts.push(`Pattern looks ${recurring.toLowerCase()} across ${group.length} similar transactions.`);
-      if (transferUid) explanationParts.push('Possible transfer between your own accounts because an equal opposite transaction appears within 3 days.');
+      if (transferUid) explanationParts.push('Possible transfer between your own visible accounts because an equal opposite transaction appears within 3 days.');
       if (anomaly) explanationParts.push(`Amount is much higher than this merchant's typical amount (${med.toFixed(2)}).`);
       if (!explanationParts.length) explanationParts.push('No strong automatic pattern was found; keep this transaction for manual review.');
 
@@ -177,30 +207,28 @@ exports.runAnalysis = async (req, res) => {
       generated += 1;
     }
 
-    await logAudit(db, audit(req, { action: 'FINANCE_INTELLIGENCE_ANALYSED', module: 'finance_intelligence', recordType: 'transaction_intelligence', recordId: scope, newValue: { analysed: generated, recurring: recurringCount, transfer_candidates: transferCount, anomalies: anomalyCount } }));
+    await logAudit(db, audit(req, { action: 'FINANCE_INTELLIGENCE_ANALYSED', module: 'finance_intelligence', recordType: 'transaction_intelligence', recordId: scope, newValue: { analysed: generated, saved_rule_matches: savedRuleCount, recurring: recurringCount, transfer_candidates: transferCount, anomalies: anomalyCount } }));
     await db.commit();
-    return res.json({ message: `Analysed ${generated} transactions. Suggestions are review-only until you apply them.`, analysed: generated, recurring: recurringCount, transfer_candidates: transferCount, anomalies: anomalyCount });
+    return res.json({ message: `Analysed ${generated} visible transactions. Suggestions are review-only until you apply them.`, analysed: generated, saved_rule_matches: savedRuleCount, recurring: recurringCount, transfer_candidates: transferCount, anomalies: anomalyCount });
   } catch (error) {
     if (db) await db.rollback();
     return fail(res, error, 'Failed to analyse transactions');
-  } finally {
-    if (db) db.release();
-  }
+  } finally { if (db) db.release(); }
 };
 
 exports.getInsights = async (req, res) => {
   try {
     const scope = String(req.query.scope || 'ALL').toUpperCase();
-    const params = [];
-    let where = "WHERE fi.status <> 'DISMISSED'";
-    if (scope !== 'ALL') { where += ' AND bt.ownership_scope=?'; params.push(scope); }
+    const params = [...privacy.visibilityParams(req)];
+    const clauses = ["fi.status <> 'DISMISSED'", privacy.visibilitySql('ba')];
+    if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
     const [rows] = await pool.query(
       `SELECT fi.*, bt.transaction_date, bt.description, bt.merchant_name, bt.debit, bt.credit, bt.category AS current_category,
               bt.ownership_scope AS current_scope, bt.is_internal_transfer, ba.nickname AS account_name, ba.currency
        FROM finance_transaction_insights fi
        JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
        JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-       ${where}
+       WHERE ${clauses.join(' AND ')}
        ORDER BY (fi.anomaly_score >= 70) DESC, (fi.transfer_candidate_uid IS NOT NULL) DESC,
                 (fi.recurring_frequency IS NOT NULL) DESC, fi.generated_at DESC LIMIT 300`, params
     );
@@ -225,11 +253,13 @@ exports.applyInsight = async (req, res) => {
     await db.beginTransaction();
     const [[insight]] = await db.query(
       `SELECT fi.*, bt.category AS current_category, bt.ownership_scope AS current_scope, bt.is_internal_transfer,
-              bt.bank_account_id, bt.description
-       FROM finance_transaction_insights fi JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
+              bt.bank_account_id, bt.description, ba.ownership_scope AS account_scope, ba.created_by AS account_created_by
+       FROM finance_transaction_insights fi
+       JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
+       JOIN bank_accounts ba ON ba.id=bt.bank_account_id
        WHERE fi.id=? FOR UPDATE`, [id]
     );
-    if (!insight) throw new FinanceError('Finance insight not found.', 404, 'FINANCE_INSIGHT_NOT_FOUND');
+    if (!insight || !privacy.accountVisible({ ownership_scope: insight.account_scope, created_by: insight.account_created_by }, privacy.userId(req))) throw new FinanceError('Finance insight not found.', 404, 'FINANCE_INSIGHT_NOT_FOUND');
     const applyCategory = req.body.apply_category !== false && insight.suggested_category;
     const applyScope = req.body.apply_scope === true && insight.suggested_scope;
     const applyTransfer = req.body.apply_transfer === true && insight.transfer_candidate_uid;
@@ -240,36 +270,99 @@ exports.applyInsight = async (req, res) => {
     );
     if (applyTransfer) {
       await db.query(
-        `UPDATE bank_transactions bt JOIN finance_transaction_insights fi ON fi.bank_transaction_id=bt.id
-         SET bt.is_internal_transfer=1 WHERE fi.transfer_candidate_uid=?`, [insight.transfer_candidate_uid]
+        `UPDATE bank_transactions bt
+          JOIN finance_transaction_insights fi ON fi.bank_transaction_id=bt.id
+          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         SET bt.is_internal_transfer=1
+         WHERE fi.transfer_candidate_uid=? AND ${privacy.visibilitySql('ba')}`,
+        [insight.transfer_candidate_uid, ...privacy.visibilityParams(req)]
       );
-      await db.query(`UPDATE finance_transaction_insights SET status='APPLIED', reviewed_at=NOW(), reviewed_by=? WHERE transfer_candidate_uid=?`, [req.user.id, insight.transfer_candidate_uid]);
+      await db.query(
+        `UPDATE finance_transaction_insights fi
+          JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
+          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         SET fi.status='APPLIED', fi.reviewed_at=NOW(), fi.reviewed_by=?
+         WHERE fi.transfer_candidate_uid=? AND ${privacy.visibilitySql('ba')}`,
+        [req.user.id, insight.transfer_candidate_uid, ...privacy.visibilityParams(req)]
+      );
     } else {
       await db.query(`UPDATE finance_transaction_insights SET status='APPLIED', reviewed_at=NOW(), reviewed_by=? WHERE id=?`, [req.user.id, id]);
     }
     if (req.body.remember_rule && insight.merchant_normalized && (applyCategory || applyScope)) {
-      await db.query(
-        `INSERT INTO finance_category_rules (rule_uid, merchant_pattern, category, ownership_scope, created_by)
-         VALUES (?, ?, ?, ?, ?)`, [uid('RULE'), insight.merchant_normalized, applyCategory ? insight.suggested_category : null, applyScope ? insight.suggested_scope : null, req.user.id]
+      const [[existingRule]] = await db.query(
+        `SELECT id FROM finance_category_rules WHERE created_by=? AND merchant_pattern=? ORDER BY id DESC LIMIT 1`,
+        [req.user.id, insight.merchant_normalized]
       );
+      if (existingRule) {
+        await db.query(
+          `UPDATE finance_category_rules SET category=?, ownership_scope=?, enabled=1, priority=200 WHERE id=?`,
+          [applyCategory ? insight.suggested_category : null, applyScope ? insight.suggested_scope : null, existingRule.id]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO finance_category_rules (rule_uid, merchant_pattern, category, ownership_scope, priority, enabled, created_by)
+           VALUES (?, ?, ?, ?, 200, 1, ?)`,
+          [uid('RULE'), insight.merchant_normalized, applyCategory ? insight.suggested_category : null, applyScope ? insight.suggested_scope : null, req.user.id]
+        );
+      }
     }
-    await logAudit(db, audit(req, { action: 'FINANCE_INSIGHT_APPLIED', module: 'finance_intelligence', recordType: 'bank_transaction', recordId: insight.bank_transaction_id, oldValue: { category: insight.current_category, ownership_scope: insight.current_scope, is_internal_transfer: insight.is_internal_transfer }, newValue: { category: applyCategory ? insight.suggested_category : insight.current_category, ownership_scope: applyScope ? insight.suggested_scope : insight.current_scope, is_internal_transfer: applyTransfer ? 1 : insight.is_internal_transfer } }));
+    await logAudit(db, audit(req, { action: 'FINANCE_INSIGHT_APPLIED', module: 'finance_intelligence', recordType: 'bank_transaction', recordId: insight.bank_transaction_id, oldValue: { category: insight.current_category, ownership_scope: insight.current_scope, is_internal_transfer: insight.is_internal_transfer }, newValue: { category: applyCategory ? insight.suggested_category : insight.current_category, ownership_scope: applyScope ? insight.suggested_scope : insight.current_scope, is_internal_transfer: applyTransfer ? 1 : insight.is_internal_transfer, remembered_rule: Boolean(req.body.remember_rule) } }));
     await db.commit();
-    return res.json({ message: 'Finance suggestion applied. Dashboard totals will now use the updated classification.' });
+    return res.json({ message: req.body.remember_rule ? 'Suggestion applied and your merchant rule was saved.' : 'Finance suggestion applied. Dashboard totals will now use the updated classification.' });
   } catch (error) {
     if (db) await db.rollback();
     return fail(res, error, 'Failed to apply finance insight');
-  } finally {
-    if (db) db.release();
-  }
+  } finally { if (db) db.release(); }
 };
 
 exports.dismissInsight = async (req, res) => {
   try {
     const id = Number(req.params.id || 0);
+    await privacy.assertInsightAccess(pool, id, req);
     const [result] = await pool.query(`UPDATE finance_transaction_insights SET status='DISMISSED', reviewed_at=NOW(), reviewed_by=? WHERE id=?`, [req.user.id, id]);
     if (!result.affectedRows) throw new FinanceError('Finance insight not found.', 404, 'FINANCE_INSIGHT_NOT_FOUND');
     await logAudit(pool, audit(req, { action: 'FINANCE_INSIGHT_DISMISSED', module: 'finance_intelligence', recordType: 'finance_transaction_insight', recordId: id }));
     return res.json({ message: 'Suggestion dismissed.' });
   } catch (error) { return fail(res, error, 'Failed to dismiss finance insight'); }
+};
+
+exports.getRules = async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, rule_uid, merchant_pattern, category, ownership_scope, priority, enabled, created_at, updated_at
+         FROM finance_category_rules WHERE created_by=? ORDER BY enabled DESC, priority DESC, updated_at DESC, id DESC`,
+      [privacy.userId(req)]
+    );
+    return res.json({
+      rules: rows,
+      explanation: 'These are your own remembered merchant rules. They create high-confidence suggestions but never post, reconcile, or change a transaction until you approve the suggestion.'
+    });
+  } catch (error) { return fail(res, error, 'Failed to load smart finance rules'); }
+};
+
+exports.updateRule = async (req, res) => {
+  try {
+    const id = Number(req.params.id || 0);
+    const category = String(req.body.category || '').trim().slice(0, 120) || null;
+    const scope = validScope(req.body.ownership_scope, true);
+    const enabled = req.body.enabled === false ? 0 : 1;
+    const priority = Math.max(1, Math.min(999, Number(req.body.priority || 200)));
+    if (!category && !scope) throw new FinanceError('A rule needs a category, a money scope, or both.', 400, 'EMPTY_FINANCE_RULE');
+    const [[existing]] = await pool.query('SELECT * FROM finance_category_rules WHERE id=? AND created_by=?', [id, privacy.userId(req)]);
+    if (!existing) throw new FinanceError('Smart rule not found.', 404, 'FINANCE_RULE_NOT_FOUND');
+    await pool.query('UPDATE finance_category_rules SET category=?, ownership_scope=?, priority=?, enabled=? WHERE id=? AND created_by=?', [category, scope, priority, enabled, id, privacy.userId(req)]);
+    await logAudit(pool, audit(req, { action: 'FINANCE_RULE_UPDATED', module: 'finance_intelligence', recordType: 'finance_category_rule', recordId: id, oldValue: existing, newValue: { category, ownership_scope: scope, priority, enabled } }));
+    return res.json({ message: enabled ? 'Smart rule updated and enabled.' : 'Smart rule saved but disabled.' });
+  } catch (error) { return fail(res, error, 'Failed to update smart finance rule'); }
+};
+
+exports.deleteRule = async (req, res) => {
+  try {
+    const id = Number(req.params.id || 0);
+    const [[existing]] = await pool.query('SELECT * FROM finance_category_rules WHERE id=? AND created_by=?', [id, privacy.userId(req)]);
+    if (!existing) throw new FinanceError('Smart rule not found.', 404, 'FINANCE_RULE_NOT_FOUND');
+    await pool.query('DELETE FROM finance_category_rules WHERE id=? AND created_by=?', [id, privacy.userId(req)]);
+    await logAudit(pool, audit(req, { action: 'FINANCE_RULE_DELETED', module: 'finance_intelligence', recordType: 'finance_category_rule', recordId: id, oldValue: existing }));
+    return res.json({ message: 'Smart rule deleted.' });
+  } catch (error) { return fail(res, error, 'Failed to delete smart finance rule'); }
 };

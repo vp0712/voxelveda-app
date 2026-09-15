@@ -14,6 +14,7 @@ const requireStepUp = require('../middleware/stepUpMiddleware');
 const requireSensitiveExportApproval = require('../middleware/sensitiveExportMiddleware');
 const highRiskPaymentGuard = require('../middleware/highRiskPaymentMiddleware');
 const statementPreviewSanitizer = require('../middleware/statementPreviewSanitizer');
+const financePrivacy = require('../middleware/financePrivacyMiddleware');
 
 const router = express.Router();
 
@@ -38,14 +39,14 @@ router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
-router.post('/intelligence/accounts', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.saveAccount);
-router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), intelligence.importStatementRows);
-router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementPreviewSanitizer, statementReview.preview);
-router.get('/intelligence/statement-reviews', requireAnyPermission('VIEW_BANKING'), statementReview.list);
-router.get('/intelligence/statement-reviews/:uid', requireAnyPermission('VIEW_BANKING'), statementReview.get);
-router.post('/intelligence/statement-reviews/:uid/rows/:rowId/select', requireAnyPermission('EDIT_FINANCE'), statementReview.updateRowSelection);
-router.post('/intelligence/statement-reviews/:uid/commit', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.commit);
-router.post('/intelligence/statement-reviews/:uid/reject', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.reject);
+router.post('/intelligence/accounts', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountBody('id'), financePrivacy.protectScopeConversion('id', 'ownership_scope'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.saveAccount);
+router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), intelligence.importStatementRows);
+router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementPreviewSanitizer, statementReview.preview);
+router.get('/intelligence/statement-reviews', requireAnyPermission('VIEW_BANKING'), financePrivacy.filterStatementList, statementReview.list);
+router.get('/intelligence/statement-reviews/:uid', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), statementReview.get);
+router.post('/intelligence/statement-reviews/:uid/rows/:rowId/select', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), statementReview.updateRowSelection);
+router.post('/intelligence/statement-reviews/:uid/commit', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.commit);
+router.post('/intelligence/statement-reviews/:uid/reject', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.reject);
 router.get('/intelligence/history-coverage', requireAnyPermission('VIEW_BANKING'), intelligence.getHistoryCoverage);
 router.get('/intelligence/data-quality', requireAnyPermission('VIEW_BANKING'), intelligence.getDataQuality);
 router.get('/intelligence/bank-connections', requireAnyPermission('VIEW_BANKING'), intelligence.getConnectionStatus);
@@ -57,11 +58,14 @@ router.post('/intelligence/open-banking/sessions/:uid/cancel', requireAnyPermiss
 router.post('/intelligence/bank-connections/connect', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.startConnection);
 router.post('/intelligence/analyse', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.runAnalysis);
 router.get('/intelligence/insights', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getInsights);
-router.post('/intelligence/insights/:id/apply', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), transactionIntelligence.applyInsight);
-router.post('/intelligence/insights/:id/dismiss', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.dismissInsight);
+router.post('/intelligence/insights/:id/apply', requireAnyPermission('EDIT_FINANCE'), financePrivacy.insightParam('id'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), transactionIntelligence.applyInsight);
+router.post('/intelligence/insights/:id/dismiss', requireAnyPermission('EDIT_FINANCE'), financePrivacy.insightParam('id'), transactionIntelligence.dismissInsight);
+router.get('/intelligence/rules', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getRules);
+router.post('/intelligence/rules/:id', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.updateRule);
+router.delete('/intelligence/rules/:id', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.deleteRule);
 router.get('/intelligence/reconciliation', requireAnyPermission('VIEW_BANKING'), reconciliationCenter.getCenter);
-router.get('/intelligence/reconciliation/:id/candidates', requireAnyPermission('VIEW_BANKING'), reconciliationCenter.getCandidates);
-router.post('/intelligence/reconciliation/:id/classify', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), reconciliationCenter.classify);
+router.get('/intelligence/reconciliation/:id/candidates', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), reconciliationCenter.getCandidates);
+router.post('/intelligence/reconciliation/:id/classify', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), reconciliationCenter.classify);
 
 router.get('/supplier-bills', operations.getSupplierBills);
 router.get('/supplier-bills/:id', operations.getSupplierBill);
@@ -69,12 +73,12 @@ router.post('/supplier-bills', requireAnyPermission('EDIT_FINANCE'), operations.
 router.post('/supplier-bills/:id/status', requireInputPermission((req) => (String(req.body.status || '').toUpperCase() === 'VOID' ? 'VOID_TRANSACTION' : 'POST_TRANSACTION')), requireStepUp('CHANGE_SUPPLIER_BILL_STATUS'), operations.updateSupplierBillStatus);
 router.post('/supplier-bills/:id/payments', requireAnyPermission('POST_TRANSACTION'), requireStepUp('RECORD_SUPPLIER_PAYMENT'), highRiskPaymentGuard, operations.recordSupplierPayment);
 
-router.get('/bank-accounts', requireAnyPermission('VIEW_BANKING'), operations.getBankAccounts);
-router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), operations.saveBankAccount);
-router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), operations.getBankTransactions);
-router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
-router.post('/bank-transactions/:id/reconcile', requireAnyPermission('EDIT_FINANCE'), requireStepUp('RECONCILE_BANK_TRANSACTION'), operations.reconcileBankTransaction);
-router.post('/bank-transactions/:id/ignore', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IGNORE_BANK_TRANSACTION'), operations.ignoreBankTransaction);
+router.get('/bank-accounts', requireAnyPermission('VIEW_BANKING'), financePrivacy.filterAccountList, operations.getBankAccounts);
+router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountBody('id'), financePrivacy.protectScopeConversion('id', 'ownership_scope'), requireStepUp('CHANGE_BANK_DETAILS'), operations.saveBankAccount);
+router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
+router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
+router.post('/bank-transactions/:id/reconcile', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('RECONCILE_BANK_TRANSACTION'), operations.reconcileBankTransaction);
+router.post('/bank-transactions/:id/ignore', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('IGNORE_BANK_TRANSACTION'), operations.ignoreBankTransaction);
 
 router.get('/accounting-periods', operations.getAccountingPeriods);
 router.post('/accounting-periods/:id/status', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), operations.updateAccountingPeriod);
