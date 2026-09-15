@@ -8,6 +8,48 @@
     return ['Account','File','Preview','Review','Approve'][index - 1] || '';
   }
 
+  function ensureWizardMarkup() {
+    const form = $('importForm');
+    if (!form || $('importWizard')) return;
+    const heading = form.querySelector('.dialog-head');
+    if (!heading) return;
+    const wizard = document.createElement('section');
+    wizard.id = 'importWizard';
+    wizard.className = 'import-wizard';
+    wizard.innerHTML = `
+      <h3>Import in 5 safe steps</h3>
+      <p>Nothing touches your finance records until the final approval step.</p>
+      <div class="import-stepper" aria-label="Statement import progress">
+        <div class="import-step active" data-import-step="1"><span class="n">1</span><span>Choose account</span></div>
+        <div class="import-step" data-import-step="2"><span class="n">2</span><span>Choose file</span></div>
+        <div class="import-step" data-import-step="3"><span class="n">3</span><span>Preview checks</span></div>
+        <div class="import-step" data-import-step="4"><span class="n">4</span><span>Review rows</span></div>
+        <div class="import-step" data-import-step="5"><span class="n">5</span><span>Approve import</span></div>
+      </div>
+      <div id="importWizardStatus" class="import-status-line">Step 1 of 5 · Account</div>`;
+    heading.insertAdjacentElement('afterend', wizard);
+
+    const fileInput = $('importFile');
+    const fileLabel = fileInput?.closest('label');
+    if (fileLabel && !$('importFileSummary')) {
+      const summary = document.createElement('div');
+      summary.id = 'importFileSummary';
+      summary.className = 'import-file-summary';
+      fileLabel.insertAdjacentElement('afterend', summary);
+      const note = document.createElement('div');
+      note.className = 'import-wizard-note';
+      note.innerHTML = '<b>Best result:</b> use CSV, OFX or QFX from your bank. PDF is accepted only when debit/credit direction can be read safely.';
+      summary.insertAdjacentElement('afterend', note);
+    }
+
+    const submit = form.querySelector('button[type="submit"]');
+    if (submit) {
+      submit.id = 'importPreviewButton';
+      submit.disabled = true;
+      submit.textContent = 'Complete account + file first';
+    }
+  }
+
   function renderSteps() {
     document.querySelectorAll('[data-import-step]').forEach((node) => {
       const n = Number(node.dataset.importStep || 0);
@@ -30,6 +72,10 @@
     return String(file?.name || '').split('.').pop().toUpperCase();
   }
 
+  function safeName(name) {
+    return String(name || '').replace(/[&<>"']/g, '');
+  }
+
   function syncReadyState() {
     const account = $('importAccount');
     const fileInput = $('importFile');
@@ -47,10 +93,10 @@
     if (summary) {
       if (!file) {
         summary.className = 'import-file-summary';
-        summary.innerHTML = '<strong>No file selected</strong><span>Choose CSV, OFX or QFX where possible. PDF is supported only when transaction direction can be read safely.</span>';
+        summary.innerHTML = '<strong>No file selected</strong><span>Select a bank statement to continue.</span>';
       } else {
         summary.className = `import-file-summary ${validFile ? 'ready' : ''}`;
-        summary.innerHTML = `<strong>${String(file.name).replace(/[&<>]/g, '')}</strong><span>${format || 'Unknown format'} · ${prettySize(file.size)}${validFile ? ' · Ready to preview' : ' · Unsupported format'}</span>`;
+        summary.innerHTML = `<strong>${safeName(file.name)}</strong><span>${format || 'Unknown format'} · ${prettySize(file.size)}${validFile ? ' · Ready to preview' : ' · Unsupported format'}</span>`;
       }
     }
 
@@ -81,12 +127,15 @@
       if (dialog.open) {
         state.busy = false;
         state.step = 4;
+        const button = $('commitReview');
+        if (button) button.textContent = 'Approve & import selected rows';
         renderSteps();
       }
     }).observe(dialog, { attributes: true, attributeFilter: ['open'] });
   }
 
   function wireImport() {
+    ensureWizardMarkup();
     const form = $('importForm');
     const account = $('importAccount');
     const file = $('importFile');
@@ -119,7 +168,10 @@
       renderSteps();
     }, true);
 
-    $('importStatement')?.addEventListener('click', () => window.setTimeout(syncReadyState, 0));
+    $('importStatement')?.addEventListener('click', () => {
+      state.busy = false;
+      window.setTimeout(syncReadyState, 0);
+    });
     syncReadyState();
   }
 
@@ -137,9 +189,23 @@
     }).observe(host, { childList: true, subtree: true });
   }
 
+  function observeImportErrors() {
+    const notice = $('notice');
+    if (!notice) return;
+    new MutationObserver(() => {
+      if (!$('importDialog')?.open || notice.hidden) return;
+      if (!String(notice.className || '').includes('error')) return;
+      state.busy = false;
+      syncReadyState();
+      const line = $('importWizardStatus');
+      if (line) line.textContent = `Could not preview this statement · ${String(notice.textContent || 'Please check the file and try again.')}`;
+    }).observe(notice, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden','class'] });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {
     wireImport();
     observeReviewDialog();
     clarifyReviewSummary();
+    observeImportErrors();
   });
 })();
