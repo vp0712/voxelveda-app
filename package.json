@@ -5,7 +5,7 @@
   "main": "server.js",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js",
+    "start": "node scripts/db-recovery-worker.js",
     "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
