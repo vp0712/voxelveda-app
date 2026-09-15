@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const { ensureFinanceSchema } = require('../services/financeSchema');
 const { FinanceError } = require('../services/financeDomain');
 const { logAudit } = require('../services/auditService');
+const privacy = require('../services/financePrivacyService');
 
 const SCOPES = new Set(['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const WORKFLOWS = new Set(['ALL', 'NEEDS_ACTION', 'READY', 'PARTIAL', 'RECONCILED', 'IGNORED']);
@@ -47,8 +48,8 @@ exports.getCenter = async (req, res) => {
     const workflow = String(req.query.workflow || 'ALL').toUpperCase();
     if (!SCOPES.has(scope)) throw new FinanceError('Invalid money scope.', 400, 'INVALID_SCOPE');
     if (!WORKFLOWS.has(workflow)) throw new FinanceError('Invalid reconciliation filter.', 400, 'INVALID_WORKFLOW');
-    const clauses = ["ba.status = 'ACTIVE'"];
-    const params = [];
+    const clauses = ["ba.status = 'ACTIVE'", privacy.visibilitySql('ba')];
+    const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { clauses.push('bt.ownership_scope = ?'); params.push(scope); }
     const search = String(req.query.search || '').trim();
     if (search) {
