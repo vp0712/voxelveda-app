@@ -47,9 +47,45 @@
     return ({ READY: 'ready', PARTIAL: 'partial', NEEDS_SETUP: 'needs', BLOCKED: 'blocked' })[status] || 'needs';
   }
   function explainOverall(payload) {
-    if (payload.overall === 'PROVIDER_CREDENTIALS_READY') return 'Infrastructure checks are strong enough to move to provider-adapter verification. Live bank consent is still intentionally disabled until the provider flow is tested end to end.';
-    if (payload.overall === 'PROVIDER_PARTIAL') return 'Provider credentials appear to exist, but one or more production controls still need work before automatic bank syncing should be enabled.';
-    return 'You can safely use statement imports now. Open Banking is being prepared in sandbox mode and remains separate from live finance data.';
+    if (payload.overall === 'PRODUCTION_READY') return 'All required production controls are ready. Keep live sync locked until one complete provider consent, callback and transaction-sync verification passes.';
+    if (payload.overall === 'SANDBOX_READY') return 'Sandbox testing is ready. This is the correct place to prove the full bank-consent flow before any real bank data is allowed.';
+    if (payload.overall === 'PROVIDER_PARTIAL') return 'Provider setup has started, but production remains intentionally locked because one or more required controls are incomplete.';
+    return 'Manual statement import is available now. Live Open Banking remains separated and fail-closed until every required production control is verified.';
+  }
+
+  function ensureProgressPanel() {
+    if ($('bankingProgressPanel')) return $('bankingProgressPanel');
+    const panel = document.createElement('section');
+    panel.id = 'bankingProgressPanel';
+    panel.className = 'banking-progress-panel';
+    panel.innerHTML = `
+      <div class="readiness-progress-head">
+        <div><p class="eyebrow">PRODUCTION READINESS</p><h3>What is ready and what still needs action</h3><p id="bankingProgressExplanation" class="muted">Loading production controls…</p></div>
+        <div class="readiness-score"><strong id="bankingProgressPercent">0%</strong><span>verified</span></div>
+      </div>
+      <div class="readiness-progress-track"><span id="bankingProgressBar"></span></div>
+      <div class="readiness-metrics">
+        <div><span>Ready</span><strong id="bankingReadyCount">0</strong></div>
+        <div><span>Partly ready</span><strong id="bankingPartialCount">0</strong></div>
+        <div><span>Blocked / missing</span><strong id="bankingBlockedCount">0</strong></div>
+        <div><span>Your approvals</span><strong id="bankingOwnerActionCount">0</strong></div>
+      </div>`;
+    const target = $('bankingSafetyControls');
+    target?.parentElement?.insertBefore(panel, target);
+    return panel;
+  }
+
+  function renderProgress(payload) {
+    ensureProgressPanel();
+    const progress = payload.progress || {};
+    const percent = Math.max(0, Math.min(100, Number(progress.production_controls_percent || 0)));
+    $('bankingProgressPercent').textContent = `${percent}%`;
+    $('bankingProgressBar').style.width = `${percent}%`;
+    $('bankingReadyCount').textContent = progress.ready ?? 0;
+    $('bankingPartialCount').textContent = progress.partial ?? 0;
+    $('bankingBlockedCount').textContent = progress.blocked_or_missing ?? 0;
+    $('bankingOwnerActionCount').textContent = progress.owner_actions ?? 0;
+    $('bankingProgressExplanation').textContent = progress.explanation || 'Production control status loaded.';
   }
 
   function ensureProviderPanel() {
@@ -120,11 +156,40 @@
     }
   }
 
+  function priorityLabel(priority) {
+    return ({ CRITICAL: 'Critical', HIGH: 'High', NORMAL: 'Normal' })[priority] || String(priority || 'Normal');
+  }
+
   function renderControls(items) {
     const host = $('bankingSafetyControls'); if (!host) return;
-    host.innerHTML = items.map((item) => `<article class="safety-card ${statusClass(item.status)}"><div class="safety-card-head"><div><strong>${escapeHtml(item.label)}</strong><small>${escapeHtml(item.description || '')}</small></div><span class="safety-status ${statusClass(item.status)}">${statusText(item.status)}</span></div><p>${escapeHtml(item.detail || '')}</p>${item.required_for_bank_feed ? '<em>Required before automatic bank feeds</em>' : '<em>Available for manual statement workflow</em>'}</article>`).join('');
+    host.innerHTML = items.map((item) => `
+      <article class="safety-card ${statusClass(item.status)}">
+        <div class="safety-card-head">
+          <div>
+            <div class="control-meta"><span>${escapeHtml(item.category || 'Control')}</span><span class="priority ${String(item.priority || '').toLowerCase()}">${escapeHtml(priorityLabel(item.priority))}</span></div>
+            <strong>${escapeHtml(item.plain_name || item.label)}</strong>
+            <small>${escapeHtml(item.description || '')}</small>
+          </div>
+          <span class="safety-status ${statusClass(item.status)}">${statusText(item.status)}</span>
+        </div>
+        <div class="control-explanation">
+          <p><b>Why it matters</b>${escapeHtml(item.why_it_matters || item.detail || '')}</p>
+          <p><b>Current status</b>${escapeHtml(item.detail || '')}</p>
+          <p><b>Next step</b>${escapeHtml(item.next_step || 'No further action reported.')}</p>
+        </div>
+        <div class="control-footer">
+          <span>Owner: ${escapeHtml(item.owner || 'System')}</span>
+          <span>${item.user_action_required && item.status !== 'READY' ? 'Your approval/action is required' : (item.status === 'READY' ? 'No action required' : 'System / platform work required')}</span>
+        </div>
+      </article>`).join('');
   }
-  function renderActions(items) { const host=$('bankingNextActions'); if(host) host.innerHTML=items.length?items.map((item,index)=>`<div class="next-action"><span>${index+1}</span><p>${escapeHtml(item)}</p></div>`).join(''):'<div class="next-action done"><span>✓</span><p>No unresolved setup items were reported.</p></div>'; }
+
+  function renderActions(items) {
+    const host = $('bankingNextActions');
+    if (host) host.innerHTML = items.length
+      ? items.map((item,index)=>`<div class="next-action"><span>${index+1}</span><p>${escapeHtml(item)}</p></div>`).join('')
+      : '<div class="next-action done"><span>✓</span><p>No unresolved setup items were reported.</p></div>';
+  }
   function renderSafetyRules(items) { const host=$('bankingSafetyRules'); if(host) host.innerHTML=items.map((item)=>`<li>${escapeHtml(item)}</li>`).join(''); }
   function renderConnections(connections) { const host=$('bankConnectionHistory'); if(!host)return; host.innerHTML=connections.length?connections.map((row)=>`<div class="connection-row"><div><strong>${escapeHtml(row.institution||row.provider||'Bank connection')}</strong><small>${escapeHtml(row.connection_uid||'')}</small></div><div><b>${escapeHtml(row.consent_status||'UNKNOWN')}</b><small>Last sync: ${escapeHtml(row.last_sync_completed_at||'Never')}</small></div></div>`).join(''):'<div class="empty"><strong>No live-bank consents yet</strong><span>This is expected while Open Banking remains in sandbox/setup mode.</span></div>'; }
   function updateConnectButton(payload) { const button=$('connectBank'); if(!button)return; button.textContent=payload.open_banking?.enabled?'Connect Bank':'Open Banking Setup'; button.dataset.readinessBlocked=payload.open_banking?.enabled?'false':'true'; }
@@ -135,15 +200,25 @@
       const payload=await api('/api/finance/intelligence/banking-readiness'); readiness=payload;
       $('bankingReadinessHeadline').textContent=payload.headline||'Banking status loaded.';
       $('bankingReadinessExplanation').textContent=explainOverall(payload);
-      const badge=$('bankingReadinessBadge'); badge.textContent=payload.open_banking?.credentials_present?'Open Banking setup started':'Manual banking ready'; badge.className=`badge ${payload.open_banking?.credentials_present?'warn':'ok'}`;
+      const badge=$('bankingReadinessBadge'); badge.textContent=payload.open_banking?.enabled?'Production controls ready':(payload.open_banking?.sandbox_consent_ready?'Sandbox ready':'Manual banking ready'); badge.className=`badge ${payload.open_banking?.enabled?'ok':'warn'}`;
       $('manualImportState').textContent=payload.manual_import_ready?'Ready now':'Needs attention';
-      $('openBankingState').textContent=payload.open_banking?.enabled?'Live':'Sandbox / setup';
+      $('openBankingState').textContent=payload.open_banking?.enabled?'Live-ready':'Sandbox / setup';
       $('openBankingProvider').textContent=payload.open_banking?.provider_name||'No provider selected';
       $('openBankingReason').textContent=payload.open_banking?.explanation||'';
-      updateConnectButton(payload); renderControls(payload.controls||[]); renderActions(payload.next_actions||[]); renderSafetyRules(payload.safety_rules||[]); renderConnections(payload.connections||[]);
+      renderProgress(payload);
+      updateConnectButton(payload);
+      renderControls(payload.controls||[]);
+      renderActions(payload.next_actions||[]);
+      renderSafetyRules(payload.safety_rules||[]);
+      renderConnections(payload.connections||[]);
       await loadProviders();
-    } catch(error){ if(error.status===401)return window.location.assign(`/login?next=${encodeURIComponent(location.pathname)}`); $('bankingReadinessHeadline').textContent='Could not load banking safety status.'; $('bankingReadinessExplanation').textContent=error.message; }
-    finally { if(button){button.disabled=false;button.textContent='Check again';} }
+    } catch(error){
+      if(error.status===401)return window.location.assign(`/login?next=${encodeURIComponent(location.pathname)}`);
+      $('bankingReadinessHeadline').textContent='Could not load banking safety status.';
+      $('bankingReadinessExplanation').textContent=error.message;
+    } finally {
+      if(button){button.disabled=false;button.textContent='Check again';}
+    }
   }
 
   $('refreshBankingSafety')?.addEventListener('click',loadReadiness);
