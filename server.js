@@ -17,6 +17,7 @@ const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./serv
 const { runMigrations } = require('./services/migrationRunner');
 const { allowedHosts } = require('./services/outboundRequestPolicy');
 const { getRateLimitService } = require('./services/rateLimitService');
+const { selfTestWebhookVerifier } = require('./services/webhookSecurityService');
 const { backgroundJobService } = require('./services/backgroundJobService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
 const { ensureSecuritySchema } = require('./services/securitySchema');
@@ -128,8 +129,17 @@ async function initializeServices() {
     backupConfigured ? 'Provider metadata is configured; current backup evidence is checked separately' : 'No backup provider adapter configured');
 
   const webhookConfigured = configured(['WEBHOOK_SIGNING_KEY']);
-  setControl('webhook_signing', webhookConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
-    webhookConfigured ? 'Signing key is configured; per-request verification remains authoritative' : 'Webhook signing key not configured');
+  if (!webhookConfigured) {
+    setControl('webhook_signing', CONTROL_STATES.NOT_CONFIGURED, 'Webhook signing key not configured');
+  } else {
+    const webhookCheck = selfTestWebhookVerifier();
+    setControl(
+      'webhook_signing',
+      webhookCheck.ok ? CONTROL_STATES.OPERATIONAL : CONTROL_STATES.FAILED,
+      webhookCheck.ok ? webhookCheck.detail : `${webhookCheck.code}: ${webhookCheck.detail || 'Verifier self-test failed'}`
+    );
+    if (!webhookCheck.ok) addWarning('Signed webhook verifier failed its startup self-test; integration webhooks remain blocked');
+  }
 
   setControl('outbound_request_policy', CONTROL_STATES.OPERATIONAL,
     `Deny-by-default outbound policy loaded with ${allowedHosts().size} allowlisted host(s)`);
