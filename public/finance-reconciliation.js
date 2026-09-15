@@ -45,7 +45,7 @@
     host.innerHTML = rows.map((row) => {
       const out = Number(row.amount || 0) < 0;
       const locked = ['RECONCILED','IGNORED'].includes(row.workflow_status);
-      const matchable = ['READY','PARTIAL'].includes(row.workflow_status) && !Number(row.is_internal_transfer || 0);
+      const matchable = ['READY','PARTIAL'].includes(row.workflow_status);
       const remaining = Number(row.remaining_amount || 0);
       return `<article class="transaction-card" data-tx-id="${Number(row.id)}">
         <div class="tx-top">
@@ -83,14 +83,9 @@
     } finally { refresh.disabled = false; refresh.textContent = 'Refresh'; }
   }
 
-  function rowFromCard(id) {
-    const card = document.querySelector(`[data-tx-id="${id}"]`);
-    if (!card) return null;
-    return card;
-  }
   async function openClassify(id) {
     try {
-      const payload = await api(`/api/finance/intelligence/reconciliation?scope=ALL&workflow=ALL`);
+      const payload = await api('/api/finance/intelligence/reconciliation?scope=ALL&workflow=ALL');
       const row = (payload.transactions || []).find((item) => Number(item.id) === Number(id));
       if (!row) throw new Error('Transaction could not be loaded.');
       state.active = row;
