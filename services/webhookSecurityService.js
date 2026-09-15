@@ -23,6 +23,35 @@ function verifyWebhookSignature({ rawBody, timestamp, signature, secret = proces
   return { ok: safeEqualHex(expected, supplied), code: supplied ? 'INVALID_SIGNATURE' : 'MISSING_SIGNATURE' };
 }
 
+function selfTestWebhookVerifier(secret = process.env.WEBHOOK_SIGNING_KEY) {
+  if (!secret || Buffer.byteLength(secret) < 32) {
+    return { ok: false, code: 'WEBHOOK_NOT_CONFIGURED', detail: 'Signing key is missing or shorter than 32 bytes.' };
+  }
+
+  const rawBody = Buffer.from('{"event":"voxelveda.security.self_test"}', 'utf8');
+  const now = Date.now();
+  const timestamp = Math.floor(now / 1000);
+  const digest = crypto.createHmac('sha256', secret).update(`${timestamp}.`).update(rawBody).digest('hex');
+  const valid = verifyWebhookSignature({ rawBody, timestamp, signature: `sha256=${digest}`, secret, now });
+  if (!valid.ok) return { ok: false, code: 'WEBHOOK_SELF_TEST_VALID_SIGNATURE_FAILED', detail: valid.code };
+
+  const tampered = verifyWebhookSignature({ rawBody: Buffer.from('{"event":"tampered"}', 'utf8'), timestamp, signature: `sha256=${digest}`, secret, now });
+  if (tampered.ok) return { ok: false, code: 'WEBHOOK_SELF_TEST_TAMPER_FAILED', detail: 'Tampered payload was accepted.' };
+
+  const staleTimestamp = timestamp - 601;
+  const staleDigest = crypto.createHmac('sha256', secret).update(`${staleTimestamp}.`).update(rawBody).digest('hex');
+  const stale = verifyWebhookSignature({ rawBody, timestamp: staleTimestamp, signature: `sha256=${staleDigest}`, secret, now });
+  if (stale.ok || stale.code !== 'STALE_WEBHOOK') {
+    return { ok: false, code: 'WEBHOOK_SELF_TEST_REPLAY_WINDOW_FAILED', detail: stale.code || 'Stale payload was accepted.' };
+  }
+
+  return {
+    ok: true,
+    code: 'WEBHOOK_VERIFIER_OPERATIONAL',
+    detail: 'HMAC verification, tamper rejection and replay-window checks passed.'
+  };
+}
+
 async function acceptWebhook(req, sourceKey) {
   await ensureOperationalTrustSchema();
   const eventId = String(req.get('x-vv-event-id') || '').trim();
@@ -50,4 +79,4 @@ async function acceptWebhook(req, sourceKey) {
   return { duplicate: false, eventId, eventType };
 }
 
-module.exports = { acceptWebhook, parseSignature, verifyWebhookSignature };
+module.exports = { acceptWebhook, parseSignature, selfTestWebhookVerifier, verifyWebhookSignature };
