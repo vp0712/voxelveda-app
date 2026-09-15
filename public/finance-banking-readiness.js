@@ -4,6 +4,20 @@
   reliabilityScript.async = false;
   document.head.appendChild(reliabilityScript);
 
+  if (!document.querySelector('link[data-finance-import-wizard]')) {
+    const wizardCss = document.createElement('link');
+    wizardCss.rel = 'stylesheet';
+    wizardCss.href = '/finance-import-wizard.css?v=20260916-wizard2';
+    wizardCss.dataset.financeImportWizard = 'true';
+    document.head.appendChild(wizardCss);
+  }
+  if (!document.querySelector('script[data-finance-import-wizard]')) {
+    const wizardScript = document.createElement('script');
+    wizardScript.src = '/finance-import-wizard.js?v=20260916-wizard2';
+    wizardScript.dataset.financeImportWizard = 'true';
+    document.head.appendChild(wizardScript);
+  }
+
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (input) => String(input ?? '').replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   let readiness = null;
