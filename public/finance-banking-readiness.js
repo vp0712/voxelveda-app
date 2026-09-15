@@ -1,6 +1,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (input) => String(input ?? '').replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+  let readiness = null;
 
   async function api(path) {
     const response = await fetch(path, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } });
@@ -70,11 +71,26 @@
       </div>`).join('');
   }
 
+  function updateConnectButton(payload) {
+    const button = $('connectBank');
+    if (!button) return;
+    if (payload.open_banking?.enabled) {
+      button.textContent = 'Connect Bank';
+      button.title = 'Start a secure CDR consent flow.';
+      button.dataset.readinessBlocked = 'false';
+      return;
+    }
+    button.textContent = 'Connect Bank · Setup Required';
+    button.title = 'Open Banking is intentionally disabled until production CDR setup is verified.';
+    button.dataset.readinessBlocked = 'true';
+  }
+
   async function loadReadiness() {
     const button = $('refreshBankingSafety');
     if (button) { button.disabled = true; button.textContent = 'Checking…'; }
     try {
       const payload = await api('/api/finance/intelligence/banking-readiness');
+      readiness = payload;
       $('bankingReadinessHeadline').textContent = payload.headline || 'Banking status loaded.';
       $('bankingReadinessExplanation').textContent = explainOverall(payload);
       const badge = $('bankingReadinessBadge');
@@ -85,6 +101,7 @@
       $('openBankingState').textContent = payload.open_banking?.enabled ? 'Live' : 'Not enabled yet';
       $('openBankingProvider').textContent = payload.open_banking?.provider_name || 'No provider selected';
       $('openBankingReason').textContent = payload.open_banking?.explanation || '';
+      updateConnectButton(payload);
 
       renderControls(payload.controls || []);
       renderActions(payload.next_actions || []);
@@ -101,5 +118,14 @@
 
   $('refreshBankingSafety')?.addEventListener('click', loadReadiness);
   $('openBankingSafety')?.addEventListener('click', () => $('bankingSafetyPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  $('connectBank')?.addEventListener('click', (event) => {
+    if (!readiness || readiness.open_banking?.enabled) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    $('bankingSafetyPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const headline = $('bankingReadinessHeadline');
+    if (headline) headline.textContent = 'Connect Bank is locked until the items below are ready.';
+  }, true);
+
   loadReadiness();
 })();
