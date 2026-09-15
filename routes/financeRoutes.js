@@ -4,6 +4,7 @@ const operations = require('../controllers/financeOperationsController');
 const intelligence = require('../controllers/financeIntelligenceController');
 const statementReview = require('../controllers/statementImportController');
 const transactionIntelligence = require('../controllers/financeTransactionIntelligenceController');
+const bankingReadiness = require('../controllers/financeBankingReadinessController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -46,6 +47,7 @@ router.post('/intelligence/statement-reviews/:uid/reject', requireAnyPermission(
 router.get('/intelligence/history-coverage', requireAnyPermission('VIEW_BANKING'), intelligence.getHistoryCoverage);
 router.get('/intelligence/data-quality', requireAnyPermission('VIEW_BANKING'), intelligence.getDataQuality);
 router.get('/intelligence/bank-connections', requireAnyPermission('VIEW_BANKING'), intelligence.getConnectionStatus);
+router.get('/intelligence/banking-readiness', requireAnyPermission('VIEW_BANKING'), bankingReadiness.getReadiness);
 router.post('/intelligence/bank-connections/connect', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.startConnection);
 router.post('/intelligence/analyse', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.runAnalysis);
 router.get('/intelligence/insights', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getInsights);
