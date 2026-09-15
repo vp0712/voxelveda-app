@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Reconciliation Center | Voxel Veda</title>
+  <link rel="stylesheet" href="/finance-reconciliation.css?v=20260916-1">
+</head>
+<body>
+  <main class="rc-shell">
+    <header class="rc-head">
+      <div><p class="eyebrow">VOXEL VEDA · FINANCE</p><h1>Reconciliation Center</h1><p>Understand every bank transaction, fix what needs attention, and only mark items reconciled when they are actually matched.</p></div>
+      <a href="/finance-intelligence" class="back">← Money Control Center</a>
+    </header>
+
+    <section class="how">
+      <strong>Simple workflow</strong>
+      <span><b>1 · Needs action</b> classify or confirm transfer</span>
+      <span><b>2 · Ready</b> understood, waiting for a finance match</span>
+      <span><b>3 · Reconciled</b> fully matched to a posted finance transaction</span>
+    </section>
+
+    <div id="rcNotice" class="notice" hidden></div>
+
+    <section class="summary" aria-label="Reconciliation summary">
+      <button data-workflow="NEEDS_ACTION"><span>Needs action</span><strong id="sumNeeds">0</strong><small>Tell the system what these are</small></button>
+      <button data-workflow="READY"><span>Ready</span><strong id="sumReady">0</strong><small>Understood, ready to match</small></button>
+      <button data-workflow="PARTIAL"><span>Partial</span><strong id="sumPartial">0</strong><small>Some amount already matched</small></button>
+      <button data-workflow="RECONCILED"><span>Reconciled</span><strong id="sumReconciled">0</strong><small>Finished correctly</small></button>
+      <button data-workflow="IGNORED"><span>Ignored</span><strong id="sumIgnored">0</strong><small>Excluded with a reason</small></button>
+    </section>
+
+    <section class="toolbar">
+      <div class="segmented" aria-label="Money scope">
+        <button class="active" data-scope="ALL">All money</button>
+        <button data-scope="PERSONAL">Personal</button>
+        <button data-scope="BUSINESS">Voxel Veda</button>
+      </div>
+      <div class="segmented workflow" aria-label="Workflow status">
+        <button class="active" data-workflow="ALL">All</button>
+        <button data-workflow="NEEDS_ACTION">Needs action</button>
+        <button data-workflow="READY">Ready</button>
+        <button data-workflow="PARTIAL">Partial</button>
+        <button data-workflow="RECONCILED">Reconciled</button>
+      </div>
+      <label class="search">Search<input id="rcSearch" type="search" placeholder="Merchant, description, account…"></label>
+      <button id="rcRefresh" class="primary">Refresh</button>
+    </section>
+
+    <section class="money-summary">
+      <div><span>Money in</span><strong id="sumIn">$0.00</strong></div>
+      <div><span>Money out</span><strong id="sumOut">$0.00</strong></div>
+      <div><span>Total transactions</span><strong id="sumTotal">0</strong></div>
+    </section>
+
+    <section id="transactionList" class="transaction-list"><div class="empty">Loading transactions…</div></section>
+  </main>
+
+  <dialog id="classifyDialog">
+    <form id="classifyForm" class="dialog-card">
+      <div class="dialog-head"><div><p class="eyebrow">REVIEW TRANSACTION</p><h2 id="classifyTitle">Classify transaction</h2></div><button type="button" data-close="classifyDialog">×</button></div>
+      <p id="classifyMeta" class="muted"></p>
+      <label>What was this for?<input id="classifyCategory" name="category" maxlength="120" placeholder="Groceries, Fuel & Vehicle, Website & Hosting…"></label>
+      <label>Whose money is this?<select id="classifyScope" name="ownership_scope"><option value="PERSONAL">Personal</option><option value="BUSINESS">Voxel Veda</option><option value="MIXED">Mixed use</option><option value="UNCLASSIFIED">Not sure yet</option></select></label>
+      <label class="check"><input id="classifyTransfer" type="checkbox"> This is money moving between my own accounts</label>
+      <p class="safe">Confirming a transfer stops it being treated as normal spending/income. Nothing is posted to accounting automatically.</p>
+      <div class="dialog-actions"><button type="button" data-close="classifyDialog">Cancel</button><button type="submit" class="primary">Save & mark ready</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="matchDialog">
+    <div class="dialog-card wide">
+      <div class="dialog-head"><div><p class="eyebrow">MATCH & RECONCILE</p><h2>Find the finance record</h2></div><button type="button" data-close="matchDialog">×</button></div>
+      <p id="matchMeta" class="muted"></p>
+      <div id="candidateList" class="candidate-list"></div>
+      <label>Amount to match<input id="matchAmount" inputmode="decimal"></label>
+      <p class="safe">Full reconciliation happens only when the complete bank amount has been matched. Smaller matches remain Partial.</p>
+      <div class="dialog-actions"><button type="button" data-close="matchDialog">Cancel</button><button id="confirmMatch" class="primary" type="button">Match selected record</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="ignoreDialog">
+    <form id="ignoreForm" class="dialog-card">
+      <div class="dialog-head"><div><p class="eyebrow">IGNORE WITH AUDIT REASON</p><h2>Why should this be excluded?</h2></div><button type="button" data-close="ignoreDialog">×</button></div>
+      <textarea id="ignoreReason" required maxlength="500" placeholder="Example: duplicate bank feed entry already handled elsewhere"></textarea>
+      <p class="safe">Ignored items are not deleted. The reason remains in the audit trail.</p>
+      <div class="dialog-actions"><button type="button" data-close="ignoreDialog">Cancel</button><button type="submit" class="danger">Ignore transaction</button></div>
+    </form>
+  </dialog>
+
+  <script src="/finance-action-reliability.js?v=20260916-reliability" defer></script>
+  <script src="/finance-reconciliation.js?v=20260916-1" defer></script>
+</body>
+</html>
