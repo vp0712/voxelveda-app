@@ -14,6 +14,12 @@ function fail(res, error, message) {
   console.error(`${message}:`, error);
   return res.status(500).json({ message, code: 'RECONCILIATION_CENTER_ERROR' });
 }
+function dateText(value) {
+  if (!value) return null;
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) return value.slice(0, 10);
+  const parsed = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
 function workflowFor(row) {
   const reconciliation = String(row.reconciliation_status || 'UNRECONCILED').toUpperCase();
   if (reconciliation === 'RECONCILED') return 'RECONCILED';
@@ -27,7 +33,7 @@ function reasonFor(row, workflow) {
   if (workflow === 'RECONCILED') return 'Fully matched to posted finance records.';
   if (workflow === 'IGNORED') return row.ignored_reason || 'Excluded with an audit reason.';
   if (workflow === 'PARTIAL') return 'Part of this bank amount is matched. The remaining amount still needs attention.';
-  if (Number(row.is_internal_transfer || 0) === 1) return 'Confirmed as money moving between your own accounts.';
+  if (Number(row.is_internal_transfer || 0) === 1) return 'Confirmed as money moving between your own accounts. Match it to the posted transfer record when available.';
   if (!String(row.category || '').trim()) return 'Choose what this transaction was for.';
   if (String(row.classification_status || '').toUpperCase() !== 'CLASSIFIED') return 'Review the category and confirm the transaction.';
   return 'Ready to match to a posted finance transaction.';
@@ -68,8 +74,8 @@ exports.getCenter = async (req, res) => {
       const matched_amount = Number(row.matched_amount || 0);
       return {
         ...row,
-        transaction_date: row.transaction_date ? String(row.transaction_date).slice(0, 10) : null,
-        posting_date: row.posting_date ? String(row.posting_date).slice(0, 10) : null,
+        transaction_date: dateText(row.transaction_date),
+        posting_date: dateText(row.posting_date),
         amount: amountFor(row), absolute_amount, matched_amount,
         remaining_amount: Math.max(0, absolute_amount - matched_amount),
         workflow_status,
@@ -107,7 +113,7 @@ exports.classify = async (req, res) => {
       oldValue: { category: row.category, classification_status: row.classification_status, ownership_scope: row.ownership_scope, is_internal_transfer: row.is_internal_transfer },
       newValue: { category: nextCategory, classification_status: 'CLASSIFIED', ownership_scope: scope, is_internal_transfer: internalTransfer ? 1 : 0 }
     }));
-    return res.json({ message: internalTransfer ? 'Transfer confirmed and ready.' : 'Transaction classified and ready for reconciliation.' });
+    return res.json({ message: internalTransfer ? 'Transfer confirmed and ready for matching.' : 'Transaction classified and ready for reconciliation.' });
   } catch (error) { return fail(res, error, 'Failed to classify bank transaction'); }
 };
 
@@ -134,8 +140,8 @@ exports.getCandidates = async (req, res) => {
        LIMIT 25`, [remaining || bankAmount, bank.transaction_date, bank.transaction_date, bank.transaction_date]
     );
     return res.json({
-      bank_transaction: { id: bank.id, transaction_date: String(bank.transaction_date).slice(0, 10), description: bank.description, amount: bankAmount, matched_amount: Number(matched.total || 0), remaining_amount: remaining },
-      candidates: rows.map((row) => ({ ...row, effective_date: String(row.effective_date).slice(0, 10) }))
+      bank_transaction: { id: bank.id, transaction_date: dateText(bank.transaction_date), description: bank.description, amount: bankAmount, matched_amount: Number(matched.total || 0), remaining_amount: remaining },
+      candidates: rows.map((row) => ({ ...row, effective_date: dateText(row.effective_date) }))
     });
   } catch (error) { return fail(res, error, 'Failed to find reconciliation matches'); }
 };
