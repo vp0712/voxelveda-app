@@ -1,4 +1,9 @@
 (() => {
+  const reliabilityScript = document.createElement('script');
+  reliabilityScript.src = '/finance-action-reliability.js?v=20260916-reliability';
+  reliabilityScript.async = false;
+  document.head.appendChild(reliabilityScript);
+
   const $ = (id) => document.getElementById(id);
   const escapeHtml = (input) => String(input ?? '').replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   let readiness = null;
@@ -97,7 +102,7 @@
       await loadProviderSessions();
       if (payload.consent_url) window.location.assign(payload.consent_url);
     } catch (error) {
-      message.textContent = error.code === 'STEP_UP_REQUIRED' ? 'For security, confirm your identity in the admin app and try again.' : error.message;
+      message.textContent = error.code === 'STEP_UP_REQUIRED' ? 'Security verification is required. Complete the verification window and the action will continue automatically.' : error.message;
     }
   }
 
