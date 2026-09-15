@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Finance Intelligence | Voxel Veda</title>
+  <link rel="stylesheet" href="/finance-intelligence.css">
+</head>
+<body>
+  <main class="fi-shell">
+    <header class="fi-topbar">
+      <div>
+        <p class="eyebrow">VOXEL VEDA · FINANCE</p>
+        <h1>Financial Command Center</h1>
+        <p class="muted">Personal and business accounts, statement history, reconciliation readiness and cash-flow intelligence.</p>
+      </div>
+      <a class="ghost-button" href="/admin?view=finance">Back to Admin</a>
+    </header>
+
+    <section class="scope-row" aria-label="Finance scope">
+      <button class="scope active" data-scope="ALL">All</button>
+      <button class="scope" data-scope="PERSONAL">Personal</button>
+      <button class="scope" data-scope="BUSINESS">Business</button>
+    </section>
+
+    <section class="actions" aria-label="Finance actions">
+      <button id="connectBank" class="primary">+ Connect Bank</button>
+      <button id="addAccount">+ Add Account</button>
+      <button id="importStatement">+ Import Statement</button>
+      <button id="refreshDashboard">Refresh</button>
+      <input id="statementFile" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" hidden>
+    </section>
+
+    <div id="notice" class="notice" hidden></div>
+
+    <section class="metric-grid" id="metricGrid">
+      <article class="metric"><span>Total inflow</span><strong id="metricInflow">—</strong></article>
+      <article class="metric"><span>Total outflow</span><strong id="metricOutflow">—</strong></article>
+      <article class="metric"><span>Net cash flow</span><strong id="metricNet">—</strong></article>
+      <article class="metric"><span>Accounts</span><strong id="metricAccounts">—</strong></article>
+      <article class="metric"><span>Unclassified</span><strong id="metricUnclassified">—</strong></article>
+      <article class="metric"><span>Unreconciled</span><strong id="metricUnreconciled">—</strong></article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading">
+        <div><p class="eyebrow">ACCOUNTS</p><h2>Bank & cash accounts</h2></div>
+        <span id="providerBadge" class="badge">Checking bank feed…</span>
+      </div>
+      <div id="accounts" class="account-grid"><p class="muted">Loading accounts…</p></div>
+    </section>
+
+    <section class="two-col">
+      <article class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">SPENDING</p><h2>Where money goes</h2></div></div>
+        <div id="categories" class="rows"></div>
+      </article>
+      <article class="panel">
+        <div class="panel-heading"><div><p class="eyebrow">DATA QUALITY</p><h2>Review queue</h2></div></div>
+        <div id="quality" class="rows"></div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-heading"><div><p class="eyebrow">HISTORY</p><h2>Transaction coverage</h2></div></div>
+      <div id="coverage" class="rows"></div>
+    </section>
+  </main>
+
+  <dialog id="accountDialog">
+    <form id="accountForm" method="dialog" class="dialog-form">
+      <div class="dialog-head"><h2>Add financial account</h2><button type="button" class="icon-button" data-close="accountDialog">×</button></div>
+      <label>Account name<input name="nickname" required maxlength="120" placeholder="Everyday, Business Operating, Savings"></label>
+      <label>Institution<input name="institution" maxlength="180" placeholder="Bank name"></label>
+      <div class="form-grid">
+        <label>Ownership<select name="ownership_scope" required><option value="PERSONAL">Personal</option><option value="BUSINESS" selected>Voxel Veda Business</option><option value="MIXED">Mixed</option><option value="UNCLASSIFIED">Unclassified</option></select></label>
+        <label>Currency<input name="currency" value="AUD" maxlength="3" required></label>
+      </div>
+      <div class="form-grid">
+        <label>Account type<select name="account_type"><option>Transaction</option><option>Savings</option><option>Credit Card</option><option>Loan</option><option>Offset</option><option>Other</option></select></label>
+        <label>Purpose<select name="financial_purpose"><option>Everyday spending</option><option>Business operating</option><option>Savings</option><option>Payroll</option><option>Tax/GST</option><option>Credit card</option><option>Loan</option><option>Other</option></select></label>
+      </div>
+      <label>Masked account number<input name="account_number_masked" maxlength="40" placeholder="•••• 4832"></label>
+      <label>Opening balance<input name="opening_balance" inputmode="decimal" value="0.00"></label>
+      <div class="dialog-actions"><button type="button" data-close="accountDialog">Cancel</button><button type="submit" class="primary">Save account</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="importDialog">
+    <form id="importForm" method="dialog" class="dialog-form">
+      <div class="dialog-head"><h2>Import bank statement</h2><button type="button" class="icon-button" data-close="importDialog">×</button></div>
+      <label>Account<select id="importAccount" name="account_id" required></select></label>
+      <label>Statement file<input id="importFile" name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" required></label>
+      <p class="helper">CSV import works in this first live release. PDF/OFX/QFX/QIF/XLSX are detected but will not be falsely marked as imported until their parser adapter is configured.</p>
+      <div class="dialog-actions"><button type="button" data-close="importDialog">Cancel</button><button type="submit" class="primary">Review & import</button></div>
+    </form>
+  </dialog>
+
+  <script src="/finance-intelligence.js" defer></script>
+</body>
+</html>
