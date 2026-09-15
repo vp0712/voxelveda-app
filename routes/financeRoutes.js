@@ -3,6 +3,7 @@ const controller = require('../controllers/financeController');
 const operations = require('../controllers/financeOperationsController');
 const intelligence = require('../controllers/financeIntelligenceController');
 const statementReview = require('../controllers/statementImportController');
+const transactionIntelligence = require('../controllers/financeTransactionIntelligenceController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -46,6 +47,10 @@ router.get('/intelligence/history-coverage', requireAnyPermission('VIEW_BANKING'
 router.get('/intelligence/data-quality', requireAnyPermission('VIEW_BANKING'), intelligence.getDataQuality);
 router.get('/intelligence/bank-connections', requireAnyPermission('VIEW_BANKING'), intelligence.getConnectionStatus);
 router.post('/intelligence/bank-connections/connect', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.startConnection);
+router.post('/intelligence/analyse', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.runAnalysis);
+router.get('/intelligence/insights', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getInsights);
+router.post('/intelligence/insights/:id/apply', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), transactionIntelligence.applyInsight);
+router.post('/intelligence/insights/:id/dismiss', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.dismissInsight);
 
 router.get('/supplier-bills', operations.getSupplierBills);
 router.get('/supplier-bills/:id', operations.getSupplierBill);
