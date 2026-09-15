@@ -1,7 +1,7 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const money = (value, currency = 'AUD') => new Intl.NumberFormat('en-AU', { style: 'currency', currency }).format(Number(value || 0));
-  const escapeHtml = (input) => String(input ?? '').replace(/[&<>'\"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' }[ch]));
+  const escapeHtml = (input) => String(input ?? '').replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   let scope = 'ALL';
 
   function installReconciliationButton() {
