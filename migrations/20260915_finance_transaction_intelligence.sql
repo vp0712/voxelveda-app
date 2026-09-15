@@ -1,0 +1,40 @@
+CREATE TABLE finance_transaction_insights (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  insight_uid VARCHAR(60) NOT NULL,
+  bank_transaction_id BIGINT NOT NULL,
+  merchant_normalized VARCHAR(255) NULL,
+  suggested_category VARCHAR(120) NULL,
+  category_confidence DECIMAL(5,2) NULL,
+  suggested_scope VARCHAR(20) NULL,
+  scope_confidence DECIMAL(5,2) NULL,
+  recurring_frequency VARCHAR(30) NULL,
+  recurring_confidence DECIMAL(5,2) NULL,
+  transfer_candidate_uid VARCHAR(60) NULL,
+  anomaly_score DECIMAL(5,2) NULL,
+  anomaly_reason VARCHAR(500) NULL,
+  explanation VARCHAR(800) NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
+  generated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at DATETIME NULL,
+  reviewed_by INT NULL,
+  UNIQUE KEY uniq_finance_insight_uid (insight_uid),
+  UNIQUE KEY uniq_finance_insight_transaction (bank_transaction_id),
+  INDEX idx_finance_insight_status (status, suggested_scope, suggested_category),
+  INDEX idx_finance_insight_recurring (recurring_frequency, recurring_confidence),
+  INDEX idx_finance_insight_transfer (transfer_candidate_uid)
+);
+
+CREATE TABLE finance_category_rules (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  rule_uid VARCHAR(60) NOT NULL,
+  merchant_pattern VARCHAR(255) NOT NULL,
+  category VARCHAR(120) NULL,
+  ownership_scope VARCHAR(20) NULL,
+  priority INT NOT NULL DEFAULT 100,
+  enabled TINYINT(1) NOT NULL DEFAULT 1,
+  created_by INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_finance_category_rule_uid (rule_uid),
+  INDEX idx_finance_category_rule_match (enabled, priority)
+);
