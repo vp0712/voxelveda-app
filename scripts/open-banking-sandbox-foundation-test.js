@@ -42,7 +42,7 @@ const readiness = read('controllers/financeBankingReadinessController.js');
 expect(readiness, "sandbox_consent_ready", 'Sandbox consent readiness state missing');
 expect(readiness, "production_controls_ready", 'Production banking controls state missing');
 expect(readiness, "BANK_DATA_WEBHOOK_SECRET", 'Webhook readiness check missing');
-expect(readiness, "BANK_DATA_LIVE_SYNC_ENABLED", 'Live sync lock should be referenced through provider service');
+expect(readiness, "liveSyncEnabled()", 'Readiness must use the explicit live-sync lock');
 
 const ui = read('public/finance-banking-readiness.js');
 expect(ui, "providerSetupPanel", 'Provider setup UI missing');
