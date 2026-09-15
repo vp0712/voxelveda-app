@@ -12,6 +12,7 @@ const { requireAnyPermission } = require('../middleware/authorizationMiddleware'
 const requireStepUp = require('../middleware/stepUpMiddleware');
 const requireSensitiveExportApproval = require('../middleware/sensitiveExportMiddleware');
 const highRiskPaymentGuard = require('../middleware/highRiskPaymentMiddleware');
+const statementPreviewSanitizer = require('../middleware/statementPreviewSanitizer');
 
 const router = express.Router();
 
@@ -39,7 +40,7 @@ router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intel
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
 router.post('/intelligence/accounts', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.saveAccount);
 router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), intelligence.importStatementRows);
-router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.preview);
+router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementPreviewSanitizer, statementReview.preview);
 router.get('/intelligence/statement-reviews', requireAnyPermission('VIEW_BANKING'), statementReview.list);
 router.get('/intelligence/statement-reviews/:uid', requireAnyPermission('VIEW_BANKING'), statementReview.get);
 router.post('/intelligence/statement-reviews/:uid/rows/:rowId/select', requireAnyPermission('EDIT_FINANCE'), statementReview.updateRowSelection);
