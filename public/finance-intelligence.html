@@ -7,6 +7,7 @@
   <title>Finance Intelligence | Voxel Veda</title>
   <link rel="stylesheet" href="/finance-intelligence.css?v=20260915-statement-review">
   <link rel="stylesheet" href="/finance-intelligence-advanced.css?v=20260915-guided">
+  <link rel="stylesheet" href="/finance-banking-readiness.css?v=20260915-readiness">
 </head>
 <body>
   <main class="fi-shell">
@@ -46,6 +47,7 @@
       <button id="openReviewQueue">Review Statements</button>
       <button id="analyseTransactions">Analyse Transactions</button>
       <button id="connectBank">Connect Bank</button>
+      <button id="openBankingSafety" class="safety-button">Banking Setup & Safety</button>
       <button id="refreshDashboard">Refresh</button>
     </section>
 
@@ -59,6 +61,53 @@
       <article class="metric"><span>Accounts</span><strong id="metricAccounts">—</strong><small>Personal + business</small></article>
       <article class="metric"><span>Needs category</span><strong id="metricUnclassified">—</strong><small>Transactions not yet understood</small></article>
       <article class="metric"><span>Needs reconciliation</span><strong id="metricUnreconciled">—</strong><small>Transactions not yet checked</small></article>
+    </section>
+
+    <section id="bankingSafetyPanel" class="panel banking-safety-panel">
+      <div class="banking-safety-hero">
+        <div>
+          <p class="eyebrow">BANKING SETUP & SAFETY</p>
+          <h2>What is safe to use right now?</h2>
+          <p id="bankingReadinessHeadline" class="muted">Checking production banking controls…</p>
+          <p id="bankingReadinessExplanation" class="muted">The app is checking whether manual imports and future Open Banking feeds have the security controls they need.</p>
+          <div class="banking-safety-actions">
+            <button id="refreshBankingSafety" type="button">Check again</button>
+            <span id="bankingReadinessBadge" class="badge">Checking…</span>
+          </div>
+        </div>
+        <div class="banking-safety-summary">
+          <div><span>Statement imports</span><strong id="manualImportState">Checking…</strong><small>Upload → review → approve</small></div>
+          <div><span>Automatic bank feed</span><strong id="openBankingState">Checking…</strong><small id="openBankingProvider">No provider selected</small></div>
+        </div>
+      </div>
+
+      <div class="panel-heading">
+        <div><p class="eyebrow">PRODUCTION CONTROLS</p><h2>Simple status for every banking safeguard</h2><p class="muted">“Needs setup” does not stop statement imports. It means that control must be fixed before automatic bank syncing should be switched on.</p></div>
+      </div>
+      <div id="bankingSafetyControls" class="safety-grid"></div>
+
+      <div class="safety-lower-grid">
+        <article class="safety-box">
+          <h3>What should be done next?</h3>
+          <div id="bankingNextActions"></div>
+        </article>
+        <article class="safety-box">
+          <h3>Rules this system will always follow</h3>
+          <ul id="bankingSafetyRules" class="safety-rules"></ul>
+        </article>
+      </div>
+
+      <div class="safety-lower-grid">
+        <article class="safety-box">
+          <h3>Open Banking status</h3>
+          <p id="openBankingReason" class="muted">Checking provider readiness…</p>
+          <p class="muted"><b>Important:</b> Connect Bank stays fail-closed until a production Australian CDR provider is configured and verified. Voxel Veda must never collect your internet-banking password, PIN or bank OTP.</p>
+        </article>
+        <article class="safety-box">
+          <h3>Bank consent & sync history</h3>
+          <div id="bankConnectionHistory"></div>
+        </article>
+      </div>
     </section>
 
     <section id="intelligencePanel" class="panel intelligence-panel">
@@ -158,5 +207,6 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="/finance-intelligence.js?v=20260915-statement-review" defer></script>
   <script src="/finance-intelligence-advanced.js?v=20260915-guided" defer></script>
+  <script src="/finance-banking-readiness.js?v=20260915-readiness" defer></script>
 </body>
 </html>
