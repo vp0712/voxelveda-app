@@ -1,12 +1,17 @@
-const { dateOnly } = require('../services/financeDomain');
+const sanitizer = require('../middleware/statementPreviewSanitizer');
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-assert(dateOnly('') === null, 'Missing dates must normalize to null for SQL DATE columns.');
-assert(dateOnly('not-a-date') === null, 'Invalid dates must normalize to null for SQL DATE columns.');
-assert(dateOnly('2026-09-16') === '2026-09-16', 'Valid ISO dates must remain unchanged.');
-assert(dateOnly('2026-09-16T08:00:00Z') === '2026-09-16', 'ISO datetimes must normalize to date-only values.');
+assert(sanitizer.normalizeStatementDate('16/09/2026') === '2026-09-16', 'Australian DD/MM/YYYY dates must normalize to ISO.');
+assert(sanitizer.normalizeStatementDate('16 Sep 2026') === '2026-09-16', 'Text month dates must normalize to ISO.');
+assert(sanitizer.normalizeStatementDate('2026-09-16') === '2026-09-16', 'ISO dates must remain ISO.');
+assert(sanitizer.normalizeStatementDate('') === null, 'Missing dates must not be staged as empty SQL DATE values.');
+assert(sanitizer.isBalanceOnlyRow({ description: 'OPENING BALANCE' }) === true, 'Opening-balance rows must be recognized as non-transactions.');
+assert(sanitizer.isBalanceOnlyRow({ description: 'COLES SUPERMARKET' }) === false, 'Normal transactions must not be filtered as balance rows.');
 
-console.log('Statement null-date staging regression checks passed.');
+const routeSource = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'routes', 'financeRoutes.js'), 'utf8');
+assert(routeSource.includes('statementPreviewSanitizer, statementReview.preview'), 'Statement preview sanitizer must run before staging controller.');
+
+console.log('Statement preview sanitizer regression checks passed.');
