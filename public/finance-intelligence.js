@@ -1,5 +1,5 @@
 (() => {
-  const state = { scope: 'ALL', accounts: [] };
+  const state = { scope: 'ALL', accounts: [], activeReview: null };
   const $ = (id) => document.getElementById(id);
   const money = (value, currency = 'AUD') => new Intl.NumberFormat('en-AU', { style: 'currency', currency }).format(Number(value || 0));
   const dateText = (value) => value ? new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium' }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`)) : 'Unknown';
@@ -36,7 +36,7 @@
     }
     host.innerHTML = accounts.map((account) => `
       <article class="account-card">
-        <div class="account-top"><span class="scope-tag ${String(account.ownership_scope || '').toLowerCase()}">${account.ownership_scope || 'UNCLASSIFIED'}</span><span class="status-dot">${account.connection_status || 'MANUAL'}</span></div>
+        <div class="account-top"><span class="scope-tag ${String(account.ownership_scope || '').toLowerCase()}">${escapeHtml(account.ownership_scope || 'UNCLASSIFIED')}</span><span class="status-dot">${escapeHtml(account.connection_status || 'MANUAL')}</span></div>
         <h3>${escapeHtml(account.nickname || 'Account')}</h3>
         <p>${escapeHtml(account.institution || 'Manual account')} · ${escapeHtml(account.account_number_masked || 'number not stored')}</p>
         <strong>${money(account.available_balance ?? account.current_ledger_balance, account.currency || 'AUD')}</strong>
@@ -106,32 +106,39 @@
     }
   }
 
+  function csvSplit(line) {
+    const values = [];
+    let value = '';
+    let quoted = false;
+    for (let i = 0; i < line.length; i += 1) {
+      const ch = line[i];
+      if (ch === '"') {
+        if (quoted && line[i + 1] === '"') { value += '"'; i += 1; }
+        else quoted = !quoted;
+      } else if (ch === ',' && !quoted) { values.push(value.trim()); value = ''; }
+      else value += ch;
+    }
+    values.push(value.trim());
+    return values;
+  }
+
+  function parseNumber(input) {
+    const cleaned = String(input || '').replace(/[$,\s]/g, '').replace(/^\((.*)\)$/, '-$1');
+    const parsed = Number(cleaned || 0);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
   function parseCsv(text) {
     const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
     if (lines.length < 2) throw new Error('CSV must contain a header row and at least one transaction.');
-    const split = (line) => {
-      const values = [];
-      let value = '';
-      let quoted = false;
-      for (let i = 0; i < line.length; i += 1) {
-        const ch = line[i];
-        if (ch === '"') {
-          if (quoted && line[i + 1] === '"') { value += '"'; i += 1; }
-          else quoted = !quoted;
-        } else if (ch === ',' && !quoted) { values.push(value.trim()); value = ''; }
-        else value += ch;
-      }
-      values.push(value.trim());
-      return values;
-    };
-    const headers = split(lines.shift()).map((h) => h.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
+    const headers = csvSplit(lines.shift()).map((h) => h.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
     const aliases = {
-      transaction_date: ['transaction_date', 'date', 'transactiondate', 'value_date'],
+      transaction_date: ['transaction_date', 'date', 'transactiondate', 'value_date', 'processed_date'],
       posting_date: ['posting_date', 'posted_date', 'process_date'],
       description: ['description', 'details', 'transaction_details', 'narrative', 'memo'],
       reference: ['reference', 'ref', 'transaction_reference'],
-      debit: ['debit', 'withdrawal', 'withdrawals', 'money_out'],
-      credit: ['credit', 'deposit', 'deposits', 'money_in'],
+      debit: ['debit', 'withdrawal', 'withdrawals', 'money_out', 'debits'],
+      credit: ['credit', 'deposit', 'deposits', 'money_in', 'credits'],
       amount: ['amount', 'transaction_amount'],
       running_balance: ['running_balance', 'balance', 'account_balance'],
       merchant_name: ['merchant', 'merchant_name', 'payee'],
@@ -146,34 +153,169 @@
       return -1;
     };
     const idx = Object.fromEntries(Object.keys(aliases).map((key) => [key, indexOf(key)]));
-    if (idx.transaction_date < 0) throw new Error('CSV needs a transaction date column.');
-    if (idx.amount < 0 && idx.debit < 0 && idx.credit < 0) throw new Error('CSV needs Amount or Debit/Credit columns.');
-    const number = (input) => {
-      const cleaned = String(input || '').replace(/[$,\s]/g, '').replace(/^\((.*)\)$/, '-$1');
-      const parsed = Number(cleaned || 0);
-      return Number.isFinite(parsed) ? Math.abs(parsed) : 0;
-    };
+    if (idx.transaction_date < 0) throw new Error('Statement needs a transaction date column.');
+    if (idx.amount < 0 && idx.debit < 0 && idx.credit < 0) throw new Error('Statement needs Amount or Debit/Credit columns.');
     return lines.map((line) => {
-      const cells = split(line);
-      let debit = idx.debit >= 0 ? number(cells[idx.debit]) : 0;
-      let credit = idx.credit >= 0 ? number(cells[idx.credit]) : 0;
+      const cells = csvSplit(line);
+      let debit = idx.debit >= 0 ? Math.abs(parseNumber(cells[idx.debit])) : 0;
+      let credit = idx.credit >= 0 ? Math.abs(parseNumber(cells[idx.credit])) : 0;
       if (idx.amount >= 0 && !debit && !credit) {
-        const raw = Number(String(cells[idx.amount] || '').replace(/[$,\s]/g, '').replace(/^\((.*)\)$/, '-$1'));
-        if (Number.isFinite(raw)) { if (raw < 0) debit = Math.abs(raw); else credit = raw; }
+        const raw = parseNumber(cells[idx.amount]);
+        if (raw < 0) debit = Math.abs(raw); else if (raw > 0) credit = raw;
       }
       return {
         transaction_date: cells[idx.transaction_date],
         posting_date: idx.posting_date >= 0 ? cells[idx.posting_date] : null,
         description: idx.description >= 0 ? cells[idx.description] : '',
         reference: idx.reference >= 0 ? cells[idx.reference] : '',
-        debit,
-        credit,
+        debit, credit,
         running_balance: idx.running_balance >= 0 ? cells[idx.running_balance] : null,
         merchant_name: idx.merchant_name >= 0 ? cells[idx.merchant_name] : null,
         category: idx.category >= 0 ? cells[idx.category] : null,
         currency: idx.currency >= 0 ? cells[idx.currency] : null
       };
     });
+  }
+
+  function ofxTag(block, name) {
+    const match = block.match(new RegExp(`<${name}>([^<\\r\\n]+)`, 'i'));
+    return match ? match[1].trim() : '';
+  }
+
+  function parseOfx(text) {
+    const blocks = String(text || '').match(/<STMTTRN>[\s\S]*?(?=<STMTTRN>|<\/BANKTRANLIST>|$)/gi) || [];
+    if (!blocks.length) throw new Error('No OFX/QFX transactions were found.');
+    return blocks.map((block) => {
+      const amount = parseNumber(ofxTag(block, 'TRNAMT'));
+      const posted = ofxTag(block, 'DTPOSTED').slice(0, 8);
+      const date = /^\d{8}$/.test(posted) ? `${posted.slice(0, 4)}-${posted.slice(4, 6)}-${posted.slice(6, 8)}` : posted;
+      const name = ofxTag(block, 'NAME');
+      const memo = ofxTag(block, 'MEMO');
+      return {
+        transaction_date: date,
+        description: [name, memo].filter(Boolean).join(' · '),
+        merchant_name: name || null,
+        reference: ofxTag(block, 'FITID') || ofxTag(block, 'REFNUM') || null,
+        debit: amount < 0 ? Math.abs(amount) : 0,
+        credit: amount > 0 ? amount : 0,
+        running_balance: null,
+        currency: null
+      };
+    });
+  }
+
+  function normalizeQifDate(value) {
+    const input = String(value || '').trim().replace(/'/g, '/');
+    const parts = input.split(/[\/.-]/).map((part) => part.trim()).filter(Boolean);
+    if (parts.length !== 3) return input;
+    let [a, b, c] = parts;
+    let year = Number(c);
+    if (year < 100) year += year >= 70 ? 1900 : 2000;
+    const first = Number(a); const second = Number(b);
+    const day = first > 12 ? first : second > 12 ? second : first;
+    const month = first > 12 ? second : second > 12 ? first : second;
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  }
+
+  function parseQif(text) {
+    const records = String(text || '').split(/^\^\s*$/m).map((record) => record.trim()).filter(Boolean);
+    const rows = [];
+    for (const record of records) {
+      const fields = {};
+      for (const line of record.split(/\r?\n/)) {
+        const code = line[0];
+        if (!code || code === '!') continue;
+        fields[code] = String(line.slice(1)).trim();
+      }
+      if (!fields.D || fields.T === undefined) continue;
+      const amount = parseNumber(fields.T);
+      rows.push({
+        transaction_date: normalizeQifDate(fields.D),
+        description: [fields.P, fields.M].filter(Boolean).join(' · '),
+        merchant_name: fields.P || null,
+        reference: fields.N || null,
+        debit: amount < 0 ? Math.abs(amount) : 0,
+        credit: amount > 0 ? amount : 0,
+        running_balance: null,
+        category: fields.L || null,
+        currency: null
+      });
+    }
+    if (!rows.length) throw new Error('No QIF transactions were found.');
+    return rows;
+  }
+
+  async function parseXlsx(file) {
+    if (!window.XLSX) throw new Error('XLSX parser failed to load. Use CSV or try again after refreshing.');
+    const workbook = window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    if (!firstSheet) throw new Error('The spreadsheet has no readable sheet.');
+    return parseCsv(window.XLSX.utils.sheet_to_csv(firstSheet));
+  }
+
+  async function pdfLines(file) {
+    if (!window.pdfjsLib) throw new Error('PDF parser failed to load. Use a CSV/OFX export or refresh and try again.');
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+    const lines = [];
+    for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+      const page = await pdf.getPage(pageNo);
+      const content = await page.getTextContent();
+      const groups = new Map();
+      for (const item of content.items || []) {
+        const y = Math.round(Number(item.transform?.[5] || 0) / 3) * 3;
+        if (!groups.has(y)) groups.set(y, []);
+        groups.get(y).push({ x: Number(item.transform?.[4] || 0), text: String(item.str || '').trim() });
+      }
+      [...groups.entries()].sort((a, b) => b[0] - a[0]).forEach(([, items]) => {
+        const line = items.sort((a, b) => a.x - b.x).map((item) => item.text).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+        if (line) lines.push(line);
+      });
+    }
+    return lines;
+  }
+
+  function parsePdfLines(lines) {
+    const datePattern = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4}\b)/;
+    const amountPattern = /(?:CR|DR)?\s*[-+]?\(?\$?\d[\d,]*\.\d{2}\)?(?:\s*(?:CR|DR))?/gi;
+    const rows = [];
+    for (const line of lines) {
+      const dateMatch = line.match(datePattern);
+      if (!dateMatch) continue;
+      const amounts = [...line.matchAll(amountPattern)].map((match) => ({ raw: match[0], index: match.index || 0 }));
+      if (!amounts.length) continue;
+      const transactionAmount = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0];
+      const balanceAmount = amounts.length >= 2 ? amounts[amounts.length - 1] : null;
+      const rawAmount = transactionAmount.raw;
+      const numeric = Math.abs(parseNumber(rawAmount.replace(/\b(?:CR|DR)\b/gi, '')));
+      const debitHint = /\bDR\b/i.test(rawAmount) || /^\s*-/.test(rawAmount) || /^\s*\(/.test(rawAmount);
+      const creditHint = /\bCR\b/i.test(rawAmount) || /^\s*\+/.test(rawAmount);
+      if (!debitHint && !creditHint) continue;
+      const description = line.slice(dateMatch.index + dateMatch[0].length, transactionAmount.index).trim();
+      rows.push({
+        transaction_date: dateMatch[0],
+        description: description || 'PDF statement transaction — verify description',
+        debit: debitHint ? numeric : 0,
+        credit: creditHint ? numeric : 0,
+        running_balance: balanceAmount ? Math.abs(parseNumber(balanceAmount.raw.replace(/\b(?:CR|DR)\b/gi, ''))) : null,
+        reference: null,
+        merchant_name: null,
+        category: null,
+        currency: null
+      });
+    }
+    if (!rows.length) throw new Error('This PDF does not expose transaction direction safely enough for automatic import. Export CSV/OFX from the bank, or use a PDF with explicit CR/DR or signed amounts. Nothing was imported.');
+    return rows;
+  }
+
+  async function parseStatement(file) {
+    const extension = (file.name.split('.').pop() || '').toUpperCase();
+    if (extension === 'CSV') return { format: extension, rows: parseCsv(await file.text()) };
+    if (extension === 'OFX' || extension === 'QFX') return { format: extension, rows: parseOfx(await file.text()) };
+    if (extension === 'QIF') return { format: extension, rows: parseQif(await file.text()) };
+    if (extension === 'XLSX') return { format: extension, rows: await parseXlsx(file) };
+    if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)) };
+    throw new Error('Unsupported statement file. Use CSV, PDF, OFX, QFX, QIF or XLSX.');
   }
 
   async function sha256(file) {
@@ -189,6 +331,62 @@
     } catch (error) {
       notice(error.message, error.code === 'BANK_PROVIDER_NOT_CONFIGURED' ? 'warning' : 'error');
     }
+  }
+
+  function statusClass(status) {
+    return `review-status ${String(status || '').toLowerCase()}`;
+  }
+
+  async function openReview(uid) {
+    const result = await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(uid)}`);
+    state.activeReview = result;
+    const session = result.session;
+    $('reviewSubtitle').textContent = `${session.original_name} · ${session.account_name} · ${session.source_format} · ${session.status}`;
+    $('reviewSummary').innerHTML = `
+      <span><b>${Number(session.total_rows || 0)}</b> total</span>
+      <span><b>${Number(session.valid_rows || 0)}</b> valid</span>
+      <span><b>${Number(session.warning_rows || 0)}</b> warnings</span>
+      <span><b>${Number(session.duplicate_rows || 0)}</b> duplicates</span>
+      <span><b>${Number(session.rejected_rows || 0)}</b> rejected</span>`;
+    $('reviewRows').innerHTML = (result.rows || []).map((row) => `
+      <tr>
+        <td><input type="checkbox" class="row-select" data-row-id="${row.id}" ${Number(row.selected) ? 'checked' : ''} ${row.validation_status === 'REJECTED' ? 'disabled' : ''}></td>
+        <td>${escapeHtml(String(row.transaction_date || '').slice(0, 10))}</td>
+        <td><strong>${escapeHtml(row.description || row.merchant_name || 'No description')}</strong>${row.validation_message ? `<small>${escapeHtml(row.validation_message)}</small>` : ''}</td>
+        <td>${Number(row.debit || 0) ? money(row.debit, row.currency || session.account_currency || 'AUD') : '—'}</td>
+        <td>${Number(row.credit || 0) ? money(row.credit, row.currency || session.account_currency || 'AUD') : '—'}</td>
+        <td>${row.running_balance === null ? '—' : money(row.running_balance, row.currency || session.account_currency || 'AUD')}</td>
+        <td><span class="${statusClass(row.validation_status)}">${escapeHtml(row.validation_status)}</span></td>
+      </tr>`).join('');
+    document.querySelectorAll('.row-select').forEach((checkbox) => checkbox.addEventListener('change', async () => {
+      checkbox.disabled = true;
+      try {
+        await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(session.import_uid)}/rows/${checkbox.dataset.rowId}/select`, {
+          method: 'POST', body: JSON.stringify({ selected: checkbox.checked })
+        });
+      } catch (error) {
+        checkbox.checked = !checkbox.checked;
+        notice(error.message, 'error');
+      } finally { checkbox.disabled = false; }
+    }));
+    $('commitReview').disabled = session.status !== 'PENDING_REVIEW';
+    $('rejectReview').disabled = session.status !== 'PENDING_REVIEW';
+    $('reviewDialog').showModal();
+  }
+
+  async function loadReviewQueue() {
+    const result = await api('/api/finance/intelligence/statement-reviews');
+    const sessions = result.sessions || [];
+    $('reviewQueue').innerHTML = sessions.length ? sessions.map((session) => `
+      <button type="button" class="queue-row" data-review-uid="${escapeHtml(session.import_uid)}">
+        <div><strong>${escapeHtml(session.original_name)}</strong><small>${escapeHtml(session.account_name)} · ${escapeHtml(session.source_format)} · ${dateText(session.created_at)}</small></div>
+        <div class="right"><span class="${statusClass(session.status)}">${escapeHtml(session.status)}</span><small>${Number(session.total_rows || 0)} rows · ${Number(session.warning_rows || 0)} warnings</small></div>
+      </button>`).join('') : '<p class="muted">No statement review sessions yet.</p>';
+    document.querySelectorAll('[data-review-uid]').forEach((button) => button.addEventListener('click', async () => {
+      $('queueDialog').close();
+      try { await openReview(button.dataset.reviewUid); } catch (error) { notice(error.message, 'error'); }
+    }));
+    $('queueDialog').showModal();
   }
 
   $('accountForm').addEventListener('submit', async (event) => {
@@ -210,25 +408,44 @@
     const accountId = Number($('importAccount').value);
     const file = $('importFile').files[0];
     if (!accountId || !file) return;
-    const extension = (file.name.split('.').pop() || '').toUpperCase();
+    const submit = event.currentTarget.querySelector('button[type="submit"]');
+    submit.disabled = true;
+    submit.textContent = 'Parsing…';
     try {
-      if (extension !== 'CSV') {
-        await api(`/api/finance/intelligence/accounts/${accountId}/statements/import`, {
-          method: 'POST',
-          body: JSON.stringify({ source_format: extension, original_name: file.name, content_hash: await sha256(file), rows: [] })
-        });
-        return;
-      }
-      const rows = parseCsv(await file.text());
-      const result = await api(`/api/finance/intelligence/accounts/${accountId}/statements/import`, {
+      const parsed = await parseStatement(file);
+      const result = await api(`/api/finance/intelligence/accounts/${accountId}/statements/preview`, {
         method: 'POST',
-        body: JSON.stringify({ source_format: 'CSV', original_name: file.name, content_hash: await sha256(file), rows })
+        body: JSON.stringify({ source_format: parsed.format, original_name: file.name, content_hash: await sha256(file), rows: parsed.rows })
       });
       $('importDialog').close();
       event.currentTarget.reset();
-      notice(`${result.message} Coverage ${result.coverage?.start || 'unknown'} to ${result.coverage?.end || 'unknown'}.`, 'success');
+      notice(`${result.message} ${result.summary.valid} valid, ${result.summary.warning} warnings, ${result.summary.duplicate} duplicates, ${result.summary.rejected} rejected.`, result.summary.warning || result.summary.rejected ? 'warning' : 'success');
+      await openReview(result.import_uid);
+    } catch (error) { notice(error.message, 'error'); }
+    finally { submit.disabled = false; submit.textContent = 'Parse & review'; }
+  });
+
+  $('commitReview').addEventListener('click', async () => {
+    const uid = state.activeReview?.session?.import_uid;
+    if (!uid) return;
+    try {
+      const result = await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(uid)}/commit`, { method: 'POST', body: '{}' });
+      $('reviewDialog').close();
+      notice(result.message, 'success');
       await load();
-    } catch (error) { notice(error.message, error.code === 'STATEMENT_PARSER_NOT_CONFIGURED' ? 'warning' : 'error'); }
+    } catch (error) { notice(error.message, 'error'); }
+  });
+
+  $('rejectReview').addEventListener('click', async () => {
+    const uid = state.activeReview?.session?.import_uid;
+    if (!uid) return;
+    const reason = window.prompt('Reason for rejecting this statement review:');
+    if (!reason) return;
+    try {
+      const result = await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(uid)}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+      $('reviewDialog').close();
+      notice(result.message, 'success');
+    } catch (error) { notice(error.message, 'error'); }
   });
 
   document.querySelectorAll('.scope').forEach((button) => button.addEventListener('click', async () => {
@@ -241,6 +458,7 @@
   $('connectBank').addEventListener('click', connectBank);
   $('addAccount').addEventListener('click', () => $('accountDialog').showModal());
   $('importStatement').addEventListener('click', () => $('importDialog').showModal());
+  $('openReviewQueue').addEventListener('click', () => loadReviewQueue().catch((error) => notice(error.message, 'error')));
   $('refreshDashboard').addEventListener('click', load);
 
   function escapeHtml(input) {
