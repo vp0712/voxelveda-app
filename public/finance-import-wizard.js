@@ -202,10 +202,13 @@
     }).observe(notice, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden','class'] });
   }
 
-  document.addEventListener('DOMContentLoaded', () => {
+  function init() {
     wireImport();
     observeReviewDialog();
     clarifyReviewSummary();
     observeImportErrors();
-  });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
+  else init();
 })();
