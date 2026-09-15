@@ -16,7 +16,7 @@ function uid(prefix) { return `${prefix}-${Date.now().toString(36).toUpperCase()
 
 function fail(res, error, fallback) {
   console.error(fallback, error);
-  const known = new Set(['BASIQ_API_KEY_REQUIRED','PROVIDER_ADAPTER_NOT_READY','BASIQ_TOKEN_INVALID','BASIQ_CLIENT_TOKEN_INVALID']);
+  const known = new Set(['BASIQ_API_KEY_REQUIRED','PROVIDER_ADAPTER_NOT_READY','BASIQ_TOKEN_INVALID','BASIQ_CLIENT_TOKEN_INVALID','PROVIDER_USER_ID_MISSING']);
   const status = known.has(error?.code) ? 503 : (Number(error?.status) || 500);
   return res.status(status).json({ message: error?.message || fallback, code: error?.code || 'OPEN_BANKING_ERROR' });
 }
@@ -68,7 +68,11 @@ exports.startConsent = async (req, res) => {
       [req.user.id, provider, environment()]
     );
     if (!mapping) {
-      if (provider !== 'BASIQ') return res.status(501).json({ message: `${option.name} adapter is registered but not implemented yet.`, code: 'PROVIDER_ADAPTER_NOT_READY' });
+      if (provider !== 'BASIQ') {
+        const unavailable = new Error(`${option.name} adapter is registered but not implemented yet.`);
+        unavailable.code = 'PROVIDER_ADAPTER_NOT_READY';
+        throw unavailable;
+      }
       const created = await basiqCreateUser({
         email,
         firstName: clean(req.user?.first_name || req.user?.firstName),
