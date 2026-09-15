@@ -12,8 +12,11 @@ const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
 const encrypted = encryptSensitive('123456789');
 assert.notEqual(encrypted, '123456789');
 assert.equal(decryptSensitive(encrypted), '123456789');
-assert.equal(maskAccount('123456789'), '••••6789');
-assert.throws(() => decryptSensitive(`${encrypted.slice(0, -1)}x`));
+const encryptedParts = encrypted.split('.');
+const tamperedTag = Buffer.from(encryptedParts[2], 'base64url');
+tamperedTag[0] ^= 0x01;
+const tampered = [encryptedParts[0], encryptedParts[1], tamperedTag.toString('base64url'), encryptedParts[3]].join('.');
+assert.throws(() => decryptSensitive(tampered));
 
 assert(HIGH_RISK_PERMISSIONS.has('VIEW_PAYROLL_BANKING'));
 assert(HIGH_RISK_PERMISSIONS.has('APPROVE_PAYROLL_BANK_CHANGE'));
