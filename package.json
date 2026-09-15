@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js",
+    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js && node scripts/database-runtime-verification-test.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
     "typecheck": "node scripts/check-syntax.js",
@@ -34,6 +34,7 @@
     "test:statement-staging": "node scripts/statement-null-date-staging-test.js",
     "test:finance-reconciliation": "node scripts/finance-reconciliation-center-test.js",
     "test:finance-privacy-rules": "node scripts/finance-privacy-rules-test.js",
+    "test:database-runtime": "node scripts/database-runtime-verification-test.js",
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "security:secrets": "node scripts/secret-scan.js",
     "readiness:check": "node scripts/check-production-readiness.js",

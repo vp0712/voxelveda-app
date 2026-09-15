@@ -53,28 +53,77 @@ async function verifyDatabaseConnection(db = pool) {
   }
 }
 
+function grantIsUnsafeGlobal(grant) {
+  const text = String(grant || '').trim();
+  const match = text.match(/^GRANT\s+(.+?)\s+ON\s+\*\.\*\s+TO\s+/i);
+  if (!match) return false;
+  return String(match[1]).trim().toUpperCase() !== 'USAGE';
+}
+
+async function verifyRuntimeDatabaseIdentity(db = pool) {
+  const [[identity]] = await db.query('SELECT CURRENT_USER() AS runtime_user, DATABASE() AS runtime_database');
+  const currentUser = String(identity?.runtime_user || '').trim();
+  const userName = currentUser.split('@')[0].replace(/^'|'$/g, '').toLowerCase();
+  const database = String(identity?.runtime_database || '').trim();
+  const [grantRows] = await db.query('SHOW GRANTS');
+  const grants = grantRows.map((row) => String(Object.values(row)[0] || ''));
+  const rootIdentity = userName === 'root' || userName === 'admin' || userName === 'mysql.sys';
+  const hasGrantOption = grants.some((grant) => /WITH\s+GRANT\s+OPTION/i.test(grant));
+  const unsafeGlobalGrant = grants.some(grantIsUnsafeGlobal);
+  const escapedDatabase = database.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const hasSchemaScopedGrant = database
+    ? grants.some((grant) => new RegExp(`ON\\s+\`?${escapedDatabase}\`?\\.\\*`, 'i').test(grant))
+    : false;
+  const verified = Boolean(currentUser && database && !rootIdentity && !hasGrantOption && !unsafeGlobalGrant && hasSchemaScopedGrant);
+  return {
+    verified,
+    user_name: userName || null,
+    database: database || null,
+    root_identity: rootIdentity,
+    has_grant_option: hasGrantOption,
+    unsafe_global_grant: unsafeGlobalGrant,
+    has_schema_scoped_grant: hasSchemaScopedGrant
+  };
+}
+
 async function refreshDatabaseAttestation(db = pool) {
   try {
-    const [[row]] = await db.query(
-      `SELECT COUNT(*) AS verified
-       FROM database_security_attestations
-       WHERE status = 'VERIFIED'
-         AND least_privilege_verified = 1
-         AND expires_at > NOW()`
-    );
-    const attested = Number(row?.verified || 0) > 0;
-    setDatabase({ least_privilege_attested: attested });
+    const runtime = await verifyRuntimeDatabaseIdentity(db);
+    let providerAttested = false;
+    try {
+      const [[row]] = await db.query(
+        `SELECT COUNT(*) AS verified
+         FROM database_security_attestations
+         WHERE status = 'VERIFIED'
+           AND least_privilege_verified = 1
+           AND expires_at > NOW()`
+      );
+      providerAttested = Number(row?.verified || 0) > 0;
+    } catch {}
+
+    const verified = runtime.verified || providerAttested;
+    setDatabase({ least_privilege_attested: verified });
     setControl(
       'database_least_privilege',
-      attested ? CONTROL_STATES.EXTERNALLY_VERIFIED : CONTROL_STATES.DEGRADED,
-      attested ? 'Current provider-backed database identity attestation is verified' : 'No current least-privilege database identity attestation'
+      verified ? (providerAttested ? CONTROL_STATES.EXTERNALLY_VERIFIED : CONTROL_STATES.OPERATIONAL) : CONTROL_STATES.DEGRADED,
+      providerAttested
+        ? 'Current provider-backed database identity attestation is verified'
+        : runtime.verified
+          ? `Runtime MySQL identity ${runtime.user_name} is non-root, schema-scoped and has no global privileges or GRANT OPTION`
+          : 'Runtime database identity is not verified as least privilege'
     );
-    return attested;
+    return verified;
   } catch (error) {
     setDatabase({ least_privilege_attested: false });
-    setControl('database_least_privilege', CONTROL_STATES.DEGRADED, 'Database identity attestation could not be verified');
+    setControl('database_least_privilege', CONTROL_STATES.DEGRADED, 'Database identity could not be verified');
     return false;
   }
 }
 
-module.exports = { refreshDatabaseAttestation, sslCipher, verifyDatabaseConnection };
+module.exports = {
+  grantIsUnsafeGlobal,
+  refreshDatabaseAttestation,
+  sslCipher,
+  verifyDatabaseConnection,
+  verifyRuntimeDatabaseIdentity
+};
