@@ -28,6 +28,9 @@ expect(finance, "$('accountForm').addEventListener('submit'", 'Add Account handl
 expect(finance, "$('importForm').addEventListener('submit'", 'Import Statement handler must remain wired.');
 expect(finance, "$('commitReview').addEventListener('click'", 'Review commit handler must remain wired.');
 expect(finance, "$('rejectReview').addEventListener('click'", 'Review reject handler must remain wired.');
+expect(advanced, "Object.defineProperty(event, 'currentTarget'", 'Mobile Safari submit-event compatibility guard is missing.');
+expect(advanced, "value: form", 'Mobile Safari compatibility guard must preserve the submitting form.');
+expect(advanced, "document.addEventListener('submit'", 'Mobile form guard must run in capture phase before finance submit handlers.');
 expect(advanced, "$('analyseTransactions')?.addEventListener('click', runAnalysis)", 'Analyse button handler must remain wired.');
 expect(advanced, "data-action=\"apply\"", 'Apply suggestion action must remain rendered.');
 
