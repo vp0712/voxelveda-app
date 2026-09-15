@@ -27,6 +27,23 @@ function accountBody(name = 'id') {
   };
 }
 
+function protectScopeConversion(idField = 'id', scopeField = 'ownership_scope') {
+  return async (req, res, next) => {
+    try {
+      const id = Number(req.body?.[idField] || 0);
+      if (!id) return next();
+      const requested = String(req.body?.[scopeField] || '').trim().toUpperCase();
+      if (!requested || requested === 'BUSINESS') return next();
+      const [[account]] = await pool.query('SELECT id, ownership_scope, created_by FROM bank_accounts WHERE id=?', [id]);
+      if (!account) throw new FinanceError('Financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
+      if (String(account.ownership_scope || '').toUpperCase() === 'BUSINESS' && Number(account.created_by || 0) !== privacy.userId(req)) {
+        throw new FinanceError('Only the account owner can change a Voxel Veda account into a private account.', 403, 'BUSINESS_ACCOUNT_PRIVATIZATION_FORBIDDEN');
+      }
+      return next();
+    } catch (error) { return fail(res, error); }
+  };
+}
+
 function bankTransactionParam(name = 'id') {
   return async (req, res, next) => {
     try { await privacy.assertBankTransactionAccess(pool, req.params[name], req); return next(); }
@@ -70,13 +87,11 @@ async function filterStatementList(req, res, next) {
     const allowed = new Set(rows.map((row) => Number(row.id)));
     const original = res.json.bind(res);
     res.json = (payload) => {
-      if (payload && Array.isArray(payload.sessions)) {
-        payload = { ...payload, sessions: payload.sessions.filter((session) => allowed.has(Number(session.bank_account_id))) };
-      }
+      if (payload && Array.isArray(payload.sessions)) payload = { ...payload, sessions: payload.sessions.filter((session) => allowed.has(Number(session.bank_account_id))) };
       return original(payload);
     };
     return next();
   } catch (error) { return fail(res, error); }
 }
 
-module.exports = { accountParam, accountBody, bankTransactionParam, insightParam, statementUid, filterAccountList, filterStatementList };
+module.exports = { accountParam, accountBody, protectScopeConversion, bankTransactionParam, insightParam, statementUid, filterAccountList, filterStatementList };
