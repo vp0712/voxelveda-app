@@ -1,8 +1,25 @@
 (() => {
   const $ = (id) => document.getElementById(id);
   const money = (value, currency = 'AUD') => new Intl.NumberFormat('en-AU', { style: 'currency', currency }).format(Number(value || 0));
-  const escapeHtml = (input) => String(input ?? '').replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+  const escapeHtml = (input) => String(input ?? '').replace(/[&<>'\"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '\"': '&quot;' }[ch]));
   let scope = 'ALL';
+
+  // iOS Safari clears Event.currentTarget after an async listener yields.
+  // Preserve the submitting form so the existing Add Account / Import handlers
+  // can safely call currentTarget.reset() and query their submit buttons after await.
+  document.addEventListener('submit', (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement)) return;
+    try {
+      Object.defineProperty(event, 'currentTarget', {
+        configurable: true,
+        enumerable: true,
+        value: form
+      });
+    } catch (error) {
+      console.warn('Finance form compatibility guard could not preserve currentTarget.', error);
+    }
+  }, true);
 
   function advancedNotice(message, tone = 'info') {
     const el = $('advancedNotice');
