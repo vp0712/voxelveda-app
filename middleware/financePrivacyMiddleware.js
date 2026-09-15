@@ -64,4 +64,19 @@ function filterAccountList(req, res, next) {
   next();
 }
 
-module.exports = { accountParam, accountBody, bankTransactionParam, insightParam, statementUid, filterAccountList };
+async function filterStatementList(req, res, next) {
+  try {
+    const [rows] = await pool.query(`SELECT id FROM bank_accounts ba WHERE ${privacy.visibilitySql('ba')}`, privacy.visibilityParams(req));
+    const allowed = new Set(rows.map((row) => Number(row.id)));
+    const original = res.json.bind(res);
+    res.json = (payload) => {
+      if (payload && Array.isArray(payload.sessions)) {
+        payload = { ...payload, sessions: payload.sessions.filter((session) => allowed.has(Number(session.bank_account_id))) };
+      }
+      return original(payload);
+    };
+    return next();
+  } catch (error) { return fail(res, error); }
+}
+
+module.exports = { accountParam, accountBody, bankTransactionParam, insightParam, statementUid, filterAccountList, filterStatementList };
