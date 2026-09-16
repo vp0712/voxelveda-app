@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-recovery-assurance-executive-command]')){const s=document.createElement('script');s.src='/personal-finance-recovery-assurance-executive-command.js?v=20260917-recovery-assurance-executive-command';s.dataset.personalFinanceRecoveryAssuranceExecutiveCommand='1';document.head.appendChild(s);}
 (() => {
   const BASE='/api/finance/personal-money/canonical-restore/reporting/certificates';
   const URLS={schedule:`${BASE}?control_scheduling=1`,capa:`${BASE}?capa=1`,reviews:`${BASE}?governance_review=1`};

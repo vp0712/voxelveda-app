@@ -13,4 +13,5 @@ assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/rec
 assert(ui.includes('deadlines_auto_moved:false')&&ui.includes('financial_records_changed:false'),'Planning pack must explicitly prohibit deadline and finance mutations.');
 assert(ui.includes('not_an_enforced_deadline:true')&&ui.includes('Planning marker only — not an enforced deadline.'),'Management review calendar entries must remain non-binding planning markers.');
 assert(loader.includes('/personal-finance-recovery-assurance-calendar-planning.js?v=20260917-recovery-assurance-calendar-planning'),'Scheduling center must load assurance calendar and forward planning.');
+require('./personal-finance-recovery-assurance-executive-command-test');
 console.log('Personal Finance Recovery Assurance Calendar & Forward Planning safeguards passed.');
