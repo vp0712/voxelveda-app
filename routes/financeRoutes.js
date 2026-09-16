@@ -13,6 +13,7 @@ const personalMoneySmart = require('../controllers/personalMoneySmartController'
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
 const personalNetWorth = require('../controllers/personalNetWorthController');
+const personalAssetLifecycle = require('../controllers/personalAssetLifecycleController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -69,6 +70,12 @@ router.post('/personal-money/net-worth/liabilities', requireAnyPermission('EDIT_
 router.post('/personal-money/net-worth/liabilities/:id/balance', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.updateLiabilityBalance);
 router.post('/personal-money/net-worth/liabilities/:id/archive', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.archiveLiability);
 router.post('/personal-money/net-worth/snapshot', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.saveSnapshot);
+router.get('/personal-money/net-worth/lifecycle', requireAnyPermission('VIEW_BANKING'), personalAssetLifecycle.getCenter);
+router.post('/personal-money/net-worth/lifecycle/items', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.createItem);
+router.post('/personal-money/net-worth/lifecycle/items/:id/complete', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.completeItem);
+router.post('/personal-money/net-worth/lifecycle/items/:id/archive', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.archiveItem);
+router.post('/personal-money/net-worth/lifecycle/documents', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.addDocument);
+router.delete('/personal-money/net-worth/lifecycle/documents/:id', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.deleteDocument);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
