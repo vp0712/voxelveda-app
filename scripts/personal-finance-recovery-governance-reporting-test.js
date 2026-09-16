@@ -15,3 +15,4 @@ for(const label of ['GOVERNANCE REPORTING, TREND ANALYTICS & MANAGEMENT REVIEW C
 assert(ui.includes("credentials:'same-origin'")&&!ui.includes("method:'POST'")&&!ui.includes("method:'PUT'")&&!ui.includes("method:'PATCH'")&&!ui.includes("method:'DELETE'"),'Governance reporting UI must remain read-only.');
 assert(loader.includes('/personal-finance-recovery-governance-reporting.js?v=20260917-recovery-governance-reporting'),'SLA governance center must load reporting center.');
 console.log('Personal Finance Recovery Governance Reporting safeguards passed.');
+require('./personal-finance-recovery-management-review-attestation-test');
