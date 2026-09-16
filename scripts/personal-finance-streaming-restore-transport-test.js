@@ -35,4 +35,5 @@ assert(restore.includes('RESTORE_CHECKPOINT_HASH_MISMATCH')&&restore.includes('h
 assert(restore.includes("DATASET_ORDER.includes(cp.dataset_name)")&&restore.includes('RESTORE_CHECKPOINT_DATASET_MISMATCH'),'Rollback must reject checkpoint datasets outside the canonical dependency contract.');
 assert(restore.includes('checkpoint_hash_verified:true'),'Rollback audit metadata must record checkpoint integrity verification.');
 assert(!transport.includes("ownership_scope='BUSINESS'")&&!transport.includes("ownership_scope='MIXED'"),'Streaming transport must not introduce company finance scope.');
+require('./personal-finance-post-restore-verification-test');
 console.log('Personal Finance Streaming Restore Transport & Fidelity regression checks passed.');
