@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-recovery-assurance-evidence-lineage]')){const s=document.createElement('script');s.src='/personal-finance-recovery-assurance-evidence-lineage.js?v=20260917-recovery-assurance-evidence-lineage';s.dataset.personalFinanceRecoveryAssuranceEvidenceLineage='1';document.head.appendChild(s);}
 (() => {
   const BASE='/api/finance/personal-money/canonical-restore/reporting/certificates';
   const URLS={tests:`${BASE}?control_testing=1`,schedule:`${BASE}?control_scheduling=1`,capa:`${BASE}?capa=1`,reviews:`${BASE}?governance_review=1`};
