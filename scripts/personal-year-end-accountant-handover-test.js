@@ -18,4 +18,5 @@ assert(ui.includes('are not sent anywhere automatically'),'Exports must require 
 assert(ui.includes('company accounting is excluded')||ui.includes('company accounting excluded'),'Personal handover must remain separate from company accounting.');
 assert(ui.includes("new Blob")&&ui.includes('application/json')&&ui.includes('text/csv'),'Handover Center must create local JSON and CSV export packs.');
 for(const prohibited of ['tax_payable','tax_liability','tax_rate','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','sendEmail','smtp','mailTransport'])assert(!ui.includes(prohibited),`Handover Center must not contain unsupported tax/accounting/send action: ${prohibited}`);
+require('./personal-financial-control-center-test');
 console.log('Personal Financial Year-End & Accountant Handover regression checks passed.');
