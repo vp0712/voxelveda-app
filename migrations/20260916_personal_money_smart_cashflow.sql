@@ -8,7 +8,7 @@ CREATE UNIQUE INDEX uniq_personal_recurring_detected_source
 
 CREATE TABLE personal_money_safety_buffers (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
-  user_id VARCHAR(120) NOT NULL,
+  user_id VARCHAR(191) NOT NULL,
   currency CHAR(3) NOT NULL,
   reserve_amount DECIMAL(18,4) NOT NULL DEFAULT 0,
   note VARCHAR(255) NULL,
