@@ -20,3 +20,4 @@ assert(ui.includes('hash_prefix')&&!/\.integrity_hash\b/.test(ui),'UI must show 
 assert(ui.includes('read-only')&&ui.includes('cannot undo, replay, edit, delete, reconcile'),'Audit UI must explicitly prohibit mutation/replay behavior.');
 for(const prohibited of ['createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','recordDebtPayment','method:\'POST\'','method:"POST"'])assert(!ui.includes(prohibited),`Audit UI must not contain mutation path: ${prohibited}`);
 console.log('Personal Finance Audit Trail & Change History regression checks passed.');
+require('./personal-finance-alerts-continuous-monitoring-test');
