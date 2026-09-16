@@ -1,0 +1,16 @@
+const fs=require('fs');const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinancialRoadmapController.js','utf8');
+const ui=fs.readFileSync('public/personal-financial-roadmap.js','utf8');
+assert(controller.includes('forecast_completion_date'),'Roadmap API must expose forecast completion date.');
+assert(controller.includes('required_monthly_change'),'Roadmap API must expose required monthly change.');
+assert(controller.includes('what_to_do_this_month'),'Roadmap API must expose monthly action guidance.');
+assert(controller.includes("direction==='DECREASE'"),'Roadmap intelligence must respect decrease-direction plans.');
+assert(controller.includes('actual_value'),'Roadmap intelligence must be based on recorded progress.');
+assert(!controller.includes('INSERT INTO financial_transactions'),'Roadmap intelligence must not post company finance transactions.');
+assert(!controller.includes('INSERT INTO journal'),'Roadmap intelligence must not create company journals.');
+assert(ui.includes('Roadmap Intelligence'),'UI must explain the intelligence layer.');
+assert(ui.includes('What to do this month'),'UI must show monthly action guidance.');
+assert(ui.includes('Forecast finish'),'UI must show forecast completion.');
+assert(ui.includes('Suggestion only'),'UI must label guidance as suggestion-only.');
+assert(!ui.includes("method:'POST',body:JSON.stringify({monthly_target"),'Intelligence must not silently change roadmap targets.');
+console.log('Personal Roadmap Intelligence regression checks passed.');
