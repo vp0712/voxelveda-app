@@ -1,0 +1,16 @@
+const fs=require('fs');
+const assert=require('assert');
+const nav=fs.readFileSync('public/personal-money-mobile-nav.js','utf8');
+const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
+assert(loader.includes('/personal-money-mobile-nav.js?v=20260916-mobile-nav'),'Mobile money navigation must load from the existing protected personal-money chain.');
+for(const endpoint of ['/api/finance/personal-money/smart','/api/finance/personal-money/attention','/api/finance/personal-money/roadmaps'])assert(nav.includes(endpoint),`Mobile layer must read ${endpoint}.`);
+assert(nav.includes("credentials:'same-origin'"),'Mobile layer must keep authenticated same-origin credentials.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(nav),'Mobile navigation must remain read-only.');
+assert(nav.includes('cashflow_calendar'),'7-day timeline must use the existing protected cash-flow calendar.');
+assert(nav.includes('TOP PRIORITY'),'Mobile home must surface the highest-priority item.');
+assert(nav.includes('Next 7 days'),'Mobile home must include a 7-day timeline.');
+for(const label of ['Home','Transactions','Plans','Wealth','More'])assert(nav.includes(`>${label}<`)||nav.includes(`${label}<b`),`Bottom navigation must include ${label}.`);
+for(const target of ['personalMoneyHomePanel','personalMoneyPanel','roadmapPanel','personalNetWorthPanel','pmnAdvancedDetails'])assert(nav.includes(target),`Bottom navigation must target ${target}.`);
+assert(nav.includes('Advanced tools'),'Advanced modules must be collapsible by default.');
+for(const prohibited of ['finance_transactions','createJournal','INSERT INTO','UPDATE finance_','POST_TRANSACTION'])assert(!nav.includes(prohibited),`Mobile navigation must not contain accounting mutation path: ${prohibited}`);
+console.log('Personal Money mobile priority/navigation regression checks passed.');
