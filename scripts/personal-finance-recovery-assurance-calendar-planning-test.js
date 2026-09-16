@@ -1,0 +1,16 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-recovery-assurance-calendar-planning.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-control-scheduling-evidence.js','utf8');
+for(const endpoint of ['?control_scheduling=1','?capa=1','?governance_review=1'])assert(ui.includes(endpoint),`Forward planner must compose protected source ${endpoint}.`);
+for(const label of ['30 / 60 / 90','Monthly workload forecast','Conflict detection','90-day assurance calendar','CAPA due','evidence-request deadlines','planning markers only','Read-only planning','does not move deadlines'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Forward planning UI must explain ${label}.`);
+for(const type of ['ASSURANCE_EXPIRY_RETEST','CONTROL_RETEST','CAPA_DUE','EVIDENCE_REQUEST_DUE','MANAGEMENT_REVIEW_OPEN','MANAGEMENT_REVIEW_PLANNING_MARKER'])assert(ui.includes(type),`Forward planning must include ${type}.`);
+for(const band of ['HEAVY','BUSY','MANAGEABLE','CLEAR'])assert(ui.includes(band),`Forward workload must expose ${band}.`);
+assert(ui.includes("items.length>=4?'HIGH':'MEDIUM'"),'Conflict detection must explicitly separate high and medium same-day workload.');
+assert(ui.includes("credentials:'same-origin'"),'Forward planner reads must remain authenticated and owner-scoped through existing protected endpoints.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Forward planning center must remain read-only.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Forward planner must not call finance mutation endpoints.');
+assert(ui.includes('deadlines_auto_moved:false')&&ui.includes('financial_records_changed:false'),'Planning pack must explicitly prohibit deadline and finance mutations.');
+assert(ui.includes('not_an_enforced_deadline:true')&&ui.includes('Planning marker only — not an enforced deadline.'),'Management review calendar entries must remain non-binding planning markers.');
+assert(loader.includes('/personal-finance-recovery-assurance-calendar-planning.js?v=20260917-recovery-assurance-calendar-planning'),'Scheduling center must load assurance calendar and forward planning.');
+console.log('Personal Finance Recovery Assurance Calendar & Forward Planning safeguards passed.');
