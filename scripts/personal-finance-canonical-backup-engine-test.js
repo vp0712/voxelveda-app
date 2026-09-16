@@ -16,7 +16,9 @@ assert(!controller.includes("name:'bank_connections'")&&!controller.includes('FR
 assert(controller.includes('value instanceof Date')&&controller.includes('value.toISOString()'),'Canonical hashing must serialize date values deterministically.');
 assert(ui.includes("fetch('/api/finance/personal-money/canonical-backup'")&&ui.includes("credentials:'same-origin'"),'Canonical UI must use the protected same-origin endpoint.');
 for(const cryptoMark of ["crypto.subtle.digest('SHA-256'","name:'AES-GCM'","name:'PBKDF2'",'iterations:310000'])assert(ui.includes(cryptoMark),`Canonical UI must include ${cryptoMark}.`);
-assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Canonical UI must not call a finance mutation endpoint.');
-assert(controller.includes("write_mode:'DISABLED_IN_CANONICAL_BACKUP_ENGINE'")&&ui.includes('does not yet execute Add/Replace writes'),'Restore execution must remain fail-closed in this engine.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Canonical backup UI itself must not call a finance mutation endpoint.');
+assert(controller.includes("write_mode:'DISABLED_IN_CANONICAL_BACKUP_ENGINE'")&&ui.includes('Transaction-Safe Restore Executor'),'Canonical backup generation must remain read-only while restore execution is delegated to its separate high-risk executor.');
+assert(ui.includes('/personal-finance-transaction-safe-restore-executor.js?v=20260916-restore-executor'),'Canonical engine must load the separate restore executor UI.');
 assert(routes.includes("router.post('/accounting-periods/:id/status', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), operations.updateAccountingPeriod);"),'Canonical work must not regress the existing accounting-period route.');
+require('./personal-finance-transaction-safe-restore-executor-test');
 console.log('Personal Finance Canonical Backup Engine regression checks passed.');
