@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-recovery-assurance-calendar]')){const s=document.createElement('script');s.src='/personal-finance-recovery-assurance-calendar-planning.js?v=20260917-recovery-assurance-calendar-planning';s.dataset.personalFinanceRecoveryAssuranceCalendar='1';document.head.appendChild(s);}
 (() => {
   const API='/api/finance/personal-money/canonical-restore/reporting/certificates',LIST=`${API}?control_scheduling=1`;
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
