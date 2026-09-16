@@ -23,3 +23,4 @@ assert(ui.includes("review_action:'GENERATE'")||ui.includes("mutate('GENERATE')"
 assert(ui.includes("mutate('SAVE'")&&ui.includes("mutate('ACKNOWLEDGE'")&&ui.includes("mutate('ATTEST'"),'Management review UI must expose explicit governed review actions.');
 assert(loader.includes('/personal-finance-recovery-management-review-attestation.js?v=20260917-recovery-management-review'),'Governance reporting center must load management review attestation center.');
 console.log('Personal Finance Recovery Management Review & Attestation safeguards passed.');
+require('./personal-finance-recovery-capa-continuous-improvement-test');

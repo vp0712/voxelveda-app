@@ -1,0 +1,24 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinanceRecoveryCapaController.js','utf8');
+const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationController.js','utf8');
+const migration=fs.readFileSync('migrations/20260917_personal_finance_recovery_capa.sql','utf8');
+const ui=fs.readFileSync('public/personal-finance-recovery-capa-continuous-improvement.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-management-review-attestation.js','utf8');
+
+assert(migration.includes('personal_finance_recovery_capa')&&migration.includes('personal_finance_recovery_capa_events'),'CAPA must persist owner-only records and append-only history.');
+assert(migration.includes('UNIQUE KEY uq_pf_recovery_capa_owner_key (user_id, capa_key)'),'CAPA must prevent duplicate owner/evidence keys.');
+for(const field of ['source_category','action_type','owner_label','due_at','source_case_ids_json','source_review_id','action_plan_json','evidence_refs_json','effectiveness_result','effectiveness_checked_at','implemented_at','closed_at'])assert(migration.includes(field),`CAPA migration must include ${field}.`);
+assert(controller.includes('WHERE id=? AND user_id=?')&&controller.includes('WHERE user_id=? AND id IN')&&controller.includes('WHERE id=? AND user_id=? LIMIT 1'),'CAPA, case and management-review lookups must remain owner scoped.');
+assert(controller.includes('RECOVERY_CAPA_CASE_SCOPE_MISMATCH')&&controller.includes('RECOVERY_CAPA_EVIDENCE_CATEGORY_MISMATCH'),'CAPA must fail closed on cross-owner or mismatched incident evidence.');
+assert(controller.includes("result=allLinkedClosed&&recurrence.length===0?'EFFECTIVE':'NOT_EFFECTIVE'")&&controller.includes('no_inferred_root_cause:true'),'CAPA effectiveness must be evidence based and must not infer root cause.');
+assert(controller.includes("row.effectiveness_result!=='EFFECTIVE'")&&controller.includes('RECOVERY_CAPA_ATTESTED_REVIEW_REQUIRED')&&controller.includes('RECOVERY_CAPA_EVIDENCE_REQUIRED'),'CAPA closure must require effective verification, supporting evidence and an attested review.');
+assert(controller.includes("'CAPA_OPENED'")&&controller.includes("'CAPA_UPDATED'")&&controller.includes("'EFFECTIVENESS_CHECKED'")&&controller.includes("'CAPA_CLOSED'"),'CAPA history must preserve the controlled lifecycle.');
+assert(controller.includes("days>=14?'L3':days>=7?'L2':'L1'"),'Overdue CAPA must have graduated governance escalation.');
+assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DELETE FROM personal_money_')&&!controller.includes('INSERT INTO personal_money_')&&!controller.includes('UPDATE bank_transactions')&&!controller.includes('DELETE FROM bank_transactions'),'CAPA must never mutate source finance records.');
+assert(cert.includes("req.query.capa")&&cert.includes('recoveryCapa.list(req,res)')&&cert.includes("req.body?.capa_action")&&cert.includes('dispatchCapaAction'),'CAPA must reuse the protected recovery certification surface.');
+for(const label of ['CAPA & CONTINUOUS IMPROVEMENT CENTER','Repeated evidence signals','Create CAPA','Action plan','Evidence references','Check effectiveness','Close CAPA','CAPA boundary','cannot reconcile banking','change balances','execute restore or rollback','does not infer a root cause'])assert(ui.toLowerCase().includes(label.toLowerCase()),`CAPA UI must explain ${label}.`);
+assert(ui.includes("act('CREATE'")||ui.includes("mutate('CREATE'"),'CAPA UI must expose explicit creation.');
+assert(ui.includes("mutate('UPDATE'")&&ui.includes("mutate('EFFECTIVENESS'")&&ui.includes("mutate('CLOSE'"),'CAPA UI must expose governed update/effectiveness/closure actions.');
+assert(loader.includes('/personal-finance-recovery-capa-continuous-improvement.js?v=20260917-recovery-capa'),'Management review center must load CAPA center.');
+console.log('Personal Finance Recovery CAPA & Continuous Improvement safeguards passed.');

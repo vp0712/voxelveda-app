@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-recovery-capa]')){const s=document.createElement('script');s.src='/personal-finance-recovery-capa-continuous-improvement.js?v=20260917-recovery-capa';s.dataset.personalFinanceRecoveryCapa='1';document.head.appendChild(s);}
 (() => {
   const API='/api/finance/personal-money/canonical-restore/reporting/certificates';
   const LIST=`${API}?governance_review=1`;
