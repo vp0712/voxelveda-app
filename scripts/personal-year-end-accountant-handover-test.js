@@ -1,0 +1,21 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-year-end-accountant-handover.js','utf8');
+const vault=fs.readFileSync('public/personal-financial-document-evidence-vault.js','utf8');
+
+assert(vault.includes('/personal-year-end-accountant-handover.js?v=20260916-year-end-handover'),'Document Vault must load the Year-End & Accountant Handover Center.');
+assert(ui.includes('/api/finance/personal-money/health?fy_start='),'Handover Center must use full financial-year PERSONAL data.');
+assert(ui.includes('/api/finance/personal-money/net-worth/lifecycle'),'Handover Center must use the owner-private evidence vault.');
+assert(ui.includes("credentials:'same-origin'"),'Handover Center must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Handover Center must remain read-only against finance APIs.');
+for(const label of ['PERSONAL FINANCIAL YEAR-END & ACCOUNTANT HANDOVER CENTER','Handover status','Year-end checklist','Financial-year summary by currency','Preparation exceptions','Questions for accountant','Export review CSV','Export handover pack'])assert(ui.includes(label),`Handover Center must explain ${label}.`);
+assert(ui.includes('voxelveda.personal-year-end-accountant-questions.v1')&&ui.includes('localStorage'),'Accountant questions must remain local organisational state in this release.');
+assert(ui.includes('Currencies remain separate')||ui.includes('currencies remain separate'),'Handover Center must keep currencies separate.');
+assert(ui.includes('not tax advice')||ui.includes('not tax lodgement'),'Handover Center must not present preparation status as tax advice or lodgement status.');
+assert(ui.includes('not automatically taxable income'),'Recorded income must not be treated automatically as taxable income.');
+assert(ui.includes('not deduction claims'),'Review candidates must not be treated as deduction claims.');
+assert(ui.includes('are not sent anywhere automatically'),'Exports must require explicit user action and must not auto-send data.');
+assert(ui.includes('company accounting is excluded')||ui.includes('company accounting excluded'),'Personal handover must remain separate from company accounting.');
+assert(ui.includes("new Blob")&&ui.includes('application/json')&&ui.includes('text/csv'),'Handover Center must create local JSON and CSV export packs.');
+for(const prohibited of ['tax_payable','tax_liability','tax_rate','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','sendEmail','smtp','mailTransport'])assert(!ui.includes(prohibited),`Handover Center must not contain unsupported tax/accounting/send action: ${prohibited}`);
+console.log('Personal Financial Year-End & Accountant Handover regression checks passed.');
