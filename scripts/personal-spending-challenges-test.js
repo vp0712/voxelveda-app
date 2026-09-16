@@ -1,0 +1,28 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalSpendingChallengeController.js','utf8');
+const ui=fs.readFileSync('public/personal-spending-challenges.js','utf8');
+const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
+const migration=fs.readFileSync('migrations/20260916_personal_spending_challenges.sql','utf8');
+
+assert(migration.includes('personal_spending_challenges'),'Challenge migration must create owner-private challenge metadata.');
+for(const col of ['user_id','challenge_type','category','currency','target_amount','baseline_amount','target_percent','start_date','end_date','status'])assert(migration.includes(col),`Challenge migration missing ${col}.`);
+for(const prohibited of ['transaction_id','bank_transaction_id','bank_account_id','result_json','balance_snapshot'])assert(!migration.includes(prohibited),`Challenge table must not copy transaction/result data: ${prohibited}`);
+assert(controller.includes("WHERE user_id=? AND status<>'ARCHIVED'"),'Challenge list must be owner scoped.');
+assert(controller.includes("ba.created_by=? AND ba.ownership_scope='PERSONAL' AND bt.ownership_scope='PERSONAL'"),'Progress feed must require owner PERSONAL bank account and PERSONAL transaction.');
+assert(controller.includes('bt.is_internal_transfer=0'),'Progress feed must exclude internal transfers.');
+assert(controller.includes("e.user_id=? AND e.entry_type IN ('EXPENSE','CASH_OUT')"),'Manual cash progress must be owner scoped and expense-only.');
+assert(controller.includes('Progress data is limited to 400 days per request.'),'Progress feed must remain date bounded.');
+for(const prohibited of ['finance_transactions','journal_entries','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION'])assert(!controller.includes(prohibited),`Challenge controller must not touch company/accounting money paths: ${prohibited}`);
+assert(routes.includes("router.get('/personal-money/spending-challenges', requireAnyPermission('VIEW_BANKING')"),'Challenge list must require VIEW_BANKING.');
+assert(routes.includes("router.get('/personal-money/spending-challenges/progress', requireAnyPermission('VIEW_BANKING')"),'Challenge progress must be protected GET.');
+assert(routes.includes("router.post('/personal-money/spending-challenges', requireAnyPermission('EDIT_FINANCE')"),'Saving challenge metadata must require EDIT_FINANCE.');
+assert(routes.includes("router.post('/personal-money/spending-challenges/:id/status', requireAnyPermission('EDIT_FINANCE')"),'Challenge status metadata must require EDIT_FINANCE.');
+assert(loader.includes('/personal-spending-challenges.js?v=20260916-spending-challenges'),'Protected Personal Money chain must load Spending Challenges.');
+assert(ui.includes("credentials:'same-origin'"),'Challenge UI must preserve authenticated same-origin requests.');
+for(const type of ['CATEGORY_CAP','NO_SPEND','REDUCE_PERCENT','SAVE_VS_BASELINE'])assert(ui.includes(type),`Challenge UI must support ${type}.`);
+for(const text of ['Use previous same-length period','current streak','Advisory only','Nothing here can decline a payment or move money','currencies separate'])assert(ui.toLowerCase().includes(text.toLowerCase()),`Challenge UI must explain ${text}.`);
+for(const prohibited of ['/payments','/reconcile','/insights/','createJournal','finance_transactions','POST_TRANSACTION'])assert(!ui.includes(prohibited),`Challenge UI must not contain financial mutation path: ${prohibited}`);
+assert(ui.includes("method:'POST'")&&ui.includes('/status'),'Challenge UI may write challenge metadata/status only.');
+console.log('Spending Goals and No-Spend Challenges regression checks passed.');
