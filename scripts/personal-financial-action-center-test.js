@@ -55,4 +55,5 @@ for(const prohibited of ['finance_transactions','journal_entries','createJournal
 assert(forecast.includes('a.d===dim(a.y,a.m)')&&forecast.includes('Math.min(a.d,dim(y,m))'),'Cash-flow forecast recurrence must clamp month-end dates rather than relying on JavaScript month rollover.');
 assert(forecast.includes("r.frequency==='MONTHLY')s=shiftMonth(start,i)")&&forecast.includes("r.frequency==='QUARTERLY')s=shiftMonth(start,i*3)")&&forecast.includes("r.frequency==='YEARLY')s=shiftYear(start,i)"),'Cash-flow forecast must use month-end-safe recurrence for monthly, quarterly and yearly items.');
 
+require('./personal-wealth-position-intelligence-test');
 console.log('Personal Action Center, Subscription, Debt, Savings, Wealth Position Intelligence and forecast recurrence regression checks passed.');
