@@ -207,3 +207,13 @@ document.addEventListener('DOMContentLoaded', () => {
   script.dataset.personalFinanceBackupRecovery = 'true';
   document.head.appendChild(script);
 });
+
+// Personal Finance Disaster Recovery & Restore Approval Center. Recovery execution remains fail-closed until canonical restore adapters exist.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-disaster-recovery]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-disaster-recovery-restore-approval.js?v=20260916-disaster-recovery';
+  script.defer = true;
+  script.dataset.personalFinanceDisasterRecovery = 'true';
+  document.head.appendChild(script);
+});
