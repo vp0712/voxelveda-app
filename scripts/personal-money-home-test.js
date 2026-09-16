@@ -6,8 +6,9 @@ assert(loader.includes('/personal-money-home.js?v=20260916-unified-home'),'Unifi
 for(const endpoint of ['/api/finance/personal-money/smart','/api/finance/personal-money/attention','/api/finance/personal-money/health','/api/finance/personal-money/net-worth','/api/finance/personal-money/roadmaps'])assert(home.includes(endpoint),`Home must read ${endpoint}.`);
 assert(home.includes("credentials:'same-origin'"),'Home API reads must keep authenticated same-origin credentials.');
 assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(home),'Unified Home must remain read-only.');
-assert(!/exchange[_ -]?rate|convertCurrency|fxRate/i.test(home),'Unified Home must not invent or apply currency conversion.');
+assert(!/convertCurrency|applyExchangeRate|fxRate|currencyConversion/i.test(home),'Unified Home must not contain currency-conversion logic.');
 assert(home.includes('Different currencies stay separate'),'Home must explain currency separation.');
+assert(home.includes('no exchange rate is assumed'),'Home must explicitly say no exchange rate is assumed.');
 assert(home.includes('safe_to_spend_by_currency'),'Home must present Safe to Spend per currency.');
 assert(home.includes('totals_by_currency'),'Home must present Net Worth per currency.');
 assert(home.includes('cashflow_calendar'),'Home must show upcoming cash-flow commitments.');
