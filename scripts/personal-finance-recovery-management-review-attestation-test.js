@@ -1,0 +1,25 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinanceRecoveryManagementReviewController.js','utf8');
+const reporting=fs.readFileSync('controllers/personalFinanceRecoveryGovernanceReportingController.js','utf8');
+const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationController.js','utf8');
+const migration=fs.readFileSync('migrations/20260917_personal_finance_recovery_management_reviews.sql','utf8');
+const ui=fs.readFileSync('public/personal-finance-recovery-management-review-attestation.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-governance-reporting.js','utf8');
+
+assert(migration.includes('personal_finance_recovery_management_reviews')&&migration.includes('UNIQUE KEY uq_pf_recovery_management_review_owner_month (user_id, review_month)'),'Management review ledger must be persistent and unique per owner/month.');
+for(const field of ['snapshot_sha256','previous_review_sha256','review_sha256','evidence_checklist_json','carry_forward_json','acknowledged_at','attested_at'])assert(migration.includes(field),`Management review migration must include ${field}.`);
+assert(controller.includes('WHERE id=? AND user_id=?')&&controller.includes('WHERE user_id=? AND review_month=?'),'Management review lookups must be owner scoped.');
+assert(controller.includes("row.status==='ATTESTED'")&&controller.includes('RECOVERY_REVIEW_IMMUTABLE'),'Final attestation must make a management review immutable.');
+assert(controller.includes("status='ACKNOWLEDGED'")||controller.includes("status='ATTESTED'")||controller.includes("status='DRAFT'"),'Management review must use a governed lifecycle.');
+assert(controller.includes('previous_review_sha256')&&controller.includes('review_sha256')&&controller.includes('hashCore'),'Management reviews must be SHA-256 integrity protected and chained.');
+assert(controller.includes('RECOVERY_REVIEW_CARRY_FORWARD_REQUIRED')&&controller.includes('snapshot?.summary?.open'),'Open incidents must require carry-forward evidence before attestation.');
+for(const key of ['REPORT_REVIEWED','SLA_REVIEWED','RECURRENCE_REVIEWED','OPEN_RISKS_REVIEWED','DECISION_RECORDED'])assert(controller.includes(key),`Management review checklist must include ${key}.`);
+assert(reporting.includes('async function buildReport')&&reporting.includes('buildReport};'),'Management review must freeze the same protected governance report logic used by reporting.');
+assert(cert.includes("req.query.governance_review")&&cert.includes('recoveryManagementReviews.list(req,res)')&&cert.includes("req.body?.review_action")&&cert.includes('dispatchReviewAction'),'Management reviews must reuse the protected recovery certification surface.');
+assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DELETE FROM personal_money_')&&!controller.includes('INSERT INTO personal_money_')&&!controller.includes('UPDATE bank_transactions')&&!controller.includes('DELETE FROM bank_transactions'),'Management review workflow must never mutate source finance records.');
+for(const label of ['MANAGEMENT REVIEW & ATTESTATION CENTER','Generate this month’s review','Save review','Acknowledge','Final attestation','Carry-forward','Attestation boundary','cannot reconcile banking','change balances','execute restore or rollback','does not infer a root cause'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Management review UI must explain ${label}.`);
+assert(ui.includes("review_action:'GENERATE'")||ui.includes("mutate('GENERATE')"),'Management review UI must expose explicit generation.');
+assert(ui.includes("mutate('SAVE'")&&ui.includes("mutate('ACKNOWLEDGE'")&&ui.includes("mutate('ATTEST'"),'Management review UI must expose explicit governed review actions.');
+assert(loader.includes('/personal-finance-recovery-management-review-attestation.js?v=20260917-recovery-management-review'),'Governance reporting center must load management review attestation center.');
+console.log('Personal Finance Recovery Management Review & Attestation safeguards passed.');
