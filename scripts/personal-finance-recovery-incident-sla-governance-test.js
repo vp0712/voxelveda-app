@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinanceRecoveryIncidentCaseController.js','utf8');
+const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationController.js','utf8');
+const migration=fs.readFileSync('migrations/20260917_personal_finance_recovery_incident_sla_governance.sql','utf8');
+const ui=fs.readFileSync('public/personal-finance-recovery-incident-sla-governance.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-remediation-planner.js','utf8');
+
+for(const field of ['assignee_label','response_due_at','resolution_due_at','first_response_at','escalation_level','approval_checkpoint','evidence_checklist_json','governance_policy_version'])assert(migration.includes(field),`SLA governance migration must add ${field}.`);
+assert(controller.includes("CRITICAL:{response_hours:2,resolution_hours:24}")&&controller.includes("ACTION_SOON:{response_hours:24,resolution_hours:72}"),'Recovery SLA policy must define explicit response/resolution targets.');
+assert(controller.includes("escalation='L1'")&&controller.includes("escalation='L2'")&&controller.includes("escalation='L3'"),'Governance must calculate graduated escalation levels from overdue state.');
+for(const key of ['CURRENT_VERIFICATION','CANONICAL_BACKUP','CERTIFICATE_EVIDENCE','REMEDIATION_DECISION','RESOLUTION_VERIFICATION'])assert(controller.includes(key),`Governance evidence checklist must include ${key}.`);
+assert(controller.includes("approval_checkpoint||'NONE')!=='CLOSURE_READY'")&&controller.includes('CASE_EVIDENCE_INCOMPLETE'),'Closure must require evidence completion and CLOSURE_READY approval.');
+assert(controller.includes("'GOVERNANCE_UPDATED'")&&controller.includes("'ESCALATION_UPDATED'"),'Governance changes and escalation must be preserved in case history.');
+assert(cert.includes("if(action==='GOVERNANCE')return recoveryCases.updateGovernance(req,res)"),'Governance writes must reuse the step-up-protected recovery certification surface.');
+assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DELETE FROM personal_money_')&&!controller.includes('INSERT INTO personal_money_')&&!controller.includes('UPDATE bank_transactions')&&!controller.includes('DELETE FROM bank_transactions'),'SLA governance must never mutate source finance records.');
+for(const label of ['INCIDENT SLA, ESCALATION & GOVERNANCE CENTER','Response overdue','Resolution overdue','Assignee','Evidence','Approval','Governance boundary','cannot reconcile banking','change balances','execute restore','execute rollback'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Governance UI must explain ${label}.`);
+assert(ui.includes("case_action:'GOVERNANCE'")&&ui.includes('evidence_checklist')&&ui.includes('approval_checkpoint'),'Governance UI must expose only governed case metadata actions.');
+assert(loader.includes('/personal-finance-recovery-incident-sla-governance.js?v=20260917-recovery-sla-governance'),'Recovery planner must load SLA governance center.');
+console.log('Personal Finance Recovery Incident SLA, Escalation & Governance safeguards passed.');
