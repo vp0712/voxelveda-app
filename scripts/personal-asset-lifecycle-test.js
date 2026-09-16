@@ -1,0 +1,33 @@
+const fs = require('node:fs');
+const path = require('node:path');
+const assert = require('node:assert');
+
+const root = path.resolve(__dirname, '..');
+const read = (p) => fs.readFileSync(path.join(root,p),'utf8');
+const controller = read('controllers/personalAssetLifecycleController.js');
+const routes = read('routes/financeRoutes.js');
+const migration = read('migrations/20260916_asset_lifecycle_protection.sql');
+const ui = read('public/personal-asset-lifecycle.js');
+const html = read('public/finance-intelligence.html');
+
+assert(migration.includes('personal_asset_lifecycle_items'), 'Lifecycle table must exist.');
+assert(migration.includes('personal_asset_documents'), 'Document reference table must exist.');
+assert(migration.includes('user_id VARCHAR(191) NOT NULL'), 'Lifecycle records must be owner-keyed.');
+assert(controller.includes('WHERE id=? AND user_id=?'), 'Asset/liability ownership must be checked before linking.');
+assert(controller.includes("status<>'ARCHIVED'"), 'Archived lifecycle records must stay out of the active center.');
+assert(controller.includes('DATEDIFF(l.due_date,CURRENT_DATE)'), 'Due-soon alerts must be date-driven.');
+assert(controller.includes('nextDate(row.due_date,row.renewal_frequency)'), 'Completion may only advance an explicitly recurring schedule.');
+assert(controller.includes("/^https:\\/\\//i.test(url)"), 'Document references must require HTTPS.');
+assert(!controller.includes('finance_transactions'), 'Asset lifecycle actions must not create company finance transactions.');
+assert(!controller.includes('journal'), 'Asset lifecycle actions must not create company journals.');
+assert(!controller.includes('multer'), 'Asset lifecycle must not create a raw upload path while malware scanning is unresolved.');
+assert(!controller.includes('AUTO_PAY'), 'Lifecycle controls must not implement automatic payments.');
+assert(routes.includes("router.get('/personal-money/net-worth/lifecycle', requireAnyPermission('VIEW_BANKING')"), 'Lifecycle dashboard must require banking view permission.');
+assert(routes.includes("router.post('/personal-money/net-worth/lifecycle/items', requireAnyPermission('EDIT_FINANCE')"), 'Lifecycle writes must require finance edit permission.');
+assert(routes.includes("router.delete('/personal-money/net-worth/lifecycle/documents/:id', requireAnyPermission('EDIT_FINANCE')"), 'Document reference deletion must be protected.');
+assert(ui.includes("const API='/api/finance/personal-money/net-worth/lifecycle'"), 'Lifecycle UI must use the protected API.');
+assert(ui.includes('Nothing renews or pays automatically'), 'UI must explain no-auto-pay behavior.');
+assert(ui.includes('Raw uploads stay disabled until malware scanning is configured'), 'UI must explain why uploads are not enabled yet.');
+assert(ui.includes('Asset Protection'), 'Asset Protection must be visible in the mobile UI.');
+assert(html.includes('/personal-asset-lifecycle.js?v=20260916-asset-protection'), 'Finance Intelligence must load Asset Protection UI.');
+console.log('Personal Asset Protection & Lifecycle regression checks passed.');
