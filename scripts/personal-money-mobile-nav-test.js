@@ -4,6 +4,7 @@ const nav=fs.readFileSync('public/personal-money-mobile-nav.js','utf8');
 const brief=fs.readFileSync('public/personal-money-daily-briefing.js','utf8');
 const command=fs.readFileSync('public/personal-finance-command-center.js','utf8');
 const saved=fs.readFileSync('public/personal-finance-saved-views.js','utf8');
+const categories=fs.readFileSync('public/personal-spending-categories.js','utf8');
 const savedController=fs.readFileSync('controllers/personalFinanceSavedViewsController.js','utf8');
 const savedMigration=fs.readFileSync('migrations/20260916_personal_saved_views.sql','utf8');
 const controller=fs.readFileSync('controllers/personalMoneyDailyBriefingController.js','utf8');
@@ -61,4 +62,17 @@ assert(saved.includes('Cards refresh from current owner-private Personal Money d
 assert(saved.includes("method:'POST'")&&saved.includes("method:'DELETE'"),'Smart Views may write saved-view metadata only.');
 for(const prohibited of ['finance_transactions','createJournal','POST_TRANSACTION','UPDATE bank_','/payments'])assert(!saved.includes(prohibited),`Smart Views UI must not contain financial mutation path: ${prohibited}`);
 assert(saved.includes('totals(rows'),'Smart View summaries must keep totals grouped by currency.');
-console.log('Personal Money mobile navigation, Daily Briefing, Command Center and Saved Views regression checks passed.');
+
+assert(loader.includes('/personal-spending-categories.js?v=20260916-smart-categories'),'Protected Personal Money chain must load Smart Categories.');
+for(const endpoint of ['/api/finance/bank-accounts','/api/finance/intelligence/insights?scope=PERSONAL','/api/finance/intelligence/rules'])assert(categories.includes(endpoint),`Smart Categories must reuse protected endpoint ${endpoint}.`);
+assert(categories.includes("ownership_scope||'').toUpperCase()==='PERSONAL'"),'Smart Categories must include PERSONAL bank accounts only.');
+assert(categories.includes('is_internal_transfer'),'Smart Categories must exclude internal transfers.');
+assert(categories.includes("scope:'PERSONAL'"),'Suggestion refresh must analyse PERSONAL scope only.');
+assert(categories.includes("/api/finance/intelligence/analyse"),'Smart Categories may only create review-only suggestions through the existing intelligence analysis endpoint.');
+assert(!categories.includes('/insights/${')&&!categories.includes('/apply'),'Smart Categories must not silently apply category insights.');
+for(const prohibited of ['finance_transactions','createJournal','POST_TRANSACTION','UPDATE bank_','/payments','/reconcile'])assert(!categories.includes(prohibited),`Smart Categories must not contain money/accounting mutation path: ${prohibited}`);
+for(const label of ['Groceries','Eating Out','Fuel & Vehicle','Transport','Shopping','Software & Subscriptions','Phone & Internet','Insurance','Health','Housing & Utilities','Travel'])assert(categories.includes(label),`Smart Categories must support ${label}.`);
+assert(categories.includes('same days last month'),'Smart Categories must use a comparable partial-month explanation.');
+assert(categories.includes('Confirmed categories stay authoritative'),'Smart Categories must explain confirmed-vs-suggested precedence.');
+assert(categories.includes('currencies kept separate'),'Smart Categories must keep currencies separate.');
+console.log('Personal Money mobile navigation, Daily Briefing, Command Center, Saved Views and Smart Categories regression checks passed.');
