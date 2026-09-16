@@ -20,6 +20,7 @@ const personalAssetLifecycle = require('../controllers/personalAssetLifecycleCon
 const personalFinancialRoadmap = require('../controllers/personalFinancialRoadmapController');
 const personalFinancialDataQuality = require('../controllers/personalFinancialDataQualityController');
 const personalFinanceCanonicalBackup = require('../controllers/personalFinanceCanonicalBackupController');
+const personalFinanceCanonicalRestore = require('../controllers/personalFinanceCanonicalRestoreController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -52,6 +53,10 @@ router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL
 
 router.get('/personal-money', requireAnyPermission('VIEW_BANKING'), personalMoney.getDashboard);
 router.get('/personal-money/canonical-backup', requireAnyPermission('VIEW_BANKING'), requireStepUp('EXPORT_PERSONAL_FINANCE_BACKUP'), personalFinanceCanonicalBackup.getCanonicalBackup);
+router.get('/personal-money/canonical-restore/status', requireAnyPermission('VIEW_BANKING'), personalFinanceCanonicalRestore.status);
+router.post('/personal-money/canonical-restore/dry-run', requireAnyPermission('VIEW_BANKING'), requireStepUp('PREVIEW_PERSONAL_FINANCE_RESTORE'), personalFinanceCanonicalRestore.dryRun);
+router.post('/personal-money/canonical-restore/execute', requireAnyPermission('EDIT_FINANCE'), requireStepUp('RESTORE_PERSONAL_FINANCE'), personalFinanceCanonicalRestore.execute);
+router.post('/personal-money/canonical-restore/:id/rollback', requireAnyPermission('EDIT_FINANCE'), requireStepUp('ROLLBACK_PERSONAL_FINANCE_RESTORE'), personalFinanceCanonicalRestore.rollback);
 router.post('/personal-money/wallets', requireAnyPermission('EDIT_FINANCE'), personalMoney.createWallet);
 router.post('/personal-money/entries', requireAnyPermission('EDIT_FINANCE'), personalMoney.createEntry);
 router.post('/personal-money/debts', requireAnyPermission('EDIT_FINANCE'), personalMoney.createDebt);
