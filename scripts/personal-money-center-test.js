@@ -11,7 +11,7 @@ const migration = read('migrations/20260916_personal_money_center.sql');
 const controller = read('controllers/personalMoneyController.js');
 const routes = read('routes/financeRoutes.js');
 const client = read('public/personal-money-center.js');
-const loader = read('public/finance-banking-readiness.js');
+const html = read('public/finance-intelligence.html');
 
 for (const table of ['personal_money_wallets','personal_money_entries','personal_money_debts','personal_money_debt_payments','personal_money_budgets']) {
   assert.match(migration, new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`), `${table} schema is required.`);
@@ -30,6 +30,6 @@ assert.match(client, /Owner-private/, 'UI must visibly explain owner privacy.');
 assert.match(client, /Currencies stay separate/, 'UI must explain multi-currency separation.');
 assert.match(client, /Borrowed & lent/, 'Borrowed/lent workflow must be visible.');
 assert.match(client, /Budgets & forecast/, 'Budget and forecast workflow must be visible.');
-assert.match(loader, /personal-money-center\.js/, 'Finance Intelligence loader must load Personal Money Center.');
+assert.match(html, /\/personal-money-center\.js/, 'Finance Intelligence page must load Personal Money Center.');
 
 console.log('Personal Money Center regression tests passed.');
