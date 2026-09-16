@@ -18,3 +18,4 @@ assert(ui.includes('window.confirm')||ui.includes('confirm('),'Session revocatio
 for(const prohibited of ['/api/finance/transactions','/payments','/reconcile','/classify','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION'])assert(!ui.includes(prohibited),`Security Center must not contain finance mutation path: ${prohibited}`);
 assert(ui.includes('does not show company-admin security data')&&ui.includes('never edits transactions'),'Security Center must state personal/company and finance-mutation boundaries.');
 console.log('Personal Finance Security & Privacy Control Center regression checks passed.');
+require('./personal-finance-backup-recovery-data-portability-test');
