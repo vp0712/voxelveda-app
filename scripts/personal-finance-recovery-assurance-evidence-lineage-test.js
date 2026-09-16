@@ -1,0 +1,16 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-recovery-assurance-evidence-lineage.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-assurance-evidence-freshness.js','utf8');
+for(const endpoint of ['?control_testing=1','?capa=1','?governance_review=1','?cases=1'])assert(ui.includes(endpoint),`Evidence lineage must compose protected source ${endpoint}.`);
+for(const label of ['EVIDENCE LINEAGE & PROVENANCE CENTER','Restore run','recovery incident','CAPA','control test','evidence reference','reviewer','certificate','management review','Broken / missing links','read-only'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Lineage UI must explain ${label}.`);
+for(const state of ['TRACEABLE','BROKEN_OR_INCOMPLETE','NO_TEST_LINEAGE'])assert(ui.includes(state),`Lineage center must expose ${state}.`);
+for(const node of ['CONTROL_TEST','TEST_EVIDENCE','REVIEWER','CAPA','INCIDENT_CASE','RESTORE_RUN','RECOVERY_CERTIFICATE','MANAGEMENT_REVIEW'])assert(ui.includes(node),`Lineage must expose ${node}.`);
+assert(ui.includes("credentials:'same-origin'"),'Lineage reads must remain authenticated through existing owner-scoped endpoints.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Evidence lineage center must remain read-only.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Lineage center must not call finance mutation endpoints.');
+assert(ui.includes('identifier_matching_only:true')&&ui.includes('no_inferred_links:true')&&ui.includes('no_causation_inference:true')&&ui.includes('no_finance_mutation:true'),'Lineage model must explicitly prohibit inferred links, causation and finance mutation.');
+assert(ui.includes('restore_run_id')&&ui.includes('linked_certificate_id')&&ui.includes('linked_capa_ids')&&ui.includes('source_case_ids'),'Lineage must follow stored provenance identifiers.');
+assert(ui.includes('Missing links are reported; they are never inferred')&&ui.includes('does not prove causation'),'UI must explain provenance limitations.');
+assert(loader.includes('/personal-finance-recovery-assurance-evidence-lineage.js?v=20260917-recovery-assurance-evidence-lineage'),'Freshness center must load evidence lineage center.');
+console.log('Personal Finance Recovery Assurance Evidence Lineage & Provenance safeguards passed.');
