@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const {
   grantIsUnsafeGlobal,
+  isCertificateTrustError,
   verifyRuntimeDatabaseIdentity
 } = require('../services/databaseRuntimeService');
 
@@ -12,6 +13,10 @@ async function run() {
   assert.strictEqual(grantIsUnsafeGlobal("GRANT USAGE ON *.* TO `voxelveda_app`@`%`"), false);
   assert.strictEqual(grantIsUnsafeGlobal("GRANT SELECT ON *.* TO `voxelveda_app`@`%`"), true);
   assert.strictEqual(grantIsUnsafeGlobal("GRANT SELECT, INSERT ON `railway`.* TO `voxelveda_app`@`%`"), false);
+
+  assert.strictEqual(isCertificateTrustError({ code: 'SELF_SIGNED_CERT_IN_CHAIN' }), true);
+  assert.strictEqual(isCertificateTrustError({ code: 'ERR_TLS_CERT_ALTNAME_INVALID' }), true);
+  assert.strictEqual(isCertificateTrustError({ code: 'ECONNREFUSED' }), false);
 
   const safeDb = {
     async query(sql) {
@@ -49,6 +54,9 @@ async function run() {
   const state = fs.readFileSync(path.join(__dirname, '..', 'services', 'runtimeState.js'), 'utf8');
   const readiness = fs.readFileSync(path.join(__dirname, '..', 'public', 'production-readiness-assurance-center.js'), 'utf8');
   assert.match(service, /probeDatabaseTlsCapability/);
+  assert.match(service, /probeTlsOnce/);
+  assert.match(service, /DB_TLS_REJECT_UNAUTHORIZED/);
+  assert.match(service, /ENCRYPTION_ONLY/);
   assert.match(service, /SHOW SESSION STATUS LIKE 'Ssl_cipher'/);
   assert.match(service, /DB_TLS_REQUIRED: 'true'/);
   assert.match(service, /connection\.end\(\)/);
