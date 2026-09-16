@@ -13,7 +13,7 @@ assert(controller.includes('WHERE id=? AND user_id=?')&&controller.includes('WHE
 assert(controller.includes("row.status==='ATTESTED'")&&controller.includes('RECOVERY_REVIEW_IMMUTABLE'),'Final attestation must make a management review immutable.');
 assert(controller.includes("status='ACKNOWLEDGED'")||controller.includes("status='ATTESTED'")||controller.includes("status='DRAFT'"),'Management review must use a governed lifecycle.');
 assert(controller.includes('previous_review_sha256')&&controller.includes('review_sha256')&&controller.includes('hashCore'),'Management reviews must be SHA-256 integrity protected and chained.');
-assert(controller.includes('RECOVERY_REVIEW_CARRY_FORWARD_REQUIRED')&&controller.includes('snapshot?.summary?.open'),'Open incidents must require carry-forward evidence before attestation.');
+assert(controller.includes('RECOVERY_REVIEW_CARRY_FORWARD_REQUIRED')&&controller.includes('summary?.open')&&controller.includes('!carryItems.length'),'Open incidents must require carry-forward evidence before attestation.');
 for(const key of ['REPORT_REVIEWED','SLA_REVIEWED','RECURRENCE_REVIEWED','OPEN_RISKS_REVIEWED','DECISION_RECORDED'])assert(controller.includes(key),`Management review checklist must include ${key}.`);
 assert(reporting.includes('async function buildReport')&&reporting.includes('buildReport};'),'Management review must freeze the same protected governance report logic used by reporting.');
 assert(cert.includes("req.query.governance_review")&&cert.includes('recoveryManagementReviews.list(req,res)')&&cert.includes("req.body?.review_action")&&cert.includes('dispatchReviewAction'),'Management reviews must reuse the protected recovery certification surface.');
