@@ -27,9 +27,11 @@ assert(migration.includes('rollback_expires_at')&&migration.includes('rolled_bac
 assert(migration.includes('approval_token_sha256')&&migration.includes('action_plan_sha256'),'Dry-run approval must bind token and exact action plan server-side.');
 assert(!controller.includes('TRUNCATE TABLE')&&!controller.includes('DROP TABLE'),'Restore executor must not truncate or drop finance tables.');
 assert(!controller.includes("ownership_scope='BUSINESS'")&&!controller.includes("ownership_scope='MIXED'"),'Restore executor must never target BUSINESS or MIXED finance scope.');
-for(const text of ['Load canonical backup','Run server dry-run','Execute approved restore','High-risk recovery control','30-day pre-change checkpoint','ADD inserts missing records only','REPLACE updates matching backup IDs'])assert(ui.includes(text),`Restore UI must explain ${text}.`);
-assert(ui.includes("fetch(`${API}${path}`")&&ui.includes("credentials:'same-origin'"),'Restore UI must use authenticated same-origin APIs.');
+for(const text of ['Load canonical backup','Run server dry-run','Execute approved restore','High-risk recovery control','Add missing only','Replace matching + add missing'])assert(ui.includes(text),`Restore UI must explain ${text}.`);
+assert(ui.includes('rollback_checkpoint_days')&&ui.includes('rollback checkpoint available'),'Restore UI must surface rollback retention from the server policy rather than hard-code an old sentence.');
+assert(ui.includes("fetch(url")&&ui.includes("credentials:'same-origin'"),'Restore UI must use authenticated same-origin APIs.');
 assert(ui.includes("window.prompt('Type exactly: ROLL BACK PERSONAL FINANCE')"),'Rollback UI must demand an explicit phrase.');
 assert(canonicalUi.includes('/personal-finance-transaction-safe-restore-executor.js?v=20260916-restore-executor'),'Canonical backup engine must load the restore executor UI.');
 assert(routes.includes("router.post('/accounting-periods/:id/status', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), operations.updateAccountingPeriod);"),'Restore work must preserve unrelated accounting period behavior.');
+require('./personal-finance-streaming-restore-transport-test');
 console.log('Personal Finance Transaction-Safe Restore Executor regression checks passed.');
