@@ -13,6 +13,7 @@ const personalMoneySmart = require('../controllers/personalMoneySmartController'
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
 const personalMoneyDailyBriefing = require('../controllers/personalMoneyDailyBriefingController');
+const personalFinanceSavedViews = require('../controllers/personalFinanceSavedViewsController');
 const personalNetWorth = require('../controllers/personalNetWorthController');
 const personalAssetLifecycle = require('../controllers/personalAssetLifecycleController');
 const personalFinancialRoadmap = require('../controllers/personalFinancialRoadmapController');
@@ -65,6 +66,11 @@ router.post('/personal-money/review-inbox/:recurringId/:transactionId/confirm', 
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/dismiss', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.dismissMatch);
 router.get('/personal-money/health', requireAnyPermission('VIEW_BANKING'), personalMoneyHealth.getHealthDashboard);
 router.get('/personal-money/daily-briefing', requireAnyPermission('VIEW_BANKING'), personalMoneyDailyBriefing.getDailyBriefing);
+router.get('/personal-money/saved-views', requireAnyPermission('VIEW_BANKING'), personalFinanceSavedViews.list);
+router.post('/personal-money/saved-views', requireAnyPermission('EDIT_FINANCE'), personalFinanceSavedViews.create);
+router.post('/personal-money/saved-views/:id', requireAnyPermission('EDIT_FINANCE'), personalFinanceSavedViews.update);
+router.post('/personal-money/saved-views/:id/opened', requireAnyPermission('VIEW_BANKING'), personalFinanceSavedViews.opened);
+router.delete('/personal-money/saved-views/:id', requireAnyPermission('EDIT_FINANCE'), personalFinanceSavedViews.remove);
 router.get('/personal-money/net-worth', requireAnyPermission('VIEW_BANKING'), personalNetWorth.getDashboard);
 router.post('/personal-money/net-worth/assets', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.createAsset);
 router.post('/personal-money/net-worth/assets/:id/value', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.updateAssetValue);
