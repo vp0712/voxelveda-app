@@ -24,4 +24,5 @@ for(const label of ['RECOVERY CERTIFICATION & EVIDENCE PACK','Generate recovery 
 assert(ui.includes("req('/status'")&&ui.includes('/verification')&&ui.includes('Check & select'),'Certification must independently rediscover successful restores after page reload.');
 assert(canonicalUi.includes('/personal-finance-recovery-certification.js?v=20260916-recovery-certification'),'Canonical recovery UI must load the certification center.');
 assert(!ui.includes('backup_password')&&!ui.includes('approval_token'),'Recovery certificate UI must not handle backup passwords or restore approval tokens.');
+require('./personal-finance-recovery-integrity-watch-test');
 console.log('Personal Finance Recovery Certification & Evidence Pack safeguards passed.');

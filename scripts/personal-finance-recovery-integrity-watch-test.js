@@ -1,0 +1,22 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinanceRecoveryIntegrityWatchController.js','utf8');
+const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationController.js','utf8');
+const ui=fs.readFileSync('public/personal-finance-recovery-integrity-watch.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-canonical-backup-engine.js','utf8');
+
+assert(controller.includes('const MAX_RUNS=5')&&controller.includes('Math.min(MAX_RUNS'),'Recovery watch must stay hard-capped to a small recent-run set.');
+assert(controller.includes("WHERE user_id=? AND status IN ('SUCCEEDED','ROLLED_BACK')"),'Recovery watch must remain owner-scoped.');
+assert(controller.includes('verification.verifyRun(userId,run.id)'),'Recovery watch must re-run current owner-only restore verification.');
+assert(controller.includes('certificateComputed')&&controller.includes('previous_certificate_sha256')&&controller.includes('CERTIFICATE_CHAIN_INTEGRITY'),'Recovery watch must independently verify the stored SHA-256 certificate chain.');
+for(const label of ['RESTORE_DRIFT','STATUS_CHANGED_SINCE_CERTIFICATE','ROLLBACK_EXPIRING','CERTIFICATE_MISSING','VERIFICATION_REVIEW'])assert(controller.includes(label),`Recovery watch must surface ${label}.`);
+assert(controller.includes("continuous_mode:'Refreshes current owner-only recovery integrity when requested. The browser UI rechecks every 5 minutes only while the page is visible.'"),'Recovery watch must describe its actual non-background refresh model.');
+assert(controller.includes("read_only:true")&&controller.includes('finance_mutations:false')&&controller.includes('automatic_repairs:false')&&controller.includes('automatic_money_movement:false'),'Recovery watch must remain explicitly read-only.');
+assert(controller.includes("company_finance_included:false")&&controller.includes('Currencies remain separate'),'Recovery watch must remain PERSONAL-only and currency-separated.');
+assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DELETE FROM personal_money_')&&!controller.includes('INSERT INTO personal_money_'),'Recovery watch must not mutate Personal Money source tables.');
+assert(cert.includes("req.query.watch")&&cert.includes('recoveryWatch.get(req,res)'),'Existing VIEW_BANKING certificate-list surface must expose the read-only watch without adding a mutation route.');
+for(const label of ['RECOVERY MONITORING & CONTINUOUS INTEGRITY WATCH','Critical','Action soon','Healthy','5 minutes','does not restore','does not reconcile'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Recovery watch UI must explain ${label}.`);
+assert(ui.includes("document.visibilityState==='visible'")&&ui.includes('300000'),'Automatic watch refresh must run at five-minute intervals only while the page is visible.');
+assert(!ui.includes("method:'POST'")&&!ui.includes("method:'PUT'")&&!ui.includes("method:'PATCH'")&&!ui.includes("method:'DELETE'"),'Recovery monitoring UI must use read-only requests only.');
+assert(loader.includes('/personal-finance-recovery-integrity-watch.js?v=20260916-recovery-integrity-watch'),'Canonical recovery shell must load the integrity watch.');
+console.log('Personal Finance Recovery Monitoring & Continuous Integrity Watch safeguards passed.');
