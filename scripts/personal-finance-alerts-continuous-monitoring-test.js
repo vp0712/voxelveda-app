@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-alerts-continuous-monitoring.js','utf8');
+const audit=fs.readFileSync('public/personal-finance-audit-trail-change-history.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
+
+assert(audit.includes('/personal-finance-alerts-continuous-monitoring.js?v=20260916-alerts-monitoring'),'Audit Trail must load Personal Finance Alerts & Continuous Monitoring Center.');
+for(const endpoint of ['/api/finance/personal-money/attention','/api/finance/personal-money/data-quality-integrity','/api/finance/personal-money/net-worth/lifecycle','/api/finance/personal-money/review-inbox','/api/finance/personal-money/health?fy_start='])assert(ui.includes(endpoint),`Monitoring Center must use protected PERSONAL source: ${endpoint}`);
+assert(ui.includes("credentials:'same-origin'"),'Monitoring Center must preserve authenticated same-origin credentials.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Monitoring Center must remain API read-only.');
+for(const route of ["router.get('/personal-money/attention', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/data-quality-integrity', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/review-inbox', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/health', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/net-worth/lifecycle', requireAnyPermission('VIEW_BANKING')"])assert(routes.includes(route),`Monitoring source must remain VIEW_BANKING protected: ${route}`);
+for(const label of ['PERSONAL FINANCE ALERTS & CONTINUOUS MONITORING CENTER','Critical','Action soon','Informational','Prioritised monitoring inbox','Snooze 24h','Acknowledge','Open source','Page-open'])assert(ui.includes(label),`Monitoring Center must expose ${label}.`);
+assert(ui.includes('setInterval')&&ui.includes('300000')&&ui.includes('document.hidden'),'Monitoring Center must refresh at a bounded five-minute cadence only while the page is visible.');
+assert(ui.includes('voxelveda.personal-finance-monitor-alert-state.v1')&&ui.includes('localStorage'),'Acknowledge/snooze state must remain local inbox state, not financial mutation.');
+assert(ui.includes('voxelveda.personal-tax-review.v1'),'Monitoring Center may read local tax-review readiness without changing tax classifications.');
+assert(ui.includes('window.__pfaac?.proposals'),'Monitoring Center must surface current approval proposals without approving them.');
+assert(ui.includes("priorityRank={CRITICAL:0,ACTION_SOON:1,INFORMATIONAL:2}"),'Monitoring priorities must have deterministic ordering.');
+assert(ui.includes('never pay a bill')&&ui.includes('move money')&&ui.includes('Source modules remain the system of record'),'Monitoring UI must explain its non-mutating role.');
+for(const prohibited of ['/payments','/reconcile','/ignore','/classify','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','method:\'POST\'','method:"POST"'])assert(!ui.includes(prohibited),`Monitoring Center must not contain financial mutation path: ${prohibited}`);
+console.log('Personal Finance Alerts & Continuous Monitoring Center regression checks passed.');
