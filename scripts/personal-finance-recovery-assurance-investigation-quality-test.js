@@ -1,0 +1,18 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-recovery-assurance-investigation-quality.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-assurance-exception-investigation.js','utf8');
+for(const label of ['INVESTIGATION QUALITY, RECURRENCE & LESSONS-LEARNED CENTER','Response SLA','Resolution SLA','Review coverage','Quality gates complete','Lessons-learned candidates','Transparent quality gates'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Quality UI must explain ${label}.`);
+for(const gate of ['Owner assigned','First response recorded','Evidence preserved','Deterministic verification recorded','Independent review completed','Closure evidence complete'])assert(ui.includes(gate),`Quality model must expose ${gate}.`);
+assert(ui.includes("?evidence_investigations=1")&&ui.includes("credentials:'same-origin'"),'Quality analytics must use the existing protected owner-scoped investigation endpoint.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Investigation quality analytics must remain read-only.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Quality analytics must not call finance mutation endpoints.');
+assert(ui.includes('hidden_score:false'),'Quality analytics must explicitly avoid a hidden score.');
+assert(ui.includes('root_cause_inference:false'),'Quality analytics must explicitly avoid root-cause inference.');
+assert(ui.includes("x.cause_conclusion==='EVIDENCE_SUPPORTED_CONTRIBUTOR'"),'Quality analytics may count only already-recorded evidence-supported contributor findings.');
+assert(ui.includes('repeat_discrepancy_count')&&ui.includes('escalation_level'),'Quality analytics must surface recorded recurrence and escalation evidence.');
+assert(ui.includes('management_attention')&&ui.includes('L3 escalation')&&ui.includes('Three or more observed repeats'),'Management-review signals must be transparent and deterministic.');
+assert(ui.includes('No investigation or finance record was changed'),'UI must state the read-only boundary.');
+assert(ui.includes('They do not prove cause')||ui.includes('do not prove cause'),'Lessons-learned candidates must not be presented as causal proof.');
+assert(loader.includes('/personal-finance-recovery-assurance-investigation-quality.js?v=20260917-recovery-assurance-investigation-quality'),'Investigation center must load the quality analytics center.');
+console.log('Personal Finance Recovery Assurance Investigation Quality, Recurrence & Lessons-Learned safeguards passed.');

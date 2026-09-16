@@ -20,3 +20,4 @@ assert(ui.includes("evidence_investigation_action:'CAUSE'")&&ui.includes("eviden
 assert(ui.includes('does not infer or declare a root cause')||ui.includes('does not infer root cause'),'UI must explain the non-causal evidence boundary.');
 assert(!controller.includes('UPDATE personal_finance_recovery_certificates SET')&&!controller.includes('UPDATE personal_finance_restore_runs SET')&&!controller.includes('UPDATE bank_transactions'),'SLA/evidence governance must not mutate source recovery or finance evidence.');
 console.log('Personal Finance Recovery Assurance Investigation SLA, Escalation & Evidence-Based Cause safeguards passed.');
+require('./personal-finance-recovery-assurance-investigation-quality-test');
