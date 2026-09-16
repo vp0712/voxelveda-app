@@ -17,4 +17,6 @@ assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/rec
 assert(ui.includes('automatic_application:false')&&ui.includes('causation_proven:false'),'Library must not auto-apply guidance or claim causation.');
 assert(ui.includes('No lesson, control, CAPA, investigation or finance record was changed'),'UI must state the read-only boundary.');
 assert(loader.includes('/personal-finance-recovery-assurance-knowledge-library.js?v=20260917-recovery-assurance-knowledge-library'),'Effectiveness center must load the knowledge library.');
+assert(ui.includes('/personal-finance-recovery-assurance-knowledge-gap.js?v=20260917-recovery-assurance-knowledge-gap'),'Knowledge Library must load the Knowledge Gap, Coverage & Recommendation Center.');
 console.log('Personal Finance Recovery Assurance Knowledge Library, Search & Applicability safeguards passed.');
+require('./personal-finance-recovery-assurance-knowledge-gap-test.js');
