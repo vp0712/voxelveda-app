@@ -8,6 +8,7 @@ const controller = read('controllers/personalAssetLifecycleController.js');
 const routes = read('routes/financeRoutes.js');
 const migration = read('migrations/20260916_asset_lifecycle_protection.sql');
 const ui = read('public/personal-asset-lifecycle.js');
+const planning = read('public/personal-wealth-planning.js');
 const html = read('public/finance-intelligence.html');
 
 assert(migration.includes('personal_asset_lifecycle_items'), 'Lifecycle table must exist.');
@@ -30,4 +31,19 @@ assert(ui.includes('Nothing renews or pays automatically'), 'UI must explain no-
 assert(ui.includes('Raw uploads stay disabled until malware scanning is configured'), 'UI must explain why uploads are not enabled yet.');
 assert(ui.includes('Asset Protection'), 'Asset Protection must be visible in the mobile UI.');
 assert(html.includes('/personal-asset-lifecycle.js?v=20260916-asset-protection'), 'Finance Intelligence must load Asset Protection UI.');
-console.log('Personal Asset Protection & Lifecycle regression checks passed.');
+
+assert(ui.includes('/personal-wealth-planning.js?v=20260916-wealth-planning'), 'Asset Protection must load the Wealth Planning UI.');
+assert(planning.includes("health:'/api/finance/personal-money/health'"), 'Wealth Planning must reuse the protected Personal Financial Health endpoint.');
+assert(planning.includes("netWorth:'/api/finance/personal-money/net-worth'"), 'Wealth Planning must reuse the owner-private Net Worth endpoint.');
+assert(planning.includes("attention:'/api/finance/personal-money/attention'"), 'Wealth Planning must reuse the protected goals endpoint.');
+assert(planning.includes('GOAL') && planning.includes('LOAN') && planning.includes('GROWTH') && planning.includes('SUPER') && planning.includes('EMERGENCY'), 'All five planning scenarios must remain available.');
+assert(planning.includes('repayment is too low to reduce the loan'), 'Loan calculator must reject non-amortising repayment assumptions.');
+assert(planning.includes('The return is an entered assumption, not a forecast or guaranteed rate.'), 'Growth scenarios must clearly label assumed returns.');
+assert(planning.includes('Currencies are') === false, 'Wealth Planning must not imply currencies are converted or combined.');
+assert(planning.includes('No financial record was changed.'), 'Scenario results must explicitly state that records were not changed.');
+assert(!planning.includes("method:'POST'"), 'Wealth Planning scenarios must remain stateless and must not POST hypothetical values.');
+assert(!planning.includes('localStorage'), 'Hypothetical scenario values must not be persisted in browser storage.');
+assert(!planning.includes('sessionStorage'), 'Hypothetical scenario values must not be persisted in session storage.');
+assert(!planning.includes('finance_transactions'), 'Wealth Planning must not create company finance transactions.');
+assert(!planning.includes('journal'), 'Wealth Planning must not create company journals.');
+console.log('Personal Asset Protection, Lifecycle & Wealth Planning regression checks passed.');

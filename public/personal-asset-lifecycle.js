@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-wealth-planning]')){const p=document.createElement('script');p.src='/personal-wealth-planning.js?v=20260916-wealth-planning';p.dataset.wealthPlanning='1';document.head.appendChild(p);}
   const API='/api/finance/personal-money/net-worth/lifecycle';
   const $=(id)=>document.getElementById(id);
   let data=null;
