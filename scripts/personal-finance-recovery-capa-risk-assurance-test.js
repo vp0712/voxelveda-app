@@ -18,3 +18,4 @@ for(const label of ['RISK-BASED PRIORITISATION & CONTROL ASSURANCE','Priority 1'
 assert(ui.includes("credentials:'same-origin'")&&!ui.includes("method:'POST'")&&!ui.includes("method:'PUT'")&&!ui.includes("method:'PATCH'")&&!ui.includes("method:'DELETE'"),'Risk assurance UI must remain read-only.');
 assert(loader.includes('/personal-finance-recovery-capa-risk-assurance.js?v=20260917-recovery-capa-risk-assurance'),'CAPA effectiveness analytics must load risk assurance center.');
 console.log('Personal Finance Recovery CAPA Risk Prioritisation & Control Assurance safeguards passed.');
+require('./personal-finance-recovery-control-testing-assurance-test');
