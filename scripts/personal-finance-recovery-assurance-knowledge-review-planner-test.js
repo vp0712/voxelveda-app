@@ -27,3 +27,4 @@ assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/rec
 assert(ui.includes('does not edit lesson content')&&ui.includes('automatically revalidate knowledge')&&ui.includes('create CAPA'),'UI must state the governed mutation boundary.');
 assert(loader.includes('/personal-finance-recovery-assurance-knowledge-review-planner.js?v=20260917-recovery-assurance-knowledge-review-planner'),'Knowledge Library must load the Review, Ownership & Revalidation Planner.');
 console.log('Personal Finance Recovery Assurance Knowledge Review, Ownership & Revalidation Planner safeguards passed.');
+require('./personal-finance-recovery-assurance-knowledge-disposition-test.js');
