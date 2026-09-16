@@ -8,6 +8,7 @@ const reconciliationCenter = require('../controllers/financeReconciliationCenter
 const bankingReadiness = require('../controllers/financeBankingReadinessController');
 const openBanking = require('../controllers/openBankingController');
 const personalMoney = require('../controllers/personalMoneyController');
+const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -44,6 +45,11 @@ router.post('/personal-money/entries', requireAnyPermission('EDIT_FINANCE'), per
 router.post('/personal-money/debts', requireAnyPermission('EDIT_FINANCE'), personalMoney.createDebt);
 router.post('/personal-money/debts/:id/payments', requireAnyPermission('EDIT_FINANCE'), personalMoney.recordDebtPayment);
 router.post('/personal-money/budgets', requireAnyPermission('EDIT_FINANCE'), personalMoney.saveBudget);
+router.get('/personal-money/attention', requireAnyPermission('VIEW_BANKING'), personalMoneyAttention.getAttentionCenter);
+router.post('/personal-money/recurring', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.createRecurring);
+router.post('/personal-money/recurring/:id/complete', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.completeRecurring);
+router.post('/personal-money/goals', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.createGoal);
+router.post('/personal-money/goals/:id/contributions', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.addGoalContribution);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
