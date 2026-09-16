@@ -14,6 +14,7 @@ const personalMoneyReview = require('../controllers/personalMoneyReviewControlle
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
 const personalMoneyDailyBriefing = require('../controllers/personalMoneyDailyBriefingController');
 const personalFinanceSavedViews = require('../controllers/personalFinanceSavedViewsController');
+const personalSpendingChallenges = require('../controllers/personalSpendingChallengeController');
 const personalNetWorth = require('../controllers/personalNetWorthController');
 const personalAssetLifecycle = require('../controllers/personalAssetLifecycleController');
 const personalFinancialRoadmap = require('../controllers/personalFinancialRoadmapController');
@@ -71,6 +72,10 @@ router.post('/personal-money/saved-views', requireAnyPermission('EDIT_FINANCE'),
 router.post('/personal-money/saved-views/:id', requireAnyPermission('EDIT_FINANCE'), personalFinanceSavedViews.update);
 router.post('/personal-money/saved-views/:id/opened', requireAnyPermission('VIEW_BANKING'), personalFinanceSavedViews.opened);
 router.delete('/personal-money/saved-views/:id', requireAnyPermission('EDIT_FINANCE'), personalFinanceSavedViews.remove);
+router.get('/personal-money/spending-challenges', requireAnyPermission('VIEW_BANKING'), personalSpendingChallenges.list);
+router.get('/personal-money/spending-challenges/progress', requireAnyPermission('VIEW_BANKING'), personalSpendingChallenges.progressData);
+router.post('/personal-money/spending-challenges', requireAnyPermission('EDIT_FINANCE'), personalSpendingChallenges.create);
+router.post('/personal-money/spending-challenges/:id/status', requireAnyPermission('EDIT_FINANCE'), personalSpendingChallenges.updateStatus);
 router.get('/personal-money/net-worth', requireAnyPermission('VIEW_BANKING'), personalNetWorth.getDashboard);
 router.post('/personal-money/net-worth/assets', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.createAsset);
 router.post('/personal-money/net-worth/assets/:id/value', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.updateAssetValue);
