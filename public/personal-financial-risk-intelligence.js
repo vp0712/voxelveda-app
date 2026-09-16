@@ -1,5 +1,6 @@
 (() => {
   if(!document.querySelector('script[data-personal-insurance-protection-register]')){const s=document.createElement('script');s.src='/personal-insurance-protection-register.js?v=20260916-insurance-register';s.dataset.personalInsuranceProtectionRegister='1';document.head.appendChild(s);}
+  if(!document.querySelector('script[data-personal-tax-financial-year-intelligence]')){const s=document.createElement('script');s.src='/personal-tax-financial-year-intelligence.js?v=20260916-tax-financial-year';s.dataset.personalTaxFinancialYearIntelligence='1';document.head.appendChild(s);}
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','\"':'&quot;'}[c]));
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};
   async function get(url){const r=await fetch(url,{credentials:'same-origin'});let p={};try{p=await r.json();}catch{}if(!r.ok)throw new Error(p.message||`Request failed (${r.status})`);return p;}
