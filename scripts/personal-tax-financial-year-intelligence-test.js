@@ -1,0 +1,25 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-tax-financial-year-intelligence.js','utf8');
+const health=fs.readFileSync('controllers/personalMoneyHealthController.js','utf8');
+const risk=fs.readFileSync('public/personal-financial-risk-intelligence.js','utf8');
+
+assert(risk.includes('/personal-tax-financial-year-intelligence.js?v=20260916-tax-financial-year'),'Financial Risk layer must load Personal Tax & Financial-Year Intelligence.');
+assert(ui.includes('/api/finance/personal-money/health?fy_start='),'Tax Intelligence must reuse the protected Personal Financial Health endpoint.');
+assert(ui.includes("credentials:'same-origin'"),'Tax Intelligence must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Tax Intelligence must not mutate finance APIs.');
+assert(ui.includes('localStorage')&&ui.includes('local-only'),'Tax review classifications must remain local organisational state in this release.');
+for(const label of ['PERSONAL TAX & FINANCIAL-YEAR INTELLIGENCE','Recorded income entries','Recorded expense entries','Your review candidates','Evidence readiness','Spending review queue','Category breakdown','Monthly financial-year view','Export review CSV'])assert(ui.includes(label),`Tax Intelligence must explain ${label}.`);
+for(const state of ['UNREVIEWED','CANDIDATE','NOT_CLAIMING','ASK_ACCOUNTANT','HAS_EVIDENCE','MISSING_EVIDENCE'])assert(ui.includes(state),`Tax Intelligence must support review state ${state}.`);
+assert(ui.includes('not tax advice')||ui.includes('not automatically taxable income'),'Tax Intelligence must not present recorded cash flow as tax advice.');
+assert(ui.includes('no ATO exchange rate')||ui.includes('No ATO exchange rate'),'Tax Intelligence must disclose that no tax FX rate is assumed.');
+assert(ui.includes('All currencies (shown separately)'),'Tax Intelligence must keep currencies separate.');
+assert(health.includes('tax_readiness: buildTaxReadiness(taxRows, fyYear)'),'Personal Financial Health must return dedicated full-year tax readiness data.');
+assert(health.includes("`${fyYear}-07-01`")&&health.includes("`${fyYear + 1}-07-01`"),'Tax readiness must use the complete July-to-June financial-year window.');
+assert(health.includes("e.user_id=? AND e.occurred_at>=? AND e.occurred_at<?"),'Tax readiness query must be owner-scoped and date-bounded.');
+assert(health.includes("['EXPENSE', 'CASH_OUT'].includes(row.entry_type)"),'Tax review queue must include personal expense and cash-out records for review.');
+assert(health.includes('Recorded INCOME entries are not automatically taxable income.'),'Backend must disclose that income records are not automatic taxable income.');
+assert(health.includes('category names do not create a deduction'),'Backend must not infer deductibility from transaction categories.');
+assert(health.includes('Company finance transactions are not included.'),'Tax readiness must remain separate from company accounting.');
+for(const prohibited of ['tax_payable','tax_liability','tax_rate','journal_entries','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION'])assert(!ui.includes(prohibited),`Tax UI must not contain unsupported tax/accounting action: ${prohibited}`);
+console.log('Personal Tax & Financial-Year Intelligence regression checks passed.');
