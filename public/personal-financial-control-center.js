@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-personal-financial-data-quality-integrity]')){const s=document.createElement('script');s.src='/personal-financial-data-quality-integrity.js?v=20260916-data-quality-integrity';s.dataset.personalFinancialDataQualityIntegrity='1';document.head.appendChild(s);}
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const TAX_KEY='voxelveda.personal-tax-review.v1',Q_KEY='voxelveda.personal-year-end-accountant-questions.v1';
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};
