@@ -1,0 +1,16 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-recovery-assurance-executive-command.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-assurance-calendar-planning.js','utf8');
+for(const endpoint of ['?capa_risk_assurance=1&months=12','?control_testing=1','?control_scheduling=1','?capa=1','?governance_review=1'])assert(ui.includes(endpoint),`Executive command center must compose protected source ${endpoint}.`);
+for(const label of ['EXECUTIVE COMMAND CENTER & CONTROL COVERAGE MAP','current position','Latest test','Next retest','Open CAPA','Evidence overdue','Evidence coverage','Latest attested review','Next 30-day work','No hidden score','read-only'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Executive command UI must explain ${label}.`);
+for(const category of ['RESTORE_FIDELITY','DEPENDENCY_INTEGRITY','CERTIFICATE_INTEGRITY','ROLLBACK_PROTECTION','VERIFICATION_INITIALIZATION','OTHER_EVIDENCE_CONDITION'])assert(ui.includes(category),`Coverage map must include ${category}.`);
+assert(ui.includes("credentials:'same-origin'"),'Executive command reads must remain authenticated and owner-scoped through protected endpoints.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Executive command center must remain read-only.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Executive command center must not call finance mutation endpoints.');
+assert(ui.includes('opaque_score:false')&&ui.includes('no_hidden_score:true'),'Executive command model must explicitly prohibit opaque scoring.');
+assert(ui.includes('no_causation_inference:true'),'Executive command center must explicitly prohibit causation inference.');
+assert(ui.includes("['formal test',true]")&&ui.includes("['execution evidence'")&&ui.includes("['reviewer'")&&ui.includes("['future retest'")&&ui.includes("['attested review'"),'Evidence coverage must be a visible gate checklist.');
+assert(ui.includes('Evidence coverage is a checklist of visible governance gates, not a safety score or guarantee.'),'UI must state the evidence-coverage boundary.');
+assert(loader.includes('/personal-finance-recovery-assurance-executive-command.js?v=20260917-recovery-assurance-executive-command'),'Forward planning center must load the executive command center.');
+console.log('Personal Finance Recovery Assurance Executive Command Center safeguards passed.');
