@@ -1,0 +1,17 @@
+const fs=require('fs');
+const assert=require('assert');
+const home=fs.readFileSync('public/personal-money-home.js','utf8');
+const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
+assert(loader.includes('/personal-money-home.js?v=20260916-unified-home'),'Unified Personal Money Home must load from the protected personal-money module chain.');
+for(const endpoint of ['/api/finance/personal-money/smart','/api/finance/personal-money/attention','/api/finance/personal-money/health','/api/finance/personal-money/net-worth','/api/finance/personal-money/roadmaps'])assert(home.includes(endpoint),`Home must read ${endpoint}.`);
+assert(home.includes("credentials:'same-origin'"),'Home API reads must keep authenticated same-origin credentials.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(home),'Unified Home must remain read-only.');
+assert(!/exchange[_ -]?rate|convertCurrency|fxRate/i.test(home),'Unified Home must not invent or apply currency conversion.');
+assert(home.includes('Different currencies stay separate'),'Home must explain currency separation.');
+assert(home.includes('safe_to_spend_by_currency'),'Home must present Safe to Spend per currency.');
+assert(home.includes('totals_by_currency'),'Home must present Net Worth per currency.');
+assert(home.includes('cashflow_calendar'),'Home must show upcoming cash-flow commitments.');
+assert(home.includes('Roadmap actions this month'),'Home must surface roadmap actions.');
+for(const id of ['personalMoneyPanel','moneyAttentionPanel','smartMoneyPanel','reviewInboxPanel','financialHealthPanel','personalNetWorthPanel','assetLifecyclePanel','wealthPlanningPanel','roadmapPanel','roadmapIntelligencePanel'])assert(home.includes(id),`Home must provide a route to ${id}.`);
+for(const prohibited of ['INSERT INTO','UPDATE finance_','finance_transactions','createJournal','POST_TRANSACTION'])assert(!home.includes(prohibited),`Home must not contain accounting mutation path: ${prohibited}`);
+console.log('Unified Personal Money Home regression checks passed.');
