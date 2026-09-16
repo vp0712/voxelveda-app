@@ -1,0 +1,24 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-financial-document-evidence-vault.js','utf8');
+const lifecycle=fs.readFileSync('controllers/personalAssetLifecycleController.js','utf8');
+const tax=fs.readFileSync('public/personal-tax-financial-year-intelligence.js','utf8');
+
+assert(tax.includes('/personal-financial-document-evidence-vault.js?v=20260916-document-evidence-vault'),'Tax Intelligence must load the Personal Financial Document & Evidence Vault.');
+assert(ui.includes('/api/finance/personal-money/net-worth/lifecycle'),'Vault must reuse the owner-private lifecycle document store.');
+assert(ui.includes('/api/finance/personal-money/health?fy_start='),'Vault must reuse full financial-year PERSONAL tax readiness data.');
+assert(ui.includes("credentials:'same-origin'"),'Vault requests must preserve authenticated same-origin credentials.');
+for(const label of ['PERSONAL FINANCIAL DOCUMENT & EVIDENCE VAULT','Evidence still missing','Possible duplicates','Tax evidence coverage','Duplicate review','Retention review date'])assert(ui.includes(label),`Vault must explain ${label}.`);
+for(const type of ['RECEIPT','STATEMENT','TAX_EVIDENCE','INSURANCE','ASSET','DEBT','REGISTRATION','WARRANTY','VALUATION','TITLE'])assert(ui.includes(type),`Vault must support ${type}.`);
+assert(ui.includes('VAULT_META:'),'Vault must keep structured evidence linkage metadata in the existing private document record.');
+assert(ui.includes('entry_id')&&ui.includes('asset_id')&&ui.includes('liability_id'),'Vault must support transaction, asset and liability linkage.');
+assert(ui.includes('fingerprint')&&ui.includes('possible duplicate'),'Vault must detect possible duplicates before save.');
+assert(ui.includes('retention_until')&&ui.includes('expiry_date'),'Vault must track retention review and expiry dates.');
+assert(ui.includes("method:'POST'")&&ui.includes("method:'DELETE'"),'Vault mutations must be explicit user actions using existing document endpoints.');
+assert(!ui.includes('/payments')&&!ui.includes('/reconcile')&&!ui.includes('createJournal')&&!ui.includes('POST_TRANSACTION'),'Vault must not mutate money or accounting records.');
+assert(ui.includes('does not upload the linked external file')||ui.includes('does not upload/copy the external file'),'Vault must disclose that external files are not copied into the app.');
+assert(ui.includes('Company documents are not included'),'Vault must remain separate from company documents.');
+assert(lifecycle.includes("WHERE d.user_id=?"),'Underlying document read must remain owner-scoped.');
+assert(lifecycle.includes("DELETE FROM personal_asset_documents WHERE id=? AND user_id=?"),'Document removal must remain owner-scoped.');
+assert(lifecycle.includes("if(!/^https:\\/\\//i.test(url))"),'Document references must require HTTPS.');
+console.log('Personal Financial Document & Evidence Vault regression checks passed.');
