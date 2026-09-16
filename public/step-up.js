@@ -217,3 +217,13 @@ document.addEventListener('DOMContentLoaded', () => {
   script.dataset.personalFinanceDisasterRecovery = 'true';
   document.head.appendChild(script);
 });
+
+// Canonical Personal Finance Backup Engine. It reads direct owner-scoped source records and remains restore-write disabled.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-canonical-backup]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-canonical-backup-engine.js?v=20260916-canonical-backup';
+  script.defer = true;
+  script.dataset.personalFinanceCanonicalBackup = 'true';
+  document.head.appendChild(script);
+});

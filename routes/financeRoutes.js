@@ -19,6 +19,7 @@ const personalNetWorth = require('../controllers/personalNetWorthController');
 const personalAssetLifecycle = require('../controllers/personalAssetLifecycleController');
 const personalFinancialRoadmap = require('../controllers/personalFinancialRoadmapController');
 const personalFinancialDataQuality = require('../controllers/personalFinancialDataQualityController');
+const personalFinanceCanonicalBackup = require('../controllers/personalFinanceCanonicalBackupController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -50,6 +51,7 @@ router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DAT
 router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
 
 router.get('/personal-money', requireAnyPermission('VIEW_BANKING'), personalMoney.getDashboard);
+router.get('/personal-money/canonical-backup', requireAnyPermission('VIEW_BANKING'), requireStepUp('EXPORT_PERSONAL_FINANCE_BACKUP'), personalFinanceCanonicalBackup.getCanonicalBackup);
 router.post('/personal-money/wallets', requireAnyPermission('EDIT_FINANCE'), personalMoney.createWallet);
 router.post('/personal-money/entries', requireAnyPermission('EDIT_FINANCE'), personalMoney.createEntry);
 router.post('/personal-money/debts', requireAnyPermission('EDIT_FINANCE'), personalMoney.createDebt);
