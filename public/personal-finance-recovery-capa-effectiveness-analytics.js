@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-recovery-capa-risk-assurance]')){const s=document.createElement('script');s.src='/personal-finance-recovery-capa-risk-assurance.js?v=20260917-recovery-capa-risk-assurance';s.dataset.personalFinanceRecoveryCapaRiskAssurance='1';document.head.appendChild(s);}
 (() => {
   const API='/api/finance/personal-money/canonical-restore/reporting/certificates?capa_analytics=1&months=12';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

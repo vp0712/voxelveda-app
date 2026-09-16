@@ -17,3 +17,4 @@ for(const label of ['CAPA EFFECTIVENESS ANALYTICS & PREVENTIVE CONTROL MONITORIN
 assert(ui.includes("credentials:'same-origin'")&&!ui.includes("method:'POST'")&&!ui.includes("method:'PUT'")&&!ui.includes("method:'PATCH'")&&!ui.includes("method:'DELETE'"),'CAPA analytics UI must remain read-only.');
 assert(loader.includes('/personal-finance-recovery-capa-effectiveness-analytics.js?v=20260917-recovery-capa-effectiveness-analytics'),'CAPA center must load CAPA effectiveness analytics.');
 console.log('Personal Finance Recovery CAPA Effectiveness Analytics safeguards passed.');
+require('./personal-finance-recovery-capa-risk-assurance-test');

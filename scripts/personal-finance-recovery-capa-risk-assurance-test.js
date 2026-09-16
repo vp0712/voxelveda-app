@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinanceRecoveryCapaRiskAssuranceController.js','utf8');
+const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationController.js','utf8');
+const ui=fs.readFileSync('public/personal-finance-recovery-capa-risk-assurance.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-capa-effectiveness-analytics.js','utf8');
+
+assert(controller.includes('c.user_id=?')&&controller.includes('m.user_id=c.user_id')&&controller.includes('WHERE user_id=? AND opened_at>=DATE_SUB')&&controller.includes('WHERE user_id=? AND created_at>=DATE_SUB'),'Risk assurance evidence must remain owner scoped and time bounded.');
+for(const factor of ['open_critical_incidents','open_action_soon_incidents','not_effective_capas','post_closure_recurrence','max_overdue_days','insufficient_evidence_capas','unattested_linked_reviews'])assert(controller.includes(factor),`Risk assurance must expose transparent factor ${factor}.`);
+for(const band of ['PRIORITY_1','PRIORITY_2','PRIORITY_3','MONITOR'])assert(controller.includes(band),`Risk assurance must expose ${band}.`);
+for(const state of ['ASSURANCE_GAP','ASSURANCE_PENDING','PARTIAL_ASSURANCE','ASSURED_BY_CURRENT_EVIDENCE'])assert(controller.includes(state),`Risk assurance must expose ${state}.`);
+assert(controller.includes("type:'TRANSPARENT_RULES'")&&controller.includes('opaque_score:false'),'Risk prioritisation must use transparent rules and explicitly prohibit an opaque score.');
+assert(controller.includes('no_inferred_root_cause:true')&&controller.includes('no_causal_claim:true'),'Risk assurance must preserve the evidence boundary.');
+assert(controller.includes("scope:'PERSONAL_ONLY'")&&controller.includes('read_only:true')&&controller.includes('finance_mutations:false')&&controller.includes('capa_mutations:false'),'Risk assurance must declare Personal-only read-only scope.');
+assert(!controller.includes('UPDATE personal_finance_recovery_capa')&&!controller.includes('DELETE FROM personal_finance_recovery_capa')&&!controller.includes('INSERT INTO personal_finance_recovery_capa')&&!controller.includes('UPDATE personal_money_')&&!controller.includes('UPDATE bank_transactions'),'Risk assurance must not mutate CAPA or finance records.');
+assert(cert.includes("req.query.capa_risk_assurance")&&cert.includes('recoveryCapaRiskAssurance.get(req,res)'),'Risk assurance must reuse the protected recovery certification GET surface.');
+for(const label of ['RISK-BASED PRIORITISATION & CONTROL ASSURANCE','Priority 1','Priority 2','Priority 3','Assurance gaps','Why this priority','Priority rules are visible','no opaque score','does not infer root cause or causation','does not edit CAPA','Observed recurrence does not prove causation'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Risk assurance UI must explain ${label}.`);
+assert(ui.includes("credentials:'same-origin'")&&!ui.includes("method:'POST'")&&!ui.includes("method:'PUT'")&&!ui.includes("method:'PATCH'")&&!ui.includes("method:'DELETE'"),'Risk assurance UI must remain read-only.');
+assert(loader.includes('/personal-finance-recovery-capa-risk-assurance.js?v=20260917-recovery-capa-risk-assurance'),'CAPA effectiveness analytics must load risk assurance center.');
+console.log('Personal Finance Recovery CAPA Risk Prioritisation & Control Assurance safeguards passed.');
