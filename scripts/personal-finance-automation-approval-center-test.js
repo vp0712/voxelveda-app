@@ -17,4 +17,5 @@ assert(ui.includes('classification only')&&ui.includes('does not move money'),'A
 assert(ui.includes('This center will not auto-approve this type of correction'),'Risky integrity findings must remain manual review only.');
 const posts=(ui.match(/method:'POST'/g)||[]).length;assert.strictEqual(posts,1,'Approval Center may POST only to the protected classify action.');
 for(const prohibited of ['/payments','/reconcile','/ignore','/statements/import','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','IGNORE_BANK_TRANSACTION','DELETE','PATCH','PUT'])assert(!ui.includes(prohibited),`Approval Center must not contain high-risk mutation path: ${prohibited}`);
+require('./personal-finance-audit-trail-change-history-test');
 console.log('Personal Finance Automation & Approval Center regression checks passed.');
