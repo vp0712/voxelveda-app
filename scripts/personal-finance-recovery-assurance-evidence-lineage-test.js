@@ -14,3 +14,4 @@ assert(ui.includes('restore_run_id')&&ui.includes('linked_certificate_id')&&ui.i
 assert(ui.includes('Missing links are reported; they are never inferred')&&ui.includes('does not prove causation'),'UI must explain provenance limitations.');
 assert(loader.includes('/personal-finance-recovery-assurance-evidence-lineage.js?v=20260917-recovery-assurance-evidence-lineage'),'Freshness center must load evidence lineage center.');
 console.log('Personal Finance Recovery Assurance Evidence Lineage & Provenance safeguards passed.');
+require('./personal-finance-recovery-assurance-evidence-integrity-test');
