@@ -15,4 +15,5 @@ assert(ui.includes('PERSONAL data only'),'Control Center must explicitly remain 
 assert(ui.includes('missing linked vault evidence'),'Control Center must surface missing evidence from the year-end/document workflow.');
 assert(ui.includes('unresolved accountant question'),'Control Center must surface unresolved accountant questions.');
 for(const prohibited of ['createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','/payments','method:\'POST\'','method:\'DELETE\''])assert(!ui.includes(prohibited),`Control Center must not contain mutation path: ${prohibited}`);
+require('./personal-financial-data-quality-integrity-test');
 console.log('Personal Financial Control Center regression checks passed.');
