@@ -143,7 +143,7 @@ router.post('/bank-transactions/:id/reconcile', requireAnyPermission('EDIT_FINAN
 router.post('/bank-transactions/:id/ignore', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('IGNORE_BANK_TRANSACTION'), operations.ignoreBankTransaction);
 
 router.get('/accounting-periods', operations.getAccountingPeriods);
-router.post('/accounting-periods/:id/status', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), operations.updateAccountingPeriodStatus);
+router.post('/accounting-periods/:id/status', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), operations.updateAccountingPeriod);
 router.get('/accountant-queries', operations.getAccountantQueries);
 router.post('/accountant-queries', requireAnyPermission('EDIT_FINANCE'), operations.saveAccountantQuery);
 router.post('/accountant-queries/:id', requireAnyPermission('EDIT_FINANCE'), operations.updateAccountantQuery);
