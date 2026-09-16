@@ -9,6 +9,7 @@ const bankingReadiness = require('../controllers/financeBankingReadinessControll
 const openBanking = require('../controllers/openBankingController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
+const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -50,6 +51,9 @@ router.post('/personal-money/recurring', requireAnyPermission('EDIT_FINANCE'), p
 router.post('/personal-money/recurring/:id/complete', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.completeRecurring);
 router.post('/personal-money/goals', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.createGoal);
 router.post('/personal-money/goals/:id/contributions', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.addGoalContribution);
+router.get('/personal-money/smart', requireAnyPermission('VIEW_BANKING'), personalMoneySmart.getSmartCenter);
+router.post('/personal-money/smart/recurring/:key/apply', requireAnyPermission('EDIT_FINANCE'), personalMoneySmart.applyRecurringSuggestion);
+router.post('/personal-money/smart/safety-buffer', requireAnyPermission('EDIT_FINANCE'), personalMoneySmart.saveSafetyBuffer);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
