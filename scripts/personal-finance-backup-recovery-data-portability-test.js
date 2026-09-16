@@ -17,3 +17,4 @@ assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Backup/recovery
 for(const prohibited of ['/payments','/reconcile','/classify','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','/api/auth/sessions','/api/finance/transactions'])assert(!ui.includes(prohibited),`Backup Center must not include mutation/company/security source path: ${prohibited}`);
 assert(ui.includes('does not restore, reconcile, delete, journal, classify, move money')&&ui.includes('Current API sources remain the system of record'),'Backup UI must state recovery and system-of-record boundaries.');
 console.log('Personal Finance Backup, Recovery & Data Portability Center regression checks passed.');
+require('./personal-finance-disaster-recovery-restore-approval-test');
