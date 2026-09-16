@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-recovery-control-scheduling]')){const s=document.createElement('script');s.src='/personal-finance-recovery-control-scheduling-evidence.js?v=20260917-recovery-control-scheduling-evidence';s.dataset.personalFinanceRecoveryControlScheduling='1';document.head.appendChild(s);}
 (() => {
   const API='/api/finance/personal-money/canonical-restore/reporting/certificates';
   const LIST=`${API}?control_testing=1`;
