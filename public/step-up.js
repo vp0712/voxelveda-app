@@ -187,3 +187,13 @@ document.addEventListener('DOMContentLoaded', () => {
     document.head.appendChild(script);
   }
 });
+
+// Personal Finance Security & Privacy Control Center. The script self-installs only when the Personal Finance chain is present.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-security-privacy]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-security-privacy-control-center.js?v=20260916-security-privacy';
+  script.defer = true;
+  script.dataset.personalFinanceSecurityPrivacy = 'true';
+  document.head.appendChild(script);
+});
