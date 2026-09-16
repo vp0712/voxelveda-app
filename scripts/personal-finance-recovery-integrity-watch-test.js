@@ -19,4 +19,5 @@ for(const label of ['RECOVERY MONITORING & CONTINUOUS INTEGRITY WATCH','Critical
 assert(ui.includes("document.visibilityState==='visible'")&&ui.includes('300000'),'Automatic watch refresh must run at five-minute intervals only while the page is visible.');
 assert(!ui.includes("method:'POST'")&&!ui.includes("method:'PUT'")&&!ui.includes("method:'PATCH'")&&!ui.includes("method:'DELETE'"),'Recovery monitoring UI must use read-only requests only.');
 assert(loader.includes('/personal-finance-recovery-integrity-watch.js?v=20260916-recovery-integrity-watch'),'Canonical recovery shell must load the integrity watch.');
+require('./personal-finance-recovery-remediation-planner-test');
 console.log('Personal Finance Recovery Monitoring & Continuous Integrity Watch safeguards passed.');
