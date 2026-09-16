@@ -22,3 +22,4 @@ assert(ui.includes("credentials:'same-origin'")&&ui.includes("method:'POST'"),'S
 assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Scheduling UI must not call finance mutation endpoints.');
 assert(loader.includes('/personal-finance-recovery-control-scheduling-evidence.js?v=20260917-recovery-control-scheduling-evidence'),'Control testing center must load scheduling/evidence center.');
 console.log('Personal Finance Recovery Control Scheduling, Evidence Collection & Exception Escalation safeguards passed.');
+require('./personal-finance-recovery-assurance-calendar-planning-test');
