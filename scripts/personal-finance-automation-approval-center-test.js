@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-automation-approval-center.js','utf8');
+const integrity=fs.readFileSync('public/personal-financial-data-quality-integrity.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
+
+assert(integrity.includes('/personal-finance-automation-approval-center.js?v=20260916-approval-center'),'Integrity Center must load Personal Finance Automation & Approval Center.');
+for(const endpoint of ['/api/finance/intelligence/reconciliation?scope=PERSONAL&workflow=ALL','/api/finance/personal-money/data-quality-integrity'])assert(ui.includes(endpoint),`Approval Center must use protected PERSONAL source: ${endpoint}`);
+assert(ui.includes("credentials:'same-origin'"),'Approval Center must preserve authenticated same-origin credentials.');
+assert(routes.includes("router.post('/intelligence/reconciliation/:id/classify', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), reconciliationCenter.classify)"),'Approved classification must remain permission, owner-visibility and step-up protected.');
+for(const label of ['PERSONAL FINANCE AUTOMATION & APPROVAL CENTER','Automation proposes. You decide.','Before','Proposed change','Impact','Approve this change','Reject proposal','Manual-review items — intentionally not automated'])assert(ui.includes(label),`Approval Center must explain ${label}.`);
+assert(ui.includes('top[1]<2')&&ui.includes('top[1]/total<.8'),'Category suggestions must require at least two historical matches and 80% agreement.');
+assert(ui.includes("Math.abs(Number(o.amount||0)+amount)<0.01")&&ui.includes("Number(o.bank_account_id)!==Number(t.bank_account_id)")&&ui.includes('3*86400000'),'Transfer suggestion must require opposite equal amount, different personal account and tight date window.');
+assert(ui.includes('window.confirm'),'Each mutation must require explicit per-proposal user confirmation.');
+assert(ui.includes("ownership_scope:'PERSONAL'"),'Approved classifications must remain PERSONAL.');
+assert(ui.includes('classification only')&&ui.includes('does not move money'),'Approval UI must explain mutation scope and no-money-movement guarantee.');
+assert(ui.includes('This center will not auto-approve this type of correction'),'Risky integrity findings must remain manual review only.');
+const posts=(ui.match(/method:'POST'/g)||[]).length;assert.strictEqual(posts,1,'Approval Center may POST only to the protected classify action.');
+for(const prohibited of ['/payments','/reconcile','/ignore','/statements/import','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','IGNORE_BANK_TRANSACTION','DELETE','PATCH','PUT'])assert(!ui.includes(prohibited),`Approval Center must not contain high-risk mutation path: ${prohibited}`);
+console.log('Personal Finance Automation & Approval Center regression checks passed.');

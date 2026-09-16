@@ -17,4 +17,5 @@ assert(controller.includes("company accounting is excluded")||controller.include
 for(const phrase of ['only a double-counting risk signal','may include legitimate repeated transactions','may be genuine','not automatically reclassified'])assert(controller.includes(phrase),`Integrity heuristics must disclose: ${phrase}`);
 assert(ui.includes('never deletes transactions')&&ui.includes('Any future correction must require your explicit approval'),'Integrity UI must prohibit automatic corrections and require explicit approval.');
 for(const prohibited of ['createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','recordDebtPayment','UPDATE bank_transactions','DELETE FROM bank_transactions'])assert(!ui.includes(prohibited),`Integrity UI must not contain mutation path: ${prohibited}`);
-console.log('Personal Financial Data Quality & Integrity Center regression checks passed.');
+require('./personal-finance-automation-approval-center-test');
+console.log('Personal Financial Data Quality & Integrity Center + Automation Approval Center regression checks passed.');
