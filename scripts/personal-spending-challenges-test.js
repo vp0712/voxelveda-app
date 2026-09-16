@@ -5,6 +5,7 @@ const ui=fs.readFileSync('public/personal-spending-challenges.js','utf8');
 const patterns=fs.readFileSync('public/personal-spending-patterns.js','utf8');
 const calendar=fs.readFileSync('public/personal-money-calendar.js','utf8');
 const forecast=fs.readFileSync('public/personal-cashflow-forecast.js','utf8');
+const predictive=fs.readFileSync('public/predictive-money-intelligence.js','utf8');
 const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
 const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
 const migration=fs.readFileSync('migrations/20260916_personal_spending_challenges.sql','utf8');
@@ -58,4 +59,13 @@ for(const label of ['Visible funds now','Baseline safe to spend','Scenario safe 
 for(const control of ['Income change %','Known spending change %','Extra one-off expense','Extra one-off income','30 days','60 days','90 days'])assert(forecast.includes(control),`Cash-flow forecast must support ${control}.`);
 assert(forecast.includes('currencies stay separate')&&forecast.includes('does not move money'),'Cash-flow forecast must disclose currency separation and no money movement.');
 for(const prohibited of ['finance_transactions','journal_entries','createJournal','/payments','/reconcile','/apply','method:\'POST\''])assert(!forecast.includes(prohibited),`Cash-flow forecast must not contain financial mutation path: ${prohibited}`);
-console.log('Spending Goals, Behaviour Patterns, Money Calendar and Cash-Flow Forecast regression checks passed.');
+
+assert(loader.includes('/predictive-money-intelligence.js?v=20260916-predictive-money'),'Protected Personal Money chain must load Predictive Money Intelligence.');
+for(const endpoint of ['/api/finance/personal-money/smart','/api/finance/personal-money/attention','/api/finance/personal-money/health','/api/finance/personal-money/roadmaps'])assert(predictive.includes(endpoint),`Predictive Money Intelligence must reuse protected read APIs: ${endpoint}`);
+assert(predictive.includes("credentials:'same-origin'"),'Predictive Money Intelligence must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(predictive),'Predictive Money Intelligence must remain read-only.');
+for(const label of ['Next 7 days','Next 30 days','Next 90 days','High attention','Watch items','Forecast confidence','Why:','Simple next step:'])assert(predictive.includes(label),`Predictive Money Intelligence must explain ${label}.`);
+assert(predictive.includes('transparent rule-based forecasting, not a guarantee and not hidden AI'),'Predictive Money Intelligence must explain forecast limits.');
+assert(predictive.includes('currencies stay separate')&&predictive.includes('never moves money'),'Predictive Money Intelligence must keep currencies separate and avoid money movement.');
+for(const prohibited of ['finance_transactions','journal_entries','createJournal','/payments','/reconcile','/apply','method:\'POST\''])assert(!predictive.includes(prohibited),`Predictive Money Intelligence must not contain financial mutation path: ${prohibited}`);
+console.log('Spending Goals, Behaviour Patterns, Money Calendar, Cash-Flow Forecast and Predictive Money Intelligence regression checks passed.');

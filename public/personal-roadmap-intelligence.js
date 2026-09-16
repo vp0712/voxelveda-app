@@ -9,6 +9,7 @@
   if(!document.querySelector('script[data-personal-spending-patterns]')){const p=document.createElement('script');p.src='/personal-spending-patterns.js?v=20260916-behaviour-patterns';p.dataset.personalSpendingPatterns='1';document.head.appendChild(p);}
   if(!document.querySelector('script[data-personal-money-calendar]')){const m=document.createElement('script');m.src='/personal-money-calendar.js?v=20260916-money-calendar';m.dataset.personalMoneyCalendar='1';document.head.appendChild(m);}
   if(!document.querySelector('script[data-personal-cashflow-forecast]')){const f=document.createElement('script');f.src='/personal-cashflow-forecast.js?v=20260916-cashflow-forecast';f.dataset.personalCashflowForecast='1';document.head.appendChild(f);}
+  if(!document.querySelector('script[data-predictive-money-intelligence]')){const q=document.createElement('script');q.src='/predictive-money-intelligence.js?v=20260916-predictive-money';q.dataset.predictiveMoneyIntelligence='1';document.head.appendChild(q);}
   const API='/api/finance/personal-money/roadmaps';
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??'').replace(/[&<>'\"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','\"':'&quot;'}[c]));
