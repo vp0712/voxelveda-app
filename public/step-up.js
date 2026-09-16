@@ -119,6 +119,7 @@
   window.stepUpSecurity = { verify: requestVerification };
 })();
 
+// Load the controlled QMS/facility form catalogue only on the authenticated admin UI.
 document.addEventListener('DOMContentLoaded', () => {
   if (!document.getElementById('companyFormsSection') || document.querySelector('script[data-controlled-forms]')) return;
   const script = document.createElement('script');
@@ -128,24 +129,101 @@ document.addEventListener('DOMContentLoaded', () => {
   document.head.appendChild(script);
 });
 
+// Universal profile entry points for authenticated admin and staff portals.
 document.addEventListener('DOMContentLoaded', () => {
   const sidebar = document.querySelector('.sidebar-nav');
   const footer = document.querySelector('.sidebar-footer');
   const profileChip = document.querySelector('.profile-chip');
-  const openProfile = (event) => { event?.preventDefault?.(); window.location.assign('/profile'); };
-  if (profileChip) { profileChip.onclick = openProfile; profileChip.setAttribute('aria-label', 'Open My Profile'); profileChip.title = 'My Profile'; }
+
+  const openProfile = (event) => {
+    event?.preventDefault?.();
+    window.location.assign('/profile');
+  };
+
+  if (profileChip) {
+    profileChip.onclick = openProfile;
+    profileChip.setAttribute('aria-label', 'Open My Profile');
+    profileChip.title = 'My Profile';
+  }
+
   if (sidebar && !sidebar.querySelector('[data-my-profile-link]')) {
     const existingLegacyProfile = sidebar.querySelector('[data-section="profileSection"]');
-    if (existingLegacyProfile) { existingLegacyProfile.dataset.myProfileLink = 'true'; existingLegacyProfile.removeAttribute('data-section'); existingLegacyProfile.textContent = 'My Profile'; existingLegacyProfile.addEventListener('click', openProfile); }
-    else { const button=document.createElement('button');button.type='button';button.className='nav-btn';button.dataset.myProfileLink='true';button.dataset.icon='ME';button.dataset.title='My Profile';button.textContent='My Profile';button.addEventListener('click',openProfile);const companyLabel=Array.from(sidebar.querySelectorAll('.nav-section-label')).find((node)=>node.textContent.trim()==='Company');if(companyLabel?.nextSibling)sidebar.insertBefore(button,companyLabel.nextSibling);else sidebar.appendChild(button); }
+    if (existingLegacyProfile) {
+      existingLegacyProfile.dataset.myProfileLink = 'true';
+      existingLegacyProfile.removeAttribute('data-section');
+      existingLegacyProfile.textContent = 'My Profile';
+      existingLegacyProfile.addEventListener('click', openProfile);
+    } else {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'nav-btn';
+      button.dataset.myProfileLink = 'true';
+      button.dataset.icon = 'ME';
+      button.dataset.title = 'My Profile';
+      button.textContent = 'My Profile';
+      button.addEventListener('click', openProfile);
+      const companyLabel = Array.from(sidebar.querySelectorAll('.nav-section-label')).find((node) => node.textContent.trim() === 'Company');
+      if (companyLabel?.nextSibling) sidebar.insertBefore(button, companyLabel.nextSibling);
+      else sidebar.appendChild(button);
+    }
   }
-  if (footer && !footer.querySelector('[data-my-profile-footer]')) { const button=document.createElement('button');button.type='button';button.className='logout-btn';button.dataset.myProfileFooter='true';button.textContent='My Profile';button.style.marginBottom='8px';button.addEventListener('click',openProfile);footer.prepend(button); }
-  if (!document.querySelector('script[data-dashboard-profile-avatar]')) { const script=document.createElement('script');script.src='/dashboard-profile-avatar.js?v=20260915-avatar-r2';script.defer=true;script.dataset.dashboardProfileAvatar='true';document.head.appendChild(script); }
+
+  if (footer && !footer.querySelector('[data-my-profile-footer]')) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'logout-btn';
+    button.dataset.myProfileFooter = 'true';
+    button.textContent = 'My Profile';
+    button.style.marginBottom = '8px';
+    button.addEventListener('click', openProfile);
+    footer.prepend(button);
+  }
+
+  if (!document.querySelector('script[data-dashboard-profile-avatar]')) {
+    const script = document.createElement('script');
+    script.src = '/dashboard-profile-avatar.js?v=20260915-avatar-r2';
+    script.defer = true;
+    script.dataset.dashboardProfileAvatar = 'true';
+    document.head.appendChild(script);
+  }
 });
 
-for (const [flag,src,key] of [
-  ['data-personal-finance-security-privacy','/personal-finance-security-privacy-control-center.js?v=20260916-security-privacy','personalFinanceSecurityPrivacy'],
-  ['data-personal-finance-backup-recovery','/personal-finance-backup-recovery-data-portability.js?v=20260916-backup-recovery','personalFinanceBackupRecovery'],
-  ['data-personal-finance-disaster-recovery','/personal-finance-disaster-recovery-restore-approval.js?v=20260916-disaster-recovery','personalFinanceDisasterRecovery'],
-  ['data-personal-finance-canonical-backup','/personal-finance-canonical-backup-engine.js?v=20260916-canonical-backup','personalFinanceCanonicalBackup']
-]) document.addEventListener('DOMContentLoaded',()=>{if(document.querySelector(`script[${flag}]`))return;const script=document.createElement('script');script.src=src;script.defer=true;script.dataset[key]='true';document.head.appendChild(script);});
+// Personal Finance Security & Privacy Control Center. The script self-installs only when the Personal Finance chain is present.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-security-privacy]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-security-privacy-control-center.js?v=20260916-security-privacy';
+  script.defer = true;
+  script.dataset.personalFinanceSecurityPrivacy = 'true';
+  document.head.appendChild(script);
+});
+
+// Personal Finance Backup, Recovery & Data Portability Center. It waits for the security/privacy center and is recovery-preview only.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-backup-recovery]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-backup-recovery-data-portability.js?v=20260916-backup-recovery';
+  script.defer = true;
+  script.dataset.personalFinanceBackupRecovery = 'true';
+  document.head.appendChild(script);
+});
+
+// Personal Finance Disaster Recovery & Restore Approval Center. Recovery execution remains fail-closed until canonical restore adapters exist.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-disaster-recovery]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-disaster-recovery-restore-approval.js?v=20260916-disaster-recovery';
+  script.defer = true;
+  script.dataset.personalFinanceDisasterRecovery = 'true';
+  document.head.appendChild(script);
+});
+
+// Canonical Personal Finance Backup Engine. It reads direct owner-scoped source records and remains restore-write disabled.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-canonical-backup]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-canonical-backup-engine.js?v=20260916-canonical-backup';
+  script.defer = true;
+  script.dataset.personalFinanceCanonicalBackup = 'true';
+  document.head.appendChild(script);
+});
