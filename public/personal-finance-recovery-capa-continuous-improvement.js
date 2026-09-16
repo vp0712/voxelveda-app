@@ -1,3 +1,9 @@
+if(!document.querySelector('script[data-personal-finance-recovery-capa-effectiveness-analytics]')){
+  const s=document.createElement('script');
+  s.src='/personal-finance-recovery-capa-effectiveness-analytics.js?v=20260917-recovery-capa-effectiveness-analytics';
+  s.dataset.personalFinanceRecoveryCapaEffectivenessAnalytics='1';
+  document.head.appendChild(s);
+}
 (() => {
   const API='/api/finance/personal-money/canonical-restore/reporting/certificates';
   const LIST=`${API}?capa=1`,REPORT=`${API}?governance_report=1&months=12`;
