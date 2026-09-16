@@ -1,0 +1,21 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinanceRecoveryIncidentCaseController.js','utf8');
+const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationController.js','utf8');
+const migration=fs.readFileSync('migrations/20260916_personal_finance_recovery_incident_cases.sql','utf8');
+const ui=fs.readFileSync('public/personal-finance-recovery-incident-case-management.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-remediation-planner.js','utf8');
+
+assert(migration.includes('personal_finance_recovery_incident_cases')&&migration.includes('personal_finance_recovery_incident_case_events'),'Case management must persist owner-only cases and case-history events.');
+assert(migration.includes('UNIQUE KEY uq_pf_recovery_case_owner_key (user_id, case_key)'),'Duplicate cases for the same owner/run/signal must be prevented.');
+assert(controller.includes('WHERE id=? AND user_id=?')&&controller.includes('WHERE user_id=? AND case_key=?'),'All case lookups must be owner-scoped.');
+assert(controller.includes("'CASE_OPENED'")&&controller.includes("'NOTE_ADDED'")&&controller.includes("'CASE_UPDATED'")&&controller.includes("'RESOLUTION_VERIFIED'")&&controller.includes("'CERTIFICATE_LINKED'")&&controller.includes("'CASE_CLOSED'"),'Case history must record the complete investigation lifecycle.');
+assert(controller.includes("resolution_verification_status!=='CLEARED'")&&controller.includes('CASE_CERTIFICATE_REQUIRED'),'Case closure must require cleared current evidence and a linked post-resolution certificate.');
+assert(controller.includes("String(cert.restore_run_id)!==String(row.restore_run_id)"),'Linked certificates must belong to the same owner restore run.');
+assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DELETE FROM personal_money_')&&!controller.includes('INSERT INTO personal_money_')&&!controller.includes('UPDATE bank_transactions')&&!controller.includes('DELETE FROM bank_transactions'),'Case management must never mutate source finance records.');
+assert(cert.includes("req.query.cases")&&cert.includes('recoveryCases.list(req,res)')&&cert.includes('dispatchCaseAction'),'Case management must reuse the existing protected recovery certification surface.');
+assert(cert.includes("if(req.body?.case_action)return dispatchCaseAction(req,res)"),'Case writes must pass through the already step-up-protected certificate POST route.');
+for(const label of ['RECOVERY INCIDENT CASE MANAGEMENT & RESOLUTION TRACKING','Open incident case','Investigation note','Verify resolution','Link latest certificate','Close case','financial records are unchanged','cannot reconcile banking','cannot change balances'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Case UI must explain ${label}.`);
+assert(ui.includes("case_action:'OPEN'")&&ui.includes("'VERIFY_RESOLUTION'")&&ui.includes("'LINK_CERTIFICATE'")&&ui.includes("'CLOSE'"),'Case UI must expose the governed lifecycle actions.');
+assert(loader.includes('/personal-finance-recovery-incident-case-management.js?v=20260916-recovery-cases'),'Remediation planner must load case management.');
+console.log('Personal Finance Recovery Incident Case Management safeguards passed.');
