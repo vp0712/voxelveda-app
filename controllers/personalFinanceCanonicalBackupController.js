@@ -7,9 +7,9 @@ const SCHEMA_VERSION='2026-09-16.1';
 const MAX_RECORDS=250000;
 
 function uid(req){const v=req.user?.id??req.user?.user_id;if(v===undefined||v===null||v==='')throw Object.assign(new Error('User identity unavailable.'),{statusCode:401});return String(v);}
-function stable(value){if(value===null||typeof value!=='object')return JSON.stringify(value);if(Array.isArray(value))return `[${value.map(stable).join(',')}]`;return `{${Object.keys(value).sort().map(k=>`${JSON.stringify(k)}:${stable(value[k])}`).join(',')}}`;}
+function stable(value){if(value instanceof Date)return JSON.stringify(value.toISOString());if(Buffer.isBuffer(value))return JSON.stringify(value.toString('base64'));if(value===null||typeof value!=='object')return JSON.stringify(value);if(Array.isArray(value))return `[${value.map(stable).join(',')}]`;return `{${Object.keys(value).sort().map(k=>`${JSON.stringify(k)}:${stable(value[k])}`).join(',')}}`;}
 function hash(value){return crypto.createHash('sha256').update(typeof value==='string'?value:stable(value)).digest('hex');}
-function publicRow(row){const out={...row};delete out.user_id;delete out.created_by;delete out.uploaded_by;delete out.reviewed_by;delete out.resolved_by;return out;}
+function publicRow(row){const out={...row};for(const k of ['user_id','created_by','uploaded_by','reviewed_by','resolved_by','access_token','refresh_token','consent_token','api_key','secret','password','provider_connection_id'])delete out[k];return out;}
 function recordId(row){return String(row.id??row.import_uid??row.connection_uid??'');}
 function err(res,e){const s=Number(e?.statusCode||500);if(s>=500)console.error('Failed to create canonical Personal Finance backup.',e);return res.status(s).json({message:s>=500?'Failed to create canonical Personal Finance backup.':e.message});}
 
