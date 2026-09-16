@@ -1,6 +1,7 @@
 (() => {
   if(!document.querySelector('script[data-wealth-planning]')){const p=document.createElement('script');p.src='/personal-wealth-planning.js?v=20260916-wealth-planning';p.dataset.wealthPlanning='1';document.head.appendChild(p);}
   if(!document.querySelector('script[data-financial-roadmap]')){const r=document.createElement('script');r.src='/personal-financial-roadmap.js?v=20260916-roadmap';r.dataset.financialRoadmap='1';document.head.appendChild(r);}
+  if(!document.querySelector('script[data-roadmap-intelligence]')){const i=document.createElement('script');i.src='/personal-roadmap-intelligence.js?v=20260916-roadmap-intelligence';i.dataset.roadmapIntelligence='1';document.head.appendChild(i);}
   const API='/api/finance/personal-money/net-worth/lifecycle';
   const $=(id)=>document.getElementById(id);
   let data=null;
