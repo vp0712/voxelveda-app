@@ -13,4 +13,5 @@ assert(ui.includes('no_causation_inference:true'),'Executive command center must
 assert(ui.includes("['formal test',true]")&&ui.includes("['execution evidence'")&&ui.includes("['reviewer'")&&ui.includes("['future retest'")&&ui.includes("['attested review'"),'Evidence coverage must be a visible gate checklist.');
 assert(ui.includes('Evidence coverage is a checklist of visible governance gates, not a safety score or guarantee.'),'UI must state the evidence-coverage boundary.');
 assert(loader.includes('/personal-finance-recovery-assurance-executive-command.js?v=20260917-recovery-assurance-executive-command'),'Forward planning center must load the executive command center.');
+assert(ui.includes('/personal-finance-recovery-assurance-evidence-freshness.js?v=20260917-recovery-assurance-evidence-freshness'),'Executive command center must load evidence freshness monitoring.');
 console.log('Personal Finance Recovery Assurance Executive Command Center safeguards passed.');
