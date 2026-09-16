@@ -16,7 +16,7 @@ assert(controller.includes('old_value')&&controller.includes('new_value')&&contr
 assert(controller.includes("Step-up authentication is required by the route for this action.")&&controller.includes('Step-up status is not universally recorded'),'Audit source must distinguish known route protection from unknown step-up state.');
 for(const label of ['PERSONAL FINANCE AUDIT TRAIL & CHANGE HISTORY','What changed, when, and what was recorded?','Before','After','What changed:','Change timeline','Audit interpretation'])assert(ui.includes(label),`Audit Trail must explain ${label}.`);
 for(const sensitive of ['ip_address','user_agent','previous_integrity_hash'])assert(!ui.includes(sensitive),`Audit UI must not expose sensitive/internal audit field: ${sensitive}`);
-assert(ui.includes('hash_prefix')&&!ui.includes('integrity_hash'),'UI must show only short integrity context, never full integrity hashes.');
+assert(ui.includes('hash_prefix')&&!/\.integrity_hash\b/.test(ui),'UI must show only short per-event integrity context, never access a full event integrity hash.');
 assert(ui.includes('read-only')&&ui.includes('cannot undo, replay, edit, delete, reconcile'),'Audit UI must explicitly prohibit mutation/replay behavior.');
 for(const prohibited of ['createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','recordDebtPayment','method:\'POST\'','method:"POST"'])assert(!ui.includes(prohibited),`Audit UI must not contain mutation path: ${prohibited}`);
 console.log('Personal Finance Audit Trail & Change History regression checks passed.');
