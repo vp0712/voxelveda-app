@@ -5,6 +5,7 @@ const brief=fs.readFileSync('public/personal-money-daily-briefing.js','utf8');
 const command=fs.readFileSync('public/personal-finance-command-center.js','utf8');
 const saved=fs.readFileSync('public/personal-finance-saved-views.js','utf8');
 const categories=fs.readFileSync('public/personal-spending-categories.js','utf8');
+const categoryBudgets=fs.readFileSync('public/personal-category-budgets.js','utf8');
 const savedController=fs.readFileSync('controllers/personalFinanceSavedViewsController.js','utf8');
 const savedMigration=fs.readFileSync('migrations/20260916_personal_saved_views.sql','utf8');
 const controller=fs.readFileSync('controllers/personalMoneyDailyBriefingController.js','utf8');
@@ -75,4 +76,14 @@ for(const label of ['Groceries','Eating Out','Fuel & Vehicle','Transport','Shopp
 assert(categories.includes('same days last month'),'Smart Categories must use a comparable partial-month explanation.');
 assert(categories.includes('Confirmed categories stay authoritative'),'Smart Categories must explain confirmed-vs-suggested precedence.');
 assert(categories.includes('currencies kept separate'),'Smart Categories must keep currencies separate.');
-console.log('Personal Money mobile navigation, Daily Briefing, Command Center, Saved Views and Smart Categories regression checks passed.');
+
+assert(loader.includes('/personal-category-budgets.js?v=20260916-category-budgets'),'Protected Personal Money chain must load Category Budgets.');
+for(const endpoint of ['/api/finance/personal-money','/api/finance/bank-accounts','/api/finance/intelligence/insights?scope=PERSONAL'])assert(categoryBudgets.includes(endpoint),`Category Budgets must reuse protected endpoint ${endpoint}.`);
+assert(categoryBudgets.includes("ownership_scope||'').toUpperCase()==='PERSONAL'"),'Category Budgets must select PERSONAL bank accounts and PERSONAL transactions only.');
+assert(categoryBudgets.includes('is_internal_transfer'),'Category Budgets must exclude internal transfers.');
+assert(categoryBudgets.includes("/api/finance/personal-money/budgets"),'Category Budgets must reuse the existing owner-private monthly budget API.');
+assert(categoryBudgets.includes("method:'POST'"),'Category Budgets may persist monthly budget metadata only.');
+for(const prohibited of ['finance_transactions','createJournal','POST_TRANSACTION','/payments','/reconcile','/insights/${','/apply'])assert(!categoryBudgets.includes(prohibited),`Category Budgets must not contain financial mutation path: ${prohibited}`);
+for(const text of ['70% = watch','90% = critical','100% = over budget','Safe per day','Previous 3-month bank avg','Imported bank','Manual cash','Currencies remain separate'])assert(categoryBudgets.includes(text),`Category Budgets must explain ${text}.`);
+assert(categoryBudgets.includes('Advisory only'),'Category Budgets must explain that spending is not blocked.');
+console.log('Personal Money mobile navigation, Daily Briefing, Command Center, Saved Views, Smart Categories and Category Budgets regression checks passed.');
