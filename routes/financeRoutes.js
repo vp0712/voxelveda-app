@@ -11,6 +11,7 @@ const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
+const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -58,6 +59,7 @@ router.post('/personal-money/smart/safety-buffer', requireAnyPermission('EDIT_FI
 router.get('/personal-money/review-inbox', requireAnyPermission('VIEW_BANKING'), personalMoneyReview.getReviewInbox);
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/confirm', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.confirmMatch);
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/dismiss', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.dismissMatch);
+router.get('/personal-money/health', requireAnyPermission('VIEW_BANKING'), personalMoneyHealth.getHealthDashboard);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
