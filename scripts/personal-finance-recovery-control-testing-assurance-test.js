@@ -1,0 +1,25 @@
+const fs=require('fs');
+const assert=require('assert');
+const migration=fs.readFileSync('migrations/20260917_personal_finance_recovery_control_testing.sql','utf8');
+const controller=fs.readFileSync('controllers/personalFinanceRecoveryControlTestingController.js','utf8');
+const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationController.js','utf8');
+const ui=fs.readFileSync('public/personal-finance-recovery-control-testing-assurance.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-capa-risk-assurance.js','utf8');
+
+for(const table of ['personal_finance_recovery_control_tests','personal_finance_recovery_control_test_events'])assert(migration.includes(table),`Control testing migration must create ${table}.`);
+for(const field of ['test_procedure_json','expected_evidence_json','frequency_days','result','tester_label','reviewer_label','linked_capa_ids_json','linked_review_id','next_retest_at','assurance_signed_at'])assert(migration.includes(field),`Control testing ledger must include ${field}.`);
+assert(controller.includes('WHERE id=? AND user_id=?')&&controller.includes('WHERE user_id=? ORDER BY'),'Control testing must remain owner scoped.');
+for(const result of ['PASS','FAIL','NEEDS_REVIEW'])assert(controller.includes(result),`Control testing must support ${result}.`);
+for(const state of ['CONTROL_FAILED','NEEDS_REVIEW','RETEST_OVERDUE','ASSURED_UNTIL_RETEST','ASSURANCE_SIGNOFF_PENDING','REVIEW_PENDING','TEST_NOT_EXECUTED'])assert(controller.includes(state),`Control testing must expose assurance state ${state}.`);
+assert(controller.includes("row.lifecycle_status!=='REVIEWED'||row.result!=='PASS'"),'Assurance sign-off must require a reviewed PASS.');
+assert(controller.includes('arr(row.evidence_refs_json).length===0')&&controller.includes('row.reviewer_label'),'Assurance sign-off must require evidence and reviewer acknowledgement.');
+assert(controller.includes("review?.status!=='ATTESTED'"),'Assurance sign-off must require an ATTESTED management review.');
+assert(controller.includes('new Date(row.next_retest_at).getTime()<=Date.now()'),'Assurance sign-off must reject an overdue retest date.');
+assert(controller.includes('INSERT INTO personal_finance_recovery_control_test_events'),'Control test lifecycle must keep append-only history.');
+assert(!controller.includes('UPDATE bank_transactions')&&!controller.includes('UPDATE personal_money_')&&!controller.includes('DELETE FROM bank_transactions')&&!controller.includes('DELETE FROM personal_money_'),'Control testing must not mutate finance records.');
+assert(cert.includes("req.body?.control_test_action")&&cert.includes('dispatchControlTestAction')&&cert.includes("req.query.control_testing")&&cert.includes('recoveryControlTesting.list(req,res)'),'Control testing must reuse the protected recovery certification surface.');
+for(const label of ['CONTROL TESTING & ASSURANCE EVIDENCE CENTER','Pass / Fail / Needs Review','Test procedure','Expected evidence','Next retest','Assurance sign-off','linked ATTESTED management review','cannot change financial records'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Control testing UI must explain ${label}.`);
+assert(ui.includes("credentials:'same-origin'")&&ui.includes("method:'POST'"),'Control testing UI must use authenticated protected writes.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Control testing UI must not call finance mutation endpoints.');
+assert(loader.includes('/personal-finance-recovery-control-testing-assurance.js?v=20260917-recovery-control-testing-assurance'),'Risk assurance center must load formal control testing.');
+console.log('Personal Finance Recovery Control Testing & Assurance safeguards passed.');
