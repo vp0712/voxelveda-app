@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-personal-net-worth]')){const nw=document.createElement('script');nw.src='/personal-net-worth.js?v=20260916-net-worth';nw.dataset.personalNetWorth='1';document.head.appendChild(nw);}
   const API='/api/finance/personal-money/health';
   const $=(id)=>document.getElementById(id);
   let data=null;
