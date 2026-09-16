@@ -21,7 +21,7 @@ assert(controller.includes("Currencies remain separate")&&!controller.includes('
 assert(controller.includes('finance_mutations:false')&&controller.includes('read_only:true'),'Verification response must explicitly remain read-only.');
 assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DELETE FROM personal_money_')&&!controller.includes('INSERT INTO personal_money_'),'Verification must not mutate Personal Money source tables.');
 assert(!controller.includes("ownership_scope='BUSINESS'")&&!controller.includes("ownership_scope='MIXED'"),'Verification must not target company finance scope.');
-for(const label of ['RESTORE VERIFICATION & POST-RECOVERY RECONCILIATION CENTER','Verified','Critical Mismatch','Needs Review','read-only','does not reconcile banking'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Verification UI must explain ${label}.`);
+for(const label of ['RESTORE VERIFICATION & POST-RECOVERY RECONCILIATION CENTER','VERIFIED','Critical mismatches','Needs review','read-only','does not reconcile banking'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Verification UI must explain ${label}.`);
 assert(ui.includes("voxelveda:personal-finance-restored")&&restoreUi.includes("voxelveda:personal-finance-restored"),'Successful restore must automatically hand off to post-recovery verification.');
 assert(restoreUi.includes("upload_id:uploadId")&&restoreUi.includes("{run_id:p.run_id,backup}"),'Automatic verification must reuse verified large upload sessions or in-memory small backups without sending the backup password.');
 assert(!restoreUi.includes('backup_password')&&!ui.includes('backup_password'),'Backup password must never be sent to verification APIs.');
