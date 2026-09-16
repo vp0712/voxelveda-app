@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-personal-debt-intelligence]')){const s=document.createElement('script');s.src='/personal-debt-intelligence.js?v=20260916-debt-intelligence';s.dataset.personalDebtIntelligence='1';document.head.appendChild(s);}
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};
   const today=()=>new Date().toISOString().slice(0,10);
