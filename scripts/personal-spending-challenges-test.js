@@ -4,6 +4,7 @@ const controller=fs.readFileSync('controllers/personalSpendingChallengeControlle
 const ui=fs.readFileSync('public/personal-spending-challenges.js','utf8');
 const patterns=fs.readFileSync('public/personal-spending-patterns.js','utf8');
 const calendar=fs.readFileSync('public/personal-money-calendar.js','utf8');
+const forecast=fs.readFileSync('public/personal-cashflow-forecast.js','utf8');
 const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
 const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
 const migration=fs.readFileSync('migrations/20260916_personal_spending_challenges.sql','utf8');
@@ -48,4 +49,13 @@ assert(calendar.includes('Expected income never turns a day “safe” by itself
 assert(calendar.includes('currencies remain separate'),'Money Calendar must keep currencies separate.');
 assert(calendar.includes('a.d===dim(a.y,a.m)')&&calendar.includes('Math.min(a.d,dim(y,m))'),'Money Calendar recurrence must clamp month-end dates instead of using JS month rollover.');
 for(const prohibited of ['finance_transactions','journal_entries','createJournal','/payments','/reconcile','method:\'POST\''])assert(!calendar.includes(prohibited),`Money Calendar must not contain financial mutation path: ${prohibited}`);
-console.log('Spending Goals, Behaviour Patterns and Money Calendar Intelligence regression checks passed.');
+
+assert(loader.includes('/personal-cashflow-forecast.js?v=20260916-cashflow-forecast'),'Protected Personal Money chain must load Cash-Flow Forecast + What-If Lab.');
+for(const endpoint of ['/api/finance/personal-money/smart','/api/finance/personal-money/attention','/api/finance/personal-money/health'])assert(forecast.includes(endpoint),`Cash-flow forecast must reuse protected read APIs: ${endpoint}`);
+assert(forecast.includes("credentials:'same-origin'"),'Cash-flow forecast must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(forecast),'Cash-flow forecast must remain read-only.');
+for(const label of ['Visible funds now','Baseline safe to spend','Scenario safe to spend','Projected end balance','Lowest projected balance','Safety buffer','Known inflows','Known outflows'])assert(forecast.includes(label),`Cash-flow forecast must explain ${label}.`);
+for(const control of ['Income change %','Known spending change %','Extra one-off expense','Extra one-off income','30 days','60 days','90 days'])assert(forecast.includes(control),`Cash-flow forecast must support ${control}.`);
+assert(forecast.includes('currencies stay separate')&&forecast.includes('does not move money'),'Cash-flow forecast must disclose currency separation and no money movement.');
+for(const prohibited of ['finance_transactions','journal_entries','createJournal','/payments','/reconcile','/apply','method:\'POST\''])assert(!forecast.includes(prohibited),`Cash-flow forecast must not contain financial mutation path: ${prohibited}`);
+console.log('Spending Goals, Behaviour Patterns, Money Calendar and Cash-Flow Forecast regression checks passed.');
