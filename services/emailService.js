@@ -69,6 +69,33 @@ function isEmailTransportError(error) {
   return EMAIL_TRANSPORT_CODES.has(code) || /smtp|socket|connection|timed?\s*out/i.test(String(error?.message || ''));
 }
 
+function classifySmtpFailure(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const responseCode = Number(error?.responseCode || 0) || null;
+  const command = String(error?.command || '').toUpperCase() || null;
+  if (code === 'EAUTH' || [530, 534, 535].includes(responseCode)) return { category: 'AUTHENTICATION', retryable: false, code: code || 'EAUTH', response_code: responseCode, command };
+  if (code === 'ETIMEDOUT') return { category: 'TIMEOUT', retryable: true, code, response_code: responseCode, command };
+  if (code === 'EDNS') return { category: 'DNS', retryable: true, code, response_code: responseCode, command };
+  if (['ECONNREFUSED','ECONNRESET','EHOSTUNREACH','ENETUNREACH','ECONNECTION','ESOCKET'].includes(code)) return { category: 'NETWORK', retryable: true, code, response_code: responseCode, command };
+  if (responseCode && responseCode >= 500) return { category: 'PROVIDER_REJECTION', retryable: false, code: code || 'SMTP_REJECTED', response_code: responseCode, command };
+  if (responseCode && responseCode >= 400) return { category: 'PROVIDER_TEMPORARY', retryable: true, code: code || 'SMTP_TEMPORARY', response_code: responseCode, command };
+  return { category: 'UNKNOWN', retryable: true, code: code || 'SMTP_CONNECTION_FAILED', response_code: responseCode, command };
+}
+
+function smtpReadinessSummary(error = null) {
+  const config = smtpConfig();
+  const base = {
+    configured: isEmailConfigured(),
+    host: config.host,
+    port: config.port,
+    secure: config.secure,
+    identity_domain: String(config.user || '').split('@')[1] || null,
+    from_domain: String(config.fromEmail || '').split('@')[1] || null,
+    missing: missingSmtpKeys()
+  };
+  return error ? { ...base, ok: false, failure: classifySmtpFailure(error) } : { ...base, ok: true, failure: null };
+}
+
 function emailFailureDetails(error) {
   const code = String(error?.code || 'EMAIL_DELIVERY_FAILED').toUpperCase();
 
@@ -156,7 +183,15 @@ async function verifyConnection() {
   const transporter = createTransporter();
   try {
     await transporter.verify();
-    return { ok: true, host: smtpConfig().host, port: smtpConfig().port };
+    const summary = smtpReadinessSummary();
+    console.log(`SMTP transport evidence: ok=yes host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} identity_domain=${summary.identity_domain || 'unknown'} from_domain=${summary.from_domain || 'unknown'}`);
+    return summary;
+  } catch (error) {
+    const summary = smtpReadinessSummary(error);
+    const f = summary.failure;
+    console.warn(`SMTP transport evidence: ok=no category=${f.category} code=${f.code} response_code=${f.response_code || 'none'} command=${f.command || 'none'} host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} identity_domain=${summary.identity_domain || 'unknown'} from_domain=${summary.from_domain || 'unknown'}`);
+    error.smtpReadiness = summary;
+    throw error;
   } finally {
     transporter.close();
   }
@@ -193,6 +228,8 @@ module.exports = {
   isEmailConfigured,
   missingSmtpKeys,
   smtpConfig,
+  smtpReadinessSummary,
+  classifySmtpFailure,
   normalizeAddressList,
   validateRecipients,
   isEmailTransportError,

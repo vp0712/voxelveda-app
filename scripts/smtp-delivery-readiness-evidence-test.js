@@ -1,0 +1,20 @@
+'use strict';
+const assert=require('node:assert');
+const fs=require('node:fs');
+const path=require('node:path');
+const service=require('../services/emailService');
+const source=fs.readFileSync(path.join(__dirname,'..','services','emailService.js'),'utf8');
+
+assert.strictEqual(service.classifySmtpFailure({code:'EAUTH'}).category,'AUTHENTICATION');
+assert.strictEqual(service.classifySmtpFailure({code:'ETIMEDOUT'}).category,'TIMEOUT');
+assert.strictEqual(service.classifySmtpFailure({code:'EDNS'}).category,'DNS');
+assert.strictEqual(service.classifySmtpFailure({code:'ECONNREFUSED'}).category,'NETWORK');
+assert.strictEqual(service.classifySmtpFailure({responseCode:550}).category,'PROVIDER_REJECTION');
+assert.strictEqual(service.classifySmtpFailure({responseCode:450}).category,'PROVIDER_TEMPORARY');
+assert.match(source,/SMTP transport evidence: ok=no/);
+assert.match(source,/identity_domain=/);
+assert.match(source,/from_domain=/);
+assert.doesNotMatch(source,/pass=\$\{/);
+assert.doesNotMatch(source,/password=\$\{/i);
+assert.match(source,/error\.smtpReadiness = summary/);
+console.log('SMTP delivery readiness evidence safeguards passed.');
