@@ -3,6 +3,7 @@ const assert=require('assert');
 const controller=fs.readFileSync('controllers/personalSpendingChallengeController.js','utf8');
 const ui=fs.readFileSync('public/personal-spending-challenges.js','utf8');
 const patterns=fs.readFileSync('public/personal-spending-patterns.js','utf8');
+const calendar=fs.readFileSync('public/personal-money-calendar.js','utf8');
 const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
 const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
 const migration=fs.readFileSync('migrations/20260916_personal_spending_challenges.sql','utf8');
@@ -37,4 +38,14 @@ assert(patterns.includes('not trustworthy time-of-day for every purchase'),'Beha
 assert(patterns.includes('payday correlation is not inferred without income-date evidence'),'Behaviour Patterns must not infer payday behaviour without income evidence.');
 assert(patterns.includes('currencies kept separate'),'Behaviour Patterns must keep currencies separate.');
 assert(patterns.includes('never saved as a behavioural profile'),'Behaviour Patterns must explain that inferred patterns are not persisted.');
-console.log('Spending Goals, No-Spend Challenges and Behaviour Patterns regression checks passed.');
+
+assert(loader.includes('/personal-money-calendar.js?v=20260916-money-calendar'),'Protected Personal Money chain must load Money Calendar Intelligence.');
+for(const endpoint of ['/api/finance/personal-money/attention','/api/finance/personal-money/smart','/api/finance/personal-money/roadmaps','/api/finance/personal-money/spending-challenges'])assert(calendar.includes(endpoint),`Money Calendar must reuse protected read APIs: ${endpoint}`);
+assert(calendar.includes("credentials:'same-origin'"),'Money Calendar must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(calendar),'Money Calendar must remain read-only.');
+for(const label of ['Safe','Tight','Attention','Expected income','Debt repayment','Roadmap milestone','Challenge deadline','Budget pressure'])assert(calendar.includes(label),`Money Calendar must explain ${label}.`);
+assert(calendar.includes('Expected income never turns a day “safe” by itself.'),'Expected income must not be treated as guaranteed affordability.');
+assert(calendar.includes('currencies remain separate'),'Money Calendar must keep currencies separate.');
+assert(calendar.includes('a.d===dim(a.y,a.m)')&&calendar.includes('Math.min(a.d,dim(y,m))'),'Money Calendar recurrence must clamp month-end dates instead of using JS month rollover.');
+for(const prohibited of ['finance_transactions','journal_entries','createJournal','/payments','/reconcile','method:\'POST\''])assert(!calendar.includes(prohibited),`Money Calendar must not contain financial mutation path: ${prohibited}`);
+console.log('Spending Goals, Behaviour Patterns and Money Calendar Intelligence regression checks passed.');
