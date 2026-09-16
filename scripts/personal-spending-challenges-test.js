@@ -68,4 +68,5 @@ for(const label of ['Next 7 days','Next 30 days','Next 90 days','High attention'
 assert(predictive.includes('transparent rule-based forecasting, not a guarantee and not hidden AI'),'Predictive Money Intelligence must explain forecast limits.');
 assert(predictive.includes('currencies stay separate')&&predictive.includes('never moves money'),'Predictive Money Intelligence must keep currencies separate and avoid money movement.');
 for(const prohibited of ['finance_transactions','journal_entries','createJournal','/payments','/reconcile','/apply','method:\'POST\''])assert(!predictive.includes(prohibited),`Predictive Money Intelligence must not contain financial mutation path: ${prohibited}`);
+require('./personal-financial-action-center-test');
 console.log('Spending Goals, Behaviour Patterns, Money Calendar, Cash-Flow Forecast and Predictive Money Intelligence regression checks passed.');
