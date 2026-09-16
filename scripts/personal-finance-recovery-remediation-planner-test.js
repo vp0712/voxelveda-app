@@ -13,4 +13,5 @@ assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DEL
 for(const label of ['RECOVERY INCIDENT & REMEDIATION PLANNER','Affected datasets','Evidence boundary','Open verification','Open certificates','Open restore controls','does not repair records','does not reconcile banking','does not roll back a restore','does not start a new restore'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Remediation UI must explain ${label}.`);
 assert(!ui.includes("method:'POST'")&&!ui.includes("method:'PUT'")&&!ui.includes("method:'PATCH'")&&!ui.includes("method:'DELETE'"),'Remediation planner UI must remain GET/read-only.');
 assert(watchUi.includes('/personal-finance-recovery-remediation-planner.js?v=20260916-recovery-remediation-planner'),'Recovery integrity watch must load the remediation planner.');
+require('./personal-finance-recovery-incident-case-management-test');
 console.log('Personal Finance Recovery Incident & Remediation Planner safeguards passed.');
