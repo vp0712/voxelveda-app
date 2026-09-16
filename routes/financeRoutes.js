@@ -7,6 +7,7 @@ const transactionIntelligence = require('../controllers/financeTransactionIntell
 const reconciliationCenter = require('../controllers/financeReconciliationCenterController');
 const bankingReadiness = require('../controllers/financeBankingReadinessController');
 const openBanking = require('../controllers/openBankingController');
+const personalMoney = require('../controllers/personalMoneyController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -36,6 +37,13 @@ router.post('/journals', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CR
 router.get('/reports', controller.getReports);
 router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), controller.downloadTrialBalanceCsv);
 router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
+
+router.get('/personal-money', requireAnyPermission('VIEW_BANKING'), personalMoney.getDashboard);
+router.post('/personal-money/wallets', requireAnyPermission('EDIT_FINANCE'), personalMoney.createWallet);
+router.post('/personal-money/entries', requireAnyPermission('EDIT_FINANCE'), personalMoney.createEntry);
+router.post('/personal-money/debts', requireAnyPermission('EDIT_FINANCE'), personalMoney.createDebt);
+router.post('/personal-money/debts/:id/payments', requireAnyPermission('EDIT_FINANCE'), personalMoney.recordDebtPayment);
+router.post('/personal-money/budgets', requireAnyPermission('EDIT_FINANCE'), personalMoney.saveBudget);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
