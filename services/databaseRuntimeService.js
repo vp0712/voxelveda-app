@@ -8,26 +8,110 @@ function sslCipher(rows) {
   return String(entry?.Value || entry?.value || '').trim();
 }
 
-async function probeDatabaseTlsCapability() {
+function tlsProbeErrorCode(error) {
+  return String(error?.code || error?.message || 'DB_TLS_PROBE_FAILED').slice(0, 120);
+}
+
+function isCertificateTrustError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toUpperCase();
+  return [
+    'SELF_SIGNED_CERT_IN_CHAIN',
+    'DEPTH_ZERO_SELF_SIGNED_CERT',
+    'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+    'UNABLE_TO_GET_ISSUER_CERT',
+    'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+    'ERR_TLS_CERT_ALTNAME_INVALID',
+    'CERT_HAS_EXPIRED'
+  ].some((token) => code.includes(token) || message.includes(token));
+}
+
+async function probeTlsOnce(rejectUnauthorized) {
   let connection;
   try {
-    const probeConfig = buildDatabaseConfig({ ...process.env, DB_TLS_REQUIRED: 'true' });
-    connection = await mysql.createConnection({ ...probeConfig.options, connectTimeout: Math.min(Number(probeConfig.options.connectTimeout || 10000), 8000) });
+    const probeConfig = buildDatabaseConfig({
+      ...process.env,
+      DB_TLS_REQUIRED: 'true',
+      DB_TLS_REJECT_UNAUTHORIZED: rejectUnauthorized ? 'true' : 'false'
+    });
+    connection = await mysql.createConnection({
+      ...probeConfig.options,
+      connectTimeout: Math.min(Number(probeConfig.options.connectTimeout || 10000), 8000)
+    });
     await connection.ping();
     const [statusRows] = await connection.query("SHOW SESSION STATUS LIKE 'Ssl_cipher'");
     const cipher = sslCipher(statusRows);
-    return { capable: Boolean(cipher), cipher: cipher || null, certificate_verification: Boolean(probeConfig.summary.tls_certificate_verification), error_code: null };
+    return {
+      succeeded: Boolean(cipher),
+      cipher: cipher || null,
+      certificate_verification: Boolean(rejectUnauthorized),
+      error_code: cipher ? null : 'DB_TLS_NO_CIPHER'
+    };
   } catch (error) {
-    return { capable: false, cipher: null, certificate_verification: true, error_code: String(error?.code || 'DB_TLS_PROBE_FAILED').slice(0, 80) };
+    return {
+      succeeded: false,
+      cipher: null,
+      certificate_verification: Boolean(rejectUnauthorized),
+      error_code: tlsProbeErrorCode(error),
+      certificate_trust_error: isCertificateTrustError(error)
+    };
   } finally {
     if (connection) await connection.end().catch(() => {});
   }
 }
 
+async function probeDatabaseTlsCapability() {
+  const strict = await probeTlsOnce(true);
+  if (strict.succeeded) {
+    return {
+      capable: true,
+      cipher: strict.cipher,
+      certificate_verification: true,
+      trust_status: 'VERIFIED',
+      error_code: null
+    };
+  }
+
+  if (!strict.certificate_trust_error) {
+    return {
+      capable: false,
+      cipher: null,
+      certificate_verification: true,
+      trust_status: 'UNAVAILABLE',
+      error_code: strict.error_code
+    };
+  }
+
+  const encryptionOnly = await probeTlsOnce(false);
+  if (encryptionOnly.succeeded) {
+    return {
+      capable: true,
+      cipher: encryptionOnly.cipher,
+      certificate_verification: false,
+      trust_status: 'ENCRYPTION_ONLY',
+      error_code: strict.error_code
+    };
+  }
+
+  return {
+    capable: false,
+    cipher: null,
+    certificate_verification: false,
+    trust_status: 'UNAVAILABLE',
+    error_code: encryptionOnly.error_code || strict.error_code
+  };
+}
+
 async function verifyDatabaseConnection(db = pool) {
   const summary = db.databaseConfigSummary || {};
-  setDatabase({ state: CONTROL_STATES.INITIALIZING, connected: false, tls_requested: Boolean(summary.tls_requested), tls_active: false, tls_certificate_verification: Boolean(summary.tls_certificate_verification) });
-  setControl('database_tls', CONTROL_STATES.INITIALIZING, summary.tls_requested ? 'TLS requested; verifying active connection' : 'TLS not requested; checking provider capability safely');
+  setDatabase({
+    state: CONTROL_STATES.INITIALIZING,
+    connected: false,
+    tls_requested: Boolean(summary.tls_requested),
+    tls_active: false,
+    tls_certificate_verification: Boolean(summary.tls_certificate_verification)
+  });
+  setControl('database_tls', CONTROL_STATES.INITIALIZING, summary.tls_requested ? 'TLS requested; verifying active connection' : 'TLS not requested; checking encryption and certificate trust separately');
 
   const connection = await db.getConnection();
   try {
@@ -41,7 +125,13 @@ async function verifyDatabaseConnection(db = pool) {
       throw error;
     }
 
-    let capability = { capable: tlsActive, cipher: cipher || null, certificate_verification: Boolean(summary.tls_certificate_verification), error_code: null };
+    let capability = {
+      capable: tlsActive,
+      cipher: cipher || null,
+      certificate_verification: Boolean(summary.tls_certificate_verification),
+      trust_status: tlsActive && summary.tls_certificate_verification ? 'VERIFIED' : tlsActive ? 'ENCRYPTION_ONLY' : 'UNKNOWN',
+      error_code: null
+    };
     if (!tlsActive) capability = await probeDatabaseTlsCapability();
 
     setDatabase({
@@ -51,19 +141,33 @@ async function verifyDatabaseConnection(db = pool) {
       tls_active: tlsActive,
       tls_capable: capability.capable,
       tls_cipher: cipher || capability.cipher || null,
-      tls_certificate_verification: tlsActive ? Boolean(summary.tls_certificate_verification) : capability.certificate_verification
+      tls_certificate_verification: tlsActive ? Boolean(summary.tls_certificate_verification) : capability.certificate_verification,
+      tls_trust_status: capability.trust_status,
+      tls_probe_error_code: capability.error_code || null
     });
 
-    if (tlsActive) {
-      setControl('database_tls', CONTROL_STATES.EXTERNALLY_VERIFIED, `Active database transport is encrypted${cipher ? ` with ${cipher}` : ''}; certificate verification ${summary.tls_certificate_verification ? 'enabled' : 'disabled'}`);
+    if (tlsActive && summary.tls_certificate_verification) {
+      setControl('database_tls', CONTROL_STATES.EXTERNALLY_VERIFIED, `Active database transport is encrypted${cipher ? ` with ${cipher}` : ''} and certificate verification is enabled`);
+    } else if (tlsActive) {
+      setControl('database_tls', CONTROL_STATES.DEGRADED, `Active database transport is encrypted${cipher ? ` with ${cipher}` : ''}, but certificate identity verification is disabled`);
+    } else if (capability.capable && capability.certificate_verification) {
+      setControl('database_tls', CONTROL_STATES.DEGRADED, `TLS is available and certificate verification succeeds${capability.cipher ? ` using ${capability.cipher}` : ''}, but the application pool is not enforcing TLS yet`);
     } else if (capability.capable) {
-      setControl('database_tls', CONTROL_STATES.DEGRADED, `Provider accepted a TLS probe${capability.cipher ? ` using ${capability.cipher}` : ''}, but the application pool is not enforcing TLS yet`);
+      setControl('database_tls', CONTROL_STATES.DEGRADED, `TLS encryption is available${capability.cipher ? ` using ${capability.cipher}` : ''}, but the server certificate is not yet trusted by the application and the pool remains plaintext`);
     } else {
-      setControl('database_tls', CONTROL_STATES.NOT_CONFIGURED, `Active connection is unencrypted and TLS capability probe did not succeed (${capability.error_code || 'unknown'})`);
+      setControl('database_tls', CONTROL_STATES.NOT_CONFIGURED, `Active connection is unencrypted and a TLS handshake could not be established (${capability.error_code || 'unknown'})`);
     }
 
-    console.log(`Database transport evidence: active=${tlsActive ? 'yes' : 'no'} capable=${capability.capable ? 'yes' : 'no'} certificate_verification=${(tlsActive ? summary.tls_certificate_verification : capability.certificate_verification) ? 'yes' : 'no'} cipher=${cipher || capability.cipher || 'none'}`);
-    return { connected: true, tls_requested: Boolean(summary.tls_requested), tls_active: tlsActive, tls_capable: capability.capable, tls_cipher: cipher || capability.cipher || null };
+    console.log(`Database transport evidence: active=${tlsActive ? 'yes' : 'no'} capable=${capability.capable ? 'yes' : 'no'} certificate_verification=${(tlsActive ? summary.tls_certificate_verification : capability.certificate_verification) ? 'yes' : 'no'} trust=${capability.trust_status || 'unknown'} cipher=${cipher || capability.cipher || 'none'} probe_error=${capability.error_code || 'none'}`);
+    return {
+      connected: true,
+      tls_requested: Boolean(summary.tls_requested),
+      tls_active: tlsActive,
+      tls_capable: capability.capable,
+      tls_cipher: cipher || capability.cipher || null,
+      tls_certificate_verification: tlsActive ? Boolean(summary.tls_certificate_verification) : capability.certificate_verification,
+      tls_trust_status: capability.trust_status
+    };
   } catch (error) {
     setDatabase({ state: CONTROL_STATES.FAILED, connected: false, tls_active: false });
     setControl('database_tls', CONTROL_STATES.FAILED, String(error.code || 'DATABASE_CONNECTION_FAILED'));
@@ -128,4 +232,4 @@ async function refreshDatabaseAttestation(db = pool) {
   }
 }
 
-module.exports = { grantIsUnsafeGlobal, probeDatabaseTlsCapability, refreshDatabaseAttestation, sslCipher, verifyDatabaseConnection, verifyRuntimeDatabaseIdentity };
+module.exports = { grantIsUnsafeGlobal, isCertificateTrustError, probeDatabaseTlsCapability, probeTlsOnce, refreshDatabaseAttestation, sslCipher, verifyDatabaseConnection, verifyRuntimeDatabaseIdentity };
