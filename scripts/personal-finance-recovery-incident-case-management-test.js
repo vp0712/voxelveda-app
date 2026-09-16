@@ -19,3 +19,4 @@ for(const label of ['RECOVERY INCIDENT CASE MANAGEMENT & RESOLUTION TRACKING','O
 assert(ui.includes("case_action:'OPEN'")&&ui.includes("'VERIFY_RESOLUTION'")&&ui.includes("'LINK_CERTIFICATE'")&&ui.includes("'CLOSE'"),'Case UI must expose the governed lifecycle actions.');
 assert(loader.includes('/personal-finance-recovery-incident-case-management.js?v=20260916-recovery-cases'),'Remediation planner must load case management.');
 console.log('Personal Finance Recovery Incident Case Management safeguards passed.');
+require('./personal-finance-recovery-incident-sla-governance-test');
