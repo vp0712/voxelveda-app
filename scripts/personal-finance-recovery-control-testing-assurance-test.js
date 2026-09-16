@@ -23,3 +23,4 @@ assert(ui.includes("credentials:'same-origin'")&&ui.includes("method:'POST'"),'C
 assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Control testing UI must not call finance mutation endpoints.');
 assert(loader.includes('/personal-finance-recovery-control-testing-assurance.js?v=20260917-recovery-control-testing-assurance'),'Risk assurance center must load formal control testing.');
 console.log('Personal Finance Recovery Control Testing & Assurance safeguards passed.');
+require('./personal-finance-recovery-control-scheduling-evidence-test');
