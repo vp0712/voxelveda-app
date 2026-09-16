@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-personal-financial-control-center]')){const c=document.createElement('script');c.src='/personal-financial-control-center.js?v=20260916-control-center';c.dataset.personalFinancialControlCenter='1';document.head.appendChild(c);}
   if(!document.querySelector('script[data-personal-subscription-intelligence]')){const s=document.createElement('script');s.src='/personal-subscription-intelligence.js?v=20260916-subscription-intelligence';s.dataset.personalSubscriptionIntelligence='1';document.head.appendChild(s);}
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
   const STORE='voxelveda.personal-financial-action-center.v1';
