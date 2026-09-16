@@ -21,4 +21,5 @@ for(const label of ['CAPA & CONTINUOUS IMPROVEMENT CENTER','Repeated evidence si
 assert(ui.includes("act('CREATE'")||ui.includes("mutate('CREATE'"),'CAPA UI must expose explicit creation.');
 assert(ui.includes("mutate('UPDATE'")&&ui.includes("mutate('EFFECTIVENESS'")&&ui.includes("mutate('CLOSE'"),'CAPA UI must expose governed update/effectiveness/closure actions.');
 assert(loader.includes('/personal-finance-recovery-capa-continuous-improvement.js?v=20260917-recovery-capa'),'Management review center must load CAPA center.');
+require('./personal-finance-recovery-capa-effectiveness-analytics-test');
 console.log('Personal Finance Recovery CAPA & Continuous Improvement safeguards passed.');
