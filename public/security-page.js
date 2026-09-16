@@ -41,5 +41,14 @@ document.getElementById('mfaConfirmForm').addEventListener('submit', async (even
   document.getElementById('mfaSetup').hidden = true;
   document.getElementById('mfaStartForm').hidden = true;
 });
+function loadProductionReadinessAssuranceCenter() {
+  if (document.querySelector('script[data-production-readiness-assurance]')) return;
+  const script = document.createElement('script');
+  script.src = '/production-readiness-assurance-center.js?v=20260917-production-readiness-assurance';
+  script.defer = true;
+  script.dataset.productionReadinessAssurance = '1';
+  document.head.appendChild(script);
+}
 loadSessions();
 loadMfaStatus();
+loadProductionReadinessAssuranceCenter();
