@@ -197,3 +197,13 @@ document.addEventListener('DOMContentLoaded', () => {
   script.dataset.personalFinanceSecurityPrivacy = 'true';
   document.head.appendChild(script);
 });
+
+// Personal Finance Backup, Recovery & Data Portability Center. It waits for the security/privacy center and is recovery-preview only.
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.querySelector('script[data-personal-finance-backup-recovery]')) return;
+  const script = document.createElement('script');
+  script.src = '/personal-finance-backup-recovery-data-portability.js?v=20260916-backup-recovery';
+  script.defer = true;
+  script.dataset.personalFinanceBackupRecovery = 'true';
+  document.head.appendChild(script);
+});
