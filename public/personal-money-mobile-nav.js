@@ -4,7 +4,7 @@
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};
   const fmtDay=(v)=>new Intl.DateTimeFormat('en-AU',{weekday:'short',day:'numeric',month:'short'}).format(new Date(`${String(v).slice(0,10)}T00:00:00`));
   const endpoints={smart:'/api/finance/personal-money/smart',attention:'/api/finance/personal-money/attention',roadmaps:'/api/finance/personal-money/roadmaps'};
-  let snapshot=null;
+  let snapshot=null,installAttempts=0;
 
   async function get(url){const r=await fetch(url,{credentials:'same-origin'});let p={};try{p=await r.json();}catch{}if(!r.ok)throw new Error(p.message||`Request failed (${r.status})`);return p;}
   async function load(){const results=await Promise.allSettled(Object.entries(endpoints).map(async([key,url])=>[key,await get(url)]));snapshot={};results.forEach(r=>{if(r.status==='fulfilled')snapshot[r.value[0]]=r.value[1];});renderPriority();renderWeek();updateBadges();}
@@ -22,8 +22,13 @@
     @media(max-width:760px){body{padding-bottom:76px}.pmn-bottom{position:fixed;z-index:999;left:8px;right:8px;bottom:max(8px,env(safe-area-inset-bottom));display:grid;grid-template-columns:repeat(5,1fr);gap:4px;padding:7px;border-radius:18px;background:rgba(12,18,28,.96);border:1px solid rgba(255,255,255,.10);backdrop-filter:blur(18px);box-shadow:0 12px 35px rgba(0,0,0,.35)}.pmn-bottom button{position:relative;min-height:50px;border:0;background:transparent;font-size:.72rem;padding:6px 2px}.pmn-bottom button span{display:block;font-size:1.05rem;margin-bottom:2px}.pmn-bottom button.active{background:rgba(59,130,246,.12);border-radius:12px}.pmn-week{grid-template-columns:repeat(7,128px)}}
   `;document.head.appendChild(s);}
 
-  function install(){if($('personalMoneyMobileNav'))return;style();
-    const home=$('personalMoneyHomePanel');if(home){const top=document.createElement('div');top.id='pmnPriority';top.className='pmn-priority';top.innerHTML='<p>Checking what matters most…</p>';home.querySelector('.pmh-actions')?.insertAdjacentElement('afterend',top);const week=document.createElement('section');week.id='pmnWeekPanel';week.className='pmh-card';week.innerHTML='<p class="eyebrow">THIS WEEK</p><h3>Next 7 days</h3><div id="pmnWeek" class="pmn-week"><p class="muted">Loading timeline…</p></div>';top.insertAdjacentElement('afterend',week);}
+  function install(){
+    if($('personalMoneyMobileNav'))return;
+    const home=$('personalMoneyHomePanel');
+    if(!home){if(installAttempts++<50)return setTimeout(install,100);return;}
+    style();
+    const top=document.createElement('div');top.id='pmnPriority';top.className='pmn-priority';top.innerHTML='<p>Checking what matters most…</p>';home.querySelector('.pmh-actions')?.insertAdjacentElement('afterend',top);
+    const week=document.createElement('section');week.id='pmnWeekPanel';week.className='pmh-card';week.innerHTML='<p class="eyebrow">THIS WEEK</p><h3>Next 7 days</h3><div id="pmnWeek" class="pmn-week"><p class="muted">Loading timeline…</p></div>';top.insertAdjacentElement('afterend',week);
     collapseAdvanced();
     const nav=document.createElement('nav');nav.id='personalMoneyMobileNav';nav.className='pmn-bottom';nav.setAttribute('aria-label','Personal money navigation');nav.innerHTML=`
       <button type="button" data-pmn-target="personalMoneyHomePanel" class="active"><span>⌂</span>Home</button>
@@ -37,7 +42,7 @@
     load().catch(()=>{});
   }
 
-  function collapseAdvanced(){const content=$('pmhContent');if(!content)return;const observer=new MutationObserver(()=>{if($('pmnAdvancedDetails'))return;const quick=content.querySelector('.pmh-quick');if(!quick)return;const title=quick.previousElementSibling;const details=document.createElement('details');details.id='pmnAdvancedDetails';details.className='pmn-advanced';details.innerHTML='<summary>Advanced tools</summary><div></div>';quick.parentNode.insertBefore(details,title||quick);const holder=details.querySelector('div');if(title)holder.appendChild(title);holder.appendChild(quick);});observer.observe(content,{childList:true,subtree:false});}
+  function collapseAdvanced(){const content=$('pmhContent');if(!content)return;const wrap=()=>{if($('pmnAdvancedDetails'))return;const quick=content.querySelector('.pmh-quick');if(!quick)return;const title=quick.previousElementSibling;const details=document.createElement('details');details.id='pmnAdvancedDetails';details.className='pmn-advanced';details.innerHTML='<summary>Advanced tools</summary><div></div>';quick.parentNode.insertBefore(details,title||quick);const holder=details.querySelector('div');if(title)holder.appendChild(title);holder.appendChild(quick);};wrap();const observer=new MutationObserver(wrap);observer.observe(content,{childList:true,subtree:false});}
 
   function severityScore(a){return ({URGENT:4,HIGH:3,MEDIUM:2,LOW:1})[String(a?.severity||'').toUpperCase()]||0;}
   function renderPriority(){const host=$('pmnPriority');if(!host)return;const alerts=snapshot?.attention?.alerts||[];const activeRoads=(snapshot?.roadmaps?.roadmaps||[]).filter(r=>r.status==='ACTIVE');const behind=activeRoads.filter(r=>r.intelligence?.trajectory==='BEHIND');const urgent=alerts.filter(a=>severityScore(a)>=3).sort((a,b)=>severityScore(b)-severityScore(a));let title='You are clear for now';let text='No high-priority personal money action is currently visible.';let cls='pmn-priority good';if(urgent.length){title=urgent[0].title;text=`Highest priority: ${urgent[0].explanation||'Review this item today.'}`;cls='pmn-priority';}else if(behind.length){title=`${behind[0].name} needs attention`;text=behind[0].intelligence?.action_text||behind[0].intelligence?.what_to_do_this_month||'Review your roadmap progress this month.';cls='pmn-priority';}host.className=cls;host.innerHTML=`<p class="eyebrow">TOP PRIORITY</p><h3>${esc(title)}</h3><p>${esc(text)}</p>`;}
