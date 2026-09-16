@@ -1,0 +1,17 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-recovery-assurance-evidence-integrity.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-assurance-evidence-lineage.js','utf8');
+for(const endpoint of ['?control_testing=1','?capa=1','?governance_review=1','?cases=1'])assert(ui.includes(endpoint),`Integrity center must compose protected source ${endpoint}.`);
+for(const label of ['EVIDENCE INTEGRITY & TAMPER VERIFICATION CENTER','Certificate chain failures','Review hash failures','Reference failures','Verification levels are explicit','read-only integrity verification','does not infer a root cause'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Integrity UI must explain ${label}.`);
+for(const state of ['ATTENTION_REQUIRED','NO_OBSERVED_INTEGRITY_BREAK','FAILED','CHAIN_CONTINUITY_VERIFIED','VERIFIED'])assert(ui.includes(state),`Integrity center must expose ${state}.`);
+for(const issue of ['CERTIFICATE_SEQUENCE_GAP','PREVIOUS_CERTIFICATE_HASH_MISMATCH','PACKAGE_HASH_CHANGED_WITHIN_RUN','SERVER_HASH_VERIFICATION_FAILED','PREVIOUS_REVIEW_HASH_MISMATCH','CERTIFICATE_RESTORE_RUN_MISMATCH'])assert(ui.includes(issue),`Integrity center must detect ${issue}.`);
+assert(ui.includes("r.integrity?.verified!==true"),'Management review integrity must rely on server-side SHA-256 recomputation result.');
+assert(ui.includes('full_certificate_payload_hash_recompute_not_claimed:true'),'Integrity model must not overclaim browser-side certificate payload hash recomputation.');
+assert(ui.includes("credentials:'same-origin'"),'Integrity reads must remain authenticated through protected owner-scoped endpoints.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Integrity center must remain read-only.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Integrity center must not call finance mutation endpoints.');
+assert(ui.includes('no_automatic_repair:true')&&ui.includes('no_finance_changes:true')&&ui.includes('no_causation_inference:true'),'Integrity model must prohibit repair, finance mutation and causation inference.');
+assert(ui.includes('It is not a guarantee that every underlying evidence byte is unchanged'),'UI must clearly state verification limitations.');
+assert(loader.includes('/personal-finance-recovery-assurance-evidence-integrity.js?v=20260917-recovery-assurance-evidence-integrity'),'Lineage center must load evidence integrity verification.');
+console.log('Personal Finance Recovery Assurance Evidence Integrity & Tamper Verification safeguards passed.');
