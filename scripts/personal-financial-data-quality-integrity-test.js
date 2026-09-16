@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-financial-data-quality-integrity.js','utf8');
+const controller=fs.readFileSync('controllers/personalFinancialDataQualityController.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
+const control=fs.readFileSync('public/personal-financial-control-center.js','utf8');
+
+assert(control.includes('/personal-financial-data-quality-integrity.js?v=20260916-data-quality-integrity'),'Control Center must load Data Quality & Integrity Center.');
+assert(ui.includes('/api/finance/personal-money/data-quality-integrity'),'Integrity UI must use the dedicated owner-private endpoint.');
+assert(ui.includes("credentials:'same-origin'"),'Integrity UI must preserve authenticated same-origin credentials.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Integrity UI must remain API read-only.');
+for(const label of ['PERSONAL FINANCIAL DATA QUALITY & INTEGRITY CENTER','Possible duplicate transactions','Possible missing statement periods','Cash movements needing more detail','Wallet / bank double-counting review','Statement import issues','How to read these signals'])assert(ui.includes(label),`Integrity Center must explain ${label}.`);
+assert(routes.includes("router.get('/personal-money/data-quality-integrity', requireAnyPermission('VIEW_BANKING'), personalFinancialDataQuality.getCenter)"),'Integrity endpoint must require VIEW_BANKING.');
+assert(controller.includes("ownership_scope='PERSONAL'")&&controller.includes('created_by=?'),'Bank integrity queries must be PERSONAL and owner-scoped.');
+assert(controller.includes('user_id=?'),'Personal Money integrity queries must remain owner-scoped.');
+assert(controller.includes("company accounting is excluded")||controller.includes('company accounting is excluded'),'Integrity response must exclude company accounting.');
+for(const phrase of ['only a double-counting risk signal','may include legitimate repeated transactions','may be genuine','not automatically reclassified'])assert(controller.includes(phrase),`Integrity heuristics must disclose: ${phrase}`);
+assert(ui.includes('never deletes transactions')&&ui.includes('Any future correction must require your explicit approval'),'Integrity UI must prohibit automatic corrections and require explicit approval.');
+for(const prohibited of ['createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','recordDebtPayment','UPDATE bank_transactions','DELETE FROM bank_transactions'])assert(!ui.includes(prohibited),`Integrity UI must not contain mutation path: ${prohibited}`);
+console.log('Personal Financial Data Quality & Integrity Center regression checks passed.');
