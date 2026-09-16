@@ -20,3 +20,4 @@ assert.match(js, /loadSecurityCentre/);
 assert.match(js, /hasCurrentPermission\('MANAGE_SECURITY'\)/);
 
 console.log('Security dashboard tests passed.');
+require('./production-readiness-assurance-center-test.js');

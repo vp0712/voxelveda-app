@@ -1,0 +1,16 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/production-readiness-assurance-center.js','utf8');
+const loader=fs.readFileSync('public/security-page.js','utf8');
+const routes=fs.readFileSync('routes/readinessRoutes.js','utf8');
+const runtime=fs.readFileSync('services/runtimeState.js','utf8');
+assert(ui.includes("ENDPOINT='/api/security/readiness'"),'Readiness center must use the protected runtime-readiness endpoint.');
+assert(routes.includes("requireAnyPermission('MANAGE_SECURITY', 'VIEW_SECURITY_GOVERNANCE')"),'Detailed readiness must remain permission protected.');
+for(const key of ['database_tls','database_least_privilege','backup_provider','malware_scanner','smtp','canonical_domain','redis_limiter','webauthn','object_storage'])assert(runtime.includes(`'${key}'`)&&ui.includes(`${key}:`),`Readiness center must explain ${key}.`);
+for(const state of ['EXTERNALLY_VERIFIED','OPERATIONAL','CONFIGURED','DEGRADED','FAILED','NOT_CONFIGURED'])assert(ui.includes(state),`UI must distinguish ${state}.`);
+assert(ui.includes('Configured is not the same as verified.'),'UI must prevent configuration from being presented as verification.');
+assert(ui.includes('does not change Railway, database, DNS, email, backup or security-provider settings'),'Center must remain read-only.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Readiness center must not perform infrastructure mutations.');
+assert(ui.includes('Download readiness JSON')&&ui.includes('Refresh live evidence'),'UI must provide understandable operator actions.');
+assert(loader.includes('/production-readiness-assurance-center.js?v=20260917-production-readiness-assurance'),'Security page must load the readiness center.');
+console.log('Production Readiness & External Assurance Center safeguards passed.');
