@@ -2,6 +2,7 @@ const fs=require('fs');
 const assert=require('assert');
 const controller=fs.readFileSync('controllers/personalSpendingChallengeController.js','utf8');
 const ui=fs.readFileSync('public/personal-spending-challenges.js','utf8');
+const patterns=fs.readFileSync('public/personal-spending-patterns.js','utf8');
 const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
 const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
 const migration=fs.readFileSync('migrations/20260916_personal_spending_challenges.sql','utf8');
@@ -25,4 +26,15 @@ for(const type of ['CATEGORY_CAP','NO_SPEND','REDUCE_PERCENT','SAVE_VS_BASELINE'
 for(const text of ['Use previous same-length period','current streak','Advisory only','Nothing here can decline a payment or move money','currencies separate'])assert(ui.toLowerCase().includes(text.toLowerCase()),`Challenge UI must explain ${text}.`);
 for(const prohibited of ['/payments','/reconcile','/insights/','createJournal','finance_transactions','POST_TRANSACTION'])assert(!ui.includes(prohibited),`Challenge UI must not contain financial mutation path: ${prohibited}`);
 assert(ui.includes("method:'POST'")&&ui.includes('/status'),'Challenge UI may write challenge metadata/status only.');
-console.log('Spending Goals and No-Spend Challenges regression checks passed.');
+
+assert(loader.includes('/personal-spending-patterns.js?v=20260916-behaviour-patterns'),'Protected Personal Money chain must load Spending Behaviour Patterns.');
+assert(patterns.includes('/api/finance/personal-money/spending-challenges/progress'),'Behaviour Patterns must reuse the owner-private progress feed.');
+assert(patterns.includes("credentials:'same-origin'"),'Behaviour Patterns must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(patterns),'Behaviour Patterns must remain read-only.');
+for(const prohibited of ['finance_transactions','createJournal','POST_TRANSACTION','/payments','/reconcile','/insights/${','/apply'])assert(!patterns.includes(prohibited),`Behaviour Patterns must not contain mutation path: ${prohibited}`);
+for(const label of ['Weekend share','Frequent small purchases','Merchant concentration','Spending-day frequency','Highest-spend weekday','Category change'])assert(patterns.includes(label),`Behaviour Patterns must explain ${label}.`);
+assert(patterns.includes('not trustworthy time-of-day for every purchase'),'Behaviour Patterns must disclose time-of-day data limits.');
+assert(patterns.includes('payday correlation is not inferred without income-date evidence'),'Behaviour Patterns must not infer payday behaviour without income evidence.');
+assert(patterns.includes('currencies kept separate'),'Behaviour Patterns must keep currencies separate.');
+assert(patterns.includes('never saved as a behavioural profile'),'Behaviour Patterns must explain that inferred patterns are not persisted.');
+console.log('Spending Goals, No-Spend Challenges and Behaviour Patterns regression checks passed.');
