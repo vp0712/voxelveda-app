@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const controller=fs.readFileSync('controllers/personalFinanceCanonicalBackupController.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
+const ui=fs.readFileSync('public/personal-finance-canonical-backup-engine.js','utf8');
+const step=fs.readFileSync('public/step-up.js','utf8');
+
+assert(routes.includes("router.get('/personal-money/canonical-backup', requireAnyPermission('VIEW_BANKING'), requireStepUp('EXPORT_PERSONAL_FINANCE_BACKUP')"),'Canonical backup endpoint must require VIEW_BANKING and fresh step-up authentication.');
+assert(step.includes('/personal-finance-canonical-backup-engine.js?v=20260916-canonical-backup'),'Authenticated shell must load Canonical Personal Finance Backup Engine.');
+for(const label of ['VOXEL_VEDA_PERSONAL_FINANCE_CANONICAL_BACKUP','PERSONAL_ONLY','owner_binding_sha256','record_sha256','dataset_sha256','package_sha256','dependency_order','rollback_checkpoint_required','transaction_required'])assert(controller.includes(label),`Canonical engine must include ${label}.`);
+for(const table of ['bank_accounts','bank_transactions','personal_money_wallets','personal_money_entries','personal_money_debts','personal_money_debt_payments','personal_money_budgets','personal_money_recurring_items','personal_money_recurring_matches','personal_money_savings_goals','personal_money_goal_contributions','personal_money_safety_buffers','personal_net_worth_assets','personal_net_worth_asset_values','personal_net_worth_liabilities','personal_net_worth_liability_values','personal_net_worth_snapshots','personal_asset_lifecycle_items','personal_asset_documents','personal_finance_saved_views','personal_spending_challenges','personal_financial_roadmaps','personal_financial_roadmap_milestones'])assert(controller.includes(table),`Canonical engine must cover source table ${table}.`);
+assert(controller.includes("ba.created_by=? AND ba.ownership_scope='PERSONAL'")&&controller.includes("bt.ownership_scope='PERSONAL'"),'Bank backup queries must be owner-scoped and PERSONAL-only.');
+assert(controller.includes('delete out.user_id')&&controller.includes('delete out.created_by'),'Portable records must strip database owner identifiers.');
+assert(!controller.includes('bank_connections')&&!controller.includes('provider_connection_id'),'Canonical package must not export bank-connection consent/credential state.');
+assert(ui.includes("fetch('/api/finance/personal-money/canonical-backup'")&&ui.includes("credentials:'same-origin'"),'Canonical UI must use the protected same-origin endpoint.');
+for(const cryptoMark of ["crypto.subtle.digest('SHA-256'","name:'AES-GCM'","name:'PBKDF2'",'iterations:310000'])assert(ui.includes(cryptoMark),`Canonical UI must include ${cryptoMark}.`);
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Canonical UI must not call a finance mutation endpoint.');
+assert(controller.includes("write_mode:'DISABLED_IN_CANONICAL_BACKUP_ENGINE'")&&ui.includes('does not yet execute Add/Replace writes'),'Restore execution must remain fail-closed in this engine.');
+assert(routes.includes("router.post('/accounting-periods/:id/status', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), operations.updateAccountingPeriod);"),'Canonical work must not regress the existing accounting-period route.');
+console.log('Personal Finance Canonical Backup Engine regression checks passed.');
