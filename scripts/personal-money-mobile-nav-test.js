@@ -1,6 +1,9 @@
 const fs=require('fs');
 const assert=require('assert');
 const nav=fs.readFileSync('public/personal-money-mobile-nav.js','utf8');
+const brief=fs.readFileSync('public/personal-money-daily-briefing.js','utf8');
+const controller=fs.readFileSync('controllers/personalMoneyDailyBriefingController.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
 const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
 assert(loader.includes('/personal-money-mobile-nav.js?v=20260916-mobile-nav'),'Mobile money navigation must load from the existing protected personal-money chain.');
 for(const endpoint of ['/api/finance/personal-money/smart','/api/finance/personal-money/attention','/api/finance/personal-money/roadmaps'])assert(nav.includes(endpoint),`Mobile layer must read ${endpoint}.`);
@@ -13,4 +16,18 @@ for(const label of ['Home','Transactions','Plans','Wealth','More'])assert(nav.in
 for(const target of ['personalMoneyHomePanel','personalMoneyPanel','roadmapPanel','personalNetWorthPanel','pmnAdvancedDetails'])assert(nav.includes(target),`Bottom navigation must target ${target}.`);
 assert(nav.includes('Advanced tools'),'Advanced modules must be collapsible by default.');
 for(const prohibited of ['finance_transactions','createJournal','INSERT INTO','UPDATE finance_','POST_TRANSACTION'])assert(!nav.includes(prohibited),`Mobile navigation must not contain accounting mutation path: ${prohibited}`);
-console.log('Personal Money mobile priority/navigation regression checks passed.');
+
+assert(nav.includes('/personal-money-daily-briefing.js?v=20260916-daily-briefing'),'Mobile navigation must load Smart Daily Money Briefing.');
+assert(routes.includes("router.get('/personal-money/daily-briefing', requireAnyPermission('VIEW_BANKING'), personalMoneyDailyBriefing.getDailyBriefing)"),'Daily briefing route must be VIEW_BANKING protected and GET-only.');
+assert(controller.includes("ba.created_by=? AND ba.ownership_scope='PERSONAL' AND bt.ownership_scope='PERSONAL'"),'Daily briefing must restrict bank activity to the signed-in user’s PERSONAL data.');
+assert(controller.includes('bt.is_internal_transfer=0'),'Daily briefing must exclude confirmed internal transfers.');
+assert(controller.includes("/^\\d{4}-\\d{2}-\\d{2}$/"),'Daily briefing must validate the phone-provided local calendar date.');
+assert(controller.includes('partial-day view'),'Daily briefing API must explain that today is a partial day.');
+for(const mutation of ['INSERT INTO','UPDATE bank_','DELETE FROM','createJournal','finance_transactions'])assert(!controller.includes(mutation),`Daily briefing controller must remain read-only: ${mutation}`);
+for(const endpoint of ['/api/finance/personal-money/daily-briefing','/api/finance/personal-money/attention','/api/finance/personal-money/smart','/api/finance/personal-money/health','/api/finance/personal-money/roadmaps'])assert(brief.includes(endpoint),`Daily briefing UI must read ${endpoint}.`);
+assert(brief.includes("credentials:'same-origin'"),'Daily briefing UI must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(brief),'Daily briefing UI must remain read-only.');
+for(const heading of ['What changed since yesterday?','What needs action today?','What is due this week?','Am I spending faster than normal?','What should I check next?'])assert(brief.includes(heading),`Daily briefing must explain: ${heading}`);
+assert(brief.includes('transactions currently imported or synced'),'Daily briefing must explain data freshness.');
+assert(brief.includes('currencies remain separate'),'Daily briefing must explain currency separation.');
+console.log('Personal Money mobile navigation and Smart Daily Briefing regression checks passed.');

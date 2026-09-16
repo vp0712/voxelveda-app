@@ -12,6 +12,7 @@ const personalMoneyAttention = require('../controllers/personalMoneyAttentionCon
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
+const personalMoneyDailyBriefing = require('../controllers/personalMoneyDailyBriefingController');
 const personalNetWorth = require('../controllers/personalNetWorthController');
 const personalAssetLifecycle = require('../controllers/personalAssetLifecycleController');
 const personalFinancialRoadmap = require('../controllers/personalFinancialRoadmapController');
@@ -63,6 +64,7 @@ router.get('/personal-money/review-inbox', requireAnyPermission('VIEW_BANKING'),
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/confirm', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.confirmMatch);
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/dismiss', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.dismissMatch);
 router.get('/personal-money/health', requireAnyPermission('VIEW_BANKING'), personalMoneyHealth.getHealthDashboard);
+router.get('/personal-money/daily-briefing', requireAnyPermission('VIEW_BANKING'), personalMoneyDailyBriefing.getDailyBriefing);
 router.get('/personal-money/net-worth', requireAnyPermission('VIEW_BANKING'), personalNetWorth.getDashboard);
 router.post('/personal-money/net-worth/assets', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.createAsset);
 router.post('/personal-money/net-worth/assets/:id/value', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.updateAssetValue);
