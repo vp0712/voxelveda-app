@@ -9,9 +9,10 @@ for(const issue of ['CERTIFICATE_SEQUENCE_GAP','PREVIOUS_CERTIFICATE_HASH_MISMAT
 assert(ui.includes("r.integrity?.verified!==true"),'Management review integrity must rely on server-side SHA-256 recomputation result.');
 assert(ui.includes('full_certificate_payload_hash_recompute_not_claimed:true'),'Integrity model must not overclaim browser-side certificate payload hash recomputation.');
 assert(ui.includes("credentials:'same-origin'"),'Integrity reads must remain authenticated through protected owner-scoped endpoints.');
-assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Integrity center must remain read-only.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Integrity center itself must remain read-only; investigation writes belong to the separately loaded protected investigation center.');
 assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Integrity center must not call finance mutation endpoints.');
 assert(ui.includes('no_automatic_repair:true')&&ui.includes('no_finance_changes:true')&&ui.includes('no_causation_inference:true'),'Integrity model must prohibit repair, finance mutation and causation inference.');
 assert(ui.includes('It is not a guarantee that every underlying evidence byte is unchanged'),'UI must clearly state verification limitations.');
 assert(loader.includes('/personal-finance-recovery-assurance-evidence-integrity.js?v=20260917-recovery-assurance-evidence-integrity'),'Lineage center must load evidence integrity verification.');
 console.log('Personal Finance Recovery Assurance Evidence Integrity & Tamper Verification safeguards passed.');
+require('./personal-finance-recovery-assurance-exception-investigation-test');
