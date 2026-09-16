@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 const {
   grantIsUnsafeGlobal,
   verifyRuntimeDatabaseIdentity
@@ -13,15 +15,11 @@ async function run() {
 
   const safeDb = {
     async query(sql) {
-      if (sql.startsWith('SELECT CURRENT_USER()')) {
-        return [[{ runtime_user: 'voxelveda_app@%', runtime_database: 'railway' }]];
-      }
-      if (sql === 'SHOW GRANTS') {
-        return [[
-          { Grants_for_voxelveda_app: 'GRANT USAGE ON *.* TO `voxelveda_app`@`%`' },
-          { Grants_for_voxelveda_app: 'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, REFERENCES, CREATE VIEW, SHOW VIEW, TRIGGER, EXECUTE ON `railway`.* TO `voxelveda_app`@`%`' }
-        ]];
-      }
+      if (sql.startsWith('SELECT CURRENT_USER()')) return [[{ runtime_user: 'voxelveda_app@%', runtime_database: 'railway' }]];
+      if (sql === 'SHOW GRANTS') return [[
+        { Grants_for_voxelveda_app: 'GRANT USAGE ON *.* TO `voxelveda_app`@`%`' },
+        { Grants_for_voxelveda_app: 'GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, INDEX, ALTER, REFERENCES, CREATE VIEW, SHOW VIEW, TRIGGER, EXECUTE ON `railway`.* TO `voxelveda_app`@`%`' }
+      ]];
       throw new Error(`Unexpected SQL: ${sql}`);
     }
   };
@@ -35,12 +33,8 @@ async function run() {
 
   const rootDb = {
     async query(sql) {
-      if (sql.startsWith('SELECT CURRENT_USER()')) {
-        return [[{ runtime_user: 'root@%', runtime_database: 'railway' }]];
-      }
-      if (sql === 'SHOW GRANTS') {
-        return [[{ Grants_for_root: 'GRANT ALL PRIVILEGES ON *.* TO `root`@`%` WITH GRANT OPTION' }]];
-      }
+      if (sql.startsWith('SELECT CURRENT_USER()')) return [[{ runtime_user: 'root@%', runtime_database: 'railway' }]];
+      if (sql === 'SHOW GRANTS') return [[{ Grants_for_root: 'GRANT ALL PRIVILEGES ON *.* TO `root`@`%` WITH GRANT OPTION' }]];
       throw new Error(`Unexpected SQL: ${sql}`);
     }
   };
@@ -50,6 +44,21 @@ async function run() {
   assert.strictEqual(unsafe.root_identity, true);
   assert.strictEqual(unsafe.unsafe_global_grant, true);
   assert.strictEqual(unsafe.has_grant_option, true);
+
+  const service = fs.readFileSync(path.join(__dirname, '..', 'services', 'databaseRuntimeService.js'), 'utf8');
+  const state = fs.readFileSync(path.join(__dirname, '..', 'services', 'runtimeState.js'), 'utf8');
+  const readiness = fs.readFileSync(path.join(__dirname, '..', 'public', 'production-readiness-assurance-center.js'), 'utf8');
+  assert.match(service, /probeDatabaseTlsCapability/);
+  assert.match(service, /SHOW SESSION STATUS LIKE 'Ssl_cipher'/);
+  assert.match(service, /DB_TLS_REQUIRED: 'true'/);
+  assert.match(service, /connection\.end\(\)/);
+  assert.match(service, /Database transport evidence:/);
+  assert.match(service, /Database privilege evidence:/);
+  assert.match(state, /tls_capable/);
+  assert.match(state, /least_privilege_source/);
+  assert.match(readiness, /Database connection evidence/);
+  assert.match(readiness, /TLS capable/);
+  assert.match(readiness, /Runtime user/);
 
   console.log('Database runtime verification regression test passed.');
 }
