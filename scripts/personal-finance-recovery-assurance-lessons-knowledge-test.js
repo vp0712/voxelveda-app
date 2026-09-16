@@ -10,7 +10,10 @@ for(const f of ['lesson_key','source_investigation_ids_json','linked_capa_ids_js
 for(const state of ['DRAFT','APPROVED','IN_PROGRESS','IMPLEMENTED','EFFECTIVENESS_REVIEW','CLOSED'])assert(migration.includes(state),`Lessons lifecycle must include ${state}.`);
 assert(controller.includes('WHERE id=? AND user_id=?')&&controller.includes('WHERE user_id=? ORDER BY'),'Lessons must remain owner scoped.');
 assert(controller.includes('validateInvestigations(userId,sources)'),'Lesson creation/approval must validate source investigations.');
-assert(controller.includes('Approval requires owner, source investigation, evidence, action plan, knowledge summary and recommended practice'),'Approval must require a complete governance package.');
+assert(controller.includes('concrete improvement action'),'Approval must require a concrete improvement action.');
+assert(controller.includes("text(action.improvement_action,1000)"),'Placeholder action-plan metadata must not satisfy approval.');
+assert(controller.includes('Independent reviewer must be different from the action owner'),'Approval must enforce reviewer independence from the action owner.');
+assert(controller.includes("approval=materialChanged?'NOT_REVIEWED':r.approval_status")&&controller.includes('approval_invalidated'),'Material lesson changes must invalidate prior approval.');
 assert(controller.includes("r.approval_status!=='APPROVED'"),'Implementation and closure must require independent approval.');
 assert(controller.includes("r.effectiveness_result!=='EFFECTIVE'"),'Final closure must require an Effective effectiveness result.');
 assert(controller.includes('Closure requires effectiveness evidence and a closure note'),'Closure must require supporting evidence and closure rationale.');
