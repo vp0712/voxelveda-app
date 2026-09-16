@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-financial-decision-assistant]')){const a=document.createElement('script');a.src='/financial-decision-assistant.js?v=20260916-decision-assistant';a.dataset.financialDecisionAssistant='1';document.head.appendChild(a);}
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};
   const today=()=>new Date().toISOString().slice(0,10),daysFromNow=n=>{const d=new Date();d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);};
