@@ -13,8 +13,7 @@ const routes = read('routes/financeRoutes.js');
 const controller = read('controllers/financeBankingReadinessController.js');
 const providerService = read('services/openBankingProviderService.js');
 const html = read('public/finance-intelligence.html');
-const loader = read('public/finance-banking-readiness.js');
-const client = read('public/finance-banking-readiness-core.js');
+const client = read('public/finance-banking-readiness.js');
 const css = read('public/finance-banking-readiness.css');
 
 assert(routes.includes("router.get('/intelligence/banking-readiness'"), 'Banking readiness API route is missing.');
@@ -28,8 +27,7 @@ assert(controller.includes('productionBankFeedReady'), 'Open Banking must calcul
 assert(controller.includes("bankEnvironment === 'PRODUCTION' && liveEnabled"), 'Production Open Banking must require explicit production environment and live-sync enablement.');
 assert(html.includes('Banking Setup & Safety'), 'Finance Intelligence safety entry is missing.');
 assert(html.includes('bankingSafetyControls'), 'Finance Intelligence safety controls are missing.');
-assert(html.includes('/finance-banking-readiness.js'), 'Finance banking readiness loader is not loaded.');
-assert(loader.includes('/finance-banking-readiness-core.js'), 'Banking readiness loader must load the protected core client.');
+assert(html.includes('/finance-banking-readiness.js'), 'Finance banking readiness client is not loaded.');
 assert(client.includes("data.readinessBlocked") || client.includes("dataset.readinessBlocked"), 'Connect Bank readiness guard is missing.');
 assert(client.includes('stopImmediatePropagation'), 'Connect Bank must be blocked before the unverified provider request is sent.');
 assert(css.includes('.safety-status.ready'), 'Banking readiness status styles are missing.');
