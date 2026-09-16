@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-personal-money-daily-briefing]')){const b=document.createElement('script');b.src='/personal-money-daily-briefing.js?v=20260916-daily-briefing';b.dataset.personalMoneyDailyBriefing='1';document.head.appendChild(b);}
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};
