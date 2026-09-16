@@ -1,8 +1,9 @@
+(() => {if(!document.querySelector('script[data-personal-year-end-accountant-handover]')){const s=document.createElement('script');s.src='/personal-year-end-accountant-handover.js?v=20260916-year-end-handover';s.dataset.personalYearEndAccountantHandover='1';document.head.appendChild(s);}})();
 (() => {
   const API='/api/finance/personal-money/net-worth/lifecycle';
   const TAX_KEY='voxelveda.personal-tax-review.v1';
   const $=id=>document.getElementById(id);
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const today=()=>new Date().toISOString().slice(0,10);
   const currentFY=()=>{const d=new Date();return d.getMonth()>=6?d.getFullYear():d.getFullYear()-1;};
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};

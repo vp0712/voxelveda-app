@@ -21,4 +21,5 @@ assert(ui.includes('Company documents are not included'),'Vault must remain sepa
 assert(lifecycle.includes("WHERE d.user_id=?"),'Underlying document read must remain owner-scoped.');
 assert(lifecycle.includes("DELETE FROM personal_asset_documents WHERE id=? AND user_id=?"),'Document removal must remain owner-scoped.');
 assert(lifecycle.includes("if(!/^https:\\/\\//i.test(url))"),'Document references must require HTTPS.');
+require('./personal-year-end-accountant-handover-test');
 console.log('Personal Financial Document & Evidence Vault regression checks passed.');
