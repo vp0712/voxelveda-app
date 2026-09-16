@@ -1,5 +1,6 @@
 (() => {
   if(!document.querySelector('script[data-personal-money-home]')){const h=document.createElement('script');h.src='/personal-money-home.js?v=20260916-unified-home';h.dataset.personalMoneyHome='1';document.head.appendChild(h);}
+  if(!document.querySelector('script[data-personal-money-mobile-nav]')){const n=document.createElement('script');n.src='/personal-money-mobile-nav.js?v=20260916-mobile-nav';n.dataset.personalMoneyMobileNav='1';document.head.appendChild(n);}
   const API='/api/finance/personal-money/roadmaps';
   const $=(id)=>document.getElementById(id);
   const esc=(v)=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
