@@ -1,0 +1,18 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-recovery-assurance-evidence-freshness.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-assurance-executive-command.js','utf8');
+for(const endpoint of ['?control_testing=1','?control_scheduling=1','?capa=1','?governance_review=1'])assert(ui.includes(endpoint),`Freshness monitor must compose protected source ${endpoint}.`);
+for(const label of ['EVIDENCE FRESHNESS & STALENESS MONITORING','Fresh','Aging','Stale','Expired','No test evidence','Overdue evidence requests','Stale CAPA effectiveness','Freshness rules are explicit','Evidence can exist and still be too old','read-only'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Freshness UI must explain ${label}.`);
+for(const state of ['FRESH','AGING','STALE','EXPIRED','NO_TEST_EVIDENCE','NO_ATTESTED_REVIEW','NOT_CHECKED','CLEAR'])assert(ui.includes(state),`Freshness monitor must expose ${state}.`);
+assert(ui.includes("age>75?'STALE':age>45?'AGING':'FRESH'"),'Management-review freshness thresholds must remain explicit.');
+assert(ui.includes("age>90?'STALE':age>60?'AGING':'FRESH'"),'CAPA effectiveness freshness thresholds must remain explicit.');
+assert(ui.includes('until<=14')&&ui.includes("state:'AGING'"),'Test evidence must enter Aging within 14 days of retest.');
+assert(ui.includes("until<0")&&ui.includes("state:'EXPIRED'"),'Test evidence must become Expired after the retest date.');
+assert(ui.includes("credentials:'same-origin'"),'Freshness reads must remain authenticated through existing protected endpoints.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Freshness monitoring must remain read-only.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Freshness monitor must not call finance mutation endpoints.');
+assert(ui.includes('finance_mutations:false')&&ui.includes('no_automatic_assurance_change:true')&&ui.includes('no_causation_inference:true'),'Freshness model must explicitly preserve finance, assurance, and causation boundaries.');
+assert(ui.includes('does not automatically fail a control')&&ui.includes('does not prove causation'),'UI must explain that staleness is evidence age, not automatic control failure or causation.');
+assert(loader.includes('/personal-finance-recovery-assurance-evidence-freshness.js?v=20260917-recovery-assurance-evidence-freshness'),'Executive command center must load evidence freshness monitoring.');
+console.log('Personal Finance Recovery Assurance Evidence Freshness & Staleness safeguards passed.');
