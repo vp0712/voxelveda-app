@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-recovery-management-review-attestation]')){const s=document.createElement('script');s.src='/personal-finance-recovery-management-review-attestation.js?v=20260917-recovery-management-review';s.dataset.personalFinanceRecoveryManagementReviewAttestation='1';document.head.appendChild(s);}
 (() => {
   const API='/api/finance/personal-money/canonical-restore/reporting/certificates?governance_report=1&months=12';
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
