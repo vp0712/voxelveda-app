@@ -1,0 +1,43 @@
+CREATE TABLE IF NOT EXISTS personal_finance_recovery_lessons (
+  id VARCHAR(36) PRIMARY KEY,
+  user_id VARCHAR(191) NOT NULL,
+  lesson_key VARCHAR(255) NOT NULL,
+  discrepancy_code VARCHAR(120) NOT NULL,
+  title VARCHAR(180) NOT NULL,
+  summary VARCHAR(1200) NULL,
+  status ENUM('DRAFT','APPROVED','IN_PROGRESS','IMPLEMENTED','EFFECTIVENESS_REVIEW','CLOSED') NOT NULL DEFAULT 'DRAFT',
+  owner_label VARCHAR(120) NULL,
+  reviewer_label VARCHAR(120) NULL,
+  approval_status ENUM('NOT_REVIEWED','APPROVED','CHANGES_REQUIRED') NOT NULL DEFAULT 'NOT_REVIEWED',
+  source_investigation_ids_json JSON NULL,
+  linked_capa_ids_json JSON NULL,
+  linked_control_categories_json JSON NULL,
+  evidence_refs_json JSON NULL,
+  action_plan_json JSON NULL,
+  knowledge_summary VARCHAR(1600) NULL,
+  applicability VARCHAR(1000) NULL,
+  warning_signs VARCHAR(1000) NULL,
+  recommended_practice VARCHAR(1600) NULL,
+  review_due_at DATETIME NULL,
+  implemented_at DATETIME NULL,
+  effectiveness_result ENUM('NOT_CHECKED','EFFECTIVE','NOT_EFFECTIVE','INSUFFICIENT_EVIDENCE') NOT NULL DEFAULT 'NOT_CHECKED',
+  effectiveness_evidence_json JSON NULL,
+  effectiveness_checked_at DATETIME NULL,
+  closure_note VARCHAR(1000) NULL,
+  closed_at DATETIME NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_pf_recovery_lesson_owner_key (user_id, lesson_key),
+  KEY idx_pf_recovery_lesson_owner_status (user_id, status),
+  KEY idx_pf_recovery_lesson_owner_due (user_id, review_due_at)
+);
+
+CREATE TABLE IF NOT EXISTS personal_finance_recovery_lesson_events (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  lesson_id VARCHAR(36) NOT NULL,
+  user_id VARCHAR(191) NOT NULL,
+  event_type VARCHAR(64) NOT NULL,
+  event_json JSON NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_pf_recovery_lesson_events_owner_lesson (user_id, lesson_id, id)
+);

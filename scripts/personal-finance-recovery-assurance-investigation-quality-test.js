@@ -16,3 +16,4 @@ assert(ui.includes('No investigation or finance record was changed'),'UI must st
 assert(ui.includes('They do not prove cause')||ui.includes('do not prove cause'),'Lessons-learned candidates must not be presented as causal proof.');
 assert(loader.includes('/personal-finance-recovery-assurance-investigation-quality.js?v=20260917-recovery-assurance-investigation-quality'),'Investigation center must load the quality analytics center.');
 console.log('Personal Finance Recovery Assurance Investigation Quality, Recurrence & Lessons-Learned safeguards passed.');
+require('./personal-finance-recovery-assurance-lessons-knowledge-test');
