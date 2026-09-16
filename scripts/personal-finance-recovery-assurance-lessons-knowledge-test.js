@@ -30,3 +30,4 @@ assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/rec
 assert(ui.includes('not proof of cause')||ui.includes('does not establish root cause'),'Candidate patterns must not be presented as causal proof.');
 assert(loader.includes('/personal-finance-recovery-assurance-lessons-knowledge.js?v=20260917-recovery-assurance-lessons-knowledge'),'Investigation workflow must load the lessons knowledge center.');
 console.log('Personal Finance Recovery Assurance Lessons-Learned Action & Knowledge safeguards passed.');
+require('./personal-finance-recovery-assurance-lessons-effectiveness-test');
