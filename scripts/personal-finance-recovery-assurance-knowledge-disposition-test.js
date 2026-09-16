@@ -26,3 +26,4 @@ assert(library.includes("!retired")&&library.includes("['RETIRED','SUPERSEDED']"
 assert(planner.includes('/personal-finance-recovery-assurance-knowledge-disposition.js?v=20260917-recovery-assurance-knowledge-disposition'),'Review planner must load the disposition center.');
 assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Disposition UI must not call finance mutation endpoints.');
 console.log('Personal Finance Recovery Assurance Knowledge Retirement, Supersession & Disposition safeguards passed.');
+require('./personal-finance-recovery-assurance-knowledge-impact-transition-test.js');
