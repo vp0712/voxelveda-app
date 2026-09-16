@@ -12,6 +12,7 @@ const personalMoneyAttention = require('../controllers/personalMoneyAttentionCon
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
+const personalNetWorth = require('../controllers/personalNetWorthController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -60,6 +61,14 @@ router.get('/personal-money/review-inbox', requireAnyPermission('VIEW_BANKING'),
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/confirm', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.confirmMatch);
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/dismiss', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.dismissMatch);
 router.get('/personal-money/health', requireAnyPermission('VIEW_BANKING'), personalMoneyHealth.getHealthDashboard);
+router.get('/personal-money/net-worth', requireAnyPermission('VIEW_BANKING'), personalNetWorth.getDashboard);
+router.post('/personal-money/net-worth/assets', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.createAsset);
+router.post('/personal-money/net-worth/assets/:id/value', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.updateAssetValue);
+router.post('/personal-money/net-worth/assets/:id/archive', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.archiveAsset);
+router.post('/personal-money/net-worth/liabilities', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.createLiability);
+router.post('/personal-money/net-worth/liabilities/:id/balance', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.updateLiabilityBalance);
+router.post('/personal-money/net-worth/liabilities/:id/archive', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.archiveLiability);
+router.post('/personal-money/net-worth/snapshot', requireAnyPermission('EDIT_FINANCE'), personalNetWorth.saveSnapshot);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
