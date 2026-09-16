@@ -1,0 +1,20 @@
+const fs=require('fs');
+const assert=require('assert');
+const register=fs.readFileSync('public/personal-insurance-protection-register.js','utf8');
+const lifecycle=fs.readFileSync('controllers/personalAssetLifecycleController.js','utf8');
+
+assert(register.includes("const API='/api/finance/personal-money/net-worth/lifecycle'"),'Insurance register must reuse the existing owner-private Asset Protection Center API.');
+assert(register.includes("credentials:'same-origin'"),'Insurance register must preserve authenticated same-origin requests.');
+assert(register.includes("body.item_type='INSURANCE'"),'Policy saves must use the existing INSURANCE lifecycle record type.');
+assert(register.includes("body.document_type='POLICY'"),'Policy document references must use the existing POLICY document type.');
+for(const label of ['PERSONAL INSURANCE & PROTECTION REGISTER','Recorded policies','Renewing in 30 days','Annual premium equivalent','Insured amount','Excess','Policy reference','Policy document references'])assert(register.includes(label),`Insurance register must explain ${label}.`);
+assert(register.includes('All currencies (never combined)'),'Insurance register must keep currencies separate.');
+assert(register.includes('Policy references are masked in this screen'),'Insurance register must explain masked policy references.');
+assert(register.includes('does not verify coverage adequacy')&&register.includes('does not buy, renew, cancel'),'Insurance register must disclose policy and action limits.');
+assert(register.includes('explicitly press a save/complete/archive control'),'Record-changing actions must remain explicit user actions.');
+assert(register.includes('INSURANCE_META:'),'Advanced protection metadata must stay attached to the existing insurance lifecycle record instead of creating a duplicate policy database.');
+assert(lifecycle.includes("new Set(['INSURANCE','REGISTRATION','WARRANTY','SERVICE','LOAN_PAYMENT','RATE_REVIEW','TAX','OTHER'])"),'Backend lifecycle controller must allow owner-private insurance records.');
+assert(lifecycle.includes("new Set(['POLICY','REGISTRATION','WARRANTY','LOAN','VALUATION','RECEIPT','TITLE','OTHER'])"),'Backend lifecycle controller must allow private policy document references.');
+assert(lifecycle.includes('WHERE id=? AND user_id=?'),'Lifecycle mutations must remain owner-scoped.');
+for(const prohibited of ['finance_transactions','journal_entries','createJournal','/reconcile','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION'])assert(!register.includes(prohibited),`Insurance register must not use company accounting mutation path: ${prohibited}`);
+console.log('Personal Insurance & Protection Register regression checks passed.');
