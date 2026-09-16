@@ -16,3 +16,4 @@ assert(ui.includes('finance_mutations:false')&&ui.includes('no_automatic_assuran
 assert(ui.includes('does not automatically fail a control')&&ui.includes('does not prove causation'),'UI must explain that staleness is evidence age, not automatic control failure or causation.');
 assert(loader.includes('/personal-finance-recovery-assurance-evidence-freshness.js?v=20260917-recovery-assurance-evidence-freshness'),'Executive command center must load evidence freshness monitoring.');
 console.log('Personal Finance Recovery Assurance Evidence Freshness & Staleness safeguards passed.');
+require('./personal-finance-recovery-assurance-evidence-lineage-test');
