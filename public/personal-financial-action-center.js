@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-personal-subscription-intelligence]')){const s=document.createElement('script');s.src='/personal-subscription-intelligence.js?v=20260916-subscription-intelligence';s.dataset.personalSubscriptionIntelligence='1';document.head.appendChild(s);}
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt',"'":'&#39;','"':'&quot;'}[c]));
   const STORE='voxelveda.personal-financial-action-center.v1';
   async function get(url){const r=await fetch(url,{credentials:'same-origin'});let p={};try{p=await r.json();}catch{}if(!r.ok)throw new Error(p.message||`Request failed (${r.status})`);return p;}
