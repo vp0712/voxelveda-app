@@ -64,10 +64,10 @@ async function main() {
 
   const verifier = await connect({ host: publicHost, port: publicPort, user: appUser, password: appPassword, database });
   try {
-    const [[identity]] = await verifier.query('SELECT CURRENT_USER() AS current_user, DATABASE() AS current_database');
+    const [[identity]] = await verifier.query('SELECT CURRENT_USER() AS runtime_user, DATABASE() AS runtime_database');
     const [grants] = await verifier.query('SHOW GRANTS');
     const grantText = grants.map((row) => String(Object.values(row)[0] || '')).join(' | ');
-    console.log(`Verified public login current_user=${identity.current_user} database=${identity.current_database}`);
+    console.log(`Verified public login runtime_user=${identity.runtime_user} database=${identity.runtime_database}`);
     console.log(`Verified grants=${grantText}`);
   } finally {
     await verifier.end();
