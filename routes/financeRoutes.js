@@ -21,6 +21,7 @@ const personalFinancialRoadmap = require('../controllers/personalFinancialRoadma
 const personalFinancialDataQuality = require('../controllers/personalFinancialDataQualityController');
 const personalFinanceCanonicalBackup = require('../controllers/personalFinanceCanonicalBackupController');
 const personalFinanceCanonicalRestore = require('../controllers/personalFinanceCanonicalRestoreController');
+const personalFinanceRestoreTransport = require('../controllers/personalFinanceRestoreTransportController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -57,6 +58,13 @@ router.get('/personal-money/canonical-restore/status', requireAnyPermission('VIE
 router.post('/personal-money/canonical-restore/dry-run', requireAnyPermission('VIEW_BANKING'), requireStepUp('PREVIEW_PERSONAL_FINANCE_RESTORE'), personalFinanceCanonicalRestore.dryRun);
 router.post('/personal-money/canonical-restore/execute', requireAnyPermission('EDIT_FINANCE'), requireStepUp('RESTORE_PERSONAL_FINANCE'), personalFinanceCanonicalRestore.execute);
 router.post('/personal-money/canonical-restore/:id/rollback', requireAnyPermission('EDIT_FINANCE'), requireStepUp('ROLLBACK_PERSONAL_FINANCE_RESTORE'), personalFinanceCanonicalRestore.rollback);
+router.post('/personal-money/canonical-restore-upload', requireAnyPermission('VIEW_BANKING'), requireStepUp('PREVIEW_PERSONAL_FINANCE_RESTORE'), personalFinanceRestoreTransport.start);
+router.get('/personal-money/canonical-restore-upload/:id', requireAnyPermission('VIEW_BANKING'), personalFinanceRestoreTransport.status);
+router.put('/personal-money/canonical-restore-upload/:id/chunks/:index', requireAnyPermission('VIEW_BANKING'), personalFinanceRestoreTransport.putChunk);
+router.post('/personal-money/canonical-restore-upload/:id/finalize', requireAnyPermission('VIEW_BANKING'), personalFinanceRestoreTransport.finalize);
+router.delete('/personal-money/canonical-restore-upload/:id', requireAnyPermission('VIEW_BANKING'), personalFinanceRestoreTransport.cancel);
+router.post('/personal-money/canonical-restore-upload/:id/dry-run', requireAnyPermission('VIEW_BANKING'), requireStepUp('PREVIEW_PERSONAL_FINANCE_RESTORE'), personalFinanceRestoreTransport.dryRunFromUpload);
+router.post('/personal-money/canonical-restore-upload/:id/execute', requireAnyPermission('EDIT_FINANCE'), requireStepUp('RESTORE_PERSONAL_FINANCE'), personalFinanceRestoreTransport.executeFromUpload);
 router.post('/personal-money/wallets', requireAnyPermission('EDIT_FINANCE'), personalMoney.createWallet);
 router.post('/personal-money/entries', requireAnyPermission('EDIT_FINANCE'), personalMoney.createEntry);
 router.post('/personal-money/debts', requireAnyPermission('EDIT_FINANCE'), personalMoney.createDebt);
