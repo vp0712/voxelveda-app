@@ -16,4 +16,6 @@ assert(ui.includes('automatic_capa_creation:false')&&ui.includes('causation_prov
 assert(ui.includes('Recurrence is a review signal')||ui.includes('not proof that the earlier lesson failed'),'UI must explain recurrence is not causal proof.');
 assert(ui.includes('No lesson, control, CAPA, investigation or finance record was changed'),'UI must state the read-only boundary.');
 assert(loader.includes('/personal-finance-recovery-assurance-lessons-effectiveness.js?v=20260917-recovery-assurance-lessons-effectiveness'),'Lessons knowledge center must load the effectiveness/freshness center.');
+assert(ui.includes('/personal-finance-recovery-assurance-knowledge-library.js?v=20260917-recovery-assurance-knowledge-library'),'Effectiveness center must load the Knowledge Library, Search & Applicability Center.');
 console.log('Personal Finance Recovery Assurance Lessons-Learned Effectiveness, Reuse & Knowledge Freshness safeguards passed.');
+require('./personal-finance-recovery-assurance-knowledge-library-test.js');
