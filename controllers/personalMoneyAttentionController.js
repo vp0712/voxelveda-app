@@ -166,9 +166,10 @@ exports.getAttentionCenter = async (req, res) => {
         suggested_monthly_contribution:months?Math.round(remaining/months*100)/100:null };
     });
 
+    const severityRank = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
     return res.json({
       explanation:'Attention Center shows reminders and planning signals only. It never pays bills, moves money, or posts company accounting entries automatically.',
-      alerts: alerts.sort((a,b) => ({URGENT:0,HIGH:1,MEDIUM:2,LOW:3}[a.severity]-({URGENT:0,HIGH:1,MEDIUM:2,LOW:3}[b.severity])),
+      alerts: alerts.sort((a,b) => (severityRank[a.severity] ?? 99) - (severityRank[b.severity] ?? 99)),
       recurring: recurring.map((r) => ({ ...r, amount:Number(r.amount), annualized_cost:r.item_type==='INCOME'?0:annualized(r.amount,r.frequency) })),
       goals: enrichedGoals,
       current_budgets: budgets.map((b) => ({ ...b, limit_amount:Number(b.limit_amount), spent_amount:Number(b.spent_amount), used_percent:Number(b.limit_amount)>0?Math.round(Number(b.spent_amount)/Number(b.limit_amount)*1000)/10:0 })),
