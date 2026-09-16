@@ -2,6 +2,7 @@ const fs=require('fs');
 const assert=require('assert');
 const nav=fs.readFileSync('public/personal-money-mobile-nav.js','utf8');
 const brief=fs.readFileSync('public/personal-money-daily-briefing.js','utf8');
+const command=fs.readFileSync('public/personal-finance-command-center.js','utf8');
 const controller=fs.readFileSync('controllers/personalMoneyDailyBriefingController.js','utf8');
 const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
 const loader=fs.readFileSync('public/personal-roadmap-intelligence.js','utf8');
@@ -30,4 +31,16 @@ assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(brief),'Daily briefi
 for(const heading of ['What changed since yesterday?','What needs action today?','What is due this week?','Am I spending faster than normal?','What should I check next?'])assert(brief.includes(heading),`Daily briefing must explain: ${heading}`);
 assert(brief.includes('transactions currently imported or synced'),'Daily briefing must explain data freshness.');
 assert(brief.includes('currencies remain separate'),'Daily briefing must explain currency separation.');
-console.log('Personal Money mobile navigation and Smart Daily Briefing regression checks passed.');
+
+assert(loader.includes('/personal-finance-command-center.js?v=20260916-command-center'),'Protected Personal Money chain must load the Search & Command Center.');
+for(const endpoint of ['/api/finance/bank-accounts','/api/finance/personal-money','/api/finance/personal-money/attention','/api/finance/personal-money/health'])assert(command.includes(endpoint),`Command Center must read existing protected endpoint ${endpoint}.`);
+assert(command.includes("ownership_scope||'').toUpperCase()==='PERSONAL'"),'Command Center must select PERSONAL bank accounts only.');
+assert(command.includes("credentials:'same-origin'"),'Command Center must preserve authenticated same-origin requests.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(command),'Command Center must remain GET/read-only.');
+assert(command.includes('Read-only: nothing here can move money or change a record.'),'Command Center must explain that commands cannot mutate money.');
+assert(command.includes('INTERPRETED AS'),'Command Center must expose its interpretation instead of hiding filters.');
+for(const example of ['Show Uber spending this month','How much did I spend on food in 3 months?','Show bills over $100','Find duplicate payments','Show money I lent to people','Why is my spending higher this month?'])assert(command.includes(example),`Command Center must keep example: ${example}`);
+for(const intent of ['DUPLICATES','LENT','BORROWED','WHY_SPENDING','BILLS','TRANSACTIONS'])assert(command.includes(intent),`Command Center must support ${intent}.`);
+assert(command.includes('totals(rows'),'Command Center must aggregate totals by currency instead of one cross-currency total.');
+for(const prohibited of ['INSERT INTO','UPDATE bank_','DELETE FROM','createJournal','POST_TRANSACTION'])assert(!command.includes(prohibited),`Command Center must not contain mutation path: ${prohibited}`);
+console.log('Personal Money mobile navigation, Daily Briefing and Command Center regression checks passed.');
