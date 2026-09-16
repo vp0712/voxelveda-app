@@ -27,7 +27,7 @@ assert(migration.includes('rollback_expires_at')&&migration.includes('rolled_bac
 assert(migration.includes('approval_token_sha256')&&migration.includes('action_plan_sha256'),'Dry-run approval must bind token and exact action plan server-side.');
 assert(!controller.includes('TRUNCATE TABLE')&&!controller.includes('DROP TABLE'),'Restore executor must not truncate or drop finance tables.');
 assert(!controller.includes("ownership_scope='BUSINESS'")&&!controller.includes("ownership_scope='MIXED'"),'Restore executor must never target BUSINESS or MIXED finance scope.');
-for(const text of ['Load canonical backup','Run server dry-run','Execute approved restore','High-risk recovery control','30-day pre-change checkpoint','ADD inserts missing records only','REPLACE updates matching backup IDs'])assert(ui.includes(text),`Restore UI must explain ${text}.`);
+for(const text of ['Load canonical backup','Run server dry-run','Execute approved restore','High-risk recovery control','30-day pre-change checkpoint','Add missing only','Replace matching + add missing'])assert(ui.includes(text),`Restore UI must explain ${text}.`);
 assert(ui.includes("fetch(url")&&ui.includes("credentials:'same-origin'"),'Restore UI must use authenticated same-origin APIs.');
 assert(ui.includes("window.prompt('Type exactly: ROLL BACK PERSONAL FINANCE')"),'Rollback UI must demand an explicit phrase.');
 assert(canonicalUi.includes('/personal-finance-transaction-safe-restore-executor.js?v=20260916-restore-executor'),'Canonical backup engine must load the restore executor UI.');
