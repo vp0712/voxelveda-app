@@ -5,6 +5,7 @@ const pool = require('../config/db');
 const { hasPermission } = require('./authorizationService');
 const { ensureSecurityOperationsSchema } = require('./securityOperationsSchema');
 const { currentScanStatus, queueDocumentScan } = require('./malwareScanService');
+const { deleteObject, getObject, isConfigured: objectStorageConfigured, keyFromStorageUri, putObject, storageUri } = require('./objectStorageService');
 const { logSecurityEvent } = require('./sessionService');
 const { isStepUpFresh, stepUpTtlMinutes } = require('./stepUpService');
 
@@ -21,6 +22,22 @@ function safeStoredPath(filePath) {
   return resolved.startsWith(`${UPLOAD_ROOT}${path.sep}`) ? resolved : null;
 }
 
+function objectStorageDocumentsEnabled() {
+  return String(process.env.OBJECT_STORAGE_DOCUMENTS_ENABLED || '').trim().toLowerCase() === 'true' && objectStorageConfigured();
+}
+
+function documentObjectKey(id, file) {
+  const storedName = path.basename(String(file?.filename || 'document')) || 'document';
+  return `secure-documents/${id}/${encodeURIComponent(storedName)}`;
+}
+
+function scanStatusForFile(file) {
+  const synchronous = String(file?.malwareScan?.status || '').toUpperCase();
+  if (synchronous === 'CLEAN') return 'CLEAN';
+  if (synchronous === 'UNVERIFIED') return 'UNAVAILABLE';
+  return currentScanStatus();
+}
+
 async function registerDocument({ module, recordType, recordId, ownerUserId, uploadedBy, file, classification = 'CONFIDENTIAL' }) {
   await ensureSecurityOperationsSchema();
   const id = crypto.randomUUID();
@@ -28,22 +45,45 @@ async function registerDocument({ module, recordType, recordId, ownerUserId, upl
   if (!safePath) throw Object.assign(new Error('Upload storage path rejected'), { status: 400 });
   const normalClassification = String(classification || '').toUpperCase();
   if (!CLASSIFICATIONS.has(normalClassification)) throw Object.assign(new Error('Document classification rejected'), { status: 400 });
-  const contentSha256 = await new Promise((resolve, reject) => {
-    const digest = crypto.createHash('sha256');
-    fs.createReadStream(safePath).on('data', (chunk) => digest.update(chunk)).on('error', reject).on('end', () => resolve(digest.digest('hex')));
-  });
-  const scanStatus = currentScanStatus();
-  await pool.query(
-    `INSERT INTO secure_documents
-     (id, module, record_type, record_id, owner_user_id, uploaded_by, original_name, stored_name,
-      storage_path, mime_type, size_bytes, content_sha256, classification, access_policy, scan_status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, module, recordType, String(recordId), ownerUserId || null, uploadedBy, safeDispositionName(file.originalname),
-      file.filename, safePath, file.mimetype, Number(file.size || 0), contentSha256, normalClassification,
-      ACCESS_POLICIES[normalClassification], scanStatus]
-  );
+
+  const body = await fs.promises.readFile(safePath);
+  const contentSha256 = crypto.createHash('sha256').update(body).digest('hex');
+  const scanStatus = scanStatusForFile(file);
+  let storagePath = safePath;
+  let objectKey = null;
+
+  try {
+    if (objectStorageDocumentsEnabled()) {
+      objectKey = documentObjectKey(id, file);
+      await putObject(objectKey, body, file.mimetype || 'application/octet-stream');
+      storagePath = storageUri(objectKey);
+    }
+
+    await pool.query(
+      `INSERT INTO secure_documents
+       (id, module, record_type, record_id, owner_user_id, uploaded_by, original_name, stored_name,
+        storage_path, mime_type, size_bytes, content_sha256, classification, access_policy, scan_status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, module, recordType, String(recordId), ownerUserId || null, uploadedBy, safeDispositionName(file.originalname),
+        file.filename, storagePath, file.mimetype, Number(file.size || body.length), contentSha256, normalClassification,
+        ACCESS_POLICIES[normalClassification], scanStatus]
+    );
+  } catch (error) {
+    if (objectKey) await deleteObject(objectKey).catch(() => {});
+    throw error;
+  }
+
+  if (objectKey) await fs.promises.unlink(safePath).catch(() => {});
   if (scanStatus === 'PENDING_SCAN') await queueDocumentScan(id, uploadedBy);
-  return { id, classification: normalClassification, access_policy: ACCESS_POLICIES[normalClassification], content_sha256: contentSha256, scan_status: scanStatus, download_url: `/api/documents/${id}/download` };
+  return {
+    id,
+    classification: normalClassification,
+    access_policy: ACCESS_POLICIES[normalClassification],
+    content_sha256: contentSha256,
+    scan_status: scanStatus,
+    storage: objectKey ? 'OBJECT_STORAGE' : 'LOCAL_LEGACY',
+    download_url: `/api/documents/${id}/download`
+  };
 }
 
 async function getAuthorisedDocument(user, id) {
@@ -56,9 +96,13 @@ async function getAuthorisedDocument(user, id) {
   const authenticatedOnly = document.access_policy === 'AUTHENTICATED' && document.classification === 'PUBLIC';
   if (!authenticatedOnly && !ownsDocument && !hasPermission(user, permission)) return { status: 403 };
   if (document.scan_status === 'QUARANTINED' || document.scan_status === 'PENDING_SCAN') return { status: 423 };
+
+  const objectKey = keyFromStorageUri(document.storage_path);
+  if (objectKey) return { status: 200, document, storage: 'OBJECT_STORAGE', objectKey };
+
   const resolved = safeStoredPath(document.storage_path);
   if (!resolved || !fs.existsSync(resolved)) return { status: 404 };
-  return { status: 200, document, path: resolved };
+  return { status: 200, document, storage: 'LOCAL_LEGACY', path: resolved };
 }
 
 function safeDispositionName(value) {
@@ -81,7 +125,23 @@ async function streamDocument(req, res, result) {
   res.setHeader('Content-Disposition', `inline; filename="${safeDispositionName(result.document.original_name)}"`);
   res.setHeader('Cache-Control', 'private, no-store');
   await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id,
-    metadata: { documentId: result.document.id, module: result.document.module, recordType: result.document.record_type, recordId: result.document.record_id, classification: result.document.classification } });
+    metadata: { documentId: result.document.id, module: result.document.module, recordType: result.document.record_type, recordId: result.document.record_id, classification: result.document.classification, storage: result.storage } });
+
+  if (result.storage === 'OBJECT_STORAGE') {
+    const body = await getObject(result.objectKey);
+    if (result.document.content_sha256) {
+      const actualSha256 = crypto.createHash('sha256').update(body).digest('hex');
+      if (actualSha256 !== result.document.content_sha256) {
+        const error = new Error('Document integrity verification failed');
+        error.code = 'DOCUMENT_INTEGRITY_MISMATCH';
+        error.status = 409;
+        throw error;
+      }
+    }
+    res.setHeader('Content-Length', String(body.length));
+    return res.end(body);
+  }
+
   return fs.createReadStream(result.path).pipe(res);
 }
 
@@ -129,4 +189,16 @@ async function sendGrantedDocument(req, res) {
   } finally { db.release(); }
 }
 
-module.exports = { createDocumentGrant, getAuthorisedDocument, registerDocument, safeDispositionName, safeStoredPath, sendDocument, sendGrantedDocument };
+module.exports = {
+  createDocumentGrant,
+  documentObjectKey,
+  getAuthorisedDocument,
+  objectStorageDocumentsEnabled,
+  registerDocument,
+  safeDispositionName,
+  safeStoredPath,
+  scanStatusForFile,
+  sendDocument,
+  sendGrantedDocument,
+  streamDocument
+};
