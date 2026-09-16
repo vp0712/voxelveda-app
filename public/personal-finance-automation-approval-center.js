@@ -1,3 +1,4 @@
+if(!document.querySelector('script[data-personal-finance-audit-trail]')){const s=document.createElement('script');s.src='/personal-finance-audit-trail-change-history.js?v=20260916-audit-trail';s.dataset.personalFinanceAuditTrail='1';document.head.appendChild(s);}
 (() => {
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const REJECT_KEY='voxelveda.personal-finance-automation-rejected.v1';

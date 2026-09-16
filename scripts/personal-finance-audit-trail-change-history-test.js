@@ -1,0 +1,22 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-audit-trail-change-history.js','utf8');
+const approval=fs.readFileSync('public/personal-finance-automation-approval-center.js','utf8');
+const controller=fs.readFileSync('controllers/personalFinancialDataQualityController.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
+
+assert(approval.includes('/personal-finance-audit-trail-change-history.js?v=20260916-audit-trail'),'Approval Center must load Personal Finance Audit Trail.');
+assert(ui.includes('/api/finance/personal-money/data-quality-integrity'),'Audit Trail must reuse the protected owner-private integrity source.');
+assert(ui.includes("credentials:'same-origin'"),'Audit Trail must preserve authenticated same-origin credentials.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Audit Trail UI must remain API read-only.');
+assert(routes.includes("router.get('/personal-money/data-quality-integrity', requireAnyPermission('VIEW_BANKING'), personalFinancialDataQuality.getCenter)"),'Audit source must remain VIEW_BANKING protected.');
+assert(controller.includes("al.record_type='bank_transaction'")&&controller.includes("ba.ownership_scope='PERSONAL'")&&controller.includes("bt.ownership_scope='PERSONAL'"),'Audit query must be restricted to PERSONAL bank transactions.');
+assert(controller.includes('al.actor_id=?')&&controller.includes('ba.created_by=?'),'Audit query must be actor and owner scoped.');
+assert(controller.includes('old_value')&&controller.includes('new_value')&&controller.includes('integrity_hash')&&controller.includes('previous_integrity_hash'),'Audit source must expose redacted before/after and integrity context from the existing audit ledger.');
+assert(controller.includes("Step-up authentication is required by the route for this action.")&&controller.includes('Step-up status is not universally recorded'),'Audit source must distinguish known route protection from unknown step-up state.');
+for(const label of ['PERSONAL FINANCE AUDIT TRAIL & CHANGE HISTORY','What changed, when, and what was recorded?','Before','After','What changed:','Change timeline','Audit interpretation'])assert(ui.includes(label),`Audit Trail must explain ${label}.`);
+for(const sensitive of ['ip_address','user_agent','previous_integrity_hash'])assert(!ui.includes(sensitive),`Audit UI must not expose sensitive/internal audit field: ${sensitive}`);
+assert(ui.includes('hash_prefix')&&!/\.integrity_hash\b/.test(ui),'UI must show only short per-event integrity context, never access a full event integrity hash.');
+assert(ui.includes('read-only')&&ui.includes('cannot undo, replay, edit, delete, reconcile'),'Audit UI must explicitly prohibit mutation/replay behavior.');
+for(const prohibited of ['createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','recordDebtPayment','method:\'POST\'','method:"POST"'])assert(!ui.includes(prohibited),`Audit UI must not contain mutation path: ${prohibited}`);
+console.log('Personal Finance Audit Trail & Change History regression checks passed.');

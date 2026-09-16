@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { ensureSecurityGovernanceSchema } = require('../services/securityGovernanceSchema');
 
 function userId(req) {
   const value = req.user?.id ?? req.user?.user_id;
@@ -7,13 +8,15 @@ function userId(req) {
 }
 function round(v){return Math.round((Number(v||0)+Number.EPSILON)*100)/100;}
 function err(res,e){const s=Number(e?.statusCode||500);if(s>=500)console.error('Failed to load Personal Financial Data Quality Center.',e);return res.status(s).json({message:s>=500?'Failed to load Personal Financial Data Quality Center.':e.message});}
-function monthKey(v){return String(v||'').slice(0,7);}
 function monthsBetween(start,end){if(!start||!end)return[];const out=[];let y=Number(String(start).slice(0,4)),m=Number(String(start).slice(5,7));const ey=Number(String(end).slice(0,4)),em=Number(String(end).slice(5,7));while(y<ey||(y===ey&&m<=em)){out.push(`${y}-${String(m).padStart(2,'0')}`);m++;if(m===13){m=1;y++;}if(out.length>240)break;}return out;}
+function parseJson(v){if(v===null||v===undefined||v==='')return null;if(typeof v==='object')return v;try{return JSON.parse(v);}catch{return v;}}
+function actionLabel(v){return String(v||'').toLowerCase().split('_').filter(Boolean).map(x=>x[0].toUpperCase()+x.slice(1)).join(' ');}
 
 exports.getCenter = async (req,res)=>{
   try{
+    await ensureSecurityGovernanceSchema();
     const uid=userId(req);
-    const [accounts,txSummary,duplicateGroups,monthly,wallets,cashEntries,imports]=await Promise.all([
+    const [accounts,txSummary,duplicateGroups,monthly,wallets,cashEntries,imports,auditRows]=await Promise.all([
       pool.query(`SELECT id,nickname,institution,currency,connection_type,connection_status,current_ledger_balance,available_balance,history_start_date,history_end_date,last_synced_at
         FROM bank_accounts WHERE created_by=? AND ownership_scope='PERSONAL' AND status='ACTIVE' ORDER BY nickname`,[uid]).then(([r])=>r),
       pool.query(`SELECT COUNT(*) total,
@@ -39,7 +42,14 @@ exports.getCenter = async (req,res)=>{
         ORDER BY occurred_at DESC LIMIT 300`,[uid]).then(([r])=>r),
       pool.query(`SELECT sif.import_uid,sif.bank_account_id,ba.nickname,sif.source_format,sif.statement_start_date,sif.statement_end_date,sif.imported_rows,sif.duplicate_rows,sif.rejected_rows,sif.reviewed_at
         FROM statement_import_files sif JOIN bank_accounts ba ON ba.id=sif.bank_account_id
-        WHERE ba.created_by=? AND ba.ownership_scope='PERSONAL' ORDER BY sif.reviewed_at DESC LIMIT 50`,[uid]).then(([r])=>r)
+        WHERE ba.created_by=? AND ba.ownership_scope='PERSONAL' ORDER BY sif.reviewed_at DESC LIMIT 50`,[uid]).then(([r])=>r),
+      pool.query(`SELECT al.id,al.actor_id,al.action,al.module,al.record_type,al.record_id,al.old_value,al.new_value,al.request_id,al.session_id,al.result,al.metadata_json,al.previous_integrity_hash,al.integrity_hash,al.created_at,
+          bt.transaction_date,bt.description,bt.merchant_name,bt.currency,bt.debit,bt.credit,bt.category,bt.classification_status,bt.is_internal_transfer,bt.reconciliation_status,ba.nickname account_name
+        FROM audit_logs al
+        JOIN bank_transactions bt ON al.record_type='bank_transaction' AND CAST(al.record_id AS UNSIGNED)=bt.id
+        JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+        WHERE al.actor_id=? AND ba.created_by=? AND ba.ownership_scope='PERSONAL' AND bt.ownership_scope='PERSONAL'
+        ORDER BY al.created_at DESC,al.id DESC LIMIT 300`,[uid,uid]).then(([r])=>r)
     ]);
 
     const monthCounts=new Map();for(const r of monthly){monthCounts.set(`${r.bank_account_id}|${r.month}`,Number(r.transaction_count||0));}
@@ -51,6 +61,9 @@ exports.getCenter = async (req,res)=>{
     const balanceSimilarity=[];
     for(const w of wallets){for(const a of accounts){if(String(w.currency)!==String(a.currency))continue;const bank=Number(a.available_balance??a.current_ledger_balance??0),wallet=Number(w.balance||0);if(Math.abs(bank-wallet)<=0.01&&Math.abs(bank)>0.01)balanceSimilarity.push({wallet_id:w.id,wallet_name:w.name,account_id:a.id,account_name:a.nickname,currency:w.currency,amount:round(bank),reason:'Wallet and bank balance are identical. This is only a double-counting risk signal, not proof they represent the same money.'});}}
     const importIssues=imports.filter(i=>Number(i.duplicate_rows||0)>0||Number(i.rejected_rows||0)>0).map(i=>({...i,imported_rows:Number(i.imported_rows||0),duplicate_rows:Number(i.duplicate_rows||0),rejected_rows:Number(i.rejected_rows||0)}));
+    const auditTrail=auditRows.map(r=>({id:Number(r.id),created_at:r.created_at,actor:{id:Number(r.actor_id),label:'You'},action:r.action,action_label:actionLabel(r.action),module:r.module,record_type:r.record_type,record_id:String(r.record_id||''),result:r.result||'SUCCESS',old_value:parseJson(r.old_value),new_value:parseJson(r.new_value),metadata:parseJson(r.metadata_json),request_id:r.request_id||null,session_id:r.session_id||null,integrity:{present:Boolean(r.integrity_hash),hash_prefix:r.integrity_hash?String(r.integrity_hash).slice(0,12):null,previous_hash_recorded:Boolean(r.previous_integrity_hash)},step_up_context:String(r.action||'').toUpperCase()==='RECONCILIATION_CLASSIFIED'?'Step-up authentication is required by the route for this action.':'Step-up status is not universally recorded on this audit row.',transaction:{date:r.transaction_date,account_name:r.account_name,description:r.description||r.merchant_name||'',currency:r.currency,amount:Number(r.credit||0)-Number(r.debit||0),current_category:r.category,classification_status:r.classification_status,is_internal_transfer:Number(r.is_internal_transfer||0)===1,reconciliation_status:r.reconciliation_status}}));
+    const auditActionCounts={};let auditLast30=0,auditIntegrity=0;const auditSessions=new Set();for(const a of auditTrail){auditActionCounts[a.action]=(auditActionCounts[a.action]||0)+1;if(new Date(a.created_at).getTime()>=now-30*86400000)auditLast30++;if(a.integrity.present)auditIntegrity++;if(a.session_id)auditSessions.add(a.session_id);}
+    const auditSummary={events:auditTrail.length,last_30_days:auditLast30,integrity_hash_present:auditIntegrity,sessions_represented:auditSessions.size,action_counts:auditActionCounts};
     const summary={personal_accounts:accounts.length,total_bank_transactions:Number(txSummary.total||0),unclassified_bank_transactions:Number(txSummary.unclassified||0),unreconciled_bank_transactions:Number(txSummary.unreconciled||0),possible_duplicate_groups:duplicateGroups.length,possible_missing_periods:possibleMissingPeriods.length,stale_accounts:staleAccounts.length,possible_transfer_candidates:Number(txSummary.possible_transfer_candidates||0),unclassified_cash_movements:unclassifiedCash.length,wallet_bank_double_count_risks:balanceSimilarity.length,imports_with_issues:importIssues.length};
     const findings=[];
     const add=(severity,type,title,count,why,next_step)=>{if(count>0)findings.push({severity,type,title,count,why,next_step});};
@@ -63,6 +76,6 @@ exports.getCenter = async (req,res)=>{
     add('WATCH','CASH','Incomplete cash movement details',summary.unclassified_cash_movements,'Cash entries are missing a category or both counterparty and note.','Add enough context for later review; do not invent a category.');
     add('WATCH','DOUBLE_COUNT','Possible wallet/bank double-counting risks',summary.wallet_bank_double_count_risks,'A Personal Money wallet balance exactly matches a personal bank balance in the same currency.','Confirm whether the wallet is physical cash/another pool or simply mirrors the bank account before relying on combined liquidity.');
     add('WATCH','IMPORT','Statement imports with duplicates/rejections',summary.imports_with_issues,'Recent personal statement imports reported duplicate or rejected rows.','Review import results and source statement coverage before re-importing.');
-    return res.json({privacy:'Owner-only PERSONAL data quality audit. Voxel Veda company accounting is excluded.',currency_rule:'Currencies remain separate. No FX conversion or cross-currency quality total is calculated.',read_only:true,limitations:['Duplicate detection is a similarity check and may include legitimate repeated transactions.','A zero-transaction month may be genuine and is labelled possible missing coverage, not confirmed missing data.','Transfer candidates are keyword-based review signals and are not automatically reclassified.','Equal wallet/bank balances are only a double-counting risk signal, never an automatic merge or correction.'],summary,accounts,findings,possible_duplicate_groups:duplicateGroups.map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0),duplicate_count:Number(x.duplicate_count||0)})),possible_missing_periods:possibleMissingPeriods.slice(0,120),stale_accounts:staleAccounts,possible_transfer_candidates:Number(txSummary.possible_transfer_candidates||0),unclassified_cash_movements:unclassifiedCash.slice(0,100),wallet_bank_double_count_risks:balanceSimilarity,imports_with_issues:importIssues});
+    return res.json({privacy:'Owner-only PERSONAL data quality audit. Voxel Veda company accounting is excluded.',currency_rule:'Currencies remain separate. No FX conversion or cross-currency quality total is calculated.',read_only:true,limitations:['Duplicate detection is a similarity check and may include legitimate repeated transactions.','A zero-transaction month may be genuine and is labelled possible missing coverage, not confirmed missing data.','Transfer candidates are keyword-based review signals and are not automatically reclassified.','Equal wallet/bank balances are only a double-counting risk signal, never an automatic merge or correction.'],summary,accounts,findings,possible_duplicate_groups:duplicateGroups.map(x=>({...x,debit:Number(x.debit||0),credit:Number(x.credit||0),duplicate_count:Number(x.duplicate_count||0)})),possible_missing_periods:possibleMissingPeriods.slice(0,120),stale_accounts:staleAccounts,possible_transfer_candidates:Number(txSummary.possible_transfer_candidates||0),unclassified_cash_movements:unclassifiedCash.slice(0,100),wallet_bank_double_count_risks:balanceSimilarity,imports_with_issues:importIssues,audit_trail:{privacy:'Owner-only PERSONAL bank-transaction change history. Voxel Veda company finance events are excluded at query level.',read_only:true,integrity_note:'This filtered view shows whether each returned audit row has an integrity hash. Because the global audit chain also contains events outside this PERSONAL subset, this page does not claim to independently re-verify full-chain continuity.',step_up_note:'Only actions known to use a step-up-protected route are labelled as requiring step-up. Other rows are shown as not universally recorded rather than inferred.',summary:auditSummary,events:auditTrail}});
   }catch(e){return err(res,e);}
 };
