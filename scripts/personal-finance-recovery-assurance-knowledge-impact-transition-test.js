@@ -1,0 +1,18 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-recovery-assurance-knowledge-impact-transition.js','utf8');
+const loader=fs.readFileSync('public/personal-finance-recovery-assurance-knowledge-disposition.js','utf8');
+for(const label of ['RECOVERY ASSURANCE KNOWLEDGE DEPENDENCY, IMPACT & TRANSITION CENTER','Transition items','Action required','Dependency reviews','Replacement required','Replacement not ready','Read-only transition intelligence'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Impact transition UI must explain ${label}.`);
+for(const field of ['linked_control_categories','linked_capa_ids','source_investigation_ids','knowledge_review_plan','knowledge_disposition'])assert(ui.includes(field),`Impact analysis must use stored ${field}.`);
+assert(ui.includes("target.status==='CLOSED'&&target.effectiveness_result==='EFFECTIVE'&&state(target)==='ACTIVE'"),'Replacement readiness must require CLOSED + EFFECTIVE active governed knowledge.');
+assert(ui.includes('The recorded replacement lesson cannot be resolved in the current owner-scoped knowledge set.'),'Missing replacement must be reported explicitly.');
+assert(ui.includes('recorded dependency reference(s) need human transition review.'),'Recorded dependencies must require human transition review.');
+assert(ui.includes("transition_state:warnings.length?'ACTION_REQUIRED':dependencyCount?'REVIEW_DEPENDENCIES':'READY'"),'Transition state must be transparent and deterministic.');
+assert(ui.includes("fetch(`${BASE}?lessons_knowledge=1`,{credentials:'same-origin'})"),'Impact center must use the existing protected owner-scoped lesson endpoint.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Impact transition center must remain read-only.');
+assert(!ui.includes("lesson_action:")&&!ui.includes("knowledge_disposition_action:"),'Impact center must not mutate lesson or disposition governance.');
+assert(!ui.includes('/api/finance/transactions')&&!ui.includes('/api/finance/reconciliation'),'Impact center must not call finance mutation endpoints.');
+assert(ui.includes('Missing links are reported, never invented.')||ui.includes('Missing links are reported, never invented'),'Impact analysis must not infer missing dependencies.');
+assert(ui.includes('no records were changed')&&ui.includes('Read-only analysis only.'),'UI must state its read-only boundary.');
+assert(loader.includes('/personal-finance-recovery-assurance-knowledge-impact-transition.js?v=20260917-recovery-assurance-knowledge-impact-transition'),'Disposition center must load the impact transition center.');
+console.log('Personal Finance Recovery Assurance Knowledge Dependency, Impact & Transition safeguards passed.');
