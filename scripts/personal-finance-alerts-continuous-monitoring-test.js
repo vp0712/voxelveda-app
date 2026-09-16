@@ -17,4 +17,5 @@ assert(ui.includes('window.__pfaac?.proposals'),'Monitoring Center must surface 
 assert(ui.includes("priorityRank={CRITICAL:0,ACTION_SOON:1,INFORMATIONAL:2}"),'Monitoring priorities must have deterministic ordering.');
 assert(ui.includes('never pay a bill')&&ui.includes('move money')&&ui.includes('Source modules remain the system of record'),'Monitoring UI must explain its non-mutating role.');
 for(const prohibited of ['/payments','/reconcile','/ignore','/classify','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','method:\'POST\'','method:"POST"'])assert(!ui.includes(prohibited),`Monitoring Center must not contain financial mutation path: ${prohibited}`);
+require('./personal-finance-security-privacy-control-center-test');
 console.log('Personal Finance Alerts & Continuous Monitoring Center regression checks passed.');
