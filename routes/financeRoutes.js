@@ -14,6 +14,7 @@ const personalMoneyReview = require('../controllers/personalMoneyReviewControlle
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
 const personalNetWorth = require('../controllers/personalNetWorthController');
 const personalAssetLifecycle = require('../controllers/personalAssetLifecycleController');
+const personalFinancialRoadmap = require('../controllers/personalFinancialRoadmapController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -76,6 +77,10 @@ router.post('/personal-money/net-worth/lifecycle/items/:id/complete', requireAny
 router.post('/personal-money/net-worth/lifecycle/items/:id/archive', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.archiveItem);
 router.post('/personal-money/net-worth/lifecycle/documents', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.addDocument);
 router.delete('/personal-money/net-worth/lifecycle/documents/:id', requireAnyPermission('EDIT_FINANCE'), personalAssetLifecycle.deleteDocument);
+router.get('/personal-money/roadmaps', requireAnyPermission('VIEW_BANKING'), personalFinancialRoadmap.getCenter);
+router.post('/personal-money/roadmaps', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.createRoadmap);
+router.post('/personal-money/roadmaps/:roadmapId/milestones/:milestoneId/progress', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.recordProgress);
+router.post('/personal-money/roadmaps/:id/status', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.updateStatus);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
