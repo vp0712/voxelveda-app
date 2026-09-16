@@ -14,7 +14,6 @@ assert(controller.includes("supported.some(x=>x.evidence_refs.length)&&causeEvid
 assert(controller.includes("row.review_status!=='APPROVED'"),'Closure must require reviewer approval.');
 assert(controller.includes('root_cause_declared:false'),'Cause framework must explicitly avoid declaring root cause.');
 assert(controller.includes("review_status='NOT_REVIEWED',reviewer_label=NULL"),'Changing cause evidence must invalidate prior reviewer approval.');
-assert(controller.includes("action==='CAUSE'")&&controller.includes("action==='REVIEW'"),'Certification dispatcher must route cause and reviewer actions.');
 assert(cert.includes("action==='CAUSE'")&&cert.includes('recoveryEvidenceInvestigations.updateCause(req,res)')&&cert.includes("action==='REVIEW'")&&cert.includes('recoveryEvidenceInvestigations.review(req,res)'),'Cause/review writes must use the existing protected route.');
 for(const label of ['Response overdue','Resolution overdue','Escalated','Repeat discrepancies','Hypothesis vs evidence','Independent review','EVIDENCE-BASED CAUSE FRAMEWORK'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Mobile UI must expose ${label}.`);
 assert(ui.includes("evidence_investigation_action:'CAUSE'")&&ui.includes("evidence_investigation_action:'REVIEW'"),'UI must expose controlled cause-evidence and reviewer actions.');
