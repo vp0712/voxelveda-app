@@ -27,6 +27,17 @@ function monthDaysUtc() {
   };
 }
 
+function financialYearStart(value) {
+  const now = new Date();
+  const current = now.getUTCMonth() >= 6 ? now.getUTCFullYear() : now.getUTCFullYear() - 1;
+  if (value === undefined || value === null || value === '') return current;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 2000 || parsed > 2100) {
+    throw Object.assign(new Error('Financial year start must be a four-digit year.'), { statusCode: 400 });
+  }
+  return parsed;
+}
+
 function ensure(map, code) {
   const currency = String(code || 'AUD').toUpperCase();
   if (!map[currency]) {
@@ -72,10 +83,60 @@ function statusFor(row) {
   };
 }
 
+function buildTaxReadiness(rows, year) {
+  const byCurrency = {};
+  const monthly = {};
+  const categories = {};
+  const reviewItems = [];
+  const add = (currency, field, value) => {
+    const code = String(currency || 'AUD').toUpperCase();
+    if (!byCurrency[code]) byCurrency[code] = { recorded_income: 0, recorded_expenses: 0, cash_in: 0, cash_out: 0 };
+    byCurrency[code][field] = round(byCurrency[code][field] + Number(value || 0));
+  };
+  for (const row of rows) {
+    const code = String(row.currency || 'AUD').toUpperCase();
+    const amount = Number(row.amount || 0);
+    const month = String(row.occurred_at || '').slice(0, 7);
+    if (!monthly[code]) monthly[code] = {};
+    if (!monthly[code][month]) monthly[code][month] = { income: 0, expenses: 0, cash_in: 0, cash_out: 0 };
+    if (row.entry_type === 'INCOME') { add(code, 'recorded_income', amount); monthly[code][month].income = round(monthly[code][month].income + amount); }
+    if (row.entry_type === 'EXPENSE') { add(code, 'recorded_expenses', amount); monthly[code][month].expenses = round(monthly[code][month].expenses + amount); }
+    if (row.entry_type === 'CASH_IN') { add(code, 'cash_in', amount); monthly[code][month].cash_in = round(monthly[code][month].cash_in + amount); }
+    if (row.entry_type === 'CASH_OUT') { add(code, 'cash_out', amount); monthly[code][month].cash_out = round(monthly[code][month].cash_out + amount); }
+    if (['EXPENSE', 'CASH_OUT'].includes(row.entry_type)) {
+      const category = String(row.category || 'Uncategorised');
+      const categoryKey = `${code}::${category}`;
+      if (!categories[categoryKey]) categories[categoryKey] = { currency: code, category, count: 0, amount: 0 };
+      categories[categoryKey].count += 1;
+      categories[categoryKey].amount = round(categories[categoryKey].amount + amount);
+      reviewItems.push({ id: row.id, entry_type: row.entry_type, amount, currency: code, category: row.category || null, counterparty: row.counterparty || null, note: row.note || null, occurred_at: row.occurred_at, wallet_name: row.wallet_name });
+    }
+  }
+  return {
+    privacy: 'Owner-only PERSONAL Money preparation data. Company finance transactions are not included.',
+    jurisdiction_note: 'This preparation view uses an Australian-style 1 July to 30 June financial-year window. It does not calculate tax liability, tax payable, taxable income, or legal deductibility.',
+    financial_year: { start_year: year, label: `${year}-${String(year + 1).slice(-2)}`, start_date: `${year}-07-01`, end_date: `${year + 1}-06-30` },
+    currency_rule: 'Currencies remain separate. No tax FX conversion or ATO exchange-rate assumption is applied.',
+    summary_by_currency: byCurrency,
+    monthly_by_currency: monthly,
+    categories: Object.values(categories).sort((a, b) => b.amount - a.amount),
+    review_items: reviewItems,
+    rules: [
+      'Recorded INCOME entries are not automatically taxable income.',
+      'EXPENSE and CASH_OUT items are review candidates only; category names do not create a deduction.',
+      'CASH_IN and CASH_OUT stay separate because they may be transfers, withdrawals, deposits or other cash movements.',
+      'Tax review classifications and evidence flags in the interface are local organisational notes only unless later saved through an explicitly approved record-changing feature.'
+    ]
+  };
+}
+
 exports.getHealthDashboard = async (req, res) => {
   try {
     const userId = uid(req);
-    const [bankBalances, walletBalances, debtRows, bufferRows, bankFlowRows, spend90Rows, budgetRows, recurringRows] = await Promise.all([
+    const fyYear = financialYearStart(req.query.fy_start);
+    const fyStart = `${fyYear}-07-01`;
+    const fyEnd = `${fyYear + 1}-07-01`;
+    const [bankBalances, walletBalances, debtRows, bufferRows, bankFlowRows, spend90Rows, budgetRows, recurringRows, taxRows] = await Promise.all([
       pool.query(
         `SELECT currency,COALESCE(SUM(COALESCE(available_balance,current_ledger_balance,0)),0) total
          FROM bank_accounts
@@ -135,6 +196,13 @@ exports.getHealthDashboard = async (req, res) => {
          WHERE user_id=? AND active=1 AND item_type<>'INCOME'
            AND next_due_date>=CURRENT_DATE AND next_due_date<=DATE_ADD(CURRENT_DATE,INTERVAL 30 DAY)
          GROUP BY currency`, [userId]
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT e.id,e.entry_type,e.amount,e.currency,e.category,e.counterparty,e.note,e.occurred_at,w.name wallet_name
+         FROM personal_money_entries e
+         JOIN personal_money_wallets w ON w.id=e.wallet_id AND w.user_id=e.user_id
+         WHERE e.user_id=? AND e.occurred_at>=? AND e.occurred_at<?
+         ORDER BY e.occurred_at DESC,e.created_at DESC`, [userId, fyStart, fyEnd]
       ).then(([rows]) => rows)
     ]);
 
@@ -190,7 +258,8 @@ exports.getHealthDashboard = async (req, res) => {
         debt_projection: 'Illustration only: outstanding borrowed balance ÷ current-month positive cash surplus. It does not assume interest, fees or a required repayment schedule.'
       },
       month_progress: monthDays,
-      by_currency: byCurrency
+      by_currency: byCurrency,
+      tax_readiness: buildTaxReadiness(taxRows, fyYear)
     });
   } catch (error) {
     return respondError(res, error, 'Failed to load Personal Financial Health.');
