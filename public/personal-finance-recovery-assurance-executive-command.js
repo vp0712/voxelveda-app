@@ -1,8 +1,9 @@
+if(!document.querySelector('script[data-personal-finance-recovery-assurance-evidence-freshness]')){const s=document.createElement('script');s.src='/personal-finance-recovery-assurance-evidence-freshness.js?v=20260917-recovery-assurance-evidence-freshness';s.dataset.personalFinanceRecoveryAssuranceEvidenceFreshness='1';document.head.appendChild(s);}
 (() => {
   const BASE='/api/finance/personal-money/canonical-restore/reporting/certificates';
   const URLS={risk:`${BASE}?capa_risk_assurance=1&months=12`,tests:`${BASE}?control_testing=1`,schedule:`${BASE}?control_scheduling=1`,capa:`${BASE}?capa=1`,reviews:`${BASE}?governance_review=1`};
   const CATS=['RESTORE_FIDELITY','DEPENDENCY_INTEGRITY','CERTIFICATE_INTEGRITY','ROLLBACK_PROTECTION','VERIFICATION_INITIALIZATION','OTHER_EVIDENCE_CONDITION'];
-  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
   const fmt=v=>v?new Date(v).toLocaleString():'—';
   const days=v=>v?Math.ceil((new Date(v).getTime()-Date.now())/86400000):null;
   let report=null;
