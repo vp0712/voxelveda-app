@@ -12,197 +12,24 @@
 <body>
   <main class="fi-shell">
     <header class="fi-topbar">
-      <div>
-        <p class="eyebrow">VOXEL VEDA · FINANCE INTELLIGENCE</p>
-        <h1>Your Money Control Center</h1>
-        <p class="muted">One place to understand personal money, Voxel Veda money, bank statements, recurring costs, transfers, unusual spending and transaction classifications.</p>
-      </div>
+      <div><p class="eyebrow">VOXEL VEDA · FINANCE INTELLIGENCE</p><h1>Your Money Control Center</h1><p class="muted">One place to understand personal money, Voxel Veda money, bank statements, recurring costs, transfers, unusual spending and transaction classifications.</p></div>
       <a class="ghost-button" href="/admin?view=finance">Back to Admin Finance</a>
     </header>
-
-    <section class="guide-panel" aria-label="Finance setup steps">
-      <div class="guide-copy">
-        <p class="eyebrow">START HERE</p>
-        <h2>Five simple steps</h2>
-        <p>You do not need accounting knowledge. Follow these steps in order and the system keeps imported data separate until you approve it.</p>
-      </div>
-      <div class="guide-steps">
-        <button type="button" data-guide="accounts"><span>1</span><strong>Add account</strong><small>Personal or business</small></button>
-        <button type="button" data-guide="import"><span>2</span><strong>Import statement</strong><small>CSV, PDF, OFX, QFX, QIF, XLSX</small></button>
-        <button type="button" data-guide="review"><span>3</span><strong>Review</strong><small>Check duplicates and warnings</small></button>
-        <button type="button" data-guide="analyse"><span>4</span><strong>Analyse money</strong><small>Find categories and patterns</small></button>
-        <button type="button" data-guide="insights"><span>5</span><strong>Apply suggestions</strong><small>You stay in control</small></button>
-      </div>
-    </section>
-
-    <section class="scope-row" aria-label="Finance scope">
-      <button class="scope active" data-scope="ALL">All money</button>
-      <button class="scope" data-scope="PERSONAL">Personal only</button>
-      <button class="scope" data-scope="BUSINESS">Voxel Veda only</button>
-    </section>
-
-    <section class="actions primary-actions" aria-label="Finance actions">
-      <button id="addAccount" class="primary">+ Add Account</button>
-      <button id="importStatement" class="primary">+ Import Statement</button>
-      <button id="openReviewQueue">Review Statements</button>
-      <button id="analyseTransactions">Analyse Transactions</button>
-      <button id="connectBank">Connect Bank</button>
-      <button id="openBankingSafety" class="safety-button">Banking Setup & Safety</button>
-      <button id="refreshDashboard">Refresh</button>
-    </section>
-
-    <div id="notice" class="notice" hidden></div>
-    <div id="advancedNotice" class="notice" hidden></div>
-
-    <section class="metric-grid" id="metricGrid">
-      <article class="metric"><span>Money in</span><strong id="metricInflow">—</strong><small>Income and deposits, excluding transfers</small></article>
-      <article class="metric"><span>Money out</span><strong id="metricOutflow">—</strong><small>Spending, excluding transfers</small></article>
-      <article class="metric"><span>Net cash flow</span><strong id="metricNet">—</strong><small>Money in minus money out</small></article>
-      <article class="metric"><span>Accounts</span><strong id="metricAccounts">—</strong><small>Personal + business</small></article>
-      <article class="metric"><span>Needs category</span><strong id="metricUnclassified">—</strong><small>Transactions not yet understood</small></article>
-      <article class="metric"><span>Needs reconciliation</span><strong id="metricUnreconciled">—</strong><small>Transactions not yet checked</small></article>
-    </section>
-
-    <section id="bankingSafetyPanel" class="panel banking-safety-panel">
-      <div class="banking-safety-hero">
-        <div>
-          <p class="eyebrow">BANKING SETUP & SAFETY</p>
-          <h2>What is safe to use right now?</h2>
-          <p id="bankingReadinessHeadline" class="muted">Checking production banking controls…</p>
-          <p id="bankingReadinessExplanation" class="muted">The app is checking whether manual imports and future Open Banking feeds have the security controls they need.</p>
-          <div class="banking-safety-actions">
-            <button id="refreshBankingSafety" type="button">Check again</button>
-            <span id="bankingReadinessBadge" class="badge">Checking…</span>
-          </div>
-        </div>
-        <div class="banking-safety-summary">
-          <div><span>Statement imports</span><strong id="manualImportState">Checking…</strong><small>Upload → review → approve</small></div>
-          <div><span>Automatic bank feed</span><strong id="openBankingState">Checking…</strong><small id="openBankingProvider">No provider selected</small></div>
-        </div>
-      </div>
-
-      <div class="panel-heading">
-        <div><p class="eyebrow">PRODUCTION CONTROLS</p><h2>Simple status for every banking safeguard</h2><p class="muted">“Needs setup” does not stop statement imports. It means that control must be fixed before automatic bank syncing should be switched on.</p></div>
-      </div>
-      <div id="bankingSafetyControls" class="safety-grid"></div>
-
-      <div class="safety-lower-grid">
-        <article class="safety-box">
-          <h3>What should be done next?</h3>
-          <div id="bankingNextActions"></div>
-        </article>
-        <article class="safety-box">
-          <h3>Rules this system will always follow</h3>
-          <ul id="bankingSafetyRules" class="safety-rules"></ul>
-        </article>
-      </div>
-
-      <div class="safety-lower-grid">
-        <article class="safety-box">
-          <h3>Open Banking status</h3>
-          <p id="openBankingReason" class="muted">Checking provider readiness…</p>
-          <p class="muted"><b>Important:</b> Connect Bank stays fail-closed until a production Australian CDR provider is configured and verified. Voxel Veda must never collect your internet-banking password, PIN or bank OTP.</p>
-        </article>
-        <article class="safety-box">
-          <h3>Bank consent & sync history</h3>
-          <div id="bankConnectionHistory"></div>
-        </article>
-      </div>
-    </section>
-
-    <section id="intelligencePanel" class="panel intelligence-panel">
-      <div class="panel-heading">
-        <div><p class="eyebrow">SMART MONEY REVIEW</p><h2>What the system found</h2><p class="muted">Suggestions are explanations, not automatic accounting decisions. Review them before applying.</p></div>
-        <button id="analyseTransactionsTop" class="primary">Run Analysis</button>
-      </div>
-      <div class="insight-metrics">
-        <div><span>Waiting for review</span><strong id="insightPending">0</strong></div>
-        <div><span>Category suggestions</span><strong id="insightCategories">0</strong></div>
-        <div><span>Possible transfers</span><strong id="insightTransfers">0</strong></div>
-        <div><span>Recurring payments</span><strong id="insightRecurring">0</strong></div>
-        <div><span>Unusual spending</span><strong id="insightAnomalies">0</strong></div>
-      </div>
-      <div class="explain-strip">
-        <span><b>Category:</b> what the payment was probably for.</span>
-        <span><b>Transfer:</b> money moving between your own accounts, not real spending.</span>
-        <span><b>Recurring:</b> a repeating bill or subscription.</span>
-        <span><b>Unusual:</b> noticeably different from your normal payment pattern.</span>
-      </div>
-      <div id="insightList" class="insight-list"><div class="empty"><strong>No analysis yet</strong><span>Import transactions, then press “Analyse Transactions”.</span></div></div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-heading">
-        <div><p class="eyebrow">ACCOUNTS</p><h2>Where your money is held</h2><p class="muted">Each account is clearly marked Personal, Business, Mixed or Unclassified.</p></div>
-        <span id="providerBadge" class="badge">Checking bank feed…</span>
-      </div>
-      <div id="accounts" class="account-grid"><p class="muted">Loading accounts…</p></div>
-    </section>
-
-    <section class="two-col">
-      <article class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">SPENDING</p><h2>Where your money goes</h2><p class="muted">Transfers between your own accounts are excluded once confirmed.</p></div></div>
-        <div id="categories" class="rows"></div>
-      </article>
-      <article class="panel">
-        <div class="panel-heading"><div><p class="eyebrow">TO-DO</p><h2>Things needing attention</h2><p class="muted">These are data-quality tasks, not necessarily errors.</p></div></div>
-        <div id="quality" class="rows"></div>
-      </article>
-    </section>
-
-    <section class="panel">
-      <div class="panel-heading"><div><p class="eyebrow">HISTORY</p><h2>How much transaction history is covered</h2><p class="muted">This shows the earliest and latest transaction we currently have for each account.</p></div></div>
-      <div id="coverage" class="rows"></div>
-    </section>
+    <section class="guide-panel" aria-label="Finance setup steps"><div class="guide-copy"><p class="eyebrow">START HERE</p><h2>Five simple steps</h2><p>You do not need accounting knowledge. Follow these steps in order and the system keeps imported data separate until you approve it.</p></div><div class="guide-steps"><button type="button" data-guide="accounts"><span>1</span><strong>Add account</strong><small>Personal or business</small></button><button type="button" data-guide="import"><span>2</span><strong>Import statement</strong><small>CSV, PDF, OFX, QFX, QIF, XLSX</small></button><button type="button" data-guide="review"><span>3</span><strong>Review</strong><small>Check duplicates and warnings</small></button><button type="button" data-guide="analyse"><span>4</span><strong>Analyse money</strong><small>Find categories and patterns</small></button><button type="button" data-guide="insights"><span>5</span><strong>Apply suggestions</strong><small>You stay in control</small></button></div></section>
+    <section class="scope-row" aria-label="Finance scope"><button class="scope active" data-scope="ALL">All money</button><button class="scope" data-scope="PERSONAL">Personal only</button><button class="scope" data-scope="BUSINESS">Voxel Veda only</button></section>
+    <section class="actions primary-actions" aria-label="Finance actions"><button id="addAccount" class="primary">+ Add Account</button><button id="importStatement" class="primary">+ Import Statement</button><button id="openReviewQueue">Review Statements</button><button id="analyseTransactions">Analyse Transactions</button><button id="connectBank">Connect Bank</button><button id="openBankingSafety" class="safety-button">Banking Setup & Safety</button><button id="refreshDashboard">Refresh</button></section>
+    <div id="notice" class="notice" hidden></div><div id="advancedNotice" class="notice" hidden></div>
+    <section class="metric-grid" id="metricGrid"><article class="metric"><span>Money in</span><strong id="metricInflow">—</strong><small>Income and deposits, excluding transfers</small></article><article class="metric"><span>Money out</span><strong id="metricOutflow">—</strong><small>Spending, excluding transfers</small></article><article class="metric"><span>Net cash flow</span><strong id="metricNet">—</strong><small>Money in minus money out</small></article><article class="metric"><span>Accounts</span><strong id="metricAccounts">—</strong><small>Personal + business</small></article><article class="metric"><span>Needs category</span><strong id="metricUnclassified">—</strong><small>Transactions not yet understood</small></article><article class="metric"><span>Needs reconciliation</span><strong id="metricUnreconciled">—</strong><small>Transactions not yet checked</small></article></section>
+    <section id="bankingSafetyPanel" class="panel banking-safety-panel"><div class="banking-safety-hero"><div><p class="eyebrow">BANKING SETUP & SAFETY</p><h2>What is safe to use right now?</h2><p id="bankingReadinessHeadline" class="muted">Checking production banking controls…</p><p id="bankingReadinessExplanation" class="muted">The app is checking whether manual imports and future Open Banking feeds have the security controls they need.</p><div class="banking-safety-actions"><button id="refreshBankingSafety" type="button">Check again</button><span id="bankingReadinessBadge" class="badge">Checking…</span></div></div><div class="banking-safety-summary"><div><span>Statement imports</span><strong id="manualImportState">Checking…</strong><small>Upload → review → approve</small></div><div><span>Automatic bank feed</span><strong id="openBankingState">Checking…</strong><small id="openBankingProvider">No provider selected</small></div></div></div><div class="panel-heading"><div><p class="eyebrow">PRODUCTION CONTROLS</p><h2>Simple status for every banking safeguard</h2><p class="muted">“Needs setup” does not stop statement imports. It means that control must be fixed before automatic bank syncing should be switched on.</p></div></div><div id="bankingSafetyControls" class="safety-grid"></div><div class="safety-lower-grid"><article class="safety-box"><h3>What should be done next?</h3><div id="bankingNextActions"></div></article><article class="safety-box"><h3>Rules this system will always follow</h3><ul id="bankingSafetyRules" class="safety-rules"></ul></article></div><div class="safety-lower-grid"><article class="safety-box"><h3>Open Banking status</h3><p id="openBankingReason" class="muted">Checking provider readiness…</p><p class="muted"><b>Important:</b> Connect Bank stays fail-closed until a production Australian CDR provider is configured and verified. Voxel Veda must never collect your internet-banking password, PIN or bank OTP.</p></article><article class="safety-box"><h3>Bank consent & sync history</h3><div id="bankConnectionHistory"></div></article></div></section>
+    <section id="intelligencePanel" class="panel intelligence-panel"><div class="panel-heading"><div><p class="eyebrow">SMART MONEY REVIEW</p><h2>What the system found</h2><p class="muted">Suggestions are explanations, not automatic accounting decisions. Review them before applying.</p></div><button id="analyseTransactionsTop" class="primary">Run Analysis</button></div><div class="insight-metrics"><div><span>Waiting for review</span><strong id="insightPending">0</strong></div><div><span>Category suggestions</span><strong id="insightCategories">0</strong></div><div><span>Possible transfers</span><strong id="insightTransfers">0</strong></div><div><span>Recurring payments</span><strong id="insightRecurring">0</strong></div><div><span>Unusual spending</span><strong id="insightAnomalies">0</strong></div></div><div class="explain-strip"><span><b>Category:</b> what the payment was probably for.</span><span><b>Transfer:</b> money moving between your own accounts, not real spending.</span><span><b>Recurring:</b> a repeating bill or subscription.</span><span><b>Unusual:</b> noticeably different from your normal payment pattern.</span></div><div id="insightList" class="insight-list"><div class="empty"><strong>No analysis yet</strong><span>Import transactions, then press “Analyse Transactions”.</span></div></div></section>
+    <section class="panel"><div class="panel-heading"><div><p class="eyebrow">ACCOUNTS</p><h2>Where your money is held</h2><p class="muted">Each account is clearly marked Personal, Business, Mixed or Unclassified.</p></div><span id="providerBadge" class="badge">Checking bank feed…</span></div><div id="accounts" class="account-grid"><p class="muted">Loading accounts…</p></div></section>
+    <section class="two-col"><article class="panel"><div class="panel-heading"><div><p class="eyebrow">SPENDING</p><h2>Where your money goes</h2><p class="muted">Transfers between your own accounts are excluded once confirmed.</p></div></div><div id="categories" class="rows"></div></article><article class="panel"><div class="panel-heading"><div><p class="eyebrow">TO-DO</p><h2>Things needing attention</h2><p class="muted">These are data-quality tasks, not necessarily errors.</p></div></div><div id="quality" class="rows"></div></article></section>
+    <section class="panel"><div class="panel-heading"><div><p class="eyebrow">HISTORY</p><h2>How much transaction history is covered</h2><p class="muted">This shows the earliest and latest transaction we currently have for each account.</p></div></div><div id="coverage" class="rows"></div></section>
   </main>
-
-  <dialog id="accountDialog">
-    <form id="accountForm" method="dialog" class="dialog-form">
-      <div class="dialog-head"><h2>Add financial account</h2><button type="button" class="icon-button" data-close="accountDialog">×</button></div>
-      <p class="helper">Add each bank account separately. You can keep Personal and Voxel Veda accounts completely separated in reports.</p>
-      <label>Account name<input name="nickname" required maxlength="120" placeholder="Personal Everyday, Voxel Veda Operating, Savings"></label>
-      <label>Institution<input name="institution" maxlength="180" placeholder="Bank name"></label>
-      <div class="form-grid">
-        <label>Who owns this account?<select name="ownership_scope" required><option value="PERSONAL">Personal</option><option value="BUSINESS" selected>Voxel Veda Business</option><option value="MIXED">Mixed use</option><option value="UNCLASSIFIED">Not sure yet</option></select></label>
-        <label>Currency<input name="currency" value="AUD" maxlength="3" required></label>
-      </div>
-      <div class="form-grid">
-        <label>Account type<select name="account_type"><option>Transaction</option><option>Savings</option><option>Credit Card</option><option>Loan</option><option>Offset</option><option>Other</option></select></label>
-        <label>Purpose<select name="financial_purpose"><option>Everyday spending</option><option>Business operating</option><option>Savings</option><option>Payroll</option><option>Tax/GST</option><option>Credit card</option><option>Loan</option><option>Other</option></select></label>
-      </div>
-      <label>Masked account number<input name="account_number_masked" maxlength="40" placeholder="•••• 4832"></label>
-      <label>Opening balance<input name="opening_balance" inputmode="decimal" value="0.00"></label>
-      <div class="dialog-actions"><button type="button" data-close="accountDialog">Cancel</button><button type="submit" class="primary">Save account</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="importDialog">
-    <form id="importForm" method="dialog" class="dialog-form wide-dialog">
-      <div class="dialog-head"><h2>Import bank statement</h2><button type="button" class="icon-button" data-close="importDialog">×</button></div>
-      <label>Which account is this statement for?<select id="importAccount" name="account_id" required></select></label>
-      <label>Choose statement file<input id="importFile" name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" required></label>
-      <p class="helper"><b>Nothing is added immediately.</b> The file is parsed into a review screen first. Duplicate and invalid rows are flagged before you commit anything.</p>
-      <div class="dialog-actions"><button type="button" data-close="importDialog">Cancel</button><button type="submit" class="primary">Parse & review</button></div>
-    </form>
-  </dialog>
-
-  <dialog id="reviewDialog">
-    <div class="dialog-form review-dialog">
-      <div class="dialog-head"><div><h2>Check statement before import</h2><p id="reviewSubtitle" class="helper"></p></div><button type="button" class="icon-button" data-close="reviewDialog">×</button></div>
-      <div id="reviewSummary" class="review-summary"></div>
-      <div class="table-wrap"><table class="review-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Money out</th><th>Money in</th><th>Balance</th><th>Status</th></tr></thead><tbody id="reviewRows"></tbody></table></div>
-      <p class="helper">Rejected and duplicate rows are excluded automatically. Warning rows stay selected so you can check them manually.</p>
-      <div class="dialog-actions"><button id="rejectReview" type="button" class="danger">Reject entire statement</button><button id="commitReview" type="button" class="primary">Approve & import selected rows</button></div>
-    </div>
-  </dialog>
-
-  <dialog id="queueDialog">
-    <div class="dialog-form wide-dialog">
-      <div class="dialog-head"><h2>Statements waiting for review</h2><button type="button" class="icon-button" data-close="queueDialog">×</button></div>
-      <div id="reviewQueue" class="rows"></div>
-    </div>
-  </dialog>
-
+  <dialog id="accountDialog"><form id="accountForm" method="dialog" class="dialog-form"><div class="dialog-head"><h2>Add financial account</h2><button type="button" class="icon-button" data-close="accountDialog">×</button></div><p class="helper">Add each bank account separately. You can keep Personal and Voxel Veda accounts completely separated in reports.</p><label>Account name<input name="nickname" required maxlength="120" placeholder="Personal Everyday, Voxel Veda Operating, Savings"></label><label>Institution<input name="institution" maxlength="180" placeholder="Bank name"></label><div class="form-grid"><label>Who owns this account?<select name="ownership_scope" required><option value="PERSONAL">Personal</option><option value="BUSINESS" selected>Voxel Veda Business</option><option value="MIXED">Mixed use</option><option value="UNCLASSIFIED">Not sure yet</option></select></label><label>Currency<input name="currency" value="AUD" maxlength="3" required></label></div><div class="form-grid"><label>Account type<select name="account_type"><option>Transaction</option><option>Savings</option><option>Credit Card</option><option>Loan</option><option>Offset</option><option>Other</option></select></label><label>Purpose<select name="financial_purpose"><option>Everyday spending</option><option>Business operating</option><option>Savings</option><option>Payroll</option><option>Tax/GST</option><option>Credit card</option><option>Loan</option><option>Other</option></select></label></div><label>Masked account number<input name="account_number_masked" maxlength="40" placeholder="•••• 4832"></label><label>Opening balance<input name="opening_balance" inputmode="decimal" value="0.00"></label><div class="dialog-actions"><button type="button" data-close="accountDialog">Cancel</button><button type="submit" class="primary">Save account</button></div></form></dialog>
+  <dialog id="importDialog"><form id="importForm" method="dialog" class="dialog-form wide-dialog"><div class="dialog-head"><h2>Import bank statement</h2><button type="button" class="icon-button" data-close="importDialog">×</button></div><label>Which account is this statement for?<select id="importAccount" name="account_id" required></select></label><label>Choose statement file<input id="importFile" name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" required></label><p class="helper"><b>Nothing is added immediately.</b> The file is parsed into a review screen first. Duplicate and invalid rows are flagged before you commit anything.</p><div class="dialog-actions"><button type="button" data-close="importDialog">Cancel</button><button type="submit" class="primary">Parse & review</button></div></form></dialog>
+  <dialog id="reviewDialog"><div class="dialog-form review-dialog"><div class="dialog-head"><div><h2>Check statement before import</h2><p id="reviewSubtitle" class="helper"></p></div><button type="button" class="icon-button" data-close="reviewDialog">×</button></div><div id="reviewSummary" class="review-summary"></div><div class="table-wrap"><table class="review-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Money out</th><th>Money in</th><th>Balance</th><th>Status</th></tr></thead><tbody id="reviewRows"></tbody></table></div><p class="helper">Rejected and duplicate rows are excluded automatically. Warning rows stay selected so you can check them manually.</p><div class="dialog-actions"><button id="rejectReview" type="button" class="danger">Reject entire statement</button><button id="commitReview" type="button" class="primary">Approve & import selected rows</button></div></div></dialog>
+  <dialog id="queueDialog"><div class="dialog-form wide-dialog"><div class="dialog-head"><h2>Statements waiting for review</h2><button type="button" class="icon-button" data-close="queueDialog">×</button></div><div id="reviewQueue" class="rows"></div></div></dialog>
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="/finance-intelligence.js?v=20260915-statement-review" defer></script>
@@ -212,6 +39,7 @@
   <script src="/personal-money-smart.js?v=20260916-smart-cashflow" defer></script>
   <script src="/personal-money-review.js?v=20260916-review-inbox" defer></script>
   <script src="/personal-money-health.js?v=20260916-financial-health" defer></script>
+  <script src="/personal-asset-lifecycle.js?v=20260916-asset-protection" defer></script>
   <script src="/finance-banking-readiness.js?v=20260915-readiness" defer></script>
 </body>
 </html>
