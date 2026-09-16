@@ -44,7 +44,9 @@ expect(readiness, "production_controls_ready", 'Production banking controls stat
 expect(readiness, "BANK_DATA_WEBHOOK_SECRET", 'Webhook readiness check missing');
 expect(readiness, "liveSyncEnabled()", 'Readiness must use the explicit live-sync lock');
 
-const ui = read('public/finance-banking-readiness.js');
+const loader = read('public/finance-banking-readiness.js');
+const ui = read('public/finance-banking-readiness-core.js');
+expect(loader, '/finance-banking-readiness-core.js', 'Readiness loader must load the Open Banking UI core.');
 expect(ui, "providerSetupPanel", 'Provider setup UI missing');
 expect(ui, "Start sandbox consent", 'Sandbox consent action missing');
 expect(ui, "Open Banking Setup", 'Guided Connect Bank label missing');
@@ -55,7 +57,7 @@ expect(env, 'BANK_DATA_ENVIRONMENT=sandbox', 'Sandbox must be the documented def
 expect(env, 'BANK_DATA_LIVE_SYNC_ENABLED=false', 'Live bank sync must default off');
 expect(env, 'BANK_DATA_API_KEY=', 'Basiq API key variable missing');
 
-const newSources = [service, controller, readiness, ui].join('\n').toLowerCase();
+const newSources = [service, controller, readiness, loader, ui].join('\n').toLowerCase();
 if (newSources.includes('bank_password') || newSources.includes('bank_pin') || newSources.includes('bank_otp')) {
   throw new Error('Open Banking source must not introduce fields for bank passwords, PINs or OTPs');
 }
