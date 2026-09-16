@@ -27,4 +27,5 @@ assert(restoreUi.includes("upload_id:uploadId")&&restoreUi.includes("{run_id:p.r
 assert(!restoreUi.includes('backup_password')&&!ui.includes('backup_password'),'Backup password must never be sent to verification APIs.');
 assert(canonicalUi.includes('/personal-finance-post-restore-verification.js?v=20260916-post-restore-verification'),'Canonical backup engine must load the verification center.');
 assert(routes.includes("router.post('/accounting-periods/:id/status', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), operations.updateAccountingPeriod);"),'Verification work must preserve unrelated accounting period behavior.');
+require('./personal-finance-recovery-certification-test');
 console.log('Personal Finance Restore Verification & Post-Recovery Reconciliation safeguards passed.');

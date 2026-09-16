@@ -23,6 +23,7 @@ const personalFinanceCanonicalBackup = require('../controllers/personalFinanceCa
 const personalFinanceCanonicalRestore = require('../controllers/personalFinanceCanonicalRestoreController');
 const personalFinanceRestoreTransport = require('../controllers/personalFinanceRestoreTransportController');
 const personalFinancePostRestoreVerification = require('../controllers/personalFinancePostRestoreVerificationController');
+const personalFinanceRecoveryCertification = require('../controllers/personalFinanceRecoveryCertificationController');
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const requirePermission = require('../middleware/permissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
@@ -61,6 +62,9 @@ router.post('/personal-money/canonical-restore/execute', requireAnyPermission('E
 router.post('/personal-money/canonical-restore/:id/rollback', requireAnyPermission('EDIT_FINANCE'), requireStepUp('ROLLBACK_PERSONAL_FINANCE_RESTORE'), personalFinanceCanonicalRestore.rollback);
 router.get('/personal-money/canonical-restore/:id/verification', requireAnyPermission('VIEW_BANKING'), personalFinancePostRestoreVerification.get);
 router.post('/personal-money/canonical-restore/:id/verification/initialize', requireAnyPermission('VIEW_BANKING'), personalFinancePostRestoreVerification.initialize);
+router.get('/personal-money/canonical-restore/:id/certificates', requireAnyPermission('VIEW_BANKING'), personalFinanceRecoveryCertification.list);
+router.post('/personal-money/canonical-restore/:id/certificates', requireAnyPermission('VIEW_BANKING'), requireStepUp('CERTIFY_PERSONAL_FINANCE_RECOVERY'), personalFinanceRecoveryCertification.generate);
+router.get('/personal-money/canonical-restore/:id/certificates/:certificateId', requireAnyPermission('VIEW_BANKING'), requireStepUp('EXPORT_PERSONAL_FINANCE_RECOVERY_EVIDENCE'), personalFinanceRecoveryCertification.get);
 router.post('/personal-money/canonical-restore-upload', requireAnyPermission('VIEW_BANKING'), requireStepUp('PREVIEW_PERSONAL_FINANCE_RESTORE'), personalFinanceRestoreTransport.start);
 router.get('/personal-money/canonical-restore-upload/:id', requireAnyPermission('VIEW_BANKING'), personalFinanceRestoreTransport.status);
 router.put('/personal-money/canonical-restore-upload/:id/chunks/:index', requireAnyPermission('VIEW_BANKING'), personalFinanceRestoreTransport.putChunk);
