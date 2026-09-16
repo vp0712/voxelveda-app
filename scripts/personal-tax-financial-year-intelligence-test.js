@@ -22,4 +22,5 @@ assert(health.includes('Recorded INCOME entries are not automatically taxable in
 assert(health.includes('category names do not create a deduction'),'Backend must not infer deductibility from transaction categories.');
 assert(health.includes('Company finance transactions are not included.'),'Tax readiness must remain separate from company accounting.');
 for(const prohibited of ['tax_payable','tax_liability','tax_rate','journal_entries','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION'])assert(!ui.includes(prohibited),`Tax UI must not contain unsupported tax/accounting action: ${prohibited}`);
+require('./personal-financial-document-evidence-vault-test');
 console.log('Personal Tax & Financial-Year Intelligence regression checks passed.');

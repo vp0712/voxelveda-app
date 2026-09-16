@@ -1,4 +1,5 @@
 (() => {
+  if(!document.querySelector('script[data-personal-financial-document-evidence-vault]')){const s=document.createElement('script');s.src='/personal-financial-document-evidence-vault.js?v=20260916-document-evidence-vault';s.dataset.personalFinancialDocumentEvidenceVault='1';document.head.appendChild(s);}
   const $=id=>document.getElementById(id),esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt','"':'&quot;',"'":'&#39;'}[c]));
   const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c,maximumFractionDigits:2}).format(Number(v||0));}catch{return `${Number(v||0).toFixed(2)} ${c}`;}};
   const KEY='voxelveda.personal-tax-review.v1';
