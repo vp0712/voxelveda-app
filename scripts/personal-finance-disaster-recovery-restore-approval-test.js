@@ -15,4 +15,5 @@ assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Recovery Center
 for(const prohibited of ['/payments','/reconcile','/classify','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','router.post','router.put','router.patch','router.delete'])assert(!ui.includes(prohibited),`Recovery Center must not contain restore/finance mutation path: ${prohibited}`);
 assert(ui.includes('derived totals, summaries and bounded history')&&ui.includes('could corrupt balances or duplicate calculated data'),'Recovery Center must explain why snapshot writes are unsafe.');
 assert(ui.includes('no transaction, balance, debt, savings, tax, evidence, insurance, reconciliation, journal or company-accounting record can be changed'),'Recovery Center must state fail-closed finance boundaries.');
+require('./personal-finance-canonical-backup-engine-test');
 console.log('Personal Finance Disaster Recovery & Restore Approval Center regression checks passed.');
