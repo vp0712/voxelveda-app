@@ -1,0 +1,19 @@
+const fs=require('fs');
+const assert=require('assert');
+const ui=fs.readFileSync('public/personal-finance-backup-recovery-data-portability.js','utf8');
+const step=fs.readFileSync('public/step-up.js','utf8');
+const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
+
+assert(step.includes('/personal-finance-backup-recovery-data-portability.js?v=20260916-backup-recovery'),'Authenticated shell must load Personal Finance Backup, Recovery & Data Portability Center.');
+for(const endpoint of ['/api/finance/personal-money','/api/finance/personal-money/attention','/api/finance/personal-money/smart','/api/finance/personal-money/health?fy_start=','/api/finance/personal-money/data-quality-integrity','/api/finance/personal-money/saved-views','/api/finance/personal-money/spending-challenges','/api/finance/personal-money/net-worth','/api/finance/personal-money/net-worth/lifecycle','/api/finance/personal-money/roadmaps'])assert(ui.includes(endpoint),`Backup Center must use protected PERSONAL source: ${endpoint}`);
+for(const route of ["router.get('/personal-money', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/attention', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/smart', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/health', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/data-quality-integrity', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/saved-views', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/spending-challenges', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/net-worth', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/net-worth/lifecycle', requireAnyPermission('VIEW_BANKING')","router.get('/personal-money/roadmaps', requireAnyPermission('VIEW_BANKING')"])assert(routes.includes(route),`Backup source must remain VIEW_BANKING protected: ${route}`);
+assert(ui.includes("credentials:'same-origin'"),'Backup Center must preserve authenticated same-origin credentials.');
+for(const label of ['PERSONAL FINANCE BACKUP, RECOVERY & DATA PORTABILITY CENTER','Prepare backup','Download encrypted backup','Download integrity manifest','Restore preview','Preview backup','PREVIEW_ONLY','PERSONAL_ONLY'])assert(ui.includes(label),`Backup Center must expose ${label}.`);
+assert(ui.includes("crypto.subtle.digest('SHA-256'")&&ui.includes("name:'AES-GCM'")&&ui.includes("name:'PBKDF2'")&&ui.includes('iterations:210000'),'Backup Center must use SHA-256 integrity plus PBKDF2/AES-GCM browser encryption.');
+assert(ui.includes('voxelveda.personal-tax-review.v1'),'Backup Center should include device-local Personal Tax review annotations in the portable pack.');
+assert(ui.includes('source_coverage')&&ui.includes('successful')&&ui.includes('failed'),'Backup Center must report source coverage gaps explicitly.');
+assert(ui.includes('previewConflict')&&ui.includes('same IDs with different content'),'Restore preview must surface record-ID conflicts without writing.');
+assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Backup/recovery center must remain API read-only.');
+for(const prohibited of ['/payments','/reconcile','/classify','createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','/api/auth/sessions','/api/finance/transactions'])assert(!ui.includes(prohibited),`Backup Center must not include mutation/company/security source path: ${prohibited}`);
+assert(ui.includes('does not restore, reconcile, delete, journal, classify, move money')&&ui.includes('Current API sources remain the system of record'),'Backup UI must state recovery and system-of-record boundaries.');
+console.log('Personal Finance Backup, Recovery & Data Portability Center regression checks passed.');
