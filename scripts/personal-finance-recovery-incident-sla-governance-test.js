@@ -17,4 +17,5 @@ assert(!controller.includes('UPDATE personal_money_')&&!controller.includes('DEL
 for(const label of ['INCIDENT SLA, ESCALATION & GOVERNANCE CENTER','Response overdue','Resolution overdue','Assignee','Evidence','Approval','Governance boundary','cannot reconcile banking','change balances','execute restore','execute rollback'])assert(ui.toLowerCase().includes(label.toLowerCase()),`Governance UI must explain ${label}.`);
 assert(ui.includes("case_action:'GOVERNANCE'")&&ui.includes('evidence_checklist')&&ui.includes('approval_checkpoint'),'Governance UI must expose only governed case metadata actions.');
 assert(loader.includes('/personal-finance-recovery-incident-sla-governance.js?v=20260917-recovery-sla-governance'),'Recovery planner must load SLA governance center.');
+require('./personal-finance-recovery-governance-reporting-test');
 console.log('Personal Finance Recovery Incident SLA, Escalation & Governance safeguards passed.');
