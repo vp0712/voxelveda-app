@@ -5,6 +5,7 @@ const cert=fs.readFileSync('controllers/personalFinanceRecoveryCertificationCont
 const ui=fs.readFileSync('public/personal-finance-recovery-integrity-watch.js','utf8');
 const loader=fs.readFileSync('public/personal-finance-canonical-backup-engine.js','utf8');
 
+assert(controller.includes('const MAX_RUNS=5')&&controller.includes('Math.min(MAX_RUNS'),'Recovery watch must stay hard-capped to a small recent-run set.');
 assert(controller.includes("WHERE user_id=? AND status IN ('SUCCEEDED','ROLLED_BACK')"),'Recovery watch must remain owner-scoped.');
 assert(controller.includes('verification.verifyRun(userId,run.id)'),'Recovery watch must re-run current owner-only restore verification.');
 assert(controller.includes('certificateComputed')&&controller.includes('previous_certificate_sha256')&&controller.includes('CERTIFICATE_CHAIN_INTEGRITY'),'Recovery watch must independently verify the stored SHA-256 certificate chain.');
