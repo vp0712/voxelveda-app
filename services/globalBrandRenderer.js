@@ -2,7 +2,7 @@
 
 const BRAND_CSS = '/global-brand.css?v=20260917c';
 const BRAND_JS = '/global-brand.js?v=20260917c';
-const CANONICAL_LOGO = '/logo.png?v=20260917c';
+const CANONICAL_LOGO = '/logo.png';
 
 function canonicalizeLogoPaths(html) {
   return String(html || '')
