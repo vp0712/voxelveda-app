@@ -1,16 +1,22 @@
-/* Voxel Veda global brand layer: the artwork itself is never filtered, recoloured, cropped or animated. */
-:root{--vv-brand-overlay-bg:rgba(248,250,252,.97);--vv-brand-ring:#111827;--vv-brand-muted:#667085}
-#vvGlobalBrandPresence{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:980;display:flex;align-items:center;justify-content:center;width:58px;height:58px;padding:6px;border:1px solid rgba(17,24,39,.10);border-radius:16px;background:#fff;box-shadow:0 10px 28px rgba(15,23,42,.12);pointer-events:none}
+/* Voxel Veda global brand layer. Original logo artwork stays untouched; all motion is outside the image. */
+:root{--vv-brand-overlay-bg:rgba(248,250,252,.985);--vv-brand-ring:#0f172a;--vv-brand-muted:#667085;--vv-brand-card:#fff}
+#vvGlobalBrandPresence{position:fixed;left:max(12px,env(safe-area-inset-left));bottom:max(12px,env(safe-area-inset-bottom));z-index:980;display:flex;align-items:center;justify-content:center;width:52px;height:52px;padding:7px;border:1px solid rgba(15,23,42,.08);border-radius:15px;background:#fff;box-shadow:0 10px 28px rgba(15,23,42,.10);pointer-events:none}
 #vvGlobalBrandPresence img{display:block;width:100%;height:100%;object-fit:contain;object-position:center;filter:none!important;transform:none!important;animation:none!important;opacity:1!important;border-radius:0!important;mix-blend-mode:normal!important}
-#vvGlobalBrandLoader{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--vv-brand-overlay-bg);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .16s ease,visibility 0s linear .16s;overscroll-behavior:contain}
-#vvGlobalBrandLoader.is-visible{opacity:1;visibility:visible;pointer-events:all;transition:opacity .12s ease}
-.vv-brand-loader-inner{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;min-width:min(78vw,320px);min-height:220px;padding:28px;border-radius:28px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.12)}
-.vv-brand-loader-logo-wrap{position:relative;display:flex;align-items:center;justify-content:center;width:clamp(150px,34vw,250px);height:clamp(150px,34vw,250px)}
-.vv-brand-loader-ring{position:absolute;inset:-8px;border:3px solid rgba(17,24,39,.10);border-top-color:var(--vv-brand-ring);border-radius:50%;animation:vvBrandSpin .85s linear infinite}
-.vv-brand-loader-logo{display:block;position:relative;z-index:1;width:100%;height:100%;object-fit:contain;object-position:center;filter:none!important;transform:none!important;animation:none!important;opacity:1!important;border-radius:0!important;mix-blend-mode:normal!important}
-.vv-brand-loader-text{margin:0;color:var(--vv-brand-muted);font:700 12px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.08em;text-transform:uppercase;text-align:center}
+#vvGlobalBrandLoader{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:max(24px,env(safe-area-inset-top)) 20px max(24px,env(safe-area-inset-bottom));background:var(--vv-brand-overlay-bg);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s;overscroll-behavior:contain}
+#vvGlobalBrandLoader.is-visible{opacity:1;visibility:visible;pointer-events:all;transition:opacity .16s ease}
+.vv-brand-loader-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;width:min(88vw,360px);padding:34px 28px 30px;border:1px solid rgba(15,23,42,.06);border-radius:30px;background:var(--vv-brand-card);box-shadow:0 26px 70px rgba(15,23,42,.10)}
+.vv-brand-loader-logo-wrap{position:relative;display:grid;place-items:center;width:220px;height:220px;flex:0 0 auto;border-radius:50%;background:#fff}
+.vv-brand-loader-ring{position:absolute;inset:0;border:3px solid rgba(15,23,42,.10);border-right-color:var(--vv-brand-ring);border-bottom-color:var(--vv-brand-ring);border-radius:50%;animation:vvBrandSpin 1.05s cubic-bezier(.5,.15,.5,.85) infinite}
+.vv-brand-loader-logo{display:block;position:relative;z-index:1;width:62%;height:62%;object-fit:contain;object-position:center;filter:none!important;transform:none!important;animation:none!important;opacity:1!important;border-radius:0!important;mix-blend-mode:normal!important}
+.vv-brand-loader-copy{display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center}
+.vv-brand-loader-text{margin:0;color:#475467;font:700 13px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;letter-spacing:.075em;text-transform:uppercase;text-align:center}
+.vv-brand-loader-subtext{margin:0;color:#98a2b3;font:500 12px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;text-align:center}
+.vv-network-status{position:fixed;left:50%;bottom:max(18px,calc(env(safe-area-inset-bottom) + 10px));z-index:2147482999;transform:translate(-50%,20px);max-width:min(88vw,420px);padding:10px 14px;border-radius:999px;background:#101828;color:#fff;font:600 12px/1.35 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;box-shadow:0 12px 30px rgba(15,23,42,.22);opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,transform .18s ease,visibility 0s linear .18s;text-align:center}
+.vv-network-status.is-visible{opacity:1;visibility:visible;transform:translate(-50%,0);transition:opacity .18s ease,transform .18s ease}
+.vv-network-status.is-offline{background:#7a271a}
 body.vv-brand-busy{overflow:hidden!important;touch-action:none}
 @keyframes vvBrandSpin{to{transform:rotate(360deg)}}
-@media(max-width:640px){#vvGlobalBrandPresence{width:50px;height:50px;border-radius:14px}.vv-brand-loader-inner{min-width:min(86vw,310px);min-height:200px;padding:22px}.vv-brand-loader-logo-wrap{width:clamp(138px,48vw,220px);height:clamp(138px,48vw,220px)}}
-@media(prefers-reduced-motion:reduce){#vvGlobalBrandLoader{transition:none}.vv-brand-loader-ring{animation:none;border-top-color:rgba(17,24,39,.35)}}
-@media print{#vvGlobalBrandPresence,#vvGlobalBrandLoader{display:none!important}}
+@media(max-width:640px){#vvGlobalBrandPresence{width:46px;height:46px;border-radius:13px}.vv-brand-loader-inner{width:min(88vw,340px);padding:30px 22px 26px;border-radius:26px;gap:16px}.vv-brand-loader-logo-wrap{width:min(58vw,210px);height:min(58vw,210px)}.vv-brand-loader-text{font-size:12px;letter-spacing:.065em}}
+@media(max-height:650px){.vv-brand-loader-inner{padding:22px}.vv-brand-loader-logo-wrap{width:160px;height:160px}.vv-brand-loader-subtext{display:none}}
+@media(prefers-reduced-motion:reduce){#vvGlobalBrandLoader,.vv-network-status{transition:none}.vv-brand-loader-ring{animation:none;border-color:rgba(15,23,42,.16);border-right-color:var(--vv-brand-ring)}}
+@media print{#vvGlobalBrandPresence,#vvGlobalBrandLoader,.vv-network-status{display:none!important}}
