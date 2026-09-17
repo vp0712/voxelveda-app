@@ -46,8 +46,8 @@ function injectFinanceIntelligence(html) {
 }
 
 function injectRecoveryAssurance(html) {
-  const metricNeedle = '        <div class="metric-grid security-metric-grid">';
-  const recoveryPanel = `        <section id="recoveryAssurancePanel" class="card recovery-assurance" aria-live="polite">
+  const metricNeedle = '<div class="metric-grid security-metric-grid">';
+  const recoveryPanel = `<section id="recoveryAssurancePanel" class="card recovery-assurance" aria-live="polite">
           <div class="recovery-assurance-head">
             <div>
               <span class="eyebrow">Disaster Recovery</span>
@@ -82,9 +82,9 @@ function injectRecoveryAssurance(html) {
           <p class="recovery-assurance-footnote">A restore must be tested in an isolated environment. This screen intentionally has no one-click production restore control.</p>
         </section>
 
-`;
+        `;
   let rendered = html;
-  if (!rendered.includes('id="recoveryAssurancePanel"')) {
+  if (!rendered.includes('id="recoveryAssurancePanel"') && rendered.includes(metricNeedle)) {
     rendered = rendered.replace(metricNeedle, `${recoveryPanel}${metricNeedle}`);
   }
   if (!rendered.includes('/recovery-assurance.css')) {
