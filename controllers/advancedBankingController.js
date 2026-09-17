@@ -24,26 +24,15 @@ exports.status = async (req, res) => {
     const option = providerOptions().find((p) => p.key === selected) || providerOptions()[0];
     const [[summary]] = await pool.query(`SELECT COUNT(*) connections, SUM(status='ACTIVE') active, SUM(status IN ('ACTION_REQUIRED','EXPIRED','ERROR')) attention, MAX(last_sync_completed_at) last_sync FROM bank_connections WHERE app_user_id=?`, [req.user.id]);
     const [[sync]] = await pool.query(`SELECT status,last_error_code,error_detail,completed_at FROM open_banking_sync_runs WHERE app_user_id=? ORDER BY id DESC LIMIT 1`, [req.user.id]);
-    return res.json({
-      provider: selected,
-      provider_name: option?.name || selected,
-      configured: Boolean(option?.configured),
-      missing: option?.missing || [],
-      environment: environment(),
-      live_sync_enabled: liveSyncEnabled(),
-      connection_summary: { total: Number(summary?.connections || 0), active: Number(summary?.active || 0), attention: Number(summary?.attention || 0), last_sync: summary?.last_sync || null },
-      last_sync: sync || null,
-      cdr_notice: 'Bank data access is customer-consented and provider-managed. Voxel Veda does not claim independent CDR accreditation through this screen.'
-    });
+    return res.json({ provider: selected, provider_name: option?.name || selected, configured: Boolean(option?.configured), missing: option?.missing || [], environment: environment(), live_sync_enabled: liveSyncEnabled(), connection_summary: { total: Number(summary?.connections || 0), active: Number(summary?.active || 0), attention: Number(summary?.attention || 0), last_sync: summary?.last_sync || null }, last_sync: sync || null, cdr_notice: 'Bank data access is customer-consented and provider-managed. Voxel Veda does not claim independent CDR accreditation through this screen.' });
   } catch (e) { return fail(res, e, 'Failed to load banking status.'); }
 };
 
 exports.connections = async (req, res) => {
   try {
-    const [connections] = await pool.query(`SELECT connection_uid,provider,institution,consent_status,consent_expires_at,last_sync_completed_at,last_sync_status,last_sync_error_code,status,next_sync_at,archived_at,disconnected_at,created_at FROM bank_connections WHERE app_user_id=? ORDER BY created_at DESC`, [req.user.id]);
+    const [connections] = await pool.query(`SELECT id,connection_uid,provider,institution,consent_status,consent_expires_at,last_sync_completed_at,last_sync_status,last_sync_error_code,status,next_sync_at,archived_at,disconnected_at,created_at FROM bank_connections WHERE app_user_id=? ORDER BY created_at DESC`, [req.user.id]);
     const [accounts] = await pool.query(`SELECT bca.connection_id,bca.provider_account_id,bca.bank_account_id,bca.account_name,bca.account_type,bca.account_number_masked,bca.currency,bca.current_balance,bca.available_balance,bca.status,bca.last_seen_at,bc.connection_uid,ba.ownership_scope FROM bank_connection_accounts bca JOIN bank_connections bc ON bc.id=bca.connection_id LEFT JOIN bank_accounts ba ON ba.id=bca.bank_account_id WHERE bc.app_user_id=? ORDER BY bc.id DESC,bca.id`, [req.user.id]);
-    const grouped = connections.map((connection) => ({ ...connection, accounts: accounts.filter((a) => a.connection_uid === connection.connection_uid) }));
-    return res.json({ connections: grouped });
+    return res.json({ connections: connections.map((connection) => ({ ...connection, accounts: accounts.filter((a) => Number(a.connection_id) === Number(connection.id)).map(({ connection_id, ...account }) => account) })) });
   } catch (e) { return fail(res, e, 'Failed to load bank connections.'); }
 };
 
@@ -53,7 +42,8 @@ exports.consentCenter = async (req, res) => {
     const mapping = await mappingForUser(req.user.id, provider);
     let providerConsents = [];
     if (mapping && providerOptions().find((p) => p.key === provider)?.configured) {
-      try { providerConsents = (await adapter(provider).listConsents(mapping.provider_user_id))?.data || []; } catch (error) { providerConsents = [{ status: 'UNAVAILABLE', message: 'Provider consent status could not be refreshed right now.' }]; }
+      try { providerConsents = (await adapter(provider).listConsents(mapping.provider_user_id))?.data || []; }
+      catch { providerConsents = [{ status: 'UNAVAILABLE', message: 'Provider consent status could not be refreshed right now.' }]; }
     }
     const [receipts] = await pool.query(`SELECT receipt_uid,connection_uid,provider,consent_status,scopes_json,purpose_text,consented_at,expires_at,withdrawn_at,created_at FROM bank_consent_receipts WHERE app_user_id=? ORDER BY created_at DESC LIMIT 50`, [req.user.id]);
     return res.json({ provider, provider_consents: providerConsents, local_receipts: receipts, privacy: { bank_credentials_stored: false, provider_tokens_returned_to_browser: false, disconnect_preserves_financial_history: true } });
@@ -81,8 +71,8 @@ exports.transactions = async (req, res) => {
   try {
     const accountId = Number(req.params.id || 0);
     const limit = Math.min(200, Math.max(1, Number(req.query.limit || 50)));
-    const [[account]] = await pool.query(`SELECT id,nickname,ownership_scope,currency FROM bank_accounts WHERE id=? LIMIT 1`, [accountId]);
-    if (!account) return res.status(404).json({ message: 'Bank account not found.', code: 'BANK_ACCOUNT_NOT_FOUND' });
+    const [[account]] = await pool.query(`SELECT ba.id,ba.nickname,ba.ownership_scope,ba.currency FROM bank_accounts ba JOIN bank_connection_accounts bca ON bca.bank_account_id=ba.id JOIN bank_connections bc ON bc.id=bca.connection_id WHERE ba.id=? AND bc.app_user_id=? LIMIT 1`, [accountId, req.user.id]);
+    if (!account) return res.status(404).json({ message: 'Connected bank account not found.', code: 'BANK_ACCOUNT_NOT_FOUND' });
     const [rows] = await pool.query(`SELECT id,transaction_date,transaction_timestamp,description,merchant_name,debit,credit,running_balance,currency,category,classification_status,is_internal_transfer,source_type,source_provider,provider_status,reconciliation_status FROM bank_transactions WHERE bank_account_id=? AND superseded_at IS NULL ORDER BY transaction_date DESC,id DESC LIMIT ?`, [accountId, limit]);
     return res.json({ account, transactions: rows });
   } catch (e) { return fail(res, e, 'Failed to load bank transactions.'); }
@@ -90,7 +80,7 @@ exports.transactions = async (req, res) => {
 
 exports.dataQuality = async (req, res) => {
   try {
-    const [[m]] = await pool.query(`SELECT COUNT(*) total, SUM(provider_transaction_id IS NULL AND source_type='OPEN_BANKING') missing_provider_ids, SUM(classification_status='UNCLASSIFIED') unclassified, SUM(reconciliation_status='UNRECONCILED') unreconciled, SUM(canonical_fingerprint IS NULL) missing_fingerprint FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id WHERE ba.status='ACTIVE'`);
+    const [[m]] = await pool.query(`SELECT COUNT(DISTINCT bt.id) total, SUM(bt.provider_transaction_id IS NULL AND bt.source_type='OPEN_BANKING') missing_provider_ids, SUM(bt.classification_status='UNCLASSIFIED') unclassified, SUM(bt.reconciliation_status='UNRECONCILED') unreconciled, SUM(bt.canonical_fingerprint IS NULL) missing_fingerprint FROM bank_transactions bt JOIN bank_connection_accounts bca ON bca.bank_account_id=bt.bank_account_id JOIN bank_connections bc ON bc.id=bca.connection_id WHERE bc.app_user_id=? AND bc.status<>'DISCONNECTED'`, [req.user.id]);
     const [[c]] = await pool.query(`SELECT SUM(status='ACTIVE') healthy,SUM(status IN ('ACTION_REQUIRED','EXPIRED','ERROR')) attention,SUM(last_sync_completed_at IS NULL) never_synced FROM bank_connections WHERE app_user_id=?`, [req.user.id]);
     const score = Math.max(0, 100 - Number(m?.unclassified || 0) * 0.1 - Number(m?.unreconciled || 0) * 0.05 - Number(c?.attention || 0) * 10);
     return res.json({ score: Math.round(score * 10) / 10, transactions: m || {}, connections: c || {}, guidance: Number(c?.attention || 0) ? 'One or more bank connections need attention.' : 'No connection-level issue is currently detected.' });
@@ -110,8 +100,7 @@ exports.disconnect = async (req, res) => {
   let db;
   try {
     const uidValue = clean(req.params.uid, 64);
-    db = await pool.getConnection();
-    await db.beginTransaction();
+    db = await pool.getConnection(); await db.beginTransaction();
     const [[connection]] = await db.query(`SELECT * FROM bank_connections WHERE connection_uid=? AND app_user_id=? FOR UPDATE`, [uidValue, req.user.id]);
     if (!connection) { await db.rollback(); return res.status(404).json({ message: 'Bank connection not found.', code: 'BANK_CONNECTION_NOT_FOUND' }); }
     if (connection.provider === 'BASIQ' && connection.provider_connection_id && !/^USER-/.test(connection.provider_connection_id) && providerOptions().find((p) => p.key === 'BASIQ')?.configured) await adapter('BASIQ').deleteConnection(connection.provider_connection_id);
@@ -125,8 +114,4 @@ exports.disconnect = async (req, res) => {
   finally { db?.release?.(); }
 };
 
-exports.reauthorize = async (req, res) => {
-  try {
-    return res.status(409).json({ message: 'Start a new provider consent session to renew or expand bank-data consent.', code: 'START_NEW_CONSENT_REQUIRED', action: '/api/finance/intelligence/open-banking/consent' });
-  } catch (e) { return fail(res, e, 'Failed to prepare reauthorisation.'); }
-};
+exports.reauthorize = async (req, res) => res.status(409).json({ message: 'Start a new provider consent session to renew or expand bank-data consent.', code: 'START_NEW_CONSENT_REQUIRED', action: '/api/finance/intelligence/open-banking/consent' });
