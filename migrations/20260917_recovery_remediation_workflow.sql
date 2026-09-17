@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS recovery_remediation_items (
   created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
   updated_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
   PRIMARY KEY (id),
-  UNIQUE KEY uq_recovery_remediation_open_source (drill_id, status),
+  KEY idx_recovery_remediation_drill_status (drill_id, status),
   KEY idx_recovery_remediation_status_due (status, due_at),
   KEY idx_recovery_remediation_priority (priority, created_at),
   CONSTRAINT fk_recovery_remediation_drill FOREIGN KEY (drill_id) REFERENCES recovery_drill_records(id) ON DELETE RESTRICT
