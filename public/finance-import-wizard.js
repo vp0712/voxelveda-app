@@ -119,19 +119,50 @@
     heading.insertAdjacentElement('afterend', guide);
   }
 
+  function resetApprovalUi(message) {
+    state.busy = false;
+    state.step = 4;
+    const button = $('commitReview');
+    if (button) button.textContent = 'Approve & import selected rows';
+    renderSteps();
+    const line = $('importWizardStatus');
+    if (line && message) line.textContent = `Step 4 of 5 · ${message}`;
+  }
+
+  function lockNonImportableRows() {
+    const host = $('reviewRows');
+    if (!host) return;
+    host.querySelectorAll('tr').forEach((row) => {
+      const checkbox = row.querySelector('.row-select');
+      const status = String(row.querySelector('.review-status')?.textContent || '').trim().toUpperCase();
+      if (!checkbox) return;
+      if (status === 'DUPLICATE' || status === 'REJECTED') {
+        checkbox.checked = false;
+        checkbox.disabled = true;
+        checkbox.setAttribute('aria-label', status === 'DUPLICATE' ? 'Duplicate transaction excluded from import' : 'Rejected row cannot be imported');
+      }
+    });
+  }
+
   function observeReviewDialog() {
     const dialog = $('reviewDialog');
     if (!dialog) return;
     installReviewGuide();
     new MutationObserver(() => {
       if (dialog.open) {
+        resetApprovalUi();
+        lockNonImportableRows();
+      } else {
         state.busy = false;
-        state.step = 4;
-        const button = $('commitReview');
-        if (button) button.textContent = 'Approve & import selected rows';
-        renderSteps();
       }
     }).observe(dialog, { attributes: true, attributeFilter: ['open'] });
+  }
+
+  function observeReviewRows() {
+    const host = $('reviewRows');
+    if (!host) return;
+    new MutationObserver(lockNonImportableRows).observe(host, { childList: true, subtree: true });
+    lockNonImportableRows();
   }
 
   function wireImport() {
@@ -185,28 +216,34 @@
       if (!guide) return;
       const warnings = warningCount?.querySelector('b')?.textContent || '0';
       const duplicates = duplicateCount?.querySelector('b')?.textContent || '0';
-      guide.innerHTML = `<b>Step 4 · Review before import.</b> There are ${warnings} warning row(s) and ${duplicates} duplicate row(s). Duplicates stay excluded. Check warning rows, untick anything you do not want, then press “Approve & import selected rows”.`;
+      guide.innerHTML = `<b>Step 4 · Review before import.</b> There are ${warnings} warning row(s) and ${duplicates} duplicate row(s). Duplicates stay excluded and cannot be selected. Check warning rows, untick anything you do not want, then press “Approve & import selected rows”.`;
     }).observe(host, { childList: true, subtree: true });
   }
 
-  function observeImportErrors() {
+  function observeNotices() {
     const notice = $('notice');
     if (!notice) return;
     new MutationObserver(() => {
-      if (!$('importDialog')?.open || notice.hidden) return;
-      if (!String(notice.className || '').includes('error')) return;
-      state.busy = false;
-      syncReadyState();
-      const line = $('importWizardStatus');
-      if (line) line.textContent = `Could not preview this statement · ${String(notice.textContent || 'Please check the file and try again.')}`;
+      if (notice.hidden || !String(notice.className || '').includes('error')) return;
+      const message = String(notice.textContent || 'Please check the statement and try again.');
+      if ($('importDialog')?.open) {
+        state.busy = false;
+        syncReadyState();
+        const line = $('importWizardStatus');
+        if (line) line.textContent = `Could not preview this statement · ${message}`;
+      }
+      if ($('reviewDialog')?.open) {
+        resetApprovalUi(`Approval did not complete · ${message}`);
+      }
     }).observe(notice, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden','class'] });
   }
 
   function init() {
     wireImport();
     observeReviewDialog();
+    observeReviewRows();
     clarifyReviewSummary();
-    observeImportErrors();
+    observeNotices();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
