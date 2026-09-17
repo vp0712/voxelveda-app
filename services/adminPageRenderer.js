@@ -45,11 +45,62 @@ function injectFinanceIntelligence(html) {
   return rendered;
 }
 
+function injectRecoveryAssurance(html) {
+  const metricNeedle = '<div class="metric-grid security-metric-grid">';
+  const recoveryPanel = `<section id="recoveryAssurancePanel" class="card recovery-assurance" aria-live="polite">
+          <div class="recovery-assurance-head">
+            <div>
+              <span class="eyebrow">Disaster Recovery</span>
+              <h3>Backup & Restore Assurance</h3>
+              <p>Evidence-based recovery status. A configured switch alone is never treated as proof of a usable backup.</p>
+            </div>
+            <div class="recovery-assurance-actions">
+              <span id="recoveryAssuranceState" class="recovery-state is-loading">CHECKING</span>
+              <button type="button" class="secondary-btn" id="refreshRecoveryAssurance">Refresh Recovery Check</button>
+            </div>
+          </div>
+          <div class="recovery-assurance-summary">
+            <strong id="recoveryAssuranceHeadline">Checking recovery evidence…</strong>
+            <p id="recoveryAssuranceSummary">Loading provider, backup freshness and restore-drill evidence.</p>
+          </div>
+          <div class="recovery-assurance-metrics">
+            <article><span>Backup freshness target</span><strong id="recoveryBackupTarget">≤ 26h</strong></article>
+            <article><span>Restore drill target</span><strong id="recoveryRestoreTarget">≤ 90d</strong></article>
+            <article><span>Fail-closed gate</span><strong id="recoveryMandatoryGate">OFF</strong></article>
+            <article><span>Evidence provider</span><strong id="recoveryProviderStatus">UNVERIFIED</strong></article>
+          </div>
+          <div class="recovery-assurance-columns">
+            <div>
+              <h4>Automated evidence</h4>
+              <div id="recoveryAssuranceChecks" class="recovery-check-list"><p class="status-note">Checking…</p></div>
+            </div>
+            <div>
+              <h4>Required next actions</h4>
+              <div id="recoveryAssuranceGuidance" class="recovery-check-list"><p class="status-note">Checking…</p></div>
+            </div>
+          </div>
+          <p class="recovery-assurance-footnote">A restore must be tested in an isolated environment. This screen intentionally has no one-click production restore control.</p>
+        </section>
+
+        `;
+  let rendered = html;
+  if (!rendered.includes('id="recoveryAssurancePanel"') && rendered.includes(metricNeedle)) {
+    rendered = rendered.replace(metricNeedle, `${recoveryPanel}${metricNeedle}`);
+  }
+  if (!rendered.includes('/recovery-assurance.css')) {
+    rendered = rendered.replace('</head>', '<link rel="stylesheet" href="/recovery-assurance.css?v=20260917">\n</head>');
+  }
+  if (!rendered.includes('/recovery-assurance.js')) {
+    rendered = rendered.replace('</body>', '<script src="/recovery-assurance.js?v=20260917"></script>\n</body>');
+  }
+  return rendered;
+}
+
 function renderAdminPage(req, res) {
-  const rendered = injectFinanceIntelligence(source());
+  const rendered = injectRecoveryAssurance(injectFinanceIntelligence(source()));
   res.type('html');
   res.setHeader('Cache-Control', 'private, no-store');
   return res.send(rendered);
 }
 
-module.exports = { injectFinanceIntelligence, renderAdminPage };
+module.exports = { injectFinanceIntelligence, injectRecoveryAssurance, renderAdminPage };

@@ -1,0 +1,46 @@
+name: Recovery Assurance Dashboard
+
+on:
+  pull_request:
+    paths:
+      - 'controllers/readinessController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-assurance.js'
+      - 'public/recovery-assurance.css'
+      - 'scripts/recovery-assurance-dashboard-test.js'
+      - '.github/workflows/recovery-assurance-dashboard.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'controllers/readinessController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-assurance.js'
+      - 'public/recovery-assurance.css'
+      - 'scripts/recovery-assurance-dashboard-test.js'
+      - '.github/workflows/recovery-assurance-dashboard.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax checks
+        run: |
+          node --check controllers/readinessController.js
+          node --check routes/readinessRoutes.js
+          node --check services/adminPageRenderer.js
+          node --check public/recovery-assurance.js
+          node --check scripts/recovery-assurance-dashboard-test.js
+      - name: Run Recovery Assurance dashboard test
+        run: node scripts/recovery-assurance-dashboard-test.js
