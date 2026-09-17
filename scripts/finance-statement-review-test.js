@@ -14,6 +14,7 @@ const controller = read('controllers/statementImportController.js');
 const routes = read('routes/financeRoutes.js');
 const client = read('public/finance-intelligence.js');
 const wizard = read('public/finance-import-wizard.js');
+const reviewFilter = read('public/finance-review-filter.js');
 
 assert(migration.includes('CREATE TABLE statement_import_sessions'), 'statement review session table missing');
 assert(migration.includes('CREATE TABLE statement_import_rows'), 'statement review row table missing');
@@ -37,5 +38,10 @@ assert(wizard.includes('No transactions available to import'), 'empty review mus
 assert(wizard.includes('rowIsBalanceMarker'), 'client must defensively identify stale balance markers');
 assert(wizard.includes('reviewActionStatus'), 'review modal needs visible in-place approval status');
 assert(wizard.includes('response.clone().json()'), 'approval error response must be surfaced without consuming the primary response');
+assert(wizard.includes('/finance-review-filter.js?v=20260918-rejected-hidden'), 'review filter asset loader missing');
+assert(reviewFilter.includes("filter: 'IMPORTABLE'"), 'review must default to importable rows rather than rejected rows');
+assert(reviewFilter.includes("filter === 'REJECTED'" ) || reviewFilter.includes("'REJECTED'"), 'rejected-row filter missing');
+assert(reviewFilter.includes('Tap Rejected or Duplicates above'), 'empty importable view must explain how to inspect excluded rows');
+assert(reviewFilter.includes('data-review-filter'), 'review summary counts must be interactive filters');
 
 console.log('Finance statement review architecture checks passed.');

@@ -349,6 +349,15 @@
     }).observe(notice, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden','class'] });
   }
 
+  function loadReviewFilter() {
+    if (document.querySelector('script[data-vv-review-filter]')) return;
+    const script = document.createElement('script');
+    script.src = '/finance-review-filter.js?v=20260918-rejected-hidden';
+    script.defer = true;
+    script.dataset.vvReviewFilter = '1';
+    document.head.appendChild(script);
+  }
+
   function init() {
     installCommitResponseGuard();
     wireImport();
@@ -356,6 +365,7 @@
     observeReviewRows();
     clarifyReviewSummary();
     observeNotices();
+    loadReviewFilter();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
