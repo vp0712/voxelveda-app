@@ -18,13 +18,14 @@ for (const alias of ['voxel-veda-logo.png', 'Frame 1.png', 'og-image.png']) {
 const sample = '<!doctype html><html><head><title>x</title></head><body><img src="/voxel-veda-logo.png"><main>OK</main></body></html>';
 const once = injectGlobalBrand(sample);
 const twice = injectGlobalBrand(once);
-assert.match(once, /\/global-brand\.css\?v=20260917/);
-assert.match(once, /\/global-brand\.js\?v=20260917/);
+assert.match(once, /\/global-brand\.css\?v=20260918-global-loader/);
+assert.match(once, /\/global-brand\.js\?v=20260918-global-loader/);
 assert.match(once, /id="vvGlobalBrandLoader"/);
 assert.match(once, /id="vvGlobalBrandPresence"/);
 assert.match(once, /class="vv-brand-loader-logo" src="\/logo\.png"/);
-assert.match(once, /Preparing your workspace/);
-assert.doesNotMatch(once, /id="vvGlobalBrandLoader" class="is-visible"/, 'Loader must not flash before the delayed client decision');
+assert.match(once, /vv-brand-orbit-ring-one/);
+assert.match(once, /vv-brand-loader-pill/);
+assert.doesNotMatch(once, /id="vvGlobalBrandLoader" class="is-visible"/, 'Loader visibility must remain a client runtime decision');
 assert.doesNotMatch(once, /voxel-veda-logo\.png/);
 assert.equal((twice.match(/id="vvGlobalBrandLoader"/g) || []).length, 1, 'Loader must be injected once');
 assert.equal((twice.match(/global-brand\.css/g) || []).length, 1, 'Brand CSS must be injected once');
@@ -33,18 +34,22 @@ assert.equal((twice.match(/global-brand\.js/g) || []).length, 1, 'Brand JS must 
 const css = read('public/global-brand.css');
 assert.match(css, /\.vv-brand-loader-logo\{[^}]*filter:none!important/i, 'Original logo must not receive visual filters');
 assert.match(css, /\.vv-brand-loader-logo\{[^}]*animation:none!important/i, 'Original logo artwork itself must not animate');
-assert.match(css, /\.vv-brand-loader-ring\{[^}]*animation:vvBrandSpin/i, 'Loading motion must live outside the logo artwork');
-assert.match(css, /\.vv-brand-loader-logo\{[^}]*width:62%/i, 'Logo must fit safely inside the circular loader without clipping');
+assert.match(css, /\.vv-brand-orbit-ring-one\{[^}]*animation:vvBrandOrbitOne/i, 'Loading motion must live outside the logo artwork');
+assert.match(css, /\.vv-brand-scan-line\{[^}]*animation:vvBrandScan/i, 'Reference-style scan motion must live outside the logo artwork');
+assert.match(css, /--vv-brand-overlay-bg:#090e16/i, 'Loader must use the approved premium dark workspace treatment');
 
 const client = read('public/global-brand.js');
-assert.match(client, /15000/, 'Loader must include a fail-safe timeout');
+assert.match(client, /FAIL_SAFE_MS = 30000/, 'Loader must include a fail-safe timeout');
+assert.match(client, /API_DELAY_MS = 520/, 'Slow API loading must be delayed to avoid flashing on fast requests');
 assert.match(client, /VoxelVedaBrandLoader|pageshow/);
 assert.match(client, /addEventListener\('offline'/);
 assert.match(client, /addEventListener\('online'/);
 assert.match(client, /voxelveda:network-restored/);
+assert.match(client, /window\.fetch = function voxelVedaTrackedFetch/, 'Slow foreground fetches must use the common brand loader');
+assert.match(client, /NativeXHR\.prototype\.send/, 'Slow foreground XHR must use the common brand loader');
+assert.match(client, /api\\\/health\|api\\\/ready|api\\\/health/, 'Health/readiness polling must remain excluded from blocking loader work');
+assert.match(client, /notifications/, 'Background notification traffic must remain excluded from blocking loader work');
 assert.doesNotMatch(client, /location\.reload\s*\(/, 'Network reconnect must never hard reload the app');
-assert.doesNotMatch(client, /window\.fetch\s*=/, 'Background fetches must not trigger the full-screen brand loader');
-assert.doesNotMatch(client, /XMLHttpRequest\.prototype\.send\s*=/, 'Background XHR must not trigger the full-screen brand loader');
 
 const app = read('app.js');
 assert.match(app, /injectGlobalBrand/);
