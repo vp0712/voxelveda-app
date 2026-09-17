@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Voxel Veda backend",
   "main": "server.js",
+  "packageManager": "npm@10.9.8",
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
