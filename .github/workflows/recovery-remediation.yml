@@ -1,0 +1,51 @@
+name: Recovery Remediation
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/20260917_recovery_remediation_workflow.sql'
+      - 'scripts/apply-recovery-remediation-migration.js'
+      - 'controllers/recoveryRemediationController.js'
+      - 'routes/readinessRoutes.js'
+      - 'public/recovery-remediation.js'
+      - 'public/recovery-remediation.css'
+      - 'services/adminPageRenderer.js'
+      - 'scripts/recovery-remediation-test.js'
+      - '.github/workflows/recovery-remediation.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/20260917_recovery_remediation_workflow.sql'
+      - 'scripts/apply-recovery-remediation-migration.js'
+      - 'controllers/recoveryRemediationController.js'
+      - 'routes/readinessRoutes.js'
+      - 'public/recovery-remediation.js'
+      - 'public/recovery-remediation.css'
+      - 'services/adminPageRenderer.js'
+      - 'scripts/recovery-remediation-test.js'
+      - '.github/workflows/recovery-remediation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax checks
+        run: |
+          node --check controllers/recoveryRemediationController.js
+          node --check routes/readinessRoutes.js
+          node --check public/recovery-remediation.js
+          node --check services/adminPageRenderer.js
+          node --check scripts/apply-recovery-remediation-migration.js
+          node --check scripts/recovery-remediation-test.js
+      - name: Run remediation safeguards
+        run: node scripts/recovery-remediation-test.js
