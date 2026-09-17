@@ -1,0 +1,1 @@
+The global loading UX uses the untouched original Voxel Veda logo, fitted within a circular loading stage. Full-screen loading is reserved for initial document boot and real navigations, while background data calls and network reconnection stay non-blocking.
