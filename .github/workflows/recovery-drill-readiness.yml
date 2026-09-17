@@ -1,0 +1,49 @@
+name: Recovery Drill Readiness
+
+on:
+  pull_request:
+    paths:
+      - 'services/recoveryDrillReadiness.js'
+      - 'controllers/readinessController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-drill.js'
+      - 'public/recovery-drill.css'
+      - 'scripts/recovery-drill-readiness-test.js'
+      - '.github/workflows/recovery-drill-readiness.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/recoveryDrillReadiness.js'
+      - 'controllers/readinessController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-drill.js'
+      - 'public/recovery-drill.css'
+      - 'scripts/recovery-drill-readiness-test.js'
+      - '.github/workflows/recovery-drill-readiness.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax checks
+        run: |
+          node --check services/recoveryDrillReadiness.js
+          node --check controllers/readinessController.js
+          node --check routes/readinessRoutes.js
+          node --check services/adminPageRenderer.js
+          node --check public/recovery-drill.js
+          node --check scripts/recovery-drill-readiness-test.js
+      - name: Run recovery drill readiness tests
+        run: node scripts/recovery-drill-readiness-test.js

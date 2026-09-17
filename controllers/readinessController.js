@@ -1,5 +1,6 @@
 const { detailedReadiness, liveness, publicReadiness } = require('../services/runtimeState');
 const { verifyBackupRestoreProvider } = require('../config/backupRestoreAssurance');
+const { buildRecoveryDrillReadiness } = require('../services/recoveryDrillReadiness');
 
 exports.health = (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -19,10 +20,7 @@ exports.details = (req, res) => {
   return res.json(detailedReadiness());
 };
 
-exports.recovery = async (req, res) => {
-  res.setHeader('Cache-Control', 'private, no-store');
-  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
-
+async function recoverySnapshot() {
   const mandatory = String(process.env.BACKUP_ASSURANCE_REQUIRED || 'false').toLowerCase() === 'true';
   const nativeProviderClaim = String(process.env.BACKUP_STATUS_PROVIDER || 'unverified').trim().toLowerCase();
   const result = await verifyBackupRestoreProvider(process.env);
@@ -61,7 +59,7 @@ exports.recovery = async (req, res) => {
   }
 
   const effectiveState = providerConnected ? result.state : 'unverified';
-  return res.json({
+  return {
     state: effectiveState,
     ready: providerConnected && result.ready,
     mandatory,
@@ -77,5 +75,18 @@ exports.recovery = async (req, res) => {
     checks: result.checks || [],
     guidance,
     checked_at: result.checked_at || new Date().toISOString()
-  });
+  };
+}
+
+exports.recovery = async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  return res.json(await recoverySnapshot());
+};
+
+exports.recoveryDrill = async (req, res) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
+  const recovery = await recoverySnapshot();
+  return res.json(buildRecoveryDrillReadiness({ recovery, env: process.env }));
 };

@@ -10,5 +10,6 @@ const securityAccess = requireAnyPermission('MANAGE_SECURITY', 'VIEW_SECURITY_GO
 
 router.get('/', securityAccess, readinessLimit, controller.details);
 router.get('/recovery', securityAccess, recoveryLimit, controller.recovery);
+router.get('/recovery/drill', securityAccess, recoveryLimit, controller.recoveryDrill);
 
 module.exports = router;
