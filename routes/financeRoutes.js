@@ -2,6 +2,7 @@ const express = require('express');
 const controller = require('../controllers/financeController');
 const operations = require('../controllers/financeOperationsController');
 const intelligence = require('../controllers/financeIntelligenceController');
+const bankAccountLifecycle = require('../controllers/bankAccountLifecycleController');
 const statementReview = require('../controllers/statementImportController');
 const transactionIntelligence = require('../controllers/financeTransactionIntelligenceController');
 const reconciliationCenter = require('../controllers/financeReconciliationCenterController');
@@ -120,8 +121,14 @@ router.post('/personal-money/roadmaps/:roadmapId/milestones/:milestoneId/progres
 router.post('/personal-money/roadmaps/:id/status', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.updateStatus);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
+router.get('/intelligence/active-overview', requireAnyPermission('VIEW_BANKING'), bankAccountLifecycle.getActiveOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
+router.get('/intelligence/accounts/:id/lifecycle', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), bankAccountLifecycle.getLifecycle);
 router.post('/intelligence/accounts', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountBody('id'), financePrivacy.protectScopeConversion('id', 'ownership_scope'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.saveAccount);
+router.post('/intelligence/accounts/:id/archive', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.archive);
+router.post('/intelligence/accounts/:id/inactive', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.deactivate);
+router.post('/intelligence/accounts/:id/restore', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.restore);
+router.delete('/intelligence/accounts/:id', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.remove);
 router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), intelligence.importStatementRows);
 router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementPreviewSanitizer, statementReview.preview);
 router.get('/intelligence/statement-reviews', requireAnyPermission('VIEW_BANKING'), financePrivacy.filterStatementList, statementReview.list);
