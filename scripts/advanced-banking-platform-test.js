@@ -29,7 +29,7 @@ assert(sync.includes('canonicalFingerprint'), 'canonical transaction fingerprint
 assert(sync.includes('provider_transaction_id'), 'provider transaction identity missing');
 assert(sync.includes('findCrossSourceMatch'), 'cross-source statement/Open Banking dedupe missing');
 assert(sync.includes('INSERT IGNORE INTO bank_transactions'), 'idempotent bank transaction insert missing');
-assert(sync.includes("source_type,source_provider"), 'existing bank_transactions ledger must remain source of truth');
+assert(sync.includes('source_type,source_provider'), 'existing bank_transactions ledger must remain source of truth');
 assert(sync.includes('linked_existing'), 'cross-source linkage accounting missing');
 assert(scheduler.includes('BANK_SYNC_SCHEDULE_ENABLED') || scheduler.includes('scheduledSyncEnabled'), 'scheduled bank sync gate missing');
 assert(scheduler.includes("trigger: 'SCHEDULED'"), 'scheduled sync trigger evidence missing');
@@ -40,11 +40,11 @@ for (const permission of ['VIEW_PERSONAL_BANKING','VIEW_BUSINESS_BANKING','CONNE
 assert(integrationRoutes.includes("router.use('/banking', auth, advancedBankingRoutes)"), 'authenticated banking API mount missing');
 assert(sanitizer.includes('unreadable_date_rows'), 'row-level unreadable-date diagnostics missing');
 assert(!sanitizer.includes('STATEMENT_DATES_UNREADABLE'), 'one unreadable row must not fail the whole statement');
-for (const marker of ['extractGeometry','detectColumns','running_balance_delta','parser_confidence','statementPeriod','inferYear','reconciliation_status']) assert(pdf.includes(marker), `PDF v3 missing ${marker}`);
-assert(pdf.includes("status='REJECTED'") || pdf.includes("status='REJECTED'"), 'PDF v3 must reject ambiguous rows');
+for (const marker of ['extractGeometry','findColumns','running_balance_delta','parser_confidence','statementPeriod','inferYear','reconciliation_status']) assert(pdf.includes(marker), `PDF v3 missing ${marker}`);
+assert(pdf.includes("status='REJECTED'"), 'PDF v3 must reject ambiguous rows');
 assert(ui.includes('Overview') && ui.includes('Accounts') && ui.includes('Transactions') && ui.includes('Insights') && ui.includes('More'), 'mobile banking navigation incomplete');
 assert(ui.includes('Connect Bank') && ui.includes('Sync now') && ui.includes('Upload statement'), 'primary banking actions incomplete');
 assert(renderer.includes('ADVANCED_BANKING_JS'), 'advanced banking UI must be served through page renderer');
-assert(!renderer.includes(`rendered.includes(FINANCE_PDF_ENHANCER_JS)`), 'legacy PDF parser must not be injected alongside PDF v3');
+assert(!renderer.includes('rendered.includes(FINANCE_PDF_ENHANCER_JS)'), 'legacy PDF parser must not be injected alongside PDF v3');
 assert(renderer.includes("const CANONICAL_LOGO = '/logo.png'"), 'canonical original logo contract changed');
 console.log('Advanced Australian banking platform architecture checks passed.');
