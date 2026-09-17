@@ -1,7 +1,7 @@
 'use strict';
 
-const BRAND_CSS = '/global-brand.css?v=20260917c';
-const BRAND_JS = '/global-brand.js?v=20260917c';
+const BRAND_CSS = '/global-brand.css?v=20260918-global-loader';
+const BRAND_JS = '/global-brand.js?v=20260918-global-loader';
 const CANONICAL_LOGO = '/logo.png';
 
 function canonicalizeLogoPaths(html) {
@@ -18,7 +18,7 @@ function injectGlobalBrand(html) {
 
   if (!rendered.includes(BRAND_CSS)) rendered = rendered.replace(/<\/head>/i, `  <link rel="stylesheet" href="${BRAND_CSS}">\n</head>`);
 
-  const loaderMarkup = `\n<div id="vvGlobalBrandPresence" aria-hidden="true"><img src="${CANONICAL_LOGO}" alt=""></div>\n<div id="vvGlobalBrandLoader" aria-hidden="true" role="status" aria-live="polite" aria-label="Voxel Veda is loading">\n  <div class="vv-brand-loader-inner">\n    <div class="vv-brand-loader-logo-wrap">\n      <span class="vv-brand-loader-ring" aria-hidden="true"></span>\n      <div class="vv-brand-loader-logo-stage">\n        <img class="vv-brand-loader-logo" src="${CANONICAL_LOGO}" alt="Voxel Veda">\n      </div>\n    </div>\n    <div class="vv-brand-loader-copy">\n      <p class="vv-brand-loader-text">Preparing your workspace</p>\n      <p class="vv-brand-loader-subtext">Voxel Veda</p>\n    </div>\n  </div>\n</div>\n`;
+  const loaderMarkup = `\n<div id="vvGlobalBrandPresence" aria-hidden="true"><img src="${CANONICAL_LOGO}" alt=""></div>\n<div id="vvGlobalBrandLoader" aria-hidden="true" role="status" aria-live="polite" aria-label="Voxel Veda is loading">\n  <div class="vv-brand-loader-scene">\n    <div class="vv-brand-orbit" aria-hidden="true">\n      <span class="vv-brand-orbit-ring vv-brand-orbit-ring-one"></span>\n      <span class="vv-brand-orbit-ring vv-brand-orbit-ring-two"></span>\n      <span class="vv-brand-orbit-ring vv-brand-orbit-ring-three"></span>\n      <span class="vv-brand-scan-line"></span>\n      <div class="vv-brand-loader-logo-stage">\n        <img class="vv-brand-loader-logo" src="${CANONICAL_LOGO}" alt="Voxel Veda">\n      </div>\n    </div>\n    <div class="vv-brand-loader-pill">\n      <span class="vv-brand-loader-dot" aria-hidden="true"></span>\n      <span class="vv-brand-loader-label">Voxel Veda</span>\n    </div>\n    <p class="vv-brand-loader-context" id="vvGlobalBrandLoaderContext">Loading securely…</p>\n  </div>\n</div>\n`;
 
   if (!rendered.includes('id="vvGlobalBrandLoader"')) rendered = rendered.replace(/<body([^>]*)>/i, (match) => `${match}${loaderMarkup}`);
   if (!rendered.includes(BRAND_JS)) rendered = rendered.replace(/<\/body>/i, `  <script src="${BRAND_JS}" defer></script>\n</body>`);
