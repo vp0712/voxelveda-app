@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { injectGlobalBrand } = require('./globalBrandRenderer');
 
 const adminPagePath = path.join(__dirname, '..', 'public', 'admin-dashboard.html');
 let cachedSource = null;
@@ -46,7 +47,7 @@ function injectRecoveryDrillCenter(html) {
 }
 
 function renderAdminPage(req, res) {
-  const rendered = injectRecoveryDrillCenter(injectRecoveryAssurance(injectFinanceIntelligence(source())));
+  const rendered = injectGlobalBrand(injectRecoveryDrillCenter(injectRecoveryAssurance(injectFinanceIntelligence(source()))));
   res.type('html');
   res.setHeader('Cache-Control', 'private, no-store');
   return res.send(rendered);
