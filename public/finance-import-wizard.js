@@ -50,6 +50,32 @@
     }
   }
 
+  function ensureReviewActionStatus() {
+    const dialog = $('reviewDialog');
+    const actions = dialog?.querySelector('.dialog-actions');
+    if (!dialog || !actions) return null;
+    let status = $('reviewActionStatus');
+    if (!status) {
+      status = document.createElement('div');
+      status.id = 'reviewActionStatus';
+      status.setAttribute('role', 'status');
+      status.setAttribute('aria-live', 'polite');
+      status.style.cssText = 'display:none;margin:12px 0;padding:12px 14px;border-radius:12px;font-weight:700;line-height:1.45;white-space:normal;';
+      actions.insertAdjacentElement('beforebegin', status);
+    }
+    return status;
+  }
+
+  function showReviewStatus(message, tone = 'error') {
+    const status = ensureReviewActionStatus();
+    if (!status) return;
+    status.textContent = message || '';
+    status.style.display = message ? 'block' : 'none';
+    status.style.background = tone === 'success' ? '#ecfdf3' : tone === 'warning' ? '#fff7ed' : '#fef2f2';
+    status.style.color = tone === 'success' ? '#166534' : tone === 'warning' ? '#9a3412' : '#991b1b';
+    status.style.border = `1px solid ${tone === 'success' ? '#bbf7d0' : tone === 'warning' ? '#fed7aa' : '#fecaca'}`;
+  }
+
   function renderSteps() {
     document.querySelectorAll('[data-import-step]').forEach((node) => {
       const n = Number(node.dataset.importStep || 0);
@@ -117,31 +143,68 @@
     guide.className = 'import-review-guide';
     guide.innerHTML = '<b>Step 4 · Review before import.</b> Valid rows are ready. Warnings need your attention. Duplicates are excluded so the same transaction is not imported twice. Rejected rows cannot be imported.';
     heading.insertAdjacentElement('afterend', guide);
+    ensureReviewActionStatus();
   }
 
   function resetApprovalUi(message) {
     state.busy = false;
     state.step = 4;
     const button = $('commitReview');
-    if (button) button.textContent = 'Approve & import selected rows';
+    if (button && !button.dataset.noImportableRows) {
+      button.disabled = false;
+      button.textContent = 'Approve & import selected rows';
+    }
     renderSteps();
     const line = $('importWizardStatus');
     if (line && message) line.textContent = `Step 4 of 5 · ${message}`;
   }
 
+  function rowIsBalanceMarker(row) {
+    const cells = row.querySelectorAll('td');
+    const description = String(cells[2]?.textContent || '').trim().toLowerCase().replace(/\s+/g, ' ');
+    return /^(opening|closing) balance\b/.test(description)
+      || /\bbalance (?:brought|carried) forward\b/.test(description)
+      || /\bbalance (?:b\/f|c\/f)\b/.test(description);
+  }
+
   function lockNonImportableRows() {
     const host = $('reviewRows');
     if (!host) return;
+    let importable = 0;
     host.querySelectorAll('tr').forEach((row) => {
       const checkbox = row.querySelector('.row-select');
-      const status = String(row.querySelector('.review-status')?.textContent || '').trim().toUpperCase();
+      const statusNode = row.querySelector('.review-status');
+      let status = String(statusNode?.textContent || '').trim().toUpperCase();
+      const balanceMarker = rowIsBalanceMarker(row);
       if (!checkbox) return;
-      if (status === 'DUPLICATE' || status === 'REJECTED') {
+      if (balanceMarker && status !== 'REJECTED') {
+        status = 'REJECTED';
+        if (statusNode) {
+          statusNode.textContent = 'REJECTED';
+          statusNode.className = 'review-status rejected';
+        }
+      }
+      if (status === 'DUPLICATE' || status === 'REJECTED' || balanceMarker) {
         checkbox.checked = false;
         checkbox.disabled = true;
-        checkbox.setAttribute('aria-label', status === 'DUPLICATE' ? 'Duplicate transaction excluded from import' : 'Rejected row cannot be imported');
+        checkbox.setAttribute('aria-label', balanceMarker ? 'Statement balance marker excluded from import' : status === 'DUPLICATE' ? 'Duplicate transaction excluded from import' : 'Rejected row cannot be imported');
+      } else {
+        if (checkbox.checked) importable += 1;
       }
     });
+    const button = $('commitReview');
+    if (button) {
+      if (importable === 0 && $('reviewDialog')?.open) {
+        button.disabled = true;
+        button.dataset.noImportableRows = '1';
+        button.textContent = 'No transactions available to import';
+        showReviewStatus('No real transaction rows are available in this review. Opening/closing balances are statement markers, not income or spending. Use CSV, OFX or QFX from your bank, or a transaction-detail PDF with explicit debit/credit direction.', 'warning');
+      } else if (importable > 0 && !state.busy) {
+        delete button.dataset.noImportableRows;
+        button.disabled = false;
+        button.textContent = 'Approve & import selected rows';
+      }
+    }
   }
 
   function observeReviewDialog() {
@@ -150,10 +213,12 @@
     installReviewGuide();
     new MutationObserver(() => {
       if (dialog.open) {
+        showReviewStatus('');
         resetApprovalUi();
-        lockNonImportableRows();
+        window.setTimeout(lockNonImportableRows, 0);
       } else {
         state.busy = false;
+        showReviewStatus('');
       }
     }).observe(dialog, { attributes: true, attributeFilter: ['open'] });
   }
@@ -161,8 +226,46 @@
   function observeReviewRows() {
     const host = $('reviewRows');
     if (!host) return;
-    new MutationObserver(lockNonImportableRows).observe(host, { childList: true, subtree: true });
+    new MutationObserver(() => window.setTimeout(lockNonImportableRows, 0)).observe(host, { childList: true, subtree: true });
     lockNonImportableRows();
+  }
+
+  function installCommitResponseGuard() {
+    if (window.__vvStatementCommitFetchGuard) return;
+    window.__vvStatementCommitFetchGuard = true;
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = async (...args) => {
+      const requestTarget = typeof args[0] === 'string' ? args[0] : String(args[0]?.url || '');
+      const isCommit = /\/api\/finance\/intelligence\/statement-reviews\/[^/]+\/commit(?:\?|$)/.test(requestTarget);
+      try {
+        const response = await nativeFetch(...args);
+        if (isCommit && !response.ok) {
+          let payload = {};
+          try { payload = await response.clone().json(); } catch {}
+          state.busy = false;
+          state.step = 4;
+          const button = $('commitReview');
+          const noRows = payload.code === 'NO_IMPORTABLE_TRANSACTIONS' || payload.code === 'NO_ROWS_SELECTED';
+          if (button) {
+            button.disabled = noRows;
+            if (noRows) button.dataset.noImportableRows = '1';
+            else delete button.dataset.noImportableRows;
+            button.textContent = noRows ? 'No transactions available to import' : 'Approve & import selected rows';
+          }
+          const message = payload.message || `Import approval failed (${response.status}). Please review the rows and try again.`;
+          showReviewStatus(message, noRows ? 'warning' : 'error');
+          renderSteps();
+          window.setTimeout(lockNonImportableRows, 0);
+        }
+        return response;
+      } catch (error) {
+        if (isCommit) {
+          resetApprovalUi('Connection problem — nothing was imported.');
+          showReviewStatus('The approval request could not reach the server. Nothing was imported. Check the connection and try again.', 'error');
+        }
+        throw error;
+      }
+    };
   }
 
   function wireImport() {
@@ -186,11 +289,16 @@
     }, true);
 
     $('commitReview')?.addEventListener('click', () => {
+      const button = $('commitReview');
+      if (button?.disabled || button?.dataset.noImportableRows) return;
+      showReviewStatus('');
       state.step = 5;
       state.busy = true;
       renderSteps();
-      const button = $('commitReview');
-      if (button) button.textContent = 'Approving selected rows…';
+      if (button) {
+        button.disabled = true;
+        button.textContent = 'Approving selected rows…';
+      }
     }, true);
 
     $('rejectReview')?.addEventListener('click', () => {
@@ -217,6 +325,7 @@
       const warnings = warningCount?.querySelector('b')?.textContent || '0';
       const duplicates = duplicateCount?.querySelector('b')?.textContent || '0';
       guide.innerHTML = `<b>Step 4 · Review before import.</b> There are ${warnings} warning row(s) and ${duplicates} duplicate row(s). Duplicates stay excluded and cannot be selected. Check warning rows, untick anything you do not want, then press “Approve & import selected rows”.`;
+      window.setTimeout(lockNonImportableRows, 0);
     }).observe(host, { childList: true, subtree: true });
   }
 
@@ -233,12 +342,15 @@
         if (line) line.textContent = `Could not preview this statement · ${message}`;
       }
       if ($('reviewDialog')?.open) {
-        resetApprovalUi(`Approval did not complete · ${message}`);
+        const button = $('commitReview');
+        if (!button?.dataset.noImportableRows) resetApprovalUi(`Approval did not complete · ${message}`);
+        showReviewStatus(message, 'error');
       }
     }).observe(notice, { childList: true, subtree: true, attributes: true, attributeFilter: ['hidden','class'] });
   }
 
   function init() {
+    installCommitResponseGuard();
     wireImport();
     observeReviewDialog();
     observeReviewRows();
