@@ -1,6 +1,5 @@
 const crypto = require('node:crypto');
 const pool = require('../config/db');
-const money = require('../utils/money');
 const { adapter, environment, liveSyncEnabled, selectedProvider } = require('./openBankingProviderService');
 const { logAudit } = require('./auditService');
 
@@ -11,6 +10,7 @@ function dateOnly(value) { const s = clean(value, 40); const m = s.match(/^\d{4}
 function dateTime(value) { const d = value ? new Date(value) : null; return d && !Number.isNaN(d.valueOf()) ? d.toISOString().slice(0, 19).replace('T', ' ') : null; }
 function decimal(value) { const n = Number(value ?? 0); return Number.isFinite(n) ? n : 0; }
 function hash(value) { return crypto.createHash('sha256').update(String(value)).digest('hex'); }
+function normalizedText(value) { return clean(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' '); }
 function normalizeInstitution(connection) { return clean(connection?.institution?.name || connection?.institution?.shortName || connection?.institution || connection?.name, 180) || 'Connected bank'; }
 function maskAccount(account) {
   const raw = clean(account?.accountNo || account?.accountNumber || account?.number || account?.displayName, 80);
@@ -19,6 +19,10 @@ function maskAccount(account) {
   return tail ? `•••• ${tail}` : null;
 }
 function providerAccountId(account) { return clean(account?.id || account?.accountId, 180); }
+function transactionAccountId(tx) {
+  if (tx?.account && typeof tx.account === 'object') return clean(tx.account.id || tx.account.accountId, 180);
+  return clean(tx?.accountId || tx?.account, 180);
+}
 function transactionId(tx) { return clean(tx?.id || tx?.transactionId || tx?.externalId, 180); }
 function transactionDescription(tx) { return clean(tx?.description || tx?.narrative || tx?.merchant?.name || tx?.merchantName || tx?.class?.title || 'Bank transaction', 500); }
 function transactionAmount(tx) {
@@ -33,7 +37,7 @@ function transactionDirection(tx, amount) {
   return amount < 0 ? 'DEBIT' : 'CREDIT';
 }
 function canonicalFingerprint(accountId, tx, debit, credit) {
-  return hash([accountId, dateOnly(tx?.transactionDate || tx?.postDate || tx?.date) || '', transactionDescription(tx).toLowerCase().replace(/\s+/g, ' '), Number(debit || 0).toFixed(2), Number(credit || 0).toFixed(2)].join('|'));
+  return hash([accountId, dateOnly(tx?.transactionDate || tx?.postDate || tx?.date) || '', normalizedText(transactionDescription(tx)), Number(debit || 0).toFixed(2), Number(credit || 0).toFixed(2)].join('|'));
 }
 function canonicalRowHash(accountId, tx, debit, credit) {
   const external = transactionId(tx);
@@ -67,14 +71,15 @@ async function upsertConnectionsAndAccounts(db, provider, appUserId, providerUse
     const remoteId = clean(remote?.id || remote?.connectionId, 180);
     if (!remoteId) continue;
     const institution = normalizeInstitution(remote);
-    const status = clean(remote?.status || remote?.state || 'ACTIVE', 30).toUpperCase();
+    const rawStatus = clean(remote?.status || remote?.state || 'ACTIVE', 30).toUpperCase();
+    const status = /INVALID|ERROR|FAILED/.test(rawStatus) ? 'ACTION_REQUIRED' : /EXPIRE/.test(rawStatus) ? 'EXPIRED' : /REVOK|CANCEL|DISCONNECT/.test(rawStatus) ? 'DISCONNECTED' : 'ACTIVE';
     const connectionUid = `BCN-${hash(`${provider}|${providerUserId}|${remoteId}`).slice(0, 16).toUpperCase()}`;
     await db.query(
       `INSERT INTO bank_connections
        (connection_uid,provider,institution,provider_connection_id,consent_status,created_by,app_user_id,environment,status,provider_user_id,next_sync_at)
-       VALUES (?,?,?,?,?,?,?, ?,?,?, DATE_ADD(NOW(), INTERVAL 6 HOUR))
-       ON DUPLICATE KEY UPDATE institution=VALUES(institution), consent_status=VALUES(consent_status), app_user_id=VALUES(app_user_id), environment=VALUES(environment), status=VALUES(status), provider_user_id=VALUES(provider_user_id), updated_at=NOW()`,
-      [connectionUid, provider, institution, remoteId, status, appUserId, appUserId, environment(), status, providerUserId]
+       VALUES (?,?,?,?,?,?,?,?,?,?,DATE_ADD(NOW(), INTERVAL 6 HOUR))
+       ON DUPLICATE KEY UPDATE institution=VALUES(institution),consent_status=VALUES(consent_status),app_user_id=VALUES(app_user_id),environment=VALUES(environment),status=VALUES(status),provider_user_id=VALUES(provider_user_id),updated_at=NOW()`,
+      [connectionUid, provider, institution, remoteId, rawStatus, appUserId, appUserId, environment(), status, providerUserId]
     );
     const [[connection]] = await db.query('SELECT * FROM bank_connections WHERE provider=? AND provider_connection_id=? LIMIT 1', [provider, remoteId]);
     if (connection) connections.push(connection);
@@ -85,7 +90,7 @@ async function upsertConnectionsAndAccounts(db, provider, appUserId, providerUse
     await db.query(
       `INSERT INTO bank_connections (connection_uid,provider,institution,provider_connection_id,consent_status,created_by,app_user_id,environment,status,provider_user_id,next_sync_at)
        VALUES (?,?, 'Connected institution',?, 'ACTIVE',?,?,?,'ACTIVE',?,DATE_ADD(NOW(), INTERVAL 6 HOUR))
-       ON DUPLICATE KEY UPDATE app_user_id=VALUES(app_user_id), provider_user_id=VALUES(provider_user_id), status='ACTIVE', updated_at=NOW()`,
+       ON DUPLICATE KEY UPDATE app_user_id=VALUES(app_user_id),provider_user_id=VALUES(provider_user_id),status='ACTIVE',updated_at=NOW()`,
       [connectionUid, provider, syntheticId, appUserId, appUserId, environment(), providerUserId]
     );
     const [[connection]] = await db.query('SELECT * FROM bank_connections WHERE provider=? AND provider_connection_id=? LIMIT 1', [provider, syntheticId]);
@@ -109,17 +114,35 @@ async function upsertConnectionsAndAccounts(db, provider, appUserId, providerUse
     const [[linked]] = await db.query('SELECT * FROM bank_connection_accounts WHERE connection_id=? AND provider_account_id=? LIMIT 1', [primary.id, accountId]);
     const localId = await ensureLocalAccount(db, primary, linked, remote);
     if (localId) {
-      await db.query(`UPDATE bank_accounts SET institution=?, account_number_masked=?, currency=?, current_ledger_balance=?, available_balance=?, connection_type='OPEN_BANKING', connection_status='CONNECTED', last_synced_at=NOW(), updated_at=NOW() WHERE id=?`, [normalizeInstitution(primary), maskAccount(remote), currency, current, available == null ? null : decimal(available), localId]);
+      await db.query(`UPDATE bank_accounts SET institution=?,account_number_masked=?,currency=?,current_ledger_balance=?,available_balance=?,connection_type='OPEN_BANKING',connection_status='CONNECTED',last_synced_at=NOW(),updated_at=NOW() WHERE id=?`, [normalizeInstitution(primary), maskAccount(remote), currency, current, available == null ? null : decimal(available), localId]);
     }
   }
   return { connections, accounts: providerAccounts };
 }
 
+async function findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credit, fingerprint) {
+  let existing = null;
+  [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type FROM bank_transactions WHERE bank_account_id=? AND canonical_fingerprint=? AND transaction_date=? LIMIT 1', [localAccountId, fingerprint, txDate]);
+  if (existing) return existing;
+  const [candidates] = await db.query(
+    `SELECT id,description,debit,credit,source_type,provider_raw_hash FROM bank_transactions
+     WHERE bank_account_id=? AND transaction_date=? AND ABS(debit-?)<0.01 AND ABS(credit-?)<0.01 AND superseded_at IS NULL LIMIT 30`,
+    [localAccountId, txDate, Number(debit || 0), Number(credit || 0)]
+  );
+  const providerText = normalizedText(transactionDescription(tx));
+  existing = candidates.find((candidate) => {
+    const candidateText = normalizedText(candidate.description);
+    return candidateText && providerText && (candidateText === providerText || candidateText.includes(providerText) || providerText.includes(candidateText));
+  }) || null;
+  if (existing) await db.query('UPDATE bank_transactions SET canonical_fingerprint=? WHERE id=? AND canonical_fingerprint IS NULL', [fingerprint, existing.id]);
+  return existing;
+}
+
 async function ingestTransactions(db, connection, transactionsPayload, provider) {
   const rows = list(transactionsPayload);
-  let inserted = 0; let updated = 0; let duplicates = 0;
+  let inserted = 0; let updated = 0; let duplicates = 0; let linkedExisting = 0;
   for (const tx of rows) {
-    const remoteAccountId = clean(tx?.account || tx?.accountId || tx?.account?.id, 180);
+    const remoteAccountId = transactionAccountId(tx);
     let linked;
     if (remoteAccountId) [[linked]] = await db.query('SELECT * FROM bank_connection_accounts WHERE connection_id=? AND provider_account_id=? LIMIT 1', [connection.id, remoteAccountId]);
     if (!linked) [[linked]] = await db.query('SELECT * FROM bank_connection_accounts WHERE connection_id=? AND bank_account_id IS NOT NULL ORDER BY id LIMIT 1', [connection.id]);
@@ -138,23 +161,24 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
     const txDate = dateOnly(tx?.transactionDate || tx?.postDate || tx?.date);
     if (!txDate) continue;
     let existing = null;
-    if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
-    if (!existing) [[existing]] = await db.query('SELECT id,source_type FROM bank_transactions WHERE bank_account_id=? AND canonical_fingerprint=? AND transaction_date=? LIMIT 1', [localAccountId, fingerprint, txDate]);
+    if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
+    if (!existing) existing = await findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credit, fingerprint);
     if (existing) {
-      if (externalId) await db.query(`UPDATE bank_transactions SET source_provider=?,provider_transaction_id=?,provider_account_id=?,provider_status=?,provider_raw_hash=?,canonical_fingerprint=?,last_seen_at=NOW(),provider_updated_at=? WHERE id=?`, [provider, externalId, remoteAccountId || null, clean(tx?.status || 'POSTED',40), rawHash, fingerprint, dateTime(tx?.lastUpdated || tx?.updatedAt), existing.id]);
+      if (externalId) await db.query(`UPDATE bank_transactions SET source_provider=?,provider_transaction_id=?,provider_account_id=?,provider_status=?,provider_raw_hash=?,canonical_fingerprint=?,last_seen_at=NOW(),provider_updated_at=? WHERE id=?`, [provider, externalId, remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.lastUpdated || tx?.updatedAt), existing.id]);
+      if (existing.source_type && existing.source_type !== 'OPEN_BANKING') linkedExisting += 1;
       if (existing.provider_raw_hash && existing.provider_raw_hash !== rawHash) updated += 1; else duplicates += 1;
       continue;
     }
-    await db.query(
+    const [result] = await db.query(
       `INSERT IGNORE INTO bank_transactions
        (bank_account_id,import_batch_uid,row_hash,transaction_date,description,reference,debit,credit,running_balance,reconciliation_status,imported_by,source_type,source_provider,provider_transaction_id,merchant_name,posting_date,currency,ownership_scope,category,classification_status,is_internal_transfer,first_seen_at,last_seen_at,provider_account_id,provider_status,provider_raw_hash,canonical_fingerprint,transaction_timestamp,provider_updated_at)
        SELECT ?,?,?,?,?,?,?,?,?, 'UNRECONCILED',?, 'OPEN_BANKING',?,?,?,?,?,currency,ownership_scope,?, 'UNCLASSIFIED',0,NOW(),NOW(),?,?,?,?,?
        FROM bank_accounts WHERE id=?`,
-      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo,180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName,255) || null, dateOnly(tx?.postDate) || null, clean(tx?.category || tx?.class?.title,120) || null, remoteAccountId || null, clean(tx?.status || 'POSTED',40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
+      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo, 180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName, 255) || null, dateOnly(tx?.postDate) || null, clean(tx?.category || tx?.class?.title, 120) || null, remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
     );
-    inserted += 1;
+    if (result.affectedRows) inserted += 1; else duplicates += 1;
   }
-  return { seen: rows.length, inserted, updated, duplicates };
+  return { seen: rows.length, inserted, updated, duplicates, linked_existing: linkedExisting };
 }
 
 async function syncUserBanking({ appUserId, providerUserId, trigger = 'MANUAL', actor = null }) {
@@ -176,10 +200,10 @@ async function syncUserBanking({ appUserId, providerUserId, trigger = 'MANUAL', 
     await db.query(`INSERT INTO bank_sync_events (event_uid,sync_uid,event_type,event_json) VALUES (?,?, 'SYNC_COMPLETED',?)`, [uid('BSE'), syncUid, JSON.stringify({ accounts: linked.accounts.length, ...tx })]);
     await logAudit(db, { actorId: actor || appUserId, action: 'BANK_SYNC_COMPLETED', module: 'finance_intelligence', recordType: 'bank_sync', recordId: syncUid, newValue: { provider, connection_uid: connection.connection_uid, ...tx } });
     await db.commit();
-    return { sync_uid: syncUid, connection_uid: connection.connection_uid, accounts_seen: linked.accounts.length, transactions_seen: tx.seen, inserted: tx.inserted, updated: tx.updated, duplicates: tx.duplicates };
+    return { sync_uid: syncUid, connection_uid: connection.connection_uid, accounts_seen: linked.accounts.length, transactions_seen: tx.seen, inserted: tx.inserted, updated: tx.updated, duplicates: tx.duplicates, linked_existing: tx.linked_existing };
   } catch (error) {
     await db.rollback().catch(() => {});
-    await pool.query(`UPDATE open_banking_sync_runs SET status='FAILED',error_code=?,error_detail=?,completed_at=NOW() WHERE sync_uid=?`, [clean(error.code || 'SYNC_FAILED',100), clean(error.message,500), syncUid]).catch(() => {});
+    await pool.query(`UPDATE open_banking_sync_runs SET status='FAILED',error_code=?,error_detail=?,completed_at=NOW() WHERE sync_uid=?`, [clean(error.code || 'SYNC_FAILED', 100), clean(error.message, 500), syncUid]).catch(() => {});
     throw error;
   } finally { db.release(); }
 }
