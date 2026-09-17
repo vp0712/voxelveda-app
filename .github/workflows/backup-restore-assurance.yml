@@ -1,0 +1,38 @@
+name: Backup Restore Assurance
+
+on:
+  pull_request:
+    paths:
+      - 'config/backupRestoreAssurance.js'
+      - 'scripts/backup-restore-assurance-test.js'
+      - 'scripts/check-backup-restore-assurance.js'
+      - '.github/workflows/backup-restore-assurance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'config/backupRestoreAssurance.js'
+      - 'scripts/backup-restore-assurance-test.js'
+      - 'scripts/check-backup-restore-assurance.js'
+      - '.github/workflows/backup-restore-assurance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax check assurance files
+        run: |
+          node --check config/backupRestoreAssurance.js
+          node --check scripts/backup-restore-assurance-test.js
+          node --check scripts/check-backup-restore-assurance.js
+      - name: Run backup and restore assurance tests
+        run: node scripts/backup-restore-assurance-test.js
