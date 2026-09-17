@@ -12,13 +12,13 @@
   async function api(path, options={}) {
     const response = await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});
     let body={}; try{body=await response.json();}catch{}
-    if(!response.ok){const e=new Error(body.message||`Request failed (${response.status})`);e.code=body.code;e.status=response.status;throw e;}
+    if(!response.ok){const e=new Error(body.message||`Request failed (${response.status})`);e.code=body.code;e.status=response.status;e.payload=body;throw e;}
     return body;
   }
 
   function installAssets(){
-    if(!$('advancedBankingCss')){const link=document.createElement('link');link.id='advancedBankingCss';link.rel='stylesheet';link.href='/advanced-banking-ui.css?v=20260918-au-banking';document.head.appendChild(link);}
-    if(!$('financePdfV3')){const script=document.createElement('script');script.id='financePdfV3';script.src='/finance-pdf-v3.js?v=20260918-pdf-v3';script.defer=true;document.head.appendChild(script);}
+    if(!$('advancedBankingCss')){const link=document.createElement('link');link.id='advancedBankingCss';link.rel='stylesheet';link.href='/advanced-banking-ui.css?v=20260918-au-banking2';document.head.appendChild(link);}
+    if(!$('financePdfV3')){const script=document.createElement('script');script.id='financePdfV3';script.src='/finance-pdf-v3.js?v=20260918-pdf-v3b';script.defer=true;document.head.appendChild(script);}
   }
 
   function installHub(){
@@ -33,6 +33,7 @@
         <div><p class="eyebrow">AUSTRALIAN BANKING HUB</p><h2>Bank-connected money</h2><p id="vvBankHeadline">Checking secure bank connectivity…</p></div>
         <span id="vvBankStatus" class="vv-bank-status">Checking</span>
       </div>
+      <div id="vvBankMessage" class="vv-bank-message" role="status" aria-live="polite" hidden></div>
       <div class="vv-bank-actions">
         <button id="vvConnectBank" class="vv-bank-primary" type="button">Connect Bank</button>
         <button id="vvSyncBanks" type="button">Sync now</button>
@@ -49,6 +50,14 @@
 
   let state={status:null,connections:[],quality:null,tab:'overview',busy:false};
 
+  function showMessage(message,tone='info',details=''){
+    const node=$('vvBankMessage'); if(!node)return;
+    node.hidden=!message;
+    node.className=`vv-bank-message ${tone}`;
+    node.innerHTML=message?`<strong>${escapeHtml(message)}</strong>${details?`<span>${escapeHtml(details)}</span>`:''}`:'';
+    if(message)node.scrollIntoView({behavior:'smooth',block:'nearest'});
+  }
+
   function healthClass(status){if(!status?.configured)return 'setup';if(status.environment==='PRODUCTION'&&!status.live_sync_enabled)return 'setup';if(Number(status.connection_summary?.attention||0)>0)return 'attention';return 'healthy';}
 
   function renderOverview(){
@@ -62,7 +71,7 @@
 
   function renderAccounts(){
     const accounts=state.connections.flatMap(c=>(c.accounts||[]).map(a=>({...a,institution:c.institution,connection_uid:c.connection_uid,connection_status:c.status})));
-    $('vvBankContent').innerHTML=accounts.length?`<div class="vv-bank-account-grid">${accounts.map(a=>`<article class="vv-bank-account"><div><small>${escapeHtml(a.institution||'Connected bank')} · ${escapeHtml(a.account_type||'Account')}</small><h3>${escapeHtml(a.account_name||'Account')}</h3><span>${escapeHtml(a.account_number_masked||'number masked')}</span></div><strong>${money(a.available_balance??a.current_balance,a.currency||'AUD')}</strong><div class="vv-bank-account-meta"><span>${escapeHtml(a.ownership_scope||'UNCLASSIFIED')}</span><span>${escapeHtml(a.status||'ACTIVE')}</span></div>${a.bank_account_id?`<button type="button" data-bank-transactions="${Number(a.bank_account_id)}">View transactions</button>`:''}</article>`).join('')}</div>`:`<div class="vv-bank-empty"><strong>No linked bank accounts yet</strong><span>Use Connect Bank to start the provider consent flow, then Sync now after consent completes.</span></div>`;
+    $('vvBankContent').innerHTML=accounts.length?`<div class="vv-bank-account-grid">${accounts.map(a=>`<article class="vv-bank-account"><div><small>${escapeHtml(a.institution||'Connected bank')} · ${escapeHtml(a.account_type||'Account')}</small><h3>${escapeHtml(a.account_name||'Account')}</h3><span>${escapeHtml(a.account_number_masked||'number masked')}</span></div><strong>${money(a.available_balance??a.current_balance,a.currency||'AUD')}</strong><div class="vv-bank-account-meta"><span>${escapeHtml(a.ownership_scope||'UNCLASSIFIED')}</span><span>${escapeHtml(a.status||'ACTIVE')}</span></div>${a.bank_account_id?`<button type="button" data-bank-transactions="${Number(a.bank_account_id)}">View transactions</button>`:''}</article>`).join('')}</div>`:`<div class="vv-bank-empty"><strong>No linked bank accounts yet</strong><span>Use Connect Bank after the Basiq provider credential is configured, or upload a statement now.</span></div>`;
   }
 
   async function renderTransactions(accountId){
@@ -79,7 +88,7 @@
   function renderInsights(){const q=state.quality||{};const t=q.transactions||{};const c=q.connections||{};$('vvBankContent').innerHTML=`<div class="vv-bank-quality"><h3>Bank data quality</h3><div><span>Unclassified transactions</span><b>${Number(t.unclassified||0)}</b></div><div><span>Unreconciled transactions</span><b>${Number(t.unreconciled||0)}</b></div><div><span>Missing canonical fingerprint</span><b>${Number(t.missing_fingerprint||0)}</b></div><div><span>Connections needing attention</span><b>${Number(c.attention||0)}</b></div></div>`;}
 
   function renderMore(){
-    $('vvBankContent').innerHTML=`<div class="vv-bank-more"><article><h3>Consent & data controls</h3><p>Review consent status, connection lifecycle and privacy boundaries. Disconnecting stops future sync while preserving existing financial history unless it is separately deleted under the data policy.</p><button type="button" data-bank-action="consents">Open consent center</button></article><article><h3>Import fallback</h3><p>Use CSV, OFX or QFX where possible. PDF parsing uses geometry, confidence and reconciliation checks and never silently treats an uncertain row as a transaction.</p><button type="button" data-bank-action="upload">Upload statement</button></article></div>`;
+    $('vvBankContent').innerHTML=`<div class="vv-bank-more"><article><h3>Consent & data controls</h3><p>Review consent status, connection lifecycle and privacy boundaries. Disconnecting stops future sync while preserving existing financial history unless it is separately deleted under the data policy.</p><button type="button" data-bank-action="consents">Open consent center</button></article><article><h3>Import fallback</h3><p>PDF parsing uses geometry, confidence and reconciliation checks. Uncertain rows stay out of import instead of being silently guessed.</p><button type="button" data-bank-action="upload">Upload statement</button></article></div>`;
   }
 
   function render(){
@@ -95,11 +104,19 @@
   }
 
   async function connectBank(){
-    try{const providers=await api('/api/finance/intelligence/open-banking/providers');const chosen=providers.selected_provider||'BASIQ';const result=await api('/api/finance/intelligence/open-banking/consent',{method:'POST',body:JSON.stringify({provider:chosen})});if(result.consent_url){window.location.assign(result.consent_url);return;}}
-    catch(e){window.alert(e.message);}
+    const button=$('vvConnectBank'); if(button)button.disabled=true;
+    showMessage('Preparing secure bank connection…','info');
+    try{const providers=await api('/api/finance/intelligence/open-banking/providers');const chosen=providers.selected_provider||'BASIQ';const result=await api('/api/finance/intelligence/open-banking/consent',{method:'POST',body:JSON.stringify({provider:chosen})});if(result.consent_url){window.location.assign(result.consent_url);return;}showMessage('Bank consent could not be started.','error','No hosted consent URL was returned.');}
+    catch(e){
+      if(e.code==='PROVIDER_CREDENTIALS_MISSING') showMessage('Basiq setup is required before Connect Bank can be used.','setup','The banking platform is installed safely, but the server-side provider API credential has not been configured. Statement upload remains available now.');
+      else if(e.code==='LIVE_BANKING_LOCKED') showMessage('Live bank connection is currently locked.','setup','Provider setup exists, but production live sync has not been explicitly enabled.');
+      else showMessage('Bank connection could not be started.','error','The secure bank connection could not be prepared. Check provider setup or try again later.');
+    } finally {if(button)button.disabled=false;}
   }
-  async function syncNow(){if(state.busy)return;state.busy=true;const button=$('vvSyncBanks');button.disabled=true;button.textContent='Syncing…';try{const result=await api(`${API}/sync`,{method:'POST',body:JSON.stringify({trigger:'MANUAL'})});window.alert(result.message);await refresh();}catch(e){window.alert(e.message);}finally{state.busy=false;button.disabled=false;button.textContent='Sync now';}}
-  async function showConsents(){try{const data=await api(`${API}/consents`);const provider=(data.provider_consents||[]);const local=data.local_receipts||[];$('vvBankContent').innerHTML=`<div class="vv-bank-consent"><h3>Consent & privacy center</h3><p>${escapeHtml(data.privacy?.bank_credentials_stored===false?'Voxel Veda does not store your bank password, PIN or OTP.':'')}</p><h4>Provider consent</h4>${provider.length?provider.map(c=>`<div class="vv-bank-line"><span>${escapeHtml(c.status||c.type||'Consent')}</span><b>${escapeHtml(c.id||c.consentId||'')}</b></div>`).join(''):'<p>No provider consent is currently visible.</p>'}<h4>Local consent history</h4>${local.length?local.map(c=>`<div class="vv-bank-line"><span>${escapeHtml(c.provider)} · ${escapeHtml(c.consent_status)}</span><b>${when(c.created_at)}</b></div>`).join(''):'<p>No local consent receipts yet.</p>'}<p class="vv-bank-legal">CDR status shown here describes the provider/data-sharing flow only; Voxel Veda does not claim independent CDR accreditation.</p></div>`;}catch(e){window.alert(e.message);}}
+
+  async function syncNow(){if(state.busy)return;state.busy=true;const button=$('vvSyncBanks');button.disabled=true;button.textContent='Syncing…';showMessage('Syncing connected bank data…','info');try{const result=await api(`${API}/sync`,{method:'POST',body:JSON.stringify({trigger:'MANUAL'})});showMessage('Bank sync completed.','success',result.message||'Balances and transactions are up to date.');await refresh();}catch(e){showMessage('Bank sync could not run.','error','No active bank connection is available, or the provider needs attention.');}finally{state.busy=false;button.disabled=false;button.textContent='Sync now';}}
+
+  async function showConsents(){try{const data=await api(`${API}/consents`);const provider=(data.provider_consents||[]);const local=data.local_receipts||[];$('vvBankContent').innerHTML=`<div class="vv-bank-consent"><h3>Consent & privacy center</h3><p>${escapeHtml(data.privacy?.bank_credentials_stored===false?'Voxel Veda does not store your bank password, PIN or OTP.':'')}</p><h4>Provider consent</h4>${provider.length?provider.map(c=>`<div class="vv-bank-line"><span>${escapeHtml(c.status||c.type||'Consent')}</span><b>${escapeHtml(c.id||c.consentId||'')}</b></div>`).join(''):'<p>No provider consent is currently visible.</p>'}<h4>Local consent history</h4>${local.length?local.map(c=>`<div class="vv-bank-line"><span>${escapeHtml(c.provider)} · ${escapeHtml(c.consent_status)}</span><b>${when(c.created_at)}</b></div>`).join(''):'<p>No local consent receipts yet.</p>'}<p class="vv-bank-legal">CDR status shown here describes the provider/data-sharing flow only; Voxel Veda does not claim independent CDR accreditation.</p></div>`;}catch(e){showMessage('Consent information could not be loaded.','error','Try again after refreshing the banking hub.');}}
 
   function handleClick(event){
     const tab=event.target.closest('[data-bank-tab]');if(tab){state.tab=tab.dataset.bankTab;render();return;}

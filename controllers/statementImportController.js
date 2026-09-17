@@ -56,13 +56,17 @@ function normalizeRow(accountId, accountCurrency, input, rowNo) {
   if (!transactionDate) { validationStatus = 'REJECTED'; messages.push('Invalid or missing transaction date'); }
   if ((money.toCents(debit) > 0n) === (money.toCents(credit) > 0n)) { validationStatus = 'REJECTED'; messages.push('Exactly one of debit or credit must be positive'); }
   if (row.running_balance !== '' && row.running_balance !== null && row.running_balance !== undefined) {
-    try { runningBalance = money.fromCents(money.toCents(row.running_balance)); } catch { validationStatus = 'WARNING'; messages.push('Running balance could not be parsed'); }
+    try { runningBalance = money.fromCents(money.toCents(row.running_balance)); } catch { if (validationStatus === 'VALID') validationStatus = 'WARNING'; messages.push('Running balance could not be parsed'); }
   }
   const currency = String(row.currency || accountCurrency || 'AUD').trim().toUpperCase();
   if (!/^[A-Z]{3}$/.test(currency)) { validationStatus = 'REJECTED'; messages.push('Invalid currency code'); }
   if (!String(row.description || row.merchant_name || '').trim()) {
     if (validationStatus === 'VALID') validationStatus = 'WARNING';
     messages.push('No transaction description');
+  }
+  if (row.validation_hint && validationStatus !== 'REJECTED') {
+    if (validationStatus === 'VALID') validationStatus = 'WARNING';
+    messages.push(String(row.validation_hint).slice(0, 220));
   }
   if (isBalanceMarker(row)) {
     validationStatus = 'REJECTED';
@@ -98,6 +102,55 @@ function sessionSummary(session) {
   };
 }
 
+function countRows(rows) {
+  return rows.reduce((acc, row) => {
+    if (row.validation_status === 'VALID') acc.valid += 1;
+    else if (row.validation_status === 'WARNING') acc.warning += 1;
+    else if (row.validation_status === 'DUPLICATE') acc.duplicate += 1;
+    else acc.rejected += 1;
+    return acc;
+  }, { valid: 0, warning: 0, duplicate: 0, rejected: 0 });
+}
+
+async function normalizeAndDedupe(db, account, inputRows) {
+  const normalized = inputRows.map((row, index) => normalizeRow(account.id, account.currency, row, index + 1));
+  const hashes = normalized.map((row) => row.row_hash).filter(Boolean);
+  const duplicateHashes = new Set();
+  if (hashes.length) {
+    const chunkSize = 500;
+    for (let offset = 0; offset < hashes.length; offset += chunkSize) {
+      const chunk = hashes.slice(offset, offset + chunkSize);
+      const placeholders = chunk.map(() => '?').join(',');
+      const [existing] = await db.query(`SELECT row_hash FROM bank_transactions WHERE bank_account_id=? AND row_hash IN (${placeholders})`, [account.id, ...chunk]);
+      existing.forEach((row) => duplicateHashes.add(row.row_hash));
+    }
+  }
+  const seenInFile = new Set();
+  for (const row of normalized) {
+    if (!row.row_hash || row.validation_status === 'REJECTED') continue;
+    if (duplicateHashes.has(row.row_hash) || seenInFile.has(row.row_hash)) {
+      row.validation_status = 'DUPLICATE';
+      row.validation_message = row.validation_message ? `${row.validation_message}; Duplicate transaction` : 'Duplicate transaction';
+      row.selected = 0;
+    }
+    seenInFile.add(row.row_hash);
+  }
+  return { normalized, counts: countRows(normalized) };
+}
+
+async function insertReviewRows(db, sessionId, normalized) {
+  for (const row of normalized) {
+    await db.query(
+      `INSERT INTO statement_import_rows
+       (import_session_id, row_no, transaction_date, posting_date, description, reference, debit, credit, running_balance,
+        merchant_name, category, currency, row_hash, validation_status, validation_message, selected)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [sessionId, row.row_no, row.transaction_date, row.posting_date, row.description, row.reference, row.debit, row.credit,
+        row.running_balance, row.merchant_name, row.category, row.currency, row.row_hash, row.validation_status, row.validation_message, row.selected]
+    );
+  }
+}
+
 async function repairPendingReview(db, session) {
   if (!session || session.status !== 'PENDING_REVIEW') return { session, rows: null, repaired: 0 };
   const [rows] = await db.query('SELECT * FROM statement_import_rows WHERE import_session_id=? ORDER BY row_no', [session.id]);
@@ -114,13 +167,7 @@ async function repairPendingReview(db, session) {
   const [freshRows] = staleMarkers.length
     ? await db.query('SELECT * FROM statement_import_rows WHERE import_session_id=? ORDER BY row_no', [session.id])
     : [rows];
-  const counts = freshRows.reduce((acc, row) => {
-    if (row.validation_status === 'VALID') acc.valid += 1;
-    else if (row.validation_status === 'WARNING') acc.warning += 1;
-    else if (row.validation_status === 'DUPLICATE') acc.duplicate += 1;
-    else acc.rejected += 1;
-    return acc;
-  }, { valid: 0, warning: 0, duplicate: 0, rejected: 0 });
+  const counts = countRows(freshRows);
   if (staleMarkers.length || Number(session.valid_rows || 0) !== counts.valid || Number(session.warning_rows || 0) !== counts.warning || Number(session.duplicate_rows || 0) !== counts.duplicate || Number(session.rejected_rows || 0) !== counts.rejected) {
     await db.query(
       'UPDATE statement_import_sessions SET valid_rows=?, warning_rows=?, duplicate_rows=?, rejected_rows=? WHERE id=?',
@@ -153,8 +200,48 @@ exports.preview = async (req, res) => {
     if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
     const [[alreadyImported]] = await db.query('SELECT import_uid FROM statement_import_files WHERE bank_account_id=? AND content_hash=? LIMIT 1', [accountId, fileHash]);
     if (alreadyImported) throw new FinanceError(`This statement was already committed as ${alreadyImported.import_uid}.`, 409, 'DUPLICATE_STATEMENT_FILE');
-    const [[existingSession]] = await db.query('SELECT * FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=? ORDER BY id DESC LIMIT 1', [accountId, fileHash]);
+
+    const prepared = await normalizeAndDedupe(db, account, rows);
+    const normalized = prepared.normalized;
+    const counts = prepared.counts;
+    const dates = normalized.filter((row) => row.validation_status !== 'REJECTED').map((row) => row.transaction_date).filter(Boolean).sort();
+    const parserVersion = String(req.body.parser_version || '').trim().slice(0, 40) || null;
+    const parserConfidence = Number.isFinite(Number(req.body.parser_confidence)) ? Math.max(0, Math.min(1, Number(req.body.parser_confidence))) : null;
+    const reconciliationStatus = String(req.body.reconciliation_status || '').trim().slice(0, 30) || null;
+    const reconciliationDifference = req.body.reconciliation_difference === null || req.body.reconciliation_difference === undefined || req.body.reconciliation_difference === '' ? null : Number(req.body.reconciliation_difference);
+    const diagnostics = req.body.extraction_diagnostics && typeof req.body.extraction_diagnostics === 'object' ? JSON.stringify(req.body.extraction_diagnostics) : null;
+
+    const [[existingSession]] = await db.query('SELECT * FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=? ORDER BY id DESC LIMIT 1 FOR UPDATE', [accountId, fileHash]);
     if (existingSession && existingSession.status === 'PENDING_REVIEW') {
+      const existingImportable = Number(existingSession.valid_rows || 0) + Number(existingSession.warning_rows || 0);
+      const parserChanged = sourceFormat === 'PDF' && parserVersion && String(existingSession.parser_version || '') !== parserVersion;
+      const shouldReparse = sourceFormat === 'PDF' && (parserChanged || existingImportable === 0);
+      if (shouldReparse) {
+        await db.query('DELETE FROM statement_import_rows WHERE import_session_id=?', [existingSession.id]);
+        await insertReviewRows(db, existingSession.id, normalized);
+        await db.query(
+          `UPDATE statement_import_sessions SET
+             source_format=?, original_name=?, statement_start_date=?, statement_end_date=?, opening_balance=?, closing_balance=?,
+             total_rows=?, valid_rows=?, warning_rows=?, duplicate_rows=?, rejected_rows=?, parser_version=?, parser_confidence=?,
+             reconciliation_status=?, reconciliation_difference=?, extraction_diagnostics_json=?, updated_at=NOW()
+           WHERE id=?`,
+          [sourceFormat, String(req.body.original_name || existingSession.original_name || 'statement.pdf').slice(0,255),
+            dateOnly(req.body.statement_start_date) || dates[0] || null, dateOnly(req.body.statement_end_date) || dates[dates.length-1] || null,
+            req.body.opening_balance ?? null, req.body.closing_balance ?? null, normalized.length, counts.valid, counts.warning, counts.duplicate, counts.rejected,
+            parserVersion, parserConfidence, reconciliationStatus, Number.isFinite(reconciliationDifference) ? reconciliationDifference : null, diagnostics, existingSession.id]
+        );
+        await logAudit(db, audit(req, { action: 'STATEMENT_PREVIEW_REPARSED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: existingSession.import_uid, newValue: { parser_version: parserVersion, previous_parser_version: existingSession.parser_version || null, previous_importable_rows: existingImportable, total_rows: normalized.length, ...counts } }));
+        await db.commit();
+        return res.status(200).json({
+          message: `Existing review ${existingSession.import_uid} was rebuilt with the current PDF parser.`,
+          import_uid: existingSession.import_uid,
+          reused: true,
+          reparsed: true,
+          summary: { total: normalized.length, ...counts, selected: counts.valid + counts.warning },
+          coverage: { start: dates[0] || null, end: dates[dates.length - 1] || null },
+          rows: normalized.slice(0,250)
+        });
+      }
       const repaired = await repairPendingReview(db, existingSession);
       await db.commit();
       return res.status(200).json({
@@ -172,58 +259,20 @@ exports.preview = async (req, res) => {
       throw new FinanceError(`This statement review is ${existingSession.status}.`, 409, 'STATEMENT_REVIEW_LOCKED');
     }
 
-    const normalized = rows.map((row, index) => normalizeRow(accountId, account.currency, row, index + 1));
-    const hashes = normalized.map((row) => row.row_hash).filter(Boolean);
-    const duplicateHashes = new Set();
-    if (hashes.length) {
-      const chunkSize = 500;
-      for (let offset = 0; offset < hashes.length; offset += chunkSize) {
-        const chunk = hashes.slice(offset, offset + chunkSize);
-        const placeholders = chunk.map(() => '?').join(',');
-        const [existing] = await db.query(`SELECT row_hash FROM bank_transactions WHERE bank_account_id=? AND row_hash IN (${placeholders})`, [accountId, ...chunk]);
-        existing.forEach((row) => duplicateHashes.add(row.row_hash));
-      }
-    }
-    const seenInFile = new Set();
-    for (const row of normalized) {
-      if (!row.row_hash || row.validation_status === 'REJECTED') continue;
-      if (duplicateHashes.has(row.row_hash) || seenInFile.has(row.row_hash)) {
-        row.validation_status = 'DUPLICATE';
-        row.validation_message = row.validation_message ? `${row.validation_message}; Duplicate transaction` : 'Duplicate transaction';
-        row.selected = 0;
-      }
-      seenInFile.add(row.row_hash);
-    }
-
-    const counts = normalized.reduce((acc, row) => {
-      if (row.validation_status === 'VALID') acc.valid += 1;
-      else if (row.validation_status === 'WARNING') acc.warning += 1;
-      else if (row.validation_status === 'DUPLICATE') acc.duplicate += 1;
-      else acc.rejected += 1;
-      return acc;
-    }, { valid: 0, warning: 0, duplicate: 0, rejected: 0 });
-    const dates = normalized.filter((row) => row.validation_status !== 'REJECTED').map((row) => row.transaction_date).filter(Boolean).sort();
     const importUid = uid('REVIEW');
     const [session] = await db.query(
       `INSERT INTO statement_import_sessions
        (import_uid, bank_account_id, source_format, original_name, content_hash, statement_start_date, statement_end_date,
-        opening_balance, closing_balance, total_rows, valid_rows, warning_rows, duplicate_rows, rejected_rows, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        opening_balance, closing_balance, total_rows, valid_rows, warning_rows, duplicate_rows, rejected_rows, created_by,
+        parser_version, parser_confidence, reconciliation_status, reconciliation_difference, extraction_diagnostics_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [importUid, accountId, sourceFormat, String(req.body.original_name || `statement.${sourceFormat.toLowerCase()}`).slice(0, 255), fileHash,
         dateOnly(req.body.statement_start_date) || dates[0] || null, dateOnly(req.body.statement_end_date) || dates[dates.length - 1] || null,
-        req.body.opening_balance ?? null, req.body.closing_balance ?? null, normalized.length, counts.valid, counts.warning, counts.duplicate, counts.rejected, req.user.id]
+        req.body.opening_balance ?? null, req.body.closing_balance ?? null, normalized.length, counts.valid, counts.warning, counts.duplicate, counts.rejected, req.user.id,
+        parserVersion, parserConfidence, reconciliationStatus, Number.isFinite(reconciliationDifference) ? reconciliationDifference : null, diagnostics]
     );
-    for (const row of normalized) {
-      await db.query(
-        `INSERT INTO statement_import_rows
-         (import_session_id, row_no, transaction_date, posting_date, description, reference, debit, credit, running_balance,
-          merchant_name, category, currency, row_hash, validation_status, validation_message, selected)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [session.insertId, row.row_no, row.transaction_date, row.posting_date, row.description, row.reference, row.debit, row.credit,
-          row.running_balance, row.merchant_name, row.category, row.currency, row.row_hash, row.validation_status, row.validation_message, row.selected]
-      );
-    }
-    await logAudit(db, audit(req, { action: 'STATEMENT_PREVIEW_CREATED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: importUid, newValue: { bank_account_id: accountId, source_format: sourceFormat, total_rows: normalized.length, ...counts } }));
+    await insertReviewRows(db, session.insertId, normalized);
+    await logAudit(db, audit(req, { action: 'STATEMENT_PREVIEW_CREATED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: importUid, newValue: { bank_account_id: accountId, source_format: sourceFormat, parser_version: parserVersion, total_rows: normalized.length, ...counts } }));
     await db.commit();
     return res.status(201).json({
       message: 'Statement parsed and staged for review. No bank transactions have been committed yet.',
@@ -319,15 +368,16 @@ exports.commit = async (req, res) => {
        WHERE import_session_id=? AND selected=1 AND validation_status IN ('VALID','WARNING') ORDER BY row_no`, [session.id]
     );
     if (!selectedRows.length) {
-      await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_NO_IMPORTABLE_ROWS', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { repaired_balance_markers: repaired.repaired } }));
+      await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_NO_IMPORTABLE_ROWS', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { repaired_balance_markers: repaired.repaired, parser_version: session.parser_version || null } }));
       await db.commit();
       return res.status(422).json({
         message: repaired.repaired
-          ? `This review contained ${repaired.repaired} opening/closing balance marker row(s), not transactions. They have now been safely excluded. No real transaction rows are available to import. Please use CSV, OFX or QFX from your bank, or a transaction-detail PDF with explicit debit/credit direction.`
-          : 'No real transaction rows are selected for import. Select at least one valid transaction, or use CSV, OFX or QFX if this PDF does not expose transaction detail safely.',
+          ? `This review contained ${repaired.repaired} opening/closing balance marker row(s), not transactions. They have now been safely excluded. Re-upload the same PDF once so the current parser can rebuild the review, or use CSV/OFX/QFX if no transaction rows can be verified.`
+          : 'No importable transaction rows are selected. If this is an older PDF review, re-upload the same PDF so the current parser can rebuild it. Otherwise select a valid/warning row or use CSV/OFX/QFX.',
         code: 'NO_IMPORTABLE_TRANSACTIONS',
         review_repaired: true,
-        repaired_rows: repaired.repaired
+        repaired_rows: repaired.repaired,
+        parser_version: session.parser_version || null
       });
     }
 
