@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify-everything:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -24,6 +24,14 @@ jobs:
           npm run check
           node scripts/final-system-audit.js
           node scripts/admin-button-activation-test.js
+          node scripts/global-brand-original-logo-test.js
+          node scripts/professional-loader-network-stability-test.js
+          node scripts/railway-startup-gateway-test.js
+          node scripts/bank-account-lifecycle-test.js
+          node scripts/finance-import-wizard-test.js
+          node scripts/finance-statement-review-test.js
+          node scripts/statement-null-date-staging-test.js
+          node scripts/finance-action-reliability-test.js
           node scripts/recovery-executive-oversight-test.js
           node scripts/recovery-remediation-test.js
           node scripts/recovery-drill-governance-test.js
