@@ -43,5 +43,8 @@ assert(reviewFilter.includes("filter: 'IMPORTABLE'"), 'review must default to im
 assert(reviewFilter.includes("filter === 'REJECTED'" ) || reviewFilter.includes("'REJECTED'"), 'rejected-row filter missing');
 assert(reviewFilter.includes('Tap Rejected or Duplicates above'), 'empty importable view must explain how to inspect excluded rows');
 assert(reviewFilter.includes('data-review-filter'), 'review summary counts must be interactive filters');
+assert(reviewFilter.includes('#reviewRows tr[hidden]{display:none!important}'), 'mobile CSS must never override hidden review rows');
+assert(reviewFilter.includes("row.style.display = visible ? '' : 'none'"), 'review filter must enforce hidden rows at inline style level');
+assert(reviewFilter.includes('__vvFinanceReviewFilterInstalled'), 'review filter must be idempotent when loaded more than once');
 
 console.log('Finance statement review architecture checks passed.');

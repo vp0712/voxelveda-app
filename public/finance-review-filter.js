@@ -10,6 +10,7 @@
     const style = document.createElement('style');
     style.id = 'financeReviewFilterStyles';
     style.textContent = `
+      #reviewRows tr[hidden]{display:none!important}
       #reviewSummary [data-review-filter]{cursor:pointer;transition:box-shadow .15s ease,border-color .15s ease,background .15s ease;user-select:none}
       #reviewSummary [data-review-filter]:focus-visible{outline:3px solid #93c5fd;outline-offset:2px}
       #reviewSummary [data-review-filter].active-filter{border-color:#60a5fa;background:#eff6ff;box-shadow:0 0 0 2px rgba(59,130,246,.08)}
@@ -18,6 +19,7 @@
       .review-empty-state strong{display:block;color:#0f172a;font-size:.96rem;line-height:1.45;margin-bottom:6px}
       .review-empty-state span{display:block;font-size:.8rem;line-height:1.45}
       @media(max-width:760px){
+        #reviewRows tr[hidden]{display:none!important}
         .review-filter-empty{display:block!important;grid-template-columns:1fr!important;padding:0!important;border:0!important;box-shadow:none!important}
         .review-filter-empty td{display:block!important;grid-column:1/-1!important;padding:0!important}
         .review-filter-empty td::before{display:none!important}
@@ -90,7 +92,11 @@
     if (!host) return;
     removeEmptyMessage();
     const rows = realRows();
-    rows.forEach((row) => { row.hidden = !visibleFor(statusOf(row)); });
+    rows.forEach((row) => {
+      const visible = visibleFor(statusOf(row));
+      row.hidden = !visible;
+      row.style.display = visible ? '' : 'none';
+    });
     const visible = rows.filter((row) => !row.hidden).length;
     const summary = counts();
     if (!visible) addEmptyMessage(summary);
@@ -134,10 +140,12 @@
   }
 
   function install() {
+    if (window.__vvFinanceReviewFilterInstalled) return;
     const dialog = $('reviewDialog');
     const summary = $('reviewSummary');
     const rows = $('reviewRows');
     if (!dialog || !summary || !rows) return;
+    window.__vvFinanceReviewFilterInstalled = true;
     installStyles();
 
     summary.addEventListener('click', activate);
