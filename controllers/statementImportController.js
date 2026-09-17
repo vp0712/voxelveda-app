@@ -22,6 +22,13 @@ function fail(res, error, message) {
   return res.status(500).json({ message, code: 'STATEMENT_REVIEW_ERROR' });
 }
 
+function isBalanceMarker(row) {
+  const text = String(row?.description || row?.merchant_name || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return /^(opening|closing) balance\b/.test(text)
+    || /\bbalance (?:brought|carried) forward\b/.test(text)
+    || /\bbalance (?:b\/f|c\/f)\b/.test(text);
+}
+
 function statementRowHash(accountId, row) {
   return crypto.createHash('sha256').update([
     accountId,
@@ -57,6 +64,10 @@ function normalizeRow(accountId, accountCurrency, input, rowNo) {
     if (validationStatus === 'VALID') validationStatus = 'WARNING';
     messages.push('No transaction description');
   }
+  if (isBalanceMarker(row)) {
+    validationStatus = 'REJECTED';
+    messages.push('Opening/closing balance is a statement marker, not a transaction');
+  }
   return {
     row_no: rowNo,
     transaction_date: transactionDate,
@@ -73,6 +84,17 @@ function normalizeRow(accountId, accountCurrency, input, rowNo) {
     validation_message: messages.join('; ').slice(0, 500) || null,
     selected: validationStatus === 'REJECTED' ? 0 : 1,
     row_hash: transactionDate ? statementRowHash(accountId, { ...row, transaction_date: transactionDate, debit, credit, running_balance: runningBalance }) : null
+  };
+}
+
+function sessionSummary(session) {
+  return {
+    total: Number(session.total_rows || 0),
+    valid: Number(session.valid_rows || 0),
+    warning: Number(session.warning_rows || 0),
+    duplicate: Number(session.duplicate_rows || 0),
+    rejected: Number(session.rejected_rows || 0),
+    selected: Math.max(0, Number(session.valid_rows || 0) + Number(session.warning_rows || 0))
   };
 }
 
@@ -95,9 +117,19 @@ exports.preview = async (req, res) => {
     if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
     const [[alreadyImported]] = await db.query('SELECT import_uid FROM statement_import_files WHERE bank_account_id=? AND content_hash=? LIMIT 1', [accountId, fileHash]);
     if (alreadyImported) throw new FinanceError(`This statement was already committed as ${alreadyImported.import_uid}.`, 409, 'DUPLICATE_STATEMENT_FILE');
-    const [[existingSession]] = await db.query('SELECT import_uid, status FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=? LIMIT 1', [accountId, fileHash]);
+    const [[existingSession]] = await db.query('SELECT * FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=? ORDER BY id DESC LIMIT 1', [accountId, fileHash]);
+    if (existingSession && existingSession.status === 'PENDING_REVIEW') {
+      await db.commit();
+      return res.status(200).json({
+        message: `Existing review ${existingSession.import_uid} reopened. No duplicate review was created.`,
+        import_uid: existingSession.import_uid,
+        reused: true,
+        summary: sessionSummary(existingSession),
+        coverage: { start: existingSession.statement_start_date || null, end: existingSession.statement_end_date || null }
+      });
+    }
     if (existingSession && existingSession.status !== 'REJECTED') {
-      throw new FinanceError(`This statement already has review session ${existingSession.import_uid}.`, 409, 'DUPLICATE_STATEMENT_REVIEW');
+      throw new FinanceError(`This statement review is ${existingSession.status}.`, 409, 'STATEMENT_REVIEW_LOCKED');
     }
 
     const normalized = rows.map((row, index) => normalizeRow(accountId, account.currency, row, index + 1));
@@ -114,7 +146,7 @@ exports.preview = async (req, res) => {
     }
     const seenInFile = new Set();
     for (const row of normalized) {
-      if (!row.row_hash) continue;
+      if (!row.row_hash || row.validation_status === 'REJECTED') continue;
       if (duplicateHashes.has(row.row_hash) || seenInFile.has(row.row_hash)) {
         row.validation_status = 'DUPLICATE';
         row.validation_message = row.validation_message ? `${row.validation_message}; Duplicate transaction` : 'Duplicate transaction';
@@ -130,7 +162,7 @@ exports.preview = async (req, res) => {
       else acc.rejected += 1;
       return acc;
     }, { valid: 0, warning: 0, duplicate: 0, rejected: 0 });
-    const dates = normalized.map((row) => row.transaction_date).filter(Boolean).sort();
+    const dates = normalized.filter((row) => row.validation_status !== 'REJECTED').map((row) => row.transaction_date).filter(Boolean).sort();
     const importUid = uid('REVIEW');
     const [session] = await db.query(
       `INSERT INTO statement_import_sessions
@@ -204,7 +236,7 @@ exports.updateRowSelection = async (req, res) => {
     const selected = req.body.selected ? 1 : 0;
     const [[row]] = await pool.query('SELECT * FROM statement_import_rows WHERE id=? AND import_session_id=?', [rowId, session.id]);
     if (!row) throw new FinanceError('Statement row not found.', 404, 'STATEMENT_ROW_NOT_FOUND');
-    if (row.validation_status === 'REJECTED' && selected) throw new FinanceError('Rejected rows cannot be selected for import.', 409, 'REJECTED_ROW_NOT_IMPORTABLE');
+    if ((row.validation_status === 'REJECTED' || isBalanceMarker(row)) && selected) throw new FinanceError('Rejected or balance-marker rows cannot be selected for import.', 409, 'REJECTED_ROW_NOT_IMPORTABLE');
     await pool.query('UPDATE statement_import_rows SET selected=? WHERE id=?', [selected, row.id]);
     await logAudit(pool, audit(req, { action: 'STATEMENT_ROW_SELECTION_CHANGED', module: 'finance_intelligence', recordType: 'statement_import_row', recordId: row.id, oldValue: { selected: row.selected }, newValue: { selected } }));
     return res.json({ message: selected ? 'Row selected for import.' : 'Row excluded from import.' });
@@ -218,41 +250,76 @@ exports.commit = async (req, res) => {
     await db.beginTransaction();
     const [[session]] = await db.query('SELECT * FROM statement_import_sessions WHERE import_uid=? FOR UPDATE', [req.params.uid]);
     if (!session) throw new FinanceError('Statement review session not found.', 404, 'STATEMENT_REVIEW_NOT_FOUND');
+    if (session.status === 'IMPORTED') {
+      const [[file]] = await db.query('SELECT imported_rows, duplicate_rows, rejected_rows FROM statement_import_files WHERE import_uid=? LIMIT 1', [session.import_uid]);
+      await db.commit();
+      return res.json({
+        message: 'This statement was already imported successfully. No duplicate import was created.',
+        imported: Number(file?.imported_rows || 0),
+        duplicates: Number(file?.duplicate_rows || 0),
+        rejected: Number(file?.rejected_rows || 0),
+        already_imported: true
+      });
+    }
     if (session.status !== 'PENDING_REVIEW') throw new FinanceError(`Statement review is already ${session.status}.`, 409, 'STATEMENT_REVIEW_LOCKED');
     const [[account]] = await db.query('SELECT * FROM bank_accounts WHERE id=? AND status="ACTIVE" FOR UPDATE', [session.bank_account_id]);
     if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
-    const [rows] = await db.query(
+    const [selectedRows] = await db.query(
       `SELECT * FROM statement_import_rows
        WHERE import_session_id=? AND selected=1 AND validation_status IN ('VALID','WARNING') ORDER BY row_no`, [session.id]
     );
-    if (!rows.length) throw new FinanceError('No valid statement rows are selected for import.', 409, 'NO_ROWS_SELECTED');
+    if (!selectedRows.length) throw new FinanceError('No valid statement rows are selected for import.', 409, 'NO_ROWS_SELECTED');
+
+    const balanceMarkers = selectedRows.filter(isBalanceMarker);
+    const rows = selectedRows.filter((row) => !isBalanceMarker(row));
+    if (balanceMarkers.length) {
+      const ids = balanceMarkers.map((row) => Number(row.id)).filter(Boolean);
+      if (ids.length) {
+        const placeholders = ids.map(() => '?').join(',');
+        await db.query(
+          `UPDATE statement_import_rows SET selected=0, validation_status='REJECTED',
+           validation_message='Opening/closing balance is a statement marker, not a transaction' WHERE id IN (${placeholders})`,
+          ids
+        );
+      }
+    }
+    if (!rows.length) throw new FinanceError('Only statement balance markers were selected. No real transactions are available to import.', 409, 'NO_ROWS_SELECTED');
+
     const batchUid = uid('BANK');
     let imported = 0;
     let duplicates = 0;
-    let minDate = null;
-    let maxDate = null;
-    for (const row of rows) {
+    const dates = rows.map((row) => String(row.transaction_date || '').slice(0, 10)).filter(Boolean).sort();
+    const minDate = dates[0] || null;
+    const maxDate = dates[dates.length - 1] || null;
+    const chunkSize = 400;
+
+    for (let offset = 0; offset < rows.length; offset += chunkSize) {
+      const chunk = rows.slice(offset, offset + chunkSize);
+      const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'STATEMENT_IMPORT\', ?, ?, ?, ?, ?, ?, ?)').join(',');
+      const params = [];
+      for (const row of chunk) {
+        params.push(
+          account.id, batchUid, row.row_hash, row.transaction_date, row.posting_date, row.description, row.reference,
+          row.debit, row.credit, row.running_balance, session.source_format, row.merchant_name, row.currency || account.currency,
+          account.ownership_scope, row.category, row.category ? 'CLASSIFIED' : 'UNCLASSIFIED', req.user.id
+        );
+      }
       const [insert] = await db.query(
         `INSERT IGNORE INTO bank_transactions
          (bank_account_id, import_batch_uid, row_hash, transaction_date, posting_date, description, reference,
           debit, credit, running_balance, source_type, source_provider, merchant_name, currency, ownership_scope,
-          category, classification_status, imported_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'STATEMENT_IMPORT', ?, ?, ?, ?, ?, ?, ?)`,
-        [account.id, batchUid, row.row_hash, row.transaction_date, row.posting_date, row.description, row.reference,
-          row.debit, row.credit, row.running_balance, session.source_format, row.merchant_name, row.currency || account.currency,
-          account.ownership_scope, row.category, row.category ? 'CLASSIFIED' : 'UNCLASSIFIED', req.user.id]
+          category, classification_status, imported_by) VALUES ${placeholders}`,
+        params
       );
-      if (insert.affectedRows) {
-        imported += 1;
-        const d = String(row.transaction_date).slice(0, 10);
-        if (!minDate || d < minDate) minDate = d;
-        if (!maxDate || d > maxDate) maxDate = d;
-      } else duplicates += 1;
+      const inserted = Number(insert.affectedRows || 0);
+      imported += inserted;
+      duplicates += Math.max(0, chunk.length - inserted);
     }
+
     await db.query(
       `INSERT INTO bank_import_batches (batch_uid, bank_account_id, original_name, imported_rows, duplicate_rows, rejected_rows, imported_by)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [batchUid, account.id, session.original_name, imported, duplicates, session.rejected_rows, req.user.id]
+      [batchUid, account.id, session.original_name, imported, duplicates, Number(session.rejected_rows || 0) + balanceMarkers.length, req.user.id]
     );
     await db.query(
       `INSERT INTO statement_import_files
@@ -261,9 +328,12 @@ exports.commit = async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IMPORTED', ?, ?, ?, ?, NOW(), ?)`,
       [session.import_uid, account.id, session.source_format, session.original_name, session.content_hash,
         session.statement_start_date || minDate, session.statement_end_date || maxDate, session.opening_balance, session.closing_balance,
-        imported, Number(session.duplicate_rows || 0) + duplicates, session.rejected_rows, session.created_by, req.user.id]
+        imported, Number(session.duplicate_rows || 0) + duplicates, Number(session.rejected_rows || 0) + balanceMarkers.length, session.created_by, req.user.id]
     );
-    await db.query('UPDATE statement_import_sessions SET status="IMPORTED", reviewed_by=?, reviewed_at=NOW(), committed_by=?, committed_at=NOW() WHERE id=?', [req.user.id, req.user.id, session.id]);
+    await db.query(
+      'UPDATE statement_import_sessions SET status="IMPORTED", rejected_rows=rejected_rows+?, reviewed_by=?, reviewed_at=NOW(), committed_by=?, committed_at=NOW() WHERE id=?',
+      [balanceMarkers.length, req.user.id, req.user.id, session.id]
+    );
     if (minDate || maxDate) {
       await db.query(
         `UPDATE bank_accounts SET
@@ -272,9 +342,16 @@ exports.commit = async (req, res) => {
          WHERE id=?`, [minDate, minDate, maxDate, maxDate, account.id]
       );
     }
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, batch_uid: batchUid } }));
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, excluded_balance_markers: balanceMarkers.length, batch_uid: batchUid } }));
     await db.commit();
-    return res.json({ message: `${imported} statement transactions committed after review.`, imported, duplicates, batch_uid: batchUid, coverage: { start: minDate, end: maxDate } });
+    return res.json({
+      message: `${imported} statement transactions committed after review.${balanceMarkers.length ? ` ${balanceMarkers.length} balance marker row(s) were safely excluded.` : ''}`,
+      imported,
+      duplicates,
+      excluded_balance_markers: balanceMarkers.length,
+      batch_uid: batchUid,
+      coverage: { start: minDate, end: maxDate }
+    });
   } catch (error) {
     if (db) await db.rollback();
     return fail(res, error, 'Failed to commit statement review');
