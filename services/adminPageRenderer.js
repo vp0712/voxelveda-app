@@ -151,8 +151,14 @@ function injectRecoveryDrillCenter(html) {
   if (!rendered.includes('/recovery-drill.css')) {
     rendered = rendered.replace('</head>', '<link rel="stylesheet" href="/recovery-drill.css?v=20260917">\n</head>');
   }
+  if (!rendered.includes('/recovery-drill-ledger.css')) {
+    rendered = rendered.replace('</head>', '<link rel="stylesheet" href="/recovery-drill-ledger.css?v=20260917">\n</head>');
+  }
   if (!rendered.includes('/recovery-drill.js')) {
     rendered = rendered.replace('</body>', '<script src="/recovery-drill.js?v=20260917"></script>\n</body>');
+  }
+  if (!rendered.includes('/recovery-drill-ledger.js')) {
+    rendered = rendered.replace('</body>', '<script src="/recovery-drill-ledger.js?v=20260917"></script>\n</body>');
   }
   return rendered;
 }
