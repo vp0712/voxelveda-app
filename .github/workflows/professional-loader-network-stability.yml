@@ -1,0 +1,41 @@
+name: Professional Loader and Network Stability
+
+on:
+  pull_request:
+    paths:
+      - 'services/globalBrandRenderer.js'
+      - 'public/global-brand.css'
+      - 'public/global-brand.js'
+      - 'scripts/global-brand-original-logo-test.js'
+      - '.github/workflows/professional-loader-network-stability.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'services/globalBrandRenderer.js'
+      - 'public/global-brand.css'
+      - 'public/global-brand.js'
+      - 'scripts/global-brand-original-logo-test.js'
+      - '.github/workflows/professional-loader-network-stability.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax checks
+        run: |
+          node --check services/globalBrandRenderer.js
+          node --check public/global-brand.js
+      - name: Branding and reconnect contracts
+        run: node scripts/global-brand-original-logo-test.js
+      - name: Whole-system audit
+        run: node scripts/final-system-audit.js

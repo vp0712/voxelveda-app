@@ -1,0 +1,1 @@
+This release refines the Voxel Veda loading experience and reconnect behavior. The original company logo remains unchanged. The loader uses a circular stage with the logo safely contained inside it, avoids full-screen overlays for background API work, and keeps the current screen open through short network interruptions and reconnection.
