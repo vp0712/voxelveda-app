@@ -1,7 +1,7 @@
 'use strict';
 
 (() => {
-  const CANONICAL_LOGO = '/logo.png?v=20260917c';
+  const CANONICAL_LOGO = '/logo.png';
   const loader = document.getElementById('vvGlobalBrandLoader');
   if (!loader) return;
 
