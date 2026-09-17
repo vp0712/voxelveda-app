@@ -12,6 +12,9 @@ const jsPaths = [
 
 const html = fs.readFileSync(htmlPath, 'utf8');
 const js = jsPaths.map((file) => fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '').join('\n');
+const globalBrandJs = fs.readFileSync(path.join(__dirname, '..', 'public', 'global-brand.js'), 'utf8');
+const globalBrandCss = fs.readFileSync(path.join(__dirname, '..', 'public', 'global-brand.css'), 'utf8');
+const globalBrandRenderer = fs.readFileSync(path.join(__dirname, '..', 'services', 'globalBrandRenderer.js'), 'utf8');
 const failures = [];
 
 // Every inline click handler must point at a callable function shipped by the page.
@@ -55,6 +58,19 @@ for (const match of html.matchAll(/<button\b([^>]*)>/gi)) {
     failures.push(`button has no detectable activation path${id ? `: #${id}` : ''}: ${attrs.trim().slice(0, 120)}`);
   }
 }
+
+// The global brand layer must provide one consistent loader across all rendered pages and slow app work.
+if (!globalBrandRenderer.includes('id="vvGlobalBrandLoader"')) failures.push('global brand renderer is not injecting the global loader');
+if (!globalBrandRenderer.includes('vv-brand-orbit-ring-one')) failures.push('global loader orbital markup is missing');
+if (!globalBrandRenderer.includes('20260918-global-loader')) failures.push('global loader asset version was not advanced');
+if (!globalBrandJs.includes('window.fetch = function voxelVedaTrackedFetch')) failures.push('slow fetch requests are not connected to the global loader');
+if (!globalBrandJs.includes('NativeXHR.prototype.send')) failures.push('XHR requests are not connected to the global loader');
+if (!globalBrandJs.includes('API_DELAY_MS = 520')) failures.push('loader must keep a delay threshold to prevent flashing on fast requests');
+if (!globalBrandJs.includes('Preparing your workspace…')) failures.push('initial workspace loading state is missing');
+if (!globalBrandJs.includes('VoxelVedaBrandLoader')) failures.push('global loader API is missing');
+if (!globalBrandCss.includes('--vv-brand-overlay-bg:#090e16')) failures.push('premium dark global loader background is missing');
+if (!globalBrandCss.includes('vvBrandScan')) failures.push('global loader scan-line animation is missing');
+if (!globalBrandCss.includes('vv-brand-loader-logo')) failures.push('canonical logo stage styling is missing');
 
 if (failures.length) {
   console.error('Admin button activation audit failed:');
