@@ -96,11 +96,72 @@ function injectRecoveryAssurance(html) {
   return rendered;
 }
 
+function injectRecoveryDrillCenter(html) {
+  const assuranceNeedle = '<section id="recoveryAssurancePanel" class="card recovery-assurance" aria-live="polite">';
+  const drillPanel = `<section id="recoveryDrillCenter" class="card recovery-drill-center" aria-live="polite">
+          <div class="recovery-drill-head">
+            <div>
+              <span class="eyebrow">Recovery Drill</span>
+              <h3>Recovery Drill Readiness Center</h3>
+              <p>Turns backup status into a controlled recovery exercise with clear gates, RPO/RTO targets, evidence requirements and an exportable drill pack.</p>
+            </div>
+            <div class="recovery-drill-actions">
+              <span id="recoveryDrillState" class="recovery-drill-state">CHECKING</span>
+              <button type="button" class="secondary-btn" id="refreshRecoveryDrill">Refresh Drill Readiness</button>
+              <button type="button" class="secondary-btn" id="exportRecoveryDrill">Export Evidence Plan</button>
+            </div>
+          </div>
+          <div class="recovery-drill-summary">
+            <div>
+              <strong>What this means</strong>
+              <p id="recoveryDrillPlainLanguage">Checking whether recovery evidence is strong enough for a controlled drill.</p>
+            </div>
+          </div>
+          <div class="recovery-drill-objectives">
+            <article><span>RPO target</span><strong id="recoveryRpoTarget">≤ 24h</strong></article>
+            <article><span>RTO target</span><strong id="recoveryRtoTarget">≤ 4h</strong></article>
+            <article><span>Formal drill gate</span><strong id="recoveryDrillGate">CHECKING</strong></article>
+            <article><span>Recovery assurance</span><strong id="recoveryDrillVerified">CHECKING</strong></article>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:8px">
+              <strong>Drill progress</strong><span id="recoveryDrillProgressLabel">0 / 0 steps ready</span>
+            </div>
+            <div class="recovery-progress" aria-hidden="true"><span id="recoveryDrillProgressBar"></span></div>
+          </div>
+          <div class="recovery-drill-grid">
+            <div>
+              <h4>Controlled drill sequence</h4>
+              <div id="recoveryDrillSteps" class="recovery-drill-steps"><p class="status-note">Checking…</p></div>
+            </div>
+            <div>
+              <h4>Evidence pack</h4>
+              <ul id="recoveryDrillEvidence" class="recovery-evidence-list"></ul>
+            </div>
+          </div>
+          <p id="recoveryDrillSafety" class="recovery-drill-note">Production restore is not available from this center.</p>
+        </section>
+
+        `;
+
+  let rendered = html;
+  if (!rendered.includes('id="recoveryDrillCenter"') && rendered.includes(assuranceNeedle)) {
+    rendered = rendered.replace(assuranceNeedle, `${drillPanel}${assuranceNeedle}`);
+  }
+  if (!rendered.includes('/recovery-drill.css')) {
+    rendered = rendered.replace('</head>', '<link rel="stylesheet" href="/recovery-drill.css?v=20260917">\n</head>');
+  }
+  if (!rendered.includes('/recovery-drill.js')) {
+    rendered = rendered.replace('</body>', '<script src="/recovery-drill.js?v=20260917"></script>\n</body>');
+  }
+  return rendered;
+}
+
 function renderAdminPage(req, res) {
-  const rendered = injectRecoveryAssurance(injectFinanceIntelligence(source()));
+  const rendered = injectRecoveryDrillCenter(injectRecoveryAssurance(injectFinanceIntelligence(source())));
   res.type('html');
   res.setHeader('Cache-Control', 'private, no-store');
   return res.send(rendered);
 }
 
-module.exports = { injectFinanceIntelligence, injectRecoveryAssurance, renderAdminPage };
+module.exports = { injectFinanceIntelligence, injectRecoveryAssurance, injectRecoveryDrillCenter, renderAdminPage };
