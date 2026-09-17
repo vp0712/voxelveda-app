@@ -15,6 +15,8 @@ const routes = read('routes/financeRoutes.js');
 const client = read('public/finance-intelligence.js');
 const wizard = read('public/finance-import-wizard.js');
 const reviewFilter = read('public/finance-review-filter.js');
+const pdfEnhancer = read('public/finance-pdf-import-enhancer.js');
+const brandRenderer = read('services/globalBrandRenderer.js');
 
 assert(migration.includes('CREATE TABLE statement_import_sessions'), 'statement review session table missing');
 assert(migration.includes('CREATE TABLE statement_import_rows'), 'statement review row table missing');
@@ -46,5 +48,17 @@ assert(reviewFilter.includes('data-review-filter'), 'review summary counts must 
 assert(reviewFilter.includes('#reviewRows tr[hidden]{display:none!important}'), 'mobile CSS must never override hidden review rows');
 assert(reviewFilter.includes("row.style.display = visible ? '' : 'none'"), 'review filter must enforce hidden rows at inline style level');
 assert(reviewFilter.includes('__vvFinanceReviewFilterInstalled'), 'review filter must be idempotent when loaded more than once');
+
+assert(brandRenderer.includes('finance-pdf-import-enhancer.js?v=20260918-pdf-parser2'), 'enhanced PDF parser must be loaded on rendered app pages');
+assert(pdfEnhancer.includes('detectColumns'), 'PDF parser must detect debit, credit and balance columns');
+assert(pdfEnhancer.includes("['debit', 'debits', 'withdrawal', 'withdrawals', 'money out', 'paid out']"), 'PDF parser must understand debit/withdrawal/money-out headings');
+assert(pdfEnhancer.includes("['credit', 'credits', 'deposit', 'deposits', 'money in', 'paid in']"), 'PDF parser must understand credit/deposit/money-in headings');
+assert(pdfEnhancer.includes('inferDirections'), 'PDF parser must support balance-delta direction verification');
+assert(pdfEnhancer.includes('balanceMarker'), 'PDF parser must exclude opening/closing balance markers');
+assert(pdfEnhancer.includes('result.reused && importable === 0'), 'zero-row stale pending reviews must be superseded instead of endlessly reopened');
+assert(pdfEnhancer.includes('Automatically superseded by improved PDF parser'), 'superseded review must leave an auditable reason');
+assert(pdfEnhancer.includes('uncertain row(s) were left out instead of being guessed'), 'ambiguous PDF rows must fail safe instead of guessing');
+assert(pdfEnhancer.includes('stopImmediatePropagation'), 'enhanced PDF submit must not race the legacy PDF parser');
+assert(!pdfEnhancer.includes('opening balance is income'), 'balance markers must never be reclassified as transactions');
 
 console.log('Finance statement review architecture checks passed.');
