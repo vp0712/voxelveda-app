@@ -1,0 +1,37 @@
+name: Railway Startup Gateway
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/railway-startup-gateway.js'
+      - 'scripts/railway-startup-gateway-test.js'
+      - 'public/logo.png'
+      - '.github/workflows/railway-startup-gateway.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/railway-startup-gateway.js'
+      - 'scripts/railway-startup-gateway-test.js'
+      - 'public/logo.png'
+      - '.github/workflows/railway-startup-gateway.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax check
+        run: node --check scripts/railway-startup-gateway.js
+      - name: Gateway contracts
+        run: node scripts/railway-startup-gateway-test.js
+      - name: Whole-system regression audit
+        run: node scripts/final-system-audit.js
