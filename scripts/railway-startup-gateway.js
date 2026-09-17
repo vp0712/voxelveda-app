@@ -30,7 +30,7 @@ function writeJson(res, status, payload) {
 }
 
 function warmupHtml() {
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>Voxel Veda is starting</title><style>html,body{margin:0;width:100%;min-height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8fafc;color:#111827}body{min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box}.wrap{display:flex;flex-direction:column;align-items:center;gap:18px;width:min(88vw,360px);padding:28px;border-radius:28px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.12)}.logo-wrap{position:relative;display:grid;place-items:center;width:min(58vw,240px);aspect-ratio:1}.ring{position:absolute;inset:-8px;border:3px solid rgba(17,24,39,.10);border-top-color:#111827;border-radius:50%;animation:spin .85s linear infinite}img{position:relative;z-index:1;display:block;width:100%;height:100%;object-fit:contain;filter:none!important;transform:none!important;animation:none!important;opacity:1!important}.txt{margin:0;text-align:center;font-size:12px;line-height:1.5;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#667085}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ring{animation:none;border-top-color:rgba(17,24,39,.35)}}</style></head><body><main class="wrap"><div class="logo-wrap"><span class="ring" aria-hidden="true"></span><img src="/logo.png" alt="Voxel Veda"></div><p class="txt">Voxel Veda is preparing your workspace</p></main><script>setTimeout(()=>location.reload(),3000)</script></body></html>`;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow"><title>Voxel Veda is starting</title><style>html,body{margin:0;width:100%;min-height:100%;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f8fafc;color:#111827}body{min-height:100vh;display:grid;place-items:center;padding:24px;box-sizing:border-box}.wrap{display:flex;flex-direction:column;align-items:center;gap:18px;width:min(88vw,360px);padding:28px;border-radius:28px;background:#fff;box-shadow:0 24px 70px rgba(15,23,42,.12)}.logo-wrap{position:relative;display:grid;place-items:center;width:min(58vw,240px);aspect-ratio:1}.ring{position:absolute;inset:-8px;border:3px solid rgba(17,24,39,.10);border-top-color:#111827;border-radius:50%;animation:spin .85s linear infinite}.logo-stage{position:relative;z-index:1;width:78%;height:78%;display:grid;place-items:center}img{display:block;width:100%;height:100%;object-fit:contain;filter:none!important;transform:none!important;animation:none!important;opacity:1!important}.txt{margin:0;text-align:center;font-size:12px;line-height:1.5;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#667085}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.ring{animation:none;border-top-color:rgba(17,24,39,.35)}}</style></head><body><main class="wrap"><div class="logo-wrap"><span class="ring" aria-hidden="true"></span><div class="logo-stage"><img src="/logo.png" alt="Voxel Veda"></div></div><p class="txt">Voxel Veda is preparing your workspace</p></main><script>(()=>{let finished=false;async function check(){if(finished)return;try{const r=await fetch('/api/health',{cache:'no-store'});const j=await r.json();if(j&&j.backend_ready===true){finished=true;location.replace(location.href);return;}}catch{}setTimeout(check,1200);}setTimeout(check,700);})();</script></body></html>`;
 }
 
 function serveLogo(res) {
@@ -68,7 +68,7 @@ function proxyRequest(req, res) {
 
 function checkBackend() {
   if (shuttingDown || backendFailed) return;
-  const request = http.get({ hostname: INTERNAL_HOST, port: INTERNAL_PORT, path: '/api/ready', timeout: 1500 }, (res) => {
+  const request = http.get({ hostname: INTERNAL_HOST, port: INTERNAL_PORT, path: '/api/health', timeout: 1500 }, (res) => {
     res.resume();
     if (res.statusCode === 200) {
       if (!backendReady) console.log(`Startup gateway: backend ready on ${INTERNAL_HOST}:${INTERNAL_PORT}.`);
@@ -108,7 +108,7 @@ const gateway = http.createServer((req, res) => {
       'Content-Type': 'text/html; charset=utf-8',
       'Content-Length': req.method === 'HEAD' ? 0 : body.length,
       'Cache-Control': 'no-store',
-      'Retry-After': '3',
+      'Retry-After': '2',
       'X-Robots-Tag': 'noindex, nofollow, noarchive',
       'X-Content-Type-Options': 'nosniff'
     });
