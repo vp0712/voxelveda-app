@@ -1,0 +1,68 @@
+name: Advanced Australian Banking Platform
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/20260918_advanced_au_banking_platform.sql'
+      - 'services/openBankingProviderService.js'
+      - 'services/advancedBankingSyncService.js'
+      - 'services/bankSyncScheduler.js'
+      - 'controllers/openBankingController.js'
+      - 'controllers/advancedBankingController.js'
+      - 'routes/advancedBankingRoutes.js'
+      - 'routes/integrationWebhookRoutes.js'
+      - 'middleware/statementPreviewSanitizer.js'
+      - 'config/permissionCatalog.js'
+      - 'public/advanced-banking-ui.js'
+      - 'public/advanced-banking-ui.css'
+      - 'public/finance-pdf-v3.js'
+      - 'services/globalBrandRenderer.js'
+      - 'scripts/advanced-banking-platform-test.js'
+      - '.github/workflows/advanced-banking-platform.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/20260918_advanced_au_banking_platform.sql'
+      - 'services/openBankingProviderService.js'
+      - 'services/advancedBankingSyncService.js'
+      - 'services/bankSyncScheduler.js'
+      - 'controllers/openBankingController.js'
+      - 'controllers/advancedBankingController.js'
+      - 'routes/advancedBankingRoutes.js'
+      - 'routes/integrationWebhookRoutes.js'
+      - 'middleware/statementPreviewSanitizer.js'
+      - 'config/permissionCatalog.js'
+      - 'public/advanced-banking-ui.js'
+      - 'public/advanced-banking-ui.css'
+      - 'public/finance-pdf-v3.js'
+      - 'services/globalBrandRenderer.js'
+      - 'scripts/advanced-banking-platform-test.js'
+
+jobs:
+  banking-platform:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax checks
+        run: |
+          node --check services/openBankingProviderService.js
+          node --check services/advancedBankingSyncService.js
+          node --check services/bankSyncScheduler.js
+          node --check controllers/openBankingController.js
+          node --check controllers/advancedBankingController.js
+          node --check routes/advancedBankingRoutes.js
+          node --check routes/integrationWebhookRoutes.js
+          node --check middleware/statementPreviewSanitizer.js
+          node --check public/advanced-banking-ui.js
+          node --check public/finance-pdf-v3.js
+          node --check scripts/advanced-banking-platform-test.js
+      - name: Architecture and security contract
+        run: node scripts/advanced-banking-platform-test.js
+      - name: Existing statement-review safety contract
+        run: node scripts/finance-statement-review-test.js
