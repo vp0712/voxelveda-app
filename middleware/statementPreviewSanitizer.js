@@ -35,49 +35,46 @@ function normalizeStatementDate(value) {
 
 function isBalanceOnlyRow(row) {
   const text = `${row?.description || ''} ${row?.merchant_name || ''}`.trim().toUpperCase();
-  return /\b(OPENING|CLOSING|BROUGHT\s+FORWARD|CARRIED\s+FORWARD|BALANCE\s+B\/F|BALANCE\s+C\/F)\b/.test(text) && /BALANCE|OPENING|CLOSING/.test(text);
+  return /\b(OPENING|CLOSING|CURRENT|AVAILABLE|BROUGHT\s+FORWARD|CARRIED\s+FORWARD|BALANCE\s+B\/F|BALANCE\s+C\/F)\b/.test(text) && /BALANCE|OPENING|CLOSING/.test(text);
 }
 
 module.exports = function statementPreviewSanitizer(req, res, next) {
   if (!Array.isArray(req.body?.rows)) return next();
   const kept = [];
   let skippedBalanceRows = 0;
-  const undatedRows = [];
+  let unreadableDateRows = 0;
 
   req.body.rows.forEach((input, index) => {
     const row = { ...(input || {}) };
-    const normalizedDate = normalizeStatementDate(row.transaction_date);
-    if (!normalizedDate) {
-      if (isBalanceOnlyRow(row)) {
-        skippedBalanceRows += 1;
-        return;
-      }
-      undatedRows.push(index + 1);
+    if (isBalanceOnlyRow(row)) {
+      skippedBalanceRows += 1;
       return;
     }
-    row.transaction_date = normalizedDate;
+    const normalizedDate = normalizeStatementDate(row.transaction_date);
+    if (!normalizedDate) {
+      // Never fail the whole statement because one row is malformed. The finance
+      // normalizer will persist this candidate as REJECTED for review/audit.
+      row.transaction_date = null;
+      row.validation_hint = 'Transaction date could not be read safely.';
+      row.source_row_no = Number(row.source_row_no || index + 1);
+      unreadableDateRows += 1;
+    } else {
+      row.transaction_date = normalizedDate;
+    }
     const postingDate = normalizeStatementDate(row.posting_date);
     row.posting_date = postingDate || null;
     kept.push(row);
   });
 
-  if (undatedRows.length) {
-    return res.status(400).json({
-      code: 'STATEMENT_DATES_UNREADABLE',
-      message: `Could not safely read the transaction date for ${undatedRows.length} row(s). No data was imported. Try CSV, OFX or QFX from your bank, or use a clearer text-based PDF.`,
-      issues: undatedRows.slice(0, 20).map((rowNo) => ({ row_no: rowNo, message: 'Transaction date could not be read safely.' }))
-    });
-  }
-
   if (!kept.length) {
     return res.status(400).json({
-      code: 'NO_DATED_TRANSACTIONS',
-      message: 'No dated transactions were found in this statement. No data was imported. Try CSV, OFX or QFX from your bank.'
+      code: 'NO_TRANSACTION_CANDIDATES',
+      message: 'No transaction candidates were found after statement-only balance markers were removed. No data was imported.'
     });
   }
 
   req.body.rows = kept;
-  req.statementPreviewSanitizer = { skipped_balance_rows: skippedBalanceRows };
+  req.statementPreviewSanitizer = { skipped_balance_rows: skippedBalanceRows, unreadable_date_rows: unreadableDateRows };
   return next();
 };
 
