@@ -154,11 +154,17 @@ function injectRecoveryDrillCenter(html) {
   if (!rendered.includes('/recovery-drill-ledger.css')) {
     rendered = rendered.replace('</head>', '<link rel="stylesheet" href="/recovery-drill-ledger.css?v=20260917">\n</head>');
   }
+  if (!rendered.includes('/recovery-drill-governance.css')) {
+    rendered = rendered.replace('</head>', '<link rel="stylesheet" href="/recovery-drill-governance.css?v=20260917">\n</head>');
+  }
   if (!rendered.includes('/recovery-drill.js')) {
     rendered = rendered.replace('</body>', '<script src="/recovery-drill.js?v=20260917"></script>\n</body>');
   }
   if (!rendered.includes('/recovery-drill-ledger.js')) {
     rendered = rendered.replace('</body>', '<script src="/recovery-drill-ledger.js?v=20260917"></script>\n</body>');
+  }
+  if (!rendered.includes('/recovery-drill-governance.js')) {
+    rendered = rendered.replace('</body>', '<script src="/recovery-drill-governance.js?v=20260917"></script>\n</body>');
   }
   return rendered;
 }

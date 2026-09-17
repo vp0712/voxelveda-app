@@ -1,0 +1,46 @@
+name: Recovery Drill Governance
+
+on:
+  pull_request:
+    paths:
+      - 'controllers/recoveryDrillGovernanceController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-drill-governance.js'
+      - 'public/recovery-drill-governance.css'
+      - 'scripts/recovery-drill-governance-test.js'
+      - '.github/workflows/recovery-drill-governance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'controllers/recoveryDrillGovernanceController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-drill-governance.js'
+      - 'public/recovery-drill-governance.css'
+      - 'scripts/recovery-drill-governance-test.js'
+      - '.github/workflows/recovery-drill-governance.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax checks
+        run: |
+          node --check controllers/recoveryDrillGovernanceController.js
+          node --check routes/readinessRoutes.js
+          node --check services/adminPageRenderer.js
+          node --check public/recovery-drill-governance.js
+          node --check scripts/recovery-drill-governance-test.js
+      - name: Run governance tests
+        run: node scripts/recovery-drill-governance-test.js
