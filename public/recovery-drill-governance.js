@@ -145,7 +145,7 @@
     const button = $('refreshRecoveryGovernance');
     if (button) { button.disabled = true; button.textContent = 'Checking…'; }
     try {
-      render(await api('/api/security/readiness/recovery/governance'));
+      render(await api('/api/security/readiness/recovery/drills/governance'));
     } catch (error) {
       renderError(error?.message);
     } finally {
