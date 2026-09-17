@@ -108,7 +108,7 @@
     showMessage('Preparing secure bank connection…','info');
     try{const providers=await api('/api/finance/intelligence/open-banking/providers');const chosen=providers.selected_provider||'BASIQ';const result=await api('/api/finance/intelligence/open-banking/consent',{method:'POST',body:JSON.stringify({provider:chosen})});if(result.consent_url){window.location.assign(result.consent_url);return;}showMessage('Bank consent could not be started.','error','No hosted consent URL was returned.');}
     catch(e){
-      if(e.code==='PROVIDER_CREDENTIALS_MISSING'||e.code==='BASIQ_API_KEY_REQUIRED') showMessage('Basiq setup is required before Connect Bank can be used.','setup','The platform is installed safely, but BANK_DATA_API_KEY has not been configured on the server. Statement upload remains available now.');
+      if(e.code==='PROVIDER_CREDENTIALS_MISSING'||e.code==='BASIQ_API_KEY_REQUIRED') showMessage('Basiq setup is required before Connect Bank can be used.','setup','The banking platform is installed safely, but the server-side provider API credential has not been configured. Statement upload remains available now.');
       else if(e.code==='LIVE_BANKING_LOCKED') showMessage('Live bank connection is currently locked.','setup','Provider setup exists, but production live sync has not been explicitly enabled.');
       else showMessage('Bank connection could not be started.','error',e.message);
     } finally {if(button)button.disabled=false;}
