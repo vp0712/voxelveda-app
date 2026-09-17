@@ -2,6 +2,9 @@ const express = require('express');
 const controller = require('../controllers/advancedBankingController');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const requireStepUp = require('../middleware/stepUpMiddleware');
+const { startBankSyncScheduler } = require('../services/bankSyncScheduler');
+
+startBankSyncScheduler();
 
 const router = express.Router();
 const view = requireAnyPermission('VIEW_BANKING', 'VIEW_PERSONAL_BANKING', 'VIEW_BUSINESS_BANKING');
