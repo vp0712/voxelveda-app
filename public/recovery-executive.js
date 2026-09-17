@@ -1,7 +1,19 @@
 (() => {
   const $ = (id) => document.getElementById(id);
-  const text = (id, value) => { const el = $(id); if (el) el.textContent = value; };
+  const text = (id, value) => { const node = $(id); if (node) node.textContent = value; };
   const fmtHours = (value) => value === null || value === undefined ? '—' : `${Number(value).toFixed(1)}h`;
+
+  function inject() {
+    const parent = $('recoveryDrillCenter');
+    if (!parent || $('recoveryExecutivePanel')) return;
+    const section = document.createElement('section');
+    section.id = 'recoveryExecutivePanel';
+    section.className = 'recovery-exec';
+    section.setAttribute('aria-live', 'polite');
+    section.innerHTML = `<div class="recovery-exec-head"><div><span class="eyebrow">Executive Oversight</span><h3>Recovery Risk & SLA Command Center</h3><p>One management view for overdue actions, SLA breaches, failed drills, missed RPO/RTO objectives and recovery accountability.</p></div><div id="recoveryExecRisk" class="recovery-exec-risk"><strong id="recoveryExecRiskScore">—</strong><span id="recoveryExecRiskLevel">CHECKING</span></div></div><div class="recovery-exec-actions"><p id="recoveryExecExplanation" class="status-note">Calculating recovery risk from live governance evidence.</p><button type="button" class="secondary-btn" id="refreshRecoveryExec">Refresh Oversight</button></div><div class="recovery-exec-metrics"><article><span>Open actions</span><strong id="recoveryExecOpen">0</strong></article><article><span>Executive escalations</span><strong id="recoveryExecEscalations">0</strong></article><article><span>SLA breaches</span><strong id="recoveryExecBreaches">0</strong></article><article><span>Overdue</span><strong id="recoveryExecOverdue">0</strong></article><article><span>Unassigned</span><strong id="recoveryExecUnassigned">0</strong></article><article><span>Mean time to close</span><strong id="recoveryExecMttr">—</strong></article><article><span>Drills / 90d</span><strong id="recoveryExecDrills90">0</strong></article><article><span>Failed drills / 90d</span><strong id="recoveryExecFailures90">0</strong></article><article><span>RPO/RTO misses / 90d</span><strong id="recoveryExecMisses90">0</strong></article></div><div class="recovery-exec-grid"><div><h4>Priority queue</h4><ul id="recoveryExecQueue" class="recovery-exec-list"><li class="recovery-exec-item">Checking…</li></ul></div><div><h4>Management actions</h4><ul id="recoveryExecActions" class="recovery-exec-action-list"><li>Checking…</li></ul></div></div><p id="recoveryExecSafety" class="recovery-exec-note">Executive oversight is read-only governance.</p>`;
+    parent.appendChild(section);
+    $('refreshRecoveryExec')?.addEventListener('click', load);
+  }
 
   function renderQueue(items) {
     const root = $('recoveryExecQueue');
@@ -62,6 +74,6 @@
     }
   }
 
-  function init() { if (!$('recoveryExecutivePanel')) return; $('refreshRecoveryExec')?.addEventListener('click', load); load(); }
+  function init() { inject(); if ($('recoveryExecutivePanel')) load(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true }); else init();
 })();
