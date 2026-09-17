@@ -1,0 +1,51 @@
+name: Recovery Drill Evidence Ledger
+
+on:
+  pull_request:
+    paths:
+      - 'migrations/20260917_recovery_drill_evidence_ledger.sql'
+      - 'scripts/apply-recovery-drill-ledger-migration.js'
+      - 'controllers/recoveryDrillEvidenceController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-drill-ledger.js'
+      - 'public/recovery-drill-ledger.css'
+      - 'scripts/recovery-drill-evidence-ledger-test.js'
+      - '.github/workflows/recovery-drill-evidence-ledger.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'migrations/20260917_recovery_drill_evidence_ledger.sql'
+      - 'scripts/apply-recovery-drill-ledger-migration.js'
+      - 'controllers/recoveryDrillEvidenceController.js'
+      - 'routes/readinessRoutes.js'
+      - 'services/adminPageRenderer.js'
+      - 'public/recovery-drill-ledger.js'
+      - 'public/recovery-drill-ledger.css'
+      - 'scripts/recovery-drill-evidence-ledger-test.js'
+      - '.github/workflows/recovery-drill-evidence-ledger.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax checks
+        run: |
+          node --check controllers/recoveryDrillEvidenceController.js
+          node --check routes/readinessRoutes.js
+          node --check services/adminPageRenderer.js
+          node --check public/recovery-drill-ledger.js
+          node --check scripts/apply-recovery-drill-ledger-migration.js
+          node --check scripts/recovery-drill-evidence-ledger-test.js
+      - name: Run ledger safeguard tests
+        run: node scripts/recovery-drill-evidence-ledger-test.js
