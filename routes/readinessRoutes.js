@@ -3,6 +3,7 @@ const controller = require('../controllers/readinessController');
 const evidenceController = require('../controllers/recoveryDrillEvidenceController');
 const governanceController = require('../controllers/recoveryDrillGovernanceController');
 const remediationController = require('../controllers/recoveryRemediationController');
+const executiveController = require('../controllers/recoveryExecutiveController');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const { rateLimit } = require('../middleware/securityMiddleware');
 
@@ -19,6 +20,7 @@ router.get('/recovery', securityAccess, recoveryLimit, controller.recovery);
 router.get('/recovery/drill', securityAccess, recoveryLimit, controller.recoveryDrill);
 router.get('/recovery/drills', securityAccess, recoveryLimit, evidenceController.list);
 router.get('/recovery/drills/governance', securityAccess, recoveryLimit, governanceController.status);
+router.get('/recovery/executive', securityAccess, recoveryLimit, executiveController.status);
 router.get('/recovery/remediations', securityAccess, recoveryLimit, remediationController.list);
 router.post('/recovery/remediations/sync', securityWriteAccess, remediationWriteLimit, remediationController.sync);
 router.post('/recovery/remediations', securityWriteAccess, remediationWriteLimit, remediationController.create);

@@ -1,0 +1,35 @@
+name: Final System Consolidation
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-everything:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax and static contracts
+        run: |
+          npm run check
+          node scripts/final-system-audit.js
+          node scripts/admin-button-activation-test.js
+          node scripts/recovery-executive-oversight-test.js
+          node scripts/recovery-remediation-test.js
+          node scripts/recovery-drill-governance-test.js
+          node scripts/recovery-drill-readiness-test.js
+          node scripts/recovery-assurance-dashboard-test.js
+      - name: Full application regression suite
+        run: npm test
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
