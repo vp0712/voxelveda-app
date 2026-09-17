@@ -3,6 +3,7 @@
 const BRAND_CSS = '/global-brand.css?v=20260918-global-loader';
 const BRAND_JS = '/global-brand.js?v=20260918-global-loader';
 const FINANCE_PDF_ENHANCER_JS = '/finance-pdf-import-enhancer.js?v=20260918-pdf-parser2';
+const ADVANCED_BANKING_JS = '/advanced-banking-ui.js?v=20260918-au-banking';
 const CANONICAL_LOGO = '/logo.png';
 
 function canonicalizeLogoPaths(html) {
@@ -23,9 +24,10 @@ function injectGlobalBrand(html) {
 
   if (!rendered.includes('id="vvGlobalBrandLoader"')) rendered = rendered.replace(/<body([^>]*)>/i, (match) => `${match}${loaderMarkup}`);
   if (!rendered.includes(FINANCE_PDF_ENHANCER_JS)) rendered = rendered.replace(/<\/body>/i, `  <script src="${FINANCE_PDF_ENHANCER_JS}" defer></script>\n</body>`);
+  if (!rendered.includes(ADVANCED_BANKING_JS)) rendered = rendered.replace(/<\/body>/i, `  <script src="${ADVANCED_BANKING_JS}" defer></script>\n</body>`);
   if (!rendered.includes(BRAND_JS)) rendered = rendered.replace(/<\/body>/i, `  <script src="${BRAND_JS}" defer></script>\n</body>`);
 
   return rendered;
 }
 
-module.exports = { BRAND_CSS, BRAND_JS, FINANCE_PDF_ENHANCER_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };
+module.exports = { BRAND_CSS, BRAND_JS, FINANCE_PDF_ENHANCER_JS, ADVANCED_BANKING_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };
