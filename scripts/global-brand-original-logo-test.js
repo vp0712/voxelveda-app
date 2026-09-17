@@ -23,6 +23,8 @@ assert.match(once, /\/global-brand\.js\?v=20260917/);
 assert.match(once, /id="vvGlobalBrandLoader"/);
 assert.match(once, /id="vvGlobalBrandPresence"/);
 assert.match(once, /class="vv-brand-loader-logo" src="\/logo\.png"/);
+assert.match(once, /Preparing your workspace/);
+assert.doesNotMatch(once, /id="vvGlobalBrandLoader" class="is-visible"/, 'Loader must not flash before the delayed client decision');
 assert.doesNotMatch(once, /voxel-veda-logo\.png/);
 assert.equal((twice.match(/id="vvGlobalBrandLoader"/g) || []).length, 1, 'Loader must be injected once');
 assert.equal((twice.match(/global-brand\.css/g) || []).length, 1, 'Brand CSS must be injected once');
@@ -32,10 +34,17 @@ const css = read('public/global-brand.css');
 assert.match(css, /\.vv-brand-loader-logo\{[^}]*filter:none!important/i, 'Original logo must not receive visual filters');
 assert.match(css, /\.vv-brand-loader-logo\{[^}]*animation:none!important/i, 'Original logo artwork itself must not animate');
 assert.match(css, /\.vv-brand-loader-ring\{[^}]*animation:vvBrandSpin/i, 'Loading motion must live outside the logo artwork');
+assert.match(css, /\.vv-brand-loader-logo\{[^}]*width:62%/i, 'Logo must fit safely inside the circular loader without clipping');
 
 const client = read('public/global-brand.js');
 assert.match(client, /15000/, 'Loader must include a fail-safe timeout');
-assert.match(client, /prefers-reduced-motion|VoxelVedaBrandLoader|pageshow/);
+assert.match(client, /VoxelVedaBrandLoader|pageshow/);
+assert.match(client, /addEventListener\('offline'/);
+assert.match(client, /addEventListener\('online'/);
+assert.match(client, /voxelveda:network-restored/);
+assert.doesNotMatch(client, /location\.reload\s*\(/, 'Network reconnect must never hard reload the app');
+assert.doesNotMatch(client, /window\.fetch\s*=/, 'Background fetches must not trigger the full-screen brand loader');
+assert.doesNotMatch(client, /XMLHttpRequest\.prototype\.send\s*=/, 'Background XHR must not trigger the full-screen brand loader');
 
 const app = read('app.js');
 assert.match(app, /injectGlobalBrand/);
@@ -49,4 +58,4 @@ assert.match(app, /sendPage\('404\.html',404\)\(req,res\)/);
 const admin = read('services/adminPageRenderer.js');
 assert.match(admin, /injectGlobalBrand\(injectRecoveryDrillCenter/);
 
-console.log('Global original-logo branding checks passed.');
+console.log('Global original-logo branding and network-stability checks passed.');
