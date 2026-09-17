@@ -19,6 +19,7 @@ const pdf = read('public/finance-pdf-v3.js');
 const ui = read('public/advanced-banking-ui.js');
 const renderer = read('services/globalBrandRenderer.js');
 const permissions = read('config/permissionCatalog.js');
+const databaseConfig = read('config/databaseConfig.js');
 
 for (const marker of ['bank_connection_accounts','bank_consent_receipts','bank_sync_events','canonical_fingerprint','provider_transaction_id','reconciliation_status','extraction_diagnostics_json']) assert(migration.includes(marker), `migration missing ${marker}`);
 assert(reparseMigration.includes('updated_at'), 'statement review reparse tracking must be additive');
@@ -53,6 +54,12 @@ assert(statementController.includes('existingImportable === 0'), 'zero-importabl
 assert(statementController.includes('parserChanged'), 'parser-version reparse control missing');
 assert(statementController.includes('DELETE FROM statement_import_rows WHERE import_session_id=?'), 'stale review rows must be replaced transactionally');
 assert(statementController.includes('parser_version, parser_confidence, reconciliation_status'), 'statement parser evidence must be persisted');
+assert(databaseConfig.includes("dateStrings: ['DATE']"), 'MySQL DATE values must remain YYYY-MM-DD strings at the application boundary');
+assert(databaseConfig.includes("date_transport: 'YYYY-MM-DD_STRING'"), 'database date transport evidence missing');
+const { buildDatabaseConfig } = require('../config/databaseConfig');
+const dateBoundary = buildDatabaseConfig({ DB_HOST: 'db.example', DB_USER: 'app', DB_PASSWORD: 'x', DB_NAME: 'voxelveda' });
+assert(Array.isArray(dateBoundary.options.dateStrings) && dateBoundary.options.dateStrings.length === 1 && dateBoundary.options.dateStrings[0] === 'DATE', 'DATE-only mysql transport guard is not active');
+assert(!dateBoundary.options.dateStrings.includes('DATETIME'), 'DATETIME transport must not be changed by the statement fix');
 assert(ui.includes('Overview') && ui.includes('Accounts') && ui.includes('Transactions') && ui.includes('Insights') && ui.includes('More'), 'mobile banking navigation incomplete');
 assert(ui.includes('Connect Bank') && ui.includes('Sync now') && ui.includes('Upload statement'), 'primary banking actions incomplete');
 assert(renderer.includes('ADVANCED_BANKING_JS'), 'advanced banking UI must be served through page renderer');

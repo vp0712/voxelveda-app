@@ -86,6 +86,10 @@ function buildDatabaseConfig(env = process.env) {
       enableKeepAlive: true,
       keepAliveInitialDelay: 0,
       charset: 'utf8mb4',
+      // MySQL DATE is a calendar value, not a timestamp. Returning DATE columns as
+      // YYYY-MM-DD strings avoids timezone shifts and prevents Date#toString()
+      // values such as "Fri Apr 24" from leaking into SQL date parameters.
+      dateStrings: ['DATE'],
       ...(ssl ? { ssl } : {})
     },
     summary: {
@@ -93,7 +97,8 @@ function buildDatabaseConfig(env = process.env) {
       configured: Boolean(base.host && base.user && base.database),
       tls_requested: tlsRequested,
       tls_certificate_verification: Boolean(ssl?.rejectUnauthorized),
-      connection_limit: positiveInteger(env.DB_CONNECTION_LIMIT, 10, 1, 100)
+      connection_limit: positiveInteger(env.DB_CONNECTION_LIMIT, 10, 1, 100),
+      date_transport: 'YYYY-MM-DD_STRING'
     }
   };
 }
