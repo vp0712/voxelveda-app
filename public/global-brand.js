@@ -1,6 +1,7 @@
 'use strict';
 
 (() => {
+  const CANONICAL_LOGO = '/logo.png';
   const loader = document.getElementById('vvGlobalBrandLoader');
   if (!loader) return;
 
@@ -68,18 +69,46 @@
     }
   }
 
-  // Canonicalize only known legacy aliases to the byte-identical original company logo.
+  function isHistoricalLogo(src) {
+    const value = String(src || '').trim();
+    return /(?:voxel-veda-logo|Frame(?:%20| )1|og-image)\.png/i.test(value)
+      || /^\/\/logo\.png/i.test(value)
+      || /\/logo\.png(?:[?#]|$)/i.test(value);
+  }
+
+  function canonicalizeLogo(img) {
+    if (!(img instanceof HTMLImageElement)) return;
+    const raw = String(img.getAttribute('src') || '');
+    if (!isHistoricalLogo(raw)) return;
+    if (raw !== CANONICAL_LOGO) img.setAttribute('src', CANONICAL_LOGO);
+    img.style.objectFit = 'contain';
+    img.style.objectPosition = 'center';
+  }
+
   document.querySelectorAll('img').forEach((img) => {
-    const src = String(img.getAttribute('src') || '');
-    if (/\/(?:voxel-veda-logo|Frame(?:%20| )1|og-image)\.png(?:[?#].*)?$/i.test(src)) img.setAttribute('src', '/logo.png');
+    canonicalizeLogo(img);
+    img.addEventListener('error', () => {
+      if (isHistoricalLogo(img.getAttribute('src')) && img.getAttribute('src') !== CANONICAL_LOGO) {
+        img.setAttribute('src', CANONICAL_LOGO);
+      }
+    });
   });
 
-  // Initial page boot: delay the full-screen loader so fast loads never flash it.
+  const logoObserver = new MutationObserver((records) => {
+    records.forEach((record) => {
+      record.addedNodes.forEach((node) => {
+        if (!(node instanceof Element)) return;
+        if (node.matches?.('img')) canonicalizeLogo(node);
+        node.querySelectorAll?.('img').forEach(canonicalizeLogo);
+      });
+    });
+  });
+  logoObserver.observe(document.documentElement, { childList: true, subtree: true });
+
   const finishInitial = begin({ delay: INITIAL_DELAY_MS });
   if (document.readyState === 'complete') finishInitial();
   else window.addEventListener('load', finishInitial, { once: true });
 
-  // Only real document navigations use the full-screen loader. Background API work does not.
   document.addEventListener('click', (event) => {
     const anchor = event.target?.closest?.('a[href]');
     if (!anchor || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -96,7 +125,6 @@
     begin({ delay: 160 });
   }, true);
 
-  // Network state is informational only. Never hard-reload or reopen the full-screen loader on reconnect.
   const status = document.createElement('div');
   status.className = 'vv-network-status';
   status.setAttribute('role', 'status');
@@ -118,7 +146,6 @@
 
   window.addEventListener('online', () => {
     showNetworkStatus('Back online. Updating in the background…', false, 2400);
-    // Let individual modules refresh on their own schedules. Do not reload the page here.
     window.dispatchEvent(new CustomEvent('voxelveda:network-restored'));
   });
 
