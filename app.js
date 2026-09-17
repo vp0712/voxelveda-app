@@ -67,7 +67,10 @@ const app = express();
 const publicDir = path.join(__dirname, 'public');
 const captureRawBody = (req, res, buffer) => { req.rawBody = Buffer.from(buffer); };
 const boundedJson = (limit) => express.json({ limit, type: 'application/json', verify: captureRawBody });
-const noStorePublicAssets = new Set(['login.js','admin-dashboard.js','staff.js','profile.js','procurement-ui.js','auth-lifecycle.js','mfa.js','security-page.js','step-up.js','step-up.css','style.css','advanced-theme.css','mobile-shell.js','quality.js','quality.css','shop-floor.js','shop-floor.css','service-worker.js','finance-intelligence.js','finance-intelligence.css','finance-statement-parsers.js']);
+const noStorePublicAssets = new Set([
+  'login.js','admin-dashboard.js','staff.js','profile.js','procurement-ui.js','auth-lifecycle.js','mfa.js','security-page.js','step-up.js','step-up.css','style.css','advanced-theme.css','mobile-shell.js','quality.js','quality.css','shop-floor.js','shop-floor.css','service-worker.js','finance-intelligence.js','finance-intelligence.css','finance-statement-parsers.js',
+  'recovery-assurance.css','recovery-assurance.js','recovery-drill.css','recovery-drill.js','recovery-drill-ledger.css','recovery-drill-ledger.js','recovery-drill-governance.css','recovery-drill-governance.js','recovery-remediation.css','recovery-remediation.js','recovery-executive.css','recovery-executive.js'
+]);
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 app.set('query parser', 'simple');
