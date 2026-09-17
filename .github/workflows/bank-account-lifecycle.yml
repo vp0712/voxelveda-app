@@ -1,0 +1,48 @@
+name: Bank Account Lifecycle
+
+on:
+  pull_request:
+    paths:
+      - 'controllers/bankAccountLifecycleController.js'
+      - 'routes/financeRoutes.js'
+      - 'public/finance-intelligence.html'
+      - 'public/finance-account-lifecycle.js'
+      - 'public/finance-account-lifecycle.css'
+      - 'scripts/bank-account-lifecycle-test.js'
+      - '.github/workflows/bank-account-lifecycle.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'controllers/bankAccountLifecycleController.js'
+      - 'routes/financeRoutes.js'
+      - 'public/finance-intelligence.html'
+      - 'public/finance-account-lifecycle.js'
+      - 'public/finance-account-lifecycle.css'
+      - 'scripts/bank-account-lifecycle-test.js'
+      - '.github/workflows/bank-account-lifecycle.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Syntax and lifecycle contracts
+        run: |
+          node --check controllers/bankAccountLifecycleController.js
+          node --check public/finance-account-lifecycle.js
+          node scripts/bank-account-lifecycle-test.js
+      - name: Finance regression checks
+        run: |
+          node scripts/finance-intelligence-admin-integration-test.js
+          node scripts/finance-banking-readiness-test.js
+          node scripts/finance-action-reliability-test.js
+          node scripts/final-system-audit.js
