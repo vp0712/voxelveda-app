@@ -4264,3 +4264,7 @@ body {
     margin: 0 -16px !important;
   }
 }
+
+.app-banking-nav{position:relative}
+.app-banking-badge{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-left:auto;padding:0 5px;border-radius:999px;background:#ef4444;color:#fff;font-size:10px;font-weight:900;line-height:1}
+@media(max-width:1023px){.app-banking-nav .app-banking-badge{margin-left:8px}}
