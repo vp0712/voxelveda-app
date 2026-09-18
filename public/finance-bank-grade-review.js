@@ -295,7 +295,7 @@
       const currency=row.currency||'AUD';
       const out=Number(row.debit||0);
       const incoming=Number(row.credit||0);
-      const source=row.source_type==='STATEMENT_IMPORT'?'Statement':(row.source_provider||row.source_type||'Bank');
+      const source=row.statement_name || (row.source_type==='STATEMENT_IMPORT'?'Statement import':(row.source_provider||row.source_type||'Bank'));
       return `<article class="vv-tx-row">
         <div>${esc(String(row.transaction_date||'').slice(0,10))}</div>
         <div class="vv-tx-main"><strong>${esc(row.description||row.merchant_name||'Transaction')}</strong><small>${esc(row.account_name||'Account')} · ${esc(row.category||'Unclassified')} · ${esc(row.reconciliation_status||'UNRECONCILED')}</small></div>
