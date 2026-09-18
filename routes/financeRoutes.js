@@ -122,12 +122,18 @@ router.post('/personal-money/roadmaps/:roadmapId/milestones/:milestoneId/progres
 router.post('/personal-money/roadmaps/:id/status', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.updateStatus);
 
 router.get('/banking-os', requireAnyPermission('VIEW_BANKING'), bankingOS.getDashboard);
+router.get('/banking-os/command-center', requireAnyPermission('VIEW_BANKING'), bankingOS.getCommandCenter);
+router.get('/banking-os/approval-inbox', requireAnyPermission('VIEW_BANKING'), bankingOS.getApprovalInbox);
+router.get('/banking-os/cashflow-calendar', requireAnyPermission('VIEW_BANKING'), bankingOS.getCashflowCalendar);
+router.get('/banking-os/accounts/:id', requireAnyPermission('VIEW_BANKING'), bankingOS.getAccountDetail);
 router.get('/banking-os/capabilities', requireAnyPermission('VIEW_BANKING'), bankingOS.capabilities);
 router.post('/banking-os/spaces', requireAnyPermission('VIEW_BANKING'), bankingOS.createSpace);
 router.post('/banking-os/spaces/:uid', requireAnyPermission('VIEW_BANKING'), bankingOS.updateSpace);
+router.post('/banking-os/spaces/:uid/archive', requireAnyPermission('VIEW_BANKING'), bankingOS.archiveSpace);
 router.post('/banking-os/beneficiaries', requireAnyPermission('VIEW_BANKING'), requireStepUp('CHANGE_BANK_BENEFICIARY'), bankingOS.createBeneficiary);
 router.post('/banking-os/payments', requireAnyPermission('VIEW_BANKING'), bankingOS.createPayment);
 router.post('/banking-os/payments/:uid/submit', requireAnyPermission('VIEW_BANKING'), requireStepUp('SUBMIT_BANK_PAYMENT'), bankingOS.submitPayment);
+router.post('/banking-os/payments/:uid/cancel', requireAnyPermission('VIEW_BANKING'), requireStepUp('CANCEL_BANK_PAYMENT'), bankingOS.cancelPayment);
 router.post('/banking-os/payments/:uid/decision', requireAnyPermission('APPROVE_PAYMENT'), requireStepUp('APPROVE_BANK_PAYMENT'), bankingOS.decidePayment);
 router.get('/banking-os/team', requireAnyPermission('VIEW_BANKING'), bankingOS.getTeam);
 router.post('/banking-os/team/:userId/access', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANKING_USER_ACCESS'), bankingOS.saveTeamAccess);
