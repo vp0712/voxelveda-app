@@ -151,8 +151,8 @@ exports.getTransactions = async (req, res) => {
     const [rows] = await pool.query(
       `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.posting_date, bt.description, bt.reference,
               bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.category, bt.currency,
-              bt.ownership_scope, bt.classification_status, bt.reconciliation_status, bt.source_type, bt.source_provider,
-              bt.statement_import_uid, bt.statement_row_id, bt.review_source_status, bt.manual_override, bt.imported_at,
+              bt.ownership_scope, bt.classification_status, bt.reconciliation_status, bt.is_internal_transfer, bt.ignored_reason,
+              bt.source_type, bt.source_provider, bt.statement_import_uid, bt.statement_row_id, bt.review_source_status, bt.manual_override, bt.imported_at,
               ba.nickname AS account_name, ba.institution, ba.entity_name,
               sif.original_name AS statement_name, sif.source_format AS statement_format
          FROM bank_transactions bt
@@ -215,6 +215,162 @@ function spendingWhere(req, options = {}) {
   if (statementUid) { clauses.push('bt.statement_import_uid=?'); params.push(statementUid); }
   return { scope, from, to, accountId, statementUid, where: clauses.join(' AND '), params };
 }
+
+
+async function visibleBankTransaction(id, req, db = pool, forUpdate = false) {
+  const suffix = forUpdate ? ' FOR UPDATE' : '';
+  const [[row]] = await db.query(
+    `SELECT bt.*, ba.nickname AS account_name, ba.ownership_scope AS account_scope, ba.created_by AS account_created_by
+       FROM bank_transactions bt
+       JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+      WHERE bt.id=? AND ${privacy.visibilitySql('ba')}${suffix}`,
+    [id, ...privacy.visibilityParams(req)]
+  );
+  if (!row) throw new FinanceError('Bank transaction not found.', 404, 'BANK_TRANSACTION_NOT_FOUND');
+  return row;
+}
+
+exports.getTransactionDetail = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const row = await visibleBankTransaction(Number(req.params.id || 0), req);
+    return res.json({ transaction: row });
+  } catch (error) { return fail(res, error, 'Failed to load transaction detail'); }
+};
+
+exports.updateTransaction = async (req, res) => {
+  let db;
+  try {
+    await ensureFinanceSchema();
+    const id = Number(req.params.id || 0);
+    db = await pool.getConnection();
+    await db.beginTransaction();
+    const row = await visibleBankTransaction(id, req, db, true);
+
+    const category = String(req.body.category || '').trim().slice(0,120) || null;
+    const requestedScope = String(req.body.ownership_scope || row.ownership_scope || '').trim().toUpperCase();
+    const allowedScopes = new Set(['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
+    if (!allowedScopes.has(requestedScope)) throw new FinanceError('Choose Personal, Business, Mixed or Needs owner.', 400, 'INVALID_TRANSACTION_SCOPE');
+
+    const accountScope = String(row.account_scope || '').toUpperCase();
+    const canOverrideScope = accountScope === 'MIXED' || accountScope === 'UNCLASSIFIED';
+    const nextScope = canOverrideScope ? requestedScope : accountScope || requestedScope;
+
+    const internalTransfer = req.body.is_internal_transfer === true ? 1 : 0;
+    const ignored = req.body.ignored === true;
+    const ignoredReason = ignored ? String(req.body.ignored_reason || '').trim().slice(0,500) : null;
+    if (ignored && ignoredReason.length < 3) throw new FinanceError('Add a short reason before excluding a transaction from reports.', 400, 'IGNORE_REASON_REQUIRED');
+    const reconciliationStatus = ignored ? 'IGNORED' : (row.reconciliation_status === 'IGNORED' ? 'UNRECONCILED' : row.reconciliation_status);
+    const rememberRule = req.body.remember_rule === true;
+
+    await db.query(
+      `UPDATE bank_transactions
+          SET category=?, classification_status=?, ownership_scope=?, is_internal_transfer=?,
+              reconciliation_status=?, ignored_reason=?
+        WHERE id=?`,
+      [category, category ? 'CLASSIFIED' : 'UNCLASSIFIED', nextScope, internalTransfer, reconciliationStatus, ignoredReason, id]
+    );
+
+    if (rememberRule && category) {
+      const pattern = String(row.merchant_name || row.description || '').trim().slice(0,255);
+      if (pattern) {
+        const [[existing]] = await db.query(
+          'SELECT id FROM finance_category_rules WHERE created_by=? AND merchant_pattern=? ORDER BY id DESC LIMIT 1',
+          [req.user.id, pattern]
+        );
+        if (existing) {
+          await db.query(
+            'UPDATE finance_category_rules SET category=?, ownership_scope=?, enabled=1, priority=250 WHERE id=?',
+            [category, canOverrideScope ? nextScope : null, existing.id]
+          );
+        } else {
+          await db.query(
+            `INSERT INTO finance_category_rules (rule_uid, merchant_pattern, category, ownership_scope, priority, enabled, created_by)
+             VALUES (?, ?, ?, ?, 250, 1, ?)`,
+            [uid('RULE'), pattern, category, canOverrideScope ? nextScope : null, req.user.id]
+          );
+        }
+      }
+    }
+
+    await logAudit(db, audit(req, {
+      action: 'BANK_TRANSACTION_UPDATED',
+      module: 'finance_intelligence',
+      recordType: 'bank_transaction',
+      recordId: id,
+      oldValue: {
+        category: row.category,
+        ownership_scope: row.ownership_scope,
+        is_internal_transfer: row.is_internal_transfer,
+        reconciliation_status: row.reconciliation_status,
+        ignored_reason: row.ignored_reason
+      },
+      newValue: {
+        category,
+        ownership_scope: nextScope,
+        is_internal_transfer: internalTransfer,
+        reconciliation_status: reconciliationStatus,
+        ignored_reason: ignoredReason,
+        remembered_rule: rememberRule
+      }
+    }));
+    await db.commit();
+    const updated = await visibleBankTransaction(id, req);
+    return res.json({
+      message: rememberRule && category ? 'Transaction updated and merchant rule saved for future imports.' : 'Transaction updated.',
+      transaction: updated,
+      scope_locked_to_account: !canOverrideScope
+    });
+  } catch (error) {
+    if (db) await db.rollback();
+    return fail(res, error, 'Failed to update transaction');
+  } finally { if (db) db.release(); }
+};
+
+exports.bulkCategorizeTransactions = async (req, res) => {
+  let db;
+  try {
+    await ensureFinanceSchema();
+    const ids = [...new Set((Array.isArray(req.body.transaction_ids) ? req.body.transaction_ids : []).map(Number).filter(Number.isInteger))];
+    if (!ids.length) throw new FinanceError('Select at least one transaction.', 400, 'TRANSACTIONS_REQUIRED');
+    if (ids.length > 200) throw new FinanceError('Bulk category updates are limited to 200 transactions at a time.', 413, 'BULK_CATEGORY_LIMIT');
+    const category = String(req.body.category || '').trim().slice(0,120);
+    if (!category) throw new FinanceError('Choose a category.', 400, 'CATEGORY_REQUIRED');
+
+    db = await pool.getConnection();
+    await db.beginTransaction();
+    let updated = 0;
+    const visibleIds = [];
+    for (const id of ids) {
+      try {
+        await visibleBankTransaction(id, req, db, true);
+        visibleIds.push(id);
+      } catch (error) {
+        if (error instanceof FinanceError && error.code === 'BANK_TRANSACTION_NOT_FOUND') continue;
+        throw error;
+      }
+    }
+    for (const id of visibleIds) {
+      const [result] = await db.query(
+        "UPDATE bank_transactions SET category=?, classification_status='CLASSIFIED' WHERE id=?",
+        [category, id]
+      );
+      updated += Number(result.affectedRows || 0);
+    }
+    await logAudit(db, audit(req, {
+      action: 'BANK_TRANSACTIONS_BULK_CATEGORIZED',
+      module: 'finance_intelligence',
+      recordType: 'bank_transaction',
+      recordId: visibleIds.join(',').slice(0,180),
+      newValue: { category, requested: ids.length, updated }
+    }));
+    await db.commit();
+    return res.json({ message: `${updated} transaction(s) categorised as ${category}.`, updated });
+  } catch (error) {
+    if (db) await db.rollback();
+    return fail(res, error, 'Failed to categorise selected transactions');
+  } finally { if (db) db.release(); }
+};
 
 exports.getStatementLibrary = async (req, res) => {
   try {
