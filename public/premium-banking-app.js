@@ -308,6 +308,11 @@
           '<div class="vv-pb-kpi"><span>Free cash flow / month</span><b>'+money(intel.monthly_free_cash_flow||0,cur)+'</b></div>'+
           '<div class="vv-pb-kpi"><span>Cash runway</span><b>'+esc(runway)+'</b></div>'+
           '<div class="vv-pb-kpi"><span>Recurring estimate / month</span><b>'+money(intel.recurring_monthly_estimate||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>7-day safe-to-spend</span><b>'+money(intel.safe_to_spend_7d||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>30-day forecast</span><b>'+money(intel.forecast_30d||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>90-day forecast</span><b>'+money(intel.forecast_90d||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>Savings rate</span><b>'+(intel.savings_rate_percent==null?'—':pct(intel.savings_rate_percent))+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>Recurring load</span><b>'+(intel.subscription_load_percent==null?'—':pct(intel.subscription_load_percent))+'</b></div>'+
           '<div class="vv-pb-kpi"><span>Open Banking feed</span><b>'+esc(bankFeed)+'</b></div>'+
         '</div>'+
         (intelAlerts.length?'<div class="vv-pb-recurring" style="margin-top:12px">'+intelAlerts.map(a=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(a.code.replaceAll('_',' '))+'</strong><small>'+esc(a.message)+'</small></div><b>'+esc(a.severity)+'</b></div>').join('')+'</div>':'<div class="vv-pb-empty" style="margin-top:10px">No material finance alerts from the available history.</div>')+
@@ -362,6 +367,7 @@
         '<div class="vv-pb-kpi"><span>Cash / ATM</span><b>'+money(f.cash_out,cur)+'</b></div>'+
       '</div>'+
       '<section class="vv-pb-card vv-pb-chart" style="margin-top:12px">'+chart+'</section>'+
+      (()=>{const intel=(state.dashboard?.intelligence_by_currency||[]).find(x=>x.currency===cur)||{};return '<section class="vv-pb-card" style="margin-top:12px"><div class="vv-pb-card-head"><h3>Forward view</h3><span>'+esc(intel.confidence||'LOW')+' confidence</span></div><div class="vv-pb-kpis"><div class="vv-pb-kpi"><span>30 days</span><b>'+money(intel.forecast_30d||0,cur)+'</b></div><div class="vv-pb-kpi"><span>60 days</span><b>'+money(intel.forecast_60d||0,cur)+'</b></div><div class="vv-pb-kpi"><span>90 days</span><b>'+money(intel.forecast_90d||0,cur)+'</b></div><div class="vv-pb-kpi"><span>Spend volatility</span><b>'+(intel.spend_volatility_percent==null?'—':pct(intel.spend_volatility_percent))+'</b></div></div></section>';})()+
       '<div class="vv-pb-two">'+
         '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Top merchants</h3><span>'+esc(cur)+'</span></div><div class="vv-pb-merchant-grid">'+(merch.length?merch.map(m=>'<div class="vv-pb-merchant"><div><strong>'+esc(m.merchant)+'</strong><small>'+Number(m.transaction_count||0)+' transaction(s)</small></div><b>'+money(m.spent,cur)+'</b></div>').join(''):'<div class="vv-pb-empty">No merchant data.</div>')+'</div></section>'+
         '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Categories</h3><span>'+cats.length+' categories</span></div>'+barChart(cats,cur)+'</section>'+
