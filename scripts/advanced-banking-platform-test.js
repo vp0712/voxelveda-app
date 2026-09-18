@@ -42,7 +42,7 @@ assert(provider.includes('BANK_DATA_API_KEY') && provider.includes('BASIQ_API_KE
 assert(!ui.includes('BANK_DATA_API_KEY') && !ui.includes('BASIQ_API_KEY'), 'provider secret must never appear in browser banking UI');
 for (const marker of ['finance_bank_budgets','ownership_scope','category','cycle','limit_amount']) assert(premiumBudgetMigration.includes(marker), `premium banking budget migration missing ${marker}`);
 assert(!ui.includes('window.alert('), 'banking UI must not use blocking browser alerts');
-assert(ui.includes('vvBankMessage') && ui.includes('showMessage'), 'inline mobile banking feedback is missing');
+assert(ui.includes('vvPbMessage') && ui.includes('function message'), 'inline premium mobile banking feedback is missing');
 assert(sync.includes('canonicalFingerprint'), 'canonical transaction fingerprint missing');
 assert(sync.includes('provider_transaction_id'), 'provider transaction identity missing');
 assert(sync.includes('findCrossSourceMatch'), 'cross-source statement/Open Banking dedupe missing');
