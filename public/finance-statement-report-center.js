@@ -18,6 +18,9 @@
     s.id='vvReportStyle';
     s.textContent=`
       .vv-report-actions{display:flex;gap:8px;flex-wrap:wrap}
+      .vv-report-presets{display:flex;gap:7px;flex-wrap:wrap;margin:0 0 12px}
+      .vv-report-preset{border:1px solid #dfe5ee;background:#fff;border-radius:999px;padding:8px 11px;font-weight:800;cursor:pointer}
+      .vv-report-preset.active{background:#111827;color:#fff;border-color:#111827}
       .vv-statement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
       .vv-statement-card{border:1px solid #e1e6ed;border-radius:15px;padding:15px;background:#fff;cursor:pointer;text-align:left;color:inherit}
       .vv-statement-card:hover{border-color:#aab7c8;box-shadow:0 8px 22px rgba(16,24,40,.06)}
@@ -75,6 +78,14 @@
     d.innerHTML=`
       <div class="dialog-form">
         <div class="dialog-head"><div><h2 id="vvReportTitle">Spending report</h2><p id="vvReportSubtitle" class="helper"></p></div><button id="vvReportClose" type="button" class="icon-button">×</button></div>
+        <div class="vv-report-presets">
+          <button class="vv-report-preset" type="button" data-range="THIS_MONTH">This month</button>
+          <button class="vv-report-preset" type="button" data-range="LAST_MONTH">Last month</button>
+          <button class="vv-report-preset" type="button" data-range="THREE_MONTHS">3 months</button>
+          <button class="vv-report-preset" type="button" data-range="FYTD">Financial year</button>
+          <button class="vv-report-preset" type="button" data-range="TWELVE_MONTHS">12 months</button>
+          <button class="vv-report-preset" type="button" data-range="ALL">All time</button>
+        </div>
         <div class="vv-report-filter">
           <label>From<input id="vvReportFrom" type="date"></label>
           <label>To<input id="vvReportTo" type="date"></label>
@@ -85,9 +96,48 @@
       </div>`;
     document.body.appendChild(d);
     $('vvReportClose').addEventListener('click',()=>d.close());
-    $('vvApplyReportDates').addEventListener('click',reloadCurrentReport);
+    d.querySelectorAll('[data-range]').forEach((button)=>button.addEventListener('click',()=>applyPreset(button.dataset.range,button)));
+    $('vvApplyReportDates').addEventListener('click',()=>{clearPresetActive();reloadCurrentReport();});
     $('vvExportCsv').addEventListener('click',exportCsv);
     $('vvPrintReport').addEventListener('click',printReport);
+  }
+
+
+  function isoDate(date) {
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+
+  function clearPresetActive() {
+    $('vvReportDialog')?.querySelectorAll('[data-range]').forEach((b)=>b.classList.remove('active'));
+  }
+
+  function applyPreset(range, button) {
+    const today=new Date();
+    let from=''; let to=isoDate(today);
+    if(range==='THIS_MONTH') {
+      from=isoDate(new Date(today.getFullYear(),today.getMonth(),1));
+    } else if(range==='LAST_MONTH') {
+      const start=new Date(today.getFullYear(),today.getMonth()-1,1);
+      const end=new Date(today.getFullYear(),today.getMonth(),0);
+      from=isoDate(start); to=isoDate(end);
+    } else if(range==='THREE_MONTHS') {
+      from=isoDate(new Date(today.getFullYear(),today.getMonth()-2,1));
+    } else if(range==='FYTD') {
+      const fyYear=today.getMonth()>=6?today.getFullYear():today.getFullYear()-1;
+      from=isoDate(new Date(fyYear,6,1));
+    } else if(range==='TWELVE_MONTHS') {
+      from=isoDate(new Date(today.getFullYear()-1,today.getMonth(),today.getDate()));
+    } else if(range==='ALL') {
+      from=''; to='';
+    }
+    $('vvReportFrom').value=from;
+    $('vvReportTo').value=to;
+    clearPresetActive();
+    button?.classList.add('active');
+    reloadCurrentReport();
   }
 
   async function loadStatements(){
@@ -121,7 +171,7 @@
 
   async function openStatementReport(uid){
     state.statementUid=uid; state.scope='STATEMENT'; ensureDialog();
-    $('vvReportFrom').value=''; $('vvReportTo').value='';
+    $('vvReportFrom').value=''; $('vvReportTo').value=''; clearPresetActive();
     $('vvReportTitle').textContent='Statement report';
     $('vvReportSubtitle').textContent='Loading statement…';
     $('vvReportBody').innerHTML='<div class="empty"><strong>Building report…</strong></div>';
@@ -131,7 +181,7 @@
 
   async function openOverallReport(){
     state.statementUid=''; state.scope='ALL'; ensureDialog();
-    $('vvReportFrom').value=''; $('vvReportTo').value='';
+    $('vvReportFrom').value=''; $('vvReportTo').value=''; clearPresetActive();
     $('vvReportTitle').textContent='Company & personal spending report';
     $('vvReportSubtitle').textContent='All visible banking transactions, separated by account ownership.';
     $('vvReportBody').innerHTML='<div class="empty"><strong>Building report…</strong></div>';
