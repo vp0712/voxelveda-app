@@ -26,7 +26,7 @@ const middleware=read('middleware/financePrivacyMiddleware.js');
 assert(middleware.includes('banking_user_account_access'),'banking scope resolver reads account grants');
 assert(middleware.includes('allowed_business_account_ids'),'banking scope resolver publishes explicit account IDs');
 
-for(const p of ['controllers/financeIntelligenceController.js','controllers/financeTransactionIntelligenceController.js','controllers/statementDataManagementController.js','controllers/bankAccountLifecycleController.js']){
+for(const p of ['controllers/financeIntelligenceController.js','controllers/financeTransactionIntelligenceController.js','controllers/statementDataManagementController.js','controllers/bankAccountLifecycleController.js','controllers/financeReconciliationCenterController.js']){
  const c=read(p);
  assert(!c.includes("privacy.visibilitySql('ba')"),p+' has no unscoped business visibility query');
  assert(c.includes("privacy.visibilitySql('ba', req)"),p+' uses request-scoped Banking visibility');
