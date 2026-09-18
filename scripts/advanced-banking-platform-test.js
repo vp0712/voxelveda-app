@@ -101,8 +101,8 @@ assert(statementReportUi.includes('This month') && statementReportUi.includes('F
 assert(statementController.includes('autoStatementCategory'), 'statement imports must run deterministic category classification');
 assert(statementController.includes("['Cash'"), 'statement imports must classify obvious cash/ATM transactions');
 assert(transactionIntelligence.includes("['Cash'"), 'finance intelligence must recognise Cash as a built-in category');
-assert(pdfV3.includes('categoryFromText'), 'PDF v3 must pass detected transaction categories into review rows');
-assert(pdfV3.includes("['Cash'"), 'PDF v3 must identify obvious cash transactions');
+assert(pdf.includes('categoryFromText'), 'PDF v3 must pass detected transaction categories into review rows');
+assert(pdf.includes("['Cash'"), 'PDF v3 must identify obvious cash transactions');
 assert(financeIntelligence.includes('cash_spent'), 'finance reports must expose Cash totals');
 assert(financeIntelligence.includes("req.query.category"), 'transaction ledger API must support category filters');
 assert(bankGradeUi.includes('<option value="Cash">Cash</option>'), 'ledger must provide a Cash filter');
