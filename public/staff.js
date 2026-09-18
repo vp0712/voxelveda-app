@@ -319,7 +319,8 @@ function applyPermissionUI() {
   const canUsePackaging = hasPermission('packaging');
   const canUseStock = hasPermission('stock') || canUseStockIn || canUseStockOut || canUseRawMaterial || canUsePackaging;
   const canUseExpenses = hasPermission('expenses');
-  const canUseFinance = canUseInvoices || canUseExpenses;
+  const canUseBanking = hasPermission('VIEW_BANKING') || hasPermission('VIEW_PERSONAL_BANKING') || hasPermission('VIEW_BUSINESS_BANKING');
+  const canUseFinance = canUseInvoices || canUseExpenses || canUseBanking;
   const canUseCompliance = hasPermission('compliance');
   const canUseCompetitors = hasPermission('competitors');
   const canUseSales = canUseRfqs || canUseInvoices || canUseCustomers || canUseSuppliers;
@@ -358,6 +359,7 @@ function applyPermissionUI() {
   setPermissionVisibility('.permission-packaging', canUsePackaging);
   setPermissionVisibility('.permission-packaging-input', canInput('packaging'));
   setPermissionVisibility('.permission-finance', canUseFinance);
+  setPermissionVisibility('.permission-banking', canUseBanking);
   setPermissionVisibility('.permission-expenses', canUseExpenses);
   setPermissionVisibility('.permission-expenses-input', canInput('expenses'));
   setPermissionVisibility('.permission-compliance', canUseCompliance);
