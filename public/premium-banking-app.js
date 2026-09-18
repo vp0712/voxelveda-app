@@ -1,11 +1,14 @@
 
 (() => {
   'use strict';
-  if (location.pathname !== '/finance-intelligence' || window.__vvPremiumBankInstalled) return;
+  if (!['/finance-intelligence','/banking'].includes(location.pathname) || window.__vvPremiumBankInstalled) return;
   window.__vvPremiumBankInstalled = true;
 
   const BANK = '/api/integrations/webhooks/banking';
-  const FIN = '/api/finance/intelligence';
+  const STANDALONE = location.pathname === '/banking';
+  const FIN = STANDALONE ? '/api/banking/intelligence' : '/api/finance/intelligence';
+  const OS = STANDALONE ? '/api/banking/os' : '/api/finance/banking-os';
+  const OPEN_BANKING = STANDALONE ? '/api/banking/open-banking' : '/api/finance/intelligence/open-banking';
   const PERSONAL = '/api/finance/personal-money';
   const $ = (id) => document.getElementById(id);
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -72,6 +75,7 @@
       '<div class="vv-pb-head">'+
         '<div class="vv-pb-headline"><div><p class="eyebrow">VOXEL VEDA BANKING</p><h2>Money, accounts & insights</h2><p id="vvPbHeadline">Loading your banking workspace…</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
           (new URLSearchParams(location.search).get('source')==='app'?'<button type="button" class="vv-pb-status" data-pb-action="app-home">← App</button>':'')+
+          (STANDALONE?'<span class="vv-pb-status healthy">Banking Portal</span>':'')+
           '<span id="vvPbStatus" class="vv-pb-status">Checking</span></div></div>'+
         '<div class="vv-pb-profile">'+
           '<button type="button" class="active" data-pb-scope="ALL">All money</button>'+
@@ -482,7 +486,7 @@
     $('vvPbAccountTitle').textContent='Account intelligence'; $('vvPbAccountSubtitle').textContent='Loading account data…';
     body.innerHTML='<div class="vv-pb-empty">Loading account intelligence…</div>'; dialog.showModal();
     try{
-      const data=await api('/api/finance/banking-os/accounts/'+encodeURIComponent(id));
+      const data=await api(OS+'/accounts/'+encodeURIComponent(id));
       const a=data.account||{}; const m=data.metrics||{};
       $('vvPbAccountTitle').textContent=a.nickname||'Account';
       $('vvPbAccountSubtitle').textContent=(a.institution||'Bank')+' · '+(a.account_number_masked||'Masked account')+' · '+(a.ownership_scope||'');
@@ -509,18 +513,18 @@
     wireDynamic();
   }
 
-  async function saveSpace(e){e.preventDefault();try{await api('/api/finance/banking-os/spaces',{method:'POST',body:JSON.stringify({name:$('vvPbSpaceName').value,ownership_scope:$('vvPbSpaceScope').value,purpose:$('vvPbSpacePurpose').value,target_amount:$('vvPbSpaceTarget').value,allocated_amount:$('vvPbSpaceAllocated').value,minimum_reserve:$('vvPbSpaceReserve').value,currency:$('vvPbSpaceCurrency').value})});$('vvPbSpaceDialog').close();message('Money Space created.','success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be created.','error',err.message);}}
-  async function saveBeneficiary(e){e.preventDefault();try{await api('/api/finance/banking-os/beneficiaries',{method:'POST',body:JSON.stringify({name:$('vvPbBenName').value,nickname:$('vvPbBenNickname').value,ownership_scope:$('vvPbBenScope').value,bank_name:$('vvPbBenBank').value,bsb_masked:$('vvPbBenBsb').value,account_masked:$('vvPbBenAccount').value,payid_masked:$('vvPbBenPayid').value,currency:$('vvPbBenCurrency').value,trusted:$('vvPbBenTrusted').checked})});$('vvPbBeneficiaryDialog').close();message('Beneficiary saved.','success');await refresh();state.tab='pay';render();}catch(err){message('Beneficiary could not be saved.','error',err.message);}}
+  async function saveSpace(e){e.preventDefault();try{await api(OS+'/spaces',{method:'POST',body:JSON.stringify({name:$('vvPbSpaceName').value,ownership_scope:$('vvPbSpaceScope').value,purpose:$('vvPbSpacePurpose').value,target_amount:$('vvPbSpaceTarget').value,allocated_amount:$('vvPbSpaceAllocated').value,minimum_reserve:$('vvPbSpaceReserve').value,currency:$('vvPbSpaceCurrency').value})});$('vvPbSpaceDialog').close();message('Money Space created.','success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be created.','error',err.message);}}
+  async function saveBeneficiary(e){e.preventDefault();try{await api(OS+'/beneficiaries',{method:'POST',body:JSON.stringify({name:$('vvPbBenName').value,nickname:$('vvPbBenNickname').value,ownership_scope:$('vvPbBenScope').value,bank_name:$('vvPbBenBank').value,bsb_masked:$('vvPbBenBsb').value,account_masked:$('vvPbBenAccount').value,payid_masked:$('vvPbBenPayid').value,currency:$('vvPbBenCurrency').value,trusted:$('vvPbBenTrusted').checked})});$('vvPbBeneficiaryDialog').close();message('Beneficiary saved.','success');await refresh();state.tab='pay';render();}catch(err){message('Beneficiary could not be saved.','error',err.message);}}
   function openPaymentDraft(){const select=$('vvPbPayAccount');select.innerHTML='<option value="">Not assigned</option>'+(state.os?.accounts||[]).map(a=>'<option value="'+Number(a.id)+'">'+esc(a.nickname)+' · '+esc(a.currency)+'</option>').join('');$('vvPbPayCurrency').value=selectedCurrency();$('vvPbPaymentDraftDialog').showModal();}
-  async function savePaymentDraft(e){e.preventDefault();try{const result=await api('/api/finance/banking-os/payments',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbPayAccount').value||null,ownership_scope:$('vvPbPayScope').value,payment_type:$('vvPbPayType').value,payee_name:$('vvPbPayPayee').value,reference_text:$('vvPbPayReference').value,amount:$('vvPbPayAmount').value,currency:$('vvPbPayCurrency').value,due_date:$('vvPbPayDue').value||null,schedule_type:$('vvPbPaySchedule').value})});$('vvPbPaymentDraftDialog').close();message(result.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment draft could not be created.','error',err.message);}}
-  async function submitPayment(uid){try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/submit',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be submitted.','error',err.message);}}
-  async function cancelPayment(uid){if(!confirm('Cancel this payment workflow?'))return;try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/cancel',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be cancelled.','error',err.message);}}
-  async function archiveSpace(uid){if(!confirm('Archive this Money Space?'))return;try{const r=await api('/api/finance/banking-os/spaces/'+encodeURIComponent(uid)+'/archive',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be archived.','error',err.message);}}
-  async function decidePayment(uid,decision){const note=prompt(decision==='APPROVE'?'Approval note (optional)':'Reason for rejection');if(decision==='REJECT'&&!note)return;try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/decision',{method:'POST',body:JSON.stringify({decision,note:note||''})});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Decision could not be recorded.','error',err.message);}}
+  async function savePaymentDraft(e){e.preventDefault();try{const result=await api(OS+'/payments',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbPayAccount').value||null,ownership_scope:$('vvPbPayScope').value,payment_type:$('vvPbPayType').value,payee_name:$('vvPbPayPayee').value,reference_text:$('vvPbPayReference').value,amount:$('vvPbPayAmount').value,currency:$('vvPbPayCurrency').value,due_date:$('vvPbPayDue').value||null,schedule_type:$('vvPbPaySchedule').value})});$('vvPbPaymentDraftDialog').close();message(result.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment draft could not be created.','error',err.message);}}
+  async function submitPayment(uid){try{const r=await api(OS+'/payments/'+encodeURIComponent(uid)+'/submit',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be submitted.','error',err.message);}}
+  async function cancelPayment(uid){if(!confirm('Cancel this payment workflow?'))return;try{const r=await api(OS+'/payments/'+encodeURIComponent(uid)+'/cancel',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be cancelled.','error',err.message);}}
+  async function archiveSpace(uid){if(!confirm('Archive this Money Space?'))return;try{const r=await api(OS+'/spaces/'+encodeURIComponent(uid)+'/archive',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be archived.','error',err.message);}}
+  async function decidePayment(uid,decision){const note=prompt(decision==='APPROVE'?'Approval note (optional)':'Reason for rejection');if(decision==='REJECT'&&!note)return;try{const r=await api(OS+'/payments/'+encodeURIComponent(uid)+'/decision',{method:'POST',body:JSON.stringify({decision,note:note||''})});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Decision could not be recorded.','error',err.message);}}
   function openTeamAccess(userId,accountId,level,label){$('vvPbAccessUser').value=userId;$('vvPbAccessUserLabel').value=label;$('vvPbAccessAccount').innerHTML=(state.os?.accounts||[]).filter(a=>a.ownership_scope==='BUSINESS').map(a=>'<option value="'+a.id+'" '+(String(a.id)===String(accountId)?'selected':'')+'>'+esc(a.nickname)+'</option>').join('');$('vvPbAccessLevel').value=level||'VIEW';$('vvPbAccessDialog').showModal();}
-  async function saveTeamAccess(e){e.preventDefault();try{const r=await api('/api/finance/banking-os/team/'+encodeURIComponent($('vvPbAccessUser').value)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbAccessAccount').value,access_level:$('vvPbAccessLevel').value})});$('vvPbAccessDialog').close();message(r.message,'success');await refresh();state.tab='team';render();}catch(err){message('Access could not be updated.','error',err.message);}}
+  async function saveTeamAccess(e){e.preventDefault();try{const r=await api(OS+'/team/'+encodeURIComponent($('vvPbAccessUser').value)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbAccessAccount').value,access_level:$('vvPbAccessLevel').value})});$('vvPbAccessDialog').close();message(r.message,'success');await refresh();state.tab='team';render();}catch(err){message('Access could not be updated.','error',err.message);}}
   function openAlerts(){const a=state.os?.alerts||{};$('vvPbAlertLow').value=a.low_balance_threshold??'';$('vvPbAlertLarge').value=a.large_transaction_threshold??'';$('vvPbAlertBudget').checked=Boolean(Number(a.notify_budget??1));$('vvPbAlertPayments').checked=Boolean(Number(a.notify_payments??1));$('vvPbAlertSync').checked=Boolean(Number(a.notify_bank_sync??1));$('vvPbAlertUnusual').checked=Boolean(Number(a.notify_unusual_activity??1));$('vvPbAlertDialog').showModal();}
-  async function saveAlerts(e){e.preventDefault();try{const r=await api('/api/finance/banking-os/alerts',{method:'POST',body:JSON.stringify({low_balance_threshold:$('vvPbAlertLow').value,large_transaction_threshold:$('vvPbAlertLarge').value,notify_budget:$('vvPbAlertBudget').checked,notify_payments:$('vvPbAlertPayments').checked,notify_bank_sync:$('vvPbAlertSync').checked,notify_unusual_activity:$('vvPbAlertUnusual').checked})});$('vvPbAlertDialog').close();message(r.message,'success');await refresh();}catch(err){message('Alerts could not be saved.','error',err.message);}}
+  async function saveAlerts(e){e.preventDefault();try{const r=await api(OS+'/alerts',{method:'POST',body:JSON.stringify({low_balance_threshold:$('vvPbAlertLow').value,large_transaction_threshold:$('vvPbAlertLarge').value,notify_budget:$('vvPbAlertBudget').checked,notify_payments:$('vvPbAlertPayments').checked,notify_bank_sync:$('vvPbAlertSync').checked,notify_unusual_activity:$('vvPbAlertUnusual').checked})});$('vvPbAlertDialog').close();message(r.message,'success');await refresh();}catch(err){message('Alerts could not be saved.','error',err.message);}}
 
   function renderPlan(){
     $('vvPbContent').innerHTML=
@@ -575,12 +579,12 @@
       api(FIN+'/banking-dashboard?'+query.toString()),
       api(FIN+'/budgets'),
       api(FIN+'/insights?scope='+encodeURIComponent(state.scope)),
-      api('/api/finance/banking-os'),
-      api('/api/finance/banking-os/team').catch(()=>({can_manage:false,users:[],grants:[]})),
-      api('/api/finance/banking-os/command-center'),
-      api('/api/finance/banking-os/cashflow-calendar?days=90')
+      api(OS+''),
+      api(OS+'/team').catch(()=>({can_manage:false,users:[],grants:[]})),
+      api(OS+'/command-center'),
+      api(OS+'/cashflow-calendar?days=90')
     ];
-    if(state.scope==='PERSONAL'||state.scope==='ALL') requests.push(api(PERSONAL+'/attention').catch(()=>null));
+    if(!STANDALONE && (state.scope==='PERSONAL'||state.scope==='ALL')) requests.push(api(PERSONAL+'/attention').catch(()=>null));
     else requests.push(Promise.resolve(null));
     const [status,connections,quality,dashboard,budgets,insights,os,team,command,calendar,attention]=await Promise.all(requests);
     state.status=status; state.connections=connections.connections||[]; state.quality=quality; state.dashboard=dashboard;
@@ -600,9 +604,9 @@
   async function connectBank(){
     message('Preparing secure bank connection…','info');
     try{
-      const providers=await api('/api/finance/intelligence/open-banking/providers');
+      const providers=await api(OPEN_BANKING+'/providers');
       const chosen=providers.selected_provider||'BASIQ';
-      const result=await api('/api/finance/intelligence/open-banking/consent',{method:'POST',body:JSON.stringify({provider:chosen})});
+      const result=await api(OPEN_BANKING+'/consent',{method:'POST',body:JSON.stringify({provider:chosen})});
       if(result.consent_url){window.location.assign(result.consent_url);return;}
       message('Bank connection could not start.','error','No hosted consent URL was returned.');
     }catch(e){

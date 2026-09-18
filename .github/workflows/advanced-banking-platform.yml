@@ -24,6 +24,8 @@ on:
       - 'controllers/bankingOperatingSystemController.js'
       - 'scripts/banking-os-multi-user-test.js'
       - 'scripts/banking-command-center-test.js'
+      - 'scripts/standalone-banking-portal-test.js'
+      - 'routes/bankingPortalRoutes.js'
       - 'controllers/financeIntelligenceController.js'
       - 'routes/financeRoutes.js'
       - 'public/finance-pdf-v3.js'
@@ -87,11 +89,15 @@ jobs:
           node --check scripts/advanced-banking-platform-test.js
           node --check scripts/banking-os-multi-user-test.js
           node --check scripts/banking-command-center-test.js
+          node --check scripts/standalone-banking-portal-test.js
+          node --check routes/bankingPortalRoutes.js
       - name: Architecture and security contract
         run: node scripts/advanced-banking-platform-test.js
       - name: Banking OS multi-user security contract
         run: node scripts/banking-os-multi-user-test.js
       - name: Banking command centre regression contract
         run: node scripts/banking-command-center-test.js
+      - name: Standalone banking portal access contract
+        run: node scripts/standalone-banking-portal-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js
