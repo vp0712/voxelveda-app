@@ -44,6 +44,27 @@
       .vv-report-transactions{max-height:340px;overflow:auto;border:1px solid #e5eaf1;border-radius:12px;margin-top:14px}
       .vv-report-tx{display:grid;grid-template-columns:110px minmax(180px,1fr) 150px 130px;gap:10px;padding:10px;border-bottom:1px solid #edf0f4;font-size:.78rem}
       .vv-report-tx:last-child{border-bottom:0}
+      #vvPrintRoot{display:none}
+      @media print{
+        body>*:not(#vvPrintRoot){display:none!important}
+        #vvPrintRoot{display:block!important;position:static!important;width:100%!important;background:#fff!important;color:#111!important}
+        #vvPrintRoot .vv-print-page{padding:0!important}
+        #vvPrintRoot .vv-print-header{display:flex;justify-content:space-between;gap:24px;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:14px;margin-bottom:18px}
+        #vvPrintRoot .vv-print-brand{font-size:11px;font-weight:900;letter-spacing:.18em}
+        #vvPrintRoot h1{font-size:24px;margin:4px 0 3px}
+        #vvPrintRoot p{margin:0;color:#555}
+        #vvPrintRoot .vv-print-meta{text-align:right;font-size:11px}.vv-print-meta span,.vv-print-meta strong{display:block}
+        #vvPrintRoot .vv-print-footer{margin-top:18px;padding-top:10px;border-top:1px solid #ccc;font-size:10px;color:#666}
+        #vvPrintRoot .vv-report-kpis{display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:8px!important}
+        #vvPrintRoot .vv-report-columns{display:grid!important;grid-template-columns:1fr 1fr!important;gap:12px!important}
+        #vvPrintRoot .vv-report-transactions{max-height:none!important;overflow:visible!important}
+        #vvPrintRoot .vv-report-box,#vvPrintRoot .vv-report-kpis div,#vvPrintRoot .vv-currency-report{break-inside:avoid;page-break-inside:avoid}
+        #vvPrintRoot .vv-report-tx{display:grid!important;grid-template-columns:90px minmax(180px,1fr) 130px 110px!important;font-size:10px!important}
+        #vvPrintRoot .vv-portfolio-line{max-height:160px!important}
+        #vvPrintRoot .vv-portfolio-donut-wrap{grid-template-columns:120px 1fr!important}
+        #vvPrintRoot .vv-portfolio-donut{width:110px!important;height:110px!important}
+        @page{size:A4;margin:12mm}
+      }
       .vv-currency-sections{display:grid;gap:16px}.vv-currency-report{border:1px solid #dfe6ee;border-radius:16px;padding:14px;margin-bottom:4px}.vv-currency-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.vv-currency-head span{display:block;color:#667085;font-size:.7rem}.vv-currency-head h3{margin:2px 0;font-size:1.25rem}.vv-portfolio-line{width:100%;height:180px}.vv-chart-legend{display:flex;gap:12px;font-size:.72rem;color:#667085}.vv-portfolio-donut-wrap{display:grid;grid-template-columns:150px 1fr;gap:15px;align-items:center}.vv-portfolio-donut{width:140px;height:140px;border-radius:50%;display:grid;place-items:center;position:relative}.vv-portfolio-donut:after{content:'';position:absolute;inset:24px;border-radius:50%;background:white}.vv-portfolio-donut span{position:relative;z-index:1;font-size:.72rem;font-weight:900}.vv-donut-row{display:grid;grid-template-columns:10px 1fr auto;gap:7px;align-items:center;font-size:.74rem;padding:3px 0}.vv-donut-row i{width:9px;height:9px;border-radius:50%}.vv-report-filter-wide{grid-template-columns:1.2fr 1fr 1fr auto}
       @media(max-width:760px){
         .vv-statement-grid,.vv-report-columns{grid-template-columns:1fr}
@@ -282,13 +303,54 @@
     document.body.appendChild(a); a.click(); URL.revokeObjectURL(a.href); a.remove();
   }
 
+  function ensurePrintRoot(){
+    let root=$('vvPrintRoot');
+    if(root) return root;
+    root=document.createElement('section');
+    root.id='vvPrintRoot';
+    root.setAttribute('aria-hidden','true');
+    document.body.appendChild(root);
+    return root;
+  }
+
   function printReport(){
-    const p=state.report; if(!p) return;
-    const title=p.statement?.original_name||'Voxel Veda Spending Report';
-    const body=$('vvReportBody')?.innerHTML||'';
-    const w=window.open('','_blank','noopener,noreferrer'); if(!w) return;
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>body{font-family:Arial,sans-serif;padding:28px;color:#111}h1{margin-bottom:4px}.muted,small{color:#666}.vv-report-kpis,.vv-report-columns{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.vv-report-kpis div,.vv-report-box{border:1px solid #ddd;border-radius:8px;padding:10px}.vv-report-row,.vv-report-tx{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:7px;border-bottom:1px solid #eee}.vv-report-transactions{margin-top:18px}.notice{padding:10px;background:#fff7df}.vv-report-actions{display:none}@media print{body{padding:0}}</style></head><body><h1>${esc(title)}</h1><p>Voxel Veda finance report</p>${body}</body></html>`);
-    w.document.close(); setTimeout(()=>w.print(),250);
+    const p=state.report;
+    if(!p){
+      alert('Open a report first, then choose Print / Save PDF.');
+      return;
+    }
+    const root=ensurePrintRoot();
+    const title=p.statement?.original_name||'Voxel Veda Financial History Report';
+    const subtitle=state.statementUid
+      ? 'Imported bank statement report'
+      : 'All accounts · statement history · transactions · spending analysis';
+    const body=$('vvReportBody')?.innerHTML||'<p>No report content is available.</p>';
+    const generated=new Intl.DateTimeFormat('en-AU',{dateStyle:'medium',timeStyle:'short'}).format(new Date());
+    root.innerHTML=
+      '<div class="vv-print-page">'+
+        '<header class="vv-print-header"><div><div class="vv-print-brand">VOXEL VEDA</div><h1>'+esc(title)+'</h1><p>'+esc(subtitle)+'</p></div><div class="vv-print-meta"><span>Generated</span><strong>'+esc(generated)+'</strong></div></header>'+
+        '<div class="vv-print-body">'+body+'</div>'+
+        '<footer class="vv-print-footer">Generated from Voxel Veda Banking · '+esc(location.host)+'</footer>'+
+      '</div>';
+    root.setAttribute('aria-hidden','false');
+
+    const cleanup=()=>{
+      root.setAttribute('aria-hidden','true');
+      root.innerHTML='';
+      window.removeEventListener('afterprint',cleanup);
+    };
+    window.addEventListener('afterprint',cleanup,{once:true});
+
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        try{
+          window.print();
+        }catch(error){
+          cleanup();
+          alert('Your browser could not open the print sheet. Please try again from Safari or Chrome.');
+        }
+      });
+    });
   }
 
   function init(){installStyles();ensurePanel();ensureDialog();loadStatements();}
