@@ -23,7 +23,7 @@ exports.status = async (req, res) => {
     const selected = selectedProvider() || 'BASIQ';
     const option = providerOptions().find((p) => p.key === selected) || providerOptions()[0];
     const [[summary]] = await pool.query(`SELECT COUNT(*) connections, SUM(status='ACTIVE') active, SUM(status IN ('ACTION_REQUIRED','EXPIRED','ERROR')) attention, MAX(last_sync_completed_at) last_sync FROM bank_connections WHERE app_user_id=?`, [req.user.id]);
-    const [[sync]] = await pool.query(`SELECT status,last_error_code,error_detail,completed_at FROM open_banking_sync_runs WHERE app_user_id=? ORDER BY id DESC LIMIT 1`, [req.user.id]);
+    const [[sync]] = await pool.query(`SELECT status,error_code AS last_error_code,error_detail,completed_at FROM open_banking_sync_runs WHERE app_user_id=? ORDER BY id DESC LIMIT 1`, [req.user.id]);
     return res.json({ provider: selected, provider_name: option?.name || selected, configured: Boolean(option?.configured), missing: option?.missing || [], environment: environment(), live_sync_enabled: liveSyncEnabled(), connection_summary: { total: Number(summary?.connections || 0), active: Number(summary?.active || 0), attention: Number(summary?.attention || 0), last_sync: summary?.last_sync || null }, last_sync: sync || null, cdr_notice: 'Bank data access is customer-consented and provider-managed. Voxel Veda does not claim independent CDR accreditation through this screen.' });
   } catch (e) { return fail(res, e, 'Failed to load banking status.'); }
 };
