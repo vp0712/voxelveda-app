@@ -122,7 +122,7 @@ exports.listRemoved = async (req,res) => {
               sif.imported_rows,sif.duplicate_rows,sif.rejected_rows,sif.reviewed_at,
               ba.id AS bank_account_id,ba.nickname AS account_name,ba.institution,ba.currency,ba.ownership_scope
          FROM statement_import_files sif JOIN bank_accounts ba ON ba.id=sif.bank_account_id
-        WHERE sif.parse_status='REMOVED' AND ${privacy.visibilitySql('ba')}
+        WHERE sif.parse_status='REMOVED' AND ${privacy.visibilitySql('ba', req)}
         ORDER BY sif.reviewed_at DESC,sif.id DESC LIMIT 250`,
       privacy.visibilityParams(req)
     );

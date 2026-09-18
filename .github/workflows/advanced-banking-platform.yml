@@ -31,6 +31,7 @@ on:
       - 'scripts/statement-data-controls-test.js'
       - 'scripts/banking-workspace-error-recovery-test.js'
       - 'scripts/access-update-actions-test.js'
+      - 'scripts/banking-account-scope-test.js'
       - 'routes/bankingPortalRoutes.js'
       - 'controllers/statementImportController.js'
       - 'public/finance-intelligence.js'
@@ -105,6 +106,9 @@ jobs:
           node --check scripts/statement-data-controls-test.js
           node --check scripts/banking-workspace-error-recovery-test.js
           node --check scripts/access-update-actions-test.js
+          node --check scripts/banking-account-scope-test.js
+          node --check services/financePrivacyService.js
+          node --check middleware/financePrivacyMiddleware.js
           node --check public/admin-dashboard.js
           node --check services/bankSyncScheduler.js
           node --check controllers/advancedBankingController.js
@@ -134,5 +138,7 @@ jobs:
         run: node scripts/banking-workspace-error-recovery-test.js
       - name: Access update and scheduler regression contract
         run: node scripts/access-update-actions-test.js
+      - name: Delegated Banking account-scope regression contract
+        run: node scripts/banking-account-scope-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js

@@ -195,7 +195,7 @@ exports.getActiveOverview = async (req, res) => {
     await ensureFinanceSchema();
     const requestedScope = String(req.query.scope || 'ALL').trim().toUpperCase();
     const scope = ['ALL', 'PERSONAL', 'BUSINESS'].includes(requestedScope) ? requestedScope : 'ALL';
-    const clauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba')];
+    const clauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba', req)];
     const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') {
       clauses.push('bt.ownership_scope=?');
@@ -214,7 +214,7 @@ exports.getActiveOverview = async (req, res) => {
         WHERE ${where}`,
       params
     );
-    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba')];
+    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') {
       accountClauses.push('ba.ownership_scope=?');

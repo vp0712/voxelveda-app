@@ -22,9 +22,9 @@ assert.match(middleware, /filterStatementList/, 'Statement review queue must be 
 assert.match(routes, /financePrivacy\.filterStatementList/, 'Statement review list route must use privacy filter.');
 assert.match(routes, /financePrivacy\.bankTransactionParam\('id'\).*RECONCILE_BANK_TRANSACTION/, 'Reconcile route must verify private transaction ownership.');
 assert.match(routes, /financePrivacy\.insightParam\('id'\).*APPLY_FINANCE_INTELLIGENCE/, 'Insight apply must verify private ownership.');
-assert.match(intelligence, /privacy\.visibilitySql\('ba'\)/, 'Finance Intelligence aggregates must filter account visibility.');
+assert.match(intelligence, /privacy\.visibilitySql\('ba', req\)/, 'Finance Intelligence aggregates must filter request-scoped account visibility.');
 assert.match(intelligence, /Private financial account created\. Only you can access it\./, 'UI/API should explain private ownership clearly.');
-assert.match(reconciliation, /privacy\.visibilitySql\('ba'\)/, 'Reconciliation Center aggregate must be privacy scoped.');
+assert.match(reconciliation, /privacy\.visibilitySql\('ba', req\)/, 'Reconciliation Center aggregate must be request-scoped for banking privacy.');
 assert.match(transactionIntelligence, /WHERE created_by=\? AND enabled=1/, 'Smart Rules analysis must load only the current user rules.');
 assert.match(transactionIntelligence, /confidence: 0\.99, source: 'SAVED_RULE'/, 'Saved merchant rules must override generic heuristic suggestions at high confidence.');
 assert.match(transactionIntelligence, /const paired = new Set\(\)/, 'Transfer matching must enforce one-to-one pairing.');

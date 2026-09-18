@@ -3,11 +3,37 @@
 const pool = require('../config/db');
 const { FinanceError } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
+const { hasPermission } = require('../services/authorizationService');
 
 function fail(res, error) {
   if (error instanceof FinanceError) return res.status(error.statusCode || 400).json({ message: error.message, code: error.code });
   console.error('Finance privacy guard failed:', error);
   return res.status(500).json({ message: 'Finance privacy check failed.', code: 'FINANCE_PRIVACY_ERROR' });
+}
+
+
+async function resolveBankingAccessScope(req, res, next) {
+  try {
+    const role = String(req.user?.role || '').toLowerCase();
+    const isAdmin = ['super_admin','admin','finance_admin'].includes(role)
+      || hasPermission(req.user, 'EDIT_BANK_DETAILS')
+      || hasPermission(req.user, 'MANAGE_ROLES');
+    const [grants] = await pool.query(
+      'SELECT bank_account_id,can_view FROM banking_user_account_access WHERE user_id=?',
+      [privacy.userId(req)]
+    );
+    const allowed = grants
+      .filter((row) => Number(row.can_view || 0) === 1)
+      .map((row) => Number(row.bank_account_id))
+      .filter((id) => Number.isInteger(id) && id > 0);
+    req.bankingAccessScope = {
+      is_admin: isAdmin,
+      has_explicit_grants: grants.length > 0,
+      can_view_all_business: hasPermission(req.user, 'VIEW_BUSINESS_BANKING'),
+      allowed_business_account_ids: [...new Set(allowed)]
+    };
+    return next();
+  } catch (error) { return fail(res, error); }
 }
 
 function accountParam(name = 'id') {
@@ -83,7 +109,7 @@ function filterAccountList(req, res, next) {
 
 async function filterStatementList(req, res, next) {
   try {
-    const [rows] = await pool.query(`SELECT id FROM bank_accounts ba WHERE ${privacy.visibilitySql('ba')}`, privacy.visibilityParams(req));
+    const [rows] = await pool.query(`SELECT id FROM bank_accounts ba WHERE ${privacy.visibilitySql('ba', req)}`, privacy.visibilityParams(req));
     const allowed = new Set(rows.map((row) => Number(row.id)));
     const original = res.json.bind(res);
     res.json = (payload) => {
@@ -94,4 +120,4 @@ async function filterStatementList(req, res, next) {
   } catch (error) { return fail(res, error); }
 }
 
-module.exports = { accountParam, accountBody, protectScopeConversion, bankTransactionParam, insightParam, statementUid, filterAccountList, filterStatementList };
+module.exports = { resolveBankingAccessScope, accountParam, accountBody, protectScopeConversion, bankTransactionParam, insightParam, statementUid, filterAccountList, filterStatementList };
