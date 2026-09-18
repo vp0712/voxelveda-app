@@ -121,6 +121,7 @@ router.post('/personal-money/roadmaps/:roadmapId/milestones/:milestoneId/progres
 router.post('/personal-money/roadmaps/:id/status', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.updateStatus);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
+router.get('/intelligence/banking-dashboard', requireAnyPermission('VIEW_BANKING'), intelligence.getBankingDashboard);
 router.get('/intelligence/transactions', requireAnyPermission('VIEW_BANKING'), intelligence.getTransactions);
 router.get('/intelligence/transactions/:id', requireAnyPermission('VIEW_BANKING'), intelligence.getTransactionDetail);
 router.post('/intelligence/transactions/:id', requireAnyPermission('EDIT_FINANCE'), intelligence.updateTransaction);
