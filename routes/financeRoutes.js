@@ -156,7 +156,7 @@ router.get('/intelligence/open-banking/providers', requireAnyPermission('VIEW_BA
 router.get('/intelligence/open-banking/sessions', requireAnyPermission('VIEW_BANKING'), openBanking.getSessions);
 router.post('/intelligence/open-banking/consent', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), openBanking.startConsent);
 router.post('/intelligence/open-banking/sessions/:uid/cancel', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), openBanking.cancelConsent);
-router.post('/intelligence/bank-connections/connect', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), intelligence.startConnection);
+router.post('/intelligence/bank-connections/connect', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANK_DETAILS'), openBanking.startConsent);
 router.post('/intelligence/analyse', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.runAnalysis);
 router.get('/intelligence/insights', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getInsights);
 router.post('/intelligence/insights/:id/apply', requireAnyPermission('EDIT_FINANCE'), financePrivacy.insightParam('id'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), transactionIntelligence.applyInsight);
