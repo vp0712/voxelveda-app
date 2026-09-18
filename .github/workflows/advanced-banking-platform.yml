@@ -26,6 +26,7 @@ on:
       - 'scripts/banking-command-center-test.js'
       - 'scripts/standalone-banking-portal-test.js'
       - 'scripts/multibank-statement-history-test.js'
+      - 'scripts/statement-first-money-warehouse-test.js'
       - 'routes/bankingPortalRoutes.js'
       - 'controllers/statementImportController.js'
       - 'public/finance-intelligence.js'
@@ -95,6 +96,7 @@ jobs:
           node --check scripts/banking-command-center-test.js
           node --check scripts/standalone-banking-portal-test.js
           node --check scripts/multibank-statement-history-test.js
+          node --check scripts/statement-first-money-warehouse-test.js
           node --check controllers/statementImportController.js
           node --check public/finance-intelligence.js
           node --check public/finance-statement-report-center.js
@@ -109,5 +111,7 @@ jobs:
         run: node scripts/standalone-banking-portal-test.js
       - name: Multi-bank statement history contract
         run: node scripts/multibank-statement-history-test.js
+      - name: Statement-first money warehouse contract
+        run: node scripts/statement-first-money-warehouse-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js
