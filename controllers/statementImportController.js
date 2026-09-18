@@ -340,6 +340,132 @@ exports.updateRowSelection = async (req, res) => {
   } catch (error) { return fail(res, error, 'Failed to update statement row'); }
 };
 
+
+exports.overrideRejectedRow = async (req, res) => {
+  let db;
+  try {
+    const reason = String(req.body.reason || '').trim();
+    if (reason.length < 3) throw new FinanceError('Explain why this rejected row is a genuine transaction before including it.', 400, 'OVERRIDE_REASON_REQUIRED');
+
+    db = await pool.getConnection();
+    await db.beginTransaction();
+    const [[session]] = await db.query('SELECT * FROM statement_import_sessions WHERE import_uid=? FOR UPDATE', [req.params.uid]);
+    if (!session) throw new FinanceError('Statement review session not found.', 404, 'STATEMENT_REVIEW_NOT_FOUND');
+    if (session.status !== 'PENDING_REVIEW') throw new FinanceError('Only pending statement reviews can be corrected.', 409, 'STATEMENT_REVIEW_LOCKED');
+
+    const [[account]] = await db.query('SELECT * FROM bank_accounts WHERE id=? AND status="ACTIVE" FOR UPDATE', [session.bank_account_id]);
+    if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
+
+    const rowId = Number(req.params.rowId || 0);
+    const [[row]] = await db.query('SELECT * FROM statement_import_rows WHERE id=? AND import_session_id=? FOR UPDATE', [rowId, session.id]);
+    if (!row) throw new FinanceError('Statement row not found.', 404, 'STATEMENT_ROW_NOT_FOUND');
+    if (row.validation_status === 'DUPLICATE') throw new FinanceError('Duplicate rows stay locked to prevent double-importing the same transaction.', 409, 'DUPLICATE_ROW_LOCKED');
+    if (isBalanceMarker(row)) throw new FinanceError('Opening and closing balances are statement markers, not transactions, and cannot be imported.', 409, 'BALANCE_MARKER_LOCKED');
+    if (row.validation_status !== 'REJECTED' && !Number(row.manual_override || 0)) {
+      throw new FinanceError('Only rejected rows need the correction workflow. Valid and warning rows can be selected normally.', 409, 'ROW_OVERRIDE_NOT_REQUIRED');
+    }
+
+    const direction = String(req.body.direction || '').trim().toUpperCase();
+    const amount = req.body.amount;
+    let debit = req.body.debit ?? row.debit;
+    let credit = req.body.credit ?? row.credit;
+    if (amount !== undefined && amount !== null && amount !== '') {
+      const normalizedAmount = money.fromCents(money.toCents(amount));
+      if (direction === 'DEBIT') { debit = normalizedAmount; credit = '0.00'; }
+      else if (direction === 'CREDIT') { credit = normalizedAmount; debit = '0.00'; }
+    }
+
+    const candidate = normalizeRow(account.id, account.currency, {
+      transaction_date: req.body.transaction_date ?? row.transaction_date,
+      posting_date: req.body.posting_date ?? row.posting_date,
+      description: req.body.description ?? row.description,
+      reference: req.body.reference ?? row.reference,
+      debit,
+      credit,
+      running_balance: req.body.running_balance ?? row.running_balance,
+      merchant_name: req.body.merchant_name ?? row.merchant_name,
+      category: req.body.category ?? row.category,
+      currency: req.body.currency ?? row.currency ?? account.currency
+    }, row.row_no);
+
+    if (candidate.validation_status === 'REJECTED' || !candidate.row_hash) {
+      throw new FinanceError(
+        candidate.validation_message || 'Correct the date and choose exactly one money-out or money-in amount.',
+        422,
+        'ROW_STILL_INVALID'
+      );
+    }
+    if (isBalanceMarker(candidate)) throw new FinanceError('Balance markers cannot be converted into transactions.', 409, 'BALANCE_MARKER_LOCKED');
+
+    const [[existingLedger]] = await db.query(
+      'SELECT id FROM bank_transactions WHERE bank_account_id=? AND row_hash=? LIMIT 1',
+      [account.id, candidate.row_hash]
+    );
+    const [[existingReview]] = await db.query(
+      `SELECT id FROM statement_import_rows
+         WHERE import_session_id=? AND id<>? AND row_hash=? AND validation_status IN ('VALID','WARNING','DUPLICATE')
+         LIMIT 1`,
+      [session.id, row.id, candidate.row_hash]
+    );
+    if (existingLedger || existingReview) {
+      throw new FinanceError('This corrected row matches an existing transaction and remains excluded as a duplicate.', 409, 'CORRECTED_ROW_DUPLICATE');
+    }
+
+    const original = row.override_original_json || JSON.stringify({
+      transaction_date: row.transaction_date,
+      posting_date: row.posting_date,
+      description: row.description,
+      reference: row.reference,
+      debit: row.debit,
+      credit: row.credit,
+      running_balance: row.running_balance,
+      merchant_name: row.merchant_name,
+      category: row.category,
+      currency: row.currency,
+      validation_status: row.validation_status,
+      validation_message: row.validation_message
+    });
+    const overrideMessage = `Manually corrected and approved for import: ${reason}`.slice(0, 500);
+
+    await db.query(
+      `UPDATE statement_import_rows SET
+         transaction_date=?, posting_date=?, description=?, reference=?, debit=?, credit=?, running_balance=?,
+         merchant_name=?, category=?, currency=?, row_hash=?, validation_status='WARNING', validation_message=?, selected=1,
+         manual_override=1, override_reason=?, override_original_json=?, overridden_by=?, overridden_at=NOW(),
+         override_version=override_version+1
+       WHERE id=?`,
+      [candidate.transaction_date, candidate.posting_date, candidate.description, candidate.reference, candidate.debit, candidate.credit,
+        candidate.running_balance, candidate.merchant_name, candidate.category, candidate.currency, candidate.row_hash, overrideMessage,
+        reason.slice(0, 500), typeof original === 'string' ? original : JSON.stringify(original), req.user.id, row.id]
+    );
+
+    const [freshRows] = await db.query('SELECT * FROM statement_import_rows WHERE import_session_id=? ORDER BY row_no', [session.id]);
+    const counts = countRows(freshRows);
+    await db.query(
+      'UPDATE statement_import_sessions SET valid_rows=?, warning_rows=?, duplicate_rows=?, rejected_rows=? WHERE id=?',
+      [counts.valid, counts.warning, counts.duplicate, counts.rejected, session.id]
+    );
+    const corrected = freshRows.find((item) => Number(item.id) === Number(row.id));
+    await logAudit(db, audit(req, {
+      action: 'STATEMENT_REJECTED_ROW_OVERRIDDEN',
+      module: 'finance_intelligence',
+      recordType: 'statement_import_row',
+      recordId: row.id,
+      oldValue: { validation_status: row.validation_status, selected: row.selected, validation_message: row.validation_message },
+      newValue: { validation_status: 'WARNING', selected: 1, manual_override: true, reason }
+    }));
+    await db.commit();
+    return res.json({
+      message: 'Rejected row corrected and selected. It will remain clearly marked as a manual override in the transaction ledger.',
+      row: corrected,
+      summary: { total: freshRows.length, ...counts, selected: freshRows.filter((item) => Number(item.selected) && ['VALID','WARNING'].includes(item.validation_status)).length }
+    });
+  } catch (error) {
+    if (db) await db.rollback();
+    return fail(res, error, 'Failed to correct rejected statement row');
+  } finally { if (db) db.release(); }
+};
+
 exports.commit = async (req, res) => {
   let db;
   try {
@@ -392,20 +518,22 @@ exports.commit = async (req, res) => {
 
     for (let offset = 0; offset < rows.length; offset += chunkSize) {
       const chunk = rows.slice(offset, offset + chunkSize);
-      const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'STATEMENT_IMPORT\', ?, ?, ?, ?, ?, ?, ?)').join(',');
+      const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, \'STATEMENT_IMPORT\', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
       const params = [];
       for (const row of chunk) {
         params.push(
           account.id, batchUid, row.row_hash, row.transaction_date, row.posting_date, row.description, row.reference,
           row.debit, row.credit, row.running_balance, session.source_format, row.merchant_name, row.currency || account.currency,
-          account.ownership_scope, row.category, row.category ? 'CLASSIFIED' : 'UNCLASSIFIED', req.user.id
+          account.ownership_scope, row.category, row.category ? 'CLASSIFIED' : 'UNCLASSIFIED',
+          session.import_uid, row.id, row.validation_status, Number(row.manual_override || 0) ? 1 : 0, req.user.id
         );
       }
       const [insert] = await db.query(
         `INSERT IGNORE INTO bank_transactions
          (bank_account_id, import_batch_uid, row_hash, transaction_date, posting_date, description, reference,
           debit, credit, running_balance, source_type, source_provider, merchant_name, currency, ownership_scope,
-          category, classification_status, imported_by) VALUES ${placeholders}`,
+          category, classification_status, statement_import_uid, statement_row_id, review_source_status, manual_override, imported_by)
+         VALUES ${placeholders}`,
         params
       );
       const inserted = Number(insert.affectedRows || 0);
@@ -439,12 +567,14 @@ exports.commit = async (req, res) => {
          WHERE id=?`, [minDate, minDate, maxDate, maxDate, account.id]
       );
     }
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, repaired_balance_markers: repaired.repaired, batch_uid: batchUid } }));
+    const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid } }));
     await db.commit();
     return res.json({
       message: `${imported} statement transactions committed after review.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
       imported,
       duplicates,
+      manual_overrides: manualOverrides,
       excluded_balance_markers: repaired.repaired,
       batch_uid: batchUid,
       coverage: { start: minDate, end: maxDate }
