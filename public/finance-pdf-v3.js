@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  if (location.pathname !== '/finance-intelligence' || window.__vvPdfV3Installed) return;
+  if (!['/finance-intelligence','/banking'].includes(location.pathname) || window.__vvPdfV3Installed) return;
   window.__vvPdfV3Installed = true;
 
   const MONTHS={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
@@ -68,7 +68,7 @@
   }
   function semanticDirection(text){const t=clean(text).toLowerCase();if(/\b(debit|withdrawal|purchase|payment|fee|charge|atm|direct debit|card purchase|transfer out)\b/.test(t))return'DEBIT';if(/\b(credit|deposit|salary|refund|interest paid|payment received|transfer in)\b/.test(t))return'CREDIT';return null;}
 
-  function parseGeometry(pages){
+  function parseGeometry(pages, accountCurrency='AUD'){
     const allText=pages.flatMap(p=>p.lines.map(l=>l.text)).join('\n');const period=statementPeriod(allText);const columns=findColumns(pages);const physical=pages.flatMap(p=>p.lines.map(l=>({...l})));const candidates=[];let pending=null;let lastResolvedDate=null;
     for(const line of physical){
       if(!line.text||/^(page\s+\d+|statement period|account number|bsb|opening balance|closing balance)\b/i.test(line.text)&&!partialDate(line.text)&&!fullDate(line.text))continue;
@@ -96,7 +96,7 @@
       const description=clean(c.lines.flatMap(l=>l.tokens.filter(t=>{amountRx.lastIndex=0;const isAmount=amountRx.test(t.text);amountRx.lastIndex=0;return !isAmount&&!fullDate(t.text)&&!partialDate(t.text);}).map(t=>t.text)).join(' ')).slice(0,500)||'PDF statement transaction';
       let status='VALID',message='';if(!date){status='REJECTED';message='Could not safely determine transaction date';confidence=Math.min(confidence,.4);}else if(!debit&&!credit){status='REJECTED';message='Could not safely determine debit/credit direction';confidence=Math.min(confidence,.6);}else if(confidence<.97){status='WARNING';message=`Direction inferred from ${evidence.replace(/_/g,' ')}`;}
       if(status==='VALID')valid++;else if(status==='WARNING')warning++;else rejected++;
-      rows.push({transaction_date:date,description,debit,credit,running_balance:balance,currency:'AUD',category:categoryFromText(text),parser_confidence:confidence,parser_evidence:evidence,validation_hint:message,source_row_no:index+1});
+      rows.push({transaction_date:date,description,debit,credit,running_balance:balance,currency:String(accountCurrency||'AUD').toUpperCase(),category:categoryFromText(text),parser_confidence:confidence,parser_evidence:evidence,validation_hint:message,source_row_no:index+1});
     }
     const importable=rows.filter(r=>r.transaction_date&&(r.debit>0||r.credit>0));const totalDebit=importable.reduce((s,r)=>s+Number(r.debit||0),0),totalCredit=importable.reduce((s,r)=>s+Number(r.credit||0),0);let reconciliation={status:'UNAVAILABLE',difference:null};if(openingBalance!==null&&closingBalance!==null){const calculated=openingBalance+totalCredit-totalDebit;const diff=Math.round((calculated-closingBalance)*100)/100;reconciliation={status:Math.abs(diff)<=.02?'PASS':'REVIEW_REQUIRED',difference:diff,calculated_closing:calculated};}
     const averageConfidence=rows.length?rows.reduce((s,r)=>s+Number(r.parser_confidence||0),0)/rows.length:0;
@@ -111,8 +111,8 @@
     event.preventDefault();event.stopImmediatePropagation();const accountId=Number(document.getElementById('importAccount')?.value||0);if(!accountId)return;
     const button=form.querySelector('button[type="submit"]');if(button){button.disabled=true;button.textContent='Reading PDF safely…';}
     try{
-      const pages=await extractGeometry(file);const parsed=parseGeometry(pages);if(!parsed.rows.length)throw new Error('No transaction candidates could be reconstructed from this PDF. CSV, OFX or QFX will be more reliable for this statement layout.');
-      const result=await fetch(`/api/finance/intelligence/accounts/${accountId}/statements/preview`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_format:'PDF',original_name:file.name,content_hash:await sha256(file),rows:parsed.rows,...parsed.metadata})});
+      const pages=await extractGeometry(file);const selected=$('importAccount')?.selectedOptions?.[0];const accountCurrency=String(selected?.dataset?.currency||'AUD').toUpperCase();const parsed=parseGeometry(pages,accountCurrency);if(!parsed.rows.length)throw new Error('No transaction candidates could be reconstructed from this PDF. CSV, OFX or QFX will be more reliable for this statement layout.');
+      const finPrefix=location.pathname==='/banking'?'/api/banking/intelligence':'/api/finance/intelligence';const result=await fetch(`${finPrefix}/accounts/${accountId}/statements/preview`,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({source_format:'PDF',original_name:file.name,content_hash:await sha256(file),rows:parsed.rows,...parsed.metadata})});
       const body=await result.json().catch(()=>({}));if(!result.ok)throw new Error(body.message||`Preview failed (${result.status})`);
       document.getElementById('importDialog')?.close();form.reset();const d=parsed.metadata.extraction_diagnostics;const rebuilt=body.reparsed?' Existing rejected review rows were rebuilt with the current parser.':'';notice(`${body.message}${rebuilt} PDF v3 found ${d.valid} ready, ${d.warning} warning and ${d.rejected} rejected candidate(s). Reconciliation: ${parsed.metadata.reconciliation_status}.`,'success');document.getElementById('openReviewQueue')?.click();
     }catch(e){notice(e.message,'error');}

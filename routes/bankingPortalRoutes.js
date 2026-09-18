@@ -3,6 +3,9 @@ const bankingOS = require('../controllers/bankingOperatingSystemController');
 const intelligence = require('../controllers/financeIntelligenceController');
 const transactionIntelligence = require('../controllers/financeTransactionIntelligenceController');
 const openBanking = require('../controllers/openBankingController');
+const statementReview = require('../controllers/statementImportController');
+const statementPreviewSanitizer = require('../middleware/statementPreviewSanitizer');
+const financePrivacy = require('../middleware/financePrivacyMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 const requireStepUp = require('../middleware/stepUpMiddleware');
 
@@ -34,15 +37,28 @@ router.post('/os/team/:userId/access', requireAnyPermission('EDIT_BANK_DETAILS')
 router.post('/os/alerts', bankingOS.saveAlerts);
 
 // Read-only ledger and intelligence surfaces for banking users.
+router.get('/intelligence/overview', intelligence.getOverview);
 router.get('/intelligence/dashboard', intelligence.getBankingDashboard);
 router.get('/intelligence/transactions', intelligence.getTransactions);
 router.get('/intelligence/transactions/:id', intelligence.getTransactionDetail);
+router.get('/intelligence/accounts', intelligence.getAccounts);
+router.post('/intelligence/accounts', bankAdmin, requireStepUp('CHANGE_BANK_DETAILS'), intelligence.saveAccount);
 router.get('/intelligence/statements', intelligence.getStatementLibrary);
+router.get('/intelligence/statements/:uid/report', financePrivacy.statementUid('uid'), intelligence.getStatementReport);
+router.post('/intelligence/accounts/:id/statements/preview', edit, financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementPreviewSanitizer, statementReview.preview);
+router.get('/intelligence/statement-reviews', financePrivacy.filterStatementList, statementReview.list);
+router.get('/intelligence/statement-reviews/:uid', financePrivacy.statementUid('uid'), statementReview.get);
+router.post('/intelligence/statement-reviews/:uid/rows/:rowId/select', edit, financePrivacy.statementUid('uid'), statementReview.updateRowSelection);
+router.post('/intelligence/statement-reviews/:uid/rows/:rowId/override', edit, financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.overrideRejectedRow);
+router.post('/intelligence/statement-reviews/:uid/commit', edit, financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.commit);
+router.post('/intelligence/statement-reviews/:uid/reject', edit, financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.reject);
 router.get('/intelligence/reports/spending', intelligence.getSpendingReport);
+router.get('/intelligence/reports/portfolio-history', intelligence.getPortfolioHistoryReport);
 router.get('/intelligence/budgets', intelligence.getBankingBudgets);
 router.get('/intelligence/history-coverage', intelligence.getHistoryCoverage);
 router.get('/intelligence/data-quality', intelligence.getDataQuality);
 router.get('/intelligence/bank-connections', intelligence.getConnectionStatus);
+router.post('/intelligence/bank-connections/connect', bankAdmin, requireStepUp('CHANGE_BANK_DETAILS'), openBanking.startConsent);
 router.get('/intelligence/insights', transactionIntelligence.getInsights);
 router.post('/intelligence/analyse', transactionIntelligence.runAnalysis);
 

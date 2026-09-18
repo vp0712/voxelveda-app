@@ -3,7 +3,8 @@
   const $ = (id) => document.getElementById(id);
   const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
   const money = (v, currency='AUD') => new Intl.NumberFormat('en-AU',{style:'currency',currency}).format(Number(v||0));
-  const state = { scope:'ALL', statementUid:'', report:null };
+  const state = { scope:'ALL', statementUid:'', report:null, accounts:[] };
+  const FIN_PREFIX = location.pathname === '/banking' ? '/api/banking/intelligence' : '/api/finance/intelligence';
 
   async function api(path) {
     const r = await fetch(path,{credentials:'same-origin',headers:{Accept:'application/json'}});
@@ -43,6 +44,7 @@
       .vv-report-transactions{max-height:340px;overflow:auto;border:1px solid #e5eaf1;border-radius:12px;margin-top:14px}
       .vv-report-tx{display:grid;grid-template-columns:110px minmax(180px,1fr) 150px 130px;gap:10px;padding:10px;border-bottom:1px solid #edf0f4;font-size:.78rem}
       .vv-report-tx:last-child{border-bottom:0}
+      .vv-currency-sections{display:grid;gap:16px}.vv-currency-report{border:1px solid #dfe6ee;border-radius:16px;padding:14px;margin-bottom:4px}.vv-currency-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}.vv-currency-head span{display:block;color:#667085;font-size:.7rem}.vv-currency-head h3{margin:2px 0;font-size:1.25rem}.vv-portfolio-line{width:100%;height:180px}.vv-chart-legend{display:flex;gap:12px;font-size:.72rem;color:#667085}.vv-portfolio-donut-wrap{display:grid;grid-template-columns:150px 1fr;gap:15px;align-items:center}.vv-portfolio-donut{width:140px;height:140px;border-radius:50%;display:grid;place-items:center;position:relative}.vv-portfolio-donut:after{content:'';position:absolute;inset:24px;border-radius:50%;background:white}.vv-portfolio-donut span{position:relative;z-index:1;font-size:.72rem;font-weight:900}.vv-donut-row{display:grid;grid-template-columns:10px 1fr auto;gap:7px;align-items:center;font-size:.74rem;padding:3px 0}.vv-donut-row i{width:9px;height:9px;border-radius:50%}.vv-report-filter-wide{grid-template-columns:1.2fr 1fr 1fr auto}
       @media(max-width:760px){
         .vv-statement-grid,.vv-report-columns{grid-template-columns:1fr}
         .vv-report-kpis{grid-template-columns:repeat(2,1fr)}
@@ -86,10 +88,11 @@
           <button class="vv-report-preset" type="button" data-range="TWELVE_MONTHS">12 months</button>
           <button class="vv-report-preset" type="button" data-range="ALL">All time</button>
         </div>
-        <div class="vv-report-filter">
+        <div class="vv-report-filter vv-report-filter-wide">
+          <label>Account<select id="vvReportAccount"><option value="">All accounts</option></select></label>
           <label>From<input id="vvReportFrom" type="date"></label>
           <label>To<input id="vvReportTo" type="date"></label>
-          <button id="vvApplyReportDates" type="button">Apply dates</button>
+          <button id="vvApplyReportDates" type="button">Apply</button>
         </div>
         <div class="vv-report-actions" style="margin-bottom:14px"><button id="vvExportCsv" type="button">Export CSV</button><button id="vvPrintReport" type="button">Print / Save PDF</button></div>
         <div id="vvReportBody"><div class="empty"><strong>Loading report…</strong></div></div>
@@ -98,6 +101,7 @@
     $('vvReportClose').addEventListener('click',()=>d.close());
     d.querySelectorAll('[data-range]').forEach((button)=>button.addEventListener('click',()=>applyPreset(button.dataset.range,button)));
     $('vvApplyReportDates').addEventListener('click',()=>{clearPresetActive();reloadCurrentReport();});
+    $('vvReportAccount').addEventListener('change',()=>reloadCurrentReport());
     $('vvExportCsv').addEventListener('click',exportCsv);
     $('vvPrintReport').addEventListener('click',printReport);
   }
@@ -144,7 +148,7 @@
     const host=$('vvStatementLibrary'); if(!host) return;
     host.innerHTML='<div class="empty"><strong>Loading statements…</strong></div>';
     try{
-      const p=await api('/api/finance/intelligence/statements?scope=ALL');
+      const p=await api(FIN_PREFIX + '/statements?scope=ALL');
       const rows=p.statements||[];
       host.innerHTML=rows.length?rows.map(s=>`
         <button class="vv-statement-card" type="button" data-statement-uid="${esc(s.import_uid)}">
@@ -164,14 +168,15 @@
 
   function reportQuery(base){
     const qs=new URLSearchParams();
-    const from=$('vvReportFrom')?.value; const to=$('vvReportTo')?.value;
-    if(from) qs.set('from',from); if(to) qs.set('to',to);
+    const from=$('vvReportFrom')?.value; const to=$('vvReportTo')?.value; const account=$('vvReportAccount')?.value;
+    if(from) qs.set('from',from); if(to) qs.set('to',to); if(account) qs.set('account_id',account);
     return base+(qs.toString()?`?${qs}`:'');
   }
 
   async function openStatementReport(uid){
     state.statementUid=uid; state.scope='STATEMENT'; ensureDialog();
     $('vvReportFrom').value=''; $('vvReportTo').value=''; clearPresetActive();
+    $('vvReportAccount').disabled=true; $('vvReportAccount').innerHTML='<option value="">This statement account</option>';
     $('vvReportTitle').textContent='Statement report';
     $('vvReportSubtitle').textContent='Loading statement…';
     $('vvReportBody').innerHTML='<div class="empty"><strong>Building report…</strong></div>';
@@ -182,8 +187,11 @@
   async function openOverallReport(){
     state.statementUid=''; state.scope='ALL'; ensureDialog();
     $('vvReportFrom').value=''; $('vvReportTo').value=''; clearPresetActive();
-    $('vvReportTitle').textContent='Company & personal spending report';
-    $('vvReportSubtitle').textContent='All visible banking transactions, separated by account ownership.';
+    try{const a=await api(FIN_PREFIX + '/accounts');state.accounts=a.bank_accounts||[];}catch{state.accounts=[];}
+    $('vvReportAccount').disabled=false;
+    $('vvReportAccount').innerHTML='<option value="">All accounts combined</option>'+state.accounts.filter(a=>a.status==='ACTIVE').map(a=>`<option value="${Number(a.id)}">${esc(a.nickname)} · ${esc(a.institution||'Bank')} · ${esc(a.currency||'AUD')}</option>`).join('');
+    $('vvReportTitle').textContent='All accounts history & net position';
+    $('vvReportSubtitle').textContent='Every imported statement and transaction together, while currencies remain financially separate.';
     $('vvReportBody').innerHTML='<div class="empty"><strong>Building report…</strong></div>';
     $('vvReportDialog').showModal();
     await reloadCurrentReport();
@@ -192,8 +200,8 @@
   async function reloadCurrentReport(){
     try{
       const base=state.statementUid
-        ? `/api/finance/intelligence/statements/${encodeURIComponent(state.statementUid)}/report`
-        : '/api/finance/intelligence/reports/spending';
+        ? `${FIN_PREFIX}/statements/${encodeURIComponent(state.statementUid)}/report`
+        : FIN_PREFIX + '/reports/portfolio-history';
       const p=await api(reportQuery(base));
       state.report=p;
       if(p.statement){
@@ -208,7 +216,31 @@
     return (rows||[]).slice(0,15).map(r=>`<div class="vv-report-row"><div><strong>${esc(r[nameKey]||'Unknown')}</strong><small>${Number(r.transaction_count||0)} transaction(s)</small></div><div><strong>${money(r.spent||0)}</strong>${r.percentage_of_spend!==undefined?`<small>${Number(r.percentage_of_spend||0).toFixed(1)}%</small>`:''}</div></div>`).join('')||'<p class="muted">No data in this period.</p>';
   }
 
+  function portfolioLine(rows,currency){
+    if(!rows?.length)return '<p class="muted">No monthly history.</p>';
+    const w=520,h=170,pad=18,max=Math.max(1,...rows.flatMap(r=>[Number(r.received||0),Number(r.spent||0)]));
+    const point=(v,i)=>{const x=pad+(rows.length===1?0:i*(w-pad*2)/(rows.length-1));const y=h-pad-(Number(v||0)/max)*(h-pad*2);return x.toFixed(1)+','+y.toFixed(1)};
+    return '<svg viewBox="0 0 '+w+' '+h+'" class="vv-portfolio-line" role="img" aria-label="Monthly money in and out"><polyline points="'+rows.map((r,i)=>point(r.received,i)).join(' ')+'" fill="none" stroke="#16a36a" stroke-width="4"/><polyline points="'+rows.map((r,i)=>point(r.spent,i)).join(' ')+'" fill="none" stroke="#d14f5b" stroke-width="4"/></svg><div class="vv-chart-legend"><span>● Money in</span><span>● Money out</span><span>'+esc(currency)+'</span></div>';
+  }
+  function portfolioDonut(rows,currency){
+    const list=(rows||[]).filter(r=>Number(r.spent||0)>0).slice(0,8);
+    const total=list.reduce((s,r)=>s+Number(r.spent||0),0); if(!total)return '<p class="muted">No spending categories.</p>';
+    let angle=0;const colors=['#16a36a','#4479e8','#f0a63a','#9b62da','#d85c68','#2aa7b8','#7aad42','#c96bb8'];
+    const stops=list.map((r,i)=>{const start=angle;angle+=Number(r.spent||0)/total*360;return colors[i%colors.length]+' '+start.toFixed(1)+'deg '+angle.toFixed(1)+'deg'}).join(',');
+    return '<div class="vv-portfolio-donut-wrap"><div class="vv-portfolio-donut" style="background:conic-gradient('+stops+')"><span>'+money(total,currency)+'</span></div><div>'+list.map((r,i)=>'<div class="vv-donut-row"><i style="background:'+colors[i%colors.length]+'"></i><span>'+esc(r.category)+'</span><b>'+money(r.spent,currency)+'</b></div>').join('')+'</div></div>';
+  }
+  function renderPortfolioReport(p){
+    const summaries=p.summary_by_currency||[];
+    const positions=p.bank_net_position_by_currency||{};
+    $('vvReportBody').innerHTML=
+      '<div class="notice"><strong>Multi-currency rule:</strong> '+esc(p.currency_rule||'Currencies are kept separate.')+'</div>'+
+      '<div class="vv-currency-sections">'+(summaries.length?summaries.map(s=>{const cur=s.currency;const cats=p.categories_by_currency?.[cur]||[];const months=p.monthly_by_currency?.[cur]||[];return '<section class="vv-currency-report"><div class="vv-currency-head"><div><span>CURRENCY</span><h3>'+esc(cur)+'</h3></div><div><span>Bank net position</span><strong>'+money(positions[cur]||0,cur)+'</strong></div></div><div class="vv-report-kpis"><div><span>Transactions</span><strong>'+Number(s.transaction_count||0)+'</strong></div><div><span>Money out</span><strong>'+money(s.money_out,cur)+'</strong></div><div><span>Money in</span><strong>'+money(s.money_in,cur)+'</strong></div><div><span>Net flow</span><strong>'+money(s.net_flow,cur)+'</strong></div><div><span>Cash out</span><strong>'+money(s.cash_out,cur)+'</strong></div><div><span>Cash in</span><strong>'+money(s.cash_in,cur)+'</strong></div><div><span>Needs category</span><strong>'+Number(s.unclassified||0)+'</strong></div></div><div class="vv-report-columns"><section class="vv-report-box"><h3>Spending pie · '+esc(cur)+'</h3>'+portfolioDonut(cats,cur)+'</section><section class="vv-report-box"><h3>Monthly history · '+esc(cur)+'</h3>'+portfolioLine(months,cur)+'</section></div></section>'}).join(''):'<div class="empty"><strong>No transaction history in this selection.</strong></div>')+'</div>'+
+      '<div class="vv-report-columns"><section class="vv-report-box"><h3>Accounts</h3>'+((p.accounts||[]).map(a=>'<div class="vv-report-row"><div><strong>'+esc(a.nickname)+'</strong><small>'+esc(a.institution||'Bank')+' · '+esc(a.currency)+' · '+esc(a.ownership_scope)+'</small></div><div><strong>'+Number(a.statement_count||0)+' statements</strong><small>'+Number(a.transaction_count||0)+' transactions</small></div></div>').join('')||'<p class="muted">No accounts.</p>')+'</section><section class="vv-report-box"><h3>Statement history</h3>'+((p.statements||[]).slice(0,50).map(s=>'<div class="vv-report-row"><div><strong>'+esc(s.original_name||'Statement')+'</strong><small>'+esc(s.account_name)+' · '+esc(s.currency)+' · '+esc(String(s.statement_start_date||'').slice(0,10))+' → '+esc(String(s.statement_end_date||'').slice(0,10))+'</small></div><div><strong>'+Number(s.imported_rows||0)+' rows</strong><small>'+Number(s.duplicate_rows||0)+' duplicates</small></div></div>').join('')||'<p class="muted">No statements.</p>')+'</section></div>'+
+      '<div class="vv-report-transactions">'+((p.transactions||[]).length?p.transactions.map(r=>'<div class="vv-report-tx"><div>'+esc(String(r.transaction_date||'').slice(0,10))+'</div><div><strong>'+esc(r.description||r.merchant_name||'Transaction')+'</strong><small>'+esc(r.category||'Unclassified')+' · '+esc(r.account_name||'')+'</small></div><div>'+esc(r.statement_name||r.source_type||'Bank')+'</div><div>'+(Number(r.debit||0)>0?'- '+money(r.debit,r.currency):'+ '+money(r.credit,r.currency))+'</div></div>').join(''):'<div class="empty"><strong>No transactions.</strong></div>')+'</div>';
+  }
+
   function renderReport(p){
+    if(Array.isArray(p.summary_by_currency)){renderPortfolioReport(p);return;}
     const s=p.summary||{};
     const currency=p.statement?.currency||'AUD';
     const tx=p.transactions||[];

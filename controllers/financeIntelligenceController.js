@@ -1174,3 +1174,139 @@ exports.getDataQuality = async (req, res) => {
     } });
   } catch (error) { return fail(res, error, 'Failed to load finance data quality'); }
 };
+
+
+exports.getPortfolioHistoryReport = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const filters = spendingWhere(req);
+    const accountClauses = [privacy.visibilitySql('ba'), "ba.status='ACTIVE'"];
+    const accountParams = [...privacy.visibilityParams(req)];
+    if (filters.scope !== 'ALL') { accountClauses.push('ba.ownership_scope=?'); accountParams.push(filters.scope); }
+    if (filters.accountId) { accountClauses.push('ba.id=?'); accountParams.push(filters.accountId); }
+
+    const [currencySummaryRows, categoryRows, monthlyRows, accountRows, statementRows, transactionRows] = await Promise.all([
+      pool.query(
+        `SELECT bt.currency,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit-bt.debit ELSE 0 END),0) AS net_flow,
+                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_out,
+                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS cash_in,
+                SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}
+          GROUP BY bt.currency ORDER BY bt.currency`, filters.params
+      ),
+      pool.query(
+        `SELECT bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}
+          GROUP BY bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified')
+          ORDER BY bt.currency,spent DESC`, filters.params
+      ),
+      pool.query(
+        `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}
+          GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
+          ORDER BY bt.currency,month`, filters.params
+      ),
+      pool.query(
+        `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
+                ba.account_type,ba.financial_purpose,ba.available_balance,ba.current_ledger_balance,
+                ba.history_start_date,ba.history_end_date,
+                COUNT(DISTINCT bt.id) AS transaction_count,
+                COUNT(DISTINCT sif.import_uid) AS statement_count,
+                MIN(bt.transaction_date) AS transaction_start,
+                MAX(bt.transaction_date) AS transaction_end
+           FROM bank_accounts ba
+           LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
+           LEFT JOIN statement_import_files sif ON sif.bank_account_id=ba.id AND sif.parse_status='IMPORTED'
+          WHERE ${accountClauses.join(' AND ')}
+          GROUP BY ba.id
+          ORDER BY ba.currency,ba.ownership_scope,ba.nickname`, accountParams
+      ),
+      pool.query(
+        `SELECT sif.import_uid,sif.bank_account_id,sif.original_name,sif.source_format,sif.statement_start_date,sif.statement_end_date,
+                sif.opening_balance,sif.closing_balance,sif.imported_rows,sif.duplicate_rows,sif.rejected_rows,sif.reviewed_at,
+                ba.nickname AS account_name,ba.institution,ba.currency,ba.ownership_scope
+           FROM statement_import_files sif JOIN bank_accounts ba ON ba.id=sif.bank_account_id
+          WHERE sif.parse_status='IMPORTED' AND ${accountClauses.join(' AND ')}
+          ORDER BY COALESCE(sif.statement_end_date,sif.reviewed_at) DESC,sif.id DESC`, accountParams
+      ),
+      pool.query(
+        `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,bt.currency,
+                bt.ownership_scope,bt.is_internal_transfer,bt.reconciliation_status,bt.source_type,bt.statement_import_uid,
+                ba.nickname AS account_name,ba.institution,sif.original_name AS statement_name
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
+          WHERE ${filters.where}
+          ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 10000`, filters.params
+      )
+    ]);
+
+    const liquidPosition = {};
+    for (const account of accountRows[0]) {
+      const cur = account.currency || 'AUD';
+      const raw = Number(account.available_balance == null ? account.current_ledger_balance : account.available_balance || 0);
+      const liability = /credit\s*card|loan|overdraft/i.test(String(account.account_type || ''));
+      liquidPosition[cur] = Number(((liquidPosition[cur] || 0) + (liability ? -Math.abs(raw) : raw)).toFixed(2));
+    }
+
+    const categoriesByCurrency = {};
+    for (const row of categoryRows[0]) {
+      const cur = row.currency || 'AUD';
+      (categoriesByCurrency[cur] ||= []).push({
+        category: row.category,
+        transaction_count: Number(row.transaction_count || 0),
+        spent: Number(row.spent || 0),
+        received: Number(row.received || 0)
+      });
+    }
+    const monthlyByCurrency = {};
+    for (const row of monthlyRows[0]) {
+      const cur = row.currency || 'AUD';
+      (monthlyByCurrency[cur] ||= []).push({
+        month: row.month,
+        transaction_count: Number(row.transaction_count || 0),
+        spent: Number(row.spent || 0),
+        received: Number(row.received || 0)
+      });
+    }
+
+    return res.json({
+      filters: { scope: filters.scope, account_id: filters.accountId || null, from: filters.from, to: filters.to },
+      currency_rule: 'Currencies are reported separately and are never added together without an explicit FX conversion source.',
+      net_position_note: 'Bank net position uses visible bank-account balances and treats credit-card, loan and overdraft accounts as liabilities. It does not include external property, investments or liabilities not stored as bank accounts.',
+      bank_net_position_by_currency: liquidPosition,
+      summary_by_currency: currencySummaryRows[0].map((row) => ({
+        currency: row.currency || 'AUD',
+        transaction_count: Number(row.transaction_count || 0),
+        money_in: Number(row.money_in || 0),
+        money_out: Number(row.money_out || 0),
+        net_flow: Number(row.net_flow || 0),
+        cash_out: Number(row.cash_out || 0),
+        cash_in: Number(row.cash_in || 0),
+        unclassified: Number(row.unclassified || 0)
+      })),
+      categories_by_currency: categoriesByCurrency,
+      monthly_by_currency: monthlyByCurrency,
+      accounts: accountRows[0].map((row) => ({
+        ...row,
+        transaction_count: Number(row.transaction_count || 0),
+        statement_count: Number(row.statement_count || 0)
+      })),
+      statements: statementRows[0],
+      transactions: transactionRows[0],
+      generated_at: new Date().toISOString()
+    });
+  } catch (error) { return fail(res, error, 'Failed to build multi-bank portfolio history report'); }
+};
