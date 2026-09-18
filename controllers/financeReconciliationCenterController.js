@@ -48,7 +48,7 @@ exports.getCenter = async (req, res) => {
     const workflow = String(req.query.workflow || 'ALL').toUpperCase();
     if (!SCOPES.has(scope)) throw new FinanceError('Invalid money scope.', 400, 'INVALID_SCOPE');
     if (!WORKFLOWS.has(workflow)) throw new FinanceError('Invalid reconciliation filter.', 400, 'INVALID_WORKFLOW');
-    const clauses = ["ba.status = 'ACTIVE'", privacy.visibilitySql('ba')];
+    const clauses = ["ba.status = 'ACTIVE'", privacy.visibilitySql('ba', req)];
     const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { clauses.push('bt.ownership_scope = ?'); params.push(scope); }
     const search = String(req.query.search || '').trim();
