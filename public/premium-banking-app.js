@@ -53,7 +53,7 @@
 
   function ensureAssets(){
     if(!$('premiumBankCss')){
-      const link=document.createElement('link'); link.id='premiumBankCss'; link.rel='stylesheet'; link.href='/premium-banking-app.css?v=20260918-premium-bank-v3'; document.head.appendChild(link);
+      const link=document.createElement('link'); link.id='premiumBankCss'; link.rel='stylesheet'; link.href='/premium-banking-app.css?v=20260919-banking-command-v1'; document.head.appendChild(link);
     }
     if(!$('financePdfV3')){
       const script=document.createElement('script'); script.id='financePdfV3'; script.src='/finance-pdf-v3.js?v=20260918-pdf-v3b'; script.defer=true; document.head.appendChild(script);
