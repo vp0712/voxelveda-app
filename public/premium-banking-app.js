@@ -231,6 +231,12 @@
 
   function renderHome(){
     const d=state.dashboard||{}; const cur=selectedCurrency(); const f=flow();
+    const intel=(d.intelligence_by_currency||[]).find(x=>x.currency===cur)||{};
+    const intelAlerts=Array.isArray(intel.alerts)?intel.alerts:[];
+    const runway=intel.cash_runway_months==null?'Not enough history':(Number(intel.cash_runway_months).toFixed(1)+' months');
+    const bankFeed=state.status?.configured
+      ? ((state.status?.connection_summary?.active||0)>0?'Connected & syncing':'Provider ready · connect your bank')
+      : 'Provider credential missing';
     const bal=(d.balances_by_currency||[]).find(x=>x.currency===cur)||{balance:0,account_count:0};
     const accounts=(d.accounts||[]).filter(a=>a.currency===cur);
     const cats=categories();
@@ -241,6 +247,17 @@
         '<article class="vv-pb-balance"><span>Money in · selected period</span><strong>'+money(f.money_in,cur)+'</strong><small>'+Number(f.transaction_count||0)+' transaction(s)</small></article>'+
         '<article class="vv-pb-balance"><span>Money out · selected period</span><strong>'+money(f.money_out,cur)+'</strong><small>Cash '+money(f.cash_out,cur)+' · '+Number(f.unclassified||0)+' uncategorised</small></article>'+
       '</div>'+
+      '<section class="vv-pb-card" style="margin-top:13px"><div class="vv-pb-card-head"><div><h3>Finance Intelligence</h3><span>Explainable signals from your real transaction history</span></div><span>'+esc(intel.confidence||'LOW')+' confidence</span></div>'+
+        '<div class="vv-pb-kpis">'+
+          '<div class="vv-pb-kpi"><span>Avg monthly income</span><b class="in">'+money(intel.average_monthly_income||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>Avg monthly spend</span><b class="out">'+money(intel.average_monthly_spend||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>Free cash flow / month</span><b>'+money(intel.monthly_free_cash_flow||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>Cash runway</span><b>'+esc(runway)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>Recurring estimate / month</span><b>'+money(intel.recurring_monthly_estimate||0,cur)+'</b></div>'+
+          '<div class="vv-pb-kpi"><span>Open Banking feed</span><b>'+esc(bankFeed)+'</b></div>'+
+        '</div>'+
+        (intelAlerts.length?'<div class="vv-pb-recurring" style="margin-top:12px">'+intelAlerts.map(a=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(a.code.replaceAll('_',' '))+'</strong><small>'+esc(a.message)+'</small></div><b>'+esc(a.severity)+'</b></div>').join('')+'</div>':'<div class="vv-pb-empty" style="margin-top:10px">No material finance alerts from the available history.</div>')+
+      '</section>'+
       '<div class="vv-pb-two">'+
         '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Accounts</h3><button type="button" class="vv-pb-select" data-pb-action="upload">Import statement</button></div>'+
           (accounts.length?'<div class="vv-pb-account-strip">'+accounts.map(a=>'<article class="vv-pb-account"><small>'+esc(a.institution||'Bank')+' · '+esc(a.account_type||'Account')+'</small><h4>'+esc(a.nickname||'Account')+'</h4><span>'+esc(a.account_number_masked||'Number masked')+'</span><div class="amount">'+accountBalance(a)+'</div><small>'+esc(a.ownership_scope||'')+' · '+esc(a.connection_status||a.connection_type||'Manual')+'</small><div class="vv-pb-account-actions"><button type="button" data-pb-account-activity="'+Number(a.id)+'">Transactions</button><button type="button" data-pb-account-statement="'+Number(a.id)+'">Statement</button></div></article>').join('')+'</div>':'<div class="vv-pb-empty">No active accounts in this view.</div>')+
