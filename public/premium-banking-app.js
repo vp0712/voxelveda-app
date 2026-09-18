@@ -181,6 +181,11 @@
         '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbAlertDialog">Cancel</button><button class="primary" type="submit">Save alerts</button></div></form>';
       document.body.appendChild(d); $('vvPbAlertForm').addEventListener('submit',saveAlerts);
     }
+    if(!$('vvPbAccountDialog')){
+      const d=document.createElement('dialog'); d.id='vvPbAccountDialog'; d.className='vv-pb-modal vv-pb-account-modal';
+      d.innerHTML='<div class="vv-pb-modal-inner vv-pb-account-modal-inner"><div class="vv-pb-card-head"><div><h3 id="vvPbAccountTitle">Account</h3><span id="vvPbAccountSubtitle">Loading account intelligence…</span></div><button type="button" data-pb-close="vvPbAccountDialog">Close</button></div><div id="vvPbAccountBody"><div class="vv-pb-empty">Loading…</div></div></div>';
+      document.body.appendChild(d);
+    }
     document.addEventListener('click',(e)=>{
       const close=e.target.closest('[data-pb-close]'); if(close) document.getElementById(close.dataset.pbClose)?.close();
     });
