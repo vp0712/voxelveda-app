@@ -718,6 +718,67 @@ exports.getBankingDashboard = async (req, res) => {
       ).then(([rows]) => rows)
     ]);
 
+    const currentMonth = new Date().toISOString().slice(0, 7);
+    const currencies = [...new Set([
+      ...balances.map((row) => row.currency),
+      ...flow.map((row) => row.currency),
+      ...monthly.map((row) => row.currency)
+    ].filter(Boolean))];
+    const recurringFactor = (frequency) => {
+      const value = String(frequency || '').toUpperCase();
+      if (value.includes('WEEK')) return 52 / 12;
+      if (value.includes('FORTNIGHT')) return 26 / 12;
+      if (value.includes('QUARTER')) return 1 / 3;
+      if (value.includes('YEAR') || value.includes('ANNUAL')) return 1 / 12;
+      if (value.includes('DAY')) return 365 / 12;
+      return 1;
+    };
+    const intelligence = currencies.map((currency) => {
+      const completeMonths = monthly
+        .filter((row) => row.currency === currency && row.month < currentMonth)
+        .sort((a, b) => String(a.month).localeCompare(String(b.month)));
+      const baseline = completeMonths.slice(-3);
+      const latest = completeMonths.at(-1) || null;
+      const previous = completeMonths.at(-2) || null;
+      const avgIncome = baseline.length ? baseline.reduce((sum, row) => sum + Number(row.money_in || 0), 0) / baseline.length : 0;
+      const avgSpend = baseline.length ? baseline.reduce((sum, row) => sum + Number(row.money_out || 0), 0) / baseline.length : 0;
+      const balance = Number((balances.find((row) => row.currency === currency) || {}).balance || 0);
+      const recurringMonthly = detectedRecurring
+        .filter((row) => row.currency === currency)
+        .reduce((sum, row) => sum + (Number(row.typical_amount || 0) * recurringFactor(row.recurring_frequency)), 0);
+      const spendTrendPct = latest && previous && Number(previous.money_out || 0) > 0
+        ? ((Number(latest.money_out || 0) - Number(previous.money_out || 0)) / Number(previous.money_out || 0)) * 100
+        : null;
+      const monthlyFreeCashFlow = avgIncome - avgSpend;
+      const runwayMonths = avgSpend > 0 ? balance / avgSpend : null;
+      const currencyFlow = flow.find((row) => row.currency === currency) || {};
+      const staleConnectedAccounts = accounts.filter((account) => {
+        if (account.currency !== currency || account.connection_type !== 'OPEN_BANKING') return false;
+        if (!account.last_synced_at) return true;
+        const age = Date.now() - new Date(account.last_synced_at).getTime();
+        return Number.isFinite(age) && age > (72 * 60 * 60 * 1000);
+      }).length;
+      const alerts = [];
+      if (monthlyFreeCashFlow < 0) alerts.push({ severity: 'HIGH', code: 'NEGATIVE_FREE_CASH_FLOW', message: 'Average monthly spending is above average monthly income.' });
+      if (runwayMonths !== null && runwayMonths < 2) alerts.push({ severity: 'HIGH', code: 'LOW_CASH_RUNWAY', message: 'Visible balance is below two average months of spending.' });
+      if (spendTrendPct !== null && spendTrendPct >= 20) alerts.push({ severity: 'MEDIUM', code: 'SPEND_ACCELERATION', message: `Latest complete-month spending is ${spendTrendPct.toFixed(1)}% above the prior month.` });
+      if (Number(currencyFlow.unclassified || 0) > 0) alerts.push({ severity: 'MEDIUM', code: 'UNCLASSIFIED_TRANSACTIONS', message: `${Number(currencyFlow.unclassified || 0)} transaction(s) still need categorisation.` });
+      if (staleConnectedAccounts > 0) alerts.push({ severity: 'MEDIUM', code: 'STALE_BANK_FEED', message: `${staleConnectedAccounts} connected account(s) have not synced within 72 hours.` });
+      return {
+        currency,
+        evidence_months: baseline.length,
+        confidence: baseline.length >= 3 ? 'HIGH' : baseline.length >= 2 ? 'MEDIUM' : 'LOW',
+        average_monthly_income: Number(avgIncome.toFixed(2)),
+        average_monthly_spend: Number(avgSpend.toFixed(2)),
+        monthly_free_cash_flow: Number(monthlyFreeCashFlow.toFixed(2)),
+        estimated_next_month_balance: Number((balance + monthlyFreeCashFlow).toFixed(2)),
+        recurring_monthly_estimate: Number(recurringMonthly.toFixed(2)),
+        cash_runway_months: runwayMonths === null ? null : Number(runwayMonths.toFixed(1)),
+        spend_trend_percent: spendTrendPct === null ? null : Number(spendTrendPct.toFixed(1)),
+        alerts
+      };
+    });
+
     return res.json({
       scope,
       period: { from: from || null, to: to || null },
@@ -737,7 +798,8 @@ exports.getBankingDashboard = async (req, res) => {
       merchants: merchants.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
       monthly: monthly.map((row) => ({ ...row, money_in: Number(row.money_in || 0), money_out: Number(row.money_out || 0) })),
       recent_transactions: recent,
-      detected_recurring: detectedRecurring.map((row) => ({ ...row, typical_amount: Number(row.typical_amount || 0), matched_transactions: Number(row.matched_transactions || 0) }))
+      detected_recurring: detectedRecurring.map((row) => ({ ...row, typical_amount: Number(row.typical_amount || 0), matched_transactions: Number(row.matched_transactions || 0) })),
+      intelligence_by_currency: intelligence
     });
   } catch (error) { return fail(res, error, 'Failed to load premium banking dashboard'); }
 };
