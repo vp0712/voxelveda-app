@@ -17,6 +17,7 @@ const edit = requireAnyPermission('EDIT_FINANCE');
 const bankAdmin = requireAnyPermission('EDIT_BANK_DETAILS','CONNECT_BANK_ACCOUNT','MANAGE_BANK_CONNECTION');
 
 router.use(view);
+router.use(financePrivacy.resolveBankingAccessScope);
 
 // Standalone Banking OS: does not require broad VIEW_FINANCE.
 router.get('/os', bankingOS.getDashboard);
