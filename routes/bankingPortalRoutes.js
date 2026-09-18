@@ -37,6 +37,7 @@ router.post('/os/team/:userId/access', requireAnyPermission('EDIT_BANK_DETAILS')
 router.post('/os/alerts', bankingOS.saveAlerts);
 
 // Read-only ledger and intelligence surfaces for banking users.
+router.get('/intelligence/overview', intelligence.getOverview);
 router.get('/intelligence/dashboard', intelligence.getBankingDashboard);
 router.get('/intelligence/transactions', intelligence.getTransactions);
 router.get('/intelligence/transactions/:id', intelligence.getTransactionDetail);
@@ -57,6 +58,7 @@ router.get('/intelligence/budgets', intelligence.getBankingBudgets);
 router.get('/intelligence/history-coverage', intelligence.getHistoryCoverage);
 router.get('/intelligence/data-quality', intelligence.getDataQuality);
 router.get('/intelligence/bank-connections', intelligence.getConnectionStatus);
+router.post('/intelligence/bank-connections/connect', bankAdmin, requireStepUp('CHANGE_BANK_DETAILS'), openBanking.startConsent);
 router.get('/intelligence/insights', transactionIntelligence.getInsights);
 router.post('/intelligence/analyse', transactionIntelligence.runAnalysis);
 
