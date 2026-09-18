@@ -9,3 +9,6 @@
 #importBatchStatus:not(:empty){margin-top:8px;padding:9px 11px;border-radius:10px;background:#eef6ff;color:#264f7c;font-weight:700}
 @media(max-width:900px){.warehouse-totals{grid-template-columns:repeat(2,1fr)}.warehouse-currency-grid{grid-template-columns:repeat(2,1fr)}.warehouse-lower{grid-template-columns:1fr}}
 @media(max-width:560px){.warehouse-totals,.warehouse-currency-grid{grid-template-columns:1fr}.warehouse-currency-head,.warehouse-row{display:grid}.warehouse-row .right{text-align:left}}
+
+.warehouse-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;margin-top:8px}.warehouse-actions button{padding:6px 8px;border:1px solid #d6deea;border-radius:8px;background:#fff;font-size:.72rem;font-weight:800;cursor:pointer}.warehouse-actions button:first-child{color:#9b2230;border-color:#efb8bd;background:#fff8f8}
+@media(max-width:560px){.warehouse-actions{justify-content:flex-start}}

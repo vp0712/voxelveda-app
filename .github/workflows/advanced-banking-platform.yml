@@ -28,6 +28,7 @@ on:
       - 'scripts/multibank-statement-history-test.js'
       - 'scripts/statement-first-money-warehouse-test.js'
       - 'scripts/print-save-pdf-test.js'
+      - 'scripts/statement-data-controls-test.js'
       - 'routes/bankingPortalRoutes.js'
       - 'controllers/statementImportController.js'
       - 'public/finance-intelligence.js'
@@ -99,6 +100,8 @@ jobs:
           node --check scripts/multibank-statement-history-test.js
           node --check scripts/statement-first-money-warehouse-test.js
           node --check scripts/print-save-pdf-test.js
+          node --check scripts/statement-data-controls-test.js
+          node --check controllers/statementDataManagementController.js
           node --check controllers/statementImportController.js
           node --check public/finance-intelligence.js
           node --check public/finance-statement-report-center.js
@@ -117,5 +120,7 @@ jobs:
         run: node scripts/statement-first-money-warehouse-test.js
       - name: Print Save PDF regression contract
         run: node scripts/print-save-pdf-test.js
+      - name: Statement data controls regression contract
+        run: node scripts/statement-data-controls-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js
