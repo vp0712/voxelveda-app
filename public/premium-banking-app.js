@@ -288,6 +288,21 @@
     }).join('')+'</div>';
   }
 
+  function commandMetrics(){
+    const cur=selectedCurrency();
+    return state.command?.summary_by_currency?.[cur]||{};
+  }
+  function commandAttention(){
+    const rows=state.command?.attention||[];
+    if(!rows.length) return '<div class="vv-pb-empty">No urgent banking attention items.</div>';
+    return '<div class="vv-pb-recurring">'+rows.slice(0,8).map(a=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(String(a.code||'ATTENTION').replaceAll('_',' '))+'</strong><small>'+esc(a.message||'')+'</small></div><b>'+esc(a.severity||'INFO')+'</b></div>').join('')+'</div>';
+  }
+  function approvalPreview(){
+    const rows=state.command?.approval_inbox||[];
+    if(!rows.length) return '<div class="vv-pb-empty">No approvals waiting for you.</div>';
+    return '<div class="vv-pb-recurring">'+rows.slice(0,6).map(p=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(p.payee_name)+'</strong><small>'+esc(p.account_name||'Account')+' · prepared by '+esc(p.created_by_name||'user')+' · '+esc(p.payment_type)+'</small></div><b>'+money(p.amount,p.currency)+'</b><div class="vv-pb-budget-actions"><button type="button" data-pb-approve-payment="'+esc(p.payment_uid)+'">Approve</button><button type="button" data-pb-reject-payment="'+esc(p.payment_uid)+'">Reject</button></div></div>').join('')+'</div>';
+  }
+
   function renderHome(){
     const d=state.dashboard||{}; const cur=selectedCurrency(); const f=flow();
     const intel=(d.intelligence_by_currency||[]).find(x=>x.currency===cur)||{};
@@ -301,6 +316,7 @@
     const cats=categories();
     const content=
       '<div class="vv-pb-toolbar"><div><h3>Banking home</h3><span style="color:#8fa4bb">Balances, cash flow and recent activity</span></div>'+renderCurrencySelect()+'</div>'+
+      (()=>{const m=commandMetrics();const o=state.command?.obligations||{};return '<section class="vv-pb-command"><div class="vv-pb-command-head"><div><span class="vv-pb-command-label">COMMAND CENTRE</span><h3>'+esc((state.command?.role_view?.mode||'BANKING').replaceAll('_',' '))+'</h3><small>Liquidity, obligations and approvals for your access level</small></div><button type="button" class="vv-pb-select" data-pb-action="calendar">90-day cash flow</button></div><div class="vv-pb-kpis"><div class="vv-pb-kpi"><span>Projected liquidity · 30d</span><b>'+money(m.projected_liquidity_30d||0,cur)+'</b></div><div class="vv-pb-kpi"><span>Cash runway</span><b>'+(m.runway_days==null?'—':Number(m.runway_days)+' days')+'</b></div><div class="vv-pb-kpi"><span>Due next 30d</span><b>'+money(m.due_next_30d||0,cur)+'</b></div><div class="vv-pb-kpi"><span>Pending obligations</span><b>'+money(m.pending_obligations||0,cur)+'</b></div><div class="vv-pb-kpi"><span>Approvals waiting</span><b>'+Number((state.command?.approval_inbox||[]).length)+'</b></div><div class="vv-pb-kpi"><span>Overdue</span><b>'+Number(o.overdue||0)+'</b></div></div><div class="vv-pb-command-grid"><section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Needs attention</h3><span>Risk & operations</span></div>'+commandAttention()+'</section><section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Approval inbox</h3><button type="button" class="vv-pb-select" data-pb-tab="pay">Open Pay</button></div>'+approvalPreview()+'</section></div></section>';})()+
       '<div class="vv-pb-balance-grid">'+
         '<article class="vv-pb-balance"><span>Total visible balance · '+esc(cur)+'</span><strong>'+money(bal.balance,cur)+'</strong><small>'+Number(bal.account_count||0)+' active account(s)</small></article>'+
         '<article class="vv-pb-balance"><span>Money in · selected period</span><strong>'+money(f.money_in,cur)+'</strong><small>'+Number(f.transaction_count||0)+' transaction(s)</small></article>'+
@@ -324,7 +340,7 @@
       '</section>'+
       '<div class="vv-pb-two">'+
         '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Accounts</h3><button type="button" class="vv-pb-select" data-pb-action="upload">Import statement</button></div>'+
-          (accounts.length?'<div class="vv-pb-account-strip">'+accounts.map(a=>'<article class="vv-pb-account"><small>'+esc(a.institution||'Bank')+' · '+esc(a.account_type||'Account')+'</small><h4>'+esc(a.nickname||'Account')+'</h4><span>'+esc(a.account_number_masked||'Number masked')+'</span><div class="amount">'+accountBalance(a)+'</div><small>'+esc(a.ownership_scope||'')+' · '+esc(a.connection_status||a.connection_type||'Manual')+'</small><div class="vv-pb-account-actions"><button type="button" data-pb-account-activity="'+Number(a.id)+'">Transactions</button><button type="button" data-pb-account-statement="'+Number(a.id)+'">Statement</button></div></article>').join('')+'</div>':'<div class="vv-pb-empty">No active accounts in this view.</div>')+
+          (accounts.length?'<div class="vv-pb-account-strip">'+accounts.map(a=>'<article class="vv-pb-account"><small>'+esc(a.institution||'Bank')+' · '+esc(a.account_type||'Account')+'</small><h4>'+esc(a.nickname||'Account')+'</h4><span>'+esc(a.account_number_masked||'Number masked')+'</span><div class="amount">'+accountBalance(a)+'</div><small>'+esc(a.ownership_scope||'')+' · '+esc(a.connection_status||a.connection_type||'Manual')+'</small><div class="vv-pb-account-actions"><button type="button" data-pb-account-detail="'+Number(a.id)+'">Open account</button><button type="button" data-pb-account-activity="'+Number(a.id)+'">Transactions</button><button type="button" data-pb-account-statement="'+Number(a.id)+'">Statement</button></div></article>').join('')+'</div>':'<div class="vv-pb-empty">No active accounts in this view.</div>')+
         '</section>'+
         '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Spending by category</h3><button type="button" data-pb-tab="insights" class="vv-pb-select">Open insights</button></div>'+pieChart(cats,f.money_out,cur)+'</section>'+
       '</div>'+
