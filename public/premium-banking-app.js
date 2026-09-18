@@ -7,8 +7,8 @@
   const BANK = '/api/integrations/webhooks/banking';
   const STANDALONE = location.pathname === '/banking';
   const FIN = STANDALONE ? '/api/banking/intelligence' : '/api/finance/intelligence';
-  const OS = STANDALONE ? '/api/banking/os' : OS+'';
-  const OPEN_BANKING = STANDALONE ? '/api/banking/open-banking' : OPEN_BANKING+'';
+  const OS = STANDALONE ? '/api/banking/os' : '/api/finance/banking-os';
+  const OPEN_BANKING = STANDALONE ? '/api/banking/open-banking' : '/api/finance/intelligence/open-banking';
   const PERSONAL = '/api/finance/personal-money';
   const $ = (id) => document.getElementById(id);
   const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
