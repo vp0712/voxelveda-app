@@ -70,6 +70,54 @@
       </div>`).join('') : '<p class="muted">No account history available yet.</p>';
   }
 
+  function renderWarehouse(warehouse) {
+    const totals=warehouse?.totals||{};
+    if($('warehouseTotals')) $('warehouseTotals').innerHTML =
+      '<div><span>Bank accounts</span><strong>'+Number(totals.accounts||0)+'</strong><small>Kept separate</small></div>'+
+      '<div><span>Approved statements</span><strong>'+Number(totals.statements||0)+'</strong><small>Permanent history</small></div>'+
+      '<div><span>Transactions</span><strong>'+Number(totals.transactions||0)+'</strong><small>Across all statements</small></div>'+
+      '<div><span>Currency handling</span><strong>Separate</strong><small>No false FX totals</small></div>';
+
+    const curHost=$('warehouseCurrencies');
+    if(curHost){
+      const rows=warehouse?.summary_by_currency||[];
+      curHost.innerHTML=rows.length?rows.map(s=>`
+        <article class="warehouse-currency-card">
+          <div class="warehouse-currency-head"><div><span>CURRENCY</span><strong>${escapeHtml(s.currency)}</strong></div><div><span>Bank net position</span><strong>${money(s.bank_net_position,s.currency)}</strong></div></div>
+          <div class="warehouse-currency-grid">
+            <div><span>Money in</span><b>${money(s.money_in,s.currency)}</b></div>
+            <div><span>Money out</span><b>${money(s.money_out,s.currency)}</b></div>
+            <div><span>Net cash flow</span><b>${money(s.net_flow,s.currency)}</b></div>
+            <div><span>Cash in</span><b>${money(s.cash_in,s.currency)}</b></div>
+            <div><span>Cash out</span><b>${money(s.cash_out,s.currency)}</b></div>
+            <div><span>Transactions</span><b>${Number(s.transactions||0)}</b></div>
+            <div><span>Needs category</span><b>${Number(s.needs_category||0)}</b></div>
+            <div><span>History</span><b>${escapeHtml(String(s.first_transaction||'').slice(0,10)||'—')} → ${escapeHtml(String(s.last_transaction||'').slice(0,10)||'—')}</b></div>
+          </div>
+        </article>`).join(''):'<div class="empty"><strong>No approved statement history yet.</strong><span>Add an account and upload its first statement.</span></div>';
+    }
+
+    const aHost=$('warehouseAccounts');
+    if(aHost){
+      const accounts=warehouse?.accounts||[];
+      aHost.innerHTML=accounts.length?accounts.map(a=>`
+        <div class="warehouse-row">
+          <div><strong>${escapeHtml(a.nickname||'Account')}</strong><small>${escapeHtml(a.institution||'Bank')} · ${escapeHtml(a.currency||'AUD')} · ${escapeHtml(a.ownership_scope||'')}</small></div>
+          <div class="right"><b>${Number(a.statement_count||0)} statements</b><small>${Number(a.transaction_count||0)} transactions · ${dateText(a.history_start_date)} → ${dateText(a.history_end_date)}</small></div>
+        </div>`).join(''):'<p class="muted">No accounts yet.</p>';
+    }
+
+    const sHost=$('warehouseStatements');
+    if(sHost){
+      const statements=warehouse?.statements||[];
+      sHost.innerHTML=statements.length?statements.slice(0,20).map(s=>`
+        <div class="warehouse-row">
+          <div><strong>${escapeHtml(s.original_name||'Statement')}</strong><small>${escapeHtml(s.account_name||'Account')} · ${escapeHtml(s.currency||'AUD')} · ${escapeHtml(s.source_format||'')}</small></div>
+          <div class="right"><b>${Number(s.imported_rows||0)} rows</b><small>${escapeHtml(String(s.statement_start_date||'').slice(0,10)||'—')} → ${escapeHtml(String(s.statement_end_date||'').slice(0,10)||'—')} · ${Number(s.duplicate_rows||0)} duplicates</small></div>
+        </div>`).join(''):'<p class="muted">No approved statements yet.</p>';
+    }
+  }
+
   function populateAccountSelect() {
     $('importAccount').innerHTML = state.accounts.filter((account) => account.status === 'ACTIVE').map((account) => `<option value="${account.id}" data-currency="${escapeHtml(account.currency || 'AUD')}">${escapeHtml(account.nickname)} · ${escapeHtml(account.institution || 'Bank')} · ${escapeHtml(account.currency || 'AUD')} · ${escapeHtml(account.ownership_scope)}</option>`).join('');
   }
@@ -77,19 +125,15 @@
   async function load() {
     notice('');
     try {
-      const [overview, quality, coverage, connection, accounts] = await Promise.all([
+      const [overview, quality, coverage, connection, accounts, warehouse] = await Promise.all([
         api(`${FIN_PREFIX}/overview?scope=${encodeURIComponent(state.scope)}`),
         api(FIN_PREFIX + '/data-quality'),
         api(FIN_PREFIX + '/history-coverage'),
         api(FIN_PREFIX + '/bank-connections'),
-        api(FIN_PREFIX + '/accounts')
+        api(FIN_PREFIX + '/accounts'),
+        api(`${FIN_PREFIX}/statement-warehouse?scope=${encodeURIComponent(state.scope)}`)
       ]);
-      $('metricInflow').textContent = money(overview.summary.total_inflow);
-      $('metricOutflow').textContent = money(overview.summary.total_outflow);
-      $('metricNet').textContent = money(overview.summary.net_cash_flow);
-      $('metricAccounts').textContent = overview.summary.account_count;
-      $('metricUnclassified').textContent = overview.summary.unclassified_count;
-      $('metricUnreconciled').textContent = overview.summary.unreconciled_count;
+      renderWarehouse(warehouse);
       renderAccounts(overview.accounts);
       renderCategories(overview.spending_by_category || []);
       renderQuality(quality.issues || {});
@@ -408,26 +452,49 @@
   $('importForm').addEventListener('submit', async (event) => {
     event.preventDefault();
     const accountId = Number($('importAccount').value);
-    const file = $('importFile').files[0];
-    if (!accountId || !file) return;
+    const files = [...($('importFile').files || [])];
+    if (!accountId || !files.length) return;
     const submit = event.currentTarget.querySelector('button[type="submit"]');
+    const status=$('importBatchStatus');
     submit.disabled = true;
-    submit.textContent = 'Parsing…';
+    submit.textContent = files.length>1 ? 'Parsing statements…' : 'Parsing…';
+    const selectedAccount = state.accounts.find((account) => Number(account.id) === accountId);
+    const accountCurrency = String(selectedAccount?.currency || $('importAccount').selectedOptions?.[0]?.dataset?.currency || 'AUD').toUpperCase();
+    const staged=[]; const failures=[];
     try {
-      const parsed = await parseStatement(file);
-      const selectedAccount = state.accounts.find((account) => Number(account.id) === accountId);
-      const accountCurrency = String(selectedAccount?.currency || $('importAccount').selectedOptions?.[0]?.dataset?.currency || 'AUD').toUpperCase();
-      parsed.rows = (parsed.rows || []).map((row) => ({ ...row, currency: String(row.currency || accountCurrency).toUpperCase() }));
-      const result = await api(`${FIN_PREFIX}/accounts/${accountId}/statements/preview`, {
-        method: 'POST',
-        body: JSON.stringify({ source_format: parsed.format, original_name: file.name, content_hash: await sha256(file), rows: parsed.rows })
-      });
-      $('importDialog').close();
+      for(let i=0;i<files.length;i+=1){
+        const file=files[i];
+        if(status) status.textContent=`Reading ${i+1} of ${files.length}: ${file.name}`;
+        try{
+          const parsed = await parseStatement(file);
+          parsed.rows = (parsed.rows || []).map((row) => ({ ...row, currency: String(row.currency || accountCurrency).toUpperCase() }));
+          const result = await api(`${FIN_PREFIX}/accounts/${accountId}/statements/preview`, {
+            method:'POST',
+            body:JSON.stringify({ source_format:parsed.format, original_name:file.name, content_hash:await sha256(file), rows:parsed.rows })
+          });
+          staged.push({file:file.name,result});
+        }catch(error){
+          failures.push({file:file.name,message:error.message});
+        }
+      }
       event.currentTarget.reset();
-      notice(`${result.message} ${result.summary.valid} valid, ${result.summary.warning} warnings, ${result.summary.duplicate} duplicates, ${result.summary.rejected} rejected.`, result.summary.warning || result.summary.rejected ? 'warning' : 'success');
-      await openReview(result.import_uid);
-    } catch (error) { notice(error.message, 'error'); }
-    finally { submit.disabled = false; submit.textContent = 'Parse & review'; }
+      if(status) status.textContent='';
+      const successText=`${staged.length} statement${staged.length===1?'':'s'} staged for review`;
+      const failureText=failures.length?` · ${failures.length} could not be staged`:'';
+      notice(successText+failureText, failures.length?'warning':'success');
+      if(staged.length===1 && !failures.length){
+        $('importDialog').close();
+        await openReview(staged[0].result.import_uid);
+      }else{
+        $('importDialog').close();
+        await loadReviewQueue();
+      }
+    } finally {
+      submit.disabled = false;
+      submit.textContent = 'Parse & review';
+      if(status && !status.textContent.includes('could not')) status.textContent='';
+      await load();
+    }
   });
 
   $('commitReview').addEventListener('click', async () => {
@@ -465,6 +532,7 @@
   $('importStatement').addEventListener('click', () => $('importDialog').showModal());
   $('openReviewQueue').addEventListener('click', () => loadReviewQueue().catch((error) => notice(error.message, 'error')));
   $('refreshDashboard').addEventListener('click', load);
+  $('warehouseOpenReport')?.addEventListener('click',()=>document.getElementById('vvOverallReport')?.click());
 
   function escapeHtml(input) {
     return String(input ?? '').replace(/[&<>'"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
