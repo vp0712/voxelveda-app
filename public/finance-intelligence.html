@@ -55,13 +55,21 @@
     <div id="notice" class="notice" hidden></div>
     <div id="advancedNotice" class="notice" hidden></div>
 
-    <section class="metric-grid" id="metricGrid">
-      <article class="metric"><span>Money in</span><strong id="metricInflow">—</strong><small>Income and deposits, excluding transfers</small></article>
-      <article class="metric"><span>Money out</span><strong id="metricOutflow">—</strong><small>Spending, excluding transfers</small></article>
-      <article class="metric"><span>Net cash flow</span><strong id="metricNet">—</strong><small>Money in minus money out</small></article>
-      <article class="metric"><span>Accounts</span><strong id="metricAccounts">—</strong><small>Active personal + business</small></article>
-      <article class="metric"><span>Needs category</span><strong id="metricUnclassified">—</strong><small>Active transactions not yet understood</small></article>
-      <article class="metric"><span>Needs reconciliation</span><strong id="metricUnreconciled">—</strong><small>Active transactions not yet checked</small></article>
+    <section id="statementWarehouse" class="panel warehouse-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">YOUR COMPLETE MONEY HISTORY</p>
+          <h2>Statement Money Warehouse</h2>
+          <p class="muted">Every bank account stays separate. Every approved statement extends its history. All accounts can then be analysed together without mixing currencies.</p>
+        </div>
+        <button id="warehouseOpenReport" type="button" class="primary">Open Full History Report</button>
+      </div>
+      <div id="warehouseTotals" class="warehouse-totals"></div>
+      <div id="warehouseCurrencies" class="warehouse-currencies"></div>
+      <div class="warehouse-lower">
+        <section class="warehouse-box"><div class="panel-heading compact"><div><h3>Accounts & coverage</h3><p class="muted">Bank → account → statements → transactions</p></div></div><div id="warehouseAccounts"></div></section>
+        <section class="warehouse-box"><div class="panel-heading compact"><div><h3>Recent statement history</h3><p class="muted">Each file remains linked to the correct account.</p></div></div><div id="warehouseStatements"></div></section>
+      </div>
     </section>
 
     <section id="bankingSafetyPanel" class="panel banking-safety-panel">
@@ -181,8 +189,8 @@
     <form id="importForm" method="dialog" class="dialog-form wide-dialog">
       <div class="dialog-head"><h2>Import bank statement</h2><button type="button" class="icon-button" data-close="importDialog">×</button></div>
       <label>Which account is this statement for?<select id="importAccount" name="account_id" required></select></label>
-      <label>Choose statement file<input id="importFile" name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" required></label>
-      <p class="helper"><b>Select the correct bank account first.</b> You can upload many statements over time for the same account. The account currency is applied to rows that do not include a currency, duplicates are blocked, and nothing is committed until you review it.</p>
+      <label>Choose one or more statements<input id="importFile" name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" multiple required></label>
+      <p class="helper"><b>Select the correct bank account first.</b> You can choose several monthly statements at once for that account. Each file is parsed into its own review, the account currency fills missing currency fields, duplicates are blocked, and nothing enters history until approved.</p><div id="importBatchStatus" class="helper"></div>
       <div class="dialog-actions"><button type="button" data-close="importDialog">Cancel</button><button type="submit" class="primary">Parse & review</button></div>
     </form>
   </dialog>
@@ -206,7 +214,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
-  <script src="/finance-intelligence.js?v=20260919-multibank-history" defer></script>
+  <script src="/finance-intelligence.js?v=20260919-statement-warehouse" defer></script>
   <script src="/finance-account-lifecycle.js?v=20260917-account-lifecycle" defer></script>
   <script src="/finance-intelligence-advanced.js?v=20260915-guided" defer></script>
   <script src="/personal-money-center.js?v=20260916-personal-money" defer></script>
