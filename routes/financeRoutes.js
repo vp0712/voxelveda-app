@@ -7,6 +7,7 @@ const statementReview = require('../controllers/statementImportController');
 const transactionIntelligence = require('../controllers/financeTransactionIntelligenceController');
 const reconciliationCenter = require('../controllers/financeReconciliationCenterController');
 const bankingReadiness = require('../controllers/financeBankingReadinessController');
+const bankingOS = require('../controllers/bankingOperatingSystemController');
 const openBanking = require('../controllers/openBankingController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
@@ -119,6 +120,18 @@ router.get('/personal-money/roadmaps', requireAnyPermission('VIEW_BANKING'), per
 router.post('/personal-money/roadmaps', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.createRoadmap);
 router.post('/personal-money/roadmaps/:roadmapId/milestones/:milestoneId/progress', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.recordProgress);
 router.post('/personal-money/roadmaps/:id/status', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.updateStatus);
+
+router.get('/banking-os', requireAnyPermission('VIEW_BANKING'), bankingOS.getDashboard);
+router.get('/banking-os/capabilities', requireAnyPermission('VIEW_BANKING'), bankingOS.capabilities);
+router.post('/banking-os/spaces', requireAnyPermission('VIEW_BANKING'), bankingOS.createSpace);
+router.post('/banking-os/spaces/:uid', requireAnyPermission('VIEW_BANKING'), bankingOS.updateSpace);
+router.post('/banking-os/beneficiaries', requireAnyPermission('VIEW_BANKING'), requireStepUp('CHANGE_BANK_BENEFICIARY'), bankingOS.createBeneficiary);
+router.post('/banking-os/payments', requireAnyPermission('VIEW_BANKING'), bankingOS.createPayment);
+router.post('/banking-os/payments/:uid/submit', requireAnyPermission('VIEW_BANKING'), requireStepUp('SUBMIT_BANK_PAYMENT'), bankingOS.submitPayment);
+router.post('/banking-os/payments/:uid/decision', requireAnyPermission('APPROVE_PAYMENT'), requireStepUp('APPROVE_BANK_PAYMENT'), bankingOS.decidePayment);
+router.get('/banking-os/team', requireAnyPermission('VIEW_BANKING'), bankingOS.getTeam);
+router.post('/banking-os/team/:userId/access', requireAnyPermission('EDIT_BANK_DETAILS'), requireStepUp('CHANGE_BANKING_USER_ACCESS'), bankingOS.saveTeamAccess);
+router.post('/banking-os/alerts', requireAnyPermission('VIEW_BANKING'), bankingOS.saveAlerts);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/banking-dashboard', requireAnyPermission('VIEW_BANKING'), intelligence.getBankingDashboard);
