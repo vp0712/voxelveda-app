@@ -592,16 +592,26 @@ exports.commit = async (req, res) => {
       'UPDATE statement_import_sessions SET status="IMPORTED", reviewed_by=?, reviewed_at=NOW(), committed_by=?, committed_at=NOW() WHERE id=?',
       [req.user.id, req.user.id, session.id]
     );
-    if (minDate || maxDate) {
+    const latestRunningBalance = [...rows].reverse().find((row) => row.running_balance !== null && row.running_balance !== undefined && row.running_balance !== '');
+    const statementClosingBalance = session.closing_balance !== null && session.closing_balance !== undefined && session.closing_balance !== ''
+      ? session.closing_balance
+      : (latestRunningBalance ? latestRunningBalance.running_balance : null);
+    const advancesAccountBalance = statementClosingBalance !== null
+      && (!account.history_end_date || !maxDate || String(maxDate) >= String(account.history_end_date).slice(0,10));
+    if (minDate || maxDate || advancesAccountBalance) {
       await db.query(
         `UPDATE bank_accounts SET
           history_start_date=CASE WHEN history_start_date IS NULL OR ? < history_start_date THEN ? ELSE history_start_date END,
-          history_end_date=CASE WHEN history_end_date IS NULL OR ? > history_end_date THEN ? ELSE history_end_date END
-         WHERE id=?`, [minDate, minDate, maxDate, maxDate, account.id]
+          history_end_date=CASE WHEN history_end_date IS NULL OR ? > history_end_date THEN ? ELSE history_end_date END,
+          current_ledger_balance=CASE WHEN ?=1 THEN ? ELSE current_ledger_balance END,
+          reconciled_balance=CASE WHEN ?=1 THEN ? ELSE reconciled_balance END
+         WHERE id=?`,
+        [minDate, minDate, maxDate, maxDate, advancesAccountBalance ? 1 : 0, statementClosingBalance,
+          advancesAccountBalance ? 1 : 0, statementClosingBalance, account.id]
       );
     }
     const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid } }));
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null } }));
     await db.commit();
     return res.json({
       message: `${imported} statement transactions committed after review.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
