@@ -54,6 +54,7 @@ router.post('/intelligence/statement-reviews/:uid/commit', edit, financePrivacy.
 router.post('/intelligence/statement-reviews/:uid/reject', edit, financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.reject);
 router.get('/intelligence/reports/spending', intelligence.getSpendingReport);
 router.get('/intelligence/reports/portfolio-history', intelligence.getPortfolioHistoryReport);
+router.get('/intelligence/statement-warehouse', intelligence.getStatementWarehouse);
 router.get('/intelligence/budgets', intelligence.getBankingBudgets);
 router.get('/intelligence/history-coverage', intelligence.getHistoryCoverage);
 router.get('/intelligence/data-quality', intelligence.getDataQuality);
