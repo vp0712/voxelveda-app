@@ -192,7 +192,7 @@
       <div class="dialog-head"><div><h2>Check statement before import</h2><p id="reviewSubtitle" class="helper"></p></div><button type="button" class="icon-button" data-close="reviewDialog">×</button></div>
       <div id="reviewSummary" class="review-summary"></div>
       <div class="table-wrap"><table class="review-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Money out</th><th>Money in</th><th>Balance</th><th>Status</th></tr></thead><tbody id="reviewRows"></tbody></table></div>
-      <p class="helper">Rejected and duplicate rows are excluded automatically. Warning rows stay selected so you can check them manually.</p>
+      <p class="helper">Rejected rows are blocked by default, but genuine transactions can be corrected with “Fix & include”. Duplicates and opening/closing balance markers stay locked to prevent double-counting or false transactions.</p>
       <div class="dialog-actions"><button id="rejectReview" type="button" class="danger">Reject entire statement</button><button id="commitReview" type="button" class="primary">Approve & import selected rows</button></div>
     </div>
   </dialog>
@@ -216,5 +216,6 @@
   <script src="/personal-money-health.js?v=20260916-financial-health" defer></script>
   <script src="/personal-asset-lifecycle.js?v=20260916-asset-protection" defer></script>
   <script src="/finance-banking-readiness.js?v=20260915-readiness" defer></script>
+  <script src="/finance-bank-grade-review.js?v=20260918-company-ledger" defer></script>
 </body>
 </html>
