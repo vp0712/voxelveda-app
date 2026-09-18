@@ -20,7 +20,7 @@
   const state = {
     tab:'home', scope:'ALL', currency:'AUD', range:'1M', chart:'pie',
     status:null, connections:[], quality:null, dashboard:null, budgets:[], insights:null, attention:null,
-    activity:[], activityQuery:'', activityCategory:'', activityAccount:'', busy:false
+    os:null, team:null, activity:[], activityQuery:'', activityCategory:'', activityAccount:'', busy:false
   };
   const palette = ['#44d7a5','#67a8ff','#f3b85b','#b89cff','#ff8f96','#5dd4e8','#98d66e','#e9a5ff'];
 
@@ -86,13 +86,13 @@
         '<button class="vv-pb-action" type="button" data-pb-action="upload"><span>⇧</span><b>Statement</b><small>PDF / CSV / OFX</small></button>'+
         '<button class="vv-pb-action" type="button" data-pb-action="search"><span>⌕</span><b>Search</b><small>Transactions</small></button>'+
         '<button class="vv-pb-action" type="button" data-pb-action="budget"><span>◎</span><b>Budget</b><small>Set a limit</small></button>'+
-        '<button class="vv-pb-action" type="button" data-pb-action="payments"><span>→</span><b>Payments</b><small>Capability</small></button>'+
+        '<button class="vv-pb-action" type="button" data-pb-action="payments"><span>→</span><b>Pay & transfer</b><small>Workflow</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="space"><span>◫</span><b>Space</b><small>Allocate money</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="team"><span>◎</span><b>Team</b><small>Access control</small></button>'+
       '</div>'+
       '<nav class="vv-pb-tabs" aria-label="Banking sections">'+
         '<button class="active" type="button" data-pb-tab="home">Home</button>'+
-        '<button type="button" data-pb-tab="activity">Activity</button>'+
+        '<button type="button" data-pb-tab="activity">Activity</button>'+'<button type="button" data-pb-tab="pay">Pay</button>'+
         '<button type="button" data-pb-tab="insights">Insights</button>'+
-        '<button type="button" data-pb-tab="plan">Plan</button>'+
+        '<button type="button" data-pb-tab="plan">Plan</button>'+'<button type="button" data-pb-tab="team">Team</button>'+
         '<button type="button" data-pb-tab="more">More</button>'+
       '</nav>'+
       '<div id="vvPbContent" class="vv-pb-content"><div class="vv-pb-empty"><strong>Loading banking data…</strong></div></div>';
@@ -126,6 +126,60 @@
         '<p>You can still identify internal transfers, manage recurring bills, categorise transactions and reconcile imported payments safely.</p>'+
         '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbPaymentDialog">Close</button><button class="primary" type="button" data-pb-action="plan">View recurring & budgets</button></div></div>';
       document.body.appendChild(d);
+    }
+    if(!$('vvPbSpaceDialog')){
+      const d=document.createElement('dialog'); d.id='vvPbSpaceDialog'; d.className='vv-pb-modal';
+      d.innerHTML='<form id="vvPbSpaceForm" class="vv-pb-modal-inner"><h3>Create Money Space</h3><p>Spaces are allocation envelopes inside Voxel Veda; they do not create a new bank account.</p>'+
+        '<label>Name<input id="vvPbSpaceName" maxlength="120" required placeholder="Tax reserve, Payroll, Emergency..."></label>'+
+        '<label>Scope<select id="vvPbSpaceScope"><option value="BUSINESS">Voxel Veda</option><option value="PERSONAL">Personal</option></select></label>'+
+        '<label>Purpose<input id="vvPbSpacePurpose" maxlength="255" placeholder="What this money is reserved for"></label>'+
+        '<label>Target amount<input id="vvPbSpaceTarget" inputmode="decimal" placeholder="10000"></label>'+
+        '<label>Allocated now<input id="vvPbSpaceAllocated" inputmode="decimal" value="0"></label>'+
+        '<label>Minimum reserve<input id="vvPbSpaceReserve" inputmode="decimal" value="0"></label>'+
+        '<label>Currency<input id="vvPbSpaceCurrency" maxlength="3" value="AUD"></label>'+
+        '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbSpaceDialog">Cancel</button><button class="primary" type="submit">Create Space</button></div></form>';
+      document.body.appendChild(d); $('vvPbSpaceForm').addEventListener('submit',saveSpace);
+    }
+    if(!$('vvPbBeneficiaryDialog')){
+      const d=document.createElement('dialog'); d.id='vvPbBeneficiaryDialog'; d.className='vv-pb-modal';
+      d.innerHTML='<form id="vvPbBeneficiaryForm" class="vv-pb-modal-inner"><h3>Add beneficiary</h3><p>Store masked payment metadata and approval context. Voxel Veda will not store banking passwords or OTPs.</p>'+
+        '<label>Name<input id="vvPbBenName" maxlength="180" required></label><label>Nickname<input id="vvPbBenNickname" maxlength="120"></label>'+
+        '<label>Scope<select id="vvPbBenScope"><option value="BUSINESS">Voxel Veda</option><option value="PERSONAL">Personal</option></select></label>'+
+        '<label>Bank<input id="vvPbBenBank" maxlength="180"></label><label>BSB (masked)<input id="vvPbBenBsb" maxlength="32" placeholder="06•-•••"></label>'+
+        '<label>Account (masked)<input id="vvPbBenAccount" maxlength="64" placeholder="•••• 1234"></label><label>PayID (masked)<input id="vvPbBenPayid" maxlength="180"></label>'+
+        '<label>Currency<input id="vvPbBenCurrency" maxlength="3" value="AUD"></label><label><input id="vvPbBenTrusted" type="checkbox"> Trusted beneficiary</label>'+
+        '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbBeneficiaryDialog">Cancel</button><button class="primary" type="submit">Save beneficiary</button></div></form>';
+      document.body.appendChild(d); $('vvPbBeneficiaryForm').addEventListener('submit',saveBeneficiary);
+    }
+    if(!$('vvPbPaymentDraftDialog')){
+      const d=document.createElement('dialog'); d.id='vvPbPaymentDraftDialog'; d.className='vv-pb-modal';
+      d.innerHTML='<form id="vvPbPaymentDraftForm" class="vv-pb-modal-inner"><h3>Prepare payment</h3><p>This creates an auditable payment workflow. External money movement remains disabled until a verified payment rail is connected.</p>'+
+        '<label>From account<select id="vvPbPayAccount"><option value="">Not assigned</option></select></label>'+
+        '<label>Scope<select id="vvPbPayScope"><option value="BUSINESS">Voxel Veda</option><option value="PERSONAL">Personal</option></select></label>'+
+        '<label>Type<select id="vvPbPayType"><option value="EXTERNAL">External transfer</option><option value="BILL">Bill</option><option value="INTERNAL">Internal transfer</option><option value="PAYROLL">Payroll</option><option value="REIMBURSEMENT">Reimbursement</option><option value="REQUEST_MONEY">Request money</option></select></label>'+
+        '<label>Payee<input id="vvPbPayPayee" maxlength="180" required></label><label>Reference<input id="vvPbPayReference" maxlength="180"></label>'+
+        '<label>Amount<input id="vvPbPayAmount" inputmode="decimal" required></label><label>Currency<input id="vvPbPayCurrency" maxlength="3" value="AUD"></label>'+
+        '<label>Due date<input id="vvPbPayDue" type="date"></label><label>Schedule<select id="vvPbPaySchedule"><option value="ONCE">Once</option><option value="WEEKLY">Weekly</option><option value="FORTNIGHTLY">Fortnightly</option><option value="MONTHLY">Monthly</option><option value="QUARTERLY">Quarterly</option><option value="YEARLY">Yearly</option></select></label>'+
+        '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbPaymentDraftDialog">Cancel</button><button class="primary" type="submit">Create draft</button></div></form>';
+      document.body.appendChild(d); $('vvPbPaymentDraftForm').addEventListener('submit',savePaymentDraft);
+    }
+    if(!$('vvPbAccessDialog')){
+      const d=document.createElement('dialog'); d.id='vvPbAccessDialog'; d.className='vv-pb-modal';
+      d.innerHTML='<form id="vvPbAccessForm" class="vv-pb-modal-inner"><h3>Banking account access</h3><p>Grant only the minimum access this user needs.</p>'+
+        '<input id="vvPbAccessUser" type="hidden"><label>User<input id="vvPbAccessUserLabel" disabled></label>'+
+        '<label>Business account<select id="vvPbAccessAccount"></select></label>'+
+        '<label>Access<select id="vvPbAccessLevel"><option value="VIEW">View only</option><option value="PREPARE">Prepare payments</option><option value="APPROVE">Approve payments</option><option value="MANAGE">Manage account workflow</option></select></label>'+
+        '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbAccessDialog">Cancel</button><button class="primary" type="submit">Save access</button></div></form>';
+      document.body.appendChild(d); $('vvPbAccessForm').addEventListener('submit',saveTeamAccess);
+    }
+    if(!$('vvPbAlertDialog')){
+      const d=document.createElement('dialog'); d.id='vvPbAlertDialog'; d.className='vv-pb-modal';
+      d.innerHTML='<form id="vvPbAlertForm" class="vv-pb-modal-inner"><h3>Banking alerts</h3>'+
+        '<label>Low balance threshold<input id="vvPbAlertLow" inputmode="decimal"></label><label>Large transaction threshold<input id="vvPbAlertLarge" inputmode="decimal"></label>'+
+        '<label><input id="vvPbAlertBudget" type="checkbox" checked> Budget alerts</label><label><input id="vvPbAlertPayments" type="checkbox" checked> Payment workflow alerts</label>'+
+        '<label><input id="vvPbAlertSync" type="checkbox" checked> Bank sync alerts</label><label><input id="vvPbAlertUnusual" type="checkbox" checked> Unusual activity alerts</label>'+
+        '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbAlertDialog">Cancel</button><button class="primary" type="submit">Save alerts</button></div></form>';
+      document.body.appendChild(d); $('vvPbAlertForm').addEventListener('submit',saveAlerts);
     }
     document.addEventListener('click',(e)=>{
       const close=e.target.closest('[data-pb-close]'); if(close) document.getElementById(close.dataset.pbClose)?.close();
@@ -338,10 +392,79 @@
     return '<div class="vv-pb-recurring">'+dedupe.slice(0,20).map(r=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(r.name)+'</strong><small>'+esc(r.source)+' · '+esc(r.frequency)+(r.next?' · due '+esc(day(r.next)):'')+'</small></div><b>'+money(r.amount,cur)+'</b><button type="button" class="vv-pb-select" data-pb-search-merchant="'+esc(r.name)+'">View</button></div>').join('')+'</div>';
   }
 
+  function capabilityBadge(flag,onLabel='Available',offLabel='Provider required'){
+    return '<span class="vv-pb-status '+(flag?'healthy':'setup')+'">'+esc(flag?onLabel:offLabel)+'</span>';
+  }
+
+  function paymentRows(){
+    const rows=state.os?.payments||[];
+    if(!rows.length) return '<div class="vv-pb-empty"><strong>No payment workflows</strong><span>Create a draft for a bill, transfer, reimbursement or payment request.</span></div>';
+    return '<div class="vv-pb-recurring">'+rows.slice(0,80).map(p=>{
+      const mine=Number(p.created_by)===Number(state.os?.current_user_id||-1);
+      const approve=(state.os?.access?.can_approve && p.status==='PENDING_APPROVAL' && !mine);
+      return '<div class="vv-pb-recurring-row"><div><strong>'+esc(p.payee_name)+'</strong><small>'+esc(p.payment_type)+' · '+esc(p.status)+' · '+esc(p.schedule_type)+(p.due_date?' · due '+esc(day(p.due_date)):'')+' · prepared by '+esc(p.created_by_name||'user')+'</small></div><b>'+money(p.amount,p.currency)+'</b><div class="vv-pb-budget-actions">'+
+        (p.status==='DRAFT'?'<button type="button" data-pb-submit-payment="'+esc(p.payment_uid)+'">Submit</button>':'')+
+        (approve?'<button type="button" data-pb-approve-payment="'+esc(p.payment_uid)+'">Approve</button><button type="button" data-pb-reject-payment="'+esc(p.payment_uid)+'">Reject</button>':'')+
+        '</div></div>';
+    }).join('')+'</div>';
+  }
+
+  function renderPay(){
+    const caps=state.os?.capabilities||{}; const intel=state.os?.operating_intelligence||{};
+    $('vvPbContent').innerHTML=
+      '<div class="vv-pb-toolbar"><div><h3>Pay & Transfer</h3><span style="color:#8fa4bb">Prepare, approve, schedule and track money movement</span></div><div><button class="vv-pb-select" type="button" data-pb-action="new-payment">＋ Payment</button> <button class="vv-pb-select" type="button" data-pb-action="beneficiary">＋ Beneficiary</button></div></div>'+
+      '<div class="vv-pb-kpis"><div class="vv-pb-kpi"><span>Pending approvals</span><b>'+Number(intel.pending_approvals||0)+'</b></div><div class="vv-pb-kpi"><span>Ready for execution</span><b>'+Number(intel.ready_for_execution||0)+'</b></div><div class="vv-pb-kpi"><span>Overdue</span><b>'+Number(intel.overdue||0)+'</b></div><div class="vv-pb-kpi"><span>External payment rail</span><b>'+ (caps.payment_rails?.external_transfer?'Enabled':'Not connected') +'</b></div></div>'+
+      '<section class="vv-pb-card" style="margin-top:12px"><div class="vv-pb-card-head"><div><h3>Payment workflow</h3><span>Maker-checker controls and scheduled obligations</span></div>'+capabilityBadge(caps.payment_rails?.external_transfer,'Execution enabled','Workflow only')+'</div>'+paymentRows()+'</section>'+
+      '<section class="vv-pb-card" style="margin-top:12px"><div class="vv-pb-card-head"><h3>Beneficiaries</h3><button type="button" class="vv-pb-select" data-pb-action="beneficiary">Add</button></div><div class="vv-pb-merchant-grid">'+
+      ((state.os?.beneficiaries||[]).length?(state.os.beneficiaries.map(b=>'<div class="vv-pb-merchant"><div><strong>'+esc(b.nickname||b.name)+'</strong><small>'+esc(b.bank_name||'Bank')+' · '+esc(b.account_masked||b.payid_masked||'masked details')+' · '+esc(b.currency)+'</small></div><b>'+(b.trusted?'Trusted':'Standard')+'</b></div>').join('')):'<div class="vv-pb-empty">No saved beneficiaries.</div>')+
+      '</div></section>'+
+      '<section class="vv-pb-card" style="margin-top:12px"><div class="vv-pb-card-head"><h3>Provider capabilities</h3><span>Actions appear only when technically available</span></div><div class="vv-pb-kpis">'+
+      '<div class="vv-pb-kpi"><span>Open Banking read/sync</span><b>'+(caps.open_banking?.configured?'Configured':'Credential missing')+'</b></div>'+
+      '<div class="vv-pb-kpi"><span>PayID / BPAY</span><b>'+(caps.payment_rails?.payid||caps.payment_rails?.bpay?'Enabled':'Provider required')+'</b></div>'+
+      '<div class="vv-pb-kpi"><span>Cards</span><b>'+(caps.payment_rails?.card_issuing?'Enabled':'Provider required')+'</b></div>'+
+      '<div class="vv-pb-kpi"><span>International transfer</span><b>'+(caps.payment_rails?.international_transfer?'Enabled':'Provider required')+'</b></div></div></section>';
+    wireDynamic();
+  }
+
+  function spaceRows(){
+    const rows=state.os?.spaces||[];
+    if(!rows.length) return '<div class="vv-pb-empty"><strong>No Money Spaces</strong><span>Create reserves for tax, payroll, emergency cash, equipment or personal goals.</span><button type="button" data-pb-action="space">Create Space</button></div>';
+    return '<div class="vv-pb-budget-grid">'+rows.map(s=>{
+      const target=Number(s.target_amount||0); const allocated=Number(s.allocated_amount||0); const used=target>0?Math.min(100,allocated/target*100):0;
+      return '<article class="vv-pb-budget"><div class="vv-pb-budget-head"><div><strong>'+esc(s.name)+'</strong><small>'+esc(s.ownership_scope)+' · '+esc(s.purpose||'Allocation')+'</small></div><b>'+money(allocated,s.currency)+'</b></div><div class="vv-pb-progress"><i style="width:'+used.toFixed(1)+'%"></i></div><small>'+(target?money(target,s.currency)+' target · ':'')+money(s.minimum_reserve,s.currency)+' minimum reserve</small></article>';
+    }).join('')+'</div>';
+  }
+
+  function renderTeam(){
+    const team=state.team||{}; const os=state.os||{};
+    if(!team.can_manage){
+      $('vvPbContent').innerHTML='<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Team banking access</h3></div><div class="vv-pb-empty"><strong>Your banking access is scoped to your role and assigned accounts.</strong><span>Only authorised banking administrators can change another user’s access.</span></div></section>';
+      return;
+    }
+    const grantMap=new Map((team.grants||[]).map(g=>[String(g.user_id)+'|'+String(g.bank_account_id),g]));
+    const businessAccounts=(os.accounts||[]).filter(a=>a.ownership_scope==='BUSINESS');
+    $('vvPbContent').innerHTML='<div class="vv-pb-toolbar"><div><h3>Team banking</h3><span style="color:#8fa4bb">Account-level least-privilege access</span></div></div>'+
+      '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Users</h3><span>View · Prepare · Approve · Manage</span></div><div class="vv-pb-recurring">'+
+      ((team.users||[]).map(u=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(u.name||u.email)+'</strong><small>'+esc(u.email)+' · '+esc(u.role)+(u.department?' · '+esc(u.department):'')+'</small></div><div>'+businessAccounts.map(a=>{const g=grantMap.get(String(u.id)+'|'+String(a.id));return '<button type="button" class="vv-pb-select" data-pb-grant-user="'+Number(u.id)+'" data-pb-grant-account="'+Number(a.id)+'" data-pb-grant-level="'+esc(g?.access_level||'VIEW')+'" data-pb-grant-label="'+esc((u.name||u.email)+' · '+a.nickname)+'">'+esc(a.nickname)+': '+esc(g?.access_level||'Set access')+'</button>';}).join(' ')+'</div></div>').join('')||'<div class="vv-pb-empty">No active users.</div>')+
+      '</div></section>';
+    wireDynamic();
+  }
+
+  async function saveSpace(e){e.preventDefault();try{await api('/api/finance/banking-os/spaces',{method:'POST',body:JSON.stringify({name:$('vvPbSpaceName').value,ownership_scope:$('vvPbSpaceScope').value,purpose:$('vvPbSpacePurpose').value,target_amount:$('vvPbSpaceTarget').value,allocated_amount:$('vvPbSpaceAllocated').value,minimum_reserve:$('vvPbSpaceReserve').value,currency:$('vvPbSpaceCurrency').value})});$('vvPbSpaceDialog').close();message('Money Space created.','success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be created.','error',err.message);}}
+  async function saveBeneficiary(e){e.preventDefault();try{await api('/api/finance/banking-os/beneficiaries',{method:'POST',body:JSON.stringify({name:$('vvPbBenName').value,nickname:$('vvPbBenNickname').value,ownership_scope:$('vvPbBenScope').value,bank_name:$('vvPbBenBank').value,bsb_masked:$('vvPbBenBsb').value,account_masked:$('vvPbBenAccount').value,payid_masked:$('vvPbBenPayid').value,currency:$('vvPbBenCurrency').value,trusted:$('vvPbBenTrusted').checked})});$('vvPbBeneficiaryDialog').close();message('Beneficiary saved.','success');await refresh();state.tab='pay';render();}catch(err){message('Beneficiary could not be saved.','error',err.message);}}
+  function openPaymentDraft(){const select=$('vvPbPayAccount');select.innerHTML='<option value="">Not assigned</option>'+(state.os?.accounts||[]).map(a=>'<option value="'+Number(a.id)+'">'+esc(a.nickname)+' · '+esc(a.currency)+'</option>').join('');$('vvPbPayCurrency').value=selectedCurrency();$('vvPbPaymentDraftDialog').showModal();}
+  async function savePaymentDraft(e){e.preventDefault();try{const result=await api('/api/finance/banking-os/payments',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbPayAccount').value||null,ownership_scope:$('vvPbPayScope').value,payment_type:$('vvPbPayType').value,payee_name:$('vvPbPayPayee').value,reference_text:$('vvPbPayReference').value,amount:$('vvPbPayAmount').value,currency:$('vvPbPayCurrency').value,due_date:$('vvPbPayDue').value||null,schedule_type:$('vvPbPaySchedule').value})});$('vvPbPaymentDraftDialog').close();message(result.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment draft could not be created.','error',err.message);}}
+  async function submitPayment(uid){try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/submit',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be submitted.','error',err.message);}}
+  async function decidePayment(uid,decision){const note=prompt(decision==='APPROVE'?'Approval note (optional)':'Reason for rejection');if(decision==='REJECT'&&!note)return;try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/decision',{method:'POST',body:JSON.stringify({decision,note:note||''})});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Decision could not be recorded.','error',err.message);}}
+  function openTeamAccess(userId,accountId,level,label){$('vvPbAccessUser').value=userId;$('vvPbAccessUserLabel').value=label;$('vvPbAccessAccount').innerHTML=(state.os?.accounts||[]).filter(a=>a.ownership_scope==='BUSINESS').map(a=>'<option value="'+a.id+'" '+(String(a.id)===String(accountId)?'selected':'')+'>'+esc(a.nickname)+'</option>').join('');$('vvPbAccessLevel').value=level||'VIEW';$('vvPbAccessDialog').showModal();}
+  async function saveTeamAccess(e){e.preventDefault();try{const r=await api('/api/finance/banking-os/team/'+encodeURIComponent($('vvPbAccessUser').value)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbAccessAccount').value,access_level:$('vvPbAccessLevel').value})});$('vvPbAccessDialog').close();message(r.message,'success');await refresh();state.tab='team';render();}catch(err){message('Access could not be updated.','error',err.message);}}
+  function openAlerts(){const a=state.os?.alerts||{};$('vvPbAlertLow').value=a.low_balance_threshold??'';$('vvPbAlertLarge').value=a.large_transaction_threshold??'';$('vvPbAlertBudget').checked=Boolean(Number(a.notify_budget??1));$('vvPbAlertPayments').checked=Boolean(Number(a.notify_payments??1));$('vvPbAlertSync').checked=Boolean(Number(a.notify_bank_sync??1));$('vvPbAlertUnusual').checked=Boolean(Number(a.notify_unusual_activity??1));$('vvPbAlertDialog').showModal();}
+  async function saveAlerts(e){e.preventDefault();try{const r=await api('/api/finance/banking-os/alerts',{method:'POST',body:JSON.stringify({low_balance_threshold:$('vvPbAlertLow').value,large_transaction_threshold:$('vvPbAlertLarge').value,notify_budget:$('vvPbAlertBudget').checked,notify_payments:$('vvPbAlertPayments').checked,notify_bank_sync:$('vvPbAlertSync').checked,notify_unusual_activity:$('vvPbAlertUnusual').checked})});$('vvPbAlertDialog').close();message(r.message,'success');await refresh();}catch(err){message('Alerts could not be saved.','error',err.message);}}
+
   function renderPlan(){
     $('vvPbContent').innerHTML=
       '<div class="vv-pb-toolbar"><div><h3>Plan</h3><span style="color:#8fa4bb">Budgets, recurring payments and upcoming obligations</span></div><div><button type="button" class="vv-pb-select" data-pb-action="budget">＋ Budget</button></div></div>'+
-      '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Category budgets</h3><span>Bank-connected spending</span></div>'+budgetCards()+'</section>'+
+      '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Money Spaces</h3><button type="button" class="vv-pb-select" data-pb-action="space">＋ Space</button></div>'+spaceRows()+'</section>'+'<section class="vv-pb-card" style="margin-top:13px"><div class="vv-pb-card-head"><h3>Category budgets</h3><span>Bank-connected spending</span></div>'+budgetCards()+'</section>'+
       '<section class="vv-pb-card" style="margin-top:13px"><div class="vv-pb-card-head"><h3>Bills & recurring</h3><span>Scheduled + detected</span></div>'+recurringRows()+'</section>'+
       ((state.attention?.goals||[]).length?'<section class="vv-pb-card" style="margin-top:13px"><div class="vv-pb-card-head"><h3>Savings goals</h3><span>Personal Money</span></div><div class="vv-pb-budget-grid">'+state.attention.goals.filter(g=>g.status==='ACTIVE').slice(0,8).map(g=>'<article class="vv-pb-budget"><div class="vv-pb-budget-head"><strong>'+esc(g.name)+'</strong><b>'+pct(g.progress_percent)+'</b></div><div class="vv-pb-progress"><i style="width:'+Math.min(100,Number(g.progress_percent||0))+'%"></i></div><small>'+money(g.current_amount,g.currency)+' of '+money(g.target_amount,g.currency)+'</small></article>').join('')+'</div></section>':'');
     wireDynamic();
@@ -355,7 +478,7 @@
         '<article class="vv-pb-more-item"><h4>Statements & reports</h4><p>Open imported statements, transaction-source history, CSV exports and printable reports.</p><button type="button" data-pb-action="statements">Open statements</button></article>'+
         '<article class="vv-pb-more-item"><h4>Spending report</h4><p>Generate detailed category, merchant, account and period analysis.</p><button type="button" data-pb-action="reports">Open report</button></article>'+
         '<article class="vv-pb-more-item"><h4>Consent & privacy</h4><p>Review bank connection consent and provider data-sharing status.</p><button type="button" data-pb-action="consent">Open consent centre</button></article>'+
-        '<article class="vv-pb-more-item"><h4>Data quality</h4><p>'+Number(q.transactions?.unclassified||0)+' unclassified · '+Number(q.transactions?.unreconciled||0)+' unreconciled · '+Number(q.connections?.attention||0)+' connection(s) need attention.</p><button type="button" data-pb-action="analyse">Run smart analysis</button></article>'+
+        '<article class="vv-pb-more-item"><h4>Data quality</h4><p>'+Number(q.transactions?.unclassified||0)+' unclassified · '+Number(q.transactions?.unreconciled||0)+' unreconciled · '+Number(q.connections?.attention||0)+' connection(s) need attention.</p><button type="button" data-pb-action="analyse">Run smart analysis</button></article>'+'<article class="vv-pb-more-item"><h4>Banking alerts</h4><p>Set low-balance, large-transaction, payment, sync and unusual-activity alerts.</p><button type="button" data-pb-action="alerts">Alert settings</button></article>'+
       '</div>';
     wireDynamic();
   }
@@ -371,8 +494,10 @@
     document.querySelectorAll('[data-pb-tab]').forEach(b=>b.classList.toggle('active',b.dataset.pbTab===state.tab));
     if(state.tab==='home') renderHome();
     else if(state.tab==='activity') renderActivity();
+    else if(state.tab==='pay') renderPay();
     else if(state.tab==='insights') renderInsights();
     else if(state.tab==='plan') renderPlan();
+    else if(state.tab==='team') renderTeam();
     else renderMore();
   }
 
@@ -387,13 +512,15 @@
       api(BANK+'/data-quality'),
       api(FIN+'/banking-dashboard?'+query.toString()),
       api(FIN+'/budgets'),
-      api(FIN+'/insights?scope='+encodeURIComponent(state.scope))
+      api(FIN+'/insights?scope='+encodeURIComponent(state.scope)),
+      api('/api/finance/banking-os'),
+      api('/api/finance/banking-os/team').catch(()=>({can_manage:false,users:[],grants:[]}))
     ];
     if(state.scope==='PERSONAL'||state.scope==='ALL') requests.push(api(PERSONAL+'/attention').catch(()=>null));
     else requests.push(Promise.resolve(null));
-    const [status,connections,quality,dashboard,budgets,insights,attention]=await Promise.all(requests);
+    const [status,connections,quality,dashboard,budgets,insights,os,team,attention]=await Promise.all(requests);
     state.status=status; state.connections=connections.connections||[]; state.quality=quality; state.dashboard=dashboard;
-    state.budgets=budgets.budgets||[]; state.insights=insights; state.attention=attention;
+    state.budgets=budgets.budgets||[]; state.insights=insights; state.os=os; state.team=team; state.attention=attention;
     selectedCurrency();
     await loadActivity();
   }
@@ -511,6 +638,10 @@
     if(statement){openStatementForAccount(statement.dataset.pbAccountStatement);return;}
     const recurring=e.target.closest('[data-pb-search-merchant]');
     if(recurring){state.activityQuery=recurring.dataset.pbSearchMerchant;state.tab='activity';await loadActivity();render();return;}
+    const submitPaymentButton=e.target.closest('[data-pb-submit-payment]'); if(submitPaymentButton){return submitPayment(submitPaymentButton.dataset.pbSubmitPayment);}
+    const approvePaymentButton=e.target.closest('[data-pb-approve-payment]'); if(approvePaymentButton){return decidePayment(approvePaymentButton.dataset.pbApprovePayment,'APPROVE');}
+    const rejectPaymentButton=e.target.closest('[data-pb-reject-payment]'); if(rejectPaymentButton){return decidePayment(rejectPaymentButton.dataset.pbRejectPayment,'REJECT');}
+    const grant=e.target.closest('[data-pb-grant-user]'); if(grant){openTeamAccess(grant.dataset.pbGrantUser,grant.dataset.pbGrantAccount,grant.dataset.pbGrantLevel,grant.dataset.pbGrantLabel);return;}
     const edit=e.target.closest('[data-pb-edit-budget]'); if(edit){openBudget(edit.dataset.pbEditBudget);return;}
     const del=e.target.closest('[data-pb-delete-budget]'); if(del){await deleteBudget(del.dataset.pbDeleteBudget);return;}
     const action=e.target.closest('[data-pb-action]');
@@ -522,7 +653,12 @@
     if(name==='upload') return $('importStatement')?.click();
     if(name==='search'){state.tab='activity';render();setTimeout(()=>$('vvPbActivitySearch')?.focus(),0);return;}
     if(name==='budget') return openBudget();
-    if(name==='payments') return $('vvPbPaymentDialog').showModal();
+    if(name==='payments'){state.tab='pay';render();return;}
+    if(name==='new-payment') return openPaymentDraft();
+    if(name==='beneficiary') return $('vvPbBeneficiaryDialog').showModal();
+    if(name==='space'){ $('vvPbSpaceCurrency').value=selectedCurrency(); $('vvPbSpaceScope').value=state.scope==='PERSONAL'?'PERSONAL':'BUSINESS'; return $('vvPbSpaceDialog').showModal(); }
+    if(name==='team'){state.tab='team';render();return;}
+    if(name==='alerts') return openAlerts();
     if(name==='plan'){$('vvPbPaymentDialog')?.close();state.tab='plan';render();return;}
     if(name==='statements'){document.getElementById('vvStatementReportCenter')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
     if(name==='reports'){const b=$('vvOverallReport');if(b)b.click();else document.getElementById('vvStatementReportCenter')?.scrollIntoView({behavior:'smooth'});return;}
