@@ -29,6 +29,7 @@ on:
       - 'scripts/statement-first-money-warehouse-test.js'
       - 'scripts/print-save-pdf-test.js'
       - 'scripts/statement-data-controls-test.js'
+      - 'scripts/banking-workspace-error-recovery-test.js'
       - 'routes/bankingPortalRoutes.js'
       - 'controllers/statementImportController.js'
       - 'public/finance-intelligence.js'
@@ -101,6 +102,9 @@ jobs:
           node --check scripts/statement-first-money-warehouse-test.js
           node --check scripts/print-save-pdf-test.js
           node --check scripts/statement-data-controls-test.js
+          node --check scripts/banking-workspace-error-recovery-test.js
+          node --check controllers/advancedBankingController.js
+          node --check public/premium-banking-app.js
           node --check controllers/statementDataManagementController.js
           node --check controllers/statementImportController.js
           node --check public/finance-intelligence.js
@@ -122,5 +126,7 @@ jobs:
         run: node scripts/print-save-pdf-test.js
       - name: Statement data controls regression contract
         run: node scripts/statement-data-controls-test.js
+      - name: Banking workspace error recovery contract
+        run: node scripts/banking-workspace-error-recovery-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js
