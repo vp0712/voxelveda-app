@@ -23,7 +23,7 @@
   const state = {
     tab:'home', scope:'ALL', currency:'AUD', range:'1M', chart:'pie',
     status:null, connections:[], quality:null, dashboard:null, budgets:[], insights:null, attention:null,
-    os:null, team:null, command:null, calendar:null, activity:[], activityQuery:'', activityCategory:'', activityAccount:'', busy:false
+    os:null, team:null, command:null, calendar:null, activity:[], activityQuery:'', activityCategory:'', activityAccount:'', partialErrors:[], busy:false
   };
   const palette = ['#44d7a5','#67a8ff','#f3b85b','#b89cff','#ff8f96','#5dd4e8','#98d66e','#e9a5ff'];
 
@@ -36,6 +36,15 @@
     let body={}; try{body=await response.json();}catch{}
     if(!response.ok){const e=new Error(body.message||('Request failed ('+response.status+')'));e.code=body.code;e.status=response.status;e.payload=body;throw e;}
     return body;
+  }
+
+  async function safeApi(path, fallback, label, options={}) {
+    try { return await api(path, options); }
+    catch (error) {
+      if (error.status === 401) throw error;
+      state.partialErrors.push({ label, message:error.message, code:error.code||null });
+      return typeof fallback === 'function' ? fallback() : fallback;
+    }
   }
 
   function rangeDates(range){
@@ -568,36 +577,56 @@
   }
 
   async function loadCore(){
+    state.partialErrors=[];
     const dates=rangeDates(state.range);
     const query=new URLSearchParams({scope:state.scope});
     if(dates.from) query.set('from',dates.from);
     if(dates.to) query.set('to',dates.to);
     const requests=[
-      api(BANK+'/status'),
-      api(BANK+'/connections'),
-      api(BANK+'/data-quality'),
-      api(FIN+'/banking-dashboard?'+query.toString()),
-      api(FIN+'/budgets'),
-      api(FIN+'/insights?scope='+encodeURIComponent(state.scope)),
-      api(OS+''),
-      api(OS+'/team').catch(()=>({can_manage:false,users:[],grants:[]})),
-      api(OS+'/command-center'),
-      api(OS+'/cashflow-calendar?days=90')
+      safeApi(BANK+'/status',{configured:false,connection_summary:{total:0,active:0,attention:0,last_sync:null}},'Open Banking status'),
+      safeApi(BANK+'/connections',{connections:[]},'Bank connections'),
+      safeApi(BANK+'/data-quality',{score:null,transactions:{},connections:{}},'Bank data quality'),
+      safeApi(FIN+'/banking-dashboard?'+query.toString(),{balances_by_currency:[],flow_by_currency:[],categories:[],merchants:[],monthly:[],accounts:[],recent_transactions:[],intelligence_by_currency:[],detected_recurring:[]},'Banking dashboard'),
+      safeApi(FIN+'/budgets',{budgets:[]},'Budgets'),
+      safeApi(FIN+'/insights?scope='+encodeURIComponent(state.scope),{insights:[]},'Insights'),
+      safeApi(OS+'',{payments:[],spaces:[],beneficiaries:[],capabilities:{},operating_intelligence:{},access:{}},'Banking operating system'),
+      safeApi(OS+'/team',{can_manage:false,users:[],grants:[]},'Team access'),
+      safeApi(OS+'/command-center',{summary_by_currency:{},attention:[],approval_inbox:[],obligations:{},role_view:{mode:'BANKING'}},'Command centre'),
+      safeApi(OS+'/cashflow-calendar?days=90',{obligations:[],calendar:[]},'Cash-flow calendar')
     ];
-    if(!STANDALONE && (state.scope==='PERSONAL'||state.scope==='ALL')) requests.push(api(PERSONAL+'/attention').catch(()=>null));
+    if(!STANDALONE && (state.scope==='PERSONAL'||state.scope==='ALL')) requests.push(safeApi(PERSONAL+'/attention',null,'Personal money attention'));
     else requests.push(Promise.resolve(null));
     const [status,connections,quality,dashboard,budgets,insights,os,team,command,calendar,attention]=await Promise.all(requests);
     state.status=status; state.connections=connections.connections||[]; state.quality=quality; state.dashboard=dashboard;
     state.budgets=budgets.budgets||[]; state.insights=insights; state.os=os; state.team=team; state.command=command; state.calendar=calendar; state.attention=attention;
     selectedCurrency();
-    await loadActivity();
+    try { await loadActivity(); }
+    catch (error) {
+      if (error.status===401) throw error;
+      state.partialErrors.push({label:'Transactions',message:error.message,code:error.code||null});
+      state.activity=[];
+    }
   }
 
   async function refresh(){
     if(state.busy) return;
     state.busy=true;
-    try{await loadCore();render();}
-    catch(e){message('Banking workspace could not load.','error',e.message);const c=$('vvPbContent');if(c)c.innerHTML='<div class="vv-pb-empty"><strong>Unable to load banking data</strong><span>'+esc(e.message)+'</span></div>';}
+    try{
+      await loadCore();
+      render();
+      if(state.partialErrors.length){
+        const names=[...new Set(state.partialErrors.map(x=>x.label))].slice(0,4);
+        message('Banking loaded with limited services.','warning',names.join(', ')+' could not refresh. Your available accounts, statements and reports remain usable.');
+      } else {
+        message('');
+      }
+    }
+    catch(e){
+      if(e.status===401){window.location.assign('/login?next='+encodeURIComponent(location.pathname));return;}
+      message('Banking workspace could not load.','error',e.message);
+      const host=$('vvPbContent');
+      if(host)host.innerHTML='<div class="vv-pb-empty"><strong>Banking data is temporarily unavailable</strong><span>'+esc(e.message)+'</span><button type="button" class="vv-pb-select" data-pb-action="refresh">Try again</button></div>';
+    }
     finally{state.busy=false;}
   }
 
@@ -720,6 +749,7 @@
     if(!action) return;
     const name=action.dataset.pbAction;
     if(name==='app-home'){window.location.assign('/admin?view=finance');return;}
+    if(name==='refresh') return refresh();
     if(name==='connect') return connectBank();
     if(name==='sync') return syncNow();
     if(name==='upload') return $('importStatement')?.click();
