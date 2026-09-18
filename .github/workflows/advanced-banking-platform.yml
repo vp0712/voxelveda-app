@@ -23,6 +23,7 @@ on:
       - 'migrations/20260918_banking_os_multi_user.sql'
       - 'controllers/bankingOperatingSystemController.js'
       - 'scripts/banking-os-multi-user-test.js'
+      - 'scripts/banking-command-center-test.js'
       - 'controllers/financeIntelligenceController.js'
       - 'routes/financeRoutes.js'
       - 'public/finance-pdf-v3.js'
@@ -85,9 +86,12 @@ jobs:
           node --check public/finance-pdf-v3.js
           node --check scripts/advanced-banking-platform-test.js
           node --check scripts/banking-os-multi-user-test.js
+          node --check scripts/banking-command-center-test.js
       - name: Architecture and security contract
         run: node scripts/advanced-banking-platform-test.js
       - name: Banking OS multi-user security contract
         run: node scripts/banking-os-multi-user-test.js
+      - name: Banking command centre regression contract
+        run: node scripts/banking-command-center-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js
