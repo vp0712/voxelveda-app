@@ -64,6 +64,7 @@
         <button class="nav-btn" data-icon="MI" data-title="Meetings & Inspections" data-section="meetingSection">Meetings & Inspections</button>
 
         <span class="nav-section-label">Finance</span>
+        <button class="nav-btn app-banking-nav" data-icon="BK" data-title="Banking" type="button" onclick="openBankingWorkspace()">Banking <span id="appBankingAlertBadge" class="app-banking-badge" hidden>0</span></button>
         <button class="nav-btn" data-icon="FN" data-title="Finance" data-section="financeSection">Finance</button>
         <button class="nav-btn" data-icon="$" data-title="Expenses" data-section="expenseSection">Expenses</button>
 
@@ -168,6 +169,7 @@
               <button class="primary-btn" onclick="goSection('invoiceSection')">Create / Review Invoice</button>
               <button class="secondary-btn" onclick="goSection('expenseSection')">Supplier Payments</button>
               <button class="secondary-btn" onclick="goSection('stockSection')">Inventory Control</button>
+              <button class="secondary-btn" onclick="openBankingWorkspace()">Banking & Insights</button>
             </div>
           </div>
           <div class="home-command-orb">
@@ -184,6 +186,7 @@
           <button class="quick-pill command-pill" onclick="goSection('customerSection')"><span>05</span>Customers</button>
           <button class="quick-pill command-pill" onclick="goSection('supplierSection')"><span>06</span>Suppliers</button>
           <button class="quick-pill command-pill" onclick="goSection('expenseSection')"><span>07</span>Expenses</button>
+          <button class="quick-pill command-pill" onclick="openBankingWorkspace()"><span>08</span>Banking</button>
           <button class="quick-pill command-pill" onclick="goSection('competitorSection')"><span>08</span>Competitors</button>
         </div>
 
@@ -1139,6 +1142,7 @@
             <p>Review recorded activity, post balanced transactions, resolve exceptions and prepare accountant-ready reports.</p>
           </div>
           <div class="card-actions finance-head-actions">
+            <button type="button" class="primary-btn" onclick="openBankingWorkspace()">Open Banking App</button>
             <button type="button" class="secondary-btn" onclick="runFinanceHealthCheck()">Run Health Check</button>
             <button type="button" class="secondary-btn" onclick="openFinanceSetupDialog()">Finance Setup</button>
             <button type="button" class="primary-btn" onclick="openFinanceTransactionDialog()">Add Transaction</button>
