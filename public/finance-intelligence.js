@@ -103,8 +103,15 @@
       aHost.innerHTML=accounts.length?accounts.map(a=>`
         <div class="warehouse-row">
           <div><strong>${escapeHtml(a.nickname||'Account')}</strong><small>${escapeHtml(a.institution||'Bank')} · ${escapeHtml(a.currency||'AUD')} · ${escapeHtml(a.ownership_scope||'')}</small></div>
-          <div class="right"><b>${Number(a.statement_count||0)} statements</b><small>${Number(a.transaction_count||0)} transactions · ${dateText(a.history_start_date)} → ${dateText(a.history_end_date)}</small></div>
+          <div class="right"><b>${Number(a.statement_count||0)} statements</b><small>${Number(a.transaction_count||0)} transactions · ${dateText(a.history_start_date)} → ${dateText(a.history_end_date)}</small>
+            <div class="warehouse-actions">
+              <button type="button" data-clear-account-history="${Number(a.id)}" data-account-name="${escapeHtml(a.nickname||'Account')}">Clear statement history</button>
+              <button type="button" data-archive-account="${Number(a.id)}" data-account-name="${escapeHtml(a.nickname||'Account')}">Archive account</button>
+            </div>
+          </div>
         </div>`).join(''):'<p class="muted">No accounts yet.</p>';
+      aHost.querySelectorAll('[data-clear-account-history]').forEach(b=>b.addEventListener('click',()=>clearAccountHistory(Number(b.dataset.clearAccountHistory),b.dataset.accountName)));
+      aHost.querySelectorAll('[data-archive-account]').forEach(b=>b.addEventListener('click',()=>archiveBankAccount(Number(b.dataset.archiveAccount),b.dataset.accountName)));
     }
 
     const sHost=$('warehouseStatements');
@@ -116,6 +123,26 @@
           <div class="right"><b>${Number(s.imported_rows||0)} rows</b><small>${escapeHtml(String(s.statement_start_date||'').slice(0,10)||'—')} → ${escapeHtml(String(s.statement_end_date||'').slice(0,10)||'—')} · ${Number(s.duplicate_rows||0)} duplicates</small></div>
         </div>`).join(''):'<p class="muted">No approved statements yet.</p>';
     }
+  }
+
+  async function clearAccountHistory(accountId,name){
+    const typed=prompt(`This removes every imported statement from "${name||'this account'}" from reports and analysis. It is reversible from Removed Statements.\n\nType CLEAR to continue.`);
+    if(typed!=='CLEAR')return;
+    try{
+      const p=await api(`${FIN_PREFIX}/accounts/${accountId}/clear-statements`,{method:'POST',body:'{}'});
+      notice(p.message||'Statement history cleared.','success');
+      await load();
+      document.getElementById('vvRefreshStatements')?.click();
+    }catch(error){notice(error.message,'error');}
+  }
+
+  async function archiveBankAccount(accountId,name){
+    if(!confirm(`Archive "${name||'this account'}"?\n\nIts history is preserved, but it will be removed from active analysis until restored.`))return;
+    try{
+      const p=await api(`${FIN_PREFIX}/accounts/${accountId}/archive`,{method:'POST',body:'{}'});
+      notice(p.message||'Account archived.','success');
+      await load();
+    }catch(error){notice(error.message,'error');}
   }
 
   function populateAccountSelect() {
