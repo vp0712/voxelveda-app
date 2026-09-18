@@ -749,6 +749,7 @@
     if(!action) return;
     const name=action.dataset.pbAction;
     if(name==='app-home'){window.location.assign('/admin?view=finance');return;}
+    if(name==='refresh') return refresh();
     if(name==='connect') return connectBank();
     if(name==='sync') return syncNow();
     if(name==='upload') return $('importStatement')?.click();
