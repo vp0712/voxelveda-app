@@ -11,12 +11,13 @@ async function tick() {
   try {
     const provider = selectedProvider() || 'BASIQ';
     const [due] = await pool.query(
-      `SELECT DISTINCT bc.app_user_id, bc.provider_user_id
+      `SELECT bc.app_user_id, bc.provider_user_id, MIN(bc.next_sync_at) AS next_sync_at
        FROM bank_connections bc
        WHERE bc.provider=? AND bc.status='ACTIVE' AND bc.provider_user_id IS NOT NULL
          AND bc.archived_at IS NULL AND bc.disconnected_at IS NULL
          AND (bc.next_sync_at IS NULL OR bc.next_sync_at<=NOW())
-       ORDER BY bc.next_sync_at ASC LIMIT 10`, [provider]
+       GROUP BY bc.app_user_id, bc.provider_user_id
+       ORDER BY MIN(bc.next_sync_at) ASC LIMIT 10`, [provider]
     );
     for (const row of due) {
       try {

@@ -135,7 +135,7 @@ assert(financeIntelligence.includes('balances_by_currency') && financeIntelligen
 assert(financeIntelligence.includes('exports.getBankingBudgets') && financeIntelligence.includes('exports.saveBankingBudget'), 'bank-connected category budget endpoints missing');
 assert(financeRoutes.includes("/intelligence/banking-dashboard") && financeRoutes.includes("/intelligence/budgets"), 'premium banking API routes missing');
 assert(bankGradeUi.includes('window.VoxelVedaFinanceLedger'), 'transaction editor bridge missing');
-assert(renderer.includes('/premium-banking-app.js?v=20260919-banking-error-fix'), 'premium banking app must be served by renderer with the current cache-safe version');
+assert(renderer.includes('/premium-banking-app.js?v=20260919-access-fix'), 'premium banking app must be served by renderer with the current cache-safe version');
 assert(premiumCss.includes('.vv-pb-donut') && premiumCss.includes('.vv-pb-line-svg') && premiumCss.includes('.vv-pb-budget'), 'premium banking chart/budget styles missing');
 assert(adminPage.includes('openBankingWorkspace()') && adminPage.includes('appBankingAlertBadge'), 'installed app Banking navigation entry missing');
 assert(adminPage.includes('Banking & Insights') && adminPage.includes('Open Banking App'), 'app Banking shortcuts missing');

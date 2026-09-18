@@ -6315,38 +6315,76 @@ async function openAccessDialog(userId) {
         <strong>Permission difference</strong><p>Change the role or grants to preview access added and removed.</p>
       </section>
       <label class="form-field">
-        <span>Reason</span>
-        <input id="dialogAccessReason" maxlength="255" placeholder="Why is this access changing?" />
+        <span>Reason <b aria-hidden="true">*</b></span>
+        <input id="dialogAccessReason" maxlength="255" required aria-describedby="dialogAccessStatus" placeholder="Required: why is this access changing?" />
       </label>
-      <p class="status-note">Access is enforced by the server using the selected role template and approved permission grants.</p>
+      <p id="dialogAccessStatus" class="status-note" role="status" aria-live="polite">Enter a reason, review the permission difference, then tap Update Access. Security verification may be required.</p>
     `,
     async () => {
+      const primaryBtn = document.getElementById('dialogPrimaryBtn');
+      const status = document.getElementById('dialogAccessStatus');
+      const reasonInput = document.getElementById('dialogAccessReason');
       const role = document.getElementById('dialogAccessRole')?.value || 'staff';
       const active = document.getElementById('dialogAccessActive')?.value === '1';
       const permissions = collectAccess();
-      const reason = document.getElementById('dialogAccessReason')?.value.trim();
+      const reason = reasonInput?.value.trim() || '';
 
       if (!reason) {
+        if (status) {
+          status.textContent = 'A reason is required before access can be updated.';
+          status.classList.add('field-error');
+        }
+        reasonInput?.focus();
         showToast('Enter a reason for this access change');
         return;
       }
 
-      const updateRes = await fetch(`/api/users/${userId}/access`, {
-        method: 'POST',
-        headers: authHeaders(),
-        body: JSON.stringify({ role, active, permissions, reason })
-      });
-
-      const updateData = await safeJson(updateRes);
-
-      if (!updateRes.ok) {
-        showToast(updateData.message || 'Access update failed');
-        return;
+      if (primaryBtn) {
+        primaryBtn.disabled = true;
+        primaryBtn.dataset.previousText = primaryBtn.textContent || 'Update Access';
+        primaryBtn.textContent = 'Updating…';
+      }
+      if (status) {
+        status.classList.remove('field-error');
+        status.textContent = 'Saving access changes…';
       }
 
-      hideDialog();
-      showToast(updateData.message || 'Access updated');
-      await loadStaff();
+      try {
+        const updateRes = await fetch(`/api/users/${userId}/access`, {
+          method: 'POST',
+          headers: authHeaders(),
+          body: JSON.stringify({ role, active, permissions, reason })
+        });
+        const updateData = await safeJson(updateRes);
+
+        if (!updateRes.ok) {
+          const detail = updateData.message || 'Access update failed';
+          if (status) {
+            status.textContent = detail;
+            status.classList.add('field-error');
+          }
+          showToast(detail);
+          return;
+        }
+
+        if (status) status.textContent = updateData.message || 'Access updated successfully.';
+        hideDialog();
+        showToast(updateData.message || 'Access updated');
+        await loadStaff();
+      } catch (error) {
+        const detail = error?.message || 'Access update could not reach the server';
+        if (status) {
+          status.textContent = detail;
+          status.classList.add('field-error');
+        }
+        showToast(detail);
+      } finally {
+        if (primaryBtn) {
+          primaryBtn.disabled = false;
+          primaryBtn.textContent = primaryBtn.dataset.previousText || 'Update Access';
+          delete primaryBtn.dataset.previousText;
+        }
+      }
     },
     'Update Access'
   );
@@ -6364,6 +6402,14 @@ async function openAccessDialog(userId) {
     target.innerHTML = `<strong>Permission difference</strong><div><span>Added</span><ul>${added}</ul><span>Removed</span><ul>${removed}</ul></div>`;
   };
   document.getElementById('dialogAccessRole')?.addEventListener('change', refreshPreview);
+  document.getElementById('dialogAccessReason')?.addEventListener('input', (event) => {
+    const status = document.getElementById('dialogAccessStatus');
+    if (!status) return;
+    status.classList.remove('field-error');
+    status.textContent = event.target.value.trim()
+      ? 'Reason recorded. Review the permission difference, then tap Update Access.'
+      : 'A reason is required before access can be updated.';
+  });
   document.querySelectorAll('.dialog-panel input[type="checkbox"]').forEach((input) => input.addEventListener('change', refreshPreview));
   refreshPreview();
 }

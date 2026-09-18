@@ -30,6 +30,7 @@ on:
       - 'scripts/print-save-pdf-test.js'
       - 'scripts/statement-data-controls-test.js'
       - 'scripts/banking-workspace-error-recovery-test.js'
+      - 'scripts/access-update-actions-test.js'
       - 'routes/bankingPortalRoutes.js'
       - 'controllers/statementImportController.js'
       - 'public/finance-intelligence.js'
@@ -103,6 +104,9 @@ jobs:
           node --check scripts/print-save-pdf-test.js
           node --check scripts/statement-data-controls-test.js
           node --check scripts/banking-workspace-error-recovery-test.js
+          node --check scripts/access-update-actions-test.js
+          node --check public/admin-dashboard.js
+          node --check services/bankSyncScheduler.js
           node --check controllers/advancedBankingController.js
           node --check public/premium-banking-app.js
           node --check controllers/statementDataManagementController.js
@@ -128,5 +132,7 @@ jobs:
         run: node scripts/statement-data-controls-test.js
       - name: Banking workspace error recovery contract
         run: node scripts/banking-workspace-error-recovery-test.js
+      - name: Access update and scheduler regression contract
+        run: node scripts/access-update-actions-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js
