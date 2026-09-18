@@ -41,7 +41,9 @@ async function visibleAccounts(req) {
   const byId = new Map(grants.map((g) => [Number(g.bank_account_id), g]));
   return accounts.filter((account) => {
     if (String(account.ownership_scope).toUpperCase() === 'PERSONAL') return Number(account.created_by) === Number(req.user.id);
-    if (isBankAdmin(req) || hasPermission(req.user, 'VIEW_BUSINESS_BANKING')) return true;
+    if (isBankAdmin(req)) return true;
+    if (grants.length) return Number(byId.get(Number(account.id))?.can_view || 0) === 1;
+    if (hasPermission(req.user, 'VIEW_BUSINESS_BANKING')) return true;
     return Number(byId.get(Number(account.id))?.can_view || 0) === 1;
   }).map((account) => ({ ...account, user_access: byId.get(Number(account.id)) || null }));
 }
@@ -100,7 +102,10 @@ function capabilities() {
 exports.getDashboard = async (req, res) => {
   try {
     const accounts = await visibleAccounts(req);
-    const businessVisible = isBankAdmin(req) || hasPermission(req.user, 'VIEW_BUSINESS_BANKING');
+    const grants = await accountAccessRows(req.user.id);
+    const grantedAccountIds = new Set(grants.filter((g)=>Number(g.can_view||0)===1).map((g)=>Number(g.bank_account_id)));
+    const restrictedBusiness = !isBankAdmin(req) && grants.length > 0;
+    const businessVisible = isBankAdmin(req) || hasPermission(req.user, 'VIEW_BUSINESS_BANKING') || grantedAccountIds.size > 0;
     const [spaces] = await pool.query(
       `SELECT * FROM banking_money_spaces
         WHERE status='ACTIVE' AND ((ownership_scope='PERSONAL' AND created_by=?) OR (ownership_scope='BUSINESS' AND ?=1))
@@ -117,7 +122,7 @@ exports.getDashboard = async (req, res) => {
     const paymentWhere = businessVisible
       ? "(ownership_scope='BUSINESS' OR created_by=?)"
       : 'created_by=?';
-    const [payments] = await pool.query(
+    let [payments] = await pool.query(
       `SELECT p.*,u.name AS created_by_name
          FROM banking_payment_requests p LEFT JOIN users u ON u.id=p.created_by
         WHERE ${paymentWhere}
@@ -125,6 +130,7 @@ exports.getDashboard = async (req, res) => {
         LIMIT 150`,
       [req.user.id]
     );
+    if (restrictedBusiness) payments = payments.filter((p) => Number(p.created_by) === Number(req.user.id) || (p.bank_account_id && grantedAccountIds.has(Number(p.bank_account_id))));
     const [[prefs]] = await pool.query('SELECT * FROM banking_alert_preferences WHERE user_id=? LIMIT 1', [req.user.id]);
     const pendingApproval = payments.filter((p) => p.status === 'PENDING_APPROVAL' && Number(p.created_by) !== Number(req.user.id));
     const upcoming = payments.filter((p) => ['PENDING_APPROVAL','APPROVED','READY_FOR_EXECUTION','SCHEDULED'].includes(p.status));
@@ -136,6 +142,7 @@ exports.getDashboard = async (req, res) => {
       spaceGapByCurrency[s.currency] = money((spaceGapByCurrency[s.currency] || 0) + gap);
     }
     return res.json({
+      current_user_id:Number(req.user.id),
       capabilities:capabilities(),
       access:{
         role:req.user.role,
