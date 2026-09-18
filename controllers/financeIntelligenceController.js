@@ -604,6 +604,145 @@ exports.getSpendingReport = async (req, res) => {
 };
 
 
+
+exports.getBankingDashboard = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const scope = normalizeDashboardScope(req.query.scope);
+    const from = reportDate(req.query.from, 'From date');
+    const to = reportDate(req.query.to, 'To date');
+    if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
+
+    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba')];
+    const accountParams = [...privacy.visibilityParams(req)];
+    const txClauses = [privacy.visibilitySql('ba'), "bt.reconciliation_status <> 'IGNORED'"];
+    const txParams = [...privacy.visibilityParams(req)];
+    if (scope !== 'ALL') {
+      accountClauses.push('ba.ownership_scope=?');
+      accountParams.push(scope);
+      txClauses.push('bt.ownership_scope=?');
+      txParams.push(scope);
+    }
+    if (from) { txClauses.push('bt.transaction_date>=?'); txParams.push(from); }
+    if (to) { txClauses.push('bt.transaction_date<=?'); txParams.push(to); }
+    const txWhere = txClauses.join(' AND ');
+
+    const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
+      pool.query(
+        `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
+                ba.entity_name,ba.account_type,ba.financial_purpose,ba.connection_type,ba.connection_status,
+                ba.current_ledger_balance,ba.available_balance,ba.last_synced_at,
+                COUNT(bt.id) AS transaction_count
+           FROM bank_accounts ba
+           LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
+          WHERE ${accountClauses.join(' AND ')}
+          GROUP BY ba.id ORDER BY ba.ownership_scope,ba.nickname`,
+        accountParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT ba.currency,COUNT(*) AS account_count,
+                COALESCE(SUM(COALESCE(ba.available_balance,ba.current_ledger_balance,0)),0) AS balance
+           FROM bank_accounts ba
+          WHERE ${accountClauses.join(' AND ')}
+          GROUP BY ba.currency ORDER BY ba.currency`,
+        accountParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
+                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_out,
+                SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${txWhere}
+          GROUP BY bt.currency ORDER BY bt.currency`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
+                COUNT(*) AS transaction_count,COALESCE(SUM(bt.debit),0) AS spent
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${txWhere}
+          GROUP BY bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified')
+          ORDER BY bt.currency,spent DESC`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
+                COUNT(*) AS transaction_count,COALESCE(SUM(bt.debit),0) AS spent
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${txWhere}
+          GROUP BY bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
+          ORDER BY bt.currency,spent DESC LIMIT 120`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.transaction_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH)
+            AND ${privacy.visibilitySql('ba')}
+            ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
+            AND bt.reconciliation_status<>'IGNORED'
+          GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
+          ORDER BY bt.currency,month`,
+        [...privacy.visibilityParams(req), ...(scope !== 'ALL' ? [scope] : [])]
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.id,bt.bank_account_id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,
+                bt.debit,bt.credit,bt.running_balance,bt.currency,bt.ownership_scope,bt.reconciliation_status,
+                bt.is_internal_transfer,bt.source_type,bt.statement_import_uid,ba.nickname AS account_name,
+                ba.institution,sif.original_name AS statement_name
+           FROM bank_transactions bt
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
+          WHERE ${txWhere}
+          ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 40`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT fi.recurring_frequency,fi.merchant_normalized,MAX(bt.transaction_date) AS last_seen,
+                COUNT(*) AS matched_transactions,bt.currency,
+                COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),fi.merchant_normalized,'Recurring payment') AS merchant,
+                AVG(CASE WHEN bt.debit>0 THEN bt.debit ELSE bt.credit END) AS typical_amount
+           FROM finance_transaction_insights fi
+           JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE fi.recurring_frequency IS NOT NULL AND fi.status<>'DISMISSED'
+            AND ${privacy.visibilitySql('ba')}
+            ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
+          GROUP BY fi.recurring_frequency,fi.merchant_normalized,bt.currency,merchant
+          ORDER BY last_seen DESC LIMIT 30`,
+        [...privacy.visibilityParams(req), ...(scope !== 'ALL' ? [scope] : [])]
+      ).then(([rows]) => rows)
+    ]);
+
+    return res.json({
+      scope,
+      period: { from: from || null, to: to || null },
+      currency_rule: 'Currencies are never added together. Choose a currency to analyse balances and spending.',
+      accounts,
+      balances_by_currency: balances.map((row) => ({ currency: row.currency, account_count: Number(row.account_count || 0), balance: Number(row.balance || 0) })),
+      flow_by_currency: flow.map((row) => ({
+        currency: row.currency,
+        transaction_count: Number(row.transaction_count || 0),
+        money_in: Number(row.money_in || 0),
+        money_out: Number(row.money_out || 0),
+        net_flow: Number(row.money_in || 0) - Number(row.money_out || 0),
+        cash_out: Number(row.cash_out || 0),
+        unclassified: Number(row.unclassified || 0)
+      })),
+      categories: categories.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
+      merchants: merchants.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
+      monthly: monthly.map((row) => ({ ...row, money_in: Number(row.money_in || 0), money_out: Number(row.money_out || 0) })),
+      recent_transactions: recent,
+      detected_recurring: detectedRecurring.map((row) => ({ ...row, typical_amount: Number(row.typical_amount || 0), matched_transactions: Number(row.matched_transactions || 0) }))
+    });
+  } catch (error) { return fail(res, error, 'Failed to load premium banking dashboard'); }
+};
+
+
 function isoUtcDay(date) {
   return date.toISOString().slice(0, 10);
 }
