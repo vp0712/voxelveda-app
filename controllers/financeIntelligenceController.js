@@ -603,6 +603,312 @@ exports.getSpendingReport = async (req, res) => {
   } catch (error) { return fail(res, error, 'Failed to build spending report'); }
 };
 
+
+
+exports.getBankingDashboard = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const scope = normalizeDashboardScope(req.query.scope);
+    const from = reportDate(req.query.from, 'From date');
+    const to = reportDate(req.query.to, 'To date');
+    if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
+
+    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba')];
+    const accountParams = [...privacy.visibilityParams(req)];
+    const txClauses = [privacy.visibilitySql('ba'), "bt.reconciliation_status <> 'IGNORED'"];
+    const txParams = [...privacy.visibilityParams(req)];
+    if (scope !== 'ALL') {
+      accountClauses.push('ba.ownership_scope=?');
+      accountParams.push(scope);
+      txClauses.push('bt.ownership_scope=?');
+      txParams.push(scope);
+    }
+    if (from) { txClauses.push('bt.transaction_date>=?'); txParams.push(from); }
+    if (to) { txClauses.push('bt.transaction_date<=?'); txParams.push(to); }
+    const txWhere = txClauses.join(' AND ');
+
+    const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
+      pool.query(
+        `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
+                ba.entity_name,ba.account_type,ba.financial_purpose,ba.connection_type,ba.connection_status,
+                ba.current_ledger_balance,ba.available_balance,ba.last_synced_at,
+                COUNT(bt.id) AS transaction_count
+           FROM bank_accounts ba
+           LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
+          WHERE ${accountClauses.join(' AND ')}
+          GROUP BY ba.id ORDER BY ba.ownership_scope,ba.nickname`,
+        accountParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT ba.currency,COUNT(*) AS account_count,
+                COALESCE(SUM(COALESCE(ba.available_balance,ba.current_ledger_balance,0)),0) AS balance
+           FROM bank_accounts ba
+          WHERE ${accountClauses.join(' AND ')}
+          GROUP BY ba.currency ORDER BY ba.currency`,
+        accountParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
+                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_out,
+                SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${txWhere}
+          GROUP BY bt.currency ORDER BY bt.currency`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
+                COUNT(*) AS transaction_count,COALESCE(SUM(bt.debit),0) AS spent
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${txWhere}
+          GROUP BY bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified')
+          ORDER BY bt.currency,spent DESC`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
+                COUNT(*) AS transaction_count,COALESCE(SUM(bt.debit),0) AS spent
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${txWhere}
+          GROUP BY bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
+          ORDER BY bt.currency,spent DESC LIMIT 120`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.transaction_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH)
+            AND ${privacy.visibilitySql('ba')}
+            ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
+            AND bt.reconciliation_status<>'IGNORED'
+          GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
+          ORDER BY bt.currency,month`,
+        [...privacy.visibilityParams(req), ...(scope !== 'ALL' ? [scope] : [])]
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.id,bt.bank_account_id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,
+                bt.debit,bt.credit,bt.running_balance,bt.currency,bt.ownership_scope,bt.reconciliation_status,
+                bt.is_internal_transfer,bt.source_type,bt.statement_import_uid,ba.nickname AS account_name,
+                ba.institution,sif.original_name AS statement_name
+           FROM bank_transactions bt
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
+          WHERE ${txWhere}
+          ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 40`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT fi.recurring_frequency,fi.merchant_normalized,MAX(bt.transaction_date) AS last_seen,
+                COUNT(*) AS matched_transactions,bt.currency,
+                COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),fi.merchant_normalized,'Recurring payment') AS merchant,
+                AVG(CASE WHEN bt.debit>0 THEN bt.debit ELSE bt.credit END) AS typical_amount
+           FROM finance_transaction_insights fi
+           JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE fi.recurring_frequency IS NOT NULL AND fi.status<>'DISMISSED'
+            AND ${privacy.visibilitySql('ba')}
+            ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
+          GROUP BY fi.recurring_frequency,fi.merchant_normalized,bt.currency,merchant
+          ORDER BY last_seen DESC LIMIT 30`,
+        [...privacy.visibilityParams(req), ...(scope !== 'ALL' ? [scope] : [])]
+      ).then(([rows]) => rows)
+    ]);
+
+    return res.json({
+      scope,
+      period: { from: from || null, to: to || null },
+      currency_rule: 'Currencies are never added together. Choose a currency to analyse balances and spending.',
+      accounts,
+      balances_by_currency: balances.map((row) => ({ currency: row.currency, account_count: Number(row.account_count || 0), balance: Number(row.balance || 0) })),
+      flow_by_currency: flow.map((row) => ({
+        currency: row.currency,
+        transaction_count: Number(row.transaction_count || 0),
+        money_in: Number(row.money_in || 0),
+        money_out: Number(row.money_out || 0),
+        net_flow: Number(row.money_in || 0) - Number(row.money_out || 0),
+        cash_out: Number(row.cash_out || 0),
+        unclassified: Number(row.unclassified || 0)
+      })),
+      categories: categories.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
+      merchants: merchants.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
+      monthly: monthly.map((row) => ({ ...row, money_in: Number(row.money_in || 0), money_out: Number(row.money_out || 0) })),
+      recent_transactions: recent,
+      detected_recurring: detectedRecurring.map((row) => ({ ...row, typical_amount: Number(row.typical_amount || 0), matched_transactions: Number(row.matched_transactions || 0) }))
+    });
+  } catch (error) { return fail(res, error, 'Failed to load premium banking dashboard'); }
+};
+
+
+function isoUtcDay(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function utcDate(value) {
+  const text = dateOnly(value);
+  if (!text) return null;
+  const date = new Date(`${text}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addUtcDays(date, days) {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function monthAnchor(year, month, day) {
+  const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(day, last)));
+}
+
+function bankingBudgetWindow(cycle, anchorValue, nowValue = new Date()) {
+  const anchor = utcDate(anchorValue);
+  if (!anchor) throw new FinanceError('Budget start date is invalid.', 400, 'INVALID_BUDGET_ANCHOR');
+  const now = new Date(Date.UTC(nowValue.getUTCFullYear(), nowValue.getUTCMonth(), nowValue.getUTCDate()));
+  if (cycle === 'MONTHLY') {
+    const day = anchor.getUTCDate();
+    let start = monthAnchor(now.getUTCFullYear(), now.getUTCMonth(), day);
+    if (start > now) start = monthAnchor(now.getUTCFullYear(), now.getUTCMonth() - 1, day);
+    const end = monthAnchor(start.getUTCFullYear(), start.getUTCMonth() + 1, day);
+    return { start: isoUtcDay(start), end: isoUtcDay(end) };
+  }
+  const days = cycle === 'FORTNIGHTLY' ? 14 : 7;
+  const diffDays = Math.floor((now.getTime() - anchor.getTime()) / 86400000);
+  const periods = Math.floor(diffDays / days);
+  const start = addUtcDays(anchor, periods * days);
+  const end = addUtcDays(start, days);
+  return { start: isoUtcDay(start), end: isoUtcDay(end) };
+}
+
+exports.getBankingBudgets = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const userId = Number(req.user?.id || req.user?.user_id || 0);
+    if (!userId) throw new FinanceError('User identity unavailable.', 401, 'USER_REQUIRED');
+    const [budgets] = await pool.query(
+      `SELECT id,budget_uid,ownership_scope,category,currency,cycle,cycle_anchor_date,limit_amount,active,updated_at
+         FROM finance_bank_budgets
+        WHERE created_by=? AND active=1
+        ORDER BY FIELD(ownership_scope,'BUSINESS','PERSONAL','MIXED','UNCLASSIFIED','ALL'),category`,
+      [userId]
+    );
+    const items = [];
+    for (const budget of budgets) {
+      const window = bankingBudgetWindow(String(budget.cycle), budget.cycle_anchor_date);
+      const clauses = [
+        privacy.visibilitySql('ba'),
+        "bt.reconciliation_status <> 'IGNORED'",
+        'bt.is_internal_transfer=0',
+        'bt.currency=?',
+        "COALESCE(NULLIF(bt.category,''),'Unclassified')=?",
+        'bt.transaction_date>=?',
+        'bt.transaction_date<?'
+      ];
+      const params = [...privacy.visibilityParams(req), budget.currency, budget.category, window.start, window.end];
+      if (budget.ownership_scope !== 'ALL') {
+        clauses.push('bt.ownership_scope=?');
+        params.push(budget.ownership_scope);
+      }
+      const [[spend]] = await pool.query(
+        `SELECT COALESCE(SUM(bt.debit),0) AS spent,COUNT(*) AS transaction_count
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${clauses.join(' AND ')}`,
+        params
+      );
+      const limit = Number(budget.limit_amount || 0);
+      const spent = Number(spend.spent || 0);
+      items.push({
+        ...budget,
+        limit_amount: limit,
+        spent_amount: spent,
+        remaining_amount: Math.round((limit - spent) * 100) / 100,
+        used_percent: limit > 0 ? Math.round((spent / limit) * 1000) / 10 : 0,
+        transaction_count: Number(spend.transaction_count || 0),
+        period_start: window.start,
+        period_end_exclusive: window.end
+      });
+    }
+    return res.json({ budgets: items });
+  } catch (error) { return fail(res, error, 'Failed to load banking budgets'); }
+};
+
+exports.saveBankingBudget = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const userId = Number(req.user?.id || req.user?.user_id || 0);
+    if (!userId) throw new FinanceError('User identity unavailable.', 401, 'USER_REQUIRED');
+    const scope = String(req.body.ownership_scope || 'PERSONAL').trim().toUpperCase();
+    if (!['ALL','PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(scope)) throw new FinanceError('Choose a valid budget scope.', 400, 'INVALID_BUDGET_SCOPE');
+    const category = String(req.body.category || '').trim().slice(0,120);
+    if (!category) throw new FinanceError('Budget category is required.', 400, 'BUDGET_CATEGORY_REQUIRED');
+    const currency = String(req.body.currency || 'AUD').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) throw new FinanceError('Budget currency must use a three-letter code.', 400, 'INVALID_BUDGET_CURRENCY');
+    const cycle = String(req.body.cycle || 'MONTHLY').trim().toUpperCase();
+    if (!['WEEKLY','FORTNIGHTLY','MONTHLY'].includes(cycle)) throw new FinanceError('Choose weekly, fortnightly or monthly.', 400, 'INVALID_BUDGET_CYCLE');
+    const anchor = dateOnly(req.body.cycle_anchor_date) || new Date().toISOString().slice(0,10);
+    const limit = money.fromCents(money.toCents(req.body.limit_amount || 0));
+    if (money.toCents(limit) <= 0n) throw new FinanceError('Budget limit must be greater than zero.', 400, 'INVALID_BUDGET_LIMIT');
+
+    const [[existing]] = await pool.query(
+      `SELECT id,budget_uid,limit_amount,cycle_anchor_date FROM finance_bank_budgets
+        WHERE created_by=? AND ownership_scope=? AND category=? AND currency=? AND cycle=? LIMIT 1`,
+      [userId,scope,category,currency,cycle]
+    );
+    const budgetUid = existing?.budget_uid || uid('BUD');
+    if (existing) {
+      await pool.query(
+        `UPDATE finance_bank_budgets
+            SET limit_amount=?,cycle_anchor_date=?,active=1,updated_at=NOW()
+          WHERE id=?`,
+        [limit,anchor,existing.id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO finance_bank_budgets
+         (budget_uid,created_by,ownership_scope,category,currency,cycle,cycle_anchor_date,limit_amount,active)
+         VALUES (?,?,?,?,?,?,?,?,1)`,
+        [budgetUid,userId,scope,category,currency,cycle,anchor,limit]
+      );
+    }
+    await logAudit(pool, audit(req, {
+      action: existing ? 'BANKING_BUDGET_UPDATED' : 'BANKING_BUDGET_CREATED',
+      module: 'finance_intelligence',
+      recordType: 'finance_bank_budget',
+      recordId: budgetUid,
+      oldValue: existing || null,
+      newValue: { ownership_scope: scope, category, currency, cycle, cycle_anchor_date: anchor, limit_amount: limit }
+    }));
+    return res.json({ message: existing ? 'Banking budget updated.' : 'Banking budget created.', budget_uid: budgetUid });
+  } catch (error) { return fail(res, error, 'Failed to save banking budget'); }
+};
+
+exports.deleteBankingBudget = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const userId = Number(req.user?.id || req.user?.user_id || 0);
+    const budgetUid = String(req.params.uid || '').trim();
+    const [[existing]] = await pool.query(
+      'SELECT * FROM finance_bank_budgets WHERE budget_uid=? AND created_by=? LIMIT 1',
+      [budgetUid,userId]
+    );
+    if (!existing) throw new FinanceError('Banking budget not found.', 404, 'BANKING_BUDGET_NOT_FOUND');
+    await pool.query('UPDATE finance_bank_budgets SET active=0,updated_at=NOW() WHERE id=?', [existing.id]);
+    await logAudit(pool, audit(req, {
+      action: 'BANKING_BUDGET_ARCHIVED',
+      module: 'finance_intelligence',
+      recordType: 'finance_bank_budget',
+      recordId: budgetUid,
+      oldValue: existing,
+      newValue: { active: 0 }
+    }));
+    return res.json({ message: 'Budget removed from active tracking.' });
+  } catch (error) { return fail(res, error, 'Failed to remove banking budget'); }
+};
+
 exports.getAccounts = async (req, res) => {
   try {
     await ensureFinanceSchema();

@@ -515,6 +515,12 @@
     }).observe(notice,{childList:true,attributes:true,attributeFilter:['hidden','class']});
   }
 
+  window.VoxelVedaFinanceLedger = Object.freeze({
+    openTransactionEditor,
+    reload: loadLedger,
+    selectedCount() { return state.selected.size; }
+  });
+
   if (document.readyState==='loading') document.addEventListener('DOMContentLoaded',init,{once:true});
   else init();
 })();
