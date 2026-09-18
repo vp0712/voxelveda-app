@@ -372,3 +372,229 @@ exports.saveAlerts = async (req,res) => {
 };
 
 exports.capabilities = async (req,res) => res.json(capabilities());
+
+
+function dateOnly(value) {
+  const text = clean(value, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : null;
+}
+function addDaysIso(days) {
+  const d = new Date(); d.setUTCDate(d.getUTCDate() + Number(days || 0)); return d.toISOString().slice(0,10);
+}
+function paymentVisibleTo(req, payment, accountIds) {
+  if (Number(payment.created_by) === Number(req.user.id)) return true;
+  if (String(payment.ownership_scope).toUpperCase() === 'PERSONAL') return false;
+  if (isBankAdmin(req)) return true;
+  return payment.bank_account_id && accountIds.has(Number(payment.bank_account_id));
+}
+async function visiblePaymentRows(req, limit=250) {
+  const accounts = await visibleAccounts(req);
+  const accountIds = new Set(accounts.map((a)=>Number(a.id)));
+  const [rows] = await pool.query(
+    `SELECT p.*,u.name AS created_by_name,ba.nickname AS account_name
+       FROM banking_payment_requests p
+       LEFT JOIN users u ON u.id=p.created_by
+       LEFT JOIN bank_accounts ba ON ba.id=p.bank_account_id
+      ORDER BY COALESCE(p.due_date,'9999-12-31'),p.created_at DESC LIMIT ?`,
+    [Number(limit)]
+  );
+  return rows.filter((p)=>paymentVisibleTo(req,p,accountIds));
+}
+
+exports.getCommandCenter = async (req,res) => {
+  try {
+    const accounts = await visibleAccounts(req);
+    const ids = accounts.map((a)=>Number(a.id));
+    const accountIds = new Set(ids);
+    const payments = await visiblePaymentRows(req,300);
+    let transactions=[];
+    if(ids.length){
+      const placeholders=ids.map(()=>'?').join(',');
+      [transactions]=await pool.query(
+        `SELECT bt.id,bt.bank_account_id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,
+                bt.debit,bt.credit,bt.currency,bt.is_internal_transfer,bt.reconciliation_status,ba.nickname AS account_name
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.bank_account_id IN (${placeholders})
+            AND bt.transaction_date>=DATE_SUB(CURDATE(),INTERVAL 90 DAY)
+            AND bt.reconciliation_status<>'IGNORED'
+          ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 1500`,
+        ids
+      );
+    }
+    const currencies=[...new Set(accounts.map((a)=>a.currency).concat(transactions.map((t)=>t.currency)).filter(Boolean))];
+    const byCurrency={};
+    for(const cur of currencies){
+      const curAccounts=accounts.filter((a)=>a.currency===cur);
+      const curTx=transactions.filter((t)=>t.currency===cur && !Number(t.is_internal_transfer||0));
+      const balance=curAccounts.reduce((sum,a)=>sum+Number(a.available_balance==null?a.current_ledger_balance:a.available_balance||0),0);
+      const income90=curTx.reduce((sum,t)=>sum+Number(t.credit||0),0);
+      const spend90=curTx.reduce((sum,t)=>sum+Number(t.debit||0),0);
+      const dailyBurn=spend90/90;
+      const pending=payments.filter((p)=>p.currency===cur && ['PENDING_APPROVAL','APPROVED','READY_FOR_EXECUTION','SCHEDULED'].includes(p.status));
+      const pendingAmount=pending.reduce((sum,p)=>sum+Number(p.amount||0),0);
+      const due30=pending.filter((p)=>p.due_date && p.due_date<=addDaysIso(30)).reduce((sum,p)=>sum+Number(p.amount||0),0);
+      const topMerchants={};
+      for(const t of curTx.filter((t)=>Number(t.debit||0)>0)){
+        const key=clean(t.merchant_name||t.description||'Unknown',120)||'Unknown';
+        topMerchants[key]=(topMerchants[key]||0)+Number(t.debit||0);
+      }
+      const merchantConcentration=spend90>0
+        ? Math.max(0,...Object.values(topMerchants))/spend90*100
+        : 0;
+      const liquidityAfter30=balance-due30+(income90/3)-(spend90/3);
+      byCurrency[cur]={
+        balance:money(balance),
+        income_90d:money(income90),
+        spend_90d:money(spend90),
+        average_daily_spend:money(dailyBurn),
+        pending_obligations:money(pendingAmount),
+        due_next_30d:money(due30),
+        projected_liquidity_30d:money(liquidityAfter30),
+        merchant_concentration_percent:Number(merchantConcentration.toFixed(1)),
+        runway_days:dailyBurn>0?Number((balance/dailyBurn).toFixed(0)):null
+      };
+    }
+    const approvalInbox=payments.filter((p)=>p.status==='PENDING_APPROVAL' && Number(p.created_by)!==Number(req.user.id) && (canApprove(req)||isBankAdmin(req)));
+    const today=addDaysIso(0);
+    const next7=addDaysIso(7);
+    const next30=addDaysIso(30);
+    const attention=[];
+    for(const [cur,metrics] of Object.entries(byCurrency)){
+      if(metrics.projected_liquidity_30d<0) attention.push({severity:'HIGH',code:'LIQUIDITY_30D_NEGATIVE',currency:cur,message:`Projected 30-day liquidity is below zero in ${cur}.`});
+      if(metrics.runway_days!==null && metrics.runway_days<45) attention.push({severity:'HIGH',code:'SHORT_RUNWAY',currency:cur,message:`Visible cash runway is about ${metrics.runway_days} days in ${cur}.`});
+      if(metrics.merchant_concentration_percent>=35) attention.push({severity:'MEDIUM',code:'MERCHANT_CONCENTRATION',currency:cur,message:`One merchant represents about ${metrics.merchant_concentration_percent}% of recent spending.`});
+    }
+    if(approvalInbox.length) attention.push({severity:'MEDIUM',code:'APPROVALS_WAITING',message:`${approvalInbox.length} payment approval(s) need attention.`});
+    const overdue=payments.filter((p)=>p.due_date && p.due_date<today && !['COMPLETED','REJECTED','CANCELLED'].includes(p.status));
+    if(overdue.length) attention.push({severity:'HIGH',code:'OVERDUE_OBLIGATIONS',message:`${overdue.length} payment obligation(s) are overdue.`});
+    return res.json({
+      generated_at:new Date().toISOString(),
+      role_view:{
+        role:req.user.role,
+        mode:isBankAdmin(req)?'BANKING_ADMIN':canApprove(req)?'APPROVER':hasPermission(req.user,'EDIT_FINANCE')?'PREPARER':'VIEWER'
+      },
+      summary_by_currency:byCurrency,
+      approval_inbox:approvalInbox.slice(0,30),
+      obligations:{
+        overdue:overdue.length,
+        due_7d:payments.filter((p)=>p.due_date&&p.due_date>=today&&p.due_date<=next7&&!['COMPLETED','REJECTED','CANCELLED'].includes(p.status)).length,
+        due_30d:payments.filter((p)=>p.due_date&&p.due_date>=today&&p.due_date<=next30&&!['COMPLETED','REJECTED','CANCELLED'].includes(p.status)).length
+      },
+      attention,
+      recent_activity:transactions.slice(0,20)
+    });
+  }catch(error){return fail(res,error,'Failed to load banking command centre');}
+};
+
+exports.getApprovalInbox = async (req,res) => {
+  try {
+    if(!canApprove(req) && !isBankAdmin(req)) return res.json({can_approve:false,payments:[]});
+    const rows=(await visiblePaymentRows(req,300))
+      .filter((p)=>p.status==='PENDING_APPROVAL'&&Number(p.created_by)!==Number(req.user.id));
+    return res.json({can_approve:true,payments:rows});
+  }catch(error){return fail(res,error,'Failed to load approval inbox');}
+};
+
+exports.getCashflowCalendar = async (req,res) => {
+  try {
+    const days=Math.min(180,Math.max(14,Number(req.query.days||90)));
+    const until=addDaysIso(days);
+    const today=addDaysIso(0);
+    const payments=(await visiblePaymentRows(req,500)).filter((p)=>p.due_date&&p.due_date>=today&&p.due_date<=until&&!['COMPLETED','REJECTED','CANCELLED'].includes(p.status));
+    const events=payments.map((p)=>({
+      date:String(p.due_date).slice(0,10),
+      type:'PAYMENT',
+      payment_uid:p.payment_uid,
+      title:p.payee_name,
+      amount:Number(p.amount||0),
+      currency:p.currency,
+      status:p.status,
+      account_name:p.account_name||null,
+      schedule_type:p.schedule_type
+    }));
+    return res.json({from:today,to:until,events});
+  }catch(error){return fail(res,error,'Failed to load cash-flow calendar');}
+};
+
+exports.getAccountDetail = async (req,res) => {
+  try {
+    const accountId=Number(req.params.id);
+    const account=await assertAccountVisible(req,accountId,'view');
+    const [transactions]=await pool.query(
+      `SELECT id,transaction_date,description,merchant_name,category,debit,credit,running_balance,currency,
+              reconciliation_status,is_internal_transfer,source_type
+         FROM bank_transactions
+        WHERE bank_account_id=? AND reconciliation_status<>'IGNORED'
+        ORDER BY transaction_date DESC,id DESC LIMIT 250`,
+      [accountId]
+    );
+    const [monthly]=await pool.query(
+      `SELECT DATE_FORMAT(transaction_date,'%Y-%m') AS month,
+              COALESCE(SUM(CASE WHEN is_internal_transfer=0 THEN credit ELSE 0 END),0) AS money_in,
+              COALESCE(SUM(CASE WHEN is_internal_transfer=0 THEN debit ELSE 0 END),0) AS money_out
+         FROM bank_transactions
+        WHERE bank_account_id=? AND reconciliation_status<>'IGNORED'
+          AND transaction_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH)
+        GROUP BY DATE_FORMAT(transaction_date,'%Y-%m') ORDER BY month`,
+      [accountId]
+    );
+    const [categories]=await pool.query(
+      `SELECT COALESCE(NULLIF(category,''),'Unclassified') AS category,COUNT(*) AS transaction_count,COALESCE(SUM(debit),0) AS spent
+         FROM bank_transactions
+        WHERE bank_account_id=? AND debit>0 AND is_internal_transfer=0 AND reconciliation_status<>'IGNORED'
+          AND transaction_date>=DATE_SUB(CURDATE(),INTERVAL 90 DAY)
+        GROUP BY COALESCE(NULLIF(category,''),'Unclassified') ORDER BY spent DESC LIMIT 15`,
+      [accountId]
+    );
+    const [payments]=await pool.query(
+      `SELECT payment_uid,payee_name,amount,currency,due_date,schedule_type,status,required_approvals,approved_count
+         FROM banking_payment_requests
+        WHERE bank_account_id=? ORDER BY created_at DESC LIMIT 50`,
+      [accountId]
+    );
+    const balance=Number(account.available_balance==null?account.current_ledger_balance:account.available_balance||0);
+    const income90=transactions.filter((t)=>String(t.transaction_date).slice(0,10)>=addDaysIso(-90)&&!Number(t.is_internal_transfer||0)).reduce((s,t)=>s+Number(t.credit||0),0);
+    const spend90=transactions.filter((t)=>String(t.transaction_date).slice(0,10)>=addDaysIso(-90)&&!Number(t.is_internal_transfer||0)).reduce((s,t)=>s+Number(t.debit||0),0);
+    return res.json({
+      account,
+      metrics:{
+        balance:money(balance),
+        income_90d:money(income90),
+        spend_90d:money(spend90),
+        net_90d:money(income90-spend90),
+        average_daily_spend:money(spend90/90),
+        runway_days:spend90>0?Number((balance/(spend90/90)).toFixed(0)):null
+      },
+      monthly:monthly.map((m)=>({...m,money_in:Number(m.money_in||0),money_out:Number(m.money_out||0)})),
+      categories:categories.map((x)=>({...x,spent:Number(x.spent||0),transaction_count:Number(x.transaction_count||0)})),
+      payments,
+      transactions
+    });
+  }catch(error){return fail(res,error,'Failed to load account detail');}
+};
+
+exports.cancelPayment = async (req,res) => {
+  try {
+    const uidValue=clean(req.params.uid,80);
+    const [[payment]]=await pool.query('SELECT * FROM banking_payment_requests WHERE payment_uid=? LIMIT 1',[uidValue]);
+    if(!payment) throw httpError('Payment not found.',404);
+    if(Number(payment.created_by)!==Number(req.user.id)&&!isBankAdmin(req)) throw httpError('Only the preparer or banking administrator can cancel this payment.',403);
+    if(['COMPLETED','REJECTED','CANCELLED'].includes(payment.status)) throw httpError('This payment can no longer be cancelled.',409);
+    await pool.query("UPDATE banking_payment_requests SET status='CANCELLED',updated_at=NOW() WHERE id=?",[payment.id]);
+    await logAudit(pool,audit(req,{action:'BANKING_PAYMENT_CANCELLED',recordType:'banking_payment',recordId:uidValue,oldValue:{status:payment.status},newValue:{status:'CANCELLED'}}));
+    return res.json({message:'Payment workflow cancelled. No money was moved by Voxel Veda.'});
+  }catch(error){return fail(res,error,'Failed to cancel payment');}
+};
+
+exports.archiveSpace = async (req,res) => {
+  try {
+    const uidValue=clean(req.params.uid,80);
+    const [[space]]=await pool.query("SELECT * FROM banking_money_spaces WHERE space_uid=? AND status='ACTIVE' LIMIT 1",[uidValue]);
+    if(!space) throw httpError('Money Space not found.',404);
+    if(space.ownership_scope==='PERSONAL'&&Number(space.created_by)!==Number(req.user.id)) throw httpError('You cannot archive another user\'s personal Space.',403);
+    if(space.ownership_scope==='BUSINESS'&&!hasPermission(req.user,'EDIT_FINANCE')&&!isBankAdmin(req)) throw httpError('Business finance edit access is required.',403);
+    await pool.query("UPDATE banking_money_spaces SET status='ARCHIVED',updated_at=NOW() WHERE id=?",[space.id]);
+    await logAudit(pool,audit(req,{action:'BANKING_SPACE_ARCHIVED',recordType:'banking_money_space',recordId:uidValue,newValue:{status:'ARCHIVED'}}));
+    return res.json({message:'Money Space archived.'});
+  }catch(error){return fail(res,error,'Failed to archive Money Space');}
+};
