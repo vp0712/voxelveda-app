@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[ch]));
   const money = (value, currency='AUD') => new Intl.NumberFormat('en-AU', { style:'currency', currency }).format(Number(value || 0));
-  const state = { scope:'ALL', q:'', accountId:'', loading:false };
+  const state = { scope:'ALL', q:'', accountId:'', loading:false, selected:new Set() };
 
   async function api(path, options={}) {
     const response = await fetch(path, {
@@ -60,22 +60,156 @@
       .vv-ledger-summary span{display:block;color:#667085;font-size:.72rem;margin-bottom:5px}
       .vv-ledger-summary strong{font-size:1.05rem}
       .vv-ledger-list{display:flex;flex-direction:column}
-      .vv-tx-row{display:grid;grid-template-columns:130px minmax(220px,1.6fr) 150px 140px 150px 130px;gap:12px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0f4}
+      .vv-tx-row{display:grid;grid-template-columns:34px 110px minmax(220px,1.6fr) 140px 130px 135px 120px 82px;gap:10px;align-items:center;padding:13px 0;border-bottom:1px solid #edf0f4}
       .vv-tx-row:last-child{border-bottom:0}
       .vv-tx-main strong,.vv-tx-main small{display:block}.vv-tx-main small{color:#7b8496;margin-top:4px}
       .vv-tx-amount.out{color:#a12b2b;font-weight:850}.vv-tx-amount.in{color:#176a36;font-weight:850}
       .vv-scope-chip,.vv-source-chip{display:inline-flex;border-radius:999px;padding:5px 8px;font-size:.68rem;font-weight:850;background:#eef1f5;color:#475467}
       .vv-scope-chip.business{background:#eaf8ef;color:#166534}.vv-scope-chip.personal{background:#eef4ff;color:#1d4ed8}.vv-scope-chip.mixed{background:#fff7df;color:#854d0e}
       .vv-source-chip.manual{background:#fff4e5;color:#8a4b00}
+      .vv-ledger-bulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:-2px 0 12px}
+      .vv-ledger-bulk button{border:1px solid #dfe5ee;background:#fff;border-radius:9px;padding:8px 11px;font-weight:800;cursor:pointer}
+      .vv-ledger-bulk button:disabled{opacity:.45;cursor:not-allowed}
+      .vv-select-tx{width:19px;height:19px;accent-color:#111827}
+      .vv-manage-tx{border:1px solid #dfe5ee;background:#fff;border-radius:9px;padding:7px 9px;font-weight:800;cursor:pointer}
+      #vvTransactionEditor,#vvBulkCategoryDialog{max-width:620px}
+      .vv-check-row{display:flex!important;align-items:center;gap:9px!important;flex-direction:row!important}
+      .vv-check-row input{width:18px;height:18px}
+      .vv-scope-hint{font-size:.72rem;color:#667085;margin-top:5px}
       @media(max-width:760px){
         .vv-ledger-summary{grid-template-columns:repeat(2,1fr)}
         .vv-ledger-toolbar{display:grid;grid-template-columns:1fr}.vv-ledger-toolbar input{min-width:0;width:100%}
         .vv-tx-row{display:grid;grid-template-columns:1fr 1fr;background:#fff;border:1px solid #e1e6ed;border-radius:14px;padding:12px;margin-bottom:10px;gap:9px}
-        .vv-tx-main{grid-column:1/-1}.vv-tx-row>div:nth-child(1){grid-column:1/-1;color:#667085;font-size:.78rem}
+        .vv-tx-main{grid-column:1/-1}.vv-tx-row>div:nth-child(2){grid-column:1/-1;color:#667085;font-size:.78rem}
+        .vv-tx-row>.vv-select-wrap{grid-column:1}.vv-tx-row>.vv-action-wrap{grid-column:2;text-align:right}
         .vv-tx-amount{text-align:right}.vv-tx-row .vv-source-wrap{grid-column:1/-1}
       }
     `;
     document.head.appendChild(style);
+  }
+
+
+  function ensureTransactionEditor() {
+    if ($('vvTransactionEditor')) return $('vvTransactionEditor');
+    const dialog=document.createElement('dialog');
+    dialog.id='vvTransactionEditor';
+    dialog.innerHTML=`
+      <form id="vvTransactionForm" class="dialog-form">
+        <div class="dialog-head"><div><h2>Manage transaction</h2><p id="vvTransactionSubtitle" class="helper"></p></div><button id="vvTransactionClose" type="button" class="icon-button">×</button></div>
+        <input id="vvTransactionId" type="hidden">
+        <label>Category<input id="vvTransactionCategory" maxlength="120" placeholder="Groceries, Software, Fuel, Rent, Travel..."></label>
+        <label>Money belongs to<select id="vvTransactionScope"><option value="BUSINESS">Voxel Veda Company</option><option value="PERSONAL">Personal</option><option value="MIXED">Mixed</option><option value="UNCLASSIFIED">Needs owner</option></select><small id="vvScopeHint" class="vv-scope-hint"></small></label>
+        <label class="vv-check-row"><input id="vvInternalTransfer" type="checkbox"> This is a transfer between my own accounts</label>
+        <label class="vv-check-row"><input id="vvIgnoreTransaction" type="checkbox"> Exclude this transaction from spending/income reports</label>
+        <label id="vvIgnoreReasonWrap" hidden>Reason for exclusion<input id="vvIgnoreReason" maxlength="500" placeholder="Example: duplicate correction or non-reporting adjustment"></label>
+        <label class="vv-check-row"><input id="vvRememberMerchantRule" type="checkbox"> Remember this category for this merchant on future imports</label>
+        <div class="dialog-actions"><button id="vvTransactionCancel" type="button">Cancel</button><button id="vvTransactionSave" type="submit" class="primary">Save transaction</button></div>
+      </form>`;
+    document.body.appendChild(dialog);
+    $('vvTransactionClose').addEventListener('click',()=>dialog.close());
+    $('vvTransactionCancel').addEventListener('click',()=>dialog.close());
+    $('vvIgnoreTransaction').addEventListener('change',()=>{$('vvIgnoreReasonWrap').hidden=!$('vvIgnoreTransaction').checked;});
+    $('vvTransactionForm').addEventListener('submit',saveTransaction);
+    return dialog;
+  }
+
+  function ensureBulkCategoryDialog() {
+    if ($('vvBulkCategoryDialog')) return $('vvBulkCategoryDialog');
+    const dialog=document.createElement('dialog');
+    dialog.id='vvBulkCategoryDialog';
+    dialog.innerHTML=`
+      <form id="vvBulkCategoryForm" class="dialog-form">
+        <div class="dialog-head"><div><h2>Categorise selected transactions</h2><p id="vvBulkCategorySubtitle" class="helper"></p></div><button id="vvBulkCategoryClose" type="button" class="icon-button">×</button></div>
+        <label>Category<input id="vvBulkCategoryValue" maxlength="120" required placeholder="Example: Materials, Fuel, Software, Groceries"></label>
+        <div class="dialog-actions"><button id="vvBulkCategoryCancel" type="button">Cancel</button><button id="vvBulkCategorySave" type="submit" class="primary">Apply category</button></div>
+      </form>`;
+    document.body.appendChild(dialog);
+    $('vvBulkCategoryClose').addEventListener('click',()=>dialog.close());
+    $('vvBulkCategoryCancel').addEventListener('click',()=>dialog.close());
+    $('vvBulkCategoryForm').addEventListener('submit',saveBulkCategory);
+    return dialog;
+  }
+
+  function syncBulkControls() {
+    const count=state.selected.size;
+    const label=$('vvSelectedCount');
+    const button=$('vvBulkCategorize');
+    if(label) label.textContent=count?`${count} selected`:'No transactions selected';
+    if(button) button.disabled=!count;
+  }
+
+  async function openTransactionEditor(id) {
+    const button=document.querySelector(`.vv-manage-tx[data-tx-id="${CSS.escape(String(id))}"]`);
+    if(button){button.disabled=true;button.textContent='…';}
+    try{
+      const p=await api(`/api/finance/intelligence/transactions/${encodeURIComponent(id)}`);
+      const row=p.transaction||{};
+      ensureTransactionEditor();
+      $('vvTransactionId').value=row.id;
+      $('vvTransactionSubtitle').textContent=`${row.account_name||'Account'} · ${String(row.transaction_date||'').slice(0,10)} · ${row.description||row.merchant_name||'Transaction'}`;
+      $('vvTransactionCategory').value=row.category||'';
+      $('vvTransactionScope').value=row.ownership_scope||row.account_scope||'UNCLASSIFIED';
+      const locked=!['MIXED','UNCLASSIFIED'].includes(String(row.account_scope||'').toUpperCase());
+      $('vvTransactionScope').disabled=locked;
+      $('vvScopeHint').textContent=locked?`Scope is locked to the ${row.account_scope} account. Change the account owner if this is wrong.`:'Mixed/Unclassified account: you may classify this individual transaction.';
+      $('vvInternalTransfer').checked=Number(row.is_internal_transfer||0)===1;
+      $('vvIgnoreTransaction').checked=String(row.reconciliation_status||'')==='IGNORED';
+      $('vvIgnoreReason').value=row.ignored_reason||'';
+      $('vvIgnoreReasonWrap').hidden=!$('vvIgnoreTransaction').checked;
+      $('vvRememberMerchantRule').checked=false;
+      $('vvTransactionEditor').showModal();
+    }catch(e){showNotice(e.message,'error');}
+    finally{if(button){button.disabled=false;button.textContent='Manage';}}
+  }
+
+  async function saveTransaction(event) {
+    event.preventDefault();
+    const id=$('vvTransactionId').value;
+    const button=$('vvTransactionSave');
+    button.disabled=true;button.textContent='Saving…';
+    try{
+      const result=await api(`/api/finance/intelligence/transactions/${encodeURIComponent(id)}`,{
+        method:'POST',
+        body:JSON.stringify({
+          category:$('vvTransactionCategory').value,
+          ownership_scope:$('vvTransactionScope').value,
+          is_internal_transfer:$('vvInternalTransfer').checked,
+          ignored:$('vvIgnoreTransaction').checked,
+          ignored_reason:$('vvIgnoreReason').value,
+          remember_rule:$('vvRememberMerchantRule').checked
+        })
+      });
+      $('vvTransactionEditor').close();
+      showNotice(result.message,'success');
+      await loadLedger();
+    }catch(e){showNotice(e.message,e.status===400?'warning':'error');}
+    finally{button.disabled=false;button.textContent='Save transaction';}
+  }
+
+  function openBulkCategory() {
+    if(!state.selected.size) return;
+    ensureBulkCategoryDialog();
+    $('vvBulkCategorySubtitle').textContent=`${state.selected.size} transaction(s) will be updated. Amounts and dates will not change.`;
+    $('vvBulkCategoryValue').value='';
+    $('vvBulkCategoryDialog').showModal();
+  }
+
+  async function saveBulkCategory(event) {
+    event.preventDefault();
+    const button=$('vvBulkCategorySave');
+    button.disabled=true;button.textContent='Applying…';
+    try{
+      const result=await api('/api/finance/intelligence/transactions/bulk/category',{
+        method:'POST',
+        body:JSON.stringify({transaction_ids:[...state.selected],category:$('vvBulkCategoryValue').value})
+      });
+      state.selected.clear();
+      $('vvBulkCategoryDialog').close();
+      showNotice(result.message,'success');
+      syncBulkControls();
+      await loadLedger();
+    }catch(e){showNotice(e.message,'error');}
+    finally{button.disabled=false;button.textContent='Apply category';}
   }
 
   function ensureOverrideDialog() {
@@ -251,6 +385,11 @@
         <input id="vvLedgerSearch" type="search" placeholder="Search description, merchant, reference or category">
         <select id="vvLedgerAccount"><option value="">All accounts</option></select>
       </div>
+      <div class="vv-ledger-bulk">
+        <span id="vvSelectedCount">No transactions selected</span>
+        <button id="vvBulkCategorize" type="button" disabled>Categorise selected</button>
+        <button id="vvClearSelected" type="button">Clear selection</button>
+      </div>
       <div class="vv-ledger-summary">
         <div><span>Transactions</span><strong id="vvLedgerCount">—</strong></div>
         <div><span>Money in</span><strong id="vvLedgerIn">—</strong></div>
@@ -267,7 +406,9 @@
       loadLedger();
     }));
     $('vvLedgerRefresh').addEventListener('click',loadLedger);
-    $('vvLedgerAccount').addEventListener('change',()=>{state.accountId=$('vvLedgerAccount').value;loadLedger();});
+    $('vvLedgerAccount').addEventListener('change',()=>{state.accountId=$('vvLedgerAccount').value;state.selected.clear();syncBulkControls();loadLedger();});
+    $('vvBulkCategorize').addEventListener('click',openBulkCategory);
+    $('vvClearSelected').addEventListener('click',()=>{state.selected.clear();document.querySelectorAll('.vv-select-tx').forEach(x=>{x.checked=false;});syncBulkControls();});
     let timer;
     $('vvLedgerSearch').addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(()=>{state.q=$('vvLedgerSearch').value.trim();loadLedger();},280);});
   }
@@ -296,15 +437,28 @@
       const out=Number(row.debit||0);
       const incoming=Number(row.credit||0);
       const source=row.statement_name || (row.source_type==='STATEMENT_IMPORT'?'Statement import':(row.source_provider||row.source_type||'Bank'));
-      return `<article class="vv-tx-row">
+      const ignored=String(row.reconciliation_status||'')==='IGNORED';
+      return `<article class="vv-tx-row" data-tx-id="${row.id}">
+        <div class="vv-select-wrap"><input class="vv-select-tx" type="checkbox" data-tx-id="${row.id}" aria-label="Select transaction"></div>
         <div>${esc(String(row.transaction_date||'').slice(0,10))}</div>
-        <div class="vv-tx-main"><strong>${esc(row.description||row.merchant_name||'Transaction')}</strong><small>${esc(row.account_name||'Account')} · ${esc(row.category||'Unclassified')} · ${esc(row.reconciliation_status||'UNRECONCILED')}</small></div>
+        <div class="vv-tx-main"><strong>${esc(row.description||row.merchant_name||'Transaction')}</strong><small>${esc(row.account_name||'Account')} · ${esc(row.category||'Unclassified')} · ${ignored?'Excluded':esc(row.reconciliation_status||'UNRECONCILED')}${Number(row.is_internal_transfer||0)?' · Internal transfer':''}</small></div>
         <div><span class="vv-scope-chip ${esc(String(row.ownership_scope||'').toLowerCase())}">${esc(scopeLabel(row.ownership_scope))}</span></div>
         <div class="vv-tx-amount ${out>0?'out':'in'}">${out>0?'- '+money(out,currency):'+ '+money(incoming,currency)}</div>
         <div>${row.running_balance===null||row.running_balance===undefined?'—':money(row.running_balance,currency)}</div>
         <div class="vv-source-wrap"><span class="vv-source-chip ${Number(row.manual_override||0)?'manual':''}">${Number(row.manual_override||0)?'Manual override':esc(source)}</span></div>
+        <div class="vv-action-wrap"><button type="button" class="vv-manage-tx" data-tx-id="${row.id}">Manage</button></div>
       </article>`;
     }).join(''):'<div class="empty"><strong>No transactions in this view</strong><span>Import a statement or change the filter.</span></div>';
+    $('vvLedgerList')?.querySelectorAll('.vv-select-tx').forEach((box)=>{
+      box.checked=state.selected.has(Number(box.dataset.txId));
+      box.addEventListener('change',()=>{
+        const id=Number(box.dataset.txId);
+        if(box.checked) state.selected.add(id); else state.selected.delete(id);
+        syncBulkControls();
+      });
+    });
+    $('vvLedgerList')?.querySelectorAll('.vv-manage-tx').forEach((button)=>button.addEventListener('click',()=>openTransactionEditor(button.dataset.txId)));
+    syncBulkControls();
   }
 
   async function loadLedger() {
@@ -327,6 +481,8 @@
   function init() {
     installStyles();
     ensureOverrideDialog();
+    ensureTransactionEditor();
+    ensureBulkCategoryDialog();
     ensureLedgerPanel();
     loadLedgerAccounts().then(loadLedger).catch((error)=>showNotice(error.message,'error'));
     const rows=$('reviewRows');
