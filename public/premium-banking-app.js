@@ -181,8 +181,9 @@
       d.innerHTML='<form id="vvPbAccessForm" class="vv-pb-modal-inner"><h3>Banking account access</h3><p>Grant only the minimum access this user needs.</p>'+
         '<input id="vvPbAccessUser" type="hidden"><label>User<input id="vvPbAccessUserLabel" disabled></label>'+
         '<label>Business account<select id="vvPbAccessAccount"></select></label>'+
-        '<label>Access<select id="vvPbAccessLevel"><option value="VIEW">View only</option><option value="PREPARE">Prepare payments</option><option value="APPROVE">Approve payments</option><option value="MANAGE">Manage account workflow</option></select></label>'+
-        '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbAccessDialog">Cancel</button><button class="primary" type="submit">Save access</button></div></form>';
+        '<label>Access<select id="vvPbAccessLevel"><option value="NONE">No access</option><option value="VIEW">View only</option><option value="PREPARE">Prepare payments</option><option value="APPROVE">Approve payments</option><option value="MANAGE">Manage account workflow</option></select></label>'+
+        '<p id="vvPbAccessStatus" class="vv-pb-modal-status" role="status" aria-live="polite">Choose an account and access level, then save. Security verification may be required.</p>'+
+        '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbAccessDialog">Cancel</button><button id="vvPbAccessSave" class="primary" type="submit">Update access</button></div></form>';
       document.body.appendChild(d); $('vvPbAccessForm').addEventListener('submit',saveTeamAccess);
     }
     if(!$('vvPbAlertDialog')){
@@ -517,7 +518,7 @@
     const businessAccounts=(os.accounts||[]).filter(a=>a.ownership_scope==='BUSINESS');
     $('vvPbContent').innerHTML='<div class="vv-pb-toolbar"><div><h3>Team banking</h3><span style="color:#8fa4bb">Account-level least-privilege access</span></div></div>'+
       '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Users</h3><span>View · Prepare · Approve · Manage</span></div><div class="vv-pb-recurring">'+
-      ((team.users||[]).map(u=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(u.name||u.email)+'</strong><small>'+esc(u.email)+' · '+esc(u.role)+(u.department?' · '+esc(u.department):'')+'</small></div><div>'+businessAccounts.map(a=>{const g=grantMap.get(String(u.id)+'|'+String(a.id));return '<button type="button" class="vv-pb-select" data-pb-grant-user="'+Number(u.id)+'" data-pb-grant-account="'+Number(a.id)+'" data-pb-grant-level="'+esc(g?.access_level||'VIEW')+'" data-pb-grant-label="'+esc((u.name||u.email)+' · '+a.nickname)+'">'+esc(a.nickname)+': '+esc(g?.access_level||'Set access')+'</button>';}).join(' ')+'</div></div>').join('')||'<div class="vv-pb-empty">No active users.</div>')+
+      ((team.users||[]).map(u=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(u.name||u.email)+'</strong><small>'+esc(u.email)+' · '+esc(u.role)+(u.department?' · '+esc(u.department):'')+'</small></div><div>'+businessAccounts.map(a=>{const g=grantMap.get(String(u.id)+'|'+String(a.id));return Number(u.id)===Number(state.os?.current_user_id||-1)?'<span class="vv-pb-status setup">'+esc(a.nickname)+': your account</span>':'<button type="button" class="vv-pb-select" data-pb-grant-user="'+Number(u.id)+'" data-pb-grant-account="'+Number(a.id)+'" data-pb-grant-level="'+esc(g?.access_level||'NONE')+'" data-pb-grant-label="'+esc((u.name||u.email)+' · '+a.nickname)+'">'+esc(a.nickname)+': '+esc(g?.access_level||'Set access')+'</button>';}).join(' ')+'</div></div>').join('')||'<div class="vv-pb-empty">No active users.</div>')+
       '</div></section>';
     wireDynamic();
   }
@@ -530,8 +531,49 @@
   async function cancelPayment(uid){if(!confirm('Cancel this payment workflow?'))return;try{const r=await api(OS+'/payments/'+encodeURIComponent(uid)+'/cancel',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be cancelled.','error',err.message);}}
   async function archiveSpace(uid){if(!confirm('Archive this Money Space?'))return;try{const r=await api(OS+'/spaces/'+encodeURIComponent(uid)+'/archive',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be archived.','error',err.message);}}
   async function decidePayment(uid,decision){const note=prompt(decision==='APPROVE'?'Approval note (optional)':'Reason for rejection');if(decision==='REJECT'&&!note)return;try{const r=await api(OS+'/payments/'+encodeURIComponent(uid)+'/decision',{method:'POST',body:JSON.stringify({decision,note:note||''})});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Decision could not be recorded.','error',err.message);}}
-  function openTeamAccess(userId,accountId,level,label){$('vvPbAccessUser').value=userId;$('vvPbAccessUserLabel').value=label;$('vvPbAccessAccount').innerHTML=(state.os?.accounts||[]).filter(a=>a.ownership_scope==='BUSINESS').map(a=>'<option value="'+a.id+'" '+(String(a.id)===String(accountId)?'selected':'')+'>'+esc(a.nickname)+'</option>').join('');$('vvPbAccessLevel').value=level||'VIEW';$('vvPbAccessDialog').showModal();}
-  async function saveTeamAccess(e){e.preventDefault();try{const r=await api(OS+'/team/'+encodeURIComponent($('vvPbAccessUser').value)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbAccessAccount').value,access_level:$('vvPbAccessLevel').value})});$('vvPbAccessDialog').close();message(r.message,'success');await refresh();state.tab='team';render();}catch(err){message('Access could not be updated.','error',err.message);}}
+  function openTeamAccess(userId,accountId,level,label){
+    const accounts=(state.os?.accounts||[]).filter(a=>String(a.ownership_scope).toUpperCase()==='BUSINESS');
+    const status=$('vvPbAccessStatus');
+    $('vvPbAccessUser').value=userId;
+    $('vvPbAccessUserLabel').value=label;
+    $('vvPbAccessAccount').innerHTML=accounts.map(a=>'<option value="'+a.id+'" '+(String(a.id)===String(accountId)?'selected':'')+'>'+esc(a.nickname)+' · '+esc(a.currency||'')+'</option>').join('');
+    $('vvPbAccessLevel').value=level&&level!=='Set access'?level:'VIEW';
+    const save=$('vvPbAccessSave');
+    if(save) save.disabled=!accounts.length;
+    if(status) status.textContent=accounts.length
+      ? 'Choose an account and access level, then tap Update access.'
+      : 'No active business bank account is available to delegate.';
+    $('vvPbAccessDialog').showModal();
+  }
+  async function saveTeamAccess(e){
+    e.preventDefault();
+    const userId=$('vvPbAccessUser').value;
+    const accountId=$('vvPbAccessAccount').value;
+    const level=$('vvPbAccessLevel').value;
+    const status=$('vvPbAccessStatus');
+    const save=$('vvPbAccessSave');
+    if(!userId||!accountId){
+      if(status) status.textContent='User and business bank account are required.';
+      message('Access could not be updated.','error','Choose a valid user and business account.');
+      return;
+    }
+    if(save){save.disabled=true;save.textContent='Updating…';}
+    if(status) status.textContent='Saving banking access…';
+    try{
+      const r=await api(OS+'/team/'+encodeURIComponent(userId)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:accountId,access_level:level})});
+      if(status) status.textContent=r.message||'Banking access updated.';
+      $('vvPbAccessDialog').close();
+      message(r.message||'Banking access updated.','success');
+      await refresh();
+      state.tab='team';
+      render();
+    }catch(err){
+      if(status) status.textContent=err.message||'Access could not be updated.';
+      message('Access could not be updated.','error',err.message);
+    }finally{
+      if(save){save.disabled=false;save.textContent='Update access';}
+    }
+  }
   function openAlerts(){const a=state.os?.alerts||{};$('vvPbAlertLow').value=a.low_balance_threshold??'';$('vvPbAlertLarge').value=a.large_transaction_threshold??'';$('vvPbAlertBudget').checked=Boolean(Number(a.notify_budget??1));$('vvPbAlertPayments').checked=Boolean(Number(a.notify_payments??1));$('vvPbAlertSync').checked=Boolean(Number(a.notify_bank_sync??1));$('vvPbAlertUnusual').checked=Boolean(Number(a.notify_unusual_activity??1));$('vvPbAlertDialog').showModal();}
   async function saveAlerts(e){e.preventDefault();try{const r=await api(OS+'/alerts',{method:'POST',body:JSON.stringify({low_balance_threshold:$('vvPbAlertLow').value,large_transaction_threshold:$('vvPbAlertLarge').value,notify_budget:$('vvPbAlertBudget').checked,notify_payments:$('vvPbAlertPayments').checked,notify_bank_sync:$('vvPbAlertSync').checked,notify_unusual_activity:$('vvPbAlertUnusual').checked})});$('vvPbAlertDialog').close();message(r.message,'success');await refresh();}catch(err){message('Alerts could not be saved.','error',err.message);}}
 
