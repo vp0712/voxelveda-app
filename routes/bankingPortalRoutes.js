@@ -39,6 +39,7 @@ router.get('/intelligence/transactions', intelligence.getTransactions);
 router.get('/intelligence/transactions/:id', intelligence.getTransactionDetail);
 router.get('/intelligence/statements', intelligence.getStatementLibrary);
 router.get('/intelligence/reports/spending', intelligence.getSpendingReport);
+router.get('/intelligence/reports/portfolio-history', intelligence.getPortfolioHistoryReport);
 router.get('/intelligence/budgets', intelligence.getBankingBudgets);
 router.get('/intelligence/history-coverage', intelligence.getHistoryCoverage);
 router.get('/intelligence/data-quality', intelligence.getDataQuality);
