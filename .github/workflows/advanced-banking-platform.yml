@@ -20,6 +20,9 @@ on:
       - 'public/advanced-theme.css'
       - 'app.js'
       - 'migrations/20260918_premium_banking_budgets.sql'
+      - 'migrations/20260918_banking_os_multi_user.sql'
+      - 'controllers/bankingOperatingSystemController.js'
+      - 'scripts/banking-os-multi-user-test.js'
       - 'controllers/financeIntelligenceController.js'
       - 'routes/financeRoutes.js'
       - 'public/finance-pdf-v3.js'
@@ -46,6 +49,9 @@ on:
       - 'public/advanced-theme.css'
       - 'app.js'
       - 'migrations/20260918_premium_banking_budgets.sql'
+      - 'migrations/20260918_banking_os_multi_user.sql'
+      - 'controllers/bankingOperatingSystemController.js'
+      - 'scripts/banking-os-multi-user-test.js'
       - 'controllers/financeIntelligenceController.js'
       - 'routes/financeRoutes.js'
       - 'public/finance-pdf-v3.js'
@@ -70,6 +76,7 @@ jobs:
           node --check services/bankSyncScheduler.js
           node --check controllers/openBankingController.js
           node --check controllers/advancedBankingController.js
+          node --check controllers/bankingOperatingSystemController.js
           node --check routes/advancedBankingRoutes.js
           node --check routes/integrationWebhookRoutes.js
           node --check middleware/statementPreviewSanitizer.js
@@ -77,7 +84,10 @@ jobs:
           node --check public/admin-dashboard.js
           node --check public/finance-pdf-v3.js
           node --check scripts/advanced-banking-platform-test.js
+          node --check scripts/banking-os-multi-user-test.js
       - name: Architecture and security contract
         run: node scripts/advanced-banking-platform-test.js
+      - name: Banking OS multi-user security contract
+        run: node scripts/banking-os-multi-user-test.js
       - name: Existing statement-review safety contract
         run: node scripts/finance-statement-review-test.js
