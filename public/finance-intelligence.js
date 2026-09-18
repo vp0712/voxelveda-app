@@ -341,6 +341,7 @@
     const result = await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(uid)}`);
     state.activeReview = result;
     const session = result.session;
+    $('reviewDialog').dataset.reviewUid = session.import_uid;
     $('reviewSubtitle').textContent = `${session.original_name} · ${session.account_name} · ${session.source_format} · ${session.status}`;
     $('reviewSummary').innerHTML = `
       <span><b>${Number(session.total_rows || 0)}</b> total</span>
@@ -349,7 +350,7 @@
       <span><b>${Number(session.duplicate_rows || 0)}</b> duplicates</span>
       <span><b>${Number(session.rejected_rows || 0)}</b> rejected</span>`;
     $('reviewRows').innerHTML = (result.rows || []).map((row) => `
-      <tr>
+      <tr data-review-row-id="${row.id}" data-review-status="${escapeHtml(row.validation_status)}" data-manual-override="${Number(row.manual_override || 0) ? '1' : '0'}">
         <td><input type="checkbox" class="row-select" data-row-id="${row.id}" ${Number(row.selected) ? 'checked' : ''} ${row.validation_status === 'REJECTED' ? 'disabled' : ''}></td>
         <td>${escapeHtml(String(row.transaction_date || '').slice(0, 10))}</td>
         <td><strong>${escapeHtml(row.description || row.merchant_name || 'No description')}</strong>${row.validation_message ? `<small>${escapeHtml(row.validation_message)}</small>` : ''}</td>

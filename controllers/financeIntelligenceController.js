@@ -114,6 +114,74 @@ exports.getOverview = async (req, res) => {
   } catch (error) { return fail(res, error, 'Failed to load Finance Intelligence overview'); }
 };
 
+
+exports.getTransactions = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const scope = String(req.query.scope || 'ALL').trim().toUpperCase();
+    const allowedScopes = new Set(['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
+    if (!allowedScopes.has(scope)) throw new FinanceError('Transaction scope must be All, Personal, Business, Mixed or Unclassified.', 400, 'INVALID_TRANSACTION_SCOPE');
+
+    const limit = Math.min(250, Math.max(10, Number.parseInt(req.query.limit, 10) || 100));
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const offset = (page - 1) * limit;
+    const q = String(req.query.q || '').trim().slice(0, 120);
+    const accountId = Number(req.query.account_id || 0);
+    const clauses = [privacy.visibilitySql('ba')];
+    const params = [...privacy.visibilityParams(req)];
+
+    if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
+    if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
+    if (q) {
+      clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.reference LIKE ? OR bt.category LIKE ? OR ba.nickname LIKE ?)');
+      const like = `%${q}%`;
+      params.push(like, like, like, like, like);
+    }
+    const where = clauses.join(' AND ');
+
+    const [[count]] = await pool.query(
+      `SELECT COUNT(*) AS total,
+              COALESCE(SUM(bt.credit),0) AS total_in,
+              COALESCE(SUM(bt.debit),0) AS total_out,
+              SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
+         FROM bank_transactions bt
+         JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+        WHERE ${where}`, params
+    );
+    const [rows] = await pool.query(
+      `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.posting_date, bt.description, bt.reference,
+              bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.category, bt.currency,
+              bt.ownership_scope, bt.classification_status, bt.reconciliation_status, bt.source_type, bt.source_provider,
+              bt.statement_import_uid, bt.statement_row_id, bt.review_source_status, bt.manual_override, bt.imported_at,
+              ba.nickname AS account_name, ba.institution, ba.entity_name
+         FROM bank_transactions bt
+         JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+        WHERE ${where}
+        ORDER BY bt.transaction_date DESC, bt.id DESC
+        LIMIT ? OFFSET ?`,
+      [...params, limit, offset]
+    );
+
+    return res.json({
+      scope,
+      page,
+      limit,
+      total: Number(count.total || 0),
+      summary: {
+        money_in: count.total_in || '0.00',
+        money_out: count.total_out || '0.00',
+        manual_overrides: Number(count.manual_overrides || 0)
+      },
+      transactions: rows,
+      separation: {
+        business_label: 'Voxel Veda Company',
+        personal_label: 'Personal',
+        inherited_from_bank_account: true
+      }
+    });
+  } catch (error) { return fail(res, error, 'Failed to load separated transaction ledger'); }
+};
+
 exports.getAccounts = async (req, res) => {
   try {
     await ensureFinanceSchema();
