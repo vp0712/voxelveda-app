@@ -153,9 +153,11 @@ exports.getTransactions = async (req, res) => {
               bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.category, bt.currency,
               bt.ownership_scope, bt.classification_status, bt.reconciliation_status, bt.source_type, bt.source_provider,
               bt.statement_import_uid, bt.statement_row_id, bt.review_source_status, bt.manual_override, bt.imported_at,
-              ba.nickname AS account_name, ba.institution, ba.entity_name
+              ba.nickname AS account_name, ba.institution, ba.entity_name,
+              sif.original_name AS statement_name, sif.source_format AS statement_format
          FROM bank_transactions bt
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
         WHERE ${where}
         ORDER BY bt.transaction_date DESC, bt.id DESC
         LIMIT ? OFFSET ?`,
@@ -180,6 +182,259 @@ exports.getTransactions = async (req, res) => {
       }
     });
   } catch (error) { return fail(res, error, 'Failed to load separated transaction ledger'); }
+};
+
+
+function reportScope(value) {
+  const scope = String(value || 'ALL').trim().toUpperCase();
+  const allowed = new Set(['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
+  if (!allowed.has(scope)) throw new FinanceError('Report scope must be All, Personal, Business, Mixed or Unclassified.', 400, 'INVALID_REPORT_SCOPE');
+  return scope;
+}
+
+function reportDate(value, label) {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = dateOnly(value);
+  if (!parsed) throw new FinanceError(`${label} must be a valid date.`, 400, 'INVALID_REPORT_DATE');
+  return parsed;
+}
+
+function spendingWhere(req, options = {}) {
+  const scope = reportScope(req.query.scope);
+  const from = reportDate(req.query.from, 'From date');
+  const to = reportDate(req.query.to, 'To date');
+  if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
+  const accountId = Number(req.query.account_id || 0);
+  const statementUid = String(options.statementUid || req.query.statement_uid || '').trim().slice(0, 80);
+  const clauses = [privacy.visibilitySql('ba'), "bt.reconciliation_status <> 'IGNORED'"];
+  const params = [...privacy.visibilityParams(req)];
+  if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
+  if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
+  if (from) { clauses.push('bt.transaction_date>=?'); params.push(from); }
+  if (to) { clauses.push('bt.transaction_date<=?'); params.push(to); }
+  if (statementUid) { clauses.push('bt.statement_import_uid=?'); params.push(statementUid); }
+  return { scope, from, to, accountId, statementUid, where: clauses.join(' AND '), params };
+}
+
+exports.getStatementLibrary = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const scope = reportScope(req.query.scope);
+    const accountId = Number(req.query.account_id || 0);
+    const clauses = [privacy.visibilitySql('ba')];
+    const params = [...privacy.visibilityParams(req)];
+    if (scope !== 'ALL') { clauses.push('ba.ownership_scope=?'); params.push(scope); }
+    if (accountId) { clauses.push('sif.bank_account_id=?'); params.push(accountId); }
+
+    const [rows] = await pool.query(
+      `SELECT sif.import_uid, sif.bank_account_id, sif.original_name, sif.source_format, sif.statement_start_date,
+              sif.statement_end_date, sif.opening_balance, sif.closing_balance, sif.parse_status, sif.imported_rows,
+              sif.duplicate_rows, sif.rejected_rows, sif.reviewed_at, ba.nickname AS account_name, ba.institution,
+              ba.ownership_scope, ba.currency,
+              COUNT(bt.id) AS linked_transactions,
+              COALESCE(SUM(bt.credit),0) AS money_in,
+              COALESCE(SUM(bt.debit),0) AS money_out,
+              MIN(bt.transaction_date) AS first_transaction_date,
+              MAX(bt.transaction_date) AS last_transaction_date,
+              SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified_transactions
+         FROM statement_import_files sif
+         JOIN bank_accounts ba ON ba.id=sif.bank_account_id
+         LEFT JOIN bank_transactions bt ON bt.statement_import_uid=sif.import_uid AND bt.bank_account_id=sif.bank_account_id
+        WHERE ${clauses.join(' AND ')}
+        GROUP BY sif.id, ba.id
+        ORDER BY COALESCE(sif.reviewed_at, sif.uploaded_at) DESC, sif.id DESC
+        LIMIT 200`, params
+    );
+    return res.json({
+      scope,
+      statements: rows.map((row) => ({
+        ...row,
+        linked_transactions: Number(row.linked_transactions || 0),
+        legacy_linkage: Number(row.imported_rows || 0) > 0 && Number(row.linked_transactions || 0) === 0
+      }))
+    });
+  } catch (error) { return fail(res, error, 'Failed to load statement library'); }
+};
+
+exports.getStatementReport = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const importUid = String(req.params.uid || '').trim();
+    if (!importUid) throw new FinanceError('Statement identifier is required.', 400, 'STATEMENT_ID_REQUIRED');
+
+    const [[statement]] = await pool.query(
+      `SELECT sif.*, ba.nickname AS account_name, ba.institution, ba.ownership_scope, ba.currency, ba.entity_name
+         FROM statement_import_files sif
+         JOIN bank_accounts ba ON ba.id=sif.bank_account_id
+        WHERE sif.import_uid=? AND ${privacy.visibilitySql('ba')}
+        LIMIT 1`,
+      [importUid, ...privacy.visibilityParams(req)]
+    );
+    if (!statement) throw new FinanceError('Statement was not found or is not available to this user.', 404, 'STATEMENT_NOT_FOUND');
+
+    const filters = spendingWhere(req, { statementUid: importUid });
+    const [summaryRows, categoryRows, merchantRows, monthlyRows, transactionRows] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) AS transaction_count,
+                COALESCE(SUM(bt.credit),0) AS money_in,
+                COALESCE(SUM(bt.debit),0) AS money_out,
+                COALESCE(SUM(bt.credit-bt.debit),0) AS net_flow,
+                SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides,
+                SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}`, filters.params
+      ),
+      pool.query(
+        `SELECT COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
+                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent,
+                COALESCE(SUM(bt.credit),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}
+          GROUP BY COALESCE(NULLIF(bt.category,''),'Unclassified')
+          ORDER BY spent DESC, transaction_count DESC`, filters.params
+      ),
+      pool.query(
+        `SELECT COALESCE(NULLIF(bt.merchant_name,''), NULLIF(bt.description,''), 'Unknown') AS merchant,
+                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent,
+                COALESCE(SUM(bt.credit),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}
+          GROUP BY COALESCE(NULLIF(bt.merchant_name,''), NULLIF(bt.description,''), 'Unknown')
+          ORDER BY spent DESC, transaction_count DESC LIMIT 25`, filters.params
+      ),
+      pool.query(
+        `SELECT DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
+                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received, COUNT(*) AS transaction_count
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}
+          GROUP BY DATE_FORMAT(bt.transaction_date,'%Y-%m') ORDER BY month`, filters.params
+      ),
+      pool.query(
+        `SELECT bt.id, bt.transaction_date, bt.description, bt.merchant_name, bt.category, bt.debit, bt.credit,
+                bt.running_balance, bt.currency, bt.reconciliation_status, bt.manual_override, bt.source_type,
+                ba.nickname AS account_name
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where}
+          ORDER BY bt.transaction_date ASC, bt.id ASC LIMIT 5000`, filters.params
+      )
+    ]);
+    const summary = summaryRows[0][0] || {};
+    return res.json({
+      statement: {
+        import_uid: statement.import_uid,
+        original_name: statement.original_name,
+        source_format: statement.source_format,
+        account_name: statement.account_name,
+        institution: statement.institution,
+        ownership_scope: statement.ownership_scope,
+        currency: statement.currency,
+        statement_start_date: statement.statement_start_date,
+        statement_end_date: statement.statement_end_date,
+        opening_balance: statement.opening_balance,
+        closing_balance: statement.closing_balance,
+        imported_rows: Number(statement.imported_rows || 0),
+        duplicate_rows: Number(statement.duplicate_rows || 0),
+        rejected_rows: Number(statement.rejected_rows || 0),
+        reviewed_at: statement.reviewed_at
+      },
+      filters: { from: filters.from, to: filters.to },
+      summary: {
+        transaction_count: Number(summary.transaction_count || 0),
+        money_in: summary.money_in || '0.00',
+        money_out: summary.money_out || '0.00',
+        net_flow: summary.net_flow || '0.00',
+        manual_overrides: Number(summary.manual_overrides || 0),
+        unclassified: Number(summary.unclassified || 0)
+      },
+      categories: categoryRows[0],
+      merchants: merchantRows[0],
+      monthly: monthlyRows[0],
+      transactions: transactionRows[0],
+      legacy_linkage: Number(statement.imported_rows || 0) > 0 && Number(summary.transaction_count || 0) === 0
+    });
+  } catch (error) { return fail(res, error, 'Failed to build statement report'); }
+};
+
+exports.getSpendingReport = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const filters = spendingWhere(req);
+    const [summaryRows, categoryRows, merchantRows, accountRows, monthlyRows, weekdayRows, transactionRows] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) AS transaction_count, COALESCE(SUM(bt.credit),0) AS money_in,
+                COALESCE(SUM(bt.debit),0) AS money_out, COALESCE(SUM(bt.credit-bt.debit),0) AS net_flow,
+                SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified,
+                SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id WHERE ${filters.where}`, filters.params
+      ),
+      pool.query(
+        `SELECT COALESCE(NULLIF(bt.category,''),'Unclassified') AS category, COUNT(*) AS transaction_count,
+                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where} GROUP BY COALESCE(NULLIF(bt.category,''),'Unclassified')
+          ORDER BY spent DESC, transaction_count DESC LIMIT 40`, filters.params
+      ),
+      pool.query(
+        `SELECT COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
+                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where} GROUP BY COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
+          ORDER BY spent DESC, transaction_count DESC LIMIT 40`, filters.params
+      ),
+      pool.query(
+        `SELECT ba.id AS bank_account_id, ba.nickname AS account_name, ba.ownership_scope, COUNT(*) AS transaction_count,
+                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where} GROUP BY ba.id ORDER BY spent DESC`, filters.params
+      ),
+      pool.query(
+        `SELECT DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month, COUNT(*) AS transaction_count,
+                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where} GROUP BY DATE_FORMAT(bt.transaction_date,'%Y-%m') ORDER BY month`, filters.params
+      ),
+      pool.query(
+        `SELECT DAYNAME(bt.transaction_date) AS weekday, WEEKDAY(bt.transaction_date) AS weekday_index,
+                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where} GROUP BY DAYNAME(bt.transaction_date), WEEKDAY(bt.transaction_date)
+          ORDER BY weekday_index`, filters.params
+      ),
+      pool.query(
+        `SELECT bt.id, bt.transaction_date, bt.description, bt.merchant_name, bt.category, bt.debit, bt.credit,
+                bt.currency, bt.ownership_scope, bt.reconciliation_status, bt.source_type, bt.statement_import_uid,
+                bt.manual_override, ba.nickname AS account_name, sif.original_name AS statement_name
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
+          WHERE ${filters.where}
+          ORDER BY bt.transaction_date DESC, bt.id DESC LIMIT 5000`, filters.params
+      )
+    ]);
+    const summary = summaryRows[0][0] || {};
+    const totalSpent = Number(summary.money_out || 0);
+    const categories = categoryRows[0].map((row) => ({
+      ...row,
+      percentage_of_spend: totalSpent > 0 ? Number(((Number(row.spent || 0) / totalSpent) * 100).toFixed(2)) : 0
+    }));
+    return res.json({
+      filters: { scope: filters.scope, account_id: filters.accountId || null, statement_uid: filters.statementUid || null, from: filters.from, to: filters.to },
+      summary: {
+        transaction_count: Number(summary.transaction_count || 0),
+        money_in: summary.money_in || '0.00',
+        money_out: summary.money_out || '0.00',
+        net_flow: summary.net_flow || '0.00',
+        unclassified: Number(summary.unclassified || 0),
+        manual_overrides: Number(summary.manual_overrides || 0)
+      },
+      categories,
+      merchants: merchantRows[0],
+      accounts: accountRows[0],
+      monthly: monthlyRows[0],
+      weekdays: weekdayRows[0],
+      transactions: transactionRows[0],
+      generated_at: new Date().toISOString()
+    });
+  } catch (error) { return fail(res, error, 'Failed to build spending report'); }
 };
 
 exports.getAccounts = async (req, res) => {
