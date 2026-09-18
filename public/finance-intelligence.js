@@ -1,5 +1,6 @@
 (() => {
   const state = { scope: 'ALL', accounts: [], activeReview: null };
+  const FIN_PREFIX = location.pathname === '/banking' ? '/api/banking/intelligence' : '/api/finance/intelligence';
   const $ = (id) => document.getElementById(id);
   const money = (value, currency = 'AUD') => new Intl.NumberFormat('en-AU', { style: 'currency', currency }).format(Number(value || 0));
   const dateText = (value) => value ? new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium' }).format(new Date(`${String(value).slice(0, 10)}T00:00:00`)) : 'Unknown';
@@ -70,18 +71,18 @@
   }
 
   function populateAccountSelect() {
-    $('importAccount').innerHTML = state.accounts.filter((account) => account.status === 'ACTIVE').map((account) => `<option value="${account.id}">${escapeHtml(account.nickname)} · ${escapeHtml(account.ownership_scope)}</option>`).join('');
+    $('importAccount').innerHTML = state.accounts.filter((account) => account.status === 'ACTIVE').map((account) => `<option value="${account.id}" data-currency="${escapeHtml(account.currency || 'AUD')}">${escapeHtml(account.nickname)} · ${escapeHtml(account.institution || 'Bank')} · ${escapeHtml(account.currency || 'AUD')} · ${escapeHtml(account.ownership_scope)}</option>`).join('');
   }
 
   async function load() {
     notice('');
     try {
       const [overview, quality, coverage, connection, accounts] = await Promise.all([
-        api(`/api/finance/intelligence/overview?scope=${encodeURIComponent(state.scope)}`),
-        api('/api/finance/intelligence/data-quality'),
-        api('/api/finance/intelligence/history-coverage'),
-        api('/api/finance/intelligence/bank-connections'),
-        api('/api/finance/intelligence/accounts')
+        api(`${FIN_PREFIX}/overview?scope=${encodeURIComponent(state.scope)}`),
+        api(FIN_PREFIX + '/data-quality'),
+        api(FIN_PREFIX + '/history-coverage'),
+        api(FIN_PREFIX + '/bank-connections'),
+        api(FIN_PREFIX + '/accounts')
       ]);
       $('metricInflow').textContent = money(overview.summary.total_inflow);
       $('metricOutflow').textContent = money(overview.summary.total_outflow);
@@ -326,7 +327,7 @@
 
   async function connectBank() {
     try {
-      const result = await api('/api/finance/intelligence/bank-connections/connect', { method: 'POST', body: '{}' });
+      const result = await api(FIN_PREFIX + '/bank-connections/connect', { method: 'POST', body: '{}' });
       notice(result.message || 'Bank connection started.', 'success');
     } catch (error) {
       notice(error.message, error.code === 'BANK_PROVIDER_NOT_CONFIGURED' ? 'warning' : 'error');
@@ -338,7 +339,7 @@
   }
 
   async function openReview(uid) {
-    const result = await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(uid)}`);
+    const result = await api(`${FIN_PREFIX}/statement-reviews/${encodeURIComponent(uid)}`);
     state.activeReview = result;
     const session = result.session;
     $('reviewDialog').dataset.reviewUid = session.import_uid;
@@ -362,7 +363,7 @@
     document.querySelectorAll('.row-select').forEach((checkbox) => checkbox.addEventListener('change', async () => {
       checkbox.disabled = true;
       try {
-        await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(session.import_uid)}/rows/${checkbox.dataset.rowId}/select`, {
+        await api(`${FIN_PREFIX}/statement-reviews/${encodeURIComponent(session.import_uid)}/rows/${checkbox.dataset.rowId}/select`, {
           method: 'POST', body: JSON.stringify({ selected: checkbox.checked })
         });
       } catch (error) {
@@ -376,7 +377,7 @@
   }
 
   async function loadReviewQueue() {
-    const result = await api('/api/finance/intelligence/statement-reviews');
+    const result = await api(FIN_PREFIX + '/statement-reviews');
     const sessions = result.sessions || [];
     $('reviewQueue').innerHTML = sessions.length ? sessions.map((session) => `
       <button type="button" class="queue-row" data-review-uid="${escapeHtml(session.import_uid)}">
@@ -396,7 +397,7 @@
     const payload = Object.fromEntries(form.entries());
     payload.currency = String(payload.currency || 'AUD').toUpperCase();
     try {
-      const result = await api('/api/finance/intelligence/accounts', { method: 'POST', body: JSON.stringify(payload) });
+      const result = await api(FIN_PREFIX + '/accounts', { method: 'POST', body: JSON.stringify(payload) });
       $('accountDialog').close();
       event.currentTarget.reset();
       notice(result.message, 'success');
@@ -414,7 +415,10 @@
     submit.textContent = 'Parsing…';
     try {
       const parsed = await parseStatement(file);
-      const result = await api(`/api/finance/intelligence/accounts/${accountId}/statements/preview`, {
+      const selectedAccount = state.accounts.find((account) => Number(account.id) === accountId);
+      const accountCurrency = String(selectedAccount?.currency || $('importAccount').selectedOptions?.[0]?.dataset?.currency || 'AUD').toUpperCase();
+      parsed.rows = (parsed.rows || []).map((row) => ({ ...row, currency: String(row.currency || accountCurrency).toUpperCase() }));
+      const result = await api(`${FIN_PREFIX}/accounts/${accountId}/statements/preview`, {
         method: 'POST',
         body: JSON.stringify({ source_format: parsed.format, original_name: file.name, content_hash: await sha256(file), rows: parsed.rows })
       });
@@ -430,7 +434,7 @@
     const uid = state.activeReview?.session?.import_uid;
     if (!uid) return;
     try {
-      const result = await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(uid)}/commit`, { method: 'POST', body: '{}' });
+      const result = await api(`${FIN_PREFIX}/statement-reviews/${encodeURIComponent(uid)}/commit`, { method: 'POST', body: '{}' });
       $('reviewDialog').close();
       notice(result.message, 'success');
       await load();
@@ -443,7 +447,7 @@
     const reason = window.prompt('Reason for rejecting this statement review:');
     if (!reason) return;
     try {
-      const result = await api(`/api/finance/intelligence/statement-reviews/${encodeURIComponent(uid)}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
+      const result = await api(`${FIN_PREFIX}/statement-reviews/${encodeURIComponent(uid)}/reject`, { method: 'POST', body: JSON.stringify({ reason }) });
       $('reviewDialog').close();
       notice(result.message, 'success');
     } catch (error) { notice(error.message, 'error'); }
