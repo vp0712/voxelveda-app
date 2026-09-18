@@ -8,6 +8,7 @@ const assert = (ok, message) => { if (!ok) throw new Error(message); };
 const migration = read('migrations/20260918_advanced_au_banking_platform.sql');
 const reparseMigration = read('migrations/20260918_statement_review_reparse_tracking.sql');
 const reviewLedgerMigration = read('migrations/20260918_bank_grade_review_company_ledger.sql');
+const cashBackfillMigration = read('migrations/20260918_cash_category_backfill.sql');
 const provider = read('services/openBankingProviderService.js');
 const sync = read('services/advancedBankingSyncService.js');
 const scheduler = read('services/bankSyncScheduler.js');
@@ -107,6 +108,9 @@ assert(financeIntelligence.includes('cash_spent'), 'finance reports must expose 
 assert(financeIntelligence.includes("req.query.category"), 'transaction ledger API must support category filters');
 assert(bankGradeUi.includes('<option value="Cash">Cash</option>'), 'ledger must provide a Cash filter');
 assert(statementReportUi.includes('<span>Cash</span>'), 'report UI must show Cash total explicitly');
+assert(cashBackfillMigration.includes("category='Cash'"), 'historical cash backfill must set the Cash category');
+assert(cashBackfillMigration.includes("category IS NULL") || cashBackfillMigration.includes("TRIM(category)=''"), 'cash backfill must not overwrite existing categories');
+assert(cashBackfillMigration.includes('ATM|CASH WITHDRAWAL'), 'cash backfill must stay limited to obvious cash patterns');
 assert(databaseConfig.includes("dateStrings: ['DATE']"), 'MySQL DATE values must remain YYYY-MM-DD strings at the application boundary');
 assert(databaseConfig.includes("date_transport: 'YYYY-MM-DD_STRING'"), 'database date transport evidence missing');
 const { buildDatabaseConfig } = require('../config/databaseConfig');
