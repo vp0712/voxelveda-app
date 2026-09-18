@@ -122,6 +122,9 @@ router.post('/personal-money/roadmaps/:id/status', requireAnyPermission('EDIT_FI
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
 router.get('/intelligence/transactions', requireAnyPermission('VIEW_BANKING'), intelligence.getTransactions);
+router.get('/intelligence/transactions/:id', requireAnyPermission('VIEW_BANKING'), intelligence.getTransactionDetail);
+router.post('/intelligence/transactions/:id', requireAnyPermission('EDIT_FINANCE'), intelligence.updateTransaction);
+router.post('/intelligence/transactions/bulk/category', requireAnyPermission('EDIT_FINANCE'), intelligence.bulkCategorizeTransactions);
 router.get('/intelligence/statements', requireAnyPermission('VIEW_BANKING'), intelligence.getStatementLibrary);
 router.get('/intelligence/statements/:uid/report', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), intelligence.getStatementReport);
 router.get('/intelligence/reports/spending', requireAnyPermission('VIEW_BANKING'), intelligence.getSpendingReport);
