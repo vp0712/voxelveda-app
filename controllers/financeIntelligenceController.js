@@ -751,6 +751,17 @@ exports.getBankingDashboard = async (req, res) => {
         : null;
       const monthlyFreeCashFlow = avgIncome - avgSpend;
       const runwayMonths = avgSpend > 0 ? balance / avgSpend : null;
+      const savingsRatePct = avgIncome > 0 ? (monthlyFreeCashFlow / avgIncome) * 100 : null;
+      const subscriptionLoadPct = avgIncome > 0 ? (recurringMonthly / avgIncome) * 100 : null;
+      const dailyAverageSpend = avgSpend > 0 ? avgSpend / 30.4375 : 0;
+      const forecast30 = balance + monthlyFreeCashFlow;
+      const forecast60 = balance + (monthlyFreeCashFlow * 2);
+      const forecast90 = balance + (monthlyFreeCashFlow * 3);
+      const safeToSpend7d = Math.max(0, balance - recurringMonthly - (dailyAverageSpend * 7));
+      const monthSpendValues = baseline.map((row) => Number(row.money_out || 0));
+      const spendMean = monthSpendValues.length ? monthSpendValues.reduce((sum, value) => sum + value, 0) / monthSpendValues.length : 0;
+      const spendVariance = monthSpendValues.length ? monthSpendValues.reduce((sum, value) => sum + ((value - spendMean) ** 2), 0) / monthSpendValues.length : 0;
+      const spendVolatilityPct = spendMean > 0 ? (Math.sqrt(spendVariance) / spendMean) * 100 : null;
       const currencyFlow = flow.find((row) => row.currency === currency) || {};
       const staleConnectedAccounts = accounts.filter((account) => {
         if (account.currency !== currency || account.connection_type !== 'OPEN_BANKING') return false;
@@ -764,6 +775,9 @@ exports.getBankingDashboard = async (req, res) => {
       if (spendTrendPct !== null && spendTrendPct >= 20) alerts.push({ severity: 'MEDIUM', code: 'SPEND_ACCELERATION', message: `Latest complete-month spending is ${spendTrendPct.toFixed(1)}% above the prior month.` });
       if (Number(currencyFlow.unclassified || 0) > 0) alerts.push({ severity: 'MEDIUM', code: 'UNCLASSIFIED_TRANSACTIONS', message: `${Number(currencyFlow.unclassified || 0)} transaction(s) still need categorisation.` });
       if (staleConnectedAccounts > 0) alerts.push({ severity: 'MEDIUM', code: 'STALE_BANK_FEED', message: `${staleConnectedAccounts} connected account(s) have not synced within 72 hours.` });
+      if (subscriptionLoadPct !== null && subscriptionLoadPct >= 25) alerts.push({ severity: 'MEDIUM', code: 'HIGH_RECURRING_COMMITMENTS', message: `Estimated recurring commitments use ${subscriptionLoadPct.toFixed(1)}% of average monthly income.` });
+      if (forecast30 < 0) alerts.push({ severity: 'HIGH', code: 'NEGATIVE_30_DAY_FORECAST', message: 'Current balance plus recent cash-flow trend projects below zero within roughly 30 days.' });
+      if (spendVolatilityPct !== null && spendVolatilityPct >= 35) alerts.push({ severity: 'LOW', code: 'SPEND_VOLATILITY', message: `Monthly spending has varied by about ${spendVolatilityPct.toFixed(1)}% around its recent average.` });
       return {
         currency,
         evidence_months: baseline.length,
@@ -771,8 +785,16 @@ exports.getBankingDashboard = async (req, res) => {
         average_monthly_income: Number(avgIncome.toFixed(2)),
         average_monthly_spend: Number(avgSpend.toFixed(2)),
         monthly_free_cash_flow: Number(monthlyFreeCashFlow.toFixed(2)),
-        estimated_next_month_balance: Number((balance + monthlyFreeCashFlow).toFixed(2)),
+        estimated_next_month_balance: Number(forecast30.toFixed(2)),
+        forecast_30d: Number(forecast30.toFixed(2)),
+        forecast_60d: Number(forecast60.toFixed(2)),
+        forecast_90d: Number(forecast90.toFixed(2)),
         recurring_monthly_estimate: Number(recurringMonthly.toFixed(2)),
+        subscription_load_percent: subscriptionLoadPct === null ? null : Number(subscriptionLoadPct.toFixed(1)),
+        savings_rate_percent: savingsRatePct === null ? null : Number(savingsRatePct.toFixed(1)),
+        daily_average_spend: Number(dailyAverageSpend.toFixed(2)),
+        safe_to_spend_7d: Number(safeToSpend7d.toFixed(2)),
+        spend_volatility_percent: spendVolatilityPct === null ? null : Number(spendVolatilityPct.toFixed(1)),
         cash_runway_months: runwayMonths === null ? null : Number(runwayMonths.toFixed(1)),
         spend_trend_percent: spendTrendPct === null ? null : Number(spendTrendPct.toFixed(1)),
         alerts
