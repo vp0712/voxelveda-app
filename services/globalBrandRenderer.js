@@ -3,7 +3,7 @@
 const BRAND_CSS = '/global-brand.css?v=20260918-global-loader';
 const BRAND_JS = '/global-brand.js?v=20260918-global-loader';
 const FINANCE_PDF_ENHANCER_JS = '/finance-pdf-import-enhancer.js?v=20260918-pdf-parser2'; // retained as legacy asset reference only
-const ADVANCED_BANKING_JS = '/premium-banking-app.js?v=20260919-banking-error-fix';
+const ADVANCED_BANKING_JS = '/premium-banking-app.js?v=20260919-access-fix';
 const CANONICAL_LOGO = '/logo.png';
 
 function canonicalizeLogoPaths(html) {
