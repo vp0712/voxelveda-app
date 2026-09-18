@@ -121,6 +121,7 @@ router.post('/personal-money/roadmaps/:roadmapId/milestones/:milestoneId/progres
 router.post('/personal-money/roadmaps/:id/status', requireAnyPermission('EDIT_FINANCE'), personalFinancialRoadmap.updateStatus);
 
 router.get('/intelligence/overview', requireAnyPermission('VIEW_BANKING'), intelligence.getOverview);
+router.get('/intelligence/transactions', requireAnyPermission('VIEW_BANKING'), intelligence.getTransactions);
 router.get('/intelligence/active-overview', requireAnyPermission('VIEW_BANKING'), bankAccountLifecycle.getActiveOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
 router.get('/intelligence/accounts/:id/lifecycle', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), bankAccountLifecycle.getLifecycle);
@@ -134,6 +135,7 @@ router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermissio
 router.get('/intelligence/statement-reviews', requireAnyPermission('VIEW_BANKING'), financePrivacy.filterStatementList, statementReview.list);
 router.get('/intelligence/statement-reviews/:uid', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), statementReview.get);
 router.post('/intelligence/statement-reviews/:uid/rows/:rowId/select', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), statementReview.updateRowSelection);
+router.post('/intelligence/statement-reviews/:uid/rows/:rowId/override', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.overrideRejectedRow);
 router.post('/intelligence/statement-reviews/:uid/commit', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.commit);
 router.post('/intelligence/statement-reviews/:uid/reject', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementReview.reject);
 router.get('/intelligence/history-coverage', requireAnyPermission('VIEW_BANKING'), intelligence.getHistoryCoverage);
