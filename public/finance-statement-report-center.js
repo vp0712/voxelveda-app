@@ -23,8 +23,8 @@
       .vv-report-preset{border:1px solid #dfe5ee;background:#fff;border-radius:999px;padding:8px 11px;font-weight:800;cursor:pointer}
       .vv-report-preset.active{background:#111827;color:#fff;border-color:#111827}
       .vv-statement-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-      .vv-statement-card{border:1px solid #e1e6ed;border-radius:15px;padding:15px;background:#fff;cursor:pointer;text-align:left;color:inherit}
-      .vv-statement-card:hover{border-color:#aab7c8;box-shadow:0 8px 22px rgba(16,24,40,.06)}
+      .vv-statement-card{border:1px solid #e1e6ed;border-radius:15px;padding:0;background:#fff;text-align:left;color:inherit;overflow:hidden}.vv-statement-open{display:block;width:100%;padding:15px;border:0;background:transparent;text-align:left;color:inherit;cursor:pointer}
+      .vv-statement-card:hover{border-color:#aab7c8;box-shadow:0 8px 22px rgba(16,24,40,.06)}.vv-statement-controls{display:flex;gap:7px;justify-content:flex-end;padding:9px 12px;border-top:1px solid #edf0f4;background:#fafbfc}.vv-statement-controls button{padding:7px 10px;border-radius:9px;border:1px solid #d7dee8;background:#fff;cursor:pointer;font-weight:800}.vv-statement-controls .danger{border-color:#efb8bd;color:#9b2230;background:#fff7f8}.vv-removed-row{display:flex;justify-content:space-between;gap:14px;padding:13px 0;border-bottom:1px solid #edf0f4}.vv-removed-row strong,.vv-removed-row small{display:block}.vv-removed-row small{color:#667085;margin-top:4px}
       .vv-statement-card strong,.vv-statement-card small{display:block}.vv-statement-card small{color:#667085;margin-top:5px}
       .vv-statement-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
       .vv-statement-stats span{background:#f7f9fc;border-radius:10px;padding:8px;font-size:.72rem;color:#667085}
@@ -86,11 +86,12 @@
     section.innerHTML=`
       <div class="panel-heading">
         <div><p class="eyebrow">STATEMENTS & REPORTS</p><h2>Imported statement library</h2><p class="muted">Every imported statement stays saved by its original filename. Open one to see exactly which transactions came from it and how the money was spent.</p></div>
-        <div class="vv-report-actions"><button id="vvRefreshStatements" type="button">Refresh</button><button id="vvOverallReport" type="button" class="primary">Spending report</button></div>
+        <div class="vv-report-actions"><button id="vvRemovedStatements" type="button">Removed</button><button id="vvRefreshStatements" type="button">Refresh</button><button id="vvOverallReport" type="button" class="primary">Full History Report</button></div>
       </div>
       <div id="vvStatementLibrary" class="vv-statement-grid"><div class="empty"><strong>Loading statements…</strong></div></div>`;
     anchor.insertAdjacentElement('afterend',section);
     $('vvRefreshStatements').addEventListener('click',loadStatements);
+    $('vvRemovedStatements').addEventListener('click',()=>openRemovedStatements());
     $('vvOverallReport').addEventListener('click',()=>openOverallReport());
   }
 
@@ -172,19 +173,87 @@
       const p=await api(FIN_PREFIX + '/statements?scope=ALL');
       const rows=p.statements||[];
       host.innerHTML=rows.length?rows.map(s=>`
-        <button class="vv-statement-card" type="button" data-statement-uid="${esc(s.import_uid)}">
-          <strong>${esc(s.original_name||'Imported statement')}</strong>
-          <small>${esc(s.account_name||'Account')} · ${esc(s.ownership_scope||'')} · ${esc(s.source_format||'')}</small>
-          <small>${esc(String(s.statement_start_date||'').slice(0,10)||'Unknown start')} → ${esc(String(s.statement_end_date||'').slice(0,10)||'Unknown end')}</small>
-          <div class="vv-statement-stats">
-            <span>Transactions<b>${Number(s.linked_transactions||0)}</b></span>
-            <span>Money out<b>${money(s.money_out,s.currency||'AUD')}</b></span>
-            <span>Money in<b>${money(s.money_in,s.currency||'AUD')}</b></span>
+        <article class="vv-statement-card" data-statement-card="${esc(s.import_uid)}">
+          <button class="vv-statement-open" type="button" data-statement-uid="${esc(s.import_uid)}">
+            <strong>${esc(s.original_name||'Imported statement')}</strong>
+            <small>${esc(s.account_name||'Account')} · ${esc(s.ownership_scope||'')} · ${esc(s.source_format||'')}</small>
+            <small>${esc(String(s.statement_start_date||'').slice(0,10)||'Unknown start')} → ${esc(String(s.statement_end_date||'').slice(0,10)||'Unknown end')}</small>
+            <div class="vv-statement-stats">
+              <span>Transactions<b>${Number(s.linked_transactions||0)}</b></span>
+              <span>Money out<b>${money(s.money_out,s.currency||'AUD')}</b></span>
+              <span>Money in<b>${money(s.money_in,s.currency||'AUD')}</b></span>
+            </div>
+            ${s.legacy_linkage?'<div class="vv-legacy-note">Legacy import: exact old transaction linkage may be incomplete.</div>':''}
+          </button>
+          <div class="vv-statement-controls">
+            <button type="button" data-statement-uid="${esc(s.import_uid)}">Open</button>
+            <button type="button" class="danger" data-remove-statement="${esc(s.import_uid)}" data-statement-name="${esc(s.original_name||'Statement')}">Remove</button>
           </div>
-          ${s.legacy_linkage?'<div class="vv-legacy-note">Legacy import: this statement was imported before exact transaction-source linkage was added, so the app will not guess which old rows belong to it.</div>':''}
-        </button>`).join(''):'<div class="empty"><strong>No imported statements yet</strong><span>Import and approve a bank statement and it will be saved here.</span></div>';
+        </article>`).join(''):'<div class="empty"><strong>No imported statements yet</strong><span>Import and approve a bank statement and it will be saved here.</span></div>';
       host.querySelectorAll('[data-statement-uid]').forEach(b=>b.addEventListener('click',()=>openStatementReport(b.dataset.statementUid)));
-    }catch(e){host.innerHTML=`<div class="empty"><strong>Could not load statement library</strong><span>${esc(e.message)}</span></div>`;}
+      host.querySelectorAll('[data-remove-statement]').forEach(b=>b.addEventListener('click',()=>removeStatement(b.dataset.removeStatement,b.dataset.statementName)));    }catch(e){host.innerHTML=`<div class="empty"><strong>Could not load statement library</strong><span>${esc(e.message)}</span></div>`;}
+  }
+
+  async function mutate(path,options={}){
+    const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json','Accept':'application/json',...(options.headers||{})},...options});
+    let p={};try{p=await r.json();}catch{}
+    if(!r.ok)throw new Error(p.message||`Request failed (${r.status})`);
+    return p;
+  }
+
+  async function removeStatement(uid,name){
+    if(!confirm(`Remove "${name||'this statement'}" from all reports and analysis?\n\nThis is reversible from Removed Statements.`))return;
+    try{
+      const p=await mutate(`${FIN_PREFIX}/statements/${encodeURIComponent(uid)}/remove`,{method:'POST',body:'{}'});
+      alert(p.message||'Statement removed.');
+      await loadStatements();
+    }catch(e){alert(e.message);}
+  }
+
+  async function restoreStatement(uid){
+    try{
+      const p=await mutate(`${FIN_PREFIX}/statements/${encodeURIComponent(uid)}/restore`,{method:'POST',body:'{}'});
+      alert(p.message||'Statement restored.');
+      await openRemovedStatements();
+      await loadStatements();
+    }catch(e){alert(e.message);}
+  }
+
+  async function purgeStatement(uid,name){
+    const required=`PURGE ${uid}`;
+    const typed=prompt(`Permanent deletion cannot be undone.\n\nStatement: ${name||uid}\n\nType exactly:\n${required}`);
+    if(typed!==required)return;
+    try{
+      const p=await mutate(`${FIN_PREFIX}/statements/${encodeURIComponent(uid)}/purge`,{method:'DELETE',body:JSON.stringify({confirmation:typed})});
+      alert(p.message||'Statement permanently deleted.');
+      await openRemovedStatements();
+    }catch(e){alert(e.message);}
+  }
+
+  async function openRemovedStatements(){
+    ensureRemovedDialog();
+    const host=$('vvRemovedBody');
+    host.innerHTML='<div class="empty"><strong>Loading removed statements…</strong></div>';
+    $('vvRemovedDialog').showModal();
+    try{
+      const p=await api(FIN_PREFIX + '/statements-removed');
+      const rows=p.removed_statements||[];
+      host.innerHTML=rows.length?rows.map(s=>`
+        <div class="vv-removed-row">
+          <div><strong>${esc(s.original_name||'Statement')}</strong><small>${esc(s.account_name||'Account')} · ${esc(s.currency||'AUD')} · ${esc(String(s.statement_start_date||'').slice(0,10)||'—')} → ${esc(String(s.statement_end_date||'').slice(0,10)||'—')}</small></div>
+          <div class="vv-statement-controls"><button type="button" data-restore-statement="${esc(s.import_uid)}">Restore</button><button type="button" class="danger" data-purge-statement="${esc(s.import_uid)}" data-statement-name="${esc(s.original_name||'Statement')}">Permanently delete</button></div>
+        </div>`).join(''):'<div class="empty"><strong>Removed Statements is empty.</strong><span>Statements you remove will appear here until permanently deleted.</span></div>';
+      host.querySelectorAll('[data-restore-statement]').forEach(b=>b.addEventListener('click',()=>restoreStatement(b.dataset.restoreStatement)));
+      host.querySelectorAll('[data-purge-statement]').forEach(b=>b.addEventListener('click',()=>purgeStatement(b.dataset.purgeStatement,b.dataset.statementName)));
+    }catch(e){host.innerHTML=`<div class="empty"><strong>Could not load removed statements</strong><span>${esc(e.message)}</span></div>`;}
+  }
+
+  function ensureRemovedDialog(){
+    if($('vvRemovedDialog'))return;
+    const d=document.createElement('dialog');d.id='vvRemovedDialog';
+    d.innerHTML='<div class="dialog-form"><div class="dialog-head"><div><h2>Removed Statements</h2><p class="helper">Restore a statement, or permanently delete it after review.</p></div><button type="button" id="vvRemovedClose" class="icon-button">×</button></div><div id="vvRemovedBody"></div></div>';
+    document.body.appendChild(d);
+    $('vvRemovedClose').addEventListener('click',()=>d.close());
   }
 
   function reportQuery(base){
