@@ -15,5 +15,5 @@ assert(client.includes("safeApi(BANK+'/data-quality'"),'data quality failure is 
 assert(client.includes("safeApi(FIN+'/banking-dashboard?"),'banking dashboard failure is isolated');
 assert(client.includes("Banking loaded with limited services."),'degraded mode warns without blanking the workspace');
 assert(client.includes("if(name==='refresh') return refresh();"),'degraded retry button is wired');
-assert(brand.includes('20260919-banking-error-fix'),'fixed premium Banking asset is cache-busted');
+assert(brand.includes('20260919-access-fix'),'fixed premium Banking asset is cache-busted');
 if(process.exitCode)process.exit(process.exitCode);
