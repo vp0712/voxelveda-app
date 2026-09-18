@@ -100,7 +100,7 @@ exports.runAnalysis = async (req, res) => {
     const scope = String(req.body.scope || 'ALL').toUpperCase();
     if (!['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED'].includes(scope)) throw new FinanceError('Invalid finance scope.', 400, 'INVALID_SCOPE');
     const params = [...privacy.visibilityParams(req)];
-    const clauses = [privacy.visibilitySql('ba')];
+    const clauses = [privacy.visibilitySql('ba', req)];
     if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
     const [transactions] = await pool.query(
       `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.description, bt.merchant_name, bt.reference,
@@ -221,7 +221,7 @@ exports.getInsights = async (req, res) => {
   try {
     const scope = String(req.query.scope || 'ALL').toUpperCase();
     const params = [...privacy.visibilityParams(req)];
-    const clauses = ["fi.status <> 'DISMISSED'", privacy.visibilitySql('ba')];
+    const clauses = ["fi.status <> 'DISMISSED'", privacy.visibilitySql('ba', req)];
     if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
     const [rows] = await pool.query(
       `SELECT fi.*, bt.transaction_date, bt.description, bt.merchant_name, bt.debit, bt.credit, bt.category AS current_category,
@@ -275,7 +275,7 @@ exports.applyInsight = async (req, res) => {
           JOIN finance_transaction_insights fi ON fi.bank_transaction_id=bt.id
           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
          SET bt.is_internal_transfer=1
-         WHERE fi.transfer_candidate_uid=? AND ${privacy.visibilitySql('ba')}`,
+         WHERE fi.transfer_candidate_uid=? AND ${privacy.visibilitySql('ba', req)}`,
         [insight.transfer_candidate_uid, ...privacy.visibilityParams(req)]
       );
       await db.query(
@@ -283,7 +283,7 @@ exports.applyInsight = async (req, res) => {
           JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
          SET fi.status='APPLIED', fi.reviewed_at=NOW(), fi.reviewed_by=?
-         WHERE fi.transfer_candidate_uid=? AND ${privacy.visibilitySql('ba')}`,
+         WHERE fi.transfer_candidate_uid=? AND ${privacy.visibilitySql('ba', req)}`,
         [req.user.id, insight.transfer_candidate_uid, ...privacy.visibilityParams(req)]
       );
     } else {
