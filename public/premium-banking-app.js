@@ -20,7 +20,7 @@
   const state = {
     tab:'home', scope:'ALL', currency:'AUD', range:'1M', chart:'pie',
     status:null, connections:[], quality:null, dashboard:null, budgets:[], insights:null, attention:null,
-    os:null, team:null, activity:[], activityQuery:'', activityCategory:'', activityAccount:'', busy:false
+    os:null, team:null, command:null, calendar:null, activity:[], activityQuery:'', activityCategory:'', activityAccount:'', busy:false
   };
   const palette = ['#44d7a5','#67a8ff','#f3b85b','#b89cff','#ff8f96','#5dd4e8','#98d66e','#e9a5ff'];
 
@@ -53,7 +53,7 @@
 
   function ensureAssets(){
     if(!$('premiumBankCss')){
-      const link=document.createElement('link'); link.id='premiumBankCss'; link.rel='stylesheet'; link.href='/premium-banking-app.css?v=20260918-premium-bank-v3'; document.head.appendChild(link);
+      const link=document.createElement('link'); link.id='premiumBankCss'; link.rel='stylesheet'; link.href='/premium-banking-app.css?v=20260919-banking-command-v1'; document.head.appendChild(link);
     }
     if(!$('financePdfV3')){
       const script=document.createElement('script'); script.id='financePdfV3'; script.src='/finance-pdf-v3.js?v=20260918-pdf-v3b'; script.defer=true; document.head.appendChild(script);
@@ -86,13 +86,13 @@
         '<button class="vv-pb-action" type="button" data-pb-action="upload"><span>⇧</span><b>Statement</b><small>PDF / CSV / OFX</small></button>'+
         '<button class="vv-pb-action" type="button" data-pb-action="search"><span>⌕</span><b>Search</b><small>Transactions</small></button>'+
         '<button class="vv-pb-action" type="button" data-pb-action="budget"><span>◎</span><b>Budget</b><small>Set a limit</small></button>'+
-        '<button class="vv-pb-action" type="button" data-pb-action="payments"><span>→</span><b>Pay & transfer</b><small>Workflow</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="space"><span>◫</span><b>Space</b><small>Allocate money</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="team"><span>◎</span><b>Team</b><small>Access control</small></button>'+
+        '<button class="vv-pb-action" type="button" data-pb-action="payments"><span>→</span><b>Pay & transfer</b><small>Workflow</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="space"><span>◫</span><b>Space</b><small>Allocate money</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="team"><span>◎</span><b>Team</b><small>Access control</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="calendar"><span>▦</span><b>Cash flow</b><small>90-day calendar</small></button>'+
       '</div>'+
       '<nav class="vv-pb-tabs" aria-label="Banking sections">'+
         '<button class="active" type="button" data-pb-tab="home">Home</button>'+
         '<button type="button" data-pb-tab="activity">Activity</button>'+'<button type="button" data-pb-tab="pay">Pay</button>'+
         '<button type="button" data-pb-tab="insights">Insights</button>'+
-        '<button type="button" data-pb-tab="plan">Plan</button>'+'<button type="button" data-pb-tab="team">Team</button>'+
+        '<button type="button" data-pb-tab="plan">Plan</button>'+'<button type="button" data-pb-tab="calendar">Calendar</button>'+'<button type="button" data-pb-tab="team">Team</button>'+
         '<button type="button" data-pb-tab="more">More</button>'+
       '</nav>'+
       '<div id="vvPbContent" class="vv-pb-content"><div class="vv-pb-empty"><strong>Loading banking data…</strong></div></div>';
@@ -180,6 +180,11 @@
         '<label><input id="vvPbAlertSync" type="checkbox" checked> Bank sync alerts</label><label><input id="vvPbAlertUnusual" type="checkbox" checked> Unusual activity alerts</label>'+
         '<div class="vv-pb-modal-actions"><button type="button" data-pb-close="vvPbAlertDialog">Cancel</button><button class="primary" type="submit">Save alerts</button></div></form>';
       document.body.appendChild(d); $('vvPbAlertForm').addEventListener('submit',saveAlerts);
+    }
+    if(!$('vvPbAccountDialog')){
+      const d=document.createElement('dialog'); d.id='vvPbAccountDialog'; d.className='vv-pb-modal vv-pb-account-modal';
+      d.innerHTML='<div class="vv-pb-modal-inner vv-pb-account-modal-inner"><div class="vv-pb-card-head"><div><h3 id="vvPbAccountTitle">Account</h3><span id="vvPbAccountSubtitle">Loading account intelligence…</span></div><button type="button" data-pb-close="vvPbAccountDialog">Close</button></div><div id="vvPbAccountBody"><div class="vv-pb-empty">Loading…</div></div></div>';
+      document.body.appendChild(d);
     }
     document.addEventListener('click',(e)=>{
       const close=e.target.closest('[data-pb-close]'); if(close) document.getElementById(close.dataset.pbClose)?.close();
@@ -283,6 +288,21 @@
     }).join('')+'</div>';
   }
 
+  function commandMetrics(){
+    const cur=selectedCurrency();
+    return state.command?.summary_by_currency?.[cur]||{};
+  }
+  function commandAttention(){
+    const rows=state.command?.attention||[];
+    if(!rows.length) return '<div class="vv-pb-empty">No urgent banking attention items.</div>';
+    return '<div class="vv-pb-recurring">'+rows.slice(0,8).map(a=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(String(a.code||'ATTENTION').replaceAll('_',' '))+'</strong><small>'+esc(a.message||'')+'</small></div><b>'+esc(a.severity||'INFO')+'</b></div>').join('')+'</div>';
+  }
+  function approvalPreview(){
+    const rows=state.command?.approval_inbox||[];
+    if(!rows.length) return '<div class="vv-pb-empty">No approvals waiting for you.</div>';
+    return '<div class="vv-pb-recurring">'+rows.slice(0,6).map(p=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(p.payee_name)+'</strong><small>'+esc(p.account_name||'Account')+' · prepared by '+esc(p.created_by_name||'user')+' · '+esc(p.payment_type)+'</small></div><b>'+money(p.amount,p.currency)+'</b><div class="vv-pb-budget-actions"><button type="button" data-pb-approve-payment="'+esc(p.payment_uid)+'">Approve</button><button type="button" data-pb-reject-payment="'+esc(p.payment_uid)+'">Reject</button></div></div>').join('')+'</div>';
+  }
+
   function renderHome(){
     const d=state.dashboard||{}; const cur=selectedCurrency(); const f=flow();
     const intel=(d.intelligence_by_currency||[]).find(x=>x.currency===cur)||{};
@@ -296,6 +316,7 @@
     const cats=categories();
     const content=
       '<div class="vv-pb-toolbar"><div><h3>Banking home</h3><span style="color:#8fa4bb">Balances, cash flow and recent activity</span></div>'+renderCurrencySelect()+'</div>'+
+      (()=>{const m=commandMetrics();const o=state.command?.obligations||{};return '<section class="vv-pb-command"><div class="vv-pb-command-head"><div><span class="vv-pb-command-label">COMMAND CENTRE</span><h3>'+esc((state.command?.role_view?.mode||'BANKING').replaceAll('_',' '))+'</h3><small>Liquidity, obligations and approvals for your access level</small></div><button type="button" class="vv-pb-select" data-pb-action="calendar">90-day cash flow</button></div><div class="vv-pb-kpis"><div class="vv-pb-kpi"><span>Projected liquidity · 30d</span><b>'+money(m.projected_liquidity_30d||0,cur)+'</b></div><div class="vv-pb-kpi"><span>Cash runway</span><b>'+(m.runway_days==null?'—':Number(m.runway_days)+' days')+'</b></div><div class="vv-pb-kpi"><span>Due next 30d</span><b>'+money(m.due_next_30d||0,cur)+'</b></div><div class="vv-pb-kpi"><span>Pending obligations</span><b>'+money(m.pending_obligations||0,cur)+'</b></div><div class="vv-pb-kpi"><span>Approvals waiting</span><b>'+Number((state.command?.approval_inbox||[]).length)+'</b></div><div class="vv-pb-kpi"><span>Overdue</span><b>'+Number(o.overdue||0)+'</b></div></div><div class="vv-pb-command-grid"><section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Needs attention</h3><span>Risk & operations</span></div>'+commandAttention()+'</section><section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Approval inbox</h3><button type="button" class="vv-pb-select" data-pb-tab="pay">Open Pay</button></div>'+approvalPreview()+'</section></div></section>';})()+
       '<div class="vv-pb-balance-grid">'+
         '<article class="vv-pb-balance"><span>Total visible balance · '+esc(cur)+'</span><strong>'+money(bal.balance,cur)+'</strong><small>'+Number(bal.account_count||0)+' active account(s)</small></article>'+
         '<article class="vv-pb-balance"><span>Money in · selected period</span><strong>'+money(f.money_in,cur)+'</strong><small>'+Number(f.transaction_count||0)+' transaction(s)</small></article>'+
@@ -319,7 +340,7 @@
       '</section>'+
       '<div class="vv-pb-two">'+
         '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Accounts</h3><button type="button" class="vv-pb-select" data-pb-action="upload">Import statement</button></div>'+
-          (accounts.length?'<div class="vv-pb-account-strip">'+accounts.map(a=>'<article class="vv-pb-account"><small>'+esc(a.institution||'Bank')+' · '+esc(a.account_type||'Account')+'</small><h4>'+esc(a.nickname||'Account')+'</h4><span>'+esc(a.account_number_masked||'Number masked')+'</span><div class="amount">'+accountBalance(a)+'</div><small>'+esc(a.ownership_scope||'')+' · '+esc(a.connection_status||a.connection_type||'Manual')+'</small><div class="vv-pb-account-actions"><button type="button" data-pb-account-activity="'+Number(a.id)+'">Transactions</button><button type="button" data-pb-account-statement="'+Number(a.id)+'">Statement</button></div></article>').join('')+'</div>':'<div class="vv-pb-empty">No active accounts in this view.</div>')+
+          (accounts.length?'<div class="vv-pb-account-strip">'+accounts.map(a=>'<article class="vv-pb-account"><small>'+esc(a.institution||'Bank')+' · '+esc(a.account_type||'Account')+'</small><h4>'+esc(a.nickname||'Account')+'</h4><span>'+esc(a.account_number_masked||'Number masked')+'</span><div class="amount">'+accountBalance(a)+'</div><small>'+esc(a.ownership_scope||'')+' · '+esc(a.connection_status||a.connection_type||'Manual')+'</small><div class="vv-pb-account-actions"><button type="button" data-pb-account-detail="'+Number(a.id)+'">Open account</button><button type="button" data-pb-account-activity="'+Number(a.id)+'">Transactions</button><button type="button" data-pb-account-statement="'+Number(a.id)+'">Statement</button></div></article>').join('')+'</div>':'<div class="vv-pb-empty">No active accounts in this view.</div>')+
         '</section>'+
         '<section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Spending by category</h3><button type="button" data-pb-tab="insights" class="vv-pb-select">Open insights</button></div>'+pieChart(cats,f.money_out,cur)+'</section>'+
       '</div>'+
@@ -410,6 +431,7 @@
       const approve=(state.os?.access?.can_approve && p.status==='PENDING_APPROVAL' && !mine);
       return '<div class="vv-pb-recurring-row"><div><strong>'+esc(p.payee_name)+'</strong><small>'+esc(p.payment_type)+' · '+esc(p.status)+' · '+esc(p.schedule_type)+(p.due_date?' · due '+esc(day(p.due_date)):'')+' · prepared by '+esc(p.created_by_name||'user')+'</small></div><b>'+money(p.amount,p.currency)+'</b><div class="vv-pb-budget-actions">'+
         (p.status==='DRAFT'?'<button type="button" data-pb-submit-payment="'+esc(p.payment_uid)+'">Submit</button>':'')+
+        (!['COMPLETED','REJECTED','CANCELLED'].includes(p.status)?'<button type="button" data-pb-cancel-payment="'+esc(p.payment_uid)+'">Cancel</button>':'')+
         (approve?'<button type="button" data-pb-approve-payment="'+esc(p.payment_uid)+'">Approve</button><button type="button" data-pb-reject-payment="'+esc(p.payment_uid)+'">Reject</button>':'')+
         '</div></div>';
     }).join('')+'</div>';
@@ -437,8 +459,39 @@
     if(!rows.length) return '<div class="vv-pb-empty"><strong>No Money Spaces</strong><span>Create reserves for tax, payroll, emergency cash, equipment or personal goals.</span><button type="button" data-pb-action="space">Create Space</button></div>';
     return '<div class="vv-pb-budget-grid">'+rows.map(s=>{
       const target=Number(s.target_amount||0); const allocated=Number(s.allocated_amount||0); const used=target>0?Math.min(100,allocated/target*100):0;
-      return '<article class="vv-pb-budget"><div class="vv-pb-budget-head"><div><strong>'+esc(s.name)+'</strong><small>'+esc(s.ownership_scope)+' · '+esc(s.purpose||'Allocation')+'</small></div><b>'+money(allocated,s.currency)+'</b></div><div class="vv-pb-progress"><i style="width:'+used.toFixed(1)+'%"></i></div><small>'+(target?money(target,s.currency)+' target · ':'')+money(s.minimum_reserve,s.currency)+' minimum reserve</small></article>';
+      return '<article class="vv-pb-budget"><div class="vv-pb-budget-head"><div><strong>'+esc(s.name)+'</strong><small>'+esc(s.ownership_scope)+' · '+esc(s.purpose||'Allocation')+'</small></div><b>'+money(allocated,s.currency)+'</b></div><div class="vv-pb-progress"><i style="width:'+used.toFixed(1)+'%"></i></div><small>'+(target?money(target,s.currency)+' target · ':'')+money(s.minimum_reserve,s.currency)+' minimum reserve</small><div class="vv-pb-budget-actions"><button type="button" data-pb-archive-space="'+esc(s.space_uid)+'">Archive</button></div></article>';
     }).join('')+'</div>';
+  }
+
+  function renderCalendar(){
+    const events=state.calendar?.events||[];
+    const grouped={};
+    events.forEach(e=>{(grouped[e.date]||(grouped[e.date]=[])).push(e);});
+    const dates=Object.keys(grouped).sort();
+    $('vvPbContent').innerHTML=
+      '<div class="vv-pb-toolbar"><div><h3>90-day cash-flow calendar</h3><span style="color:#8fa4bb">Upcoming obligations, scheduled payments and approval-dependent outflows</span></div><button type="button" class="vv-pb-select" data-pb-action="new-payment">＋ Schedule payment</button></div>'+
+      '<div class="vv-pb-kpis"><div class="vv-pb-kpi"><span>Calendar items</span><b>'+events.length+'</b></div><div class="vv-pb-kpi"><span>Due in 7 days</span><b>'+Number(state.command?.obligations?.due_7d||0)+'</b></div><div class="vv-pb-kpi"><span>Due in 30 days</span><b>'+Number(state.command?.obligations?.due_30d||0)+'</b></div><div class="vv-pb-kpi"><span>Overdue now</span><b>'+Number(state.command?.obligations?.overdue||0)+'</b></div></div>'+
+      '<section class="vv-pb-card" style="margin-top:12px"><div class="vv-pb-calendar">'+
+      (dates.length?dates.map(date=>'<div class="vv-pb-calendar-day"><div class="vv-pb-calendar-date"><strong>'+esc(date)+'</strong><span>'+grouped[date].length+' item(s)</span></div><div class="vv-pb-calendar-events">'+grouped[date].map(e=>'<div class="vv-pb-calendar-event"><div><strong>'+esc(e.title)+'</strong><small>'+esc(e.status)+' · '+esc(e.schedule_type)+(e.account_name?' · '+esc(e.account_name):'')+'</small></div><b>'+money(e.amount,e.currency)+'</b></div>').join('')+'</div></div>').join(''):'<div class="vv-pb-empty"><strong>No scheduled obligations in this window.</strong><span>Create payment drafts with due dates to build your cash-flow calendar.</span></div>')+
+      '</div></section>';
+    wireDynamic();
+  }
+
+  async function openAccountDetail(id){
+    const dialog=$('vvPbAccountDialog'); const body=$('vvPbAccountBody');
+    $('vvPbAccountTitle').textContent='Account intelligence'; $('vvPbAccountSubtitle').textContent='Loading account data…';
+    body.innerHTML='<div class="vv-pb-empty">Loading account intelligence…</div>'; dialog.showModal();
+    try{
+      const data=await api('/api/finance/banking-os/accounts/'+encodeURIComponent(id));
+      const a=data.account||{}; const m=data.metrics||{};
+      $('vvPbAccountTitle').textContent=a.nickname||'Account';
+      $('vvPbAccountSubtitle').textContent=(a.institution||'Bank')+' · '+(a.account_number_masked||'Masked account')+' · '+(a.ownership_scope||'');
+      body.innerHTML='<div class="vv-pb-kpis"><div class="vv-pb-kpi"><span>Available balance</span><b>'+money(m.balance,a.currency||'AUD')+'</b></div><div class="vv-pb-kpi"><span>90d money in</span><b class="in">'+money(m.income_90d,a.currency||'AUD')+'</b></div><div class="vv-pb-kpi"><span>90d money out</span><b class="out">'+money(m.spend_90d,a.currency||'AUD')+'</b></div><div class="vv-pb-kpi"><span>90d net</span><b>'+money(m.net_90d,a.currency||'AUD')+'</b></div><div class="vv-pb-kpi"><span>Daily spend</span><b>'+money(m.average_daily_spend,a.currency||'AUD')+'</b></div><div class="vv-pb-kpi"><span>Runway</span><b>'+(m.runway_days==null?'—':m.runway_days+' days')+'</b></div></div>'+
+        '<div class="vv-pb-two" style="margin-top:12px"><section class="vv-pb-card"><div class="vv-pb-card-head"><h3>12-month cash flow</h3><span>'+esc(a.currency||'AUD')+'</span></div>'+lineChart(data.monthly||[],a.currency||'AUD')+'</section><section class="vv-pb-card"><div class="vv-pb-card-head"><h3>Top spending categories</h3><span>90 days</span></div>'+barChart(data.categories||[],a.currency||'AUD')+'</section></div>'+
+        '<section class="vv-pb-card" style="margin-top:12px"><div class="vv-pb-card-head"><h3>Payment workflows</h3><span>'+(data.payments||[]).length+' linked</span></div>'+((data.payments||[]).length?'<div class="vv-pb-recurring">'+data.payments.slice(0,15).map(p=>'<div class="vv-pb-recurring-row"><div><strong>'+esc(p.payee_name)+'</strong><small>'+esc(p.status)+' · '+esc(p.schedule_type)+(p.due_date?' · due '+esc(day(p.due_date)):'')+'</small></div><b>'+money(p.amount,p.currency)+'</b></div>').join('')+'</div>':'<div class="vv-pb-empty">No linked payment workflows.</div>')+'</section>'+
+        '<section class="vv-pb-card" style="margin-top:12px"><div class="vv-pb-card-head"><h3>Recent transactions</h3><button type="button" class="vv-pb-select" data-pb-account-activity="'+Number(a.id)+'">Open full activity</button></div>'+txRows((data.transactions||[]).map(t=>({...t,account_name:a.nickname})),25)+'</section>';
+      wireDynamic();
+    }catch(err){body.innerHTML='<div class="vv-pb-empty"><strong>Account detail could not load.</strong><span>'+esc(err.message)+'</span></div>';}
   }
 
   function renderTeam(){
@@ -461,6 +514,8 @@
   function openPaymentDraft(){const select=$('vvPbPayAccount');select.innerHTML='<option value="">Not assigned</option>'+(state.os?.accounts||[]).map(a=>'<option value="'+Number(a.id)+'">'+esc(a.nickname)+' · '+esc(a.currency)+'</option>').join('');$('vvPbPayCurrency').value=selectedCurrency();$('vvPbPaymentDraftDialog').showModal();}
   async function savePaymentDraft(e){e.preventDefault();try{const result=await api('/api/finance/banking-os/payments',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbPayAccount').value||null,ownership_scope:$('vvPbPayScope').value,payment_type:$('vvPbPayType').value,payee_name:$('vvPbPayPayee').value,reference_text:$('vvPbPayReference').value,amount:$('vvPbPayAmount').value,currency:$('vvPbPayCurrency').value,due_date:$('vvPbPayDue').value||null,schedule_type:$('vvPbPaySchedule').value})});$('vvPbPaymentDraftDialog').close();message(result.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment draft could not be created.','error',err.message);}}
   async function submitPayment(uid){try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/submit',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be submitted.','error',err.message);}}
+  async function cancelPayment(uid){if(!confirm('Cancel this payment workflow?'))return;try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/cancel',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be cancelled.','error',err.message);}}
+  async function archiveSpace(uid){if(!confirm('Archive this Money Space?'))return;try{const r=await api('/api/finance/banking-os/spaces/'+encodeURIComponent(uid)+'/archive',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be archived.','error',err.message);}}
   async function decidePayment(uid,decision){const note=prompt(decision==='APPROVE'?'Approval note (optional)':'Reason for rejection');if(decision==='REJECT'&&!note)return;try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/decision',{method:'POST',body:JSON.stringify({decision,note:note||''})});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Decision could not be recorded.','error',err.message);}}
   function openTeamAccess(userId,accountId,level,label){$('vvPbAccessUser').value=userId;$('vvPbAccessUserLabel').value=label;$('vvPbAccessAccount').innerHTML=(state.os?.accounts||[]).filter(a=>a.ownership_scope==='BUSINESS').map(a=>'<option value="'+a.id+'" '+(String(a.id)===String(accountId)?'selected':'')+'>'+esc(a.nickname)+'</option>').join('');$('vvPbAccessLevel').value=level||'VIEW';$('vvPbAccessDialog').showModal();}
   async function saveTeamAccess(e){e.preventDefault();try{const r=await api('/api/finance/banking-os/team/'+encodeURIComponent($('vvPbAccessUser').value)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbAccessAccount').value,access_level:$('vvPbAccessLevel').value})});$('vvPbAccessDialog').close();message(r.message,'success');await refresh();state.tab='team';render();}catch(err){message('Access could not be updated.','error',err.message);}}
@@ -503,6 +558,7 @@
     else if(state.tab==='pay') renderPay();
     else if(state.tab==='insights') renderInsights();
     else if(state.tab==='plan') renderPlan();
+    else if(state.tab==='calendar') renderCalendar();
     else if(state.tab==='team') renderTeam();
     else renderMore();
   }
@@ -520,13 +576,15 @@
       api(FIN+'/budgets'),
       api(FIN+'/insights?scope='+encodeURIComponent(state.scope)),
       api('/api/finance/banking-os'),
-      api('/api/finance/banking-os/team').catch(()=>({can_manage:false,users:[],grants:[]}))
+      api('/api/finance/banking-os/team').catch(()=>({can_manage:false,users:[],grants:[]})),
+      api('/api/finance/banking-os/command-center'),
+      api('/api/finance/banking-os/cashflow-calendar?days=90')
     ];
     if(state.scope==='PERSONAL'||state.scope==='ALL') requests.push(api(PERSONAL+'/attention').catch(()=>null));
     else requests.push(Promise.resolve(null));
-    const [status,connections,quality,dashboard,budgets,insights,os,team,attention]=await Promise.all(requests);
+    const [status,connections,quality,dashboard,budgets,insights,os,team,command,calendar,attention]=await Promise.all(requests);
     state.status=status; state.connections=connections.connections||[]; state.quality=quality; state.dashboard=dashboard;
-    state.budgets=budgets.budgets||[]; state.insights=insights; state.os=os; state.team=team; state.attention=attention;
+    state.budgets=budgets.budgets||[]; state.insights=insights; state.os=os; state.team=team; state.command=command; state.calendar=calendar; state.attention=attention;
     selectedCurrency();
     await loadActivity();
   }
@@ -638,6 +696,8 @@
     if(range){state.range=range.dataset.pbRange;await refresh();state.tab='insights';render();return;}
     const chart=e.target.closest('[data-pb-chart]');
     if(chart){state.chart=chart.dataset.pbChart;renderInsights();return;}
+    const accountDetail=e.target.closest('[data-pb-account-detail]');
+    if(accountDetail){return openAccountDetail(Number(accountDetail.dataset.pbAccountDetail));}
     const account=e.target.closest('[data-pb-account-activity]');
     if(account){state.activityAccount=account.dataset.pbAccountActivity;state.tab='activity';await loadActivity();render();return;}
     const statement=e.target.closest('[data-pb-account-statement]');
@@ -645,6 +705,8 @@
     const recurring=e.target.closest('[data-pb-search-merchant]');
     if(recurring){state.activityQuery=recurring.dataset.pbSearchMerchant;state.tab='activity';await loadActivity();render();return;}
     const submitPaymentButton=e.target.closest('[data-pb-submit-payment]'); if(submitPaymentButton){return submitPayment(submitPaymentButton.dataset.pbSubmitPayment);}
+    const cancelPaymentButton=e.target.closest('[data-pb-cancel-payment]'); if(cancelPaymentButton){return cancelPayment(cancelPaymentButton.dataset.pbCancelPayment);}
+    const archiveSpaceButton=e.target.closest('[data-pb-archive-space]'); if(archiveSpaceButton){return archiveSpace(archiveSpaceButton.dataset.pbArchiveSpace);}
     const approvePaymentButton=e.target.closest('[data-pb-approve-payment]'); if(approvePaymentButton){return decidePayment(approvePaymentButton.dataset.pbApprovePayment,'APPROVE');}
     const rejectPaymentButton=e.target.closest('[data-pb-reject-payment]'); if(rejectPaymentButton){return decidePayment(rejectPaymentButton.dataset.pbRejectPayment,'REJECT');}
     const grant=e.target.closest('[data-pb-grant-user]'); if(grant){openTeamAccess(grant.dataset.pbGrantUser,grant.dataset.pbGrantAccount,grant.dataset.pbGrantLevel,grant.dataset.pbGrantLabel);return;}
@@ -664,6 +726,7 @@
     if(name==='beneficiary') return $('vvPbBeneficiaryDialog').showModal();
     if(name==='space'){ $('vvPbSpaceCurrency').value=selectedCurrency(); $('vvPbSpaceScope').value=state.scope==='PERSONAL'?'PERSONAL':'BUSINESS'; return $('vvPbSpaceDialog').showModal(); }
     if(name==='team'){state.tab='team';render();return;}
+    if(name==='calendar'){state.tab='calendar';render();return;}
     if(name==='alerts') return openAlerts();
     if(name==='plan'){$('vvPbPaymentDialog')?.close();state.tab='plan';render();return;}
     if(name==='statements'){document.getElementById('vvStatementReportCenter')?.scrollIntoView({behavior:'smooth',block:'start'});return;}
