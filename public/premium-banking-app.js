@@ -20,7 +20,7 @@
   const state = {
     tab:'home', scope:'ALL', currency:'AUD', range:'1M', chart:'pie',
     status:null, connections:[], quality:null, dashboard:null, budgets:[], insights:null, attention:null,
-    os:null, team:null, activity:[], activityQuery:'', activityCategory:'', activityAccount:'', busy:false
+    os:null, team:null, command:null, calendar:null, activity:[], activityQuery:'', activityCategory:'', activityAccount:'', busy:false
   };
   const palette = ['#44d7a5','#67a8ff','#f3b85b','#b89cff','#ff8f96','#5dd4e8','#98d66e','#e9a5ff'];
 
@@ -86,13 +86,13 @@
         '<button class="vv-pb-action" type="button" data-pb-action="upload"><span>⇧</span><b>Statement</b><small>PDF / CSV / OFX</small></button>'+
         '<button class="vv-pb-action" type="button" data-pb-action="search"><span>⌕</span><b>Search</b><small>Transactions</small></button>'+
         '<button class="vv-pb-action" type="button" data-pb-action="budget"><span>◎</span><b>Budget</b><small>Set a limit</small></button>'+
-        '<button class="vv-pb-action" type="button" data-pb-action="payments"><span>→</span><b>Pay & transfer</b><small>Workflow</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="space"><span>◫</span><b>Space</b><small>Allocate money</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="team"><span>◎</span><b>Team</b><small>Access control</small></button>'+
+        '<button class="vv-pb-action" type="button" data-pb-action="payments"><span>→</span><b>Pay & transfer</b><small>Workflow</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="space"><span>◫</span><b>Space</b><small>Allocate money</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="team"><span>◎</span><b>Team</b><small>Access control</small></button>'+'<button class="vv-pb-action" type="button" data-pb-action="calendar"><span>▦</span><b>Cash flow</b><small>90-day calendar</small></button>'+
       '</div>'+
       '<nav class="vv-pb-tabs" aria-label="Banking sections">'+
         '<button class="active" type="button" data-pb-tab="home">Home</button>'+
         '<button type="button" data-pb-tab="activity">Activity</button>'+'<button type="button" data-pb-tab="pay">Pay</button>'+
         '<button type="button" data-pb-tab="insights">Insights</button>'+
-        '<button type="button" data-pb-tab="plan">Plan</button>'+'<button type="button" data-pb-tab="team">Team</button>'+
+        '<button type="button" data-pb-tab="plan">Plan</button>'+'<button type="button" data-pb-tab="calendar">Calendar</button>'+'<button type="button" data-pb-tab="team">Team</button>'+
         '<button type="button" data-pb-tab="more">More</button>'+
       '</nav>'+
       '<div id="vvPbContent" class="vv-pb-content"><div class="vv-pb-empty"><strong>Loading banking data…</strong></div></div>';
