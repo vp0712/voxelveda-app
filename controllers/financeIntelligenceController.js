@@ -603,6 +603,173 @@ exports.getSpendingReport = async (req, res) => {
   } catch (error) { return fail(res, error, 'Failed to build spending report'); }
 };
 
+
+function isoUtcDay(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function utcDate(value) {
+  const text = dateOnly(value);
+  if (!text) return null;
+  const date = new Date(`${text}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function addUtcDays(date, days) {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function monthAnchor(year, month, day) {
+  const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(year, month, Math.min(day, last)));
+}
+
+function bankingBudgetWindow(cycle, anchorValue, nowValue = new Date()) {
+  const anchor = utcDate(anchorValue);
+  if (!anchor) throw new FinanceError('Budget start date is invalid.', 400, 'INVALID_BUDGET_ANCHOR');
+  const now = new Date(Date.UTC(nowValue.getUTCFullYear(), nowValue.getUTCMonth(), nowValue.getUTCDate()));
+  if (cycle === 'MONTHLY') {
+    const day = anchor.getUTCDate();
+    let start = monthAnchor(now.getUTCFullYear(), now.getUTCMonth(), day);
+    if (start > now) start = monthAnchor(now.getUTCFullYear(), now.getUTCMonth() - 1, day);
+    const end = monthAnchor(start.getUTCFullYear(), start.getUTCMonth() + 1, day);
+    return { start: isoUtcDay(start), end: isoUtcDay(end) };
+  }
+  const days = cycle === 'FORTNIGHTLY' ? 14 : 7;
+  const diffDays = Math.floor((now.getTime() - anchor.getTime()) / 86400000);
+  const periods = Math.floor(diffDays / days);
+  const start = addUtcDays(anchor, periods * days);
+  const end = addUtcDays(start, days);
+  return { start: isoUtcDay(start), end: isoUtcDay(end) };
+}
+
+exports.getBankingBudgets = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const userId = Number(req.user?.id || req.user?.user_id || 0);
+    if (!userId) throw new FinanceError('User identity unavailable.', 401, 'USER_REQUIRED');
+    const [budgets] = await pool.query(
+      `SELECT id,budget_uid,ownership_scope,category,currency,cycle,cycle_anchor_date,limit_amount,active,updated_at
+         FROM finance_bank_budgets
+        WHERE created_by=? AND active=1
+        ORDER BY FIELD(ownership_scope,'BUSINESS','PERSONAL','MIXED','UNCLASSIFIED','ALL'),category`,
+      [userId]
+    );
+    const items = [];
+    for (const budget of budgets) {
+      const window = bankingBudgetWindow(String(budget.cycle), budget.cycle_anchor_date);
+      const clauses = [
+        privacy.visibilitySql('ba'),
+        "bt.reconciliation_status <> 'IGNORED'",
+        'bt.is_internal_transfer=0',
+        'bt.currency=?',
+        "COALESCE(NULLIF(bt.category,''),'Unclassified')=?",
+        'bt.transaction_date>=?',
+        'bt.transaction_date<?'
+      ];
+      const params = [...privacy.visibilityParams(req), budget.currency, budget.category, window.start, window.end];
+      if (budget.ownership_scope !== 'ALL') {
+        clauses.push('bt.ownership_scope=?');
+        params.push(budget.ownership_scope);
+      }
+      const [[spend]] = await pool.query(
+        `SELECT COALESCE(SUM(bt.debit),0) AS spent,COUNT(*) AS transaction_count
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${clauses.join(' AND ')}`,
+        params
+      );
+      const limit = Number(budget.limit_amount || 0);
+      const spent = Number(spend.spent || 0);
+      items.push({
+        ...budget,
+        limit_amount: limit,
+        spent_amount: spent,
+        remaining_amount: Math.round((limit - spent) * 100) / 100,
+        used_percent: limit > 0 ? Math.round((spent / limit) * 1000) / 10 : 0,
+        transaction_count: Number(spend.transaction_count || 0),
+        period_start: window.start,
+        period_end_exclusive: window.end
+      });
+    }
+    return res.json({ budgets: items });
+  } catch (error) { return fail(res, error, 'Failed to load banking budgets'); }
+};
+
+exports.saveBankingBudget = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const userId = Number(req.user?.id || req.user?.user_id || 0);
+    if (!userId) throw new FinanceError('User identity unavailable.', 401, 'USER_REQUIRED');
+    const scope = String(req.body.ownership_scope || 'PERSONAL').trim().toUpperCase();
+    if (!['ALL','PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(scope)) throw new FinanceError('Choose a valid budget scope.', 400, 'INVALID_BUDGET_SCOPE');
+    const category = String(req.body.category || '').trim().slice(0,120);
+    if (!category) throw new FinanceError('Budget category is required.', 400, 'BUDGET_CATEGORY_REQUIRED');
+    const currency = String(req.body.currency || 'AUD').trim().toUpperCase();
+    if (!/^[A-Z]{3}$/.test(currency)) throw new FinanceError('Budget currency must use a three-letter code.', 400, 'INVALID_BUDGET_CURRENCY');
+    const cycle = String(req.body.cycle || 'MONTHLY').trim().toUpperCase();
+    if (!['WEEKLY','FORTNIGHTLY','MONTHLY'].includes(cycle)) throw new FinanceError('Choose weekly, fortnightly or monthly.', 400, 'INVALID_BUDGET_CYCLE');
+    const anchor = dateOnly(req.body.cycle_anchor_date) || new Date().toISOString().slice(0,10);
+    const limit = money.fromCents(money.toCents(req.body.limit_amount || 0));
+    if (money.toCents(limit) <= 0n) throw new FinanceError('Budget limit must be greater than zero.', 400, 'INVALID_BUDGET_LIMIT');
+
+    const [[existing]] = await pool.query(
+      `SELECT id,budget_uid,limit_amount,cycle_anchor_date FROM finance_bank_budgets
+        WHERE created_by=? AND ownership_scope=? AND category=? AND currency=? AND cycle=? LIMIT 1`,
+      [userId,scope,category,currency,cycle]
+    );
+    const budgetUid = existing?.budget_uid || uid('BUD');
+    if (existing) {
+      await pool.query(
+        `UPDATE finance_bank_budgets
+            SET limit_amount=?,cycle_anchor_date=?,active=1,updated_at=NOW()
+          WHERE id=?`,
+        [limit,anchor,existing.id]
+      );
+    } else {
+      await pool.query(
+        `INSERT INTO finance_bank_budgets
+         (budget_uid,created_by,ownership_scope,category,currency,cycle,cycle_anchor_date,limit_amount,active)
+         VALUES (?,?,?,?,?,?,?,?,1)`,
+        [budgetUid,userId,scope,category,currency,cycle,anchor,limit]
+      );
+    }
+    await logAudit(pool, audit(req, {
+      action: existing ? 'BANKING_BUDGET_UPDATED' : 'BANKING_BUDGET_CREATED',
+      module: 'finance_intelligence',
+      recordType: 'finance_bank_budget',
+      recordId: budgetUid,
+      oldValue: existing || null,
+      newValue: { ownership_scope: scope, category, currency, cycle, cycle_anchor_date: anchor, limit_amount: limit }
+    }));
+    return res.json({ message: existing ? 'Banking budget updated.' : 'Banking budget created.', budget_uid: budgetUid });
+  } catch (error) { return fail(res, error, 'Failed to save banking budget'); }
+};
+
+exports.deleteBankingBudget = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const userId = Number(req.user?.id || req.user?.user_id || 0);
+    const budgetUid = String(req.params.uid || '').trim();
+    const [[existing]] = await pool.query(
+      'SELECT * FROM finance_bank_budgets WHERE budget_uid=? AND created_by=? LIMIT 1',
+      [budgetUid,userId]
+    );
+    if (!existing) throw new FinanceError('Banking budget not found.', 404, 'BANKING_BUDGET_NOT_FOUND');
+    await pool.query('UPDATE finance_bank_budgets SET active=0,updated_at=NOW() WHERE id=?', [existing.id]);
+    await logAudit(pool, audit(req, {
+      action: 'BANKING_BUDGET_ARCHIVED',
+      module: 'finance_intelligence',
+      recordType: 'finance_bank_budget',
+      recordId: budgetUid,
+      oldValue: existing,
+      newValue: { active: 0 }
+    }));
+    return res.json({ message: 'Budget removed from active tracking.' });
+  } catch (error) { return fail(res, error, 'Failed to remove banking budget'); }
+};
+
 exports.getAccounts = async (req, res) => {
   try {
     await ensureFinanceSchema();
