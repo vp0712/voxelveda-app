@@ -13,8 +13,15 @@ on:
       - 'routes/integrationWebhookRoutes.js'
       - 'middleware/statementPreviewSanitizer.js'
       - 'config/permissionCatalog.js'
-      - 'public/advanced-banking-ui.js'
-      - 'public/advanced-banking-ui.css'
+      - 'public/premium-banking-app.js'
+      - 'public/premium-banking-app.css'
+      - 'public/admin-dashboard.html'
+      - 'public/admin-dashboard.js'
+      - 'public/advanced-theme.css'
+      - 'app.js'
+      - 'migrations/20260918_premium_banking_budgets.sql'
+      - 'controllers/financeIntelligenceController.js'
+      - 'routes/financeRoutes.js'
       - 'public/finance-pdf-v3.js'
       - 'services/globalBrandRenderer.js'
       - 'scripts/advanced-banking-platform-test.js'
@@ -32,8 +39,15 @@ on:
       - 'routes/integrationWebhookRoutes.js'
       - 'middleware/statementPreviewSanitizer.js'
       - 'config/permissionCatalog.js'
-      - 'public/advanced-banking-ui.js'
-      - 'public/advanced-banking-ui.css'
+      - 'public/premium-banking-app.js'
+      - 'public/premium-banking-app.css'
+      - 'public/admin-dashboard.html'
+      - 'public/admin-dashboard.js'
+      - 'public/advanced-theme.css'
+      - 'app.js'
+      - 'migrations/20260918_premium_banking_budgets.sql'
+      - 'controllers/financeIntelligenceController.js'
+      - 'routes/financeRoutes.js'
       - 'public/finance-pdf-v3.js'
       - 'services/globalBrandRenderer.js'
       - 'scripts/advanced-banking-platform-test.js'
@@ -59,7 +73,8 @@ jobs:
           node --check routes/advancedBankingRoutes.js
           node --check routes/integrationWebhookRoutes.js
           node --check middleware/statementPreviewSanitizer.js
-          node --check public/advanced-banking-ui.js
+          node --check public/premium-banking-app.js
+          node --check public/admin-dashboard.js
           node --check public/finance-pdf-v3.js
           node --check scripts/advanced-banking-platform-test.js
       - name: Architecture and security contract

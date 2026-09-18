@@ -70,7 +70,9 @@
     section.className='vv-premium-bank';
     section.innerHTML=
       '<div class="vv-pb-head">'+
-        '<div class="vv-pb-headline"><div><p class="eyebrow">VOXEL VEDA BANKING</p><h2>Money, accounts & insights</h2><p id="vvPbHeadline">Loading your banking workspace…</p></div><span id="vvPbStatus" class="vv-pb-status">Checking</span></div>'+
+        '<div class="vv-pb-headline"><div><p class="eyebrow">VOXEL VEDA BANKING</p><h2>Money, accounts & insights</h2><p id="vvPbHeadline">Loading your banking workspace…</p></div><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+          (new URLSearchParams(location.search).get('source')==='app'?'<button type="button" class="vv-pb-status" data-pb-action="app-home">← App</button>':'')+
+          '<span id="vvPbStatus" class="vv-pb-status">Checking</span></div></div>'+
         '<div class="vv-pb-profile">'+
           '<button type="button" class="active" data-pb-scope="ALL">All money</button>'+
           '<button type="button" data-pb-scope="BUSINESS">Voxel Veda</button>'+
@@ -497,6 +499,7 @@
     const action=e.target.closest('[data-pb-action]');
     if(!action) return;
     const name=action.dataset.pbAction;
+    if(name==='app-home'){window.location.assign('/admin?view=finance');return;}
     if(name==='connect') return connectBank();
     if(name==='sync') return syncNow();
     if(name==='upload') return $('importStatement')?.click();
