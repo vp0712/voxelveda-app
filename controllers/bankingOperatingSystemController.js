@@ -334,11 +334,16 @@ exports.saveTeamAccess = async (req,res) => {
     if(Number(userId)===Number(req.user.id)) throw httpError('Use another authorised administrator to change your own banking access.',403);
     const level=clean(req.body.access_level||'VIEW',16).toUpperCase();
     const levels={VIEW:[1,0,0,0],PREPARE:[1,1,0,0],APPROVE:[1,0,1,0],MANAGE:[1,1,1,1]};
-    if(!levels[level]) throw httpError('Choose VIEW, PREPARE, APPROVE or MANAGE.');
+    if(level!=='NONE'&&!levels[level]) throw httpError('Choose NONE, VIEW, PREPARE, APPROVE or MANAGE.');
     const [[user]]=await pool.query('SELECT id,name,email FROM users WHERE id=? AND active=1 AND deleted_at IS NULL LIMIT 1',[userId]);
     if(!user) throw httpError('Active user not found.',404);
     const [[account]]=await pool.query("SELECT id,nickname,ownership_scope FROM bank_accounts WHERE id=? AND status='ACTIVE' LIMIT 1",[accountId]);
     if(!account||String(account.ownership_scope).toUpperCase()==='PERSONAL') throw httpError('Only business bank accounts can be delegated.',400);
+    if(level==='NONE'){
+      await pool.query('DELETE FROM banking_user_account_access WHERE user_id=? AND bank_account_id=?',[userId,accountId]);
+      await logAudit(pool,audit(req,{action:'BANKING_USER_ACCESS_REVOKED',recordType:'banking_user_access',recordId:`${userId}:${accountId}`,newValue:{user_id:userId,account_id:accountId,access_level:'NONE'}}));
+      return res.json({message:`${user.name || user.email} banking access removed for ${account.nickname}.`});
+    }
     const [view,prepare,approve,manage]=levels[level];
     await pool.query(
       `INSERT INTO banking_user_account_access
