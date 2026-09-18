@@ -6724,6 +6724,83 @@ function openSystemPage(path) {
   if (!opened) window.location.href = path;
 }
 
+function isNativeVoxelVedaApp() {
+  try {
+    if (window.Capacitor?.isNativePlatform?.()) return true;
+  } catch {}
+  return Boolean(window.VoxelVedaNative);
+}
+
+function openBankingWorkspace() {
+  toggleMobileMenu(false);
+  closeNotificationPanel();
+  const path = '/finance-intelligence?source=app';
+  if (isNativeVoxelVedaApp() || isMobileShellViewport()) {
+    window.location.assign(path);
+    return;
+  }
+  openSystemPage(path);
+}
+
+function notifyNativeBanking(title, body, dedupeKey) {
+  if (!window.VoxelVedaNative?.notify) return;
+  const day = new Date().toISOString().slice(0, 10);
+  const storageKey = `vv-bank-alert:${day}:${dedupeKey}`;
+  try {
+    if (localStorage.getItem(storageKey) === '1') return;
+    window.VoxelVedaNative.notify(String(title || 'Voxel Veda Banking'), String(body || 'Finance update'));
+    localStorage.setItem(storageKey, '1');
+  } catch {}
+}
+
+async function refreshAppBankingAlerts() {
+  const badge = document.getElementById('appBankingAlertBadge');
+  try {
+    const [budgetsRes, statusRes] = await Promise.all([
+      fetch('/api/finance/intelligence/budgets', { credentials: 'same-origin' }),
+      fetch('/api/integrations/webhooks/banking/status', { credentials: 'same-origin' })
+    ]);
+    const budgets = budgetsRes.ok ? await budgetsRes.json() : { budgets: [] };
+    const status = statusRes.ok ? await statusRes.json() : null;
+
+    const stressed = (budgets.budgets || []).filter((b) => Number(b.used_percent || 0) >= 90);
+    const connectionsNeedingAttention = Number(status?.connection_summary?.attention || 0);
+    const count = stressed.length + connectionsNeedingAttention;
+
+    if (badge) {
+      badge.hidden = count <= 0;
+      badge.textContent = count > 99 ? '99+' : String(count);
+      badge.title = count ? `${count} banking item(s) need attention` : '';
+    }
+
+    const over = stressed.find((b) => Number(b.used_percent || 0) >= 100);
+    if (over) {
+      notifyNativeBanking(
+        'Budget over limit',
+        `${over.category}: ${Number(over.used_percent || 0).toFixed(0)}% of the ${over.currency} budget used.`,
+        `budget-over:${over.budget_uid}`
+      );
+    } else if (stressed[0]) {
+      const b = stressed[0];
+      notifyNativeBanking(
+        'Budget getting close',
+        `${b.category}: ${Number(b.used_percent || 0).toFixed(0)}% of the ${b.currency} budget used.`,
+        `budget-warning:${b.budget_uid}`
+      );
+    }
+
+    if (connectionsNeedingAttention > 0) {
+      notifyNativeBanking(
+        'Bank connection needs attention',
+        `${connectionsNeedingAttention} bank connection(s) need review or reauthorisation.`,
+        'connection-attention'
+      );
+    }
+  } catch {
+    if (badge) badge.hidden = true;
+  }
+}
+
 function normalizeQrUrl(value) {
   const url = String(value || '').trim();
   if (!url) return '';
@@ -9917,6 +9994,19 @@ async function loadTimesheets() {
   renderTimesheetRegister();
 }
 
+
+
+if (!window.__appBankingAlertWatcher) {
+  window.__appBankingAlertWatcher = true;
+  const startBankingAlerts = () => {
+    refreshAppBankingAlerts();
+    window.setInterval(() => {
+      if (document.visibilityState !== 'hidden') refreshAppBankingAlerts();
+    }, 15 * 60 * 1000);
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startBankingAlerts, { once:true });
+  else startBankingAlerts();
+}
 
 if (!window.__adminStaffMessagePoller) {
   window.__adminStaffMessagePoller = setInterval(() => {
