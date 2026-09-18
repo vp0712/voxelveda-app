@@ -32,7 +32,7 @@
       #vvReportDialog{max-width:1050px;width:calc(100% - 20px)}
       .vv-report-filter{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;margin-bottom:14px}
       .vv-report-filter label{margin:0}
-      .vv-report-kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:14px}
+      .vv-report-kpis{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-bottom:14px}
       .vv-report-kpis div{background:#f7f9fc;border:1px solid #e5eaf1;border-radius:12px;padding:10px}
       .vv-report-kpis span{display:block;color:#667085;font-size:.68rem}.vv-report-kpis strong{display:block;margin-top:5px}
       .vv-report-columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -219,6 +219,7 @@
         <div><span>Money out</span><strong>${money(s.money_out,currency)}</strong></div>
         <div><span>Money in</span><strong>${money(s.money_in,currency)}</strong></div>
         <div><span>Net flow</span><strong>${money(s.net_flow,currency)}</strong></div>
+        <div><span>Cash</span><strong>${money(s.cash_spent,currency)}</strong></div>
         <div><span>Unclassified</span><strong>${Number(s.unclassified||0)}</strong></div>
         <div><span>Manual overrides</span><strong>${Number(s.manual_overrides||0)}</strong></div>
       </div>

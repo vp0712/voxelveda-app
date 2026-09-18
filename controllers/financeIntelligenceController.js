@@ -127,11 +127,16 @@ exports.getTransactions = async (req, res) => {
     const offset = (page - 1) * limit;
     const q = String(req.query.q || '').trim().slice(0, 120);
     const accountId = Number(req.query.account_id || 0);
+    const category = String(req.query.category || '').trim().slice(0, 120);
     const clauses = [privacy.visibilitySql('ba')];
     const params = [...privacy.visibilityParams(req)];
 
     if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
     if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
+    if (category) {
+      if (category.toUpperCase() === 'UNCLASSIFIED') clauses.push("(bt.category IS NULL OR bt.category='')");
+      else { clauses.push('bt.category=?'); params.push(category); }
+    }
     if (q) {
       clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.reference LIKE ? OR bt.category LIKE ? OR ba.nickname LIKE ?)');
       const like = `%${q}%`;
@@ -166,6 +171,7 @@ exports.getTransactions = async (req, res) => {
 
     return res.json({
       scope,
+      category: category || null,
       page,
       limit,
       total: Number(count.total || 0),
@@ -435,6 +441,7 @@ exports.getStatementReport = async (req, res) => {
                 COALESCE(SUM(bt.credit),0) AS money_in,
                 COALESCE(SUM(bt.debit),0) AS money_out,
                 COALESCE(SUM(bt.credit-bt.debit),0) AS net_flow,
+                COALESCE(SUM(CASE WHEN bt.category='Cash' THEN bt.debit ELSE 0 END),0) AS cash_spent,
                 SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides,
                 SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
@@ -499,6 +506,7 @@ exports.getStatementReport = async (req, res) => {
         money_in: summary.money_in || '0.00',
         money_out: summary.money_out || '0.00',
         net_flow: summary.net_flow || '0.00',
+        cash_spent: summary.cash_spent || '0.00',
         manual_overrides: Number(summary.manual_overrides || 0),
         unclassified: Number(summary.unclassified || 0)
       },
@@ -519,6 +527,7 @@ exports.getSpendingReport = async (req, res) => {
       pool.query(
         `SELECT COUNT(*) AS transaction_count, COALESCE(SUM(bt.credit),0) AS money_in,
                 COALESCE(SUM(bt.debit),0) AS money_out, COALESCE(SUM(bt.credit-bt.debit),0) AS net_flow,
+                COALESCE(SUM(CASE WHEN bt.category='Cash' THEN bt.debit ELSE 0 END),0) AS cash_spent,
                 SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified,
                 SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id WHERE ${filters.where}`, filters.params
@@ -579,6 +588,7 @@ exports.getSpendingReport = async (req, res) => {
         money_in: summary.money_in || '0.00',
         money_out: summary.money_out || '0.00',
         net_flow: summary.net_flow || '0.00',
+        cash_spent: summary.cash_spent || '0.00',
         unclassified: Number(summary.unclassified || 0),
         manual_overrides: Number(summary.manual_overrides || 0)
       },

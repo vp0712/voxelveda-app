@@ -129,7 +129,17 @@
       const url = new URL(urlValue, window.location.href);
       if (url.origin !== window.location.origin) return false;
       if (!url.pathname.startsWith('/api/')) return false;
-      return String(method || 'GET').toUpperCase() !== 'HEAD';
+      const verb = String(method || 'GET').toUpperCase();
+      if (verb === 'HEAD') return false;
+
+      // Ordinary GET requests are background data refreshes. Showing the full-screen
+      // loader for them makes a healthy app look like it is constantly reloading.
+      if (verb === 'GET') {
+        return /\/(statement-reviews\/[^/]+\/report|reports\/spending|export|restore|download)(?:\/|$)/i.test(url.pathname);
+      }
+
+      // Foreground mutations remain branded so the user gets clear progress feedback.
+      return true;
     } catch {
       return false;
     }
@@ -239,6 +249,9 @@
   status.setAttribute('aria-live', 'polite');
   document.body.appendChild(status);
   let networkTimer = null;
+  let reconnectTimer = null;
+  let offlineSince = navigator.onLine ? 0 : Date.now();
+  let wasOffline = !navigator.onLine;
 
   function showNetworkStatus(message, offline = false, duration = 2600) {
     clearTimeout(networkTimer);
@@ -249,13 +262,27 @@
   }
 
   window.addEventListener('offline', () => {
+    clearTimeout(reconnectTimer);
+    wasOffline = true;
+    offlineSince = Date.now();
     hideAll();
     showNetworkStatus('You’re offline. Your current screen will stay open.', true, 0);
   });
 
   window.addEventListener('online', () => {
-    showNetworkStatus('Back online. Updating in the background…', false, 2400);
-    window.dispatchEvent(new CustomEvent('voxelveda:network-restored'));
+    // Some mobile browsers emit transient online events during Wi-Fi/LTE handoffs.
+    // Only treat this as a real restoration after a genuine offline period and a
+    // short stable-online window. Never hard-refresh the page.
+    if (!wasOffline) return;
+    const offlineDuration = offlineSince ? Date.now() - offlineSince : 0;
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(() => {
+      if (!navigator.onLine || !wasOffline) return;
+      wasOffline = false;
+      offlineSince = 0;
+      showNetworkStatus('Back online. Your screen stayed open.', false, 1800);
+      if (offlineDuration >= 1500) window.dispatchEvent(new CustomEvent('voxelveda:network-restored', { detail: { offlineDuration } }));
+    }, 2200);
   });
 
   if (!navigator.onLine) showNetworkStatus('You’re offline. Your current screen will stay open.', true, 0);

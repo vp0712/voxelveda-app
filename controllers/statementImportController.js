@@ -42,6 +42,32 @@ function statementRowHash(accountId, row) {
   ].join('|')).digest('hex');
 }
 
+
+function autoStatementCategory(row) {
+  const explicit = String(row?.category || '').trim().slice(0, 120);
+  if (explicit) return explicit;
+  const text = `${row?.description || ''} ${row?.merchant_name || ''} ${row?.reference || ''}`.toUpperCase().replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  const rules = [
+    ['Cash', /\b(ATM|CASH WITHDRAWAL|CASH WDL|CASH OUT|CASH ADVANCE|BRANCH WITHDRAWAL|WITHDRAWAL CASH|CASH DISPENSED)\b/],
+    ['Groceries', /\b(COLES|WOOLWORTHS|ALDI|IGA|COSTCO)\b/],
+    ['Fuel & Vehicle', /\b(SHELL|AMPOL|CALTEX|UNITED PETROLEUM|MOBIL|PETROL|FUEL)\b/],
+    ['Eating Out', /\b(MCDONALD|KFC|SUBWAY|UBER EATS|MENULOG|DOORDASH|RESTAURANT|CAFE|COFFEE)\b/],
+    ['Software & Subscriptions', /\b(ADOBE|MICROSOFT|OPENAI|CHATGPT|CANVA|AUTODESK|GITHUB|DROPBOX|NOTION|ZOOM)\b/],
+    ['Website & Hosting', /\b(HOSTINGER|CLOUDFLARE|RAILWAY|VERCEL|NETLIFY|DOMAIN|HOSTING)\b/],
+    ['Materials & Manufacturing', /\b(BUNNINGS|TOTAL TOOLS|SYDNEY TOOLS|RS COMPONENTS|ELEMENT14|JAYCAR|FILAMENT|RESIN|MATERIAL)\b/],
+    ['Phone & Internet', /\b(TELSTRA|OPTUS|VODAFONE|TPG|AUSSIE BROADBAND|NBN)\b/],
+    ['Insurance', /\b(AAMI|ALLIANZ|BINGLE|NRMA|RACV|INSURANCE)\b/],
+    ['Bank Fees & Interest', /\b(BANK FEE|ACCOUNT FEE|CARD FEE|INTEREST CHARGE|OVERDRAWN FEE)\b/],
+    ['Travel', /\b(QANTAS|VIRGIN AUSTRALIA|JETSTAR|AIRBNB|BOOKING\.COM|EXPEDIA|HOTEL|FLIGHT)\b/],
+    ['Income', /\b(SALARY|PAYROLL|WAGES|PAYMENT RECEIVED|REFUND|CREDIT INTEREST)\b/],
+    ['Transfer', /\b(OSKO|PAYID|TRANSFER|INTERNAL TRANSFER)\b/]
+  ];
+  for (const [category, pattern] of rules) if (pattern.test(text)) return category;
+  return null;
+}
+
 function normalizeRow(accountId, accountCurrency, input, rowNo) {
   const row = input || {};
   const transactionDate = dateOnly(row.transaction_date);
@@ -82,7 +108,7 @@ function normalizeRow(accountId, accountCurrency, input, rowNo) {
     credit,
     running_balance: runningBalance,
     merchant_name: String(row.merchant_name || '').trim().slice(0, 255) || null,
-    category: String(row.category || '').trim().slice(0, 120) || null,
+    category: autoStatementCategory(row),
     currency,
     validation_status: validationStatus,
     validation_message: messages.join('; ').slice(0, 500) || null,

@@ -49,6 +49,23 @@
   }
   function rowDate(line,period,previousDate){const full=fullDate(line.text);if(full)return full;return inferYear(partialDate(line.text),period,previousDate);}
   function explicitDirection(text){if(/\bDR\b/i.test(text)||/^\s*-/.test(text)||/^\s*\(/.test(text))return'DEBIT';if(/\bCR\b/i.test(text)||/^\s*\+/.test(text))return'CREDIT';return null;}
+  function categoryFromText(text){
+    const t=clean(text).toUpperCase();
+    const rules=[
+      ['Cash', /\b(ATM|CASH WITHDRAWAL|CASH WDL|CASH OUT|CASH ADVANCE|BRANCH WITHDRAWAL|WITHDRAWAL CASH|CASH DISPENSED)\b/],
+      ['Groceries', /\b(COLES|WOOLWORTHS|ALDI|IGA|COSTCO)\b/],
+      ['Fuel & Vehicle', /\b(SHELL|AMPOL|CALTEX|UNITED PETROLEUM|MOBIL|PETROL|FUEL)\b/],
+      ['Eating Out', /\b(MCDONALD|KFC|SUBWAY|UBER EATS|MENULOG|DOORDASH|RESTAURANT|CAFE|COFFEE)\b/],
+      ['Software & Subscriptions', /\b(ADOBE|MICROSOFT|OPENAI|CHATGPT|CANVA|AUTODESK|GITHUB|DROPBOX|NOTION|ZOOM)\b/],
+      ['Website & Hosting', /\b(HOSTINGER|CLOUDFLARE|RAILWAY|VERCEL|NETLIFY|DOMAIN|HOSTING)\b/],
+      ['Materials & Manufacturing', /\b(BUNNINGS|TOTAL TOOLS|SYDNEY TOOLS|RS COMPONENTS|ELEMENT14|JAYCAR|FILAMENT|RESIN|MATERIAL)\b/],
+      ['Phone & Internet', /\b(TELSTRA|OPTUS|VODAFONE|TPG|AUSSIE BROADBAND|NBN)\b/],
+      ['Bank Fees & Interest', /\b(BANK FEE|ACCOUNT FEE|CARD FEE|INTEREST CHARGE|OVERDRAWN FEE)\b/],
+      ['Travel', /\b(QANTAS|VIRGIN AUSTRALIA|JETSTAR|AIRBNB|BOOKING\.COM|EXPEDIA|HOTEL|FLIGHT)\b/]
+    ];
+    for(const [category,pattern] of rules) if(pattern.test(t)) return category;
+    return null;
+  }
   function semanticDirection(text){const t=clean(text).toLowerCase();if(/\b(debit|withdrawal|purchase|payment|fee|charge|atm|direct debit|card purchase|transfer out)\b/.test(t))return'DEBIT';if(/\b(credit|deposit|salary|refund|interest paid|payment received|transfer in)\b/.test(t))return'CREDIT';return null;}
 
   function parseGeometry(pages){
@@ -79,7 +96,7 @@
       const description=clean(c.lines.flatMap(l=>l.tokens.filter(t=>{amountRx.lastIndex=0;const isAmount=amountRx.test(t.text);amountRx.lastIndex=0;return !isAmount&&!fullDate(t.text)&&!partialDate(t.text);}).map(t=>t.text)).join(' ')).slice(0,500)||'PDF statement transaction';
       let status='VALID',message='';if(!date){status='REJECTED';message='Could not safely determine transaction date';confidence=Math.min(confidence,.4);}else if(!debit&&!credit){status='REJECTED';message='Could not safely determine debit/credit direction';confidence=Math.min(confidence,.6);}else if(confidence<.97){status='WARNING';message=`Direction inferred from ${evidence.replace(/_/g,' ')}`;}
       if(status==='VALID')valid++;else if(status==='WARNING')warning++;else rejected++;
-      rows.push({transaction_date:date,description,debit,credit,running_balance:balance,currency:'AUD',parser_confidence:confidence,parser_evidence:evidence,validation_hint:message,source_row_no:index+1});
+      rows.push({transaction_date:date,description,debit,credit,running_balance:balance,currency:'AUD',category:categoryFromText(text),parser_confidence:confidence,parser_evidence:evidence,validation_hint:message,source_row_no:index+1});
     }
     const importable=rows.filter(r=>r.transaction_date&&(r.debit>0||r.credit>0));const totalDebit=importable.reduce((s,r)=>s+Number(r.debit||0),0),totalCredit=importable.reduce((s,r)=>s+Number(r.credit||0),0);let reconciliation={status:'UNAVAILABLE',difference:null};if(openingBalance!==null&&closingBalance!==null){const calculated=openingBalance+totalCredit-totalDebit;const diff=Math.round((calculated-closingBalance)*100)/100;reconciliation={status:Math.abs(diff)<=.02?'PASS':'REVIEW_REQUIRED',difference:diff,calculated_closing:calculated};}
     const averageConfidence=rows.length?rows.reduce((s,r)=>s+Number(r.parser_confidence||0),0)/rows.length:0;

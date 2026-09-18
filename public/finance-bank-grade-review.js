@@ -3,7 +3,7 @@
   const $ = (id) => document.getElementById(id);
   const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (ch) => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[ch]));
   const money = (value, currency='AUD') => new Intl.NumberFormat('en-AU', { style:'currency', currency }).format(Number(value || 0));
-  const state = { scope:'ALL', q:'', accountId:'', loading:false, selected:new Set() };
+  const state = { scope:'ALL', q:'', accountId:'', category:'', loading:false, selected:new Set() };
 
   async function api(path, options={}) {
     const response = await fetch(path, {
@@ -384,6 +384,20 @@
         </div>
         <input id="vvLedgerSearch" type="search" placeholder="Search description, merchant, reference or category">
         <select id="vvLedgerAccount"><option value="">All accounts</option></select>
+        <select id="vvLedgerCategory">
+          <option value="">All categories</option>
+          <option value="Cash">Cash</option>
+          <option value="Groceries">Groceries</option>
+          <option value="Fuel & Vehicle">Fuel & Vehicle</option>
+          <option value="Eating Out">Eating Out</option>
+          <option value="Software & Subscriptions">Software & Subscriptions</option>
+          <option value="Materials & Manufacturing">Materials & Manufacturing</option>
+          <option value="Bank Fees & Interest">Bank Fees & Interest</option>
+          <option value="Travel">Travel</option>
+          <option value="Income">Income</option>
+          <option value="Transfer">Transfer</option>
+          <option value="UNCLASSIFIED">Unclassified</option>
+        </select>
       </div>
       <div class="vv-ledger-bulk">
         <span id="vvSelectedCount">No transactions selected</span>
@@ -407,6 +421,7 @@
     }));
     $('vvLedgerRefresh').addEventListener('click',loadLedger);
     $('vvLedgerAccount').addEventListener('change',()=>{state.accountId=$('vvLedgerAccount').value;state.selected.clear();syncBulkControls();loadLedger();});
+    $('vvLedgerCategory').addEventListener('change',()=>{state.category=$('vvLedgerCategory').value;state.selected.clear();syncBulkControls();loadLedger();});
     $('vvBulkCategorize').addEventListener('click',openBulkCategory);
     $('vvClearSelected').addEventListener('click',()=>{state.selected.clear();document.querySelectorAll('.vv-select-tx').forEach(x=>{x.checked=false;});syncBulkControls();});
     let timer;
@@ -469,6 +484,7 @@
       const params=new URLSearchParams({scope:state.scope,limit:'100'});
       if (state.q) params.set('q',state.q);
       if (state.accountId) params.set('account_id',state.accountId);
+      if (state.category) params.set('category',state.category);
       renderLedger(await api(`/api/finance/intelligence/transactions?${params.toString()}`));
     } catch (error) {
       $('vvLedgerList').innerHTML=`<div class="empty"><strong>Could not load transactions</strong><span>${esc(error.message)}</span></div>`;
