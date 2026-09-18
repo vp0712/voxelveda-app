@@ -1,7 +1,6 @@
 'use strict';
 
 const { FinanceError } = require('./financeDomain');
-const { hasPermission } = require('./authorizationService');
 
 const BUSINESS_SCOPE = 'BUSINESS';
 
