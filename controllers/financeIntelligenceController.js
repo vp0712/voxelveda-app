@@ -53,10 +53,10 @@ exports.getOverview = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const scope = normalizeDashboardScope(req.query.scope);
-    const accountClauses = ["ba.status = 'ACTIVE'", privacy.visibilitySql('ba')];
+    const accountClauses = ["ba.status = 'ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { accountClauses.push('ba.ownership_scope = ?'); accountParams.push(scope); }
-    const txClauses = [privacy.visibilitySql('ba')];
+    const txClauses = [privacy.visibilitySql('ba', req)];
     const txParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { txClauses.push('bt.ownership_scope = ?'); txParams.push(scope); }
 
@@ -128,7 +128,7 @@ exports.getTransactions = async (req, res) => {
     const q = String(req.query.q || '').trim().slice(0, 120);
     const accountId = Number(req.query.account_id || 0);
     const category = String(req.query.category || '').trim().slice(0, 120);
-    const clauses = [privacy.visibilitySql('ba')];
+    const clauses = [privacy.visibilitySql('ba', req)];
     const params = [...privacy.visibilityParams(req)];
 
     if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
@@ -212,7 +212,7 @@ function spendingWhere(req, options = {}) {
   if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
   const accountId = Number(req.query.account_id || 0);
   const statementUid = String(options.statementUid || req.query.statement_uid || '').trim().slice(0, 80);
-  const clauses = [privacy.visibilitySql('ba'), "bt.reconciliation_status <> 'IGNORED'"];
+  const clauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
   const params = [...privacy.visibilityParams(req)];
   if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
   if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
@@ -229,7 +229,7 @@ async function visibleBankTransaction(id, req, db = pool, forUpdate = false) {
     `SELECT bt.*, ba.nickname AS account_name, ba.ownership_scope AS account_scope, ba.created_by AS account_created_by
        FROM bank_transactions bt
        JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-      WHERE bt.id=? AND ${privacy.visibilitySql('ba')}${suffix}`,
+      WHERE bt.id=? AND ${privacy.visibilitySql('ba', req)}${suffix}`,
     [id, ...privacy.visibilityParams(req)]
   );
   if (!row) throw new FinanceError('Bank transaction not found.', 404, 'BANK_TRANSACTION_NOT_FOUND');
@@ -383,7 +383,7 @@ exports.getStatementLibrary = async (req, res) => {
     await ensureFinanceSchema();
     const scope = reportScope(req.query.scope);
     const accountId = Number(req.query.account_id || 0);
-    const clauses = [privacy.visibilitySql('ba')];
+    const clauses = [privacy.visibilitySql('ba', req)];
     const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { clauses.push('ba.ownership_scope=?'); params.push(scope); }
     if (accountId) { clauses.push('sif.bank_account_id=?'); params.push(accountId); }
@@ -428,7 +428,7 @@ exports.getStatementReport = async (req, res) => {
       `SELECT sif.*, ba.nickname AS account_name, ba.institution, ba.ownership_scope, ba.currency, ba.entity_name
          FROM statement_import_files sif
          JOIN bank_accounts ba ON ba.id=sif.bank_account_id
-        WHERE sif.import_uid=? AND ${privacy.visibilitySql('ba')}
+        WHERE sif.import_uid=? AND ${privacy.visibilitySql('ba', req)}
         LIMIT 1`,
       [importUid, ...privacy.visibilityParams(req)]
     );
@@ -613,9 +613,9 @@ exports.getBankingDashboard = async (req, res) => {
     const to = reportDate(req.query.to, 'To date');
     if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
 
-    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba')];
+    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
-    const txClauses = [privacy.visibilitySql('ba'), "bt.reconciliation_status <> 'IGNORED'"];
+    const txClauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
     const txParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') {
       accountClauses.push('ba.ownership_scope=?');
@@ -682,7 +682,7 @@ exports.getBankingDashboard = async (req, res) => {
                 COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE bt.transaction_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH)
-            AND ${privacy.visibilitySql('ba')}
+            AND ${privacy.visibilitySql('ba', req)}
             ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
             AND bt.reconciliation_status<>'IGNORED'
           GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
@@ -710,7 +710,7 @@ exports.getBankingDashboard = async (req, res) => {
            JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
            JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE fi.recurring_frequency IS NOT NULL AND fi.status<>'DISMISSED'
-            AND ${privacy.visibilitySql('ba')}
+            AND ${privacy.visibilitySql('ba', req)}
             ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
           GROUP BY fi.recurring_frequency,fi.merchant_normalized,bt.currency,merchant
           ORDER BY last_seen DESC LIMIT 30`,
@@ -884,7 +884,7 @@ exports.getBankingBudgets = async (req, res) => {
     for (const budget of budgets) {
       const window = bankingBudgetWindow(String(budget.cycle), budget.cycle_anchor_date);
       const clauses = [
-        privacy.visibilitySql('ba'),
+        privacy.visibilitySql('ba', req),
         "bt.reconciliation_status <> 'IGNORED'",
         'bt.is_internal_transfer=0',
         'bt.currency=?',
@@ -1004,7 +1004,7 @@ exports.getAccounts = async (req, res) => {
               SUM(CASE WHEN bt.reconciliation_status = 'UNRECONCILED' THEN 1 ELSE 0 END) AS unreconciled_count
          FROM bank_accounts ba
          LEFT JOIN bank_transactions bt ON bt.bank_account_id = ba.id
-        WHERE ${privacy.visibilitySql('ba')}
+        WHERE ${privacy.visibilitySql('ba', req)}
         GROUP BY ba.id ORDER BY ba.status = 'ACTIVE' DESC, ba.ownership_scope, ba.nickname`, privacy.visibilityParams(req)
     );
     return res.json({ bank_accounts: rows, privacy: { personal_accounts_owner_only: true } });
@@ -1127,7 +1127,7 @@ exports.getHistoryCoverage = async (req, res) => {
               SUM(CASE WHEN bt.source_type='OPEN_BANKING' THEN 1 ELSE 0 END) AS open_banking_rows,
               SUM(CASE WHEN bt.source_type='STATEMENT_IMPORT' THEN 1 ELSE 0 END) AS statement_rows
          FROM bank_accounts ba LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
-        WHERE ba.status='ACTIVE' AND ${privacy.visibilitySql('ba')}
+        WHERE ba.status='ACTIVE' AND ${privacy.visibilitySql('ba', req)}
         GROUP BY ba.id ORDER BY ba.ownership_scope, ba.nickname`, privacy.visibilityParams(req)
     );
     return res.json({ accounts: rows });
@@ -1160,12 +1160,12 @@ exports.getDataQuality = async (req, res) => {
         SUM(CASE WHEN bt.reconciliation_status='UNRECONCILED' THEN 1 ELSE 0 END) AS unreconciled,
         SUM(CASE WHEN bt.ownership_scope='UNCLASSIFIED' THEN 1 ELSE 0 END) AS ownership_missing
        FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-       WHERE ${privacy.visibilitySql('ba')}`, privacy.visibilityParams(req)
+       WHERE ${privacy.visibilitySql('ba', req)}`, privacy.visibilityParams(req)
     );
     const [[accounts]] = await pool.query(
       `SELECT SUM(CASE WHEN connection_type='OPEN_BANKING' AND (connection_status IS NULL OR connection_status <> 'CONNECTED') THEN 1 ELSE 0 END) AS disconnected,
               SUM(CASE WHEN history_start_date IS NULL OR history_end_date IS NULL THEN 1 ELSE 0 END) AS coverage_unknown
-       FROM bank_accounts ba WHERE status='ACTIVE' AND ${privacy.visibilitySql('ba')}`, privacy.visibilityParams(req)
+       FROM bank_accounts ba WHERE status='ACTIVE' AND ${privacy.visibilitySql('ba', req)}`, privacy.visibilityParams(req)
     );
     return res.json({ issues: {
       unclassified_transactions: Number(counts?.unclassified || 0), unreconciled_transactions: Number(counts?.unreconciled || 0),
@@ -1180,7 +1180,7 @@ exports.getPortfolioHistoryReport = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const filters = spendingWhere(req);
-    const accountClauses = [privacy.visibilitySql('ba'), "ba.status='ACTIVE'"];
+    const accountClauses = [privacy.visibilitySql('ba', req), "ba.status='ACTIVE'"];
     const accountParams = [...privacy.visibilityParams(req)];
     if (filters.scope !== 'ALL') { accountClauses.push('ba.ownership_scope=?'); accountParams.push(filters.scope); }
     if (filters.accountId) { accountClauses.push('ba.id=?'); accountParams.push(filters.accountId); }
@@ -1316,9 +1316,9 @@ exports.getStatementWarehouse = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const scope = normalizeDashboardScope(req.query.scope);
-    const txClauses = [privacy.visibilitySql('ba'), "bt.reconciliation_status <> 'IGNORED'"];
+    const txClauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
     const txParams = [...privacy.visibilityParams(req)];
-    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba')];
+    const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') {
       txClauses.push('bt.ownership_scope=?'); txParams.push(scope);
