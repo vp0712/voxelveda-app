@@ -431,6 +431,7 @@
       const approve=(state.os?.access?.can_approve && p.status==='PENDING_APPROVAL' && !mine);
       return '<div class="vv-pb-recurring-row"><div><strong>'+esc(p.payee_name)+'</strong><small>'+esc(p.payment_type)+' · '+esc(p.status)+' · '+esc(p.schedule_type)+(p.due_date?' · due '+esc(day(p.due_date)):'')+' · prepared by '+esc(p.created_by_name||'user')+'</small></div><b>'+money(p.amount,p.currency)+'</b><div class="vv-pb-budget-actions">'+
         (p.status==='DRAFT'?'<button type="button" data-pb-submit-payment="'+esc(p.payment_uid)+'">Submit</button>':'')+
+        (!['COMPLETED','REJECTED','CANCELLED'].includes(p.status)?'<button type="button" data-pb-cancel-payment="'+esc(p.payment_uid)+'">Cancel</button>':'')+
         (approve?'<button type="button" data-pb-approve-payment="'+esc(p.payment_uid)+'">Approve</button><button type="button" data-pb-reject-payment="'+esc(p.payment_uid)+'">Reject</button>':'')+
         '</div></div>';
     }).join('')+'</div>';
@@ -458,7 +459,7 @@
     if(!rows.length) return '<div class="vv-pb-empty"><strong>No Money Spaces</strong><span>Create reserves for tax, payroll, emergency cash, equipment or personal goals.</span><button type="button" data-pb-action="space">Create Space</button></div>';
     return '<div class="vv-pb-budget-grid">'+rows.map(s=>{
       const target=Number(s.target_amount||0); const allocated=Number(s.allocated_amount||0); const used=target>0?Math.min(100,allocated/target*100):0;
-      return '<article class="vv-pb-budget"><div class="vv-pb-budget-head"><div><strong>'+esc(s.name)+'</strong><small>'+esc(s.ownership_scope)+' · '+esc(s.purpose||'Allocation')+'</small></div><b>'+money(allocated,s.currency)+'</b></div><div class="vv-pb-progress"><i style="width:'+used.toFixed(1)+'%"></i></div><small>'+(target?money(target,s.currency)+' target · ':'')+money(s.minimum_reserve,s.currency)+' minimum reserve</small></article>';
+      return '<article class="vv-pb-budget"><div class="vv-pb-budget-head"><div><strong>'+esc(s.name)+'</strong><small>'+esc(s.ownership_scope)+' · '+esc(s.purpose||'Allocation')+'</small></div><b>'+money(allocated,s.currency)+'</b></div><div class="vv-pb-progress"><i style="width:'+used.toFixed(1)+'%"></i></div><small>'+(target?money(target,s.currency)+' target · ':'')+money(s.minimum_reserve,s.currency)+' minimum reserve</small><div class="vv-pb-budget-actions"><button type="button" data-pb-archive-space="'+esc(s.space_uid)+'">Archive</button></div></article>';
     }).join('')+'</div>';
   }
 
@@ -513,6 +514,8 @@
   function openPaymentDraft(){const select=$('vvPbPayAccount');select.innerHTML='<option value="">Not assigned</option>'+(state.os?.accounts||[]).map(a=>'<option value="'+Number(a.id)+'">'+esc(a.nickname)+' · '+esc(a.currency)+'</option>').join('');$('vvPbPayCurrency').value=selectedCurrency();$('vvPbPaymentDraftDialog').showModal();}
   async function savePaymentDraft(e){e.preventDefault();try{const result=await api('/api/finance/banking-os/payments',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbPayAccount').value||null,ownership_scope:$('vvPbPayScope').value,payment_type:$('vvPbPayType').value,payee_name:$('vvPbPayPayee').value,reference_text:$('vvPbPayReference').value,amount:$('vvPbPayAmount').value,currency:$('vvPbPayCurrency').value,due_date:$('vvPbPayDue').value||null,schedule_type:$('vvPbPaySchedule').value})});$('vvPbPaymentDraftDialog').close();message(result.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment draft could not be created.','error',err.message);}}
   async function submitPayment(uid){try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/submit',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be submitted.','error',err.message);}}
+  async function cancelPayment(uid){if(!confirm('Cancel this payment workflow?'))return;try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/cancel',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Payment could not be cancelled.','error',err.message);}}
+  async function archiveSpace(uid){if(!confirm('Archive this Money Space?'))return;try{const r=await api('/api/finance/banking-os/spaces/'+encodeURIComponent(uid)+'/archive',{method:'POST',body:'{}'});message(r.message,'success');await refresh();state.tab='plan';render();}catch(err){message('Space could not be archived.','error',err.message);}}
   async function decidePayment(uid,decision){const note=prompt(decision==='APPROVE'?'Approval note (optional)':'Reason for rejection');if(decision==='REJECT'&&!note)return;try{const r=await api('/api/finance/banking-os/payments/'+encodeURIComponent(uid)+'/decision',{method:'POST',body:JSON.stringify({decision,note:note||''})});message(r.message,'success');await refresh();state.tab='pay';render();}catch(err){message('Decision could not be recorded.','error',err.message);}}
   function openTeamAccess(userId,accountId,level,label){$('vvPbAccessUser').value=userId;$('vvPbAccessUserLabel').value=label;$('vvPbAccessAccount').innerHTML=(state.os?.accounts||[]).filter(a=>a.ownership_scope==='BUSINESS').map(a=>'<option value="'+a.id+'" '+(String(a.id)===String(accountId)?'selected':'')+'>'+esc(a.nickname)+'</option>').join('');$('vvPbAccessLevel').value=level||'VIEW';$('vvPbAccessDialog').showModal();}
   async function saveTeamAccess(e){e.preventDefault();try{const r=await api('/api/finance/banking-os/team/'+encodeURIComponent($('vvPbAccessUser').value)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:$('vvPbAccessAccount').value,access_level:$('vvPbAccessLevel').value})});$('vvPbAccessDialog').close();message(r.message,'success');await refresh();state.tab='team';render();}catch(err){message('Access could not be updated.','error',err.message);}}
@@ -573,13 +576,15 @@
       api(FIN+'/budgets'),
       api(FIN+'/insights?scope='+encodeURIComponent(state.scope)),
       api('/api/finance/banking-os'),
-      api('/api/finance/banking-os/team').catch(()=>({can_manage:false,users:[],grants:[]}))
+      api('/api/finance/banking-os/team').catch(()=>({can_manage:false,users:[],grants:[]})),
+      api('/api/finance/banking-os/command-center'),
+      api('/api/finance/banking-os/cashflow-calendar?days=90')
     ];
     if(state.scope==='PERSONAL'||state.scope==='ALL') requests.push(api(PERSONAL+'/attention').catch(()=>null));
     else requests.push(Promise.resolve(null));
-    const [status,connections,quality,dashboard,budgets,insights,os,team,attention]=await Promise.all(requests);
+    const [status,connections,quality,dashboard,budgets,insights,os,team,command,calendar,attention]=await Promise.all(requests);
     state.status=status; state.connections=connections.connections||[]; state.quality=quality; state.dashboard=dashboard;
-    state.budgets=budgets.budgets||[]; state.insights=insights; state.os=os; state.team=team; state.attention=attention;
+    state.budgets=budgets.budgets||[]; state.insights=insights; state.os=os; state.team=team; state.command=command; state.calendar=calendar; state.attention=attention;
     selectedCurrency();
     await loadActivity();
   }
@@ -700,6 +705,8 @@
     const recurring=e.target.closest('[data-pb-search-merchant]');
     if(recurring){state.activityQuery=recurring.dataset.pbSearchMerchant;state.tab='activity';await loadActivity();render();return;}
     const submitPaymentButton=e.target.closest('[data-pb-submit-payment]'); if(submitPaymentButton){return submitPayment(submitPaymentButton.dataset.pbSubmitPayment);}
+    const cancelPaymentButton=e.target.closest('[data-pb-cancel-payment]'); if(cancelPaymentButton){return cancelPayment(cancelPaymentButton.dataset.pbCancelPayment);}
+    const archiveSpaceButton=e.target.closest('[data-pb-archive-space]'); if(archiveSpaceButton){return archiveSpace(archiveSpaceButton.dataset.pbArchiveSpace);}
     const approvePaymentButton=e.target.closest('[data-pb-approve-payment]'); if(approvePaymentButton){return decidePayment(approvePaymentButton.dataset.pbApprovePayment,'APPROVE');}
     const rejectPaymentButton=e.target.closest('[data-pb-reject-payment]'); if(rejectPaymentButton){return decidePayment(rejectPaymentButton.dataset.pbRejectPayment,'REJECT');}
     const grant=e.target.closest('[data-pb-grant-user]'); if(grant){openTeamAccess(grant.dataset.pbGrantUser,grant.dataset.pbGrantAccount,grant.dataset.pbGrantLevel,grant.dataset.pbGrantLabel);return;}
