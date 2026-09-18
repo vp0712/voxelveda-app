@@ -30,6 +30,9 @@ const premiumCss = read('public/premium-banking-app.css');
 const renderer = read('services/globalBrandRenderer.js');
 const permissions = read('config/permissionCatalog.js');
 const databaseConfig = read('config/databaseConfig.js');
+const adminPage = read('public/admin-dashboard.html');
+const adminClient = read('public/admin-dashboard.js');
+const appServer = read('app.js');
 
 for (const marker of ['bank_connection_accounts','bank_consent_receipts','bank_sync_events','canonical_fingerprint','provider_transaction_id','reconciliation_status','extraction_diagnostics_json']) assert(migration.includes(marker), `migration missing ${marker}`);
 assert(reparseMigration.includes('updated_at'), 'statement review reparse tracking must be additive');
@@ -134,6 +137,15 @@ assert(financeRoutes.includes("/intelligence/banking-dashboard") && financeRoute
 assert(bankGradeUi.includes('window.VoxelVedaFinanceLedger'), 'transaction editor bridge missing');
 assert(renderer.includes('/premium-banking-app.js?v=20260918-premium-bank-v3'), 'premium banking app must be served by renderer');
 assert(premiumCss.includes('.vv-pb-donut') && premiumCss.includes('.vv-pb-line-svg') && premiumCss.includes('.vv-pb-budget'), 'premium banking chart/budget styles missing');
+assert(adminPage.includes('openBankingWorkspace()') && adminPage.includes('appBankingAlertBadge'), 'installed app Banking navigation entry missing');
+assert(adminPage.includes('Banking & Insights') && adminPage.includes('Open Banking App'), 'app Banking shortcuts missing');
+assert(adminClient.includes("'/finance-intelligence?source=app'"), 'installed app must open premium Banking in app mode');
+assert(adminClient.includes('isNativeVoxelVedaApp') && adminClient.includes('window.VoxelVedaNative'), 'native app shell detection missing');
+assert(adminClient.includes('refreshAppBankingAlerts'), 'app Banking alert watcher missing');
+assert(adminClient.includes('Budget over limit') && adminClient.includes('Bank connection needs attention'), 'native Banking alert types missing');
+assert(adminClient.includes('15 * 60 * 1000'), 'app Banking alert refresh cadence missing');
+assert(ui.includes("source')==='app") && ui.includes("window.location.assign('/admin?view=finance')"), 'premium Banking return-to-app path missing');
+assert(appServer.includes("'premium-banking-app.js','premium-banking-app.css'"), 'premium Banking assets must be no-store to prevent stale installed-app UI');
 assert(renderer.includes('ADVANCED_BANKING_JS'), 'advanced banking UI must be served through page renderer');
 assert(!renderer.includes('rendered.includes(FINANCE_PDF_ENHANCER_JS)'), 'legacy PDF parser must not be injected alongside PDF v3');
 assert(renderer.includes("const CANONICAL_LOGO = '/logo.png'"), 'canonical original logo contract changed');
