@@ -128,6 +128,9 @@ router.post('/intelligence/transactions/bulk/category', requireAnyPermission('ED
 router.get('/intelligence/statements', requireAnyPermission('VIEW_BANKING'), intelligence.getStatementLibrary);
 router.get('/intelligence/statements/:uid/report', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), intelligence.getStatementReport);
 router.get('/intelligence/reports/spending', requireAnyPermission('VIEW_BANKING'), intelligence.getSpendingReport);
+router.get('/intelligence/budgets', requireAnyPermission('VIEW_BANKING'), intelligence.getBankingBudgets);
+router.post('/intelligence/budgets', requireAnyPermission('EDIT_FINANCE'), intelligence.saveBankingBudget);
+router.delete('/intelligence/budgets/:uid', requireAnyPermission('EDIT_FINANCE'), intelligence.deleteBankingBudget);
 router.get('/intelligence/active-overview', requireAnyPermission('VIEW_BANKING'), bankAccountLifecycle.getActiveOverview);
 router.get('/intelligence/accounts', requireAnyPermission('VIEW_BANKING'), intelligence.getAccounts);
 router.get('/intelligence/accounts/:id/lifecycle', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), bankAccountLifecycle.getLifecycle);
