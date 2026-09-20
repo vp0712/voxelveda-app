@@ -17,20 +17,22 @@ assert(server.includes("objectStorageHealthProbe()"), 'object storage is runtime
 assert(server.includes("MALWARE_SCANNER_REQUIRED"), 'required malware scanner failure stays fail-closed');
 assert(server.includes("OBJECT_STORAGE_REQUIRED"), 'required object storage failure stays fail-closed');
 
-assert(auditWorkflow.includes('branches: [main]'), 'audit refresh runs from merged main');
+assert(auditWorkflow.includes('branches: [main]'), 'audit evidence runs from merged main');
 assert(auditWorkflow.includes('node scripts/generate-enterprise-inventory.js'), 'audit workflow regenerates machine-readable inventory');
-assert(auditWorkflow.includes('node scripts/update-enterprise-audit-baseline.js'), 'audit workflow updates deep-audit baseline');
+assert(auditWorkflow.includes('node scripts/update-enterprise-audit-baseline.js'), 'audit workflow refreshes deep-audit evidence metadata');
 assert(auditWorkflow.includes('node scripts/check-enterprise-audit-provenance.js'), 'audit workflow verifies provenance before commit');
-assert(auditWorkflow.includes('[audit refresh]'), 'audit refresh marks generated commits to prevent recursive refresh');
-assert(auditWorkflow.includes('pull-requests: write'), 'audit refresh can open a protected-main pull request');
-assert(auditWorkflow.includes('gh pr create'), 'audit refresh opens a pull request instead of pushing directly to protected main');
-assert(auditWorkflow.includes('gh pr merge'), 'audit refresh requests automatic squash merge after branch protections pass');
+assert(auditWorkflow.includes('actions/upload-artifact@v4'), 'audit evidence is preserved without mutating protected main');
+assert(auditWorkflow.includes('enterprise-audit-${{ github.sha }}'), 'audit artifact is bound to the exact source SHA');
+assert(auditWorkflow.includes("cron: '17 3 * * 1'"), 'audit evidence also refreshes weekly');
 assert(auditUpdater.includes('ENTERPRISE_ARCHITECTURE_INVENTORY.json'), 'audit updater uses generated inventory as source of truth');
 assert(auditUpdater.includes('Current remediation branch'), 'audit updater removes stale branch metadata');
 
-for(const command of ['npm run check','npm test','npm run security:audit','npm run audit:inventory:check']){
+for(const command of ['npm run check','npm test','npm run security:audit']){
   assert(releaseWorkflow.includes(command), 'release gate runs '+command);
 }
+assert(releaseWorkflow.includes('node scripts/generate-enterprise-inventory.js'), 'release gate regenerates enterprise inventory from release source');
+assert(releaseWorkflow.includes('node scripts/update-enterprise-audit-baseline.js'), 'release gate refreshes audit metadata in its evidence workspace');
+assert(releaseWorkflow.includes('node scripts/check-enterprise-audit-provenance.js'), 'release gate verifies regenerated audit provenance');
 assert(releaseWorkflow.includes("tags:"), 'tagged releases have a dedicated workflow');
 assert(releaseWorkflow.includes('gh release create'), 'successful tag gate publishes a GitHub release');
 assert(releaseWorkflow.includes('release-evidence.md'), 'release workflow emits evidence artifact');

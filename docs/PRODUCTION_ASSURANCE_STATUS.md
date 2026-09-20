@@ -14,6 +14,7 @@ This document separates **verified production evidence** from **configured but u
 - Database least privilege: runtime evidence reported a non-root schema-scoped application identity with no GRANT OPTION and no unsafe global grant.
 - Banking access hardening: delegated account scope, Update Access repair, statement history controls, Print/Save PDF repair and multi-bank statement warehouse are merged to main.
 - Enterprise issue tracking: current unresolved production controls are represented by assigned GitHub issues rather than hidden in prose.
+- Audit provenance model: the checked-in 12 September deep audit is retained as a historical baseline; current full-source audit evidence is regenerated as a SHA-bound CI artifact on every main push and again inside each tagged release gate.
 
 ## Runtime verification strengthened by the current hardening branch
 
@@ -54,3 +55,9 @@ A production/provider control can be marked verified only when all applicable it
 - SMTP delivery: https://github.com/vp0712/voxelveda-app/issues/181
 - Redis multi-replica test: https://github.com/vp0712/voxelveda-app/issues/182
 - Real multi-bank/iPhone E2E: https://github.com/vp0712/voxelveda-app/issues/183
+
+
+## Product and release backlog transparency
+
+- Public e-commerce storefront implementation is tracked as GitHub issue #186 and is intentionally sequenced after release-critical hardening.
+- The first formal tagged release with evidence and rollback reference is tracked as GitHub issue #187.

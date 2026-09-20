@@ -37,8 +37,13 @@ jobs:
       - name: Production dependency audit
         run: npm run security:audit
 
+      - name: Regenerate release-source enterprise audit
+        run: |
+          node scripts/generate-enterprise-inventory.js
+          node scripts/update-enterprise-audit-baseline.js
+
       - name: Audit provenance
-        run: npm run audit:inventory:check
+        run: node scripts/check-enterprise-audit-provenance.js
 
       - name: Build release evidence
         env:
