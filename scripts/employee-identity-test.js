@@ -1,0 +1,13 @@
+const assert=require('node:assert');const fs=require('node:fs');
+const app=fs.readFileSync('app.js','utf8'),server=fs.readFileSync('server.js','utf8'),schema=fs.readFileSync('services/employeeIdentitySchema.js','utf8'),controller=fs.readFileSync('controllers/employeeIdentityController.js','utf8');
+assert(app.includes("/api/public/employee-id/:token/verify"));
+assert(app.includes("/api/employee-identities"));
+assert(app.includes("/employee-id"));
+assert(server.includes("ensureEmployeeIdentitySchema"));
+assert(schema.includes("verification_token CHAR(64)"));
+assert(schema.includes("UNIQUE KEY uniq_employee_verify_token"));
+assert(controller.includes("crypto.randomBytes(32)"));
+assert(controller.includes("EMPLOYEE_ID_REVOKED"));
+assert(controller.includes("Cache-Control','no-store"));
+assert(!controller.includes("password"));
+console.log('Employee identity foundation checks passed.');
