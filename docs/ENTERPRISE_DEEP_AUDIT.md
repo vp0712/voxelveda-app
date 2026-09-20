@@ -1,5 +1,7 @@
 # Voxel Veda Enterprise Deep Audit
 
+> **Historical baseline notice (2026-09-21):** This checked-in document preserves the full source inventory baseline captured on 12 September 2026. It must not be interpreted as the current production audit. Current control/provider status is maintained in `docs/PRODUCTION_ASSURANCE_STATUS.md`, and `.github/workflows/enterprise-audit-refresh.yml` regenerates a full commit-specific audit artifact on every main push, weekly, and on manual request. Tagged releases independently regenerate and verify the audit from the exact release source before publication.
+
 ## Audit baseline
 
 - Repository: `vp0712/voxelveda-app`
