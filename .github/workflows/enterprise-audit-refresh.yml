@@ -1,24 +1,24 @@
-name: Enterprise Audit Refresh
+name: Enterprise Audit Evidence
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '17 3 * * 1'
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
-  group: enterprise-audit-refresh
+  group: enterprise-audit-evidence
   cancel-in-progress: true
 
 jobs:
-  refresh:
-    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[audit refresh]') }}
+  generate:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out main
+      - name: Check out audited source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -32,36 +32,31 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
 
-      - name: Regenerate architecture inventory
+      - name: Regenerate architecture inventory for this exact commit
         run: node scripts/generate-enterprise-inventory.js
 
-      - name: Update deep-audit baseline metadata
+      - name: Update deep-audit baseline metadata in evidence workspace
         run: node scripts/update-enterprise-audit-baseline.js
 
       - name: Verify audit provenance
         run: node scripts/check-enterprise-audit-provenance.js
 
-      - name: Open protected-main audit refresh PR
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Write audit evidence manifest
         shell: bash
         run: |
-          if git diff --quiet -- docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json docs/ENTERPRISE_DEEP_AUDIT.md; then
-            echo "Audit evidence is already current."
-            exit 0
-          fi
-          short_sha="${GITHUB_SHA::12}"
-          branch="automation/audit-refresh-${short_sha}"
-          git config user.name "voxelveda-audit-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git checkout -b "$branch"
-          git add docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json docs/ENTERPRISE_DEEP_AUDIT.md
-          git commit -m "docs: refresh enterprise audit for ${short_sha} [audit refresh]"
-          git push --force-with-lease origin "$branch"
-          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // empty')"
-          if [ -n "$existing" ]; then
-            pr="$existing"
-          else
-            pr="$(gh pr create               --repo "$GITHUB_REPOSITORY"               --base main               --head "$branch"               --title "docs: refresh enterprise audit for ${short_sha} [audit refresh]"               --body "Automated deterministic enterprise-audit refresh generated from main commit \`$GITHUB_SHA\`. No application code is changed."               --json number --jq '.number')"
-          fi
-          gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch
+          {
+            echo "source_sha=$GITHUB_SHA"
+            echo "ref=$GITHUB_REF"
+            echo "run_id=$GITHUB_RUN_ID"
+            echo "generated_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          } > docs/ENTERPRISE_AUDIT_EVIDENCE.txt
+
+      - name: Upload current enterprise audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: enterprise-audit-${{ github.sha }}
+          path: |
+            docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json
+            docs/ENTERPRISE_DEEP_AUDIT.md
+            docs/ENTERPRISE_AUDIT_EVIDENCE.txt
+          retention-days: 90
