@@ -17,6 +17,8 @@ const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./serv
 const { runMigrations } = require('./services/migrationRunner');
 const { allowedHosts } = require('./services/outboundRequestPolicy');
 const { getRateLimitService } = require('./services/rateLimitService');
+const { healthCheck: malwareHealthCheck, scannerConfig } = require('./services/malwareScannerService');
+const { healthProbe: objectStorageHealthProbe } = require('./services/objectStorageService');
 const { selfTestWebhookVerifier } = require('./services/webhookSecurityService');
 const { backgroundJobService } = require('./services/backgroundJobService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
@@ -106,15 +108,16 @@ async function initializeServices() {
     const limiterStatus = await limiter.initialize();
     const memoryInProduction = limiterStatus.provider === 'MEMORY' && process.env.NODE_ENV === 'production';
     const runtimeControlState = limiterStatus.distributed
-      ? CONTROL_STATES.OPERATIONAL
+      ? CONTROL_STATES.EXTERNALLY_VERIFIED
       : (memoryInProduction ? CONTROL_STATES.DEGRADED : CONTROL_STATES.OPERATIONAL);
     const detail = limiterStatus.distributed
-      ? 'Redis adapter connected and completed a provider health operation'
+      ? 'Redis adapter connected and completed a live PING/PONG provider health operation'
       : (memoryInProduction
         ? 'Memory limiter is active for a single replica; configure Redis before horizontal scaling'
         : 'Memory limiter is active for development or single-replica operation');
     setControl('redis_limiter', runtimeControlState, detail);
-    setCriticalService('rate_limiter', runtimeControlState, detail);
+    setCriticalService('rate_limiter', limiterStatus.distributed ? CONTROL_STATES.OPERATIONAL : runtimeControlState, detail);
+    console.log(`Rate limiter evidence: provider=${limiterStatus.provider} distributed=${limiterStatus.distributed ? 'yes' : 'no'} failure_policy=${limiterStatus.failure_policy} state=${runtimeControlState}`);
     if (memoryInProduction) addWarning('Rate limiting is process-local; keep one replica until a Redis provider is connected and health-verified');
   } catch (error) {
     setControl('redis_limiter', CONTROL_STATES.FAILED, error.code || 'RATE_LIMIT_INITIALIZATION_FAILED');
@@ -123,8 +126,25 @@ async function initializeServices() {
   }
 
   const scannerConfigured = configured(['MALWARE_SCANNER_PROVIDER']);
-  setControl('malware_scanner', scannerConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
-    scannerConfigured ? 'Provider is configured but no authenticated scan result has been verified' : 'No malware scanner provider configured');
+  if (!scannerConfigured) {
+    setControl('malware_scanner', CONTROL_STATES.NOT_CONFIGURED, 'No malware scanner provider configured');
+  } else {
+    setControl('malware_scanner', CONTROL_STATES.INITIALIZING, 'Verifying malware-scanner provider health');
+    try {
+      const scannerResult = await malwareHealthCheck(scannerConfig());
+      if (!scannerResult?.ok) {
+        const error = new Error('Malware scanner health operation failed');
+        error.code = scannerResult?.code || 'MALWARE_SCANNER_HEALTH_FAILED';
+        throw error;
+      }
+      setControl('malware_scanner', CONTROL_STATES.EXTERNALLY_VERIFIED, `Provider ${scannerResult.provider || process.env.MALWARE_SCANNER_PROVIDER} passed a live health operation`);
+      console.log(`Malware scanner runtime evidence: ok=yes provider=${scannerResult.provider || process.env.MALWARE_SCANNER_PROVIDER}`);
+    } catch (error) {
+      setControl('malware_scanner', CONTROL_STATES.FAILED, error.code || 'MALWARE_SCANNER_HEALTH_FAILED');
+      if (String(process.env.MALWARE_SCANNER_REQUIRED || '').toLowerCase() === 'true') throw error;
+      addWarning('Malware scanner provider health could not be verified at runtime');
+    }
+  }
 
   const backupConfigured = String(process.env.BACKUP_STATUS_PROVIDER || '').toLowerCase() === 'configured';
   setControl('backup_provider', backupConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
@@ -155,8 +175,20 @@ async function initializeServices() {
     webauthnConfigured ? 'WebAuthn settings present; no live ceremony adapter verified' : 'WebAuthn not configured');
 
   const objectStorageConfigured = configured(['OBJECT_STORAGE_PROVIDER']) || configured(['S3_BUCKET', 'S3_ENDPOINT']);
-  setControl('object_storage', objectStorageConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
-    objectStorageConfigured ? 'Object storage settings present; adapter verification is scheduled for Wave D' : 'Durable object storage not configured');
+  if (!objectStorageConfigured) {
+    setControl('object_storage', CONTROL_STATES.NOT_CONFIGURED, 'Durable object storage not configured');
+  } else {
+    setControl('object_storage', CONTROL_STATES.INITIALIZING, 'Verifying durable object-storage provider');
+    try {
+      const storageResult = await objectStorageHealthProbe();
+      setControl('object_storage', CONTROL_STATES.EXTERNALLY_VERIFIED, `Provider ${storageResult.provider || process.env.OBJECT_STORAGE_PROVIDER} passed a live write/read/delete health operation`);
+      console.log(`Object storage runtime evidence: ok=yes provider=${storageResult.provider || process.env.OBJECT_STORAGE_PROVIDER}`);
+    } catch (error) {
+      setControl('object_storage', CONTROL_STATES.FAILED, error.code || 'OBJECT_STORAGE_HEALTH_FAILED');
+      if (String(process.env.OBJECT_STORAGE_REQUIRED || '').toLowerCase() === 'true') throw error;
+      addWarning('Object storage provider health could not be verified at runtime');
+    }
+  }
 
   if (!isEmailConfigured()) {
     setControl('smtp', CONTROL_STATES.NOT_CONFIGURED, 'SMTP credentials are incomplete');
