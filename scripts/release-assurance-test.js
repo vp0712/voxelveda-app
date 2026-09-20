@@ -21,7 +21,10 @@ assert(auditWorkflow.includes('branches: [main]'), 'audit refresh runs from merg
 assert(auditWorkflow.includes('node scripts/generate-enterprise-inventory.js'), 'audit workflow regenerates machine-readable inventory');
 assert(auditWorkflow.includes('node scripts/update-enterprise-audit-baseline.js'), 'audit workflow updates deep-audit baseline');
 assert(auditWorkflow.includes('node scripts/check-enterprise-audit-provenance.js'), 'audit workflow verifies provenance before commit');
-assert(auditWorkflow.includes('[skip ci] [audit refresh]'), 'audit refresh prevents recursive CI churn');
+assert(auditWorkflow.includes('[audit refresh]'), 'audit refresh marks generated commits to prevent recursive refresh');
+assert(auditWorkflow.includes('pull-requests: write'), 'audit refresh can open a protected-main pull request');
+assert(auditWorkflow.includes('gh pr create'), 'audit refresh opens a pull request instead of pushing directly to protected main');
+assert(auditWorkflow.includes('gh pr merge'), 'audit refresh requests automatic squash merge after branch protections pass');
 assert(auditUpdater.includes('ENTERPRISE_ARCHITECTURE_INVENTORY.json'), 'audit updater uses generated inventory as source of truth');
 assert(auditUpdater.includes('Current remediation branch'), 'audit updater removes stale branch metadata');
 

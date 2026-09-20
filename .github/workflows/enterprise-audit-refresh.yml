@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: enterprise-audit-refresh
@@ -40,15 +41,27 @@ jobs:
       - name: Verify audit provenance
         run: node scripts/check-enterprise-audit-provenance.js
 
-      - name: Commit refreshed evidence
+      - name: Open protected-main audit refresh PR
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           if git diff --quiet -- docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json docs/ENTERPRISE_DEEP_AUDIT.md; then
             echo "Audit evidence is already current."
             exit 0
           fi
+          short_sha="${GITHUB_SHA::12}"
+          branch="automation/audit-refresh-${short_sha}"
           git config user.name "voxelveda-audit-bot"
           git config user.email "actions@users.noreply.github.com"
+          git checkout -b "$branch"
           git add docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json docs/ENTERPRISE_DEEP_AUDIT.md
-          git commit -m "docs: refresh enterprise audit [skip ci] [audit refresh]"
-          git push origin HEAD:main
+          git commit -m "docs: refresh enterprise audit for ${short_sha} [audit refresh]"
+          git push --force-with-lease origin "$branch"
+          existing="$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            pr="$existing"
+          else
+            pr="$(gh pr create               --repo "$GITHUB_REPOSITORY"               --base main               --head "$branch"               --title "docs: refresh enterprise audit for ${short_sha} [audit refresh]"               --body "Automated deterministic enterprise-audit refresh generated from main commit \`$GITHUB_SHA\`. No application code is changed."               --json number --jq '.number')"
+          fi
+          gh pr merge "$pr" --repo "$GITHUB_REPOSITORY" --auto --squash --delete-branch
