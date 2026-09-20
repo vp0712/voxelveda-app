@@ -1415,7 +1415,7 @@ function invoiceDueDate(value, termsDays) {
 function invoiceCompanySummary(company) {
   return [
     company.legalName || company.name,
-    company.abn ? \`ABN: \${company.abn}\` : '',
+    company.abn ? `ABN: ${company.abn}` : '',
     company.address || '',
     company.phone || '',
     company.email || '',
@@ -1481,7 +1481,7 @@ function drawInvoiceTotals(doc, { subtotal, gst, total, paidAmount = 0, balanceD
   doc.roundedRect(x, y, w, 100, 6).fill(panel).strokeColor(line).stroke();
   const rows = [
     ['Subtotal', statementMoney(subtotal)],
-    [\`GST (\${gstRate}%)\`, statementMoney(gst)],
+    [`GST (${gstRate}%)`, statementMoney(gst)],
     ['Paid', statementMoney(paidAmount)]
   ];
   rows.forEach(([label, value], index) => {
@@ -1516,14 +1516,14 @@ function drawInvoicePaymentFooter(doc, company, reference, y, blank = false) {
   } else {
     const hasBank = Boolean(company.bankName || company.bankBsb || company.bankAccountNumber);
     if (hasBank) {
-      doc.text(\`Bank: \${company.bankName || '-'}\`, x, y + 37);
-      doc.text(\`Account name: \${company.bankAccountName || company.legalName || company.name}\`, x, y + 52);
-      doc.text(\`BSB: \${company.bankBsb || '-'}   Account: \${company.bankAccountNumber || '-'}\`, x, y + 67);
+      doc.text(`Bank: ${company.bankName || '-'}`, x, y + 37);
+      doc.text(`Account name: ${company.bankAccountName || company.legalName || company.name}`, x, y + 52);
+      doc.text(`BSB: ${company.bankBsb || '-'}   Account: ${company.bankAccountNumber || '-'}`, x, y + 67);
     } else {
-      doc.text(\`Payment instructions: contact \${company.email || 'Voxel Veda accounts'}\`, x, y + 37, { width: 300 });
+      doc.text(`Payment instructions: contact ${company.email || 'Voxel Veda accounts'}`, x, y + 37, { width: 300 });
       doc.text('Bank details are intentionally omitted until configured in the secure company profile.', x, y + 52, { width: 300 });
     }
-    doc.text(\`Reference: \${reference}\`, x, y + 82);
+    doc.text(`Reference: ${reference}`, x, y + 82);
   }
 
   doc.fillColor(ink).font('Helvetica-Bold').fontSize(9).text('AUTHORIZED SIGNATURE', 390, y + 17, { width: 160, align: 'right' });
@@ -1567,9 +1567,9 @@ function drawInvoiceHero(doc, { title = 'INVOICE', invoiceNo = '', date = '', du
     doc.text('Date: ______________________', 345, 85, { width: 185, align: 'right' });
     doc.text('Due: _______________________', 345, 99, { width: 185, align: 'right' });
   } else {
-    doc.text(\`Number: \${invoiceNo}\`, 345, 71, { width: 185, align: 'right' });
-    doc.text(\`Date: \${date}\`, 345, 85, { width: 185, align: 'right' });
-    doc.text(\`Due: \${due}\`, 345, 99, { width: 185, align: 'right' });
+    doc.text(`Number: ${invoiceNo}`, 345, 71, { width: 185, align: 'right' });
+    doc.text(`Date: ${date}`, 345, 85, { width: 185, align: 'right' });
+    doc.text(`Due: ${due}`, 345, 99, { width: 185, align: 'right' });
   }
 }
 
@@ -1592,7 +1592,7 @@ function renderInvoicePdf(doc, invoice, items, id) {
   const total = subtotal + gst;
   const paidAmount = Number(invoice.paid_amount || 0);
   const balanceDue = Math.max(total - paidAmount, 0);
-  const invoiceNo = invoice.invoice_no || \`INV-\${id}\`;
+  const invoiceNo = invoice.invoice_no || `INV-${id}`;
   const invoiceDate = invoiceDisplayDate(invoice.created_at);
   const dueDate = invoiceDueDate(invoice.created_at, company.invoiceTermsDays);
 
@@ -1629,7 +1629,7 @@ function renderInvoicePdf(doc, invoice, items, id) {
       .text(item.description || 'Item', 54, rowY + 10, { width: 224, ellipsis: true });
     doc.fillColor(muted).text(String(Number(item.quantity || 0)), 297, rowY + 10, { width: 35, align: 'right' });
     doc.text(statementMoney(item.unit_price || 0), 351, rowY + 10, { width: 58, align: 'right' });
-    doc.text(\`\${gstRate}%\`, 427, rowY + 10, { width: 38, align: 'right' });
+    doc.text(`${gstRate}%`, 427, rowY + 10, { width: 38, align: 'right' });
     doc.fillColor(ink).font('Helvetica-Bold')
       .text(statementMoney(item.amount || 0), 481, rowY + 10, { width: 60, align: 'right' });
   });
