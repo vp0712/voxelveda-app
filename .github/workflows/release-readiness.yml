@@ -1,0 +1,80 @@
+name: Tagged Release Gate
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Syntax and static contracts
+        run: npm run check
+
+      - name: Full regression suite
+        run: npm test
+
+      - name: Production dependency audit
+        run: npm run security:audit
+
+      - name: Audit provenance
+        run: npm run audit:inventory:check
+
+      - name: Build release evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          {
+            echo "# Voxel Veda release evidence"
+            echo
+            echo "- Source SHA: \`$GITHUB_SHA\`"
+            echo "- Ref: \`$GITHUB_REF\`"
+            echo "- Run: \`$GITHUB_RUN_ID\`"
+            echo "- UTC generated: \`$(date -u +%Y-%m-%dT%H:%M:%SZ)\`"
+            echo
+            echo "## Open production/release-gate issues"
+            gh issue list --repo "$GITHUB_REPOSITORY" --state open --limit 100 --json number,title,url --jq '.[] | select(.title | startswith("[Production]") or startswith("[Release Gate]")) | "- #\\(.number) [\\(.title)](\\(.url))"' || true
+            echo
+            echo "## Required rollback reference"
+            echo "See docs/RELEASE_RUNBOOK.md before production rollback."
+          } > release-evidence.md
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: release-evidence.md
+          retention-days: 90
+
+      - name: Publish GitHub release for tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release already exists."
+          else
+            gh release create "$GITHUB_REF_NAME"               --repo "$GITHUB_REPOSITORY"               --verify-tag               --generate-notes               --notes-file release-evidence.md
+          fi
