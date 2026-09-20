@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Careers at Voxel Veda | Engineering & Advanced Manufacturing</title>
+  <meta name="description" content="Join Voxel Veda in Melbourne. Explore engineering, additive manufacturing, technical sales, quality and growth opportunities.">
+  <link rel="canonical" href="https://app.voxelveda.com/careers">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/public-pages.css">
+  <style>
+    body{background:#06101c;color:#eef4fb}.career-wrap{max-width:1180px;margin:auto;padding:28px 22px 70px}.career-hero{padding:72px 0 36px;display:grid;grid-template-columns:1.5fr .5fr;gap:34px;align-items:center}.career-hero h1{font-size:clamp(42px,7vw,82px);line-height:.98;margin:8px 0 18px}.career-hero p{max-width:780px;color:#aebdcb;font-size:18px;line-height:1.7}.career-logo{max-width:220px;justify-self:end}.career-stats,.jobs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.stat,.job,.apply-card{background:linear-gradient(180deg,#0b1b2d,#081522);border:1px solid #1c3348;border-radius:18px}.stat{padding:20px}.stat strong{display:block;font-size:30px}.stat span{color:#9db0c1}.jobs{margin-top:26px}.job{padding:22px;display:flex;flex-direction:column;min-height:280px}.job h3{font-size:22px;margin:8px 0}.meta{color:#8fa5b8;font-size:14px}.job p{color:#afbecb;line-height:1.55}.job button,.primary{margin-top:auto;background:#22c55e;color:#03120a;border:0;border-radius:10px;padding:12px 15px;font-weight:800;cursor:pointer}.section-title{margin-top:56px}.apply-card{margin-top:28px;padding:26px}.job-detail{display:none;margin-top:24px}.job-detail.open{display:block}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.detail-list{color:#b5c3cf;line-height:1.65}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.form-grid .wide{grid-column:1/-1}label{display:block;font-weight:700;margin-bottom:6px}input,select,textarea{width:100%;box-sizing:border-box;background:#06111d;color:#eef4fb;border:1px solid #29445c;border-radius:10px;padding:12px}textarea{min-height:120px}.consent{display:flex;gap:10px;align-items:flex-start;color:#aebdcb}.consent input{width:auto;margin-top:4px}.notice{margin-top:14px;padding:12px;border-radius:10px;display:none}.notice.show{display:block}.notice.ok{background:#0a2b1a;border:1px solid #1d7f49}.notice.err{background:#351313;border:1px solid #8c3434}.hp{position:absolute;left:-10000px}.career-note{margin-top:44px;color:#93a7b8}.public-nav nav a[href="/careers"]{color:#fff}@media(max-width:850px){.career-hero{grid-template-columns:1fr}.career-logo{justify-self:start}.career-stats,.jobs,.detail-grid,.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}}
+  </style>
+</head>
+<body class="public-page">
+<header class="public-nav">
+  <a class="public-brand" href="/" aria-label="Voxel Veda home"><img src="/logo.png" alt="Voxel Veda"><span>VOXEL VEDA</span></a>
+  <nav><a href="/request-quote">Request a quote</a><a href="/careers">Careers</a><a class="button button-small" href="/login">Sign in</a></nav>
+</header>
+<main class="career-wrap">
+  <section class="career-hero">
+    <div><p class="eyebrow">CAREERS AT VOXEL VEDA</p><h1>Build What Comes Next.</h1><p>Voxel Veda Pty Ltd is an Australian engineering, prototyping and advanced manufacturing company supporting product development, additive manufacturing, reverse engineering, robotics and low-volume production. Based in Melbourne, we are building a practical, multidisciplinary team that turns concepts into manufacturable products.</p></div>
+    <img class="career-logo" src="/logo.png" alt="Voxel Veda">
+  </section>
+  <section class="career-stats"><div class="stat"><strong id="openCount">6</strong><span>Open roles</span></div><div class="stat"><strong>Melbourne</strong><span>Primary location</span></div><div class="stat"><strong>Engineering-led</strong><span>Design to production</span></div></section>
+  <h2 class="section-title">Current opportunities</h2>
+  <div id="jobs" class="jobs"><p>Loading vacancies…</p></div>
+  <section id="detail" class="job-detail apply-card" aria-live="polite"></section>
+  <p class="career-note">Voxel Veda assesses applicants on role-related capability, experience and lawful work eligibility. Shortlisted engineering candidates may be asked to complete a practical technical assessment.</p>
+</main>
+<footer class="public-footer"><span>&copy; <span id="year"></span> Voxel Veda Pty Ltd</span><nav><a href="https://voxelveda.com">Main website</a><a href="/privacy">Privacy</a><a href="/terms">Terms</a><a href="/support">Support</a></nav></footer>
+<script>
+document.getElementById('year').textContent=new Date().getFullYear();
+let jobs=[];
+const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function loadJobs(){const r=await fetch('/api/public/careers/jobs');const d=await r.json();jobs=d.jobs||[];document.getElementById('openCount').textContent=jobs.length;document.getElementById('jobs').innerHTML=jobs.map(j=>`<article class="job"><div class="meta">${esc(j.department)} · ${esc(j.employment_type)}</div><h3>${esc(j.title)}</h3><div class="meta">${esc(j.location)} · ${j.openings} opening${j.openings===1?'':'s'}</div><p>${esc(j.summary)}</p><button type="button" onclick="openJob('${esc(j.slug)}')">View role & apply</button></article>`).join('')||'<p>No vacancies are currently open.</p>'}
+function list(items){return '<ul class="detail-list">'+(items||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'}
+function openJob(slug){const j=jobs.find(x=>x.slug===slug);if(!j)return;const el=document.getElementById('detail');el.classList.add('open');el.innerHTML=`
+<div class="meta">${esc(j.department)} · ${esc(j.location)} · ${esc(j.employment_type)}</div><h2>${esc(j.title)}</h2><p>${esc(j.summary)}</p>
+<div class="detail-grid"><div><h3>Responsibilities</h3>${list(j.responsibilities)}</div><div><h3>Requirements</h3>${list(j.requirements)}<h3>Preferred experience</h3>${list(j.preferred)}</div></div>
+<h3>Apply for this role</h3>
+<form id="careerForm" enctype="multipart/form-data">
+<input type="hidden" name="job_slug" value="${esc(j.slug)}"><div class="hp"><label>Company website<input name="company_website" tabindex="-1" autocomplete="off"></label></div>
+<div class="form-grid">
+<div><label>Full name *</label><input name="full_name" required maxlength="180"></div>
+<div><label>Email *</label><input name="email" type="email" required maxlength="255"></div>
+<div><label>Phone *</label><input name="phone" required maxlength="80"></div>
+<div><label>Current location</label><input name="current_location" maxlength="180"></div>
+<div><label>Australian work rights *</label><select name="work_rights" required><option value="">Select</option><option>Australian citizen</option><option>Permanent resident</option><option>Temporary visa with work rights</option><option>Other / require sponsorship consideration</option></select></div>
+<div><label>Availability</label><input name="availability" placeholder="e.g. 2 weeks notice"></div>
+<div><label>Expected remuneration</label><input name="expected_remuneration" placeholder="Optional"></div>
+<div><label>LinkedIn URL</label><input name="linkedin_url" type="url" placeholder="https://"></div>
+<div class="wide"><label>Portfolio / project URL</label><input name="portfolio_url" type="url" placeholder="https://"></div>
+<div class="wide"><label>CV / Resume * (PDF or Word, max 10 MB)</label><input name="resume" type="file" required accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></div>
+<div class="wide"><label>Cover note</label><textarea name="cover_note" maxlength="4000" placeholder="Briefly explain your relevant experience and why this role fits you."></textarea></div>
+<div class="wide consent"><input id="consent" name="consent" type="checkbox" required><label for="consent">I consent to Voxel Veda collecting and using the information in this application for recruitment, candidate assessment and related employment processes. *</label></div>
+<div class="wide"><button class="primary" type="submit">Submit application</button></div>
+</div><div id="notice" class="notice"></div></form>`;el.scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('careerForm').addEventListener('submit',submitApplication)}
+async function submitApplication(e){e.preventDefault();const form=e.currentTarget,btn=form.querySelector('button[type=submit]'),notice=document.getElementById('notice');btn.disabled=true;btn.textContent='Submitting securely…';notice.className='notice';try{const r=await fetch('/api/public/careers/applications',{method:'POST',body:new FormData(form)});const d=await r.json();notice.textContent=d.message+(d.application_id?' Reference: '+d.application_id:'');notice.className='notice show '+(r.ok?'ok':'err');if(r.ok){form.reset();btn.textContent='Application submitted'}}catch{notice.textContent='Could not submit your application. Please try again.';notice.className='notice show err'}finally{if(btn.textContent!=='Application submitted'){btn.disabled=false;btn.textContent='Submit application'}}}
+loadJobs().catch(()=>{document.getElementById('jobs').innerHTML='<p>Vacancies could not be loaded right now.</p>'});
+</script>
+</body></html>

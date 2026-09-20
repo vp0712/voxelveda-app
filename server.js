@@ -36,6 +36,7 @@ const { ensureWorkflowSchema } = require('./services/workflowSchema');
 const { ensureProcurementSchema } = require('./services/procurementSchema');
 const { ensureWorkforceSchema } = require('./services/workforceSchema');
 const { ensureEnterpriseControlPlaneSchema } = require('./services/enterpriseControlPlaneSchema');
+const { ensureCareersSchema } = require('./services/careersSchema');
 const { startWeeklyTimesheetScheduler, stopWeeklyTimesheetScheduler } = require('./services/weeklyTimesheetScheduler');
 const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
 const { startWorkflowSlaScheduler, stopWorkflowSlaScheduler } = require('./services/workflowEscalationService');
@@ -75,7 +76,8 @@ async function initializeCriticalSchemas() {
     ['workflow', 'Workflow Engine schema ready.', () => ensureWorkflowSchema()],
     ['procurement', 'Procurement lifecycle schema ready.', () => ensureProcurementSchema()],
     ['workforce', 'Workforce schema ready.', () => ensureWorkforceSchema()],
-    ['enterprise_control_plane', 'Enterprise control plane schema ready.', () => ensureEnterpriseControlPlaneSchema()]
+    ['enterprise_control_plane', 'Enterprise control plane schema ready.', () => ensureEnterpriseControlPlaneSchema()],
+    ['careers', 'Careers recruitment schema ready.', () => ensureCareersSchema()]
   ];
 
   for (const [key, message, initialize] of schemas) {
