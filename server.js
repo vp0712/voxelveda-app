@@ -101,6 +101,7 @@ function configured(keys) {
 }
 
 async function initializeServices() {
+  console.log('Provider assurance runtime checks: version=2026-09-21');
   const limiter = getRateLimitService();
   setControl('redis_limiter', CONTROL_STATES.INITIALIZING, 'Initializing configured rate-limit adapter');
   setCriticalService('rate_limiter', CONTROL_STATES.INITIALIZING);
