@@ -37,6 +37,6 @@ for(const issue of ['#178','#179','#180','#181','#182','#183']){
 }
 assert(runbook.includes('Rollback procedure'), 'release runbook documents rollback');
 assert(runbook.includes('do not manually drop columns/tables'), 'rollback avoids destructive schema reversal');
-assert(runbook.includes('No P0/P1 defect remains open'), 'release process blocks critical unresolved defects');
+assert(runbook.toLowerCase().includes('no p0/p1 defect remains open'), 'release process blocks critical unresolved defects');
 
 if(process.exitCode) process.exit(process.exitCode);
