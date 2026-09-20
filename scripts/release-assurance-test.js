@@ -27,9 +27,12 @@ assert(auditWorkflow.includes("cron: '17 3 * * 1'"), 'audit evidence also refres
 assert(auditUpdater.includes('ENTERPRISE_ARCHITECTURE_INVENTORY.json'), 'audit updater uses generated inventory as source of truth');
 assert(auditUpdater.includes('Current remediation branch'), 'audit updater removes stale branch metadata');
 
-for(const command of ['npm run check','npm test','npm run security:audit','npm run audit:inventory:check']){
+for(const command of ['npm run check','npm test','npm run security:audit']){
   assert(releaseWorkflow.includes(command), 'release gate runs '+command);
 }
+assert(releaseWorkflow.includes('node scripts/generate-enterprise-inventory.js'), 'release gate regenerates enterprise inventory from release source');
+assert(releaseWorkflow.includes('node scripts/update-enterprise-audit-baseline.js'), 'release gate refreshes audit metadata in its evidence workspace');
+assert(releaseWorkflow.includes('node scripts/check-enterprise-audit-provenance.js'), 'release gate verifies regenerated audit provenance');
 assert(releaseWorkflow.includes("tags:"), 'tagged releases have a dedicated workflow');
 assert(releaseWorkflow.includes('gh release create'), 'successful tag gate publishes a GitHub release');
 assert(releaseWorkflow.includes('release-evidence.md'), 'release workflow emits evidence artifact');
