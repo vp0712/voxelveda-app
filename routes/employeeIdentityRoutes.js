@@ -1,0 +1,12 @@
+const express=require('express');
+const {requireAnyPermission}=require('../middleware/authorizationMiddleware');
+const requireStepUp=require('../middleware/stepUpMiddleware');
+const {bodyContract}=require('../middleware/requestContractMiddleware');
+const c=require('../controllers/employeeIdentityController');
+const router=express.Router();
+router.use(requireAnyPermission('MANAGE_USERS'));
+router.get('/',c.list);
+router.get('/:id/card',c.card);
+router.post('/:id/issue',requireStepUp('CHANGE_USER_RECORD'),bodyContract(['expires_at']),c.issue);
+router.post('/:id/revoke',requireStepUp('TERMINATE_USER_ACCESS'),bodyContract(['reason'],{required:['reason']}),c.revoke);
+module.exports=router;
