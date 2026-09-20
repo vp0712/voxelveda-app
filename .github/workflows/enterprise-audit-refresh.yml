@@ -1,0 +1,54 @@
+name: Enterprise Audit Refresh
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: enterprise-audit-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(github.event.head_commit.message, '[audit refresh]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Regenerate architecture inventory
+        run: node scripts/generate-enterprise-inventory.js
+
+      - name: Update deep-audit baseline metadata
+        run: node scripts/update-enterprise-audit-baseline.js
+
+      - name: Verify audit provenance
+        run: node scripts/check-enterprise-audit-provenance.js
+
+      - name: Commit refreshed evidence
+        shell: bash
+        run: |
+          if git diff --quiet -- docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json docs/ENTERPRISE_DEEP_AUDIT.md; then
+            echo "Audit evidence is already current."
+            exit 0
+          fi
+          git config user.name "voxelveda-audit-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json docs/ENTERPRISE_DEEP_AUDIT.md
+          git commit -m "docs: refresh enterprise audit [skip ci] [audit refresh]"
+          git push origin HEAD:main
