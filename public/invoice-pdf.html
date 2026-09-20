@@ -46,12 +46,12 @@
     button:focus-visible { outline: 3px solid rgba(105, 181, 247, 0.28); outline-offset: 2px; }
 
     .primary-btn {
-      border-color: #69b5f7;
-      background: #69b5f7;
+      border-color: #f59e0b;
+      background: #f59e0b;
       color: #081018;
     }
 
-    .primary-btn:hover { border-color: #8bc6f7; background: #8bc6f7; }
+    .primary-btn:hover { border-color: #fbbf24; background: #fbbf24; }
 
     .muted-text {
       margin: 4px 0 0;
@@ -113,9 +113,9 @@
       grid-template-columns: 1fr auto;
       gap: 18px;
       padding: 26px;
-      background: #101923;
+      background: #24201c;
       color: #ffffff;
-      border-bottom: 4px solid #69b5f7;
+      border-bottom: 4px solid #f59e0b;
     }
 
     .invoice-document-head img {
@@ -163,7 +163,7 @@
 
     .invoice-panel h3 {
       margin: 0 0 10px;
-      color: #315f83;
+      color: #92400e;
       font-size: 13px;
       text-transform: uppercase;
     }
@@ -187,7 +187,7 @@
     }
 
     .invoice-items th {
-      background: #07111f;
+      background: #24201c;
       color: #ffffff;
       border: 0;
       padding: 12px;
@@ -221,7 +221,7 @@
     }
 
     .invoice-total-row.final {
-      background: #07111f;
+      background: #24201c;
       color: #ffffff;
       font-size: 18px;
       font-weight: 900;
@@ -249,7 +249,7 @@
     }
 
     .invoice-privacy-card strong {
-      color: #315f83;
+      color: #92400e;
       display: block;
       margin-bottom: 4px;
     }
@@ -266,7 +266,7 @@
 
     .invoice-privacy-url {
       margin-top: 8px;
-      color: #315f83;
+      color: #92400e;
       font-size: 11px;
       font-weight: 800;
       overflow-wrap: anywhere;
@@ -360,7 +360,7 @@
 
       .invoice-items td::before {
         content: attr(data-label);
-        color: #315f83;
+        color: #92400e;
         font-size: 11px;
         font-weight: 900;
         text-transform: uppercase;
@@ -381,7 +381,7 @@
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
   <link rel="manifest" href="/site.webmanifest?v=20260703-brand" />
-  <meta name="theme-color" content="#101923" />
+  <meta name="theme-color" content="#24201c" />
   <meta property="og:site_name" content="Voxel Veda" />
   <meta name="robots" content="noindex,nofollow,noarchive" />
   <meta property="og:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />
@@ -492,39 +492,42 @@
         <section class="invoice-document-head">
           <div class="invoice-company">
             <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda" />
-            <p>Voxel Veda Pty Ltd</p>
-            <p>Advanced manufacturing and engineering services</p>
+            <p><strong>Voxel Veda Pty Ltd</strong></p>
+            <p>Advanced manufacturing & engineering</p>
           </div>
           <div class="invoice-title">
             <h2>INVOICE</h2>
-            <p>Engineering Operations</p>
+            <p>No: ${escapeHtml(invoice.invoice_no || `INV-${invoiceId}`)}</p>
+            <p>Date: ${escapeHtml(invoiceDate)}</p>
+            <p>Due: ${escapeHtml(dueDate.toLocaleDateString('en-AU'))}</p>
           </div>
         </section>
         <section class="invoice-document-body">
           <div class="invoice-info-grid">
             <div class="invoice-panel invoice-bill">
+              <h3>Invoice From</h3>
+              <p><strong>Voxel Veda Pty Ltd</strong></p>
+              <p>info@voxelveda.com</p>
+              <p>voxelveda.com</p>
+            </div>
+            <div class="invoice-panel invoice-bill">
               <h3>Bill To</h3>
               <p><strong>${escapeHtml(invoice.customer_name || 'Customer')}</strong></p>
               <p>${escapeHtml(invoice.customer_email || '-')}</p>
-            </div>
-            <div class="invoice-panel invoice-meta">
-              <h3>Invoice Details</h3>
-              <div class="invoice-meta-row"><span>Invoice No</span><strong>${escapeHtml(invoice.invoice_no || `INV-${invoiceId}`)}</strong></div>
-              <div class="invoice-meta-row"><span>Date</span><strong>${escapeHtml(invoiceDate)}</strong></div>
-              <div class="invoice-meta-row"><span>Due Date</span><strong>${escapeHtml(dueDate.toLocaleDateString('en-AU'))}</strong></div>
             </div>
           </div>
 
           <table class="invoice-items">
             <thead>
-              <tr><th>Description</th><th>Qty</th><th>Unit</th><th>Amount</th></tr>
+              <tr><th>Description</th><th>Qty</th><th>Price</th><th>GST</th><th>Amount</th></tr>
             </thead>
             <tbody>
               ${items.map((item) => `
                 <tr>
                   <td data-label="Description">${escapeHtml(item.description || 'Item')}</td>
                   <td data-label="Qty">${escapeHtml(Number(item.quantity || 0))}</td>
-                  <td data-label="Unit">${escapeHtml(money(item.unit_price))}</td>
+                  <td data-label="Price">${escapeHtml(money(item.unit_price))}</td>
+                  <td data-label="GST">${escapeHtml(gstRate)}%</td>
                   <td data-label="Amount">${escapeHtml(money(item.amount))}</td>
                 </tr>
               `).join('')}
@@ -534,7 +537,7 @@
           <div class="invoice-total-card">
             <div class="invoice-total-row"><span>Subtotal</span><strong>${money(subtotal)}</strong></div>
             <div class="invoice-total-row"><span>GST (${gstRate}%)</span><strong>${money(gst)}</strong></div>
-            <div class="invoice-total-row final"><span>Total AUD</span><strong>${money(total)}</strong></div>
+            <div class="invoice-total-row final"><span>Total Due</span><strong>${money(total)}</strong></div>
           </div>
 
           <div class="invoice-privacy-card">
@@ -548,14 +551,13 @@
 
           <div class="invoice-footer">
             <div>
-              <strong>Payment details</strong>
-              <p>Bank: Commonwealth Bank</p>
-              <p>Account name: Voxel Veda Pty Ltd</p>
-              <p>BSB / Account: Add your details</p>
+              <strong>Payment information</strong>
+              <p>Use the invoice number as the payment reference.</p>
+              <p>The downloadable official PDF contains the configured Voxel Veda payment instructions.</p>
               <p>Reference: ${escapeHtml(invoice.invoice_no || `INV-${invoiceId}`)}</p>
             </div>
             <div>
-              <strong>Authorized Signatory</strong>
+              <strong>Authorized Signature</strong>
               <p>Voxel Veda Pty Ltd</p>
             </div>
           </div>

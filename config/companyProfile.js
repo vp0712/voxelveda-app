@@ -22,7 +22,15 @@ function companyProfile() {
     email,
     supportEmail: firstValue([process.env.SUPPORT_EMAIL, email]),
     replyTo: firstValue([process.env.MAIL_REPLY_TO, email]),
-    website: firstValue([process.env.PUBLIC_WEBSITE_URL, 'https://voxelveda.com'])
+    website: firstValue([process.env.PUBLIC_WEBSITE_URL, 'https://voxelveda.com']),
+    phone: firstValue([process.env.COMPANY_PHONE, process.env.PUBLIC_COMPANY_PHONE]),
+    address: firstValue([process.env.COMPANY_ADDRESS, process.env.PUBLIC_COMPANY_ADDRESS]),
+    abn: firstValue([process.env.COMPANY_ABN]),
+    bankName: firstValue([process.env.COMPANY_BANK_NAME]),
+    bankAccountName: firstValue([process.env.COMPANY_BANK_ACCOUNT_NAME, process.env.COMPANY_LEGAL_NAME, 'Voxel Veda Pty Ltd']),
+    bankBsb: firstValue([process.env.COMPANY_BANK_BSB]),
+    bankAccountNumber: firstValue([process.env.COMPANY_BANK_ACCOUNT_NUMBER]),
+    invoiceTermsDays: Number(process.env.COMPANY_INVOICE_TERMS_DAYS || 7)
   };
 }
 

@@ -12,6 +12,7 @@ router.get('/', invoiceController.getInvoices);
 router.get('/statement/search', invoiceController.searchCustomerStatements);
 router.get('/statement/pdf', invoiceController.viewCustomerStatementPdf);
 router.post('/statement/send', requireAnyPermission('SEND_COMPANY_EMAIL'), invoiceController.sendCustomerStatement);
+router.get('/blank/pdf', invoiceController.viewBlankInvoicePdf);
 
 router.get('/:id', invoiceController.getInvoiceDetails);
 

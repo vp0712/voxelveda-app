@@ -160,6 +160,7 @@ const COMPANY_FORMS = [
 ];
 
 const ADDITIONAL_COMPANY_FORMS = [
+  { category: 'Finance', title: 'Blank Voxel Veda Invoice Template', file: '/api/invoice/blank/pdf', downloadFile: '/api/invoice/blank/pdf?download=1', visual: 'contract', digital: false, note: 'Premium blank company invoice sheet matching the issued invoice layout. Preview, print or download it for manual/client use.' },
   { category: 'Supplier', title: 'Supplier Onboarding & Approval Form', file: '/forms/company/supplier-onboarding-approval.pdf', visual: 'supplier', note: 'Use before approving a supplier for raw material, packaging, transport, tooling, outsourced manufacturing or services.' },
   { category: 'Finance', title: 'Purchase Order & Supplier Bill Register', file: '/forms/company/purchase-order-supplier-bill-register.pdf', visual: 'contract', note: 'Use to control purchase orders, supplier bills, GST, payment status, due dates and approval evidence.' },
   { category: 'Quality', title: 'Raw Material Receiving & Traceability Form', file: '/forms/company/raw-material-receiving-traceability.pdf', visual: 'risk', note: 'Use when receiving material so batch, supplier, COA/SDS, quantity, condition and release status are traceable.' },
@@ -1058,7 +1059,9 @@ function renderCompanyForms() {
       </div>
       <div class="form-card-grid">
         ${forms.map((form) => {
-          const fileUrl = `${form.file}?v=${COMPANY_FORM_VERSION}`;
+          const fileUrl = `${form.file}${form.file.includes('?') ? '&' : '?'}v=${COMPANY_FORM_VERSION}`;
+          const downloadBase = form.downloadFile || form.file;
+          const downloadUrl = `${downloadBase}${downloadBase.includes('?') ? '&' : '?'}v=${COMPANY_FORM_VERSION}`;
           const formKey = companyFormKey(form);
           const savedCount = digitalRecords.filter((record) => record.formKey === formKey).length;
           return `
@@ -1074,12 +1077,12 @@ function renderCompanyForms() {
             <span class="status-chip">${escapeHtml(form.category)}</span>
             <h4>${escapeHtml(form.title)}</h4>
             <p>${escapeHtml(form.note)}</p>
-            <div class="form-record-line">${savedCount} digital record${savedCount === 1 ? '' : 's'} saved</div>
+            ${form.digital === false ? '<div class="form-record-line">Printable master template</div>' : `<div class="form-record-line">${savedCount} digital record${savedCount === 1 ? '' : 's'} saved</div>`}
             <div class="dialog-actions inline-actions form-action-stack">
-              <button class="primary-btn" onclick="openCompanyFormFiller('${escapeHtml(formKey)}')">Fill Digitally</button>
-              <button class="icon-btn" onclick="openCompanyFormEntries('${escapeHtml(formKey)}')">Entries</button>
+              ${form.digital === false ? '' : `<button class="primary-btn" onclick="openCompanyFormFiller('${escapeHtml(formKey)}')">Fill Digitally</button>
+              <button class="icon-btn" onclick="openCompanyFormEntries('${escapeHtml(formKey)}')">Entries</button>`}
               <button class="icon-btn" onclick="window.open('${escapeHtml(fileUrl)}', '_blank', 'noopener')">Preview PDF</button>
-              <a class="icon-btn" href="${escapeHtml(fileUrl)}" download>Download</a>
+              <a class="icon-btn" href="${escapeHtml(downloadUrl)}" download>Download Blank PDF</a>
             </div>
           </article>
         `}).join('')}
