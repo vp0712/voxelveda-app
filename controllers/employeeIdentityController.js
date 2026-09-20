@@ -7,7 +7,8 @@ const {logAudit}=require('../services/auditService');
 
 function statusOf(card){
   if(!card) return 'NOT_ISSUED';
-  if(card.status!=='ACTIVE') return card.status;
+  const state=card.status ?? card.card_status;
+  if(state!=='ACTIVE') return state || 'NOT_ISSUED';
   if(card.expires_at && new Date(card.expires_at).getTime()<Date.now()) return 'EXPIRED';
   return 'ACTIVE';
 }
@@ -19,7 +20,11 @@ async function userById(id){
 exports.list=async(req,res)=>{
   try{
     await Promise.all([ensureEmployeeIdentitySchema(),ensureUserLifecycleSchema()]);
-    const [rows]=await pool.query(`SELECT u.id user_id,u.name,u.email,u.role,u.department,u.employee_number,u.active,u.account_status,
+    const [activeUsers]=await pool.query(\`SELECT id FROM users WHERE deleted_at IS NULL AND active=1 AND UPPER(COALESCE(account_status,'ACTIVE')) NOT IN ('TERMINATED','SUSPENDED','DISABLED')\`);
+    for(const u of activeUsers){
+      await pool.query(\`INSERT IGNORE INTO employee_id_cards(user_id,card_uuid,verification_token,status,created_by) VALUES(?,?,?,'ACTIVE',?)\`,[u.id,crypto.randomUUID(),crypto.randomBytes(32).toString('hex'),req.user.id]);
+    }
+    const [rows]=await pool.query(\`SELECT u.id user_id,u.name,u.email,u.role,u.department,u.employee_number,u.active,u.account_status,
       c.card_uuid,c.status card_status,c.issued_at,c.expires_at,c.revoked_at
       FROM users u LEFT JOIN employee_id_cards c ON c.user_id=u.id
       WHERE u.deleted_at IS NULL ORDER BY u.name`);
