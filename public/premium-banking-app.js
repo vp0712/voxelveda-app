@@ -1,7 +1,7 @@
 
 (() => {
   'use strict';
-  if (!['/finance-intelligence','/banking'].includes(location.pathname) || window.__vvPremiumBankInstalled) return;
+  if (location.pathname !== '/banking' || window.__vvPremiumBankInstalled) return;
   window.__vvPremiumBankInstalled = true;
 
   const BANK = '/api/integrations/webhooks/banking';
