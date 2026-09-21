@@ -415,7 +415,6 @@
     $('bankV3DrawerClose')?.addEventListener('click',closeDrawer);$('bankV3DrawerBackdrop')?.addEventListener('click',closeDrawer);$('bankV3ModalClose')?.addEventListener('click',closeModal);
     $('refreshDashboard')?.addEventListener('click',loadCore);
     $('fiGlobalSearch')?.addEventListener('keydown',e=>{if(e.key!=='Enter')return;const q=e.currentTarget.value.trim();nav('activity');setTimeout(()=>{$('bankActivitySearch').value=q;loadActivityFiltered()},20)});
-    document.addEventListener('click',e=>{const btn=e.target.closest('[data-bank-action]');if(btn)action(btn.dataset.bankAction)});
   }
 
   document.addEventListener('DOMContentLoaded',async()=>{
