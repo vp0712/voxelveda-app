@@ -13,7 +13,7 @@ assert(!routes.includes("requirePermission('VIEW_FINANCE')"),'standalone banking
 assert(routes.includes("requireAnyPermission('VIEW_BANKING','VIEW_PERSONAL_BANKING','VIEW_BUSINESS_BANKING')"),'banking view permission is required');
 assert(routes.includes("requireAnyPermission('EDIT_BANK_DETAILS','CONNECT_BANK_ACCOUNT','MANAGE_BANK_CONNECTION')"),'bank consent remains privileged');
 assert(routes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'payment approval remains explicitly permission-gated');
-assert(ui.includes("['/finance-intelligence','/banking']"),'premium Banking client supports standalone /banking page');
+assert(ui.includes("if (location.pathname !== '/banking'"),'premium Banking client is isolated to the standalone /banking page');
 assert(ui.includes("const STANDALONE = location.pathname === '/banking'"),'standalone API mode is explicit');
 assert(ui.includes("'/api/banking/intelligence'"),'standalone intelligence API is used');
 assert(ui.includes("'/api/banking/os'"),'standalone Banking OS API is used');
