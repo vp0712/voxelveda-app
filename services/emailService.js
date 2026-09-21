@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const fs = require('node:fs');
 const { companyProfile } = require('../config/companyProfile');
 
 const SMTP_FIELDS = {
@@ -47,8 +48,24 @@ function missingSmtpKeys() {
   return missing;
 }
 
+function relayConfig() {
+  const requestedTimeout = Number(process.env.WORDPRESS_MAIL_RELAY_TIMEOUT_MS || 15000);
+  return {
+    url: String(process.env.WORDPRESS_MAIL_RELAY_URL || '').trim(),
+    token: String(process.env.WORDPRESS_MAIL_RELAY_TOKEN || '').trim(),
+    timeoutMs: Number.isFinite(requestedTimeout) && requestedTimeout >= 1000
+      ? Math.min(requestedTimeout, 60000)
+      : 15000
+  };
+}
+
+function isRelayConfigured() {
+  const config = relayConfig();
+  return Boolean(config.url.startsWith('https://') && config.token);
+}
+
 function isEmailConfigured() {
-  return missingSmtpKeys().length === 0;
+  return isRelayConfigured() || missingSmtpKeys().length === 0;
 }
 
 const EMAIL_TRANSPORT_CODES = new Set([
@@ -61,7 +78,8 @@ const EMAIL_TRANSPORT_CODES = new Set([
   'ECONNRESET',
   'EHOSTUNREACH',
   'ENETUNREACH',
-  'EDNS'
+  'EDNS',
+  'EMAIL_HTTPS_RELAY_FAILED'
 ]);
 
 function isEmailTransportError(error) {
@@ -180,6 +198,32 @@ function createTransporter() {
 }
 
 async function verifyConnection() {
+  if (isRelayConfigured()) {
+    const config = relayConfig();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+    try {
+      const response = await fetch(`${config.url.replace(/\/+$/, '')}/health`, {
+        method: 'GET',
+        headers: { 'X-Voxel-Veda-Relay-Token': config.token },
+        signal: controller.signal
+      });
+      if (!response.ok) {
+        const error = new Error(`WordPress mail relay health check returned ${response.status}`);
+        error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+        throw error;
+      }
+      console.log('Email HTTPS relay evidence: ok=yes provider=wordpress_wp_mail transport=https');
+      return { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https' };
+    } catch (error) {
+      if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+      console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code}`);
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
   const transporter = createTransporter();
   try {
     await transporter.verify();
@@ -197,12 +241,90 @@ async function verifyConnection() {
   }
 }
 
+async function relayAttachments(attachments = []) {
+  let totalBytes = 0;
+  const encoded = [];
+  for (const attachment of attachments) {
+    if (!attachment?.path) continue;
+    const content = await fs.promises.readFile(attachment.path);
+    totalBytes += content.length;
+    if (totalBytes > 20 * 1024 * 1024) {
+      const error = new Error('Email relay attachments exceed the 20 MB limit.');
+      error.code = 'EMAIL_RELAY_ATTACHMENT_LIMIT';
+      throw error;
+    }
+    encoded.push({
+      filename: String(attachment.filename || 'attachment').slice(0, 180),
+      content_type: String(attachment.contentType || 'application/octet-stream').slice(0, 120),
+      content_base64: content.toString('base64')
+    });
+  }
+  return encoded;
+}
+
+async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, attachments }) {
+  const config = relayConfig();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(config.url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'X-Voxel-Veda-Relay-Token': config.token,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        to,
+        cc,
+        bcc,
+        subject: String(subject || '').trim(),
+        html: html || '',
+        text: text || '',
+        reply_to: replyTo || '',
+        request_id: `railway-${Date.now()}`,
+        attachments: await relayAttachments(attachments)
+      }),
+      signal: controller.signal
+    });
+    const raw = await response.text();
+    let result = {};
+    try { result = raw ? JSON.parse(raw) : {}; } catch { result = {}; }
+    if (!response.ok || result.sent !== true) {
+      const error = new Error(result.message || `WordPress mail relay returned ${response.status}`);
+      error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+      error.responseCode = response.status;
+      throw error;
+    }
+    return { messageId: result.provider_message_id || result.request_id || null, accepted: to };
+  } catch (error) {
+    if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [] }) {
-  const config = smtpConfig();
-  const transporter = createTransporter();
   const recipients = validateRecipients(to, 'to');
   const ccRecipients = validateRecipients(cc, 'cc');
   const bccRecipients = validateRecipients(bcc, 'bcc');
+
+  if (isRelayConfigured()) {
+    return sendViaHttpsRelay({
+      to: recipients,
+      cc: ccRecipients,
+      bcc: bccRecipients,
+      subject,
+      html,
+      text,
+      replyTo,
+      attachments
+    });
+  }
+
+  const config = smtpConfig();
+  const transporter = createTransporter();
 
   try {
     return await transporter.sendMail({
@@ -230,6 +352,8 @@ module.exports = {
   smtpConfig,
   smtpReadinessSummary,
   classifySmtpFailure,
+  isRelayConfigured,
+  relayConfig,
   normalizeAddressList,
   validateRecipients,
   isEmailTransportError,
