@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/finance-intelligence-advanced.css?v=20260915-guided">
   <link rel="stylesheet" href="/finance-banking-readiness.css?v=20260915-readiness">
   <link rel="stylesheet" href="/finance-account-lifecycle.css?v=20260917-account-lifecycle">
-  <link rel="stylesheet" href="/finance-dashboard-v2.css?v=20260921-bank-dashboard">
+  <link rel="stylesheet" href="/finance-bank-app-v3.css?v=20260921-bank-v3">
 </head>
 <body>
   <div class="fi-app-frame">
@@ -18,17 +18,17 @@
         <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda">
         <div><strong>Voxel Veda</strong><span>FINANCE INTELLIGENCE</span></div>
       </div>
-      <nav class="fi-bank-nav">
-        <button class="active" data-fi-nav="dashboard"><span>⌂</span>Dashboard</button>
-        <button data-fi-nav="accounts"><span>▣</span>Accounts</button>
-        <button data-fi-nav="statements"><span>▤</span>Statements</button>
-        <button data-fi-nav="transactions"><span>⇄</span>Transactions</button>
-        <button data-fi-nav="categories"><span>◫</span>Categories</button>
-        <button data-fi-nav="cashflow"><span>▥</span>Cash Flow</button>
-        <button data-fi-nav="reports"><span>▦</span>Reports</button>
-        <button data-fi-nav="insights"><span>✦</span>AI Insights</button>
-        <button data-fi-nav="team"><span>♙</span>Team Access</button>
-        <button data-fi-nav="settings"><span>⚙</span>Settings</button>
+      <nav class="fi-bank-nav bank-v3-nav">
+        <button class="active" data-bank-view="home"><span>⌂</span>Home</button>
+        <button data-bank-view="accounts"><span>▣</span>Accounts</button>
+        <button data-bank-view="activity"><span>⇄</span>Activity</button>
+        <button data-bank-view="payments"><span>→</span>Payments</button>
+        <button data-bank-view="plan"><span>◎</span>Plan</button>
+        <button data-bank-view="insights"><span>✦</span>Insights</button>
+        <button data-bank-view="statements"><span>▤</span>Statements</button>
+        <button data-bank-view="reports"><span>▦</span>Reports</button>
+        <button data-bank-view="team"><span>♙</span>Team</button>
+        <button data-bank-view="settings"><span>⚙</span>Settings</button>
       </nav>
       <div class="fi-side-note">
         <span>SMARTER FINANCE</span>
@@ -40,17 +40,17 @@
     <header class="fi-topbar fi-bank-topbar">
       <div>
         <p class="eyebrow">VOXEL VEDA · FINANCE INTELLIGENCE</p>
-        <h1>Finance Intelligence</h1>
-        <p class="muted">Real money. Real statements. Smarter decisions.</p>
+        <h1 id="bankPageTitle">Money</h1>
+        <p id="bankPageSubtitle" class="muted">Your accounts, activity and financial controls in one place.</p>
       </div>
       <div class="fi-topbar-tools">
-        <label class="fi-global-search"><span>⌕</span><input id="fiGlobalSearch" placeholder="Search transactions or accounts"></label>
+        <label class="fi-global-search"><span>⌕</span><input id="fiGlobalSearch" placeholder="Search money, merchants, accounts or statements"></label>
         <button id="refreshDashboard" class="fi-icon-action" type="button" title="Refresh">↻</button>
         <a class="fi-profile-chip" href="/admin"><span>VV</span><b>Voxel Veda</b></a>
       </div>
     </header>
 
-    <section class="guide-panel" aria-label="Finance setup steps">
+    <section class="guide-panel bank-v3-hide" aria-label="Finance setup steps">
       <div class="guide-copy">
         <p class="eyebrow">START HERE</p>
         <h2>Five simple steps</h2>
@@ -65,13 +65,13 @@
       </div>
     </section>
 
-    <section class="scope-row" aria-label="Finance scope">
+    <section class="scope-row bank-v3-hide" aria-label="Finance scope">
       <button class="scope active" data-scope="ALL">All money</button>
       <button class="scope" data-scope="PERSONAL">Personal only</button>
       <button class="scope" data-scope="BUSINESS">Voxel Veda only</button>
     </section>
 
-    <section class="actions primary-actions" aria-label="Finance actions">
+    <section class="actions primary-actions bank-v3-legacy-actions" aria-label="Finance actions">
       <button id="addAccount" class="primary">+ Add Account</button>
       <button id="importStatement" class="primary">+ Import Statement</button>
       <button id="openReviewQueue">Review Statements</button>
@@ -84,72 +84,33 @@
     <div id="notice" class="notice" hidden></div>
     <div id="advancedNotice" class="notice" hidden></div>
 
-    <section id="fiDashboardV2" class="fi-dashboard-v2" aria-label="Finance dashboard">
-      <div class="fi-dashboard-toolbar">
-        <div class="fi-scope-pills">
-          <button class="active" data-v2-scope="ALL">All money</button>
-          <button data-v2-scope="BUSINESS">Voxel Veda</button>
-          <button data-v2-scope="PERSONAL">Personal</button>
-        </div>
-        <div class="fi-dashboard-selects">
-          <label>Currency<select id="fiDashboardCurrency"><option value="AUD">AUD</option></select></label>
-          <label>Period<select id="fiDashboardRange"><option value="30">30 days</option><option value="90">90 days</option><option value="365" selected>12 months</option><option value="ALL">All history</option></select></label>
-        </div>
-      </div>
-
-      <div id="fiKpiGrid" class="fi-kpi-grid"></div>
-
-      <div class="fi-chart-grid fi-chart-grid-main">
-        <article class="fi-dash-card fi-span-2">
-          <div class="fi-card-head"><div><span>PERFORMANCE</span><h2>Income vs expenses</h2></div><button type="button" data-fi-jump="transactions">View transactions →</button></div>
-          <div id="fiIncomeExpenseChart" class="fi-chart-host"></div>
-        </article>
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>SPENDING</span><h2>By category</h2></div><button type="button" data-fi-jump="categories">View all →</button></div>
-          <div id="fiCategoryDonut" class="fi-chart-host"></div>
-        </article>
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>CASH FLOW</span><h2>Monthly overview</h2></div><button type="button" data-fi-jump="cashflow">Explore →</button></div>
-          <div id="fiCashflowBars" class="fi-chart-host"></div>
-        </article>
-      </div>
-
-      <div class="fi-dashboard-grid">
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>ACCOUNTS</span><h2>Bank accounts</h2></div><button type="button" data-fi-jump="accounts">View all →</button></div>
-          <div id="fiAccountSummary"></div>
-        </article>
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>CURRENCIES</span><h2>Multi-currency balance</h2></div></div>
-          <div id="fiCurrencySummary"></div>
-        </article>
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>UPCOMING</span><h2>Obligations & approvals</h2></div><button type="button" data-fi-jump="cashflow">View all →</button></div>
-          <div id="fiObligations"></div>
-        </article>
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>INTELLIGENCE</span><h2>AI insights</h2></div><button type="button" data-fi-jump="insights">View all →</button></div>
-          <div id="fiAiInsights"></div>
-        </article>
-      </div>
-
-      <div class="fi-bottom-grid">
-        <article class="fi-dash-card fi-span-2">
-          <div class="fi-card-head"><div><span>ACTIVITY</span><h2>Recent transactions</h2></div><button type="button" data-fi-jump="transactions">View all →</button></div>
-          <div id="fiRecentTransactions" class="fi-table-host"></div>
-        </article>
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>TRENDS</span><h2>Monthly comparison</h2></div></div>
-          <div id="fiMonthlyComparison"></div>
-        </article>
-        <article class="fi-dash-card">
-          <div class="fi-card-head"><div><span>EXPORTS</span><h2>Reports & downloads</h2></div><button type="button" data-fi-jump="reports">View all →</button></div>
-          <div id="fiReportShortcuts"></div>
-        </article>
+    <section id="bankAppV3" class="bank-v3-app" aria-live="polite">
+      <div id="bankV3TopActions" class="bank-v3-top-actions"></div>
+      <div id="bankV3Screen" class="bank-v3-screen">
+        <div class="bank-v3-loading"><span></span><strong>Loading your money workspace…</strong></div>
       </div>
     </section>
 
-    <section id="statementWarehouse" class="panel warehouse-panel" data-fi-section="statements">
+    <aside id="bankV3Drawer" class="bank-v3-drawer" aria-hidden="true">
+      <div class="bank-v3-drawer-head">
+        <div><span id="bankV3DrawerEyebrow">DETAIL</span><h2 id="bankV3DrawerTitle">Details</h2></div>
+        <button id="bankV3DrawerClose" type="button" aria-label="Close">×</button>
+      </div>
+      <div id="bankV3DrawerBody" class="bank-v3-drawer-body"></div>
+    </aside>
+    <div id="bankV3DrawerBackdrop" class="bank-v3-drawer-backdrop" hidden></div>
+
+    <dialog id="bankV3Modal" class="bank-v3-modal">
+      <div class="bank-v3-modal-shell">
+        <div class="bank-v3-drawer-head">
+          <div><span id="bankV3ModalEyebrow">BANKING WORKFLOW</span><h2 id="bankV3ModalTitle">Action</h2></div>
+          <button id="bankV3ModalClose" type="button" aria-label="Close">×</button>
+        </div>
+        <div id="bankV3ModalBody" class="bank-v3-modal-body"></div>
+      </div>
+    </dialog>
+
+    <section id="statementWarehouse" class="panel warehouse-panel bank-v3-legacy-panel" data-fi-section="statements">
       <div class="panel-heading">
         <div>
           <p class="eyebrow">YOUR COMPLETE MONEY HISTORY</p>
@@ -166,7 +127,7 @@
       </div>
     </section>
 
-    <section id="bankingSafetyPanel" class="panel banking-safety-panel" data-fi-section="settings">
+    <section id="bankingSafetyPanel" class="panel banking-safety-panel bank-v3-legacy-panel" data-fi-section="settings">
       <div class="banking-safety-hero">
         <div>
           <p class="eyebrow">BANKING SETUP & SAFETY</p>
@@ -213,7 +174,7 @@
       </div>
     </section>
 
-    <section id="intelligencePanel" class="panel intelligence-panel" data-fi-section="insights">
+    <section id="intelligencePanel" class="panel intelligence-panel bank-v3-legacy-panel" data-fi-section="insights">
       <div class="panel-heading">
         <div><p class="eyebrow">SMART MONEY REVIEW</p><h2>What the system found</h2><p class="muted">Suggestions are explanations, not automatic accounting decisions. Review them before applying.</p></div>
         <button id="analyseTransactionsTop" class="primary">Run Analysis</button>
@@ -234,7 +195,7 @@
       <div id="insightList" class="insight-list"><div class="empty"><strong>No analysis yet</strong><span>Import transactions, then press “Analyse Transactions”.</span></div></div>
     </section>
 
-    <section class="panel" data-fi-section="accounts">
+    <section class="panel bank-v3-legacy-panel" data-fi-section="accounts">
       <div class="panel-heading">
         <div><p class="eyebrow">ACCOUNTS</p><h2>Where your active money is held</h2><p class="muted">Active accounts appear here. Use Account Management below to archive, restore, exclude or safely delete an empty account.</p></div>
         <span id="providerBadge" class="badge">Checking bank feed…</span>
@@ -242,7 +203,7 @@
       <div id="accounts" class="account-grid"><p class="muted">Loading accounts…</p></div>
     </section>
 
-    <section class="two-col" data-fi-section="categories">
+    <section class="two-col bank-v3-legacy-panel" data-fi-section="categories">
       <article class="panel">
         <div class="panel-heading"><div><p class="eyebrow">SPENDING</p><h2>Where your money goes</h2><p class="muted">Only active accounts are included. Transfers between your own accounts are excluded once confirmed.</p></div></div>
         <div id="categories" class="rows"></div>
@@ -253,7 +214,7 @@
       </article>
     </section>
 
-    <section class="panel" data-fi-section="reports">
+    <section class="panel bank-v3-legacy-panel" data-fi-section="reports">
       <div class="panel-heading"><div><p class="eyebrow">HISTORY</p><h2>How much transaction history is covered</h2><p class="muted">This shows the earliest and latest transaction we currently have for each account.</p></div></div>
       <div id="coverage" class="rows"></div>
     </section>
@@ -310,7 +271,7 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="/finance-intelligence.js?v=20260919-data-controls" defer></script>
-  <script src="/finance-dashboard-v2.js?v=20260921-bank-dashboard" defer></script>
+  <script src="/finance-bank-app-v3.js?v=20260921-bank-v3" defer></script>
   <script src="/finance-account-lifecycle.js?v=20260917-account-lifecycle" defer></script>
   <script src="/finance-intelligence-advanced.js?v=20260915-guided" defer></script>
   <script src="/personal-money-center.js?v=20260916-personal-money" defer></script>
