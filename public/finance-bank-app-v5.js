@@ -5,7 +5,7 @@ const STANDALONE=location.pathname==='/banking';
 const FIN=STANDALONE?'/api/banking/intelligence':'/api/finance/intelligence';
 const OS=STANDALONE?'/api/banking/os':'/api/finance/banking-os';
 const DASH=STANDALONE?FIN+'/dashboard':FIN+'/banking-dashboard';
-const state={view:'home',scope:'ALL',currency:'AUD',activityTab:'all',paymentTab:'all',os:{},command:{},dash:{},tx:[],statements:[],budgets:[],insights:[],calendar:[],team:{},caps:{},connections:{}};
+const state={view:'home',scope:'ALL',currency:'AUD',activityTab:'all',paymentTab:'all',selectedAccountId:null,os:{},command:{},dash:{},tx:[],statements:[],budgets:[],insights:[],calendar:[],team:{},caps:{},connections:{}};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
 const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c}).format(num(v))}catch{return c+' '+num(v).toFixed(2)}};
@@ -24,9 +24,14 @@ function kpi(l,v,s,t=''){return '<div class="v5-kpi"><span>'+esc(l)+'</span><str
 function quick(i,t,s,a){return '<button class="v5-quick" data-v5-action="'+a+'"><span class="ico">'+i+'</span><b>'+t+'</b><small>'+s+'</small></button>'}
 function empty(t,s=''){return '<div class="v5-empty"><strong>'+t+'</strong>'+esc(s)+'</div>'}
 function topActions(){
- const base=[['accent','＋ Add account','add-account'],['primary','⇧ Import statement','import'],['','⌕ Find transaction','activity']];
- const extra={home:[['','✦ Analyse','analyse']],accounts:[['','↻ Refresh','refresh']],activity:[['','▤ Statements','statements']],payments:[['accent','＋ Payment draft','new-payment']],plan:[['accent','＋ Money Space','new-space']],wealth:[['','▦ Reports','reports']],statements:[['','✓ Review queue','review']],insights:[['accent','✦ Run analysis','analyse']],team:[['','↗ Banking portal','banking']],more:[['','↻ Refresh status','refresh']]}[state.view]||[];
- $('bankV5TopActions').innerHTML=[...base,...extra].map(x=>'<button class="bank-v5-action '+x[0]+'" data-v5-action="'+x[2]+'">'+x[1]+'</button>').join('');
+ const actions={
+   home:[],
+   accounts:[['accent','＋ Add account','add-account'],['','⇧ Import statement','import']],
+   activity:[['','▤ Statements','statements']],
+   payments:[['accent','＋ Payment','new-payment'],['','＋ Payee','new-payee']],
+   more:[['','↻ Refresh','refresh']]
+ }[state.view]||[];
+ $('bankV5TopActions').innerHTML=actions.map(x=>'<button class="bank-v5-action '+x[0]+'" data-v5-action="'+x[2]+'">'+x[1]+'</button>').join('');
  bindDynamic();
 }
 function nav(v){state.view=v;document.querySelectorAll('[data-bank-view]').forEach(b=>b.classList.toggle('active',b.dataset.bankView===v));history.replaceState(null,'','#'+v);topActions();render()}
@@ -49,17 +54,36 @@ function alerts(){
  return rows.map(a=>'<div class="v5-alert"><span class="ico">'+(String(a.severity).toUpperCase()==='HIGH'?'!':'✦')+'</span><div><strong>'+esc((a.code||'Finance alert').replaceAll('_',' '))+'</strong><p>'+esc(a.message||'Review this signal.')+'</p></div><span class="v5-status '+(String(a.severity).toUpperCase()==='HIGH'?'bad':'warn')+'">'+esc(a.severity||'INFO')+'</span></div>').join('');
 }
 function home(){
- setHead('Money','Everything important about your money, without the admin-dashboard feel.');
- const c=cur(),b=bal(),f=flow(),i=intel(),cmd=state.command.summary_by_currency?.[c]||{},accounts=(state.os.accounts||[]).filter(a=>a.currency===c);
- const monthly=(state.dash.monthly||[]).filter(x=>x.currency===c).slice(-12),net=num(f.money_in)-num(f.money_out);
+ setHead('Home','Your everyday banking view.');
+ const c=cur(),allAccounts=(state.os.accounts||[]).filter(a=>a.currency===c),selected=allAccounts.find(a=>Number(a.id)===Number(state.selectedAccountId));
+ const b=bal(),f=flow(),i=intel(),cmd=state.command.summary_by_currency?.[c]||{};
+ const available=selected?num(selected.available_balance==null?selected.current_ledger_balance:selected.available_balance):num(b.balance);
+ const label=selected?(selected.nickname||'Account'):'All money';
+ const visibleTx=(state.tx||[]).filter(t=>t.currency===c && (!selected||Number(t.bank_account_id||t.account_id)===Number(selected.id)));
+ const due=(state.calendar||[]).filter(x=>!selected||Number(x.bank_account_id||x.account_id)===Number(selected.id)).slice(0,4);
+ const attention=[...(i.alerts||[]),...(state.command.attention||[])];
+ const approvals=state.command.approval_inbox||[];
+ const notificationCount=attention.length+approvals.length;
+ const btn=$('bankNotificationButton');
+ if(btn){btn.innerHTML='♢'+(notificationCount?'<span class="v5-notification-badge">'+Math.min(99,notificationCount)+'</span>':'');}
  $('bankV5Screen').innerHTML=
- '<div class="v5-grid two"><section class="v5-card v5-hero"><div class="v5-pad"><div class="v5-hero-label">AVAILABLE · '+esc(c)+'</div><div class="v5-hero-balance">'+esc(money(b.balance,c))+'</div><div class="v5-hero-sub">'+Number(b.account_count||accounts.length)+' visible account'+((b.account_count||accounts.length)==1?'':'s')+'</div><div class="v5-hero-actions"><button class="accent" data-v5-action="import">Import statement</button><button data-v5-action="new-payment">Pay & transfer</button><button data-v5-action="activity">Search activity</button></div></div></section>'+
- '<section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>QUICK ACCESS</span><h2>Banking shortcuts</h2></div></div><div class="v5-quick-grid">'+quick('⇧','Statements','Import or review','statements')+quick('→','Payments','Drafts & approvals','payments')+quick('◎','Plan','Budgets & reserves','plan')+quick('◇','Wealth','Assets & liabilities','wealth')+'</div></div></section></div>'+
- '<div class="v5-kpis">'+kpi('Income',money(f.money_in,c),'Visible period','v5-pos')+kpi('Spending',money(f.money_out,c),'Transfers excluded')+kpi('Net cash flow',money(net,c),net>=0?'Positive':'Negative',net>=0?'v5-pos':'v5-neg')+kpi('30-day liquidity',money(cmd.projected_liquidity_30d??i.forecast_30d??b.balance,c),'Projected')+'</div>'+
- '<section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>YOUR ACCOUNTS</span><h2>Accounts</h2></div><button data-v5-view="accounts">View all</button></div><div class="v5-account-carousel">'+(accounts.length?accounts.map(accountTile).join(''):empty('No accounts yet'))+'</div></div></section>'+
- '<div class="v5-grid two"><section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>CASH FLOW</span><h2>12-month movement</h2></div><button data-v5-view="wealth">Financial position</button></div>'+lineChart(monthly)+'</div></section><section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>NOTIFICATIONS</span><h2>Needs your attention</h2></div><button data-v5-view="insights">See all</button></div>'+alerts()+'</div></section></div>'+
- '<section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>RECENT ACTIVITY</span><h2>Latest transactions</h2></div><button data-v5-view="activity">View all</button></div>'+txRows((state.tx||[]).filter(t=>t.currency===c),7)+'</div></section>';
+ '<div class="v5-home-greeting"><div><h2>Hello</h2><p>Here is your money today.</p></div><span class="v5-status '+(notificationCount?'warn':'good')+'">'+(notificationCount?notificationCount+' item'+(notificationCount===1?'':'s')+' to review':'All clear')+'</span></div>'+
+ '<div class="v5-account-switcher"><button class="'+(!selected?'active':'')+'" data-home-account="">All money</button>'+allAccounts.map(a=>'<button class="'+(selected&&Number(selected.id)===Number(a.id)?'active':'')+'" data-home-account="'+a.id+'">'+esc(a.nickname||'Account')+'</button>').join('')+'</div>'+
+ '<section class="v5-card v5-hero"><div class="v5-pad"><div class="v5-hero-label">'+esc(label)+' · '+esc(c)+'</div><div class="v5-hero-balance">'+esc(money(available,c))+'</div><div class="v5-hero-sub">'+(selected?esc(selected.institution||selected.account_type||'Account'):'Across '+allAccounts.length+' visible account'+(allAccounts.length===1?'':'s'))+'</div><div class="v5-hero-actions"><button class="accent" data-v5-action="new-payment">Pay</button><button data-v5-action="activity">Transactions</button><button data-v5-action="statements">Statements</button><button data-v5-action="more">More</button></div></div></section>'+
+ '<div class="v5-home-actions" style="margin-top:11px">'+
+   '<button class="v5-home-action primary" data-v5-action="new-payment"><span>→</span><b>Pay</b><small>Create payment</small></button>'+
+   '<button class="v5-home-action" data-v5-action="activity"><span>↕</span><b>Activity</b><small>Search money</small></button>'+
+   '<button class="v5-home-action" data-v5-action="import"><span>⇧</span><b>Import</b><small>Add statement</small></button>'+
+   '<button class="v5-home-action" data-v5-action="plan"><span>◎</span><b>Plan</b><small>Budgets & bills</small></button>'+
+ '</div>'+
+ '<div class="v5-grid two" style="margin-top:12px"><section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>UPCOMING</span><h2>Bills & scheduled payments</h2></div><button data-v5-action="plan">View plan</button></div>'+billCalendar(due,c)+'</div></section><section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>THIS PERIOD</span><h2>Money movement</h2></div></div><div class="v5-kpis">'+kpi('Money in',money(f.money_in,c),'Income','v5-pos')+kpi('Money out',money(f.money_out,c),'Spending')+kpi('Net',money(num(f.money_in)-num(f.money_out),c),'Cash flow',num(f.money_in)-num(f.money_out)>=0?'v5-pos':'v5-neg')+kpi('30d',money(cmd.projected_liquidity_30d??i.forecast_30d??available,c),'Projected')+'</div></div></section></div>'+
+ '<section class="v5-card" style="margin-top:12px"><div class="v5-pad"><div class="v5-head"><div><span>RECENT</span><h2>Transactions</h2></div><button data-v5-action="activity">See all</button></div>'+txRows(visibleTx,8)+'</div></section>';
+ document.querySelectorAll('[data-home-account]').forEach(b=>b.addEventListener('click',()=>{state.selectedAccountId=b.dataset.homeAccount?Number(b.dataset.homeAccount):null;home()}));
  bindDynamic();
+}
+function billCalendar(rows,currency){
+ if(!rows.length)return empty('Nothing due soon','Scheduled obligations will appear here.');
+ return '<div class="v5-bill-calendar">'+rows.map(x=>{const d=new Date(x.due_date||x.scheduled_for||Date.now()),day=String(d.getDate()).padStart(2,'0'),mon=d.toLocaleString('en-AU',{month:'short'}).toUpperCase();return '<div class="v5-bill"><div class="v5-bill-date"><b>'+day+'</b><small>'+mon+'</small></div><div><b style="font-size:.72rem">'+esc(x.title||x.description||x.payee_name||'Scheduled payment')+'</b><div style="font-size:.6rem;color:#6e7781;margin-top:3px">'+esc(x.status||'Upcoming')+'</div></div><strong>'+esc(x.amount!=null?money(x.amount,x.currency||currency):'—')+'</strong></div>'}).join('')+'</div>';
 }
 function accounts(){
  setHead('Accounts','Each account has its own balance, history, currency and access boundary.');
@@ -79,7 +103,7 @@ function activity(){
  setHead('Activity','A searchable ledger, not a decorative transaction list.');
  const tabs=[['all','All'],['in','Money in'],['out','Money out'],['transfer','Transfers'],['review','Needs review']];
  $('bankV5Screen').innerHTML='<div class="v5-tabs">'+tabs.map(x=>'<button class="'+(state.activityTab===x[0]?'active':'')+'" data-v5-activity-tab="'+x[0]+'">'+x[1]+'</button>').join('')+'</div><div class="v5-toolbar"><input id="v5TxSearch" placeholder="Merchant, reference, account or category"><select id="v5TxAccount"><option value="">All accounts</option>'+(state.os.accounts||[]).map(a=>'<option value="'+a.id+'">'+esc(a.nickname)+'</option>').join('')+'</select><button id="v5TxApply">Search</button></div><section class="v5-card"><div class="v5-pad">'+txRows(filterTx(),250)+'</div></section>';
- document.querySelectorAll('[data-v5-activity-tab]').forEach(b=>b.addEventListener('click',()=>{state.activityTab=b.dataset.v4ActivityTab;activity()}));
+ document.querySelectorAll('[data-v5-activity-tab]').forEach(b=>b.addEventListener('click',()=>{state.activityTab=b.dataset.v5ActivityTab;activity()}));
  $('v5TxApply')?.addEventListener('click',searchTx);bindDynamic();
 }
 async function searchTx(){const q=$('v5TxSearch')?.value||'',a=$('v5TxAccount')?.value||'';const p=new URLSearchParams({scope:state.scope,limit:'250'});if(q)p.set('q',q);if(a)p.set('account_id',a);const r=await api(FIN+'/transactions?'+p);state.tx=r.transactions||[];activity()}
@@ -137,15 +161,31 @@ function manageAccess(){
  $('v5AccessForm')?.addEventListener('submit',async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),userId=fd.get('user_id'),body={bank_account_id:fd.get('bank_account_id'),access_level:fd.get('access_level')};try{const p=await api(OS+'/team/'+encodeURIComponent(userId)+'/access',{method:'POST',body:JSON.stringify(body)});toast(p.message||'Access updated');closeModal();await load();nav('team')}catch(x){toast(x.message,true)}})
 }
 function more(){
- setHead('More','Connections, capability, alerts and banking safety.');
+ setHead('More','Everything else you need from your banking workspace.');
  const caps=state.caps||state.os.capabilities||{},ob=caps.open_banking||{},r=caps.payment_rails||{},a=state.os.alerts||{};
- $('bankV5Screen').innerHTML='<div class="v5-grid two"><section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>CAPABILITIES</span><h2>What is really connected</h2></div></div>'+[
- ['Open Banking',ob.configured?'Configured':'Not verified',ob.provider||'No provider'],
- ['Live sync',ob.live_sync_enabled?'Enabled':'Disabled',ob.environment||''],
- ['External transfer',r.external_transfer?'Available':'Not connected',r.reason||''],
- ['PayID / BPAY / Cards',(r.payid||r.bpay||r.card_issuing)?'Partial':'Not connected','Controls remain gated']
- ].map(x=>'<div class="v5-plan-item"><div class="v5-plan-top"><h3>'+x[0]+'</h3><span class="v5-status '+(x[1]==='Configured'||x[1]==='Enabled'||x[1]==='Available'?'good':'warn')+'">'+x[1]+'</span></div><p>'+esc(x[2])+'</p></div>').join('')+'</div></section><section class="v5-card"><div class="v5-pad"><div class="v5-head"><div><span>ALERT PREFERENCES</span><h2>Notifications</h2></div></div><form id="v5AlertForm" class="v5-form"><div class="v5-form-grid"><label>Low balance<input name="low_balance_threshold" inputmode="decimal" value="'+esc(a.low_balance_threshold??'')+'"></label><label>Large transaction<input name="large_transaction_threshold" inputmode="decimal" value="'+esc(a.large_transaction_threshold??'')+'"></label></div><label><input type="checkbox" name="notify_budget" '+(a.notify_budget!==0?'checked':'')+'> Budget alerts</label><label><input type="checkbox" name="notify_payments" '+(a.notify_payments!==0?'checked':'')+'> Payment workflow alerts</label><label><input type="checkbox" name="notify_bank_sync" '+(a.notify_bank_sync!==0?'checked':'')+'> Bank sync alerts</label><label><input type="checkbox" name="notify_unusual_activity" '+(a.notify_unusual_activity!==0?'checked':'')+'> Unusual activity alerts</label><div class="v5-form-actions"><button class="primary">Save</button></div></form></div></section></div>';
+ const items=[
+ ['▤','Statements','Statement vault & review','statements'],
+ ['✦','Insights','Alerts & intelligence','insights'],
+ ['◎','Plan','Budgets, Spaces & bills','plan'],
+ ['◇','Wealth','Assets & liabilities','wealth'],
+ ['♙','Team','Business account access','team'],
+ ['⚙','Security & connections','Provider status & alerts','security']
+ ];
+ $('bankV5Screen').innerHTML='<div class="v5-more-grid">'+items.map(x=>'<button class="v5-more-item" data-more-destination="'+x[3]+'"><span>'+x[0]+'</span><b>'+x[1]+'</b><small>'+x[2]+'</small></button>').join('')+'</div>'+
+ '<section id="v5SecurityPanel" class="v5-card" style="margin-top:12px"><div class="v5-pad"><div class="v5-head"><div><span>SECURITY & CONNECTIONS</span><h2>Banking status</h2></div></div>'+
+ '<div class="v5-security-row"><div><strong>Open Banking</strong><p>'+esc(ob.provider||'No provider selected')+'</p></div><span class="v5-status '+(ob.configured?'good':'warn')+'">'+(ob.configured?'Configured':'Not verified')+'</span></div>'+
+ '<div class="v5-security-row"><div><strong>Live account sync</strong><p>'+esc(ob.environment||'')+'</p></div><span class="v5-status '+(ob.live_sync_enabled?'good':'warn')+'">'+(ob.live_sync_enabled?'Enabled':'Disabled')+'</span></div>'+
+ '<div class="v5-security-row"><div><strong>External payment rail</strong><p>'+esc(r.reason||'Provider capability required')+'</p></div><span class="v5-status '+(r.external_transfer?'good':'warn')+'">'+(r.external_transfer?'Available':'Not connected')+'</span></div>'+
+ '<div class="v5-security-row"><div><strong>PayID / BPAY / cards</strong><p>Only shown as available when a verified provider supports them.</p></div><span class="v5-status '+((r.payid||r.bpay||r.card_issuing)?'good':'warn')+'">'+((r.payid||r.bpay||r.card_issuing)?'Partial':'Not connected')+'</span></div>'+
+ '<div class="v5-head" style="margin-top:18px"><div><span>NOTIFICATIONS</span><h3>Alert preferences</h3></div></div><form id="v5AlertForm" class="v5-form"><div class="v5-form-grid"><label>Low balance<input name="low_balance_threshold" inputmode="decimal" value="'+esc(a.low_balance_threshold??'')+'"></label><label>Large transaction<input name="large_transaction_threshold" inputmode="decimal" value="'+esc(a.large_transaction_threshold??'')+'"></label></div><label><input type="checkbox" name="notify_budget" '+(a.notify_budget!==0?'checked':'')+'> Budget alerts</label><label><input type="checkbox" name="notify_payments" '+(a.notify_payments!==0?'checked':'')+'> Payment workflow alerts</label><label><input type="checkbox" name="notify_bank_sync" '+(a.notify_bank_sync!==0?'checked':'')+'> Bank sync alerts</label><label><input type="checkbox" name="notify_unusual_activity" '+(a.notify_unusual_activity!==0?'checked':'')+'> Unusual activity alerts</label><div class="v5-form-actions"><button class="primary">Save preferences</button></div></form></div></section>';
+ document.querySelectorAll('[data-more-destination]').forEach(b=>b.addEventListener('click',()=>{const d=b.dataset.moreDestination;if(d==='security')$('v5SecurityPanel')?.scrollIntoView({behavior:'smooth'});else nav(d)}));
  $('v5AlertForm')?.addEventListener('submit',saveAlerts);bindDynamic();
+}
+function notificationCenter(){
+ const items=[...(intel().alerts||[]),...(state.command.attention||[])],approvals=state.command.approval_inbox||[];
+ drawer('NOTIFICATIONS','Notifications','<div class="v5-head"><div><span>ATTENTION</span><h3>Banking notifications</h3></div></div>'+
+ (approvals.length?approvals.map(p=>'<div class="v5-alert"><span class="ico">✓</span><div><strong>Payment approval</strong><p>'+esc(p.payee_name||'Payment')+' · '+esc(money(p.amount,p.currency||'AUD'))+'</p></div><span class="v5-status warn">Review</span></div>').join(''):'')+
+ (items.length?items.map(a=>'<div class="v5-alert"><span class="ico">'+(String(a.severity).toUpperCase()==='HIGH'?'!':'✦')+'</span><div><strong>'+esc((a.code||'Finance alert').replaceAll('_',' '))+'</strong><p>'+esc(a.message||'Review this item.')+'</p></div><span class="v5-status '+(String(a.severity).toUpperCase()==='HIGH'?'bad':'warn')+'">'+esc(a.severity||'INFO')+'</span></div>').join(''):empty('No notifications','You are up to date.')));
 }
 function render(){topActions();({home,accounts,activity,payments,plan,wealth,statements,insights,team,more:more}[state.view]||home)()}
 async function load(){
@@ -183,6 +223,6 @@ async function saveAlerts(e){e.preventDefault();const f=new FormData(e.currentTa
 async function analyse(){try{toast('Running analysis…');const p=await api(FIN+'/analyse',{method:'POST',body:'{}'});toast(p.message||'Analysis complete');await load();nav('insights')}catch(x){toast(x.message,true)}}
 function action(a){if(a==='add-account')$('addAccount')?.click();else if(a==='import')$('importStatement')?.click();else if(a==='review')$('openReviewQueue')?.click();else if(a==='analyse')analyse();else if(a==='new-payment')newPayment();else if(a==='new-payee')newPayee();else if(a==='manage-access')manageAccess();else if(a==='new-space')newSpace();else if(['activity','payments','plan','wealth','statements','reports'].includes(a))nav(a==='reports'?'wealth':a);else if(a==='refresh')load();else if(a==='banking')location.href='/banking';}
 function bindDynamic(){document.querySelectorAll('[data-v5-action]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>action(b.dataset.v4Action))});document.querySelectorAll('[data-v5-view]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>nav(b.dataset.v4View))});document.querySelectorAll('[data-account-id]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>openAccount(b.dataset.accountId))});document.querySelectorAll('[data-tx-id]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>openTx(b.dataset.txId))});document.querySelectorAll('[data-statement-uid]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>openStatement(b.dataset.statementUid))});document.querySelectorAll('[data-payment-action]').forEach(b=>{if(b.dataset.bound)return;b.dataset.bound='1';b.addEventListener('click',()=>paymentAction(b.dataset.paymentAction,b.dataset.paymentUid))})}
-function bind(){document.querySelectorAll('[data-bank-view]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.bankView)));$('bankV5DrawerClose')?.addEventListener('click',closeDrawer);$('bankV5DrawerBackdrop')?.addEventListener('click',closeDrawer);$('bankV5ModalClose')?.addEventListener('click',closeModal);$('refreshDashboard')?.addEventListener('click',load);$('fiGlobalSearch')?.addEventListener('keydown',e=>{if(e.key==='Enter'){const q=e.currentTarget.value.trim();nav('activity');setTimeout(()=>{$('v5TxSearch').value=q;searchTx()},10)}})}
+function bind(){document.querySelectorAll('[data-bank-view]').forEach(b=>b.addEventListener('click',()=>nav(b.dataset.bankView)));$('bankV5DrawerClose')?.addEventListener('click',closeDrawer);$('bankV5DrawerBackdrop')?.addEventListener('click',closeDrawer);$('bankV5ModalClose')?.addEventListener('click',closeModal);$('bankNotificationButton')?.addEventListener('click',notificationCenter);$('fiGlobalSearch')?.addEventListener('keydown',e=>{if(e.key==='Enter'){const q=e.currentTarget.value.trim();nav('activity');setTimeout(()=>{$('v5TxSearch').value=q;searchTx()},10)}})}
 document.addEventListener('DOMContentLoaded',async()=>{bind();const h=location.hash.slice(1);if(['home','accounts','activity','payments','plan','wealth','statements','insights','team','more'].includes(h))state.view=h;document.querySelectorAll('[data-bank-view]').forEach(b=>b.classList.toggle('active',b.dataset.bankView===state.view));topActions();await load()});
 })();
