@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="/finance-intelligence-advanced.css?v=20260915-guided">
   <link rel="stylesheet" href="/finance-banking-readiness.css?v=20260915-readiness">
   <link rel="stylesheet" href="/finance-account-lifecycle.css?v=20260917-account-lifecycle">
-  <link rel="stylesheet" href="/finance-bank-app-v3.css?v=20260921-bank-v3">
+  <link rel="stylesheet" href="/finance-bank-app-v4.css?v=20260921-bank-v4">
 </head>
 <body>
   <div class="fi-app-frame">
@@ -18,17 +18,17 @@
         <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda">
         <div><strong>Voxel Veda</strong><span>FINANCE INTELLIGENCE</span></div>
       </div>
-      <nav class="fi-bank-nav bank-v3-nav">
+      <nav class="fi-bank-nav bank-v4-nav">
         <button class="active" data-bank-view="home"><span>⌂</span>Home</button>
         <button data-bank-view="accounts"><span>▣</span>Accounts</button>
         <button data-bank-view="activity"><span>⇄</span>Activity</button>
-        <button data-bank-view="payments"><span>→</span>Payments</button>
+        <button data-bank-view="payments"><span>→</span>Pay & transfer</button>
         <button data-bank-view="plan"><span>◎</span>Plan</button>
-        <button data-bank-view="insights"><span>✦</span>Insights</button>
+        <button data-bank-view="wealth"><span>◇</span>Wealth</button>
         <button data-bank-view="statements"><span>▤</span>Statements</button>
-        <button data-bank-view="reports"><span>▦</span>Reports</button>
+        <button data-bank-view="insights"><span>✦</span>Insights</button>
         <button data-bank-view="team"><span>♙</span>Team</button>
-        <button data-bank-view="settings"><span>⚙</span>Settings</button>
+        <button data-bank-view="settings"><span>⚙</span>More</button>
       </nav>
       <div class="fi-side-note">
         <span>SMARTER FINANCE</span>
@@ -84,29 +84,29 @@
     <div id="notice" class="notice" hidden></div>
     <div id="advancedNotice" class="notice" hidden></div>
 
-    <section id="bankAppV3" class="bank-v3-app" aria-live="polite">
-      <div id="bankV3TopActions" class="bank-v3-top-actions"></div>
-      <div id="bankV3Screen" class="bank-v3-screen">
-        <div class="bank-v3-loading"><span></span><strong>Loading your money workspace…</strong></div>
+    <section id="bankAppV4" class="bank-v4-app" aria-live="polite">
+      <div id="bankV4TopActions" class="bank-v4-top-actions"></div>
+      <div id="bankV4Screen" class="bank-v4-screen">
+        <div class="bank-v4-loading"><span></span><strong>Loading your money workspace…</strong></div>
       </div>
     </section>
 
-    <aside id="bankV3Drawer" class="bank-v3-drawer" aria-hidden="true">
-      <div class="bank-v3-drawer-head">
-        <div><span id="bankV3DrawerEyebrow">DETAIL</span><h2 id="bankV3DrawerTitle">Details</h2></div>
-        <button id="bankV3DrawerClose" type="button" aria-label="Close">×</button>
+    <aside id="bankV4Drawer" class="bank-v4-drawer" aria-hidden="true">
+      <div class="bank-v4-drawer-head">
+        <div><span id="bankV4DrawerEyebrow">DETAIL</span><h2 id="bankV4DrawerTitle">Details</h2></div>
+        <button id="bankV4DrawerClose" type="button" aria-label="Close">×</button>
       </div>
-      <div id="bankV3DrawerBody" class="bank-v3-drawer-body"></div>
+      <div id="bankV4DrawerBody" class="bank-v4-drawer-body"></div>
     </aside>
-    <div id="bankV3DrawerBackdrop" class="bank-v3-drawer-backdrop" hidden></div>
+    <div id="bankV4DrawerBackdrop" class="bank-v4-drawer-backdrop" hidden></div>
 
-    <dialog id="bankV3Modal" class="bank-v3-modal">
-      <div class="bank-v3-modal-shell">
-        <div class="bank-v3-drawer-head">
-          <div><span id="bankV3ModalEyebrow">BANKING WORKFLOW</span><h2 id="bankV3ModalTitle">Action</h2></div>
-          <button id="bankV3ModalClose" type="button" aria-label="Close">×</button>
+    <dialog id="bankV4Modal" class="bank-v4-modal">
+      <div class="bank-v4-modal-shell">
+        <div class="bank-v4-drawer-head">
+          <div><span id="bankV4ModalEyebrow">BANKING WORKFLOW</span><h2 id="bankV4ModalTitle">Action</h2></div>
+          <button id="bankV4ModalClose" type="button" aria-label="Close">×</button>
         </div>
-        <div id="bankV3ModalBody" class="bank-v3-modal-body"></div>
+        <div id="bankV4ModalBody" class="bank-v4-modal-body"></div>
       </div>
     </dialog>
 
@@ -271,7 +271,7 @@
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <script src="/finance-intelligence.js?v=20260919-data-controls" defer></script>
-  <script src="/finance-bank-app-v3.js?v=20260921-bank-v3" defer></script>
+  <script src="/finance-bank-app-v4.js?v=20260921-bank-v4" defer></script>
   <script src="/finance-account-lifecycle.js?v=20260917-account-lifecycle" defer></script>
   <script src="/finance-intelligence-advanced.js?v=20260915-guided" defer></script>
   <script src="/personal-money-center.js?v=20260916-personal-money" defer></script>
