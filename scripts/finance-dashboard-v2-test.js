@@ -33,5 +33,5 @@ assert(js.includes("api(OS+'/capabilities')"),'bank app reads provider capabilit
 assert(js.includes("No money moves here."),'payment workflow is explicitly non-executing without provider rail');
 assert(!js.includes('$125,430.20'),'reference-image sample balances are not hard-coded');
 assert(!js.includes('$24,530.00'),'reference-image sample income is not hard-coded');
-assert(premium.includes("if (location.pathname !== '/banking'"),'standalone Banking app remains isolated to /banking');
+assert(premium.includes("document.getElementById('bankAppV3')"),'legacy Banking client yields to unified V3 UI');
 if(process.exitCode)process.exit(process.exitCode);
