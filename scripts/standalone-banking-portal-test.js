@@ -17,7 +17,7 @@ assert(routes.includes("requireAnyPermission('EDIT_BANK_DETAILS','CONNECT_BANK_A
 assert(routes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'payment approval remains explicitly permission-gated');
 assert(ui.includes("document.getElementById('bankAppV4')"),'legacy Banking client yields to unified V4 UI when present');
 assert(financeHtml.includes('id="bankAppV4"'),'shared Banking/Finance page contains unified V4 application root');
-assert(v4.includes("const STANDALONE = location.pathname === '/banking'"),'V4 explicitly detects standalone Banking route');
+assert(v4.includes("const STANDALONE=location.pathname==='/banking'"),'V4 explicitly detects standalone Banking route');
 assert(v4.includes("'/api/banking/intelligence'"),'V4 standalone mode uses delegated Banking intelligence API');
 assert(v4.includes("'/api/banking/os'"),'V4 standalone mode uses delegated Banking OS API');
 assert(v4.includes("FIN+'/dashboard'"),'V4 standalone mode uses standalone Banking dashboard endpoint');
