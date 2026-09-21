@@ -9,7 +9,7 @@ const JOBS = [
     department: 'Sales & Business Development',
     location: 'Melbourne, VIC',
     employment_type: 'Full-time',
-    openings: 1,
+    openings: 2,
     summary: 'Develop qualified B2B opportunities for Voxel Veda engineering and advanced manufacturing services.',
     responsibilities: [
       'Identify prospective B2B customers across manufacturing and engineering sectors.',
@@ -38,7 +38,7 @@ const JOBS = [
     department: 'Engineering',
     location: 'Melbourne, VIC',
     employment_type: 'Full-time',
-    openings: 1,
+    openings: 3,
     summary: 'Support concept development, CAD modelling, prototyping, DfAM and manufacturing preparation.',
     responsibilities: [
       'Develop 3D CAD models and engineering assemblies.',
@@ -67,7 +67,7 @@ const JOBS = [
     department: 'Manufacturing',
     location: 'Melbourne, VIC',
     employment_type: 'Full-time',
-    openings: 1,
+    openings: 2,
     summary: 'Operate and maintain additive-manufacturing workflows from incoming production files through printing, inspection and post-processing.',
     responsibilities: [
       'Prepare manufacturing files for production.',
@@ -99,7 +99,7 @@ const JOBS = [
     department: 'Engineering',
     location: 'Melbourne, VIC',
     employment_type: 'Full-time',
-    openings: 1,
+    openings: 2,
     summary: 'Support reverse engineering, CAD reconstruction and technical drawing workflows.',
     responsibilities: [
       'Measure and document existing physical components.',

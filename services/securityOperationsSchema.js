@@ -15,7 +15,7 @@ async function createSecurityOperationsSchema() {
     record_type VARCHAR(60) NOT NULL,
     record_id VARCHAR(80) NOT NULL,
     owner_user_id INT NULL,
-    uploaded_by INT NOT NULL,
+    uploaded_by INT NULL,
     original_name VARCHAR(255) NOT NULL,
     stored_name VARCHAR(255) NOT NULL,
     storage_path TEXT NOT NULL,
@@ -33,6 +33,19 @@ async function createSecurityOperationsSchema() {
 
   await tolerateDuplicate('ALTER TABLE secure_documents ADD COLUMN content_sha256 CHAR(64) NULL AFTER size_bytes');
   await tolerateDuplicate("ALTER TABLE secure_documents ADD COLUMN access_policy VARCHAR(40) NOT NULL DEFAULT 'MODULE_OR_OWNER' AFTER classification");
+  const [[uploadedByColumn]] = await pool.query(
+    `SELECT IS_NULLABLE
+       FROM information_schema.columns
+      WHERE table_schema = DATABASE()
+        AND table_name = 'secure_documents'
+        AND column_name = 'uploaded_by'
+      LIMIT 1`
+  );
+  if (uploadedByColumn && uploadedByColumn.IS_NULLABLE !== 'YES') {
+    // Public recruitment and public enquiry documents do not have an authenticated staff uploader.
+    // Their owning module/record still controls authorisation through access_policy.
+    await pool.query('ALTER TABLE secure_documents MODIFY COLUMN uploaded_by INT NULL');
+  }
   await pool.query(`CREATE TABLE IF NOT EXISTS document_download_grants (
     id CHAR(36) PRIMARY KEY,
     document_id CHAR(36) NOT NULL,

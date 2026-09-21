@@ -11,6 +11,9 @@
   <style>
     body{background:#06101c;color:#eef4fb}.career-wrap{max-width:1180px;margin:auto;padding:28px 22px 70px}.career-hero{padding:72px 0 36px;display:grid;grid-template-columns:1.5fr .5fr;gap:34px;align-items:center}.career-hero h1{font-size:clamp(42px,7vw,82px);line-height:.98;margin:8px 0 18px}.career-hero p{max-width:780px;color:#aebdcb;font-size:18px;line-height:1.7}.career-logo{max-width:220px;justify-self:end}.career-stats,.jobs{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}.stat,.job,.apply-card{background:linear-gradient(180deg,#0b1b2d,#081522);border:1px solid #1c3348;border-radius:18px}.stat{padding:20px}.stat strong{display:block;font-size:30px}.stat span{color:#9db0c1}.jobs{margin-top:26px}.job{padding:22px;display:flex;flex-direction:column;min-height:280px}.job h3{font-size:22px;margin:8px 0}.meta{color:#8fa5b8;font-size:14px}.job p{color:#afbecb;line-height:1.55}.job button,.primary{margin-top:auto;background:#22c55e;color:#03120a;border:0;border-radius:10px;padding:12px 15px;font-weight:800;cursor:pointer}.section-title{margin-top:56px}.apply-card{margin-top:28px;padding:26px}.job-detail{display:none;margin-top:24px}.job-detail.open{display:block}.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:28px}.detail-list{color:#b5c3cf;line-height:1.65}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.form-grid .wide{grid-column:1/-1}label{display:block;font-weight:700;margin-bottom:6px}input,select,textarea{width:100%;box-sizing:border-box;background:#06111d;color:#eef4fb;border:1px solid #29445c;border-radius:10px;padding:12px}textarea{min-height:120px}.consent{display:flex;gap:10px;align-items:flex-start;color:#aebdcb}.consent input{width:auto;margin-top:4px}.notice{margin-top:14px;padding:12px;border-radius:10px;display:none}.notice.show{display:block}.notice.ok{background:#0a2b1a;border:1px solid #1d7f49}.notice.err{background:#351313;border:1px solid #8c3434}.hp{position:absolute;left:-10000px}.career-note{margin-top:44px;color:#93a7b8}.public-nav nav a[href="/careers"]{color:#fff}@media(max-width:850px){.career-hero{grid-template-columns:1fr}.career-logo{justify-self:start}.career-stats,.jobs,.detail-grid,.form-grid{grid-template-columns:1fr}.form-grid .wide{grid-column:auto}}
   </style>
+  <style>
+    .career-tools{display:grid;grid-template-columns:minmax(0,1fr) 250px;gap:14px;align-items:end;margin-top:22px;padding:18px;border:1px solid #1c3348;border-radius:16px;background:#081522}.career-tools label{margin:0;color:#b8c8d6;font-size:13px}.career-tools input,.career-tools select{margin-top:7px}.career-results{margin:14px 0 0;color:#93a7b8}.job[hidden]{display:none}.job__opening{display:inline-flex;margin-top:10px;padding:5px 9px;border-radius:999px;background:#102b3d;color:#7de6f2;font-size:12px;font-weight:800}.application-head{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start}.application-head .role-count{padding:9px 12px;border-radius:999px;background:#112a3b;color:#7de6f2;font-weight:800;white-space:nowrap}.application-checklist{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0}.application-checklist div{padding:13px;border:1px solid #24415a;border-radius:12px;color:#b8c8d6;font-size:13px}.application-checklist strong{display:block;color:#fff;margin-bottom:3px}.form-status{display:flex;justify-content:space-between;gap:12px;margin:6px 0 16px;color:#92a8ba;font-size:12px}.file-note{display:block;margin-top:6px;color:#8fa5b8;font-size:12px}.draft-note{color:#7de6f2}.success-receipt{padding:22px;border:1px solid #1d7f49;border-radius:14px;background:#0a2b1a}.success-receipt strong{display:block;margin:8px 0;color:#8df0b4;font-size:20px;overflow-wrap:anywhere}.success-receipt button{margin-top:14px}.primary[disabled]{cursor:wait;opacity:.65}@media(max-width:850px){.career-tools,.application-head,.application-checklist{grid-template-columns:1fr}.career-tools{align-items:stretch}.application-head .role-count{justify-self:start}}
+  </style>
 </head>
 <body class="public-page">
 <header class="public-nav">
@@ -22,8 +25,13 @@
     <div><p class="eyebrow">CAREERS AT VOXEL VEDA</p><h1>Build What Comes Next.</h1><p>Voxel Veda Pty Ltd is an Australian engineering, prototyping and advanced manufacturing company supporting product development, additive manufacturing, reverse engineering, robotics and low-volume production. Based in Melbourne, we are building a practical, multidisciplinary team that turns concepts into manufacturable products.</p></div>
     <img class="career-logo" src="/logo.png" alt="Voxel Veda">
   </section>
-  <section class="career-stats"><div class="stat"><strong id="openCount">6</strong><span>Open roles</span></div><div class="stat"><strong>Melbourne</strong><span>Primary location</span></div><div class="stat"><strong>Engineering-led</strong><span>Design to production</span></div></section>
+  <section class="career-stats"><div class="stat"><strong id="openCount">11</strong><span>Open positions across <b id="roleCount">6</b> roles</span></div><div class="stat"><strong>Melbourne</strong><span>Primary location</span></div><div class="stat"><strong>Engineering-led</strong><span>Design to production</span></div></section>
   <h2 class="section-title">Current opportunities</h2>
+  <section class="career-tools" aria-label="Filter vacancies">
+    <label>Search roles<input id="jobSearch" type="search" placeholder="Search title, department or capability"></label>
+    <label>Department<select id="departmentFilter"><option value="">All departments</option></select></label>
+  </section>
+  <p id="careerResults" class="career-results" aria-live="polite">Loading current vacancies…</p>
   <div id="jobs" class="jobs"><p>Loading vacancies…</p></div>
   <section id="detail" class="job-detail apply-card" aria-live="polite"></section>
   <p class="career-note">Voxel Veda assesses applicants on role-related capability, experience and lawful work eligibility. Shortlisted engineering candidates may be asked to complete a practical technical assessment.</p>
@@ -32,31 +40,101 @@
 <script>
 document.getElementById('year').textContent=new Date().getFullYear();
 let jobs=[];
+let activeJobSlug='';
 const esc=(s)=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function loadJobs(){const r=await fetch('/api/public/careers/jobs');const d=await r.json();jobs=d.jobs||[];document.getElementById('openCount').textContent=jobs.length;document.getElementById('jobs').innerHTML=jobs.map(j=>`<article class="job"><div class="meta">${esc(j.department)} · ${esc(j.employment_type)}</div><h3>${esc(j.title)}</h3><div class="meta">${esc(j.location)} · ${j.openings} opening${j.openings===1?'':'s'}</div><p>${esc(j.summary)}</p><button type="button" onclick="openJob('${esc(j.slug)}')">View role & apply</button></article>`).join('')||'<p>No vacancies are currently open.</p>'}
+const jobsNode=document.getElementById('jobs');
+const searchNode=document.getElementById('jobSearch');
+const departmentNode=document.getElementById('departmentFilter');
+const resultsNode=document.getElementById('careerResults');
+function applicationDraftKey(slug){return `vv-career-draft:${slug}`}
 function list(items){return '<ul class="detail-list">'+(items||[]).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>'}
-function openJob(slug){const j=jobs.find(x=>x.slug===slug);if(!j)return;const el=document.getElementById('detail');el.classList.add('open');el.innerHTML=`
-<div class="meta">${esc(j.department)} · ${esc(j.location)} · ${esc(j.employment_type)}</div><h2>${esc(j.title)}</h2><p>${esc(j.summary)}</p>
-<div class="detail-grid"><div><h3>Responsibilities</h3>${list(j.responsibilities)}</div><div><h3>Requirements</h3>${list(j.requirements)}<h3>Preferred experience</h3>${list(j.preferred)}</div></div>
-<h3>Apply for this role</h3>
-<form id="careerForm" enctype="multipart/form-data">
-<input type="hidden" name="job_slug" value="${esc(j.slug)}"><div class="hp"><label>Company website<input name="company_website" tabindex="-1" autocomplete="off"></label></div>
-<div class="form-grid">
-<div><label>Full name *</label><input name="full_name" required maxlength="180"></div>
-<div><label>Email *</label><input name="email" type="email" required maxlength="255"></div>
-<div><label>Phone *</label><input name="phone" required maxlength="80"></div>
-<div><label>Current location</label><input name="current_location" maxlength="180"></div>
-<div><label>Australian work rights *</label><select name="work_rights" required><option value="">Select</option><option>Australian citizen</option><option>Permanent resident</option><option>Temporary visa with work rights</option><option>Other / require sponsorship consideration</option></select></div>
-<div><label>Availability</label><input name="availability" placeholder="e.g. 2 weeks notice"></div>
-<div><label>Expected remuneration</label><input name="expected_remuneration" placeholder="Optional"></div>
-<div><label>LinkedIn URL</label><input name="linkedin_url" type="url" placeholder="https://"></div>
-<div class="wide"><label>Portfolio / project URL</label><input name="portfolio_url" type="url" placeholder="https://"></div>
-<div class="wide"><label>CV / Resume * (PDF or Word, max 10 MB)</label><input name="resume" type="file" required accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></div>
-<div class="wide"><label>Cover note</label><textarea name="cover_note" maxlength="4000" placeholder="Briefly explain your relevant experience and why this role fits you."></textarea></div>
-<div class="wide consent"><input id="consent" name="consent" type="checkbox" required><label for="consent">I consent to Voxel Veda collecting and using the information in this application for recruitment, candidate assessment and related employment processes. *</label></div>
-<div class="wide"><button class="primary" type="submit">Submit application</button></div>
-</div><div id="notice" class="notice"></div></form>`;el.scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('careerForm').addEventListener('submit',submitApplication)}
-async function submitApplication(e){e.preventDefault();const form=e.currentTarget,btn=form.querySelector('button[type=submit]'),notice=document.getElementById('notice');btn.disabled=true;btn.textContent='Submitting securely…';notice.className='notice';try{const r=await fetch('/api/public/careers/applications',{method:'POST',body:new FormData(form)});const d=await r.json();notice.textContent=d.message+(d.application_id?' Reference: '+d.application_id:'');notice.className='notice show '+(r.ok?'ok':'err');if(r.ok){form.reset();btn.textContent='Application submitted'}}catch{notice.textContent='Could not submit your application. Please try again.';notice.className='notice show err'}finally{if(btn.textContent!=='Application submitted'){btn.disabled=false;btn.textContent='Submit application'}}}
-loadJobs().catch(()=>{document.getElementById('jobs').innerHTML='<p>Vacancies could not be loaded right now.</p>'});
+function renderJobs(){
+  const query=searchNode.value.trim().toLowerCase();
+  const department=departmentNode.value;
+  const visible=jobs.filter(j=>{
+    const haystack=[j.title,j.department,j.summary,...(j.preferred||[])].join(' ').toLowerCase();
+    return (!department||j.department===department)&&(!query||haystack.includes(query));
+  });
+  jobsNode.innerHTML=visible.map(j=>`<article class="job" data-job-card="${esc(j.slug)}"><div class="meta">${esc(j.department)} · ${esc(j.employment_type)}</div><h3>${esc(j.title)}</h3><div class="meta">${esc(j.location)}</div><span class="job__opening">${Number(j.openings||1)} position${Number(j.openings||1)===1?'':'s'} available</span><p>${esc(j.summary)}</p><button type="button" data-job-open="${esc(j.slug)}">View role & apply</button></article>`).join('')||'<p>No vacancies match those filters.</p>';
+  resultsNode.textContent=`Showing ${visible.length} of ${jobs.length} roles · ${visible.reduce((sum,j)=>sum+Number(j.openings||1),0)} open position${visible.reduce((sum,j)=>sum+Number(j.openings||1),0)===1?'':'s'}`;
+}
+async function loadJobs(){
+  const r=await fetch('/api/public/careers/jobs',{headers:{Accept:'application/json'}});
+  const d=await r.json();
+  if(!r.ok)throw new Error(d.message||'Vacancies could not be loaded.');
+  jobs=Array.isArray(d.jobs)?d.jobs:[];
+  const totalOpenings=jobs.reduce((sum,j)=>sum+Number(j.openings||1),0);
+  document.getElementById('openCount').textContent=totalOpenings;
+  document.getElementById('roleCount').textContent=jobs.length;
+  [...new Set(jobs.map(j=>j.department))].sort().forEach(department=>departmentNode.insertAdjacentHTML('beforeend',`<option>${esc(department)}</option>`));
+  renderJobs();
+  const requested=new URLSearchParams(location.search).get('role');
+  if(requested&&jobs.some(job=>job.slug===requested))openJob(requested,false);
+}
+function restoreDraft(form,slug){
+  try{
+    const draft=JSON.parse(localStorage.getItem(applicationDraftKey(slug))||'{}');
+    Object.entries(draft).forEach(([name,value])=>{const field=form.elements[name];if(!field||field.type==='file'||name==='company_website')return;if(field.type==='checkbox')field.checked=Boolean(value);else field.value=String(value??'')});
+    if(Object.keys(draft).length)form.querySelector('[data-draft-note]').textContent='Saved details restored on this device.';
+  }catch{}
+}
+function saveDraft(form,slug){
+  const draft={};
+  [...form.elements].forEach(field=>{if(!field.name||field.type==='file'||field.type==='hidden'||field.name==='company_website')return;draft[field.name]=field.type==='checkbox'?field.checked:field.value});
+  try{localStorage.setItem(applicationDraftKey(slug),JSON.stringify(draft));form.querySelector('[data-draft-note]').textContent='Draft saved on this device.'}catch{}
+}
+function openJob(slug,updateUrl=true){
+  const j=jobs.find(x=>x.slug===slug);if(!j)return;activeJobSlug=slug;
+  const el=document.getElementById('detail');el.classList.add('open');el.innerHTML=`
+  <div class="application-head"><div><div class="meta">${esc(j.department)} · ${esc(j.location)} · ${esc(j.employment_type)}</div><h2>${esc(j.title)}</h2><p>${esc(j.summary)}</p></div><span class="role-count">${Number(j.openings||1)} position${Number(j.openings||1)===1?'':'s'} available</span></div>
+  <div class="detail-grid"><div><h3>Responsibilities</h3>${list(j.responsibilities)}</div><div><h3>Requirements</h3>${list(j.requirements)}<h3>Preferred experience</h3>${list(j.preferred)}</div></div>
+  <div class="application-checklist" aria-label="Application checklist"><div><strong>1 · Prepare</strong>Current CV in PDF or Word format</div><div><strong>2 · Support</strong>Portfolio, LinkedIn or project evidence where relevant</div><div><strong>3 · Confirm</strong>Work rights, availability and privacy consent</div></div>
+  <h3>Apply for this role</h3><div class="form-status"><span>Required fields are marked *</span><span class="draft-note" data-draft-note></span></div>
+  <form id="careerForm" enctype="multipart/form-data" novalidate>
+  <input type="hidden" name="job_slug" value="${esc(j.slug)}"><div class="hp"><label>Company website<input name="company_website" tabindex="-1" autocomplete="off"></label></div>
+  <div class="form-grid">
+  <div><label for="career-full-name">Full name *</label><input id="career-full-name" name="full_name" autocomplete="name" required maxlength="180"></div>
+  <div><label for="career-email">Email *</label><input id="career-email" name="email" type="email" autocomplete="email" required maxlength="255"></div>
+  <div><label for="career-phone">Phone *</label><input id="career-phone" name="phone" autocomplete="tel" required maxlength="80"></div>
+  <div><label for="career-location">Current location</label><input id="career-location" name="current_location" autocomplete="address-level2" maxlength="180"></div>
+  <div><label for="career-rights">Australian work rights *</label><select id="career-rights" name="work_rights" required><option value="">Select</option><option>Australian citizen</option><option>Permanent resident</option><option>Temporary visa with work rights</option><option>Other / require sponsorship consideration</option></select></div>
+  <div><label for="career-availability">Availability</label><input id="career-availability" name="availability" placeholder="e.g. 2 weeks notice"></div>
+  <div><label for="career-remuneration">Expected remuneration</label><input id="career-remuneration" name="expected_remuneration" placeholder="Optional"></div>
+  <div><label for="career-linkedin">LinkedIn URL</label><input id="career-linkedin" name="linkedin_url" type="url" inputmode="url" placeholder="https://"></div>
+  <div class="wide"><label for="career-portfolio">Portfolio / project URL</label><input id="career-portfolio" name="portfolio_url" type="url" inputmode="url" placeholder="https://"></div>
+  <div class="wide"><label for="career-resume">CV / Resume * (PDF or Word, max 10 MB)</label><input id="career-resume" name="resume" type="file" required accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"><small class="file-note" data-file-note>No file selected.</small></div>
+  <div class="wide"><label for="career-cover">Cover note</label><textarea id="career-cover" name="cover_note" maxlength="4000" placeholder="Briefly explain your relevant experience and why this role fits you."></textarea></div>
+  <div class="wide consent"><input id="consent" name="consent" type="checkbox" required><label for="consent">I consent to Voxel Veda collecting and using the information in this application for recruitment, candidate assessment and related employment processes. *</label></div>
+  <div class="wide"><button class="primary" type="submit">Submit application</button></div>
+  </div><div id="notice" class="notice" role="status" aria-live="polite"></div></form>`;
+  const form=document.getElementById('careerForm');restoreDraft(form,slug);
+  form.addEventListener('input',()=>saveDraft(form,slug));form.addEventListener('change',()=>saveDraft(form,slug));form.addEventListener('submit',submitApplication);
+  form.elements.resume.addEventListener('change',()=>{const file=form.elements.resume.files[0];const note=form.querySelector('[data-file-note]');if(!file){note.textContent='No file selected.';return}if(file.size>10*1024*1024){form.elements.resume.value='';note.textContent='The selected file is larger than 10 MB.';return}note.textContent=`Selected: ${file.name} · ${(file.size/1024/1024).toFixed(1)} MB`});
+  if(updateUrl)history.replaceState(null,'',`${location.pathname}?role=${encodeURIComponent(slug)}#application`);
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+}
+async function responsePayload(response){
+  const text=await response.text();
+  if(!text)return{};
+  try{return JSON.parse(text)}catch{return{message:text.slice(0,300)}}
+}
+async function submitApplication(e){
+  e.preventDefault();const form=e.currentTarget,btn=form.querySelector('button[type=submit]'),notice=document.getElementById('notice');
+  if(!form.reportValidity())return;
+  btn.disabled=true;btn.textContent='Submitting securely…';notice.className='notice';notice.textContent='';
+  try{
+    const r=await fetch('/api/public/careers/applications',{method:'POST',headers:{Accept:'application/json'},body:new FormData(form)});
+    const d=await responsePayload(r);const requestId=d.requestId?` Request ID: ${d.requestId}`:'';
+    if(!r.ok)throw new Error((d.message||`Application could not be submitted (${r.status}).`)+requestId);
+    try{localStorage.removeItem(applicationDraftKey(activeJobSlug))}catch{}
+    const reference=d.application_id||'Recorded';
+    notice.innerHTML=`<div class="success-receipt"><span>Application received</span><strong>${esc(reference)}</strong><p>${esc(d.message||'Your application has been securely recorded.')}</p><p>Keep this reference for your records. Voxel Veda will contact shortlisted applicants using the details supplied.</p><button type="button" class="primary" data-view-roles>View other roles</button></div>`;
+    notice.className='notice show ok';form.reset();form.querySelector('[data-file-note]').textContent='No file selected.';btn.textContent='Application submitted';
+    notice.querySelector('[data-view-roles]').addEventListener('click',()=>document.querySelector('.section-title').scrollIntoView({behavior:'smooth'}));
+  }catch(error){notice.textContent=error.message||'Could not submit your application. Please try again.';notice.className='notice show err';btn.disabled=false;btn.textContent='Submit application'}
+}
+jobsNode.addEventListener('click',event=>{const control=event.target.closest('[data-job-open]');if(control)openJob(control.dataset.jobOpen)});
+searchNode.addEventListener('input',renderJobs);departmentNode.addEventListener('change',renderJobs);
+loadJobs().catch(error=>{jobsNode.innerHTML='<p>Vacancies could not be loaded right now.</p>';resultsNode.textContent=error.message||'Vacancies could not be loaded right now.'});
 </script>
 </body></html>

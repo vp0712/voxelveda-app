@@ -91,61 +91,109 @@ async function submitApplication(req, res) {
   }
 
   const [[recent]] = await pool.query(
-    `SELECT id FROM career_applications
+    `SELECT id,public_id,resume_document_id FROM career_applications
      WHERE job_id=? AND email=? AND created_at >= DATE_SUB(NOW(), INTERVAL 30 MINUTE)
-     LIMIT 1`,
+     ORDER BY created_at DESC LIMIT 1`,
     [job.id, email]
   );
-  if (recent) {
+  if (recent?.resume_document_id) {
     await removeFile(req.file);
     return res.status(409).json({ message: 'An application for this role was recently submitted with this email address.' });
   }
 
-  const publicId = crypto.randomUUID();
+  // A previous attempt may have saved the applicant record before secure CV registration failed.
+  // Reuse that incomplete record so the candidate can retry without creating a duplicate.
+  const publicId = recent?.public_id || crypto.randomUUID();
   const ip = String(req.ip || req.headers['x-forwarded-for'] || '').split(',')[0].trim();
   const ipHash = ip ? crypto.createHash('sha256').update(ip).digest('hex') : null;
   const db = await pool.getConnection();
+  let applicationId;
   try {
     await db.beginTransaction();
-    const [result] = await db.query(
-      `INSERT INTO career_applications
-       (public_id,job_id,full_name,email,phone,current_location,work_rights,availability,expected_remuneration,
-        linkedin_url,portfolio_url,cover_note,status,consent_at,ip_hash,user_agent)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'NEW', NOW(), ?, ?)`,
-      [publicId, job.id, fullName, email, phone, clean(body.current_location,180) || null, workRights,
-       clean(body.availability,120) || null, clean(body.expected_remuneration,120) || null,
-       clean(body.linkedin_url,500) || null, clean(body.portfolio_url,500) || null,
-       clean(body.cover_note,4000) || null, ipHash, clean(req.headers['user-agent'],500) || null]
-    );
+    if (recent) {
+      applicationId = Number(recent.id);
+      await db.query(
+        `UPDATE career_applications
+            SET full_name=?,phone=?,current_location=?,work_rights=?,availability=?,expected_remuneration=?,
+                linkedin_url=?,portfolio_url=?,cover_note=?,status='NEW',consent_at=NOW(),ip_hash=?,user_agent=?
+          WHERE id=? AND resume_document_id IS NULL`,
+        [fullName, phone, clean(body.current_location,180) || null, workRights,
+         clean(body.availability,120) || null, clean(body.expected_remuneration,120) || null,
+         clean(body.linkedin_url,500) || null, clean(body.portfolio_url,500) || null,
+         clean(body.cover_note,4000) || null, ipHash, clean(req.headers['user-agent'],500) || null,
+         applicationId]
+      );
+    } else {
+      const [result] = await db.query(
+        `INSERT INTO career_applications
+         (public_id,job_id,full_name,email,phone,current_location,work_rights,availability,expected_remuneration,
+          linkedin_url,portfolio_url,cover_note,status,consent_at,ip_hash,user_agent)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'NEW', NOW(), ?, ?)`,
+        [publicId, job.id, fullName, email, phone, clean(body.current_location,180) || null, workRights,
+         clean(body.availability,120) || null, clean(body.expected_remuneration,120) || null,
+         clean(body.linkedin_url,500) || null, clean(body.portfolio_url,500) || null,
+         clean(body.cover_note,4000) || null, ipHash, clean(req.headers['user-agent'],500) || null]
+      );
+      applicationId = Number(result.insertId);
+    }
     await db.query(
       `INSERT INTO career_application_events (application_id,event_type,to_status,note)
-       VALUES (?, 'APPLICATION_SUBMITTED', 'NEW', 'Application submitted through careers portal')`,
-      [result.insertId]
+       VALUES (?, ?, 'NEW', ?)`,
+      [applicationId, recent ? 'APPLICATION_RESUBMITTED' : 'APPLICATION_SUBMITTED',
+       recent ? 'Candidate retried an incomplete application through careers portal' : 'Application submitted through careers portal']
     );
     await db.commit();
-
-    const document = await registerDocument({
-      module: 'careers',
-      recordType: 'career_application',
-      recordId: result.insertId,
-      uploadedBy: null,
-      file: req.file,
-      classification: 'CONFIDENTIAL'
-    });
-    await pool.query('UPDATE career_applications SET resume_document_id=? WHERE id=?', [document.id, result.insertId]);
-
-    return res.status(201).json({
-      message: 'Application submitted successfully.',
-      application_id: publicId,
-      role: job.title,
-      status: 'NEW'
-    });
   } catch (error) {
     await db.rollback().catch(() => {});
     await removeFile(req.file);
     throw error;
   } finally {
     db.release();
+  }
+
+  try {
+    const document = await registerDocument({
+      module: 'careers',
+      recordType: 'career_application',
+      recordId: applicationId,
+      uploadedBy: null,
+      file: req.file,
+      classification: 'CONFIDENTIAL'
+    });
+    await pool.query('UPDATE career_applications SET resume_document_id=? WHERE id=?', [document.id, applicationId]);
+    await pool.query(
+      `INSERT INTO career_application_events (application_id,event_type,to_status,note)
+       VALUES (?, 'RESUME_SECURED', 'NEW', 'Applicant CV registered as a confidential document')`,
+      [applicationId]
+    );
+    return res.status(201).json({
+      message: 'Application submitted successfully.',
+      application_id: publicId,
+      role: job.title,
+      status: 'NEW',
+      resume_status: document.scan_status
+    });
+  } catch (error) {
+    console.error('Career resume registration failed:', {
+      applicationId,
+      publicId,
+      errorName: error.name,
+      errorCode: error.code || null
+    });
+    await pool.query(
+      `INSERT INTO career_application_events (application_id,event_type,to_status,note)
+       VALUES (?, 'RESUME_REGISTRATION_FAILED', 'NEW', ?)`,
+      [applicationId, `Secure CV registration failed: ${clean(error.code || error.name || 'UNKNOWN', 120)}`]
+    ).catch(() => {});
+    // The applicant record must remain available even when document processing is temporarily degraded.
+    // Keeping the validated staged file permits operational recovery or a clean retry against this record.
+    return res.status(202).json({
+      message: 'Your application details were recorded, but the CV is still being secured. Keep this reference; Voxel Veda can follow up if another copy is needed.',
+      application_id: publicId,
+      role: job.title,
+      status: 'NEW',
+      resume_status: 'PENDING_REGISTRATION'
+    });
   }
 }
 
