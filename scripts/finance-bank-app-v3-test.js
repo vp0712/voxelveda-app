@@ -24,6 +24,9 @@ assert(js.includes("api(OS+'/payments'"),'payment drafts use Banking OS workflow
 assert(js.includes("api(OS+'/spaces'"),'Money Spaces use Banking OS API');
 assert(js.includes("api(OS+'/alerts'"),'bank alert preferences use Banking OS API');
 assert(js.includes("api(OS+'/team')"),'team access data comes from Banking OS');
+assert(js.includes("const STANDALONE = location.pathname === '/banking'"),'V3 supports standalone Banking route');
+assert(js.includes("'/api/banking/intelligence'"),'standalone route uses delegated intelligence API');
+assert(js.includes("'/api/banking/os'"),'standalone route uses delegated Banking OS API');
 assert(js.includes("api(OS+'/capabilities')"),'provider capabilities are loaded from server');
 assert(js.includes("payment_rails"),'payment rail capability is explicitly surfaced');
 assert(js.includes('No money moves here.'),'payment draft UI states that workflow does not move funds');
