@@ -2,13 +2,13 @@ const fs=require('node:fs');
 function read(p){return fs.readFileSync(p,'utf8')}
 function assert(v,m){if(!v){console.error('FAIL:',m);process.exitCode=1}else console.log('PASS:',m)}
 const html=read('public/finance-intelligence.html');
-const css=read('public/finance-bank-app-v4.css');
-const js=read('public/finance-bank-app-v4.js');
-for(const fn of ['home','accounts','activity','payments','plan','wealth','statements','insights','team','more'])assert(js.includes('function '+fn),'V4 contains '+fn+' screen');
-assert(js.includes("const STANDALONE=location.pathname==='/banking'"),'V4 detects standalone Banking route');
-assert(js.includes("'/api/banking/intelligence'"),'standalone V4 uses delegated intelligence API');
-assert(js.includes("'/api/banking/os'"),'standalone V4 uses delegated Banking OS API');
-assert(js.includes("FIN+'/dashboard'"),'standalone V4 uses Banking dashboard endpoint');
+const css=read('public/finance-bank-app-v5.css');
+const js=read('public/finance-bank-app-v5.js');
+for(const fn of ['home','accounts','activity','payments','plan','wealth','statements','insights','team','more'])assert(js.includes('function '+fn),'V5 contains '+fn+' screen');
+assert(js.includes("const STANDALONE=location.pathname==='/banking'"),'V5 detects standalone Banking route');
+assert(js.includes("'/api/banking/intelligence'"),'standalone V5 uses delegated intelligence API');
+assert(js.includes("'/api/banking/os'"),'standalone V5 uses delegated Banking OS API');
+assert(js.includes("FIN+'/dashboard'"),'standalone V5 uses Banking dashboard endpoint');
 assert(js.includes("state.activityTab==='in'"),'activity supports money-in filter');
 assert(js.includes("state.activityTab==='out'"),'activity supports money-out filter');
 assert(js.includes("state.activityTab==='transfer'"),'activity supports transfer filter');
@@ -16,7 +16,7 @@ assert(js.includes("state.activityTab==='review'"),'activity supports review fil
 assert(js.includes("state.paymentTab==='payees'"),'payments includes payee book');
 assert(js.includes("state.command.approval_inbox"),'payments uses approval inbox');
 assert(js.includes("state.paymentTab==='scheduled'"),'payments includes scheduled view');
-assert(js.includes("function wealth()"),'V4 contains per-currency balance sheet');
+assert(js.includes("function wealth()"),'V5 contains per-currency balance sheet');
 assert(js.includes("No fake currency conversion"),'wealth view prevents false cross-currency net worth');
 assert(js.includes("num(a.is_internal_transfer)")||js.includes("num(t.is_internal_transfer)"),'transfer classification is respected');
 assert(js.includes("api(OS+'/payments'"),'payment drafts use Banking OS workflow');
@@ -26,8 +26,13 @@ assert(js.includes('function manageAccess'),'bank administrators have an account
 assert(js.includes("'/team/'+encodeURIComponent(userId)+'/access'"),'team access updates use account-level Banking OS endpoint');
 assert(js.includes("api(OS+'/spaces'"),'Money Spaces use Banking OS');
 assert(js.includes("api(OS+'/alerts'"),'alert preferences use Banking OS');
-assert(css.includes('.v4-hero'),'bank-style balance hero exists');
-assert(css.includes('.v4-account-tile'),'account tiles exist');
-assert(css.includes('.bank-v4-drawer'),'detail drawer is styled');
+assert(css.includes('.v5-hero'),'bank-style balance hero exists');
+assert(css.includes('.v5-account-tile'),'account tiles exist');
+assert(css.includes('.bank-v5-drawer'),'detail drawer is styled');
 if(process.exitCode)process.exit(process.exitCode);
-console.log('Finance Bank App V4 contract passed.');
+console.log('Finance Bank App V5 contract passed.');
+
+assert(js.includes("selectedAccountId"),'V5 maintains selected-account state');
+assert(js.includes("function billCalendar"),'V5 includes upcoming bills/scheduled payments');
+assert(js.includes("function notificationCenter"),'V5 includes a notification centre');
+assert(js.includes("data-more-destination"),'V5 More hub routes to secondary banking tools');
