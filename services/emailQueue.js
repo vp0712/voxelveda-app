@@ -1,6 +1,6 @@
 const pool = require('../config/db');
 const { ensureWorkforceSchema } = require('./workforceSchema');
-const { sendMail, normalizeAddressList, isEmailTransportError } = require('./emailService');
+const { sendMail, normalizeAddressList, isEmailTransportError, classifySmtpFailure } = require('./emailService');
 
 function parseJson(value, fallback) {
   try {
@@ -135,7 +135,15 @@ async function processEmailQueue(limit = 10) {
         [retry ? 'RETRY' : 'FAILED', String(error.message || error).slice(0, 4000), retry ? 1 : 0, retryMinutes, row.id]
       );
       await writeEmailLog(row, retry ? 'RETRY' : 'FAILED', null, error);
-      outcomes.push({ id: row.id, status: retry ? 'RETRY' : 'FAILED', error: error.message });
+      const failure = classifySmtpFailure(error);
+      outcomes.push({
+        id: row.id,
+        status: retry ? 'RETRY' : 'FAILED',
+        error: error.message,
+        errorCode: failure.code,
+        errorCategory: failure.category,
+        responseCode: failure.response_code
+      });
     }
   }
   return outcomes;

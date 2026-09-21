@@ -6,7 +6,7 @@ async function processEmailQueueCycle() {
   const outcomes = await processEmailQueue(Number(process.env.EMAIL_QUEUE_BATCH_SIZE || 10));
   for (const outcome of outcomes) {
     console.log(
-      `Email queue delivery evidence: queue_id=${outcome.id} status=${outcome.status} provider_message_id=${outcome.status === 'SENT' ? 'yes' : 'no'}`
+      `Email queue delivery evidence: queue_id=${outcome.id} status=${outcome.status} provider_message_id=${outcome.status === 'SENT' ? 'yes' : 'no'} error_category=${outcome.errorCategory || 'none'} error_code=${outcome.errorCode || 'none'} response_code=${outcome.responseCode || 'none'}`
     );
   }
   return {
