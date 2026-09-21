@@ -3,6 +3,7 @@ const fs = require('fs');
 const pool = require('../config/db');
 const { ensureCareersSchema } = require('../services/careersSchema');
 const { registerDocument } = require('../services/documentSecurityService');
+const { queueEmail } = require('../services/emailQueue');
 
 const VALID_STATUSES = new Set(['NEW','SCREENING','SHORTLISTED','INTERVIEW','TECHNICAL_ASSESSMENT','REFERENCE_CHECK','OFFER','HIRED','REJECTED','TALENT_POOL']);
 
@@ -12,6 +13,157 @@ function clean(value, max = 500) {
 
 function parseJson(value) {
   try { return JSON.parse(value || '[]'); } catch { return []; }
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value).replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[character]));
+}
+
+function publicAppUrl() {
+  return String(
+    process.env.PUBLIC_APP_URL
+      || process.env.APP_BASE_URL
+      || 'https://voxelveda-app-production.up.railway.app'
+  ).replace(/\/+$/, '');
+}
+
+async function addApplicationEvent(applicationId, eventType, note) {
+  await pool.query(
+    `INSERT INTO career_application_events (application_id,event_type,to_status,note)
+     VALUES (?, ?, 'NEW', ?)`,
+    [applicationId, eventType, clean(note, 2000)]
+  );
+}
+
+async function queueApplicationEmails({ applicationId, publicId, job, applicant, resumeStatus }) {
+  const notificationEmail = clean(process.env.CAREERS_NOTIFICATION_EMAIL || 'info@voxelveda.com', 255);
+  const adminUrl = `${publicAppUrl()}/careers-admin`;
+  const safeName = escapeHtml(applicant.fullName);
+  const safeRole = escapeHtml(job.title);
+  const safeReference = escapeHtml(publicId);
+  const safeEmail = escapeHtml(applicant.email);
+  const safePhone = escapeHtml(applicant.phone);
+  const safeLocation = escapeHtml(applicant.currentLocation || 'Not supplied');
+  const safeWorkRights = escapeHtml(applicant.workRights);
+  const safeAvailability = escapeHtml(applicant.availability || 'Not supplied');
+  const safeResumeStatus = escapeHtml(resumeStatus);
+
+  let adminQueueId = null;
+  let candidateQueueId = null;
+  const queueFailures = [];
+  try {
+    adminQueueId = await queueEmail({
+    templateKey: 'career_application_admin',
+    to: notificationEmail,
+    replyTo: applicant.email,
+    subject: `New career application: ${job.title} — ${applicant.fullName}`,
+    text: [
+      'A new Voxel Veda career application has been received.',
+      '',
+      `Reference: ${publicId}`,
+      `Role: ${job.title}`,
+      `Applicant: ${applicant.fullName}`,
+      `Email: ${applicant.email}`,
+      `Phone: ${applicant.phone}`,
+      `Current location: ${applicant.currentLocation || 'Not supplied'}`,
+      `Work rights: ${applicant.workRights}`,
+      `Availability: ${applicant.availability || 'Not supplied'}`,
+      `Resume security status: ${resumeStatus}`,
+      '',
+      `Review securely: ${adminUrl}`,
+      '',
+      'The CV remains in the private recruitment system and is not attached to this email.'
+    ].join('\n'),
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:680px;margin:auto;color:#102238">
+        <div style="padding:24px;background:#071522;color:#fff;border-radius:16px 16px 0 0">
+          <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#71e6f2">VOXEL VEDA PEOPLE OPERATIONS</div>
+          <h1 style="margin:10px 0 0;font-size:26px">New career application</h1>
+        </div>
+        <div style="padding:24px;border:1px solid #dbe5ec;border-top:0;border-radius:0 0 16px 16px">
+          <p><strong>${safeName}</strong> applied for <strong>${safeRole}</strong>.</p>
+          <table style="width:100%;border-collapse:collapse">
+            <tr><td style="padding:8px 0;color:#637487">Reference</td><td style="padding:8px 0"><strong>${safeReference}</strong></td></tr>
+            <tr><td style="padding:8px 0;color:#637487">Email</td><td style="padding:8px 0">${safeEmail}</td></tr>
+            <tr><td style="padding:8px 0;color:#637487">Phone</td><td style="padding:8px 0">${safePhone}</td></tr>
+            <tr><td style="padding:8px 0;color:#637487">Location</td><td style="padding:8px 0">${safeLocation}</td></tr>
+            <tr><td style="padding:8px 0;color:#637487">Work rights</td><td style="padding:8px 0">${safeWorkRights}</td></tr>
+            <tr><td style="padding:8px 0;color:#637487">Availability</td><td style="padding:8px 0">${safeAvailability}</td></tr>
+            <tr><td style="padding:8px 0;color:#637487">CV status</td><td style="padding:8px 0">${safeResumeStatus}</td></tr>
+          </table>
+          <p style="margin:24px 0 0"><a href="${escapeHtml(adminUrl)}" style="display:inline-block;padding:12px 18px;border-radius:9px;background:#0e7490;color:#fff;text-decoration:none;font-weight:700">Review application securely</a></p>
+          <p style="margin-top:18px;color:#637487;font-size:13px">The CV is retained in the private recruitment system and is not attached to this notification.</p>
+        </div>
+      </div>`,
+    relatedModule: 'careers',
+    relatedRecordId: applicationId,
+      idempotencyKey: `career-application:${publicId}:admin`
+    });
+  } catch (error) {
+    queueFailures.push(`recruitment:${clean(error.code || error.name || 'UNKNOWN', 120)}`);
+  }
+
+  try {
+    candidateQueueId = await queueEmail({
+      templateKey: 'career_application_candidate',
+      to: applicant.email,
+      replyTo: notificationEmail,
+      subject: `We received your Voxel Veda application — ${job.title}`,
+      text: [
+        `Hello ${applicant.fullName},`,
+        '',
+        `Thank you for applying for ${job.title} at Voxel Veda.`,
+        `Your application reference is ${publicId}.`,
+        '',
+        'Your application has been securely recorded. Our team will contact shortlisted applicants using the details supplied.',
+        '',
+        'Regards,',
+        'Voxel Veda People Operations'
+      ].join('\n'),
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:640px;margin:auto;color:#102238">
+          <div style="padding:28px;background:#071522;color:#fff;border-radius:16px 16px 0 0">
+            <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#71e6f2">VOXEL VEDA</div>
+            <h1 style="margin:10px 0 0;font-size:28px">Application received</h1>
+          </div>
+          <div style="padding:28px;border:1px solid #dbe5ec;border-top:0;border-radius:0 0 16px 16px">
+            <p>Hello ${safeName},</p>
+            <p>Thank you for applying for <strong>${safeRole}</strong>. Your application has been securely recorded.</p>
+            <div style="margin:22px 0;padding:18px;border-radius:12px;background:#eff8fb">
+              <div style="font-size:12px;color:#637487;text-transform:uppercase;letter-spacing:.08em">Application reference</div>
+              <strong style="display:block;margin-top:6px;font-size:20px;color:#0e7490">${safeReference}</strong>
+            </div>
+            <p>Our team will contact shortlisted applicants using the details supplied.</p>
+            <p style="margin-top:26px">Regards,<br><strong>Voxel Veda People Operations</strong></p>
+          </div>
+        </div>`,
+      relatedModule: 'careers',
+      relatedRecordId: applicationId,
+      idempotencyKey: `career-application:${publicId}:candidate`
+    });
+  } catch (error) {
+    queueFailures.push(`candidate:${clean(error.code || error.name || 'UNKNOWN', 120)}`);
+  }
+
+  if (!adminQueueId && !candidateQueueId) {
+    const error = new Error(`Career application emails could not be queued (${queueFailures.join(', ') || 'unknown error'})`);
+    error.code = 'CAREER_EMAIL_QUEUE_FAILED';
+    throw error;
+  }
+
+  await addApplicationEvent(
+    applicationId,
+    queueFailures.length ? 'APPLICATION_EMAIL_QUEUE_PARTIAL' : 'APPLICATION_EMAILS_QUEUED',
+    [
+      adminQueueId ? `Recruitment notification queued for ${notificationEmail}` : `Recruitment notification queue failed`,
+      candidateQueueId ? `candidate confirmation queued for ${applicant.email}` : 'candidate confirmation queue failed',
+      queueFailures.length ? `failures: ${queueFailures.join(', ')}` : ''
+    ].filter(Boolean).join('; ')
+  );
+
+  return { adminQueueId, candidateQueueId, notificationEmail };
 }
 
 function publicJob(row) {
@@ -151,6 +303,9 @@ async function submitApplication(req, res) {
     db.release();
   }
 
+  let responseStatus = 201;
+  let responseMessage = 'Thank you. Your application was submitted successfully.';
+  let resumeStatus = 'PENDING_REGISTRATION';
   try {
     const document = await registerDocument({
       module: 'careers',
@@ -166,13 +321,7 @@ async function submitApplication(req, res) {
        VALUES (?, 'RESUME_SECURED', 'NEW', 'Applicant CV registered as a confidential document')`,
       [applicationId]
     );
-    return res.status(201).json({
-      message: 'Application submitted successfully.',
-      application_id: publicId,
-      role: job.title,
-      status: 'NEW',
-      resume_status: document.scan_status
-    });
+    resumeStatus = document.scan_status;
   } catch (error) {
     console.error('Career resume registration failed:', {
       applicationId,
@@ -187,14 +336,47 @@ async function submitApplication(req, res) {
     ).catch(() => {});
     // The applicant record must remain available even when document processing is temporarily degraded.
     // Keeping the validated staged file permits operational recovery or a clean retry against this record.
-    return res.status(202).json({
-      message: 'Your application details were recorded, but the CV is still being secured. Keep this reference; Voxel Veda can follow up if another copy is needed.',
-      application_id: publicId,
-      role: job.title,
-      status: 'NEW',
-      resume_status: 'PENDING_REGISTRATION'
-    });
+    responseStatus = 202;
+    responseMessage = 'Thank you. Your application details were recorded, but the CV is still being secured. Keep this reference; Voxel Veda can follow up if another copy is needed.';
   }
+
+  const applicant = {
+    fullName,
+    email,
+    phone,
+    currentLocation: clean(body.current_location, 180),
+    workRights,
+    availability: clean(body.availability, 120)
+  };
+  let emailQueued = false;
+  let confirmationQueued = false;
+  try {
+    const queued = await queueApplicationEmails({ applicationId, publicId, job, applicant, resumeStatus });
+    emailQueued = Boolean(queued.adminQueueId);
+    confirmationQueued = Boolean(queued.candidateQueueId);
+  } catch (error) {
+    console.error('Career application email queue failed:', {
+      applicationId,
+      publicId,
+      errorName: error.name,
+      errorCode: error.code || null
+    });
+    await addApplicationEvent(
+      applicationId,
+      'APPLICATION_EMAIL_QUEUE_FAILED',
+      `Application remains saved; email queue failed: ${clean(error.code || error.name || 'UNKNOWN', 120)}`
+    ).catch(() => {});
+  }
+
+  return res.status(responseStatus).json({
+    message: responseMessage,
+    application_id: publicId,
+    role: job.title,
+    status: 'NEW',
+    resume_status: resumeStatus,
+    recruitment_email_queued: emailQueued,
+    applicant_confirmation_queued: confirmationQueued
+  });
 }
 
 async function listApplications(req, res) {
