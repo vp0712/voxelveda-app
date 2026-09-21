@@ -1,7 +1,7 @@
 
 (() => {
   'use strict';
-  if (location.pathname !== '/banking' || window.__vvPremiumBankInstalled) return;
+  if (document.getElementById('bankAppV3') || location.pathname !== '/banking' || window.__vvPremiumBankInstalled) return;
   window.__vvPremiumBankInstalled = true;
 
   const BANK = '/api/integrations/webhooks/banking';
