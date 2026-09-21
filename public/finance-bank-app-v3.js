@@ -2,8 +2,10 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const FIN = '/api/finance/intelligence';
-  const OS = '/api/finance/banking-os';
+  const STANDALONE = location.pathname === '/banking';
+  const FIN = STANDALONE ? '/api/banking/intelligence' : '/api/finance/intelligence';
+  const OS = STANDALONE ? '/api/banking/os' : '/api/finance/banking-os';
+  const DASHBOARD = STANDALONE ? FIN + '/dashboard' : FIN + '/banking-dashboard';
   const state = {
     view:'home',
     scope:'ALL',
@@ -299,7 +301,7 @@
     const results=await Promise.allSettled([
       api(OS),
       api(OS+'/command-center'),
-      api(FIN+'/banking-dashboard?scope='+scope),
+      api(DASHBOARD+'?scope='+scope),
       api(FIN+'/transactions?scope='+scope+'&limit=250'),
       api(FIN+'/statements?scope='+scope),
       api(FIN+'/budgets'),
