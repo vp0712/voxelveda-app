@@ -20,6 +20,10 @@ assert(js.includes("function wealth()"),'V4 contains per-currency balance sheet'
 assert(js.includes("No fake currency conversion"),'wealth view prevents false cross-currency net worth');
 assert(js.includes("num(a.is_internal_transfer)")||js.includes("num(t.is_internal_transfer)"),'transfer classification is respected');
 assert(js.includes("api(OS+'/payments'"),'payment drafts use Banking OS workflow');
+assert(js.includes('function paymentAction'),'payment workflow exposes submit/cancel/approve/reject actions');
+assert(js.includes("api(OS+'/beneficiaries'"),'saved payees use Banking OS beneficiary API');
+assert(js.includes('function manageAccess'),'bank administrators have an account access editor');
+assert(js.includes("'/team/'+encodeURIComponent(userId)+'/access'"),'team access updates use account-level Banking OS endpoint');
 assert(js.includes("api(OS+'/spaces'"),'Money Spaces use Banking OS');
 assert(js.includes("api(OS+'/alerts'"),'alert preferences use Banking OS');
 assert(css.includes('.v4-hero'),'bank-style balance hero exists');
