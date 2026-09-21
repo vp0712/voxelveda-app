@@ -159,8 +159,8 @@
     if(view==='transactions')$('fiRecentTransactions')?.scrollIntoView({behavior:'smooth',block:'center'});
     else if(view==='cashflow')$('fiCashflowBars')?.scrollIntoView({behavior:'smooth',block:'center'});
     else if(view==='team'){
-      const team=document.querySelector('[data-pb-tab="team"]');
-      if(team)team.click(); else document.querySelector('[data-fi-section="settings"]')?.scrollIntoView({behavior:'smooth'});
+      location.href='/banking#team';
+      return;
     } else if(direct) document.querySelector('[data-fi-section="'+view+'"]')?.scrollIntoView({behavior:'smooth',block:'start'});
     else window.scrollTo({top:0,behavior:'smooth'});
   }
@@ -178,6 +178,7 @@
     $('fiDashboardCurrency')?.addEventListener('change',()=>{state.currency=$('fiDashboardCurrency').value;renderAll();});
     $('fiDashboardRange')?.addEventListener('change',async()=>{state.range=$('fiDashboardRange').value;await load();});
     $('refreshDashboardSecondary')?.addEventListener('click',()=>load());
+    $('refreshDashboard')?.addEventListener('click',()=>load());
     $('fiGlobalSearch')?.addEventListener('keydown',(e)=>{
       if(e.key!=='Enter')return;
       const q=e.currentTarget.value.trim().toLowerCase(); if(!q)return;
