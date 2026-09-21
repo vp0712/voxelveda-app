@@ -4,7 +4,7 @@ function assert(v,m){if(!v){console.error('FAIL:',m);process.exitCode=1}else con
 const app=read('app.js');
 const routes=read('routes/bankingPortalRoutes.js');
 const ui=read('public/premium-banking-app.js');
-const v3=read('public/finance-bank-app-v3.js');
+const v4=read('public/finance-bank-app-v4.js');
 const financeHtml=read('public/finance-intelligence.html');
 const staff=read('public/staff.js');
 const html=read('public/staff-dashboard.html');
@@ -15,12 +15,12 @@ assert(!routes.includes("requirePermission('VIEW_FINANCE')"),'standalone banking
 assert(routes.includes("requireAnyPermission('VIEW_BANKING','VIEW_PERSONAL_BANKING','VIEW_BUSINESS_BANKING')"),'banking view permission is required');
 assert(routes.includes("requireAnyPermission('EDIT_BANK_DETAILS','CONNECT_BANK_ACCOUNT','MANAGE_BANK_CONNECTION')"),'bank consent remains privileged');
 assert(routes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'payment approval remains explicitly permission-gated');
-assert(ui.includes("document.getElementById('bankAppV3')"),'legacy Banking client yields to unified V3 UI when present');
-assert(financeHtml.includes('id="bankAppV3"'),'shared Banking/Finance page contains unified V3 application root');
-assert(v3.includes("const STANDALONE = location.pathname === '/banking'"),'V3 explicitly detects standalone Banking route');
-assert(v3.includes("'/api/banking/intelligence'"),'V3 standalone mode uses delegated Banking intelligence API');
-assert(v3.includes("'/api/banking/os'"),'V3 standalone mode uses delegated Banking OS API');
-assert(v3.includes("FIN + '/dashboard'"),'V3 standalone mode uses standalone Banking dashboard endpoint');
+assert(ui.includes("document.getElementById('bankAppV4')"),'legacy Banking client yields to unified V4 UI when present');
+assert(financeHtml.includes('id="bankAppV4"'),'shared Banking/Finance page contains unified V4 application root');
+assert(v4.includes("const STANDALONE = location.pathname === '/banking'"),'V4 explicitly detects standalone Banking route');
+assert(v4.includes("'/api/banking/intelligence'"),'V4 standalone mode uses delegated Banking intelligence API');
+assert(v4.includes("'/api/banking/os'"),'V4 standalone mode uses delegated Banking OS API');
+assert(v4.includes("FIN+'/dashboard'"),'V4 standalone mode uses standalone Banking dashboard endpoint');
 assert(ui.includes("const STANDALONE = location.pathname === '/banking'"),'standalone API mode is explicit');
 assert(ui.includes("'/api/banking/intelligence'"),'standalone intelligence API is used');
 assert(ui.includes("'/api/banking/os'"),'standalone Banking OS API is used');
