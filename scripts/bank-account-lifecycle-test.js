@@ -5,7 +5,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const routes = fs.readFileSync(path.join(root, 'routes', 'financeRoutes.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'public', 'finance-intelligence.html'), 'utf8');
-const ui = fs.readFileSync(path.join(root, 'public', 'finance-account-lifecycle.js'), 'utf8');
+const ui = fs.readFileSync(path.join(root, 'public', 'finance-master.js'), 'utf8');
 const controllerSource = fs.readFileSync(path.join(root, 'controllers', 'bankAccountLifecycleController.js'), 'utf8');
 const controller = require('../controllers/bankAccountLifecycleController');
 
