@@ -1,3 +1,25 @@
+ALTER TABLE statement_import_rows
+  ADD COLUMN raw_payload_json JSON NULL;
+
+UPDATE statement_import_rows
+SET raw_payload_json = COALESCE(
+  raw_payload_json,
+  override_original_json,
+  JSON_OBJECT(
+    'transaction_date', transaction_date,
+    'posting_date', posting_date,
+    'description', description,
+    'merchant_name', merchant_name,
+    'reference', reference,
+    'category', category,
+    'debit', debit,
+    'credit', credit,
+    'running_balance', running_balance,
+    'currency', currency
+  )
+)
+WHERE raw_payload_json IS NULL;
+
 CREATE TABLE IF NOT EXISTS bank_transaction_original_data (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   bank_transaction_id BIGINT NOT NULL,
@@ -34,7 +56,7 @@ SELECT
   sr.transaction_date, sr.posting_date, sr.description, sr.merchant_name,
   sr.reference, sr.category, sr.debit, sr.credit, sr.running_balance,
   sr.currency,
-  COALESCE(sr.override_original_json,
+  COALESCE(sr.raw_payload_json, sr.override_original_json,
     JSON_OBJECT(
       'transaction_date', sr.transaction_date,
       'posting_date', sr.posting_date,
