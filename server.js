@@ -20,6 +20,7 @@ const { getRateLimitService } = require('./services/rateLimitService');
 const { healthCheck: malwareHealthCheck, scannerConfig } = require('./services/malwareScannerService');
 const { healthProbe: objectStorageHealthProbe } = require('./services/objectStorageService');
 const { selfTestWebhookVerifier } = require('./services/webhookSecurityService');
+const { verifyBackupRestoreProvider } = require('./config/backupRestoreAssurance');
 const { backgroundJobService } = require('./services/backgroundJobService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
 const { ensureSecuritySchema } = require('./services/securitySchema');
@@ -149,9 +150,24 @@ async function initializeServices() {
     }
   }
 
-  const backupConfigured = String(process.env.BACKUP_STATUS_PROVIDER || '').toLowerCase() === 'configured';
-  setControl('backup_provider', backupConfigured ? CONTROL_STATES.CONFIGURED : CONTROL_STATES.NOT_CONFIGURED,
-    backupConfigured ? 'Provider metadata is configured; current backup evidence is checked separately' : 'No backup provider adapter configured');
+  const backupMetadataConfigured = String(process.env.BACKUP_STATUS_PROVIDER || '').toLowerCase() === 'configured';
+  const backupTelemetryConfigured = Boolean(String(process.env.BACKUP_STATUS_URL || '').trim());
+  if (!backupMetadataConfigured || !backupTelemetryConfigured) {
+    setControl('backup_provider', CONTROL_STATES.NOT_CONFIGURED,
+      backupMetadataConfigured
+        ? 'Backup provider metadata exists, but no BACKUP_STATUS_URL is configured for live evidence'
+        : 'No backup provider adapter configured');
+    addWarning('Database backup/restore evidence is not live-verified; configure BACKUP_STATUS_URL before claiming backup assurance');
+  } else {
+    setControl('backup_provider', CONTROL_STATES.INITIALIZING, 'Verifying live backup and restore evidence');
+    const backupEvidence = await verifyBackupRestoreProvider(process.env);
+    const backupState = backupEvidence.ready
+      ? CONTROL_STATES.EXTERNALLY_VERIFIED
+      : backupEvidence.state === 'degraded' ? CONTROL_STATES.DEGRADED : CONTROL_STATES.FAILED;
+    setControl('backup_provider', backupState, backupEvidence.summary || 'Backup provider verification completed');
+    console.log(`Backup restore evidence: state=${backupEvidence.state || 'unknown'} ready=${backupEvidence.ready ? 'yes' : 'no'}`);
+    if (!backupEvidence.ready) addWarning(backupEvidence.summary || 'Backup/restore evidence is not currently verified');
+  }
 
   const webhookConfigured = configured(['WEBHOOK_SIGNING_KEY']);
   if (!webhookConfigured) {
