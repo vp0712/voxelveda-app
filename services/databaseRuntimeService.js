@@ -72,16 +72,10 @@ async function probeDatabaseTlsCapability() {
     };
   }
 
-  if (!strict.certificate_trust_error) {
-    return {
-      capable: false,
-      cipher: null,
-      certificate_verification: true,
-      trust_status: 'UNAVAILABLE',
-      error_code: strict.error_code
-    };
-  }
-
+  // A strict TLS failure does not prove the server is incapable of TLS. mysql2 may
+  // surface certificate/trust failures as generic HANDSHAKE_SSL_ERROR values, so run
+  // one isolated encryption-only diagnostic probe to distinguish transport capability
+  // from certificate trust. This never changes the application pool configuration.
   const encryptionOnly = await probeTlsOnce(false);
   if (encryptionOnly.succeeded) {
     return {
@@ -89,16 +83,19 @@ async function probeDatabaseTlsCapability() {
       cipher: encryptionOnly.cipher,
       certificate_verification: false,
       trust_status: 'ENCRYPTION_ONLY',
-      error_code: strict.error_code
+      error_code: strict.error_code,
+      strict_certificate_trust_error: Boolean(strict.certificate_trust_error)
     };
   }
 
   return {
     capable: false,
     cipher: null,
-    certificate_verification: false,
+    certificate_verification: true,
     trust_status: 'UNAVAILABLE',
-    error_code: encryptionOnly.error_code || strict.error_code
+    error_code: strict.error_code || encryptionOnly.error_code,
+    encryption_probe_error_code: encryptionOnly.error_code || null,
+    strict_certificate_trust_error: Boolean(strict.certificate_trust_error)
   };
 }
 
