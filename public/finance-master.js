@@ -132,8 +132,19 @@ function dashboardCardVisible(key){const configured=state.userPreferences?.dashb
 async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
+ const prefPayload=await loadResource('userPreferences',API+'/preferences');
+ state.userPreferences=prefPayload?.preferences||state.userPreferences;
+ if(!state.preferencesApplied&&state.userPreferences){
+  const pref=state.userPreferences;
+  if(['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
+  if(pref.default_period)state.period=pref.default_period;
+  if(pref.default_account_id)state.account=String(pref.default_account_id);
+  state.preferencesApplied=true;
+  if($('fmScope'))$('fmScope').value=state.scope;
+  if($('fmPeriod'))$('fmPeriod').value=state.period;
+ }
  const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,categories]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,categories,smart,health,roadmaps]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -164,20 +175,25 @@ async function loadBase(){
   loadResource('archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)),
   loadResource('cashflowCalendar',OS+'/cashflow-calendar?days=90'),
   loadResource('accountingPeriods',API+'/accounting-periods'),
-  loadResource('categories',API+'/categories?include_archived=true')
+  loadResource('categories',API+'/categories?include_archived=true'),
+  loadResource('smart',API+'/personal-money/smart'),
+  loadResource('health',API+'/personal-money/health'),
+  loadResource('roadmaps',API+'/personal-money/roadmaps')
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
- else{state.tx=[]}
+ else state.tx=[];
  state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
  state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;state.categories=categories||null;
+ state.smart=smart||null;state.health=health||null;state.roadmaps=roadmaps||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
   state.accounts=accounts?.accounts||[];
  }
+ if(state.account&&!state.accounts.some(a=>String(a.id)===String(state.account)))state.account='';
  const sel=$('fmAccount'),keep=state.account;
  sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
  sel.value=keep;
