@@ -40,3 +40,5 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .fm-account-grid,.fm-capability-grid,.fm-detail-grid{grid-template-columns:1fr}.fm-filter-grid{grid-template-columns:1fr 1fr}.fm-attention-grid{grid-template-columns:1fr 1fr}.fm-chart-row{grid-template-columns:72px minmax(90px,1fr) 90px}
  .fm-table{min-width:760px}.fm-drawer-body{padding:12px}.fm-account-tabs{position:sticky;top:0;background:#fff;padding:5px 0;z-index:2}
 }
+
+.fm-inline-actions{display:flex;gap:6px;justify-content:flex-end;margin-top:6px}.fm-inline-actions button,.fm-row-right>button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:5px 8px;font-size:.56rem;font-weight:850;cursor:pointer}.fm-inline-actions .bad{border-color:#e1b4b9;color:#8b2c36;background:#fff7f8}.fm-removed-statements{overflow:visible}.fm-removed-statements>summary{display:flex;justify-content:space-between;gap:12px;cursor:pointer;list-style:none}.fm-removed-statements>summary span{color:var(--muted);font-size:.62rem}
