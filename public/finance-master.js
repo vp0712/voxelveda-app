@@ -9,13 +9,13 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''}
 };
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
- ['DOCUMENTS',[['statements','▤','Statements']]],
+ ['DOCUMENTS',[['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports']]],
@@ -41,6 +41,7 @@ function title(v){return ({
  accounts:['Accounts','Bank, savings, credit, cash and loan accounts with coverage and lifecycle controls.'],
  transactions:['Transaction Explorer','Server-filtered financial movements with preserved source evidence.'],
  statements:['Statement Vault','Upload, review, duplicate-check and commit statements without overwriting source evidence.'],
+ receipts:['Receipts','Private receipt vault and missing-receipt review queue over visible Finance transactions.'],
  cash:['Cash','Cash wallets and cash-type financial accounts.'],
  debt:['Borrow & Lend','Owner-only debt lifecycle with repayments and remaining balances.'],
  recurring:['Recurring Money','Known and detected recurring commitments; nothing is paid automatically.'],
@@ -128,7 +129,7 @@ async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
  const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -153,7 +154,8 @@ async function loadBase(){
   loadResource('reimbursements',API+'/reimbursements'),
   loadResource('notifications','/api/notifications?limit=50'),
   loadResource('notificationPrefs','/api/notifications/preferences'),
-  loadResource('companySettings','/api/settings')
+  loadResource('companySettings','/api/settings'),
+  loadResource('receiptCenter',API+'/receipts?scope='+encodeURIComponent(state.scope))
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
@@ -161,7 +163,7 @@ async function loadBase(){
  state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
- state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;
+ state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
