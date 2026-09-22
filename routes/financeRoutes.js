@@ -17,6 +17,7 @@ const financeReceipt = require('../controllers/financeReceiptController');
 const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
 const financeReportBuilder = require('../controllers/financeReportBuilderController');
+const financeTransactionLifecycle = require('../controllers/financeTransactionLifecycleController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -231,6 +232,9 @@ router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), finance
 router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
 router.get('/receipts', requireAnyPermission('VIEW_BANKING'), financeReceipt.center);
+router.get('/bank-transactions-archived', requireAnyPermission('VIEW_BANKING'), financeTransactionLifecycle.listArchived);
+router.post('/bank-transactions/:id/archive', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeTransactionLifecycle.archive);
+router.post('/bank-transactions/:id/restore', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('RESTORE_BANK_TRANSACTION'), financeTransactionLifecycle.restore);
 router.get('/bank-transactions/:id/original', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), statementReview.getOriginalBankTransaction);
 router.get('/bank-transactions/:id/audit', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeAudit.transactionTimeline);
 router.get('/bank-transactions/:id/transfer-links', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getTransferLinks);
