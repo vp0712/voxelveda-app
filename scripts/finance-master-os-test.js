@@ -8,8 +8,8 @@ const html=read('public/finance-intelligence.html');
 const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
-assert.match(html,/finance-master\\.css\\?v=20260923-control-centre/,'Master finance stylesheet must be loaded.');
-assert.match(html,/finance-master\\.js\\?v=20260923-control-centre/,'Master finance client must be loaded.');
+assert.match(html,/finance-master\.css\?v=20260923-control-centre/,'Master finance stylesheet must be loaded.');
+assert.match(html,/finance-master\.js\?v=20260923-control-centre/,'Master finance client must be loaded.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');
 for(const name of ['Overview','My Money','Company Finance','Consolidated','Accounts','Transactions','Cash','Transfers','Refunds','Reimbursements','Borrow & Lend','Recurring','Statements','Budgets','Savings Goals','Insights','Rules','Review Centre','Reconciliation','Reports','Team Access','Banking Connections','Finance Settings']){
