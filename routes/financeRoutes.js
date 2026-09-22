@@ -35,9 +35,11 @@ const requireSensitiveExportApproval = require('../middleware/sensitiveExportMid
 const highRiskPaymentGuard = require('../middleware/highRiskPaymentMiddleware');
 const statementPreviewSanitizer = require('../middleware/statementPreviewSanitizer');
 const financePrivacy = require('../middleware/financePrivacyMiddleware');
+const { financeCapabilities } = require('../services/financeCapabilityRegistry');
 
 const router = express.Router();
 
+router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => res.json(financeCapabilities()));
 router.get('/overview', controller.getOverview);
 router.get('/financial-years', controller.getFinancialYears);
 router.post('/financial-years/:id/check', requireAnyPermission('EDIT_FINANCE'), controller.runYearEndCheck);
