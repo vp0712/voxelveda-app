@@ -18,14 +18,14 @@ assert.match(routes, /requireStepUp\('CHANGE_BANK_DETAILS'\)/);
 assert.match(routes, /financePrivacy\.accountParam\('id'\)/);
 assert.match(routes, /\/intelligence\/active-overview/);
 
-assert.match(html, /finance-account-lifecycle\.css/);
-assert.match(html, /finance-account-lifecycle\.js/);
+assert.match(html, /finance-master\.css/);
+assert.match(html, /finance-master\.js/);
 assert.match(ui, /Archive/);
 assert.match(ui, /Set inactive/);
 assert.match(ui, /Restore/);
 assert.match(ui, /Permanently delete/);
-assert.match(ui, /deletion_check/);
-assert.match(ui, /active-overview/);
+assert.match(ui, /accountLifecycle/);
+assert.match(ui, /intelligence\/accounts\/'\+id/);
 
 assert.match(controllerSource, /INFORMATION_SCHEMA\.COLUMNS/);
 assert.match(controllerSource, /COLUMN_NAME = 'bank_account_id'/);
