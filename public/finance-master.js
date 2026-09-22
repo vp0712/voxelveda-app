@@ -801,6 +801,26 @@ function openNew(kind='expense',presetAccount=''){
  $('fmEntryForm').onsubmit=async e=>{e.preventDefault();try{const x=await saveManualMovement(e.currentTarget);$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
 async function refresh(){notice('');$('fmContent').innerHTML='<div class="fm-loading"><span></span><b>Refreshing finance workspace…</b></div>';await loadBase();render()}
+function runFinanceCommand(input){
+ const q=String(input||'').trim();const command=q.toLowerCase();
+ const direct={
+  'add expense':()=>openNew('expense'),
+  'add income':()=>openNew('income'),
+  'upload statement':()=>openStatementWizard(),
+  'company accounts':()=>{state.scope='BUSINESS';$('fmScope').value='BUSINESS';go('accounts');refresh()},
+  'personal accounts':()=>{state.scope='PERSONAL';$('fmScope').value='PERSONAL';go('accounts');refresh()},
+  'open company accounts':()=>{state.scope='BUSINESS';$('fmScope').value='BUSINESS';go('accounts');refresh()},
+  'missing receipts':()=>{state.txFilters.q='';state.view='review';go('review')},
+  'create report':()=>go('reports'),
+  'open reports':()=>go('reports'),
+  'open notifications':()=>go('notifications'),
+  'banking connections':()=>go('connections'),
+  'review centre':()=>go('review')
+ };
+ if(direct[command]){direct[command]();return true}
+ if(command.startsWith('search ')){state.txFilters.q=q.slice(7).trim();state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions();return true}
+ return false;
+}
 function bind(){
  $('fmScope').onchange=e=>{state.scope=e.target.value;state.txMeta.page=1;refresh()};
  $('fmAccount').onchange=e=>{state.account=e.target.value;state.txMeta.page=1;refresh()};
@@ -809,7 +829,8 @@ function bind(){
  $('fmTo').onchange=e=>{state.customTo=e.target.value;if(state.period==='custom'&&state.customFrom)refresh()};
  $('fmCurrencyMode').onchange=()=>notice('Reporting-currency conversion is unavailable because no verified FX-rate service is configured. Native currency mode remains active.');
  $('fmRefresh').onclick=refresh;$('fmNew').onclick=()=>openNew('expense');$('fmDrawerClose').onclick=closeDrawer;$('fmBackdrop').onclick=closeDrawer;$('fmModalClose').onclick=()=> $('fmModal').close();
- $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){state.txFilters.q=e.currentTarget.value.trim();state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()}};
+ $('fmSearch').placeholder='Search finance or type a command: add expense, upload statement, create report';
+ $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){const value=e.currentTarget.value.trim();if(runFinanceCommand(value))return;state.txFilters.q=value;state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()}};
 }
 document.addEventListener('DOMContentLoaded',async()=>{bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h))state.view=h;navButtons();try{await loadBase();render()}catch(e){notice(e.message||'Finance workspace failed to load',true)}})
 })();
