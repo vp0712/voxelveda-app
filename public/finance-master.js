@@ -55,6 +55,7 @@ function title(v){return ({
  reconciliation:['Reconciliation','Bank transaction reconciliation inside the master Finance OS.'],
  reports:['Reports','Trusted exports and report-ready filtered transaction data.'],
  team:['Team Finance Access','Server-enforced banking and finance access controls.'],
+ notifications:['Finance Notifications','User-specific finance alerts and notification preferences.'],
  connections:['Banking Connections','Open Banking readiness and sync status; fail-closed when not configured.'],
  settings:['Finance Settings','Capability status, safety controls and company finance configuration.']
  })[v]||['Finance','Finance workspace']}
@@ -204,15 +205,35 @@ function removedStatementsSection(){
 function personalCard(kind){
  const p=state.personal||{};const a=state.personalAttention||{};
  const data=kind==='budgets'?(p.budgets||[]):kind==='savings'?(a.goals||[]):kind==='debt'?(p.debts||[]):(a.recurring||[]);
- const label=kind==='budgets'?'Budgets':kind==='savings'?'Savings Goals':kind==='debt'?'Borrow & Lend':'Recurring Money';
- return `<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>${label}</h2><p>Owner-only Personal Money records. They are not silently added to company/bank totals.</p></div><button data-personal-new="${kind}">+ Add</button></div><div class="fm-list">${data.map(x=>{const amount=kind==='budgets'?x.limit_amount:kind==='savings'?x.target_amount:kind==='debt'?x.outstanding_amount:x.amount;return `<div class="fm-row"><div><h3>${esc(x.name||x.category||x.counterparty||'Item')}</h3><p>${esc(x.status||x.frequency||'')} ${x.due_date?'· '+date(x.due_date):''}</p></div><div class="fm-row-right"><b>${nativeMoney(amount||0,x.currency||'AUD')}</b><small>${kind==='budgets'?(num(x.used_percent)+'% used'):kind==='savings'?(nativeMoney(x.current_amount||0,x.currency)+' saved'):kind==='debt'?'remaining':''}</small></div></div>`}).join('')||emptyState('No records yet','Use Add to create the first record.')}</div></div></article>`;
+ const label=kind==='budgets'?'Personal Budgets':kind==='savings'?'Savings Goals':kind==='debt'?'Borrow & Lend':'Recurring Money';
+ const rows=data.map(x=>{
+  const amount=kind==='budgets'?x.limit_amount:kind==='savings'?x.target_amount:kind==='debt'?x.outstanding_amount:x.amount;
+  const actions=kind==='savings'&&x.status==='ACTIVE'?'<button type="button" data-goal-contribute="'+esc(x.id)+'">Add progress</button>'
+   :kind==='debt'&&x.status!=='SETTLED'?'<button type="button" data-debt-pay="'+esc(x.id)+'">Record payment</button>'
+   :kind==='recurring'&&x.active?'<button type="button" data-recurring-complete="'+esc(x.id)+'">Mark completed</button>'
+   :'';
+  return '<div class="fm-row"><div><h3>'+esc(x.name||x.category||x.counterparty||'Item')+'</h3><p>'+esc(x.status||x.frequency||'')+' '+(x.due_date?'· '+date(x.due_date):x.next_due_date?'· next '+date(x.next_due_date):'')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(amount||0,x.currency||'AUD')+'</b><small>'+(kind==='budgets'?(num(x.used_percent)+'% used'):kind==='savings'?(nativeMoney(x.current_amount||0,x.currency)+' saved'):kind==='debt'?'remaining':'')+'</small>'+actions+'</div></div>';
+ }).join('');
+ return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>'+label+'</h2><p>Owner-only Personal Money records. They are not silently added to company/bank totals.</p></div><button data-personal-new="'+kind+'">+ Add</button></div><div class="fm-list">'+(rows||emptyState('No records yet','Use Add to create the first record.'))+'</div></div></article>';
 }
-
 function personalView(){
- const p=state.personal||{}, totals=p.wallet_totals||{}, debts=p.debt_totals_by_currency||{};
- const cards=Object.entries(totals).map(([c,v])=>`<div class="fm-kpi"><span>${esc(c)} wallets</span><strong>${nativeMoney(v,c)}</strong><small>Owner-only Personal Money</small></div>`).join('');
- const debtCards=Object.entries(debts).map(([c,v])=>`<div class="fm-kpi"><span>${esc(c)} owed to me</span><strong>${nativeMoney(v.lent_open,c)}</strong><small>Open lending</small></div><div class="fm-kpi"><span>${esc(c)} I owe</span><strong>${nativeMoney(v.borrowed_open,c)}</strong><small>Open borrowing</small></div>`).join('');
- return `${resourceError('personal','My Money')}<div class="fm-grid four">${cards+debtCards||'<div class="fm-kpi"><span>Personal Money</span><strong>—</strong><small>No owner-only wallets yet</small></div>'}</div><div class="fm-grid two">${personalCard('budgets')}${personalCard('debt')}</div>`;
+ const p=state.personal||{},totals=p.wallet_totals||{},debts=p.debt_totals_by_currency||{};
+ const cards=Object.entries(totals).map(([c,v])=>'<div class="fm-kpi"><span>'+esc(c)+' wallets</span><strong>'+nativeMoney(v,c)+'</strong><small>Owner-only Personal Money</small></div>').join('');
+ const debtCards=Object.entries(debts).map(([c,v])=>'<div class="fm-kpi"><span>'+esc(c)+' owed to me</span><strong>'+nativeMoney(v.lent_open,c)+'</strong><small>Open lending</small></div><div class="fm-kpi"><span>'+esc(c)+' I owe</span><strong>'+nativeMoney(v.borrowed_open,c)+'</strong><small>Open borrowing</small></div>').join('');
+ return resourceError('personal','My Money')+'<div class="fm-grid four">'+(cards+debtCards||'<div class="fm-kpi"><span>Personal Money</span><strong>—</strong><small>No owner-only wallets yet</small></div>')+'</div>'+dailyBriefingCard()+'<div class="fm-grid two">'+personalCard('budgets')+personalCard('debt')+'</div>';
+}
+function dailyBriefingCard(){
+ const b=state.briefing||{},rows=Object.values(b.by_currency||{});
+ return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Daily Finance Briefing</h2><p>'+esc(b.comparison_date_note||'Owner-only daily Personal Money snapshot.')+'</p></div></div><div class="fm-grid four">'+(rows.map(r=>'<div class="fm-kpi"><span>'+esc(r.currency)+' today out</span><strong>'+nativeMoney(r.today_spending,r.currency)+'</strong><small>Yesterday '+nativeMoney(r.yesterday_spending,r.currency)+'</small></div><div class="fm-kpi"><span>'+esc(r.currency)+' today in</span><strong>'+nativeMoney(r.today_income,r.currency)+'</strong><small>Yesterday '+nativeMoney(r.yesterday_income,r.currency)+'</small></div>').join('')||'<div class="fm-kpi"><span>Daily briefing</span><strong>—</strong><small>No personal bank activity for today/yesterday.</small></div>')+'</div></div></article>';
+}
+function budgetsView(){
+ const banking=state.bankingBudgets?.budgets||[];
+ const bankingRows=banking.map(x=>'<div class="fm-row"><div><h3>'+esc(x.category)+'</h3><p>'+esc(x.ownership_scope)+' · '+esc(x.cycle)+' · '+esc(x.currency)+'</p></div><div class="fm-row-right"><b>'+nativeMoney(x.limit_amount,x.currency)+'</b><small>'+num(x.used_percent)+'% used · '+nativeMoney(x.remaining_amount,x.currency)+' remaining</small><button data-bank-budget-archive="'+esc(x.budget_uid)+'">Archive</button></div></div>').join('');
+ return '<div class="fm-grid two">'+personalCard('budgets')+'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Banking Budgets</h2><p>Category budgets calculated from the canonical bank ledger; internal transfers are excluded.</p></div><button id="addBankBudget">+ Add</button></div><div class="fm-list">'+(bankingRows||emptyState('No banking budgets','Create a Company/Personal banking budget against real ledger activity.'))+'</div></div></article></div>';
+}
+function notificationsView(){
+ const items=state.notifications?.notifications||[],prefs=state.notificationPrefs?.preferences||[];
+ return resourceError('notifications','Finance Notifications')+'<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Notifications</h2><p>'+num(state.notifications?.total)+' active notification(s).</p></div><button id="markAllNotifications">Mark all read</button></div><div class="fm-list">'+(items.map(n=>'<div class="fm-row"><div><h3>'+esc(n.title)+'</h3><p>'+esc(n.message||'')+' · '+esc(n.category||'')+'</p></div><div class="fm-row-right">'+statusBadge(n.priority||'NORMAL')+'<small>'+date(n.created_at)+'</small>'+(n.is_read?'':'<button data-notification-read="'+n.id+'">Mark read</button>')+'</div></div>').join('')||emptyState('No notifications','No active Finance/user notifications are available.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Preferences</h2><p>Per-user in-app, email and digest settings.</p></div></div><div class="fm-list">'+(prefs.map(p=>'<div class="fm-row"><div><h3>'+esc(p.category)+'</h3><p>'+esc(p.digest_frequency||'IMMEDIATE')+(p.quiet_hours_start?' · quiet '+esc(p.quiet_hours_start)+'–'+esc(p.quiet_hours_end||''):'')+'</p></div><label class="fm-check"><input type="checkbox" data-notification-pref="'+esc(p.category)+'" '+(Number(p.in_app_enabled)?'checked':'')+'> In app</label></div>').join('')||'<p class="fm-helper">Preferences are created when a category is configured.</p>')+'</div></div></article></div>';
 }
 function companyView(){
  if(state.scope!=='BUSINESS')return `<article class="fm-card"><div class="fm-pad">${emptyState('Company workspace','Switch the Workspace filter to Company for business-only finance.','<button class="fm-primary" data-scope-jump="BUSINESS">Switch to Company</button>')}</div></article>`;
@@ -271,7 +292,8 @@ function openRefundLink(refundId,currency){
  $('fmModal').showModal();$('refundLinkForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(API+'/bank-transactions/'+refundId+'/refund-links',{method:'POST',body:JSON.stringify({original_expense_transaction_id:Number(fd.get('expense_id')),linked_amount:fd.get('amount')||undefined,note:fd.get('note')||null})});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
 function simpleView(v){
- if(['budgets','savings','debt','recurring'].includes(v))return personalCard(v);
+ if(v==='budgets')return budgetsView();
+ if(['savings','debt','recurring'].includes(v))return personalCard(v);
  if(v==='reports')return reportView();
  if(v==='review')return reviewView();
  if(v==='personal')return personalView();
@@ -284,6 +306,7 @@ function simpleView(v){
  if(v==='insights')return insightsView();
  if(v==='rules')return rulesView();
  if(v==='reconciliation')return reconciliationView();
+ if(v==='notifications')return notificationsView();
  if(v==='team')return teamView();
  if(v==='connections')return connectionsView();
  return settingsView();
