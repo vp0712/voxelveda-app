@@ -20,9 +20,14 @@ assert(controller.includes("Mixed currencies") || controller.includes("Currency"
 assert(controller.includes("LIMIT 20000"),'filtered report must use a bounded server query');
 assert(controller.includes("csvCell"),'CSV escaping is missing');
 assert(controller.includes("FILTERED_REPORT_EXPORTED"),'filtered export audit logging is missing');
+assert(controller.includes('exports.pdf'),'filtered branded PDF export is missing');
+assert(controller.includes('doc.switchToPage(index)'),'filtered PDF must repeat company branding on every page');
+assert(controller.includes('reportCompanyProfile'),'filtered PDF must consume company reporting settings');
+assert(controller.includes('profile.footer'),'filtered PDF must repeat the configured confidential footer');
 
 assert(routes.includes("router.get('/reports/builder'"),'report builder route is missing');
 assert(routes.includes("router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE')"),'filtered CSV must require export permission, step-up and sensitive export approval');
+assert(routes.includes("router.get('/reports/builder.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE')"),'filtered PDF must require export permission, step-up and sensitive export approval');
 assert(routes.includes("router.get('/reports/saved'"),'saved report list route is missing');
 assert(routes.includes("router.post('/reports/saved'"),'saved report save route is missing');
 assert(routes.includes("router.delete('/reports/saved/:uid'"),'saved report delete route is missing');
@@ -35,6 +40,8 @@ assert(client.includes('reportAccounts'),'multi-account report control is missin
 assert(client.includes('generateBuiltReport'),'report generation handler is missing');
 assert(client.includes('exportBuiltReportXlsx'),'XLSX report export is missing');
 assert(client.includes("API+'/reports/builder.csv?'"),'CSV report export is missing');
+assert(client.includes("API+'/reports/builder.pdf?'"),'PDF report export is missing');
+assert(client.includes('id="reportPdf"'),'Report Builder PDF action is missing');
 assert(client.includes("API+'/reports/saved'"),'saved report UI is missing');
 assert(client.includes('Currencies are never converted or relabelled'),'currency safety disclosure is missing');
 
