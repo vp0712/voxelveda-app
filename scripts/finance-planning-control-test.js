@@ -42,6 +42,7 @@ expect(controller, 'privacy.visibilitySql', 'Observed categories must use Financ
 expect(controller, 'privacy.assertAccountAccess', 'Default account preference must validate account access');
 expect(controller, 'FINANCE_CATEGORY_ARCHIVED', 'Category archive audit event missing');
 expect(controller, 'FINANCE_PREFERENCES_UPDATED', 'Preference update audit event missing');
+expect(controller, 'Array.isArray(row.dashboard_cards_json)', 'Finance preferences must handle parsed MySQL JSON safely');
 
 const routes = read('routes/financeRoutes.js');
 [
@@ -54,7 +55,7 @@ const routes = read('routes/financeRoutes.js');
 
 const ui = read('public/finance-master.js');
 [
-  "['forecast','◒','Forecast']", "['calendar','▦','Cash Flow Calendar']", "['categories','◈','Categories']",
+  "['forecast','◷','Forecast']", "['calendar','▦','Cash Flow Calendar']", "['categories','◈','Categories']",
   "loadResource('smart',API+'/personal-money/smart')", "loadResource('health',API+'/personal-money/health')",
   "loadResource('roadmaps',API+'/personal-money/roadmaps')", "loadResource('cashflowCalendar',OS+'/cashflow-calendar?days=90')",
   "loadResource('categories',API+'/categories')", "loadResource('userPreferences',API+'/preferences')",
