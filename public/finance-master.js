@@ -9,11 +9,12 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''}
 };
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
- ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
+ ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['statements','▤','Statements']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
@@ -43,6 +44,9 @@ function title(v){return ({
  cash:['Cash','Cash wallets and cash-type financial accounts.'],
  debt:['Borrow & Lend','Owner-only debt lifecycle with repayments and remaining balances.'],
  recurring:['Recurring Money','Known and detected recurring commitments; nothing is paid automatically.'],
+ transfers:['Transfers','Confirm own-account debit/credit pairs without counting them as income or expense.'],
+ refunds:['Refunds','Link merchant credits to original expenses so they are not treated as ordinary revenue.'],
+ reimbursements:['Reimbursements','Track employee-paid expenses through submission, approval and linked repayment.'],
  budgets:['Budgets','Personal and banking budget controls backed by current finance records.'],
  savings:['Savings Goals','Track goals and contributions without pretending that progress automatically moves cash.'],
  insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
@@ -112,11 +116,11 @@ function currencyRows(){
 function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — consolidated total unavailable until verified FX rates are available.':''}
 function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
 function emptyState(title,message,action=''){return `<div class="fm-empty"><strong>${esc(title)}</strong><span>${esc(message)}</span>${action}</div>`}
-async async function loadBase(){
+async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
  const base=filterQuery();
- const [capabilities,dash,tx,st,reviews,personal,attention,readiness,insights,rules,quality,reconciliation,history,team,os]=await Promise.all([
+ const [capabilities,dash,tx,st,reviews,personal,attention,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -131,7 +135,10 @@ async async function loadBase(){
   loadResource('reconciliation',I+'/reconciliation'+filterQuery()),
   loadResource('history',I+'/history-coverage'+base),
   loadResource('team',OS+'/team'),
-  loadResource('os',OS+'/command-center')
+  loadResource('os',OS+'/command-center'),
+  loadResource('transferCandidates',API+'/relationship-candidates/transfers'),
+  loadResource('refundCandidates',API+'/relationship-candidates/refunds'),
+  loadResource('reimbursements',API+'/reimbursements')
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
@@ -139,6 +146,7 @@ async async function loadBase(){
  state.statements=st?.statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
+ state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
