@@ -252,6 +252,282 @@ function reviewView(){
  const q=state.quality||{};const ins=state.insights?.summary||{};const cards=[['Uncategorised',q.unclassified_transactions??q.unclassified,'transactions'],['Unreconciled',q.unreconciled_transactions??q.unreconciled,'reconciliation'],['Ownership missing',q.ownership_missing,'transactions'],['Unknown history coverage',q.unknown_history_coverage,'accounts'],['Transfer candidates',ins.transfer_candidates,'insights'],['Category suggestions',ins.category_suggestions,'insights'],['Anomalies',ins.anomalies,'insights']];
  return \`\${resourceError('quality','Data Quality')}<div class="fm-grid four">\${cards.map(([l,n,v])=>\`<button class="fm-kpi fm-kpi-button" data-viewjump="\${v}"><span>\${esc(l)}</span><strong>\${num(n)}</strong><small>Open underlying queue</small></button>\`).join('')}</div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Review Centre</h2><p>Quality metrics open the underlying data rather than hiding issues behind a score.</p></div></div><div class="fm-list">\${(state.personalAttention?.alerts||[]).slice(0,12).map(x=>\`<div class="fm-row"><div><h3>\${esc(x.title)}</h3><p>\${esc(x.explanation||'')}</p></div>\${statusBadge(x.severity)}</div>\`).join('')||emptyState('No personal attention alerts','No current owner-only alerts were returned.')}</div></div></article>\`;
 }
+function csvSplit(line) {
+  const values = [];
+  let value = '';
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (quoted && line[i + 1] === '"') { value += '"'; i += 1; }
+      else quoted = !quoted;
+    } else if (ch === ',' && !quoted) { values.push(value.trim()); value = ''; }
+    else value += ch;
+  }
+  values.push(value.trim());
+  return values;
+}
+
+function parseNumber(input) {
+  const cleaned = String(input || '').replace(/[$,\s]/g, '').replace(/^\((.*)\)$/, '-$1');
+  const parsed = Number(cleaned || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function parseCsv(text) {
+  const lines = String(text || '').replace(/^\uFEFF/, '').split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) throw new Error('CSV must contain a header row and at least one transaction.');
+  const headers = csvSplit(lines.shift()).map((h) => h.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
+  const aliases = {
+    transaction_date: ['transaction_date', 'date', 'transactiondate', 'value_date', 'processed_date'],
+    posting_date: ['posting_date', 'posted_date', 'process_date'],
+    description: ['description', 'details', 'transaction_details', 'narrative', 'memo'],
+    reference: ['reference', 'ref', 'transaction_reference'],
+    debit: ['debit', 'withdrawal', 'withdrawals', 'money_out', 'debits'],
+    credit: ['credit', 'deposit', 'deposits', 'money_in', 'credits'],
+    amount: ['amount', 'transaction_amount'],
+    running_balance: ['running_balance', 'balance', 'account_balance'],
+    merchant_name: ['merchant', 'merchant_name', 'payee'],
+    category: ['category'],
+    currency: ['currency']
+  };
+  const indexOf = (key) => {
+    for (const alias of aliases[key] || []) {
+      const index = headers.indexOf(alias);
+      if (index >= 0) return index;
+    }
+    return -1;
+  };
+  const idx = Object.fromEntries(Object.keys(aliases).map((key) => [key, indexOf(key)]));
+  if (idx.transaction_date < 0) throw new Error('Statement needs a transaction date column.');
+  if (idx.amount < 0 && idx.debit < 0 && idx.credit < 0) throw new Error('Statement needs Amount or Debit/Credit columns.');
+  return lines.map((line) => {
+    const cells = csvSplit(line);
+    let debit = idx.debit >= 0 ? Math.abs(parseNumber(cells[idx.debit])) : 0;
+    let credit = idx.credit >= 0 ? Math.abs(parseNumber(cells[idx.credit])) : 0;
+    if (idx.amount >= 0 && !debit && !credit) {
+      const raw = parseNumber(cells[idx.amount]);
+      if (raw < 0) debit = Math.abs(raw); else if (raw > 0) credit = raw;
+    }
+    return {
+      transaction_date: cells[idx.transaction_date],
+      posting_date: idx.posting_date >= 0 ? cells[idx.posting_date] : null,
+      description: idx.description >= 0 ? cells[idx.description] : '',
+      reference: idx.reference >= 0 ? cells[idx.reference] : '',
+      debit, credit,
+      running_balance: idx.running_balance >= 0 ? cells[idx.running_balance] : null,
+      merchant_name: idx.merchant_name >= 0 ? cells[idx.merchant_name] : null,
+      category: idx.category >= 0 ? cells[idx.category] : null,
+      currency: idx.currency >= 0 ? cells[idx.currency] : null
+    };
+  });
+}
+
+function ofxTag(block, name) {
+  const match = block.match(new RegExp(`<${name}>([^<\\r\\n]+)`, 'i'));
+  return match ? match[1].trim() : '';
+}
+
+function parseOfx(text) {
+  const blocks = String(text || '').match(/<STMTTRN>[\s\S]*?(?=<STMTTRN>|<\/BANKTRANLIST>|$)/gi) || [];
+  if (!blocks.length) throw new Error('No OFX/QFX transactions were found.');
+  return blocks.map((block) => {
+    const amount = parseNumber(ofxTag(block, 'TRNAMT'));
+    const posted = ofxTag(block, 'DTPOSTED').slice(0, 8);
+    const date = /^\d{8}$/.test(posted) ? `${posted.slice(0, 4)}-${posted.slice(4, 6)}-${posted.slice(6, 8)}` : posted;
+    const name = ofxTag(block, 'NAME');
+    const memo = ofxTag(block, 'MEMO');
+    return {
+      transaction_date: date,
+      description: [name, memo].filter(Boolean).join(' · '),
+      merchant_name: name || null,
+      reference: ofxTag(block, 'FITID') || ofxTag(block, 'REFNUM') || null,
+      debit: amount < 0 ? Math.abs(amount) : 0,
+      credit: amount > 0 ? amount : 0,
+      running_balance: null,
+      currency: null
+    };
+  });
+}
+
+function normalizeQifDate(value) {
+  const input = String(value || '').trim().replace(/'/g, '/');
+  const parts = input.split(/[\/.-]/).map((part) => part.trim()).filter(Boolean);
+  if (parts.length !== 3) return input;
+  let [a, b, c] = parts;
+  let year = Number(c);
+  if (year < 100) year += year >= 70 ? 1900 : 2000;
+  const first = Number(a); const second = Number(b);
+  const day = first > 12 ? first : second > 12 ? second : first;
+  const month = first > 12 ? second : second > 12 ? first : second;
+  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+}
+
+function parseQif(text) {
+  const records = String(text || '').split(/^\^\s*$/m).map((record) => record.trim()).filter(Boolean);
+  const rows = [];
+  for (const record of records) {
+    const fields = {};
+    for (const line of record.split(/\r?\n/)) {
+      const code = line[0];
+      if (!code || code === '!') continue;
+      fields[code] = String(line.slice(1)).trim();
+    }
+    if (!fields.D || fields.T === undefined) continue;
+    const amount = parseNumber(fields.T);
+    rows.push({
+      transaction_date: normalizeQifDate(fields.D),
+      description: [fields.P, fields.M].filter(Boolean).join(' · '),
+      merchant_name: fields.P || null,
+      reference: fields.N || null,
+      debit: amount < 0 ? Math.abs(amount) : 0,
+      credit: amount > 0 ? amount : 0,
+      running_balance: null,
+      category: fields.L || null,
+      currency: null
+    });
+  }
+  if (!rows.length) throw new Error('No QIF transactions were found.');
+  return rows;
+}
+
+async function parseXlsx(file) {
+  if (!window.XLSX) throw new Error('XLSX parser failed to load. Use CSV or try again after refreshing.');
+  const workbook = window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: false });
+  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+  if (!firstSheet) throw new Error('The spreadsheet has no readable sheet.');
+  return parseCsv(window.XLSX.utils.sheet_to_csv(firstSheet));
+}
+
+async function pdfLines(file) {
+  if (!window.pdfjsLib) throw new Error('PDF parser failed to load. Use a CSV/OFX export or refresh and try again.');
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const lines = [];
+  for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
+    const page = await pdf.getPage(pageNo);
+    const content = await page.getTextContent();
+    const groups = new Map();
+    for (const item of content.items || []) {
+      const y = Math.round(Number(item.transform?.[5] || 0) / 3) * 3;
+      if (!groups.has(y)) groups.set(y, []);
+      groups.get(y).push({ x: Number(item.transform?.[4] || 0), text: String(item.str || '').trim() });
+    }
+    [...groups.entries()].sort((a, b) => b[0] - a[0]).forEach(([, items]) => {
+      const line = items.sort((a, b) => a.x - b.x).map((item) => item.text).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+      if (line) lines.push(line);
+    });
+  }
+  return lines;
+}
+
+function parsePdfLines(lines) {
+  const datePattern = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4}\b)/;
+  const amountPattern = /(?:CR|DR)?\s*[-+]?\(?\$?\d[\d,]*\.\d{2}\)?(?:\s*(?:CR|DR))?/gi;
+  const rows = [];
+  for (const line of lines) {
+    const dateMatch = line.match(datePattern);
+    if (!dateMatch) continue;
+    const amounts = [...line.matchAll(amountPattern)].map((match) => ({ raw: match[0], index: match.index || 0 }));
+    if (!amounts.length) continue;
+    const transactionAmount = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0];
+    const balanceAmount = amounts.length >= 2 ? amounts[amounts.length - 1] : null;
+    const rawAmount = transactionAmount.raw;
+    const numeric = Math.abs(parseNumber(rawAmount.replace(/\b(?:CR|DR)\b/gi, '')));
+    const debitHint = /\bDR\b/i.test(rawAmount) || /^\s*-/.test(rawAmount) || /^\s*\(/.test(rawAmount);
+    const creditHint = /\bCR\b/i.test(rawAmount) || /^\s*\+/.test(rawAmount);
+    if (!debitHint && !creditHint) continue;
+    const description = line.slice(dateMatch.index + dateMatch[0].length, transactionAmount.index).trim();
+    rows.push({
+      transaction_date: dateMatch[0],
+      description: description || 'PDF statement transaction — verify description',
+      debit: debitHint ? numeric : 0,
+      credit: creditHint ? numeric : 0,
+      running_balance: balanceAmount ? Math.abs(parseNumber(balanceAmount.raw.replace(/\b(?:CR|DR)\b/gi, ''))) : null,
+      reference: null,
+      merchant_name: null,
+      category: null,
+      currency: null
+    });
+  }
+  if (!rows.length) throw new Error('This PDF does not expose transaction direction safely enough for automatic import. Export CSV/OFX from the bank, or use a PDF with explicit CR/DR or signed amounts. Nothing was imported.');
+  return rows;
+}
+
+async function parseStatement(file) {
+  const extension = (file.name.split('.').pop() || '').toUpperCase();
+  if (extension === 'CSV') return { format: extension, rows: parseCsv(await file.text()) };
+  if (extension === 'OFX' || extension === 'QFX') return { format: extension, rows: parseOfx(await file.text()) };
+  if (extension === 'QIF') return { format: extension, rows: parseQif(await file.text()) };
+  if (extension === 'XLSX') return { format: extension, rows: await parseXlsx(file) };
+  if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)) };
+  throw new Error('Unsupported statement file. Use CSV, PDF, OFX, QFX, QIF or XLSX.');
+}
+
+async function sha256(file) {
+  const buffer = await file.arrayBuffer();
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+
+
+async function loadTransactions(){
+ await loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters}));
+ const tx=state.resources.txPayload?.data;
+ if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
+ else state.tx=[];
+ if(state.view==='transactions')render();
+}
+async function saveManualMovement(form){
+ const fd=new FormData(form);
+ const body={bank_account_id:Number(fd.get('bank_account_id')),type:fd.get('type'),transaction_date:fd.get('transaction_date'),posting_date:fd.get('posting_date')||null,amount:fd.get('amount'),description:fd.get('description'),merchant_name:fd.get('merchant_name')||null,reference:fd.get('reference')||null,category:fd.get('category')||null,ownership_scope:fd.get('ownership_scope')||null};
+ return api(I+'/transactions',{method:'POST',body:JSON.stringify(body)});
+}
+async function openStatementWizard(){
+ $('fmModalEyebrow').textContent='STATEMENT IMPORT';$('fmModalTitle').textContent='Import statement';
+ $('fmModalBody').innerHTML=\`<form id="statementWizard" class="fm-form"><label>1. Account<select name="account_id" required><option value="">Choose account</option>\${state.accounts.map(a=>\`<option value="\${a.id}">\${esc(a.nickname||'Account')} · \${esc(a.currency||'AUD')}</option>\`).join('')}</select></label><label>2. Statement file<input name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" required></label><p class="fm-helper">The file is parsed locally, SHA-256 hashed, staged on the server, duplicate-checked and reviewed before any transaction is committed.</p><div id="statementProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Extract & review</button></div></form>\`;
+ $('fmModal').showModal();
+ document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
+ $('statementWizard').onsubmit=async e=>{
+   e.preventDefault();const form=e.currentTarget,fd=new FormData(form),file=fd.get('file'),accountId=fd.get('account_id'),account=state.accounts.find(a=>String(a.id)===String(accountId)),progress=$('statementProgress');
+   progress.hidden=false;progress.className='fm-state';progress.textContent='Reading statement…';
+   try{
+     const parsed=await parseStatement(file);
+     parsed.rows=(parsed.rows||[]).map(row=>({...row,currency:String(row.currency||account?.currency||'AUD').toUpperCase()}));
+     progress.textContent=\`Extracted \${parsed.rows.length} row(s). Running validation and duplicate checks…\`;
+     const result=await api(I+\`/accounts/\${accountId}/statements/preview\`,{method:'POST',body:JSON.stringify({source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),rows:parsed.rows})});
+     $('fmModal').close();await openStatementReview(result.import_uid);
+   }catch(error){progress.className='fm-state fm-state-error';progress.textContent=error.message}
+ };
+}
+async function openStatementReview(uid){
+ try{
+  const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)),session=result.session;
+  openDrawer('Review '+(session.original_name||'statement'),\`<div class="fm-grid four"><div class="fm-kpi"><span>Total</span><strong>\${num(session.total_rows)}</strong></div><div class="fm-kpi"><span>Valid</span><strong class="good">\${num(session.valid_rows)}</strong></div><div class="fm-kpi"><span>Duplicates</span><strong class="warn">\${num(session.duplicate_rows)}</strong></div><div class="fm-kpi"><span>Rejected</span><strong class="bad">\${num(session.rejected_rows)}</strong></div></div><div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th></tr></thead><tbody>\${(result.rows||[]).map(row=>\`<tr><td><input type="checkbox" data-review-select="\${row.id}" \${Number(row.selected)?'checked':''} \${['DUPLICATE','REJECTED'].includes(row.validation_status)?'disabled':''}></td><td>\${date(row.transaction_date)}</td><td>\${esc(row.description)}</td><td>\${num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):''}</td><td>\${num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):''}</td><td>\${statusBadge(row.validation_status)}</td></tr>\`).join('')}</tbody></table></div><div class="fm-form-actions"><button type="button" data-review-reject="\${esc(uid)}">Reject review</button><button class="primary" type="button" data-review-commit="\${esc(uid)}">Commit selected rows</button></div>\`,'STATEMENT REVIEW');
+  setTimeout(()=>{
+   document.querySelectorAll('[data-review-select]').forEach(c=>c.onchange=async()=>{try{await api(I+\`/statement-reviews/\${encodeURIComponent(uid)}/rows/\${c.dataset.reviewSelect}/select\`,{method:'POST',body:JSON.stringify({selected:c.checked})})}catch(error){c.checked=!c.checked;notice(error.message,true)}});
+   document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{try{const x=await api(I+\`/statement-reviews/\${encodeURIComponent(uid)}/commit\`,{method:'POST',body:'{}'});closeDrawer();notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+   document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+\`/statement-reviews/\${encodeURIComponent(uid)}/reject\`,{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
+  },0);
+ }catch(error){notice(error.message,true)}
+}
+function openPersonalForm(kind){
+ const p=state.personal||{},wallets=p.wallets||[];
+ $('fmModalEyebrow').textContent='PERSONAL MONEY';
+ $('fmModalTitle').textContent=kind==='budgets'?'New budget':kind==='savings'?'New savings goal':kind==='debt'?'Borrow / lend':kind==='recurring'?'Recurring item':'Cash movement';
+ if(kind==='budgets')$('fmModalBody').innerHTML=\`<form id="personalForm" class="fm-form"><label>Month<input name="month_start" type="month" required></label><label>Category<input name="category" required></label><label>Currency<input name="currency" value="AUD" maxlength="3" required></label><label>Budget limit<input name="limit_amount" inputmode="decimal" required></label><div class="fm-form-actions"><button class="primary">Save budget</button></div></form>\`;
+ else if(kind==='savings')$('fmModalBody').innerHTML=\`<form id="personalForm" class="fm-form"><label>Name<input name="name" required></label><label>Target amount<input name="target_amount" required></label><label>Current amount<input name="current_amount" value="0"></label><label>Currency<input name="currency" value="AUD"></label><label>Target date<input name="target_date" type="date"></label><label>Priority<select name="priority"><option>LOW</option><option selected>MEDIUM</option><option>HIGH</option></select></label><div class="fm-form-actions"><button class="primary">Create goal</button></div></form>\`;
+ else if(kind==='debt')$('fmModalBody').innerHTML=\`<form id="personalForm" class="fm-form"><label>Direction<select name="direction"><option value="BORROWED">I borrowed</option><option value="LENT">I lent</option></select></label><label>Person / entity<input name="counterparty" required></label><label>Amount<input name="principal_amount" required></label><label>Currency<input name="currency" value="AUD"></label><label>Due date<input name="due_date" type="date"></label><label>Note<textarea name="note"></textarea></label><div class="fm-form-actions"><button class="primary">Save</button></div></form>\`;
+ else if(kind==='recurring')$('fmModalBody').innerHTML=\`<form id="personalForm" class="fm-form"><label>Name<input name="name" required></label><label>Type<select name="item_type"><option>BILL</option><option>SUBSCRIPTION</option><option>INCOME</option></select></label><label>Amount<input name="amount" required></label><label>Currency<input name="currency" value="AUD"></label><label>Frequency<select name="frequency"><option>WEEKLY</option><option>FORTNIGHTLY</option><option selected>MONTHLY</option><option>QUARTERLY</option><option>YEARLY</option></select></label><label>Next due<input name="next_due_date" type="date" required></label><div class="fm-form-actions"><button class="primary">Save recurring item</button></div></form>\`;
+ else $('fmModalBody').innerHTML=\`<form id="personalForm" class="fm-form"><label>Wallet<select name="wallet_id" required><option value="">Choose wallet</option>\${wallets.map(w=>\`<option value="\${w.id}">\${esc(w.name)} · \${esc(w.currency)}</option>\`).join('')}</select></label><label>Type<select name="entry_type"><option>EXPENSE</option><option>INCOME</option><option>CASH_OUT</option><option>CASH_IN</option></select></label><label>Amount<input name="amount" required></label><label>Currency<input name="currency" value="\${esc(wallets[0]?.currency||'AUD')}"></label><label>Category<input name="category"></label><label>Counterparty<input name="counterparty"></label><label>Date/time<input name="occurred_at" type="datetime-local"></label><div class="fm-form-actions"><button class="primary">Record movement</button></div></form>\`;
+ $('fmModal').showModal();
+ $('personalForm').onsubmit=async e=>{
+  e.preventDefault();const fd=new FormData(e.currentTarget);let path=API+'/personal-money/entries',body=Object.fromEntries(fd.entries());
+  if(kind==='budgets'){path=API+'/personal-money/budgets';body.month_start=(body.month_start||'')+'-01'}else if(kind==='savings')path=API+'/personal-money/goals';else if(kind==='debt')path=API+'/personal-money/debts';else if(kind==='recurring')path=API+'/personal-money/recurring';
+  try{await api(path,{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice('Saved.');await refresh()}catch(error){notice(error.message,true)}
+ };
+}
 function render(){const [t,s]=title(state.view);$('fmTitle').textContent=t;$('fmSubtitle').textContent=s;navButtons();$('fmContent').innerHTML=state.view==='overview'?overview():state.view==='accounts'?accounts():state.view==='transactions'?transactions():state.view==='statements'?statements():simpleView(state.view);bindDynamic()}
 async function go(v){state.view=v;history.replaceState(null,'','#'+v);render()}
 function bindDynamic(){
