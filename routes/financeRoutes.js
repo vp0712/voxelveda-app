@@ -18,6 +18,7 @@ const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
 const financeReportBuilder = require('../controllers/financeReportBuilderController');
 const financeTransactionLifecycle = require('../controllers/financeTransactionLifecycleController');
+const financeControlPreferences = require('../controllers/financeControlPreferencesController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -57,6 +58,13 @@ const financeReceiptUpload = multer(secureMulterOptions(financeReceiptStorage, 1
 
 
 router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => res.json(financeCapabilities()));
+router.get('/categories', requireAnyPermission('VIEW_BANKING'), financeControlPreferences.listCategories);
+router.post('/categories', requireAnyPermission('EDIT_FINANCE'), financeControlPreferences.createCategory);
+router.put('/categories/:id', requireAnyPermission('EDIT_FINANCE'), financeControlPreferences.updateCategory);
+router.post('/categories/:id/archive', requireAnyPermission('EDIT_FINANCE'), financeControlPreferences.archiveCategory);
+router.post('/categories/:id/restore', requireAnyPermission('EDIT_FINANCE'), financeControlPreferences.restoreCategory);
+router.get('/preferences', requireAnyPermission('VIEW_BANKING'), financeControlPreferences.getPreferences);
+router.put('/preferences', requireAnyPermission('VIEW_BANKING'), financeControlPreferences.savePreferences);
 router.get('/overview', controller.getOverview);
 router.get('/financial-years', controller.getFinancialYears);
 router.post('/financial-years/:id/check', requireAnyPermission('EDIT_FINANCE'), controller.runYearEndCheck);
