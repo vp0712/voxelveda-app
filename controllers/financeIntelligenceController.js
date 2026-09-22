@@ -5,6 +5,7 @@ const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
+const trustedTotals = require('../services/financeTrustedTotalsService');
 
 const VALID_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const DASHBOARD_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'ALL']);
@@ -175,11 +176,11 @@ exports.getTransactions = async (req, res) => {
 
     const [[count]] = await pool.query(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS total_in,
-              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS total_out,
+              ${trustedTotals.aggregateSelect('bt')},
               SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
          FROM bank_transactions bt
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         ${trustedTotals.joins('bt')}
         WHERE ${where}`, params
     );
     const [rows] = await pool.query(
@@ -208,11 +209,11 @@ exports.getTransactions = async (req, res) => {
       total: Number(count.total || 0),
       total_pages: Math.max(1, Math.ceil(Number(count.total || 0) / limit)),
       summary: {
-        money_in: count.total_in || '0.00',
-        money_out: count.total_out || '0.00',
-        net_cash_flow: money.subtract(count.total_in || 0, count.total_out || 0),
+        ...trustedTotals.normalize(count),
+        money_in: trustedTotals.normalize(count).cash_in,
+        money_out: trustedTotals.normalize(count).cash_out,
         manual_overrides: Number(count.manual_overrides || 0),
-        transfer_policy: 'Internal transfers are excluded from money-in and money-out totals.'
+        policy: trustedTotals.POLICY
       },
       transactions: rows,
       separation: {
@@ -730,7 +731,7 @@ exports.getBankingDashboard = async (req, res) => {
     if (to) { txClauses.push('bt.transaction_date<=?'); txParams.push(to); }
     const txWhere = txClauses.join(' AND ');
 
-    const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
+    const [accounts, balances, flow, economic, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
       pool.query(
         `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
                 ba.entity_name,ba.account_type,ba.financial_purpose,ba.connection_type,ba.connection_status,
@@ -757,6 +758,16 @@ exports.getBankingDashboard = async (req, res) => {
                 COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_out,
                 SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${txWhere}
+          GROUP BY bt.currency ORDER BY bt.currency`,
+        txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,
+                ${trustedTotals.aggregateSelect('bt')}
+           FROM bank_transactions bt
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           ${trustedTotals.joins('bt')}
           WHERE ${txWhere}
           GROUP BY bt.currency ORDER BY bt.currency`,
         txParams
@@ -821,6 +832,7 @@ exports.getBankingDashboard = async (req, res) => {
     const currencies = [...new Set([
       ...balances.map((row) => row.currency),
       ...flow.map((row) => row.currency),
+      ...economic.map((row) => row.currency),
       ...monthly.map((row) => row.currency)
     ].filter(Boolean))];
     const recurringFactor = (frequency) => {
@@ -916,6 +928,11 @@ exports.getBankingDashboard = async (req, res) => {
         cash_out: Number(row.cash_out || 0),
         unclassified: Number(row.unclassified || 0)
       })),
+      economic_by_currency: economic.map((row) => ({
+        currency: row.currency,
+        ...trustedTotals.normalize(row)
+      })),
+      totals_policy: trustedTotals.POLICY,
       categories: categories.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
       merchants: merchants.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
       monthly: monthly.map((row) => ({ ...row, money_in: Number(row.money_in || 0), money_out: Number(row.money_out || 0) })),
