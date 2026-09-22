@@ -6,9 +6,10 @@
 - **income / money_in**: credits in the selected activity period excluding internal transfers and ignored transactions.
 - **expense / money_out**: debits in the selected activity period excluding internal transfers and ignored transactions.
 - **net_cash_flow**: money_in minus money_out for the selected period. It is not account balance.
-- **transfer**: linked/identified movement between owned accounts. Visible as movement but excluded from income/expense totals.
-- **refund**: must eventually link to an original expense; until a canonical relationship exists it must not be assumed to be revenue or automatically netted.
-- **reimbursement**: must eventually link expense, claimant and reimbursement payment; not currently canonical.
+- **transfer**: confirmed `finance_transfer_links` pair between owned-account debit and credit movements. Visible as movement but excluded from income/expense totals.
+- **split**: child classification allocations in `bank_transaction_splits` whose exact sum equals the immutable parent bank transaction amount. Reporting uses children for category/ownership allocation without counting the parent again.
+- **refund**: an active `finance_refund_links` relationship connects a credit to an original expense. Linked refunds remain visible cash inflow, are excluded from ordinary-revenue interpretation, and reduce net economic expense only by the linked amount.
+- **reimbursement**: `finance_reimbursements` links an expense, claimant and lifecycle state; `finance_reimbursement_payments` links approved settlement transactions. Reimbursement payments must not duplicate the original expense or create synthetic cash movement.
 - **ownership_scope**: PERSONAL, BUSINESS, MIXED or UNCLASSIFIED, subject to account ownership and privacy rules.
 - **original_category**: immutable raw source/bank category in provenance storage.
 - **system_category**: current user/system classification; it may change without overwriting original source evidence.
