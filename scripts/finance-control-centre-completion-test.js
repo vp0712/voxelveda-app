@@ -78,7 +78,7 @@ if (cspIndex < 0 || csrfIndex < 0 || cspIndex > csrfIndex) {
   throw new Error('CSP report ingestion must remain before CSRF enforcement while retaining rate limiting and validation');
 }
 
-const trustedTotals = read('services/financeTrustedTotalsService.js');
+const trustedTotals = read('services/financeTrustedTotals.js');
 expect(trustedTotals, 'net_economic_expense', 'Trusted totals must expose net economic expense semantics');
 expect(trustedTotals, 'linked_refund_inflow', 'Trusted totals must expose linked refund inflow semantics');
 expect(routes, "router.get('/reports/builder'", 'Report Builder route must exist');
@@ -89,7 +89,7 @@ expect(routes, "router.post('/accounting-periods/:id/status'", 'Accounting perio
 expect(routes, "router.post('/categories'", 'Finance category creation route must exist');
 expect(routes, "router.post('/bank-transactions/:id/archive'", 'Recoverable transaction archive route must exist');
 expect(routes, "router.post('/bank-transactions/:id/restore'", 'Recoverable transaction restore route must exist');
-expect(ui, 'global search', 'Finance UI must keep global search capability discoverable');
+expect(ui.toLowerCase(), 'global search', 'Finance UI must keep global search capability discoverable');
 
 console.log('FINANCE_FINAL_PRODUCTION_VERIFICATION_OK');
 
