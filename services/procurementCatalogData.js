@@ -13,9 +13,21 @@ function loadProcurementCatalog() {
   // sheet as the master BOM when the alias is missing.
   // The master BOM is embedded separately from the order-plan sheets so it can
   // never fall back to Order 1 / Order 2 / Order 3 data.
-  data.bom = JSON.parse(
-    zlib.inflateSync(Buffer.from(MASTER_BOM_B64, 'base64')).toString('utf8')
-  );
+  try {
+    data.bom = JSON.parse(
+      zlib.inflateSync(Buffer.from(MASTER_BOM_B64, 'base64')).toString('utf8')
+    );
+    data.catalog_source = 'MASTER_BOM_EMBEDDED';
+    data.catalog_warning = null;
+  } catch (error) {
+    // A damaged optional master-BOM payload must never prevent the application
+    // from starting. Keep the already-decoded catalog BOM available and expose
+    // a diagnostic so Procurement can be repaired without taking Finance down.
+    console.error('Procurement master BOM payload could not be decoded; using base catalog BOM:', error.message);
+    data.bom = Array.isArray(data.bom) ? data.bom : [];
+    data.catalog_source = 'BASE_CATALOG_FALLBACK';
+    data.catalog_warning = 'Master BOM payload could not be decoded. Base catalog BOM is being used until the workbook payload is repaired.';
+  }
 
   return data;
 }
