@@ -537,39 +537,49 @@ exports.getStatementReport = async (req, res) => {
     const [summaryRows, categoryRows, merchantRows, monthlyRows, transactionRows] = await Promise.all([
       pool.query(
         `SELECT COUNT(*) AS transaction_count,
-                COALESCE(SUM(bt.credit),0) AS money_in,
-                COALESCE(SUM(bt.debit),0) AS money_out,
-                COALESCE(SUM(bt.credit-bt.debit),0) AS net_flow,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' THEN bt.debit ELSE 0 END),0) AS cash_spent,
+                ${trustedTotals.aggregateSelect('bt')},
+                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_spent,
                 SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides,
                 SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           ${trustedTotals.joins('bt')}
           WHERE ${filters.where}`, filters.params
       ),
       pool.query(
         `SELECT COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
-                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent,
-                COALESCE(SUM(bt.credit),0) AS received
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').grossExpense}),0) AS spent,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').income}),0) AS received
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           ${trustedTotals.joins('bt')}
           WHERE ${filters.where}
           GROUP BY COALESCE(NULLIF(bt.category,''),'Unclassified')
+          HAVING spent<>0 OR received<>0
           ORDER BY spent DESC, transaction_count DESC`, filters.params
       ),
       pool.query(
         `SELECT COALESCE(NULLIF(bt.merchant_name,''), NULLIF(bt.description,''), 'Unknown') AS merchant,
-                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent,
-                COALESCE(SUM(bt.credit),0) AS received
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').grossExpense}),0) AS spent,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').income}),0) AS received
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           ${trustedTotals.joins('bt')}
           WHERE ${filters.where}
           GROUP BY COALESCE(NULLIF(bt.merchant_name,''), NULLIF(bt.description,''), 'Unknown')
+          HAVING spent<>0 OR received<>0
           ORDER BY spent DESC, transaction_count DESC LIMIT 25`, filters.params
       ),
       pool.query(
-        `SELECT DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
-                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received, COUNT(*) AS transaction_count
+        `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').grossExpense}),0) AS spent,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').income}),0) AS received,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').refundOffset}),0) AS refund_offset,
+                COALESCE(SUM(${trustedTotals.selectExpressions('bt').netExpense}),0) AS net_expense,
+                COUNT(*) AS transaction_count
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           ${trustedTotals.joins('bt')}
           WHERE ${filters.where}
-          GROUP BY DATE_FORMAT(bt.transaction_date,'%Y-%m') ORDER BY month`, filters.params
+          GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') ORDER BY bt.currency,month`, filters.params
       ),
       pool.query(
         `SELECT bt.id, bt.transaction_date, bt.description, bt.merchant_name, bt.category, bt.debit, bt.credit,
@@ -581,6 +591,7 @@ exports.getStatementReport = async (req, res) => {
       )
     ]);
     const summary = summaryRows[0][0] || {};
+    const normalizedSummary = trustedTotals.normalize(summary);
     return res.json({
       statement: {
         import_uid: statement.import_uid,
@@ -602,13 +613,16 @@ exports.getStatementReport = async (req, res) => {
       filters: { from: filters.from, to: filters.to },
       summary: {
         transaction_count: Number(summary.transaction_count || 0),
-        money_in: summary.money_in || '0.00',
-        money_out: summary.money_out || '0.00',
-        net_flow: summary.net_flow || '0.00',
+        ...normalizedSummary,
+        money_in: normalizedSummary.cash_in,
+        money_out: normalizedSummary.cash_out,
+        net_flow: normalizedSummary.net_cash_flow,
         cash_spent: summary.cash_spent || '0.00',
         manual_overrides: Number(summary.manual_overrides || 0),
         unclassified: Number(summary.unclassified || 0)
       },
+      totals_policy: trustedTotals.POLICY,
+      category_semantics: 'Breakdowns show gross economic expense. Linked refunds remain a separate offset because exact allocation across split lines is not inferred.',
       categories: categoryRows[0],
       merchants: merchantRows[0],
       monthly: monthlyRows[0],
