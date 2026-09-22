@@ -14,6 +14,7 @@ const bankingReadiness = require('../controllers/financeBankingReadinessControll
 const bankingOS = require('../controllers/bankingOperatingSystemController');
 const openBanking = require('../controllers/openBankingController');
 const financeReceipt = require('../controllers/financeReceiptController');
+const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
@@ -222,7 +223,9 @@ router.get('/bank-accounts', requireAnyPermission('VIEW_BANKING'), financePrivac
 router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountBody('id'), financePrivacy.protectScopeConversion('id', 'ownership_scope'), requireStepUp('CHANGE_BANK_DETAILS'), operations.saveBankAccount);
 router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
+router.get('/receipts', requireAnyPermission('VIEW_BANKING'), financeReceipt.center);
 router.get('/bank-transactions/:id/original', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), statementReview.getOriginalBankTransaction);
+router.get('/bank-transactions/:id/audit', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeAudit.transactionTimeline);
 router.get('/bank-transactions/:id/transfer-links', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getTransferLinks);
 router.post('/bank-transactions/:id/transfer-links', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.linkTransfer);
 router.delete('/bank-transactions/:id/transfer-links/:linkId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.unlinkTransfer);

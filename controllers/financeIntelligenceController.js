@@ -5,6 +5,7 @@ const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
+const trustedTotals = require('../services/financeTrustedTotals');
 
 const VALID_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const DASHBOARD_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'ALL']);
@@ -56,65 +57,65 @@ exports.getOverview = async (req, res) => {
     const accountClauses = ["ba.status = 'ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { accountClauses.push('ba.ownership_scope = ?'); accountParams.push(scope); }
-    const txClauses = [privacy.visibilitySql('ba', req)];
+    const txClauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
     const txParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { txClauses.push('bt.ownership_scope = ?'); txParams.push(scope); }
+    const txWhere = txClauses.join(' AND ');
 
-    const [accountRows] = await pool.query(
-      `SELECT ba.id, ba.nickname, ba.institution, ba.account_number_masked, ba.currency,
-              ba.ownership_scope, ba.entity_name, ba.account_type, ba.financial_purpose,
-              ba.connection_type, ba.connection_status, ba.current_ledger_balance,
-              ba.available_balance, ba.history_start_date, ba.history_end_date, ba.last_synced_at,
-              (SELECT COUNT(*) FROM bank_transactions bt WHERE bt.bank_account_id = ba.id) AS transaction_count,
-              (SELECT COUNT(*) FROM bank_transactions bt WHERE bt.bank_account_id = ba.id AND bt.reconciliation_status = 'UNRECONCILED') AS unreconciled_count
-         FROM bank_accounts ba
-        WHERE ${accountClauses.join(' AND ')}
-        ORDER BY ba.ownership_scope, ba.nickname`, accountParams
-    );
-    const [summaryRows] = await pool.query(
-      `SELECT
-          COALESCE(SUM(CASE WHEN bt.credit > 0 AND bt.is_internal_transfer = 0 AND bt.reconciliation_status <> 'IGNORED' THEN bt.credit ELSE 0 END),0) AS total_inflow,
-          COALESCE(SUM(CASE WHEN bt.debit > 0 AND bt.is_internal_transfer = 0 AND bt.reconciliation_status <> 'IGNORED' THEN bt.debit ELSE 0 END),0) AS total_outflow,
-          COUNT(*) AS transaction_count,
-          SUM(CASE WHEN bt.classification_status = 'UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified_count,
-          SUM(CASE WHEN bt.reconciliation_status = 'UNRECONCILED' THEN 1 ELSE 0 END) AS unreconciled_count
-         FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-        WHERE ${txClauses.join(' AND ')}`, txParams
-    );
-    const [categoryRows] = await pool.query(
-      `SELECT COALESCE(NULLIF(bt.category,''), 'Unclassified') AS category, SUM(bt.debit) AS amount, COUNT(*) AS transaction_count
-         FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-        WHERE bt.debit > 0 AND bt.is_internal_transfer = 0 AND bt.reconciliation_status <> 'IGNORED' AND ${txClauses.join(' AND ')}
-        GROUP BY COALESCE(NULLIF(bt.category,''), 'Unclassified')
-        ORDER BY amount DESC LIMIT 12`, txParams
-    );
-    const [monthRows] = await pool.query(
-      `SELECT DATE_FORMAT(bt.transaction_date, '%Y-%m') AS month,
-              SUM(CASE WHEN bt.credit > 0 AND bt.is_internal_transfer = 0 AND bt.reconciliation_status <> 'IGNORED' THEN bt.credit ELSE 0 END) AS inflow,
-              SUM(CASE WHEN bt.debit > 0 AND bt.is_internal_transfer = 0 AND bt.reconciliation_status <> 'IGNORED' THEN bt.debit ELSE 0 END) AS outflow
-         FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-        WHERE bt.transaction_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH) AND ${txClauses.join(' AND ')}
-        GROUP BY DATE_FORMAT(bt.transaction_date, '%Y-%m') ORDER BY month`, txParams
-    );
-    const summary = summaryRows[0] || {};
-    const inflow = money.toCents(summary.total_inflow || 0);
-    const outflow = money.toCents(summary.total_outflow || 0);
+    const [accountRows, summaryByCurrency, categoryRows, monthRows, qualityRows] = await Promise.all([
+      pool.query(
+        `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,
+                ba.ownership_scope,ba.entity_name,ba.account_type,ba.financial_purpose,
+                ba.connection_type,ba.connection_status,ba.current_ledger_balance,
+                ba.available_balance,ba.history_start_date,ba.history_end_date,ba.last_synced_at,
+                (SELECT COUNT(*) FROM bank_transactions bx WHERE bx.bank_account_id=ba.id) AS transaction_count,
+                (SELECT COUNT(*) FROM bank_transactions bx WHERE bx.bank_account_id=ba.id AND bx.reconciliation_status='UNRECONCILED') AS unreconciled_count
+           FROM bank_accounts ba
+          WHERE ${accountClauses.join(' AND ')}
+          ORDER BY ba.ownership_scope,ba.nickname`, accountParams
+      ).then(([rows]) => rows),
+      trustedTotals.cashTotalsByCurrency(pool, txWhere, txParams),
+      trustedTotals.categorySpendByCurrency(pool, txWhere, txParams, 40),
+      pool.query(
+        `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS inflow,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS outflow
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE bt.transaction_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH) AND ${txWhere}
+          GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
+          ORDER BY bt.currency,month`, txParams
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT
+            COUNT(*) AS transaction_count,
+            SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified_count,
+            SUM(CASE WHEN bt.reconciliation_status='UNRECONCILED' THEN 1 ELSE 0 END) AS unreconciled_count
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${txWhere}`, txParams
+      ).then(([rows]) => rows[0] || {})
+    ]);
+    const single = trustedTotals.singleCurrencySummary(summaryByCurrency);
     return res.json({
       scope,
       privacy: { personal_accounts_owner_only: true },
+      currency_rule: 'Currencies are never combined without verified FX evidence. Refund cash is separated from ordinary money-in.',
       summary: {
-        total_inflow: money.fromCents(inflow), total_outflow: money.fromCents(outflow), net_cash_flow: money.fromCents(inflow - outflow),
-        transaction_count: Number(summary.transaction_count || 0), unclassified_count: Number(summary.unclassified_count || 0),
-        unreconciled_count: Number(summary.unreconciled_count || 0), account_count: accountRows.length
+        ...single,
+        total_inflow: single.consolidated_available ? single.money_in : null,
+        total_outflow: single.consolidated_available ? single.money_out : null,
+        transaction_count: Number(qualityRows.transaction_count || 0),
+        unclassified_count: Number(qualityRows.unclassified_count || 0),
+        unreconciled_count: Number(qualityRows.unreconciled_count || 0),
+        account_count: accountRows.length
       },
+      summary_by_currency: summaryByCurrency,
       accounts: accountRows,
       spending_by_category: categoryRows,
-      monthly_cash_flow: monthRows
+      monthly_cash_flow: monthRows,
+      split_policy: 'Split child category amounts replace the parent category amount and are never double counted.'
     });
   } catch (error) { return fail(res, error, 'Failed to load Finance Intelligence overview'); }
 };
-
-
 exports.getTransactions = async (req, res) => {
   try {
     await ensureFinanceSchema();
@@ -157,8 +158,12 @@ exports.getTransactions = async (req, res) => {
     if (bank) { clauses.push('ba.institution LIKE ?'); params.push(`%${bank}%`); }
     if (merchant) { clauses.push('bt.merchant_name LIKE ?'); params.push(`%${merchant}%`); }
     if (category) {
-      if (category.toUpperCase() === 'UNCLASSIFIED') clauses.push("(bt.category IS NULL OR bt.category='')");
-      else { clauses.push('bt.category=?'); params.push(category); }
+      if (category.toUpperCase() === 'UNCLASSIFIED') {
+        clauses.push("((NOT EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id) AND (bt.category IS NULL OR bt.category='')) OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND (sx.category IS NULL OR sx.category='')))");
+      } else {
+        clauses.push("(bt.category=? OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND sx.category=?))");
+        params.push(category, category);
+      }
     }
     if (type === 'TRANSFER') clauses.push('bt.is_internal_transfer=1');
     else if (type === 'INCOME') clauses.push('bt.credit>0 AND bt.is_internal_transfer=0');
@@ -175,13 +180,12 @@ exports.getTransactions = async (req, res) => {
 
     const [[count]] = await pool.query(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS total_in,
-              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS total_out,
               SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
          FROM bank_transactions bt
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
         WHERE ${where}`, params
     );
+    const summaryByCurrency = await trustedTotals.cashTotalsByCurrency(pool, where, params);
     const [rows] = await pool.query(
       `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.posting_date, bt.description, bt.reference,
               bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.category, bt.currency,
@@ -208,12 +212,12 @@ exports.getTransactions = async (req, res) => {
       total: Number(count.total || 0),
       total_pages: Math.max(1, Math.ceil(Number(count.total || 0) / limit)),
       summary: {
-        money_in: count.total_in || '0.00',
-        money_out: count.total_out || '0.00',
-        net_cash_flow: money.subtract(count.total_in || 0, count.total_out || 0),
+        ...trustedTotals.singleCurrencySummary(summaryByCurrency),
         manual_overrides: Number(count.manual_overrides || 0),
-        transfer_policy: 'Internal transfers are excluded from money-in and money-out totals.'
+        transfer_policy: 'Internal transfers are excluded from money-in and money-out totals.',
+        refund_policy: 'Linked refunds are cash inflow but are separated from ordinary money-in.'
       },
+      summary_by_currency: summaryByCurrency,
       transactions: rows,
       separation: {
         business_label: 'Voxel Veda Company',
@@ -523,7 +527,7 @@ exports.getStatementReport = async (req, res) => {
     if (!importUid) throw new FinanceError('Statement identifier is required.', 400, 'STATEMENT_ID_REQUIRED');
 
     const [[statement]] = await pool.query(
-      `SELECT sif.*, ba.nickname AS account_name, ba.institution, ba.ownership_scope, ba.currency, ba.entity_name
+      `SELECT sif.*,ba.nickname AS account_name,ba.institution,ba.ownership_scope,ba.currency,ba.entity_name
          FROM statement_import_files sif
          JOIN bank_accounts ba ON ba.id=sif.bank_account_id
         WHERE sif.import_uid=? AND ${privacy.visibilitySql('ba', req)}
@@ -533,53 +537,50 @@ exports.getStatementReport = async (req, res) => {
     if (!statement) throw new FinanceError('Statement was not found or is not available to this user.', 404, 'STATEMENT_NOT_FOUND');
 
     const filters = spendingWhere(req, { statementUid: importUid });
-    const [summaryRows, categoryRows, merchantRows, monthlyRows, transactionRows] = await Promise.all([
+    const [summaryByCurrency, categories, merchantRows, monthlyRows, transactionRows, manualRows] = await Promise.all([
+      trustedTotals.cashTotalsByCurrency(pool, filters.where, filters.params),
+      trustedTotals.categorySpendByCurrency(pool, filters.where, filters.params, 200),
       pool.query(
-        `SELECT COUNT(*) AS transaction_count,
-                COALESCE(SUM(bt.credit),0) AS money_in,
-                COALESCE(SUM(bt.debit),0) AS money_out,
-                COALESCE(SUM(bt.credit-bt.debit),0) AS net_flow,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' THEN bt.debit ELSE 0 END),0) AS cash_spent,
-                SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides,
-                SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where}`, filters.params
-      ),
-      pool.query(
-        `SELECT COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
-                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent,
-                COALESCE(SUM(bt.credit),0) AS received
+        `SELECT bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE ${filters.where}
-          GROUP BY COALESCE(NULLIF(bt.category,''),'Unclassified')
-          ORDER BY spent DESC, transaction_count DESC`, filters.params
-      ),
+          GROUP BY bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
+          ORDER BY bt.currency,spent DESC,transaction_count DESC LIMIT 100`, filters.params
+      ).then(([rows]) => rows),
       pool.query(
-        `SELECT COALESCE(NULLIF(bt.merchant_name,''), NULLIF(bt.description,''), 'Unknown') AS merchant,
-                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent,
-                COALESCE(SUM(bt.credit),0) AS received
+        `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received,
+                COUNT(*) AS transaction_count
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE ${filters.where}
-          GROUP BY COALESCE(NULLIF(bt.merchant_name,''), NULLIF(bt.description,''), 'Unknown')
-          ORDER BY spent DESC, transaction_count DESC LIMIT 25`, filters.params
-      ),
+          GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
+          ORDER BY bt.currency,month`, filters.params
+      ).then(([rows]) => rows),
       pool.query(
-        `SELECT DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
-                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received, COUNT(*) AS transaction_count
+        `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,
+                bt.running_balance,bt.currency,bt.reconciliation_status,bt.manual_override,bt.source_type,
+                bt.is_internal_transfer,ba.nickname AS account_name
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE ${filters.where}
-          GROUP BY DATE_FORMAT(bt.transaction_date,'%Y-%m') ORDER BY month`, filters.params
-      ),
+          ORDER BY bt.transaction_date ASC,bt.id ASC LIMIT 5000`, filters.params
+      ).then(([rows]) => rows),
       pool.query(
-        `SELECT bt.id, bt.transaction_date, bt.description, bt.merchant_name, bt.category, bt.debit, bt.credit,
-                bt.running_balance, bt.currency, bt.reconciliation_status, bt.manual_override, bt.source_type,
-                ba.nickname AS account_name
+        `SELECT bt.currency,SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where}
-          ORDER BY bt.transaction_date ASC, bt.id ASC LIMIT 5000`, filters.params
-      )
+          WHERE ${filters.where} GROUP BY bt.currency`, filters.params
+      ).then(([rows]) => rows)
     ]);
-    const summary = summaryRows[0][0] || {};
+    const enrichedSummary = summaryByCurrency.map((row) => {
+      const currencyCategories = categories.filter((entry) => entry.currency === row.currency);
+      const cashSpentCents = currencyCategories.filter((entry) => String(entry.category).toLowerCase() === 'cash').reduce((sum, entry) => sum + money.toCents(entry.spent || 0), 0n);
+      const unclassified = currencyCategories.filter((entry) => String(entry.category).toLowerCase() === 'unclassified').reduce((sum, entry) => sum + Number(entry.source_transaction_count || 0), 0);
+      const manual = manualRows.find((entry) => String(entry.currency).toUpperCase() === row.currency);
+      return { ...row, net_flow: row.net_cash_flow, cash_spent: money.fromCents(cashSpentCents), unclassified, manual_overrides: Number(manual?.manual_overrides || 0) };
+    });
     return res.json({
       statement: {
         import_uid: statement.import_uid,
@@ -599,110 +600,121 @@ exports.getStatementReport = async (req, res) => {
         reviewed_at: statement.reviewed_at
       },
       filters: { from: filters.from, to: filters.to },
-      summary: {
-        transaction_count: Number(summary.transaction_count || 0),
-        money_in: summary.money_in || '0.00',
-        money_out: summary.money_out || '0.00',
-        net_flow: summary.net_flow || '0.00',
-        cash_spent: summary.cash_spent || '0.00',
-        manual_overrides: Number(summary.manual_overrides || 0),
-        unclassified: Number(summary.unclassified || 0)
-      },
-      categories: categoryRows[0],
-      merchants: merchantRows[0],
-      monthly: monthlyRows[0],
-      transactions: transactionRows[0],
-      legacy_linkage: Number(statement.imported_rows || 0) > 0 && Number(summary.transaction_count || 0) === 0
+      currency_rule: 'Statement activity remains in native currency; linked refunds are not ordinary revenue.',
+      summary: trustedTotals.singleCurrencySummary(enrichedSummary),
+      summary_by_currency: enrichedSummary,
+      categories,
+      merchants: merchantRows,
+      monthly: monthlyRows,
+      transactions: transactionRows,
+      split_policy: 'Split child categories replace the parent category allocation for reporting; the source bank transaction stays immutable.',
+      refund_policy: 'Linked refund cash inflow is separated and reduces net economic expense.',
+      legacy_linkage: Number(statement.imported_rows || 0) > 0 && transactionRows.length === 0
     });
   } catch (error) { return fail(res, error, 'Failed to build statement report'); }
 };
-
 exports.getSpendingReport = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const filters = spendingWhere(req);
-    const [summaryRows, categoryRows, merchantRows, accountRows, monthlyRows, weekdayRows, transactionRows] = await Promise.all([
+    const [summaryByCurrency, categories, merchantRows, accountRows, monthlyRows, weekdayRows, transactionRows, manualRows] = await Promise.all([
+      trustedTotals.cashTotalsByCurrency(pool, filters.where, filters.params),
+      trustedTotals.categorySpendByCurrency(pool, filters.where, filters.params, 200),
       pool.query(
-        `SELECT COUNT(*) AS transaction_count, COALESCE(SUM(bt.credit),0) AS money_in,
-                COALESCE(SUM(bt.debit),0) AS money_out, COALESCE(SUM(bt.credit-bt.debit),0) AS net_flow,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' THEN bt.debit ELSE 0 END),0) AS cash_spent,
-                SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified,
-                SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id WHERE ${filters.where}`, filters.params
-      ),
-      pool.query(
-        `SELECT COALESCE(NULLIF(bt.category,''),'Unclassified') AS category, COUNT(*) AS transaction_count,
-                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
+        `SELECT bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where} GROUP BY COALESCE(NULLIF(bt.category,''),'Unclassified')
-          ORDER BY spent DESC, transaction_count DESC LIMIT 40`, filters.params
-      ),
+          WHERE ${filters.where}
+          GROUP BY bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
+          ORDER BY bt.currency,spent DESC,transaction_count DESC LIMIT 200`, filters.params
+      ).then(([rows]) => rows),
       pool.query(
-        `SELECT COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
-                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where} GROUP BY COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
-          ORDER BY spent DESC, transaction_count DESC LIMIT 40`, filters.params
-      ),
-      pool.query(
-        `SELECT ba.id AS bank_account_id, ba.nickname AS account_name, ba.ownership_scope, COUNT(*) AS transaction_count,
-                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
+        `SELECT ba.id AS bank_account_id,ba.nickname AS account_name,ba.ownership_scope,ba.currency,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE ${filters.where} GROUP BY ba.id ORDER BY spent DESC`, filters.params
-      ),
+      ).then(([rows]) => rows),
       pool.query(
-        `SELECT DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month, COUNT(*) AS transaction_count,
-                COALESCE(SUM(bt.debit),0) AS spent, COALESCE(SUM(bt.credit),0) AS received
+        `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where} GROUP BY DATE_FORMAT(bt.transaction_date,'%Y-%m') ORDER BY month`, filters.params
-      ),
+          WHERE ${filters.where}
+          GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
+          ORDER BY bt.currency,month`, filters.params
+      ).then(([rows]) => rows),
       pool.query(
-        `SELECT DAYNAME(bt.transaction_date) AS weekday, WEEKDAY(bt.transaction_date) AS weekday_index,
-                COUNT(*) AS transaction_count, COALESCE(SUM(bt.debit),0) AS spent
+        `SELECT bt.currency,DAYNAME(bt.transaction_date) AS weekday,WEEKDAY(bt.transaction_date) AS weekday_index,
+                COUNT(*) AS transaction_count,
+                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where} GROUP BY DAYNAME(bt.transaction_date), WEEKDAY(bt.transaction_date)
-          ORDER BY weekday_index`, filters.params
-      ),
+          WHERE ${filters.where}
+          GROUP BY bt.currency,DAYNAME(bt.transaction_date),WEEKDAY(bt.transaction_date)
+          ORDER BY bt.currency,weekday_index`, filters.params
+      ).then(([rows]) => rows),
       pool.query(
-        `SELECT bt.id, bt.transaction_date, bt.description, bt.merchant_name, bt.category, bt.debit, bt.credit,
-                bt.currency, bt.ownership_scope, bt.reconciliation_status, bt.source_type, bt.statement_import_uid,
-                bt.manual_override, ba.nickname AS account_name, sif.original_name AS statement_name
+        `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,
+                bt.currency,bt.ownership_scope,bt.reconciliation_status,bt.source_type,bt.statement_import_uid,
+                bt.manual_override,bt.is_internal_transfer,ba.nickname AS account_name,sif.original_name AS statement_name
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
            LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
           WHERE ${filters.where}
-          ORDER BY bt.transaction_date DESC, bt.id DESC LIMIT 5000`, filters.params
-      )
+          ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 5000`, filters.params
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${filters.where} GROUP BY bt.currency`, filters.params
+      ).then(([rows]) => rows)
     ]);
-    const summary = summaryRows[0][0] || {};
-    const totalSpent = Number(summary.money_out || 0);
-    const categories = categoryRows[0].map((row) => ({
-      ...row,
-      percentage_of_spend: totalSpent > 0 ? Number(((Number(row.spent || 0) / totalSpent) * 100).toFixed(2)) : 0
-    }));
+
+    const enrichedSummary = summaryByCurrency.map((row) => {
+      const currencyCategories = categories.filter((entry) => entry.currency === row.currency);
+      const cashSpentCents = currencyCategories
+        .filter((entry) => String(entry.category).toLowerCase() === 'cash')
+        .reduce((sum, entry) => sum + money.toCents(entry.spent || 0), 0n);
+      const unclassified = currencyCategories
+        .filter((entry) => String(entry.category).toLowerCase() === 'unclassified')
+        .reduce((sum, entry) => sum + Number(entry.source_transaction_count || 0), 0);
+      const manual = manualRows.find((entry) => String(entry.currency).toUpperCase() === row.currency);
+      return {
+        ...row,
+        net_flow: row.net_cash_flow,
+        cash_spent: money.fromCents(cashSpentCents),
+        unclassified,
+        manual_overrides: Number(manual?.manual_overrides || 0)
+      };
+    });
+    const categoriesWithPercent = categories.map((row) => {
+      const currencySummary = enrichedSummary.find((entry) => entry.currency === row.currency);
+      const gross = Number(currencySummary?.money_out || 0);
+      return {
+        ...row,
+        percentage_of_spend: gross > 0 ? Number(((Number(row.spent || 0) / gross) * 100).toFixed(2)) : 0
+      };
+    });
+
     return res.json({
       filters: { scope: filters.scope, account_id: filters.accountId || null, statement_uid: filters.statementUid || null, from: filters.from, to: filters.to },
-      summary: {
-        transaction_count: Number(summary.transaction_count || 0),
-        money_in: summary.money_in || '0.00',
-        money_out: summary.money_out || '0.00',
-        net_flow: summary.net_flow || '0.00',
-        cash_spent: summary.cash_spent || '0.00',
-        unclassified: Number(summary.unclassified || 0),
-        manual_overrides: Number(summary.manual_overrides || 0)
-      },
-      categories,
-      merchants: merchantRows[0],
-      accounts: accountRows[0],
-      monthly: monthlyRows[0],
-      weekdays: weekdayRows[0],
-      transactions: transactionRows[0],
+      currency_rule: 'Currencies are never combined without verified FX evidence. Linked refunds are separated from ordinary money-in.',
+      summary: trustedTotals.singleCurrencySummary(enrichedSummary),
+      summary_by_currency: enrichedSummary,
+      categories: categoriesWithPercent,
+      merchants: merchantRows,
+      accounts: accountRows,
+      monthly: monthlyRows,
+      weekdays: weekdayRows,
+      transactions: transactionRows,
+      split_policy: 'Split parents contribute child category amounts instead of parent + child amounts, preventing double counting.',
+      refund_policy: 'Linked refunds remain cash inflow but are excluded from ordinary_money_in and reduce net_economic_expense.',
       generated_at: new Date().toISOString()
     });
   } catch (error) { return fail(res, error, 'Failed to build spending report'); }
 };
-
-
-
 exports.getBankingDashboard = async (req, res) => {
   try {
     await ensureFinanceSchema();
@@ -750,26 +762,8 @@ exports.getBankingDashboard = async (req, res) => {
           GROUP BY ba.currency ORDER BY ba.currency`,
         accountParams
       ).then(([rows]) => rows),
-      pool.query(
-        `SELECT bt.currency,COUNT(*) AS transaction_count,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_out,
-                SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${txWhere}
-          GROUP BY bt.currency ORDER BY bt.currency`,
-        txParams
-      ).then(([rows]) => rows),
-      pool.query(
-        `SELECT bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
-                COUNT(*) AS transaction_count,COALESCE(SUM(bt.debit),0) AS spent
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${txWhere}
-          GROUP BY bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified')
-          ORDER BY bt.currency,spent DESC`,
-        txParams
-      ).then(([rows]) => rows),
+      trustedTotals.cashTotalsByCurrency(pool, txWhere, txParams),
+      trustedTotals.categorySpendByCurrency(pool, txWhere, txParams, 200),
       pool.query(
         `SELECT bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
                 COUNT(*) AS transaction_count,COALESCE(SUM(bt.debit),0) AS spent
@@ -909,14 +903,19 @@ exports.getBankingDashboard = async (req, res) => {
       balances_by_currency: balances.map((row) => ({ currency: row.currency, account_count: Number(row.account_count || 0), balance: Number(row.balance || 0) })),
       flow_by_currency: flow.map((row) => ({
         currency: row.currency,
-        transaction_count: Number(row.transaction_count || 0),
+        transaction_count: Number(row.source_transaction_count || 0),
         money_in: Number(row.money_in || 0),
+        ordinary_money_in: Number(row.ordinary_money_in || 0),
+        linked_refund_inflow: Number(row.linked_refund_inflow || 0),
         money_out: Number(row.money_out || 0),
-        net_flow: Number(row.money_in || 0) - Number(row.money_out || 0),
+        net_flow: Number(row.net_cash_flow || 0),
+        net_economic_expense: Number(row.net_economic_expense || 0),
+        transfer_movement: Number(row.transfer_movement || 0),
         cash_out: Number(row.cash_out || 0),
+        cash_in: Number(row.cash_in || 0),
         unclassified: Number(row.unclassified || 0)
       })),
-      categories: categories.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
+      categories: categories.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.source_transaction_count || 0) })),
       merchants: merchants.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
       monthly: monthly.map((row) => ({ ...row, money_in: Number(row.money_in || 0), money_out: Number(row.money_out || 0) })),
       recent_transactions: recent,
@@ -1285,30 +1284,9 @@ exports.getPortfolioHistoryReport = async (req, res) => {
     if (filters.scope !== 'ALL') { accountClauses.push('ba.ownership_scope=?'); accountParams.push(filters.scope); }
     if (filters.accountId) { accountClauses.push('ba.id=?'); accountParams.push(filters.accountId); }
 
-    const [currencySummaryRows, categoryRows, monthlyRows, accountRows, statementRows, transactionRows] = await Promise.all([
-      pool.query(
-        `SELECT bt.currency,
-                COUNT(*) AS transaction_count,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit-bt.debit ELSE 0 END),0) AS net_flow,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_out,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS cash_in,
-                SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where}
-          GROUP BY bt.currency ORDER BY bt.currency`, filters.params
-      ),
-      pool.query(
-        `SELECT bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
-                COUNT(*) AS transaction_count,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${filters.where}
-          GROUP BY bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified')
-          ORDER BY bt.currency,spent DESC`, filters.params
-      ),
+    const [summaryByCurrency, categoryRows, monthlyRows, accountRows, statementRows, transactionRows] = await Promise.all([
+      trustedTotals.cashTotalsByCurrency(pool, filters.where, filters.params),
+      trustedTotals.categorySpendByCurrency(pool, filters.where, filters.params, 300),
       pool.query(
         `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
                 COUNT(*) AS transaction_count,
@@ -1318,7 +1296,7 @@ exports.getPortfolioHistoryReport = async (req, res) => {
           WHERE ${filters.where}
           GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
           ORDER BY bt.currency,month`, filters.params
-      ),
+      ).then(([rows]) => rows),
       pool.query(
         `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
                 ba.account_type,ba.financial_purpose,ba.available_balance,ba.current_ledger_balance,
@@ -1333,7 +1311,7 @@ exports.getPortfolioHistoryReport = async (req, res) => {
           WHERE ${accountClauses.join(' AND ')}
           GROUP BY ba.id
           ORDER BY ba.currency,ba.ownership_scope,ba.nickname`, accountParams
-      ),
+      ).then(([rows]) => rows),
       pool.query(
         `SELECT sif.import_uid,sif.bank_account_id,sif.original_name,sif.source_format,sif.statement_start_date,sif.statement_end_date,
                 sif.opening_balance,sif.closing_balance,sif.imported_rows,sif.duplicate_rows,sif.rejected_rows,sif.reviewed_at,
@@ -1341,7 +1319,7 @@ exports.getPortfolioHistoryReport = async (req, res) => {
            FROM statement_import_files sif JOIN bank_accounts ba ON ba.id=sif.bank_account_id
           WHERE sif.parse_status='IMPORTED' AND ${accountClauses.join(' AND ')}
           ORDER BY COALESCE(sif.statement_end_date,sif.reviewed_at) DESC,sif.id DESC`, accountParams
-      ),
+      ).then(([rows]) => rows),
       pool.query(
         `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,bt.currency,
                 bt.ownership_scope,bt.is_internal_transfer,bt.reconciliation_status,bt.source_type,bt.statement_import_uid,
@@ -1350,68 +1328,46 @@ exports.getPortfolioHistoryReport = async (req, res) => {
            LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
           WHERE ${filters.where}
           ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 10000`, filters.params
-      )
+      ).then(([rows]) => rows)
     ]);
 
     const liquidPosition = {};
-    for (const account of accountRows[0]) {
+    for (const account of accountRows) {
       const cur = account.currency || 'AUD';
       const raw = Number(account.available_balance == null ? account.current_ledger_balance : account.available_balance || 0);
       const liability = /credit\s*card|loan|overdraft/i.test(String(account.account_type || ''));
       liquidPosition[cur] = Number(((liquidPosition[cur] || 0) + (liability ? -Math.abs(raw) : raw)).toFixed(2));
     }
-
     const categoriesByCurrency = {};
-    for (const row of categoryRows[0]) {
-      const cur = row.currency || 'AUD';
-      (categoriesByCurrency[cur] ||= []).push({
-        category: row.category,
-        transaction_count: Number(row.transaction_count || 0),
-        spent: Number(row.spent || 0),
-        received: Number(row.received || 0)
-      });
-    }
+    for (const row of categoryRows) (categoriesByCurrency[row.currency || 'AUD'] ||= []).push({
+      category: row.category,
+      transaction_count: Number(row.source_transaction_count || 0),
+      split_line_count: Number(row.split_line_count || 0),
+      spent: Number(row.spent || 0)
+    });
     const monthlyByCurrency = {};
-    for (const row of monthlyRows[0]) {
-      const cur = row.currency || 'AUD';
-      (monthlyByCurrency[cur] ||= []).push({
-        month: row.month,
-        transaction_count: Number(row.transaction_count || 0),
-        spent: Number(row.spent || 0),
-        received: Number(row.received || 0)
-      });
-    }
+    for (const row of monthlyRows) (monthlyByCurrency[row.currency || 'AUD'] ||= []).push({
+      month: row.month, transaction_count: Number(row.transaction_count || 0),
+      spent: Number(row.spent || 0), received: Number(row.received || 0)
+    });
 
     return res.json({
       filters: { scope: filters.scope, account_id: filters.accountId || null, from: filters.from, to: filters.to },
-      currency_rule: 'Currencies are reported separately and are never added together without an explicit FX conversion source.',
+      currency_rule: 'Currencies are reported separately and are never added together without verified FX evidence.',
+      refund_rule: 'Linked refunds are cash inflow but are separated from ordinary money-in and reduce net economic expense.',
+      split_rule: 'Category spend uses split child amounts instead of parent + child values.',
       net_position_note: 'Bank net position uses visible bank-account balances and treats credit-card, loan and overdraft accounts as liabilities. It does not include external property, investments or liabilities not stored as bank accounts.',
       bank_net_position_by_currency: liquidPosition,
-      summary_by_currency: currencySummaryRows[0].map((row) => ({
-        currency: row.currency || 'AUD',
-        transaction_count: Number(row.transaction_count || 0),
-        money_in: Number(row.money_in || 0),
-        money_out: Number(row.money_out || 0),
-        net_flow: Number(row.net_flow || 0),
-        cash_out: Number(row.cash_out || 0),
-        cash_in: Number(row.cash_in || 0),
-        unclassified: Number(row.unclassified || 0)
-      })),
+      summary_by_currency: summaryByCurrency,
       categories_by_currency: categoriesByCurrency,
       monthly_by_currency: monthlyByCurrency,
-      accounts: accountRows[0].map((row) => ({
-        ...row,
-        transaction_count: Number(row.transaction_count || 0),
-        statement_count: Number(row.statement_count || 0)
-      })),
-      statements: statementRows[0],
-      transactions: transactionRows[0],
+      accounts: accountRows.map((row) => ({ ...row, transaction_count: Number(row.transaction_count || 0), statement_count: Number(row.statement_count || 0) })),
+      statements: statementRows,
+      transactions: transactionRows,
       generated_at: new Date().toISOString()
     });
   } catch (error) { return fail(res, error, 'Failed to build multi-bank portfolio history report'); }
 };
-
-
 exports.getStatementWarehouse = async (req, res) => {
   try {
     await ensureFinanceSchema();
@@ -1427,21 +1383,8 @@ exports.getStatementWarehouse = async (req, res) => {
     const txWhere = txClauses.join(' AND ');
     const accountWhere = accountClauses.join(' AND ');
 
-    const [summaryRows, accountRows, statementRows, categoryRows, monthlyRows] = await Promise.all([
-      pool.query(
-        `SELECT bt.currency,
-                COUNT(*) AS transactions,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
-                COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS cash_out,
-                COALESCE(SUM(CASE WHEN bt.category='Cash' AND bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS cash_in,
-                SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS needs_category,
-                MIN(bt.transaction_date) AS first_transaction,
-                MAX(bt.transaction_date) AS last_transaction
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${txWhere}
-          GROUP BY bt.currency ORDER BY bt.currency`, txParams
-      ),
+    const [summaryByCurrency, accountRows, statementRows, categoryRows, monthlyRows, metaRows] = await Promise.all([
+      trustedTotals.cashTotalsByCurrency(pool, txWhere, txParams),
       pool.query(
         `SELECT ba.id,ba.nickname,ba.institution,ba.currency,ba.ownership_scope,ba.account_type,
                 ba.current_ledger_balance,ba.available_balance,ba.history_start_date,ba.history_end_date,
@@ -1453,7 +1396,7 @@ exports.getStatementWarehouse = async (req, res) => {
            LEFT JOIN statement_import_files sif ON sif.bank_account_id=ba.id AND sif.parse_status='IMPORTED'
           WHERE ${accountWhere}
           GROUP BY ba.id ORDER BY ba.currency,ba.nickname`, accountParams
-      ),
+      ).then(([rows]) => rows),
       pool.query(
         `SELECT sif.import_uid,sif.original_name,sif.source_format,sif.statement_start_date,sif.statement_end_date,
                 sif.imported_rows,sif.duplicate_rows,sif.rejected_rows,ba.id AS bank_account_id,ba.nickname AS account_name,
@@ -1461,15 +1404,8 @@ exports.getStatementWarehouse = async (req, res) => {
            FROM statement_import_files sif JOIN bank_accounts ba ON ba.id=sif.bank_account_id
           WHERE sif.parse_status='IMPORTED' AND ${accountWhere}
           ORDER BY COALESCE(sif.statement_end_date,sif.reviewed_at) DESC,sif.id DESC LIMIT 250`, accountParams
-      ),
-      pool.query(
-        `SELECT bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified') AS category,
-                COUNT(*) AS transaction_count,COALESCE(SUM(bt.debit),0) AS spent
-           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE ${txWhere} AND bt.debit>0 AND bt.is_internal_transfer=0
-          GROUP BY bt.currency,COALESCE(NULLIF(bt.category,''),'Unclassified')
-          ORDER BY bt.currency,spent DESC`, txParams
-      ),
+      ).then(([rows]) => rows),
+      trustedTotals.categorySpendByCurrency(pool, txWhere, txParams, 300),
       pool.query(
         `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,
                 COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
@@ -1478,52 +1414,63 @@ exports.getStatementWarehouse = async (req, res) => {
           WHERE ${txWhere}
           GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
           ORDER BY bt.currency,month`, txParams
-      )
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT bt.currency,
+                SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS needs_category,
+                MIN(bt.transaction_date) AS first_transaction,
+                MAX(bt.transaction_date) AS last_transaction
+           FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+          WHERE ${txWhere} GROUP BY bt.currency`, txParams
+      ).then(([rows]) => rows)
     ]);
 
     const netPosition = {};
-    for (const a of accountRows[0]) {
-      const cur = a.currency || 'AUD';
-      const balance = Number(a.available_balance == null ? a.current_ledger_balance : a.available_balance || 0);
-      const liability = /credit\s*card|loan|overdraft/i.test(String(a.account_type || ''));
+    for (const account of accountRows) {
+      const cur = account.currency || 'AUD';
+      const balance = Number(account.available_balance == null ? account.current_ledger_balance : account.available_balance || 0);
+      const liability = /credit\s*card|loan|overdraft/i.test(String(account.account_type || ''));
       netPosition[cur] = Number(((netPosition[cur] || 0) + (liability ? -Math.abs(balance) : balance)).toFixed(2));
     }
     const categories = {};
-    for (const row of categoryRows[0]) (categories[row.currency || 'AUD'] ||= []).push({
-      category: row.category, transaction_count: Number(row.transaction_count || 0), spent: Number(row.spent || 0)
+    for (const row of categoryRows) (categories[row.currency || 'AUD'] ||= []).push({
+      category: row.category,
+      transaction_count: Number(row.source_transaction_count || 0),
+      split_line_count: Number(row.split_line_count || 0),
+      spent: Number(row.spent || 0)
     });
     const monthly = {};
-    for (const row of monthlyRows[0]) (monthly[row.currency || 'AUD'] ||= []).push({
+    for (const row of monthlyRows) (monthly[row.currency || 'AUD'] ||= []).push({
       month: row.month, money_in: Number(row.money_in || 0), money_out: Number(row.money_out || 0)
     });
 
     return res.json({
       scope,
       architecture: 'STATEMENT_FIRST_MONEY_WAREHOUSE',
-      currency_rule: 'Each currency is calculated separately. No cross-currency total is produced without an explicit FX valuation source.',
+      currency_rule: 'Each currency is calculated separately. No cross-currency total is produced without verified FX evidence.',
+      refund_rule: 'Linked refunds are separated from ordinary money-in and reduce net economic expense.',
+      split_rule: 'Split child category amounts replace parent category allocation.',
       totals: {
-        accounts: accountRows[0].length,
-        statements: statementRows[0].length,
-        transactions: summaryRows[0].reduce((s,r)=>s+Number(r.transactions||0),0)
+        accounts: accountRows.length,
+        statements: statementRows.length,
+        transactions: summaryByCurrency.reduce((sum,row)=>sum+Number(row.source_transaction_count||0),0)
       },
-      summary_by_currency: summaryRows[0].map(r=>({
-        currency:r.currency || 'AUD',
-        transactions:Number(r.transactions||0),
-        money_in:Number(r.money_in||0),
-        money_out:Number(r.money_out||0),
-        net_flow:Number(r.money_in||0)-Number(r.money_out||0),
-        cash_in:Number(r.cash_in||0),
-        cash_out:Number(r.cash_out||0),
-        needs_category:Number(r.needs_category||0),
-        first_transaction:r.first_transaction,
-        last_transaction:r.last_transaction,
-        bank_net_position:Number(netPosition[r.currency||'AUD']||0)
-      })),
-      accounts: accountRows[0],
-      statements: statementRows[0],
+      summary_by_currency: summaryByCurrency.map((row) => {
+        const meta = metaRows.find((item) => String(item.currency || 'AUD').toUpperCase() === row.currency) || {};
+        return {
+          ...row,
+          transactions: Number(row.source_transaction_count || 0),
+          needs_category: Number(meta.needs_category || 0),
+          first_transaction: meta.first_transaction || null,
+          last_transaction: meta.last_transaction || null,
+          bank_net_position: Number(netPosition[row.currency] || 0)
+        };
+      }),
+      accounts: accountRows,
+      statements: statementRows,
       categories_by_currency: categories,
       monthly_by_currency: monthly,
-      generated_at:new Date().toISOString()
+      generated_at: new Date().toISOString()
     });
   } catch (error) { return fail(res,error,'Failed to load statement money warehouse'); }
 };

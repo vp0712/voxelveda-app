@@ -13,3 +13,16 @@
 - **original_category**: immutable raw source/bank category in provenance storage.
 - **system_category**: current user/system classification; it may change without overwriting original source evidence.
 - **currency**: native transaction/account currency. Values from different currencies must not be added unless a verified FX rate, rate date and reporting currency are stored.
+
+
+## Trusted totals rules
+
+- **money_in** is cash inflow in the selected period, excluding confirmed internal transfers. It may include linked merchant refunds and must never be labelled business revenue by itself.
+- **ordinary_money_in** is money_in less active linked-refund amounts. It is still a banking cash metric, not automatically accounting revenue.
+- **linked_refund_inflow** is the amount of selected-period credits actively linked to original expense transactions.
+- **money_out** is cash outflow in the selected period, excluding confirmed internal transfers.
+- **net_cash_flow** is money_in minus money_out. Refunds remain cash inflow because cash actually returned to the account.
+- **net_economic_expense** is money_out minus linked_refund_inflow for the same selected population. This provides the requested economic-expense view without misclassifying refunds as revenue.
+- **split category allocation** uses child split amounts when a transaction has splits. The parent amount is not also added to category totals. The immutable bank transaction remains the source cash movement.
+- **mixed-currency reporting** returns separate per-currency totals. A consolidated total is unavailable until a verified FX rate, rate date and reporting currency are stored.
+- **internal transfer movement** may be displayed as movement, but confirmed transfer pairs contribute zero to income and expense totals.

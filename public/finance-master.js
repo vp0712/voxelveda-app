@@ -9,13 +9,13 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''}
 };
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
- ['DOCUMENTS',[['statements','▤','Statements']]],
+ ['DOCUMENTS',[['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports']]],
@@ -41,6 +41,7 @@ function title(v){return ({
  accounts:['Accounts','Bank, savings, credit, cash and loan accounts with coverage and lifecycle controls.'],
  transactions:['Transaction Explorer','Server-filtered financial movements with preserved source evidence.'],
  statements:['Statement Vault','Upload, review, duplicate-check and commit statements without overwriting source evidence.'],
+ receipts:['Receipts','Private receipt vault and missing-receipt review queue over visible Finance transactions.'],
  cash:['Cash','Cash wallets and cash-type financial accounts.'],
  debt:['Borrow & Lend','Owner-only debt lifecycle with repayments and remaining balances.'],
  recurring:['Recurring Money','Known and detected recurring commitments; nothing is paid automatically.'],
@@ -105,14 +106,21 @@ function resourceError(name,label){
 function currencyRows(){
  const balances=Array.isArray(state.dash?.balances_by_currency)?state.dash.balances_by_currency:[];
  const flows=Array.isArray(state.dash?.flow_by_currency)?state.dash.flow_by_currency:[];
- return [...new Set([...balances.map(x=>x.currency),...flows.map(x=>x.currency)].filter(Boolean))].map(currency=>({
-  currency,
-  balance:num(balances.find(x=>x.currency===currency)?.balance),
-  money_in:num(flows.find(x=>x.currency===currency)?.money_in),
-  money_out:num(flows.find(x=>x.currency===currency)?.money_out),
-  net_flow:num(flows.find(x=>x.currency===currency)?.net_flow),
-  unclassified:num(flows.find(x=>x.currency===currency)?.unclassified)
- }));
+ return [...new Set([...balances.map(x=>x.currency),...flows.map(x=>x.currency)].filter(Boolean))].map(currency=>{
+  const flow=flows.find(x=>x.currency===currency)||{};
+  return {
+   currency,
+   balance:num(balances.find(x=>x.currency===currency)?.balance),
+   money_in:num(flow.money_in),
+   ordinary_money_in:num(flow.ordinary_money_in),
+   refund_inflow:num(flow.linked_refund_inflow),
+   money_out:num(flow.money_out),
+   net_flow:num(flow.net_flow),
+   net_economic_expense:num(flow.net_economic_expense),
+   transfer_movement:num(flow.transfer_movement),
+   unclassified:num(flow.unclassified)
+  };
+ });
 }
 function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — consolidated total unavailable until verified FX rates are available.':''}
 function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
@@ -121,7 +129,7 @@ async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
  const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -146,7 +154,8 @@ async function loadBase(){
   loadResource('reimbursements',API+'/reimbursements'),
   loadResource('notifications','/api/notifications?limit=50'),
   loadResource('notificationPrefs','/api/notifications/preferences'),
-  loadResource('companySettings','/api/settings')
+  loadResource('companySettings','/api/settings'),
+  loadResource('receiptCenter',API+'/receipts?scope='+encodeURIComponent(state.scope))
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
@@ -154,7 +163,7 @@ async function loadBase(){
  state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
- state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;
+ state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
@@ -168,8 +177,8 @@ function hero(){
  const err=resourceError('dash','Financial overview');if(err)return err;
  const rows=currencyRows();const mixed=mixedCurrencyMessage(rows);const one=rows[0]||{currency:'AUD',balance:0,money_in:0,money_out:0,net_flow:0};
  const position=rows.length===1?nativeMoney(one.balance,one.currency):'Mixed currencies';
- const kpis=rows.length?rows.map(r=>`<div class="fm-kpi"><span>${esc(r.currency)} · Available balance</span><strong>${nativeMoney(r.balance,r.currency)}</strong><small>Current balance — not period filtered</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money in</span><strong class="good">${nativeMoney(r.money_in,r.currency)}</strong><small>Selected period</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money out</span><strong class="bad">${nativeMoney(r.money_out,r.currency)}</strong><small>Selected period · transfers excluded</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Net cash flow</span><strong>${nativeMoney(r.net_flow,r.currency)}</strong><small>Income minus expense</small></div>`).join(''):'<div class="fm-empty">No visible financial activity.</div>';
- return `<div class="fm-grid two"><article class="fm-card fm-hero"><div class="fm-pad"><small>TOTAL FINANCIAL POSITION</small><strong>${position}</strong><p>${mixed||'Current account position. Period activity is shown separately.'}</p><div class="fm-hero-actions"><button class="accent" data-quick="expense">Add movement</button><button data-quick="statement">Upload statement</button><button data-viewjump="reports">Reports</button></div></div></article><div class="fm-grid two">${kpis}</div></div>`;
+ const kpis=rows.length?rows.map(r=>`<div class="fm-kpi"><span>${esc(r.currency)} · Available balance</span><strong>${nativeMoney(r.balance,r.currency)}</strong><small>Current balance — not period filtered</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money in</span><strong class="good">${nativeMoney(r.money_in,r.currency)}</strong><small>Cash inflow · includes ${nativeMoney(r.refund_inflow,r.currency)} linked refunds</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money out</span><strong class="bad">${nativeMoney(r.money_out,r.currency)}</strong><small>Cash outflow · confirmed transfers excluded</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Net cash flow</span><strong>${nativeMoney(r.net_flow,r.currency)}</strong><small>Cash in minus cash out</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Linked refunds</span><strong class="good">${nativeMoney(r.refund_inflow,r.currency)}</strong><small>Not treated as ordinary revenue</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Net economic expense</span><strong>${nativeMoney(r.net_economic_expense,r.currency)}</strong><small>Money out less linked refunds</small></div>`).join(''):'<div class="fm-empty">No visible financial activity.</div>';
+ return `<div class="fm-grid two"><article class="fm-card fm-hero"><div class="fm-pad"><small>TOTAL FINANCIAL POSITION</small><strong>${position}</strong><p>${mixed||'Current account position. Period activity is shown separately from balances.'}</p><div class="fm-hero-actions"><button class="accent" data-quick="expense">Add movement</button><button data-quick="statement">Upload statement</button><button data-viewjump="reports">Reports</button></div></div></article><div class="fm-grid two">${kpis}</div></div>`;
 }
 function recentRows(){
  const rows=state.dash?.recent_transactions||state.tx.slice(0,8);
@@ -325,10 +334,18 @@ function openCompanySettings(){
  $('fmModal').showModal();
  $('companySettingsForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const body=Object.fromEntries(fd.entries());body.base_currency=String(body.base_currency||'AUD').toUpperCase();try{const x=await api('/api/settings',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
+function receiptsView(){
+ const center=state.receiptCenter||{},attached=center.receipts||[],missing=center.missing_receipts||[];
+ const attachedRows=attached.map(doc=>`<div class="fm-row"><div><h3>${esc(doc.original_name)}</h3><p>${date(doc.transaction_date)} · ${esc(doc.merchant_name||doc.description||'Transaction')} · ${esc(doc.account_name||'')} · ${esc(doc.scan_status||'')}</p></div><div class="fm-row-right"><a href="${esc(doc.download_url)}" target="_blank" rel="noopener">View</a><button type="button" data-tx="${doc.bank_transaction_id}">Transaction</button></div></div>`).join('');
+ const missingRows=missing.map(tx=>`<div class="fm-row" data-tx="${tx.bank_transaction_id}"><div><h3>${esc(tx.merchant_name||tx.description||'Expense')}</h3><p>${date(tx.transaction_date)} · ${esc(tx.account_name||'')} · ${esc(tx.ownership_scope||'')}</p></div><div class="fm-row-right"><b>${nativeMoney(tx.debit,tx.currency)}</b><small>Receipt missing</small></div></div>`).join('');
+ return `${resourceError('receiptCenter','Receipts Centre')}<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Receipt Vault</h2><p>Private, malware-scanned Finance attachments. Downloads require authenticated document access.</p></div><span class="fm-badge good">${num(center.counts?.attached)} attached</span></div><div class="fm-list">${attachedRows||emptyState('No receipts attached','Open a transaction to capture or upload its receipt.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Missing Receipts</h2><p>Visible expense transactions with no active receipt document.</p></div><span class="fm-badge warn">${num(center.counts?.missing)} missing</span></div><div class="fm-list">${missingRows||emptyState('No missing receipts','Visible expense transactions have receipt coverage or there is no expense activity.')}</div></div></article></div>`;
+}
+
 function simpleView(v){
  if(v==='budgets')return budgetsView();
  if(['savings','debt','recurring'].includes(v))return personalCard(v);
  if(v==='reports')return reportView();
+ if(v==='receipts')return receiptsView();
  if(v==='review')return reviewView();
  if(v==='personal')return personalView();
  if(v==='company')return companyView();
@@ -725,14 +742,16 @@ async function transactionDetail(id){
   let receiptPayload=null,receiptError=null;
   try{receiptPayload=await api(API+'/bank-transactions/'+id+'/receipts')}catch(error){receiptError=error}
   const receipts=receiptPayload?.receipts||[];
-  const [splitResult,refundResult,transferResult]=await Promise.allSettled([
+  const [splitResult,refundResult,transferResult,auditResult]=await Promise.allSettled([
     api(API+'/bank-transactions/'+id+'/splits'),
     api(API+'/bank-transactions/'+id+'/refund-links'),
-    api(API+'/bank-transactions/'+id+'/transfer-links')
+    api(API+'/bank-transactions/'+id+'/transfer-links'),
+    api(API+'/bank-transactions/'+id+'/audit')
   ]);
   const splits=splitResult.status==='fulfilled'?(splitResult.value.splits||[]):[];
   const refundLinks=refundResult.status==='fulfilled'?(refundResult.value.links||[]):[];
   const transferLinks=transferResult.status==='fulfilled'?(transferResult.value.links||[]):[];
+  const auditTimeline=auditResult.status==='fulfilled'?(auditResult.value.timeline||[]):[];
   let sourceBlock='';
   if(r.source_type==='MANUAL') sourceBlock=`<div class="fm-card"><div class="fm-pad"><h3>Source provenance</h3><p class="fm-helper">Manual Voxel Veda entry. No external bank source record exists.</p></div></div>`;
   else if(provenanceError) sourceBlock=`<div class="fm-state fm-state-error"><strong>Original bank data unavailable</strong><p>${esc(provenanceError.message)}</p></div>`;
@@ -741,7 +760,8 @@ async function transactionDetail(id){
   const receiptBlock=receiptError
     ? `<div class="fm-state fm-state-error"><strong>Receipts unavailable</strong><p>${esc(receiptError.message)}</p></div>`
     : `<div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>Receipts & attachments</h3><p>Private documents are scanned and served only through authenticated download routes.</p></div></div><div class="fm-list">${receipts.map(doc=>`<div class="fm-row"><div><h3>${esc(doc.original_name)}</h3><p>${esc(doc.mime_type||'')} · ${esc(doc.scan_status||'')}</p></div><div class="fm-row-right"><a href="${esc(doc.download_url)}" target="_blank" rel="noopener">View</a><button type="button" data-receipt-unlink="${esc(doc.id)}">Unlink</button></div></div>`).join('')||emptyState('No receipt attached','Upload a JPG, PNG, HEIC or PDF receipt.')}</div><form id="receiptUploadForm" class="fm-form"><label>Attach receipt<input name="file" type="file" accept="image/jpeg,image/png,image/heic,image/heif,application/pdf" capture="environment" required></label><div class="fm-form-actions"><button class="primary" type="submit">Upload securely</button></div></form></div></div>`;
-  openDrawer(r.merchant_name||r.description||'Transaction',`<div class="fm-grid two"><div class="fm-kpi"><span>Amount</span><strong>${nativeMoney(Math.abs(num(r.credit||0)-num(r.debit||0)),r.currency||'AUD')}</strong><small>${Number(r.is_internal_transfer)?'Internal transfer':num(r.debit)>0?'Expense':'Income'} · ${esc(r.currency||'')}</small></div><div class="fm-kpi"><span>Reconciliation</span><strong>${esc(r.reconciliation_status||'')}</strong><small>${esc(r.source_type||'')}</small></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>CURRENT CLASSIFICATION</h3><p>Editable classification never overwrites original bank evidence.</p></div></div><form id="txEditForm" class="fm-form"><div class="fm-form-grid"><label>Category<input name="category" value="${esc(r.category||'')}"></label><label>Ownership<select name="ownership_scope"><option ${r.ownership_scope==='PERSONAL'?'selected':''}>PERSONAL</option><option ${r.ownership_scope==='BUSINESS'?'selected':''}>BUSINESS</option><option ${r.ownership_scope==='MIXED'?'selected':''}>MIXED</option><option ${r.ownership_scope==='UNCLASSIFIED'?'selected':''}>UNCLASSIFIED</option></select></label></div><div class="fm-detail-grid"><span>Date<b>${date(r.transaction_date)}</b></span><span>Posting date<b>${date(r.posting_date)}</b></span><span>Account<b>${esc(r.account_name||'')}</b></span><span>Bank<b>${esc(r.institution||'')}</b></span><span>Description<b>${esc(r.description||'')}</b></span><span>Reference<b>${esc(r.reference||'—')}</b></span><span>Source<b>${esc(r.source_type||'')}</b></span><span>Statement<b>${esc(r.statement_import_uid||'—')}</b></span></div><label class="fm-check"><input name="remember_rule" type="checkbox"> Remember as suggestion rule</label><div class="fm-form-actions"><button class="primary" type="submit">Save classification</button></div></form><div class="fm-workflow-actions"><button type="button" data-split-open="1">Split transaction</button>${num(r.debit)>0?'<button type="button" data-reimbursement-open="1">Create reimbursement</button>':''}${num(r.credit)>0?'<button type="button" data-refund-link="'+r.id+'" data-refund-currency="'+esc(r.currency)+'">Link as refund</button>':''}<button type="button" data-viewjump="transfers">Transfer matching</button></div><div class="fm-relation-summary"><span>Split lines <b>${splits.length}</b></span><span>Refund links <b>${refundLinks.length}</b></span><span>Transfer pairs <b>${transferLinks.length}</b></span></div></div></div>${sourceBlock}${receiptBlock}`,'TRANSACTION');
+  const auditBlock=`<div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>Audit History</h3><p>Human-readable events from the existing hash-linked audit chain.</p></div></div><div class="fm-timeline">${auditTimeline.map(event=>`<div class="fm-timeline-item"><time>${event.at?new Date(event.at).toLocaleString('en-AU'):'—'}</time><div><b>${esc(String(event.action||'Activity').replaceAll('_',' '))}</b><p>${event.actor_id?'User #'+esc(event.actor_id):'System'} · ${esc(event.result||'SUCCESS')}</p></div></div>`).join('')||emptyState('No audit events yet','No transaction-specific audit event has been recorded for this item.')}</div></div></div>`;
+  openDrawer(r.merchant_name||r.description||'Transaction',`<div class="fm-grid two"><div class="fm-kpi"><span>Amount</span><strong>${nativeMoney(Math.abs(num(r.credit||0)-num(r.debit||0)),r.currency||'AUD')}</strong><small>${Number(r.is_internal_transfer)?'Internal transfer':num(r.debit)>0?'Expense':'Income'} · ${esc(r.currency||'')}</small></div><div class="fm-kpi"><span>Reconciliation</span><strong>${esc(r.reconciliation_status||'')}</strong><small>${esc(r.source_type||'')}</small></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>CURRENT CLASSIFICATION</h3><p>Editable classification never overwrites original bank evidence.</p></div></div><form id="txEditForm" class="fm-form"><div class="fm-form-grid"><label>Category<input name="category" value="${esc(r.category||'')}"></label><label>Ownership<select name="ownership_scope"><option ${r.ownership_scope==='PERSONAL'?'selected':''}>PERSONAL</option><option ${r.ownership_scope==='BUSINESS'?'selected':''}>BUSINESS</option><option ${r.ownership_scope==='MIXED'?'selected':''}>MIXED</option><option ${r.ownership_scope==='UNCLASSIFIED'?'selected':''}>UNCLASSIFIED</option></select></label></div><div class="fm-detail-grid"><span>Date<b>${date(r.transaction_date)}</b></span><span>Posting date<b>${date(r.posting_date)}</b></span><span>Account<b>${esc(r.account_name||'')}</b></span><span>Bank<b>${esc(r.institution||'')}</b></span><span>Description<b>${esc(r.description||'')}</b></span><span>Reference<b>${esc(r.reference||'—')}</b></span><span>Source<b>${esc(r.source_type||'')}</b></span><span>Statement<b>${esc(r.statement_import_uid||'—')}</b></span></div><label class="fm-check"><input name="remember_rule" type="checkbox"> Remember as suggestion rule</label><div class="fm-form-actions"><button class="primary" type="submit">Save classification</button></div></form><div class="fm-workflow-actions"><button type="button" data-split-open="1">Split transaction</button>${num(r.debit)>0?'<button type="button" data-reimbursement-open="1">Create reimbursement</button>':''}${num(r.credit)>0?'<button type="button" data-refund-link="'+r.id+'" data-refund-currency="'+esc(r.currency)+'">Link as refund</button>':''}<button type="button" data-viewjump="transfers">Transfer matching</button></div><div class="fm-relation-summary"><span>Split lines <b>${splits.length}</b></span><span>Refund links <b>${refundLinks.length}</b></span><span>Transfer pairs <b>${transferLinks.length}</b></span></div></div></div>${sourceBlock}${receiptBlock}${auditBlock}`,'TRANSACTION');
   setTimeout(()=>{
    $('txEditForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(I+'/transactions/'+id,{method:'POST',body:JSON.stringify({category:fd.get('category'),ownership_scope:fd.get('ownership_scope'),remember_rule:fd.get('remember_rule')==='on'})});notice(x.message);closeDrawer();await refresh()}catch(error){notice(error.message,true)}};
    if($('receiptUploadForm'))$('receiptUploadForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const response=await fetch(API+'/bank-transactions/'+id+'/receipts',{method:'POST',credentials:'same-origin',body:fd});let payload={};try{payload=await response.json()}catch{}if(!response.ok)throw new Error(payload.message||'Receipt upload failed');notice(payload.message||'Receipt attached.');await transactionDetail(id)}catch(error){notice(error.message,true)}};
