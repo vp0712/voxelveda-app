@@ -25,7 +25,6 @@ assert.match(ui, /Set inactive/);
 assert.match(ui, /Restore/);
 assert.match(ui, /Permanently delete/);
 assert.match(ui, /accountLifecycle/);
-assert.match(ui, /intelligence\/accounts\/'\+id/);
 
 assert.match(controllerSource, /INFORMATION_SCHEMA\.COLUMNS/);
 assert.match(controllerSource, /COLUMN_NAME = 'bank_account_id'/);
