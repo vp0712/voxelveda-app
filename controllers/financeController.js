@@ -1,4 +1,6 @@
 const crypto = require('crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const PDFDocument = require('pdfkit');
 const pool = require('../config/db');
 const { hasPermission } = require('../services/authorizationService');
@@ -858,38 +860,82 @@ exports.downloadAccountantPdf = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const report = await reportRows(Number(req.query.financial_year_id));
-    const profile = companyProfile();
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 50, left: 48, right: 48, bottom: 50 }, bufferPages: true });
+    const defaults = companyProfile();
+    const settingKeys = ['company_legal_name','trading_name','company_address','company_email','abn','website','support_phone','report_footer'];
+    const [settingRows] = await pool.query(
+      `SELECT setting_key,setting_value FROM app_settings WHERE setting_key IN (${settingKeys.map(() => '?').join(',')})`,
+      settingKeys
+    ).catch(() => [[]]);
+    const configured = Object.fromEntries((settingRows || []).map((row) => [row.setting_key, row.setting_value]));
+    const profile = {
+      legalName: configured.company_legal_name || defaults.legalName,
+      tradingName: configured.trading_name || defaults.name,
+      address: configured.company_address || defaults.address,
+      email: configured.company_email || defaults.email,
+      abn: configured.abn || defaults.abn,
+      website: configured.website || defaults.website,
+      phone: configured.support_phone || defaults.phone,
+      footer: configured.report_footer || 'Confidential Financial Information'
+    };
+    const reportId = `ACCT-${report.year.label}-${new Date().toISOString().slice(0,10).replace(/-/g,'')}`;
+    const generatedAt = new Date();
+    const doc = new PDFDocument({
+      size: 'A4',
+      margins: { top: 108, left: 48, right: 48, bottom: 66 },
+      bufferPages: true,
+      info: { Title: `${profile.legalName} - ${report.year.label} Accountant Review`, Author: profile.legalName }
+    });
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="Voxel-Veda-${report.year.label}-Accountant-Review.pdf"`);
     doc.pipe(res);
-    doc.fontSize(20).fillColor('#0b5f75').text(profile.legalName);
-    doc.fontSize(28).fillColor('#111827').text('Financial Year Accountant Review Pack', { align: 'left' });
-    doc.moveDown().fontSize(14).text(report.year.label);
-    doc.fontSize(10).fillColor('#4b5563').text(`${String(report.year.start_date).slice(0, 10)} to ${String(report.year.end_date).slice(0, 10)}`);
-    doc.moveDown().fillColor('#111827').fontSize(12).text(`Status: ${report.year.status}`);
+
+    doc.fontSize(22).fillColor('#111827').text('Financial Year Accountant Review Pack');
+    doc.moveDown(0.35).fontSize(12).fillColor('#374151').text(`${report.year.label} · ${String(report.year.start_date).slice(0,10)} to ${String(report.year.end_date).slice(0,10)}`);
+    doc.moveDown().fillColor('#111827').fontSize(11).text(`Status: ${report.year.status}`);
     doc.text(`Readiness: ${report.year.readiness_score}%`);
     doc.text(`Blocking issues: ${report.year.blocking_issue_count}`);
+    doc.text(`Report ID: ${reportId}`);
     doc.moveDown().fontSize(16).text('Trial Balance');
     doc.fontSize(9);
     for (const row of report.trial_balance) {
-      if (doc.y > 730) doc.addPage();
-      doc.text(`${row.account_code}  ${row.account_name}`, 48, doc.y, { width: 260, continued: true });
+      if (doc.y > 720) doc.addPage();
+      doc.fillColor('#111827').text(`${row.account_code}  ${row.account_name}`, 48, doc.y, { width: 265, continued: true });
       doc.text(`D ${money.fromCents(money.toCents(row.debit))}   C ${money.fromCents(money.toCents(row.credit))}`, { align: 'right' });
     }
     doc.moveDown().fontSize(11).text(`Total Debits: $${report.totals.debit}`);
     doc.text(`Total Credits: $${report.totals.credit}`);
     doc.text(`Difference: $${report.totals.difference}`);
     doc.text(`Status: ${report.totals.balanced ? 'BALANCED' : 'FINANCIAL INTEGRITY ERROR'}`);
+
+    const logoPath = path.join(__dirname, '..', 'public', 'Frame 1.png');
     const pages = doc.bufferedPageRange();
     for (let index = 0; index < pages.count; index += 1) {
       doc.switchToPage(index);
-      doc.fontSize(8).fillColor('#6b7280').text(
-        `Generated ${new Date().toLocaleString('en-AU')} | Draft for accountant review | Page ${index + 1} of ${pages.count}`,
-        48, 790, { width: 499, align: 'center' }
+      if (fs.existsSync(logoPath)) {
+        try { doc.image(logoPath, 48, 30, { fit: [54, 42], align: 'left', valign: 'center' }); } catch {}
+      }
+      doc.fontSize(11).fillColor('#111827').text(profile.legalName, 112, 28, { width: 260 });
+      const identity = [
+        profile.abn ? `ABN ${profile.abn}` : null,
+        profile.website || null,
+        profile.email || null
+      ].filter(Boolean).join(' · ');
+      doc.fontSize(7.5).fillColor('#6b7280').text(identity, 112, 45, { width: 420 });
+      doc.fontSize(7.5).fillColor('#6b7280').text(
+        `Accountant Review · ${report.year.label} · Generated ${generatedAt.toLocaleString('en-AU')} · ${reportId}`,
+        48, 77, { width: 499, align: 'left' }
+      );
+      doc.moveTo(48, 92).lineTo(547, 92).strokeColor('#d1d5db').lineWidth(0.6).stroke();
+      doc.moveTo(48, 772).lineTo(547, 772).strokeColor('#d1d5db').lineWidth(0.6).stroke();
+      doc.fontSize(7.5).fillColor('#6b7280').text(
+        `${profile.footer} · Page ${index + 1} of ${pages.count}`,
+        48, 780, { width: 499, align: 'center' }
       );
     }
-    await logAudit(pool, requestAudit(req, { action: 'EXPORTED', module: 'finance', recordType: 'accountant_pack_pdf', recordId: report.year.id, newValue: { financial_year: report.year.label } }));
+    await logAudit(pool, requestAudit(req, {
+      action: 'EXPORTED', module: 'finance', recordType: 'accountant_pack_pdf', recordId: report.year.id,
+      newValue: { financial_year: report.year.label, report_id: reportId, pages: pages.count }
+    }));
     doc.end();
   } catch (error) {
     if (!res.headersSent) return sendError(res, error, 'Failed to generate accountant PDF');
