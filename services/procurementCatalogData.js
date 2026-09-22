@@ -4,7 +4,19 @@ const DATA_B64 = 'eNrtXetyKklyfpUKxWzEOg7Q3CX5RNiBAF1mkIQAnTOzG/ujgQJ61dBMX4QYhx
 
 function loadProcurementCatalog() {
   const json = zlib.inflateSync(Buffer.from(DATA_B64, 'base64')).toString('utf8');
-  return JSON.parse(json);
+  const data = JSON.parse(json);
+
+  // Normalise workbook sheet keys. The source workbook can preserve the sheet
+  // title instead of the internal "bom" alias, so resolve the largest tabular
+  // sheet as the master BOM when the alias is missing.
+  if (!Array.isArray(data.bom) || data.bom.length <= 1) {
+    const candidates = Object.values(data)
+      .filter((value) => Array.isArray(value) && value.length > 2)
+      .sort((a, b) => b.length - a.length);
+    data.bom = candidates.find((sheet) => sheet.length > 200) || candidates[0] || [];
+  }
+
+  return data;
 }
 
 module.exports = loadProcurementCatalog();
