@@ -113,9 +113,10 @@ function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — c
 function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
 function emptyState(title,message,action=''){return `<div class="fm-empty"><strong>${esc(title)}</strong><span>${esc(message)}</span>${action}</div>`}
 async async function loadBase(){
+ const setup=await loadResource('setup',API+'/setup');
+ state.setup=setup||state.setup;
  const base=filterQuery();
- const [setup,capabilities,dash,tx,st,reviews,personal,attention,readiness,insights,rules,quality,reconciliation,history,team]=await Promise.all([
-  loadResource('setup',API+'/setup'),
+ const [capabilities,dash,tx,st,reviews,personal,attention,readiness,insights,rules,quality,reconciliation,history,team,os]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -129,9 +130,10 @@ async async function loadBase(){
   loadResource('quality',I+'/data-quality'+base),
   loadResource('reconciliation',I+'/reconciliation'+filterQuery()),
   loadResource('history',I+'/history-coverage'+base),
-  loadResource('team',OS+'/team')
+  loadResource('team',OS+'/team'),
+  loadResource('os',OS+'/command-center')
  ]);
- state.setup=setup||state.setup;state.capabilities=capabilities||null;state.dash=dash||null;
+ state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
  else{state.tx=[]}
  state.statements=st?.statements||[];state.reviews=reviews?.sessions||[];
@@ -142,7 +144,9 @@ async async function loadBase(){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
   state.accounts=accounts?.accounts||[];
  }
- const sel=$('fmAccount');const keep=state.account;sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');sel.value=keep;
+ const sel=$('fmAccount'),keep=state.account;
+ sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
+ sel.value=keep;
 }
 function hero(){
  const err=resourceError('dash','Financial overview');if(err)return err;
