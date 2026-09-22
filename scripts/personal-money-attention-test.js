@@ -32,6 +32,6 @@ assert.match(client, /Nothing is paid or moved automatically/, 'UI must explain 
 assert.match(client, /Wallet headroom after known 30-day obligations/, '30-day planning headroom must be visible.');
 assert.match(client, /Bills & subscriptions/, 'Recurring commitments UI is required.');
 assert.match(client, /Savings goals/, 'Savings-goal UI is required.');
-assert.match(html, /personal-money-attention\.js/, 'Finance Intelligence must load the Attention Center client.');
+assert.match(html, /finance-master\.js/, 'Finance OS must load the unified master client.');
 
 console.log('Smart Money Attention Center regression tests passed.');
