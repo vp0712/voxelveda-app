@@ -6,6 +6,7 @@ const { hasPermission } = require('./authorizationService');
 const { logAudit } = require('./auditService');
 const { createNotification } = require('./notificationService');
 const { ensureProcurementSchema } = require('./procurementSchema');
+const procurementCatalog = require('./procurementCatalogData');
 const { cancelWorkflow, startWorkflow } = require('./workflowService');
 
 const REQUISITION_ACTIVE = new Set(['DRAFT', 'PENDING_APPROVAL', 'PENDING', 'BLOCKED_ASSIGNMENT', 'NEEDS_CHANGES']);
@@ -230,7 +231,13 @@ async function listWorkspace() {
   ]);
   const children = (rows, key, id) => rows.filter((row) => Number(row[key]) === Number(id));
   return {
-    summary,
+    summary: {
+      ...summary,
+      bom_items: Math.max(0, (procurementCatalog.bom || []).length - 1),
+      launch_cap: procurementCatalog.order1?.[4]?.[1] || 0,
+      launch_estimated_total: procurementCatalog.order1?.[5]?.[1] || 0
+    },
+    catalog: procurementCatalog,
     suppliers,
     requisitions: requisitions.map((row) => ({ ...row, items: children(requisitionItems, 'purchase_requisition_id', row.id) })),
     supplier_rfqs: supplierRfqs.map((row) => ({ ...row, invites: children(supplierInvites, 'supplier_rfq_id', row.id) })),
