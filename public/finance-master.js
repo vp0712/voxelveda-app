@@ -400,7 +400,8 @@ async function saveBuiltReport(){
  const x=await api(API+'/reports/saved',{method:'POST',body:JSON.stringify({name,report_type:type,definition:def})});notice(x.message);await refresh();state.view='reports';render();
 }
 async function exportBuiltReportXlsx(){
- let result=state.reportResult;if(!result)result=await generateBuiltReport();if(!result)return;
+ const def=reportDefinitionFromUi();if(!def)return;
+ const result=await api(API+'/reports/builder?'+reportQuery(def));if(!result)return;
  if(!window.XLSX){notice('XLSX library is unavailable in this browser session.',true);return}
  const rows=(result.transactions||[]).map(t=>({
   Date:String(t.transaction_date||'').slice(0,10),PostingDate:String(t.posting_date||'').slice(0,10),Account:t.account_name||'',Institution:t.institution||'',
