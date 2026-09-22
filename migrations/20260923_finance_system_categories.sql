@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS finance_system_categories (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  category_uid VARCHAR(64) NOT NULL,
+  name VARCHAR(120) NOT NULL,
+  parent_id BIGINT NULL,
+  scope VARCHAR(20) NOT NULL DEFAULT 'BOTH',
+  owner_user_id INT NULL,
+  icon VARCHAR(40) NULL,
+  color VARCHAR(24) NULL,
+  gst_default VARCHAR(40) NOT NULL DEFAULT 'REVIEW',
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  archived_at DATETIME NULL,
+  archived_by INT NULL,
+  created_by INT NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_by INT NULL,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_finance_system_category_uid (category_uid),
+  INDEX idx_finance_category_visibility (scope,owner_user_id,active),
+  INDEX idx_finance_category_parent (parent_id,active),
+  INDEX idx_finance_category_name (name,scope,active)
+);
