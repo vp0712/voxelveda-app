@@ -5,49 +5,67 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>Finance Operating System | Voxel Veda</title>
-  <link rel="stylesheet" href="/finance-master.css?v=20260923-master1">
+  <link rel="stylesheet" href="/finance-master.css?v=20260923-control-centre">
+  <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
 </head>
 <body>
   <div class="fm-shell">
-    <aside class="fm-sidebar">
+    <aside class="fm-sidebar" aria-label="Finance navigation">
       <a class="fm-brand" href="/admin"><img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda"><div><strong>Voxel Veda</strong><span>FINANCE OS</span></div></a>
       <nav id="fmNav"></nav>
-      <div class="fm-side-footer"><small>Secure finance workspace</small><b>Personal · Company · Consolidated</b></div>
+      <div class="fm-side-footer"><small>Trusted finance workspace</small><b>Personal · Company · Consolidated</b></div>
     </aside>
 
     <main class="fm-main">
       <header class="fm-topbar">
-        <div><p class="fm-eyebrow">FINANCE OPERATING SYSTEM</p><h1 id="fmTitle">Finance Overview</h1><p id="fmSubtitle">Know where the money is, what changed, and what needs attention.</p></div>
+        <div><p class="fm-eyebrow">FINANCE OPERATING SYSTEM</p><h1 id="fmTitle">Finance Overview</h1><p id="fmSubtitle">One trusted view over Voxel Veda finance capabilities.</p></div>
         <div class="fm-top-actions">
-          <label class="fm-search"><span>⌕</span><input id="fmSearch" placeholder="Search transactions, merchants, accounts, statements"></label>
-          <button id="fmRefresh" class="fm-icon" type="button" title="Refresh">↻</button>
+          <label class="fm-search" aria-label="Global finance search"><span>⌕</span><input id="fmSearch" placeholder="Search transactions, merchants, accounts, statements"></label>
+          <button id="fmRefresh" class="fm-icon" type="button" title="Refresh" aria-label="Refresh Finance">↻</button>
           <button id="fmNew" class="fm-primary" type="button">+ New</button>
         </div>
       </header>
 
-      <section class="fm-filterbar">
+      <section class="fm-filterbar" aria-label="Finance filters">
         <label>Workspace<select id="fmScope"><option value="ALL">Consolidated</option><option value="PERSONAL">Personal</option><option value="BUSINESS">Company</option></select></label>
-        <label>Account<select id="fmAccount"><option value="">All accounts</option></select></label>
-        <label>Period<select id="fmPeriod"><option value="month">This month</option><option value="last_month">Last month</option><option value="quarter">This quarter</option><option value="fy">Financial year</option><option value="year">Calendar year</option></select></label>
-        <label>Currency<select id="fmCurrency"><option value="AUD">AUD</option></select></label>
+        <label>Account<select id="fmAccount"><option value="">All permitted accounts</option></select></label>
+        <label>Period<select id="fmPeriod">
+          <option value="today">Today</option>
+          <option value="yesterday">Yesterday</option>
+          <option value="week">This Week</option>
+          <option value="last7">Last 7 Days</option>
+          <option value="month" selected>This Month</option>
+          <option value="last_month">Last Month</option>
+          <option value="last30">Last 30 Days</option>
+          <option value="quarter">This Quarter</option>
+          <option value="previous_quarter">Previous Quarter</option>
+          <option value="fy">Current Financial Year</option>
+          <option value="previous_fy">Previous Financial Year</option>
+          <option value="year">Calendar Year</option>
+          <option value="custom">Custom Range</option>
+        </select></label>
+        <label id="fmFromWrap" hidden>From<input id="fmFrom" type="date"></label>
+        <label id="fmToWrap" hidden>To<input id="fmTo" type="date"></label>
+        <label>Currency<select id="fmCurrencyMode"><option value="NATIVE">Native currencies</option></select></label>
       </section>
 
-      <div id="fmNotice" class="fm-notice" hidden></div>
-      <section id="fmContent" class="fm-content"><div class="fm-loading"><span></span><b>Loading finance workspace…</b></div></section>
+      <div id="fmNotice" class="fm-notice" hidden role="status"></div>
+      <section id="fmContent" class="fm-content" aria-live="polite"><div class="fm-loading"><span></span><b>Loading finance workspace…</b></div></section>
     </main>
   </div>
 
-  <aside id="fmDrawer" class="fm-drawer" aria-hidden="true">
-    <header><div><small id="fmDrawerEyebrow">DETAIL</small><h2 id="fmDrawerTitle">Details</h2></div><button id="fmDrawerClose" type="button">×</button></header>
+  <aside id="fmDrawer" class="fm-drawer" aria-hidden="true" aria-label="Finance detail">
+    <header><div><small id="fmDrawerEyebrow">DETAIL</small><h2 id="fmDrawerTitle">Details</h2></div><button id="fmDrawerClose" type="button" aria-label="Close details">×</button></header>
     <div id="fmDrawerBody" class="fm-drawer-body"></div>
   </aside>
   <div id="fmBackdrop" class="fm-backdrop" hidden></div>
 
-  <dialog id="fmModal" class="fm-modal">
-    <header><div><small id="fmModalEyebrow">FINANCE WORKFLOW</small><h2 id="fmModalTitle">New</h2></div><button id="fmModalClose" type="button">×</button></header>
+  <dialog id="fmModal" class="fm-modal" aria-labelledby="fmModalTitle">
+    <header><div><small id="fmModalEyebrow">FINANCE WORKFLOW</small><h2 id="fmModalTitle">New</h2></div><button id="fmModalClose" type="button" aria-label="Close dialog">×</button></header>
     <div id="fmModalBody" class="fm-modal-body"></div>
   </dialog>
 
-  <script src="/finance-master.js?v=20260923-master1" defer></script>
+  <script src="/finance-master.js?v=20260923-control-centre" defer></script>
 </body>
 </html>
