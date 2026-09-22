@@ -578,6 +578,9 @@ function bindDynamic(){
  document.querySelectorAll('[data-scope-jump]').forEach(b=>b.onclick=()=>{state.scope=b.dataset.scopeJump;$('fmScope').value=state.scope;refresh()});
  document.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>{location.href=b.dataset.export});
  document.querySelectorAll('[data-retry]').forEach(b=>b.onclick=refresh);
+ document.querySelectorAll('[data-transfer-debit]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/bank-transactions/'+b.dataset.transferDebit+'/transfer-links',{method:'POST',body:JSON.stringify({counterpart_transaction_id:Number(b.dataset.transferCredit)})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-refund-link]').forEach(b=>b.onclick=()=>openRefundLink(b.dataset.refundLink,b.dataset.refundCurrency));
+ document.querySelectorAll('[data-reimb-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.reimbAction,id=b.dataset.reimbId;let body={};if(action==='reject'){const reason=prompt('Reason for rejecting this reimbursement:');if(!reason)return;body={reason}}try{const x=await api(API+'/reimbursements/'+id+'/'+action,{method:'POST',body:JSON.stringify(body)});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  if($('txApply'))$('txApply').onclick=()=>{state.txFilters={...state.txFilters,q:$('txSearch').value.trim(),type:$('txType').value,category:$('txCategory').value.trim(),merchant:$('txMerchant').value.trim(),source:$('txSource').value,reconciliation_status:$('txRecon').value,amount_min:$('txMin').value.trim(),amount_max:$('txMax').value.trim()};state.txMeta.page=1;loadTransactions()};
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
