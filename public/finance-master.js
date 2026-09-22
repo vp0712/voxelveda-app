@@ -314,13 +314,6 @@ function openBankBudget(){
  $('fmModal').showModal();
  $('bankBudgetForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(I+'/budgets',{method:'POST',body:JSON.stringify(Object.fromEntries(fd.entries()))});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
-function saveCurrentView(){
- const current=state.txFilters.q||state.txFilters.merchant||state.txFilters.category;
- if(!current){notice('Enter a transaction search, merchant or category filter before saving a view.',true);return}
- const name=prompt('Name this saved transaction view:');if(!name)return;
- const query=[state.txFilters.q,state.txFilters.merchant,state.txFilters.category].filter(Boolean).join(' ').slice(0,180);
- api(API+'/personal-money/saved-views',{method:'POST',body:JSON.stringify({name,query_text:query,pinned:true})}).then(async x=>{notice(x.message);await refresh()}).catch(e=>notice(e.message,true));
-}
 function savedViewsCard(){
  const views=state.savedViews?.saved_views||[];
  return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Saved Views</h2><p>Owner-private search definitions; no transaction snapshots are duplicated.</p></div><button id="saveCurrentView">Save current</button></div><div class="fm-list">'+(views.map(v=>'<div class="fm-row"><div><h3>'+esc(v.name)+'</h3><p>'+esc(v.query_text)+'</p></div><div class="fm-row-right"><button data-saved-open="'+esc(v.id)+'" data-query="'+esc(v.query_text)+'">Open</button><button data-saved-delete="'+esc(v.id)+'">Delete</button></div></div>').join('')||emptyState('No saved views','Save a useful transaction search for quick reuse.'))+'</div></div></article>';
@@ -693,14 +686,16 @@ function bindDynamic(){
  document.querySelectorAll('[data-debt-pay]').forEach(b=>b.onclick=()=>openDebtPaymentForm(b.dataset.debtPay));
  document.querySelectorAll('[data-goal-contribute]').forEach(b=>b.onclick=()=>openGoalContributionForm(b.dataset.goalContribute));
  document.querySelectorAll('[data-recurring-complete]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/personal-money/recurring/'+encodeURIComponent(b.dataset.recurringComplete)+'/complete',{method:'POST',body:JSON.stringify({completed_date:new Date().toISOString().slice(0,10)})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
- document.querySelectorAll('[data-bank-budget-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this banking budget?'))return;try{const x=await api(I+'/budgets/'+encodeURIComponent(b.dataset.bankBudgetArchive),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-bank-budget-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this active banking budget?'))return;try{const x=await api(I+'/budgets/'+encodeURIComponent(b.dataset.bankBudgetArchive),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  if($('addBankBudget'))$('addBankBudget').onclick=openBankingBudgetForm;
  document.querySelectorAll('[data-saved-query]').forEach(b=>b.onclick=()=>openSavedView(b.dataset.savedQuery));
+ document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)+'/opened',{method:'POST',body:'{}'}).catch(()=>{});state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()});
+ document.querySelectorAll('[data-saved-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this saved view?'))return;try{const x=await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedDelete),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  if($('saveCurrentView'))$('saveCurrentView').onclick=saveCurrentView;
- document.querySelectorAll('[data-notification-read]').forEach(b=>b.onclick=async()=>{try{await api('/api/notifications/'+b.dataset.notificationRead+'/read',{method:'PATCH',body:'{}'});await refresh()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-notification-read]').forEach(b=>b.onclick=async()=>{try{await api('/api/notifications/'+encodeURIComponent(b.dataset.notificationRead)+'/read',{method:'PATCH',body:'{}'});await refresh()}catch(error){notice(error.message,true)}});
  if($('markAllNotifications'))$('markAllNotifications').onclick=async()=>{try{const x=await api('/api/notifications/mark-all-read',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
  document.querySelectorAll('[data-notification-pref]').forEach(c=>c.onchange=async()=>{const existing=(state.notificationPrefs?.preferences||[]).find(p=>p.category===c.dataset.notificationPref)||{};try{await api('/api/notifications/preferences',{method:'PATCH',body:JSON.stringify({category:c.dataset.notificationPref,in_app_enabled:c.checked,email_enabled:Boolean(existing.email_enabled),push_enabled:Boolean(existing.push_enabled),quiet_hours_start:existing.quiet_hours_start||null,quiet_hours_end:existing.quiet_hours_end||null,digest_frequency:existing.digest_frequency||'IMMEDIATE'})});notice('Notification preference saved.')}catch(error){c.checked=!c.checked;notice(error.message,true)}});
- if($('companySettingsForm'))$('companySettingsForm').onsubmit=async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget).entries());body.base_currency=String(body.base_currency||'').toUpperCase();try{const x=await api('/api/settings',{method:'POST',body:JSON.stringify(body)});notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
+ if($('openCompanySettings'))$('openCompanySettings').onclick=openCompanySettings;
  document.querySelectorAll('[data-tx]').forEach(r=>r.onclick=()=>transactionDetail(r.dataset.tx));
  document.querySelectorAll('[data-account]').forEach(r=>r.onclick=()=>accountDetail(r.dataset.account));
  document.querySelectorAll('[data-review]').forEach(r=>r.onclick=()=>openStatementReview(r.dataset.review));
@@ -714,18 +709,6 @@ function bindDynamic(){
  document.querySelectorAll('[data-transfer-debit]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/bank-transactions/'+b.dataset.transferDebit+'/transfer-links',{method:'POST',body:JSON.stringify({counterpart_transaction_id:Number(b.dataset.transferCredit)})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-refund-link]').forEach(b=>b.onclick=()=>openRefundLink(b.dataset.refundLink,b.dataset.refundCurrency));
  document.querySelectorAll('[data-reimb-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.reimbAction,id=b.dataset.reimbId;let body={};if(action==='reject'){const reason=prompt('Reason for rejecting this reimbursement:');if(!reason)return;body={reason}}try{const x=await api(API+'/reimbursements/'+id+'/'+action,{method:'POST',body:JSON.stringify(body)});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
- document.querySelectorAll('[data-goal-contribute]').forEach(b=>b.onclick=()=>openGoalContribution(b.dataset.goalContribute));
- document.querySelectorAll('[data-debt-pay]').forEach(b=>b.onclick=()=>openDebtPayment(b.dataset.debtPay));
- document.querySelectorAll('[data-recurring-complete]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/personal-money/recurring/'+encodeURIComponent(b.dataset.recurringComplete)+'/complete',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
- document.querySelectorAll('[data-bank-budget-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this active banking budget?'))return;try{const x=await api(I+'/budgets/'+encodeURIComponent(b.dataset.bankBudgetArchive),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
- if($('addBankBudget'))$('addBankBudget').onclick=openBankBudget;
- if($('saveCurrentView'))$('saveCurrentView').onclick=saveCurrentView;
- document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)+'/opened',{method:'POST',body:'{}'}).catch(()=>{});loadTransactions()});
- document.querySelectorAll('[data-saved-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this saved view?'))return;try{const x=await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedDelete),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
- document.querySelectorAll('[data-notification-read]').forEach(b=>b.onclick=async()=>{try{await api('/api/notifications/'+encodeURIComponent(b.dataset.notificationRead)+'/read',{method:'PATCH',body:'{}'});await refresh()}catch(error){notice(error.message,true)}});
- document.querySelectorAll('[data-notification-pref]').forEach(b=>b.onchange=async()=>{try{const x=await api('/api/notifications/preferences',{method:'PATCH',body:JSON.stringify({category:b.dataset.notificationPref,in_app_enabled:b.checked})});notice(x.message);await refresh()}catch(error){b.checked=!b.checked;notice(error.message,true)}});
- if($('markAllNotifications'))$('markAllNotifications').onclick=async()=>{try{const x=await api('/api/notifications/mark-all-read',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
- if($('openCompanySettings'))$('openCompanySettings').onclick=openCompanySettings;
  if($('txApply'))$('txApply').onclick=()=>{state.txFilters={...state.txFilters,q:$('txSearch').value.trim(),type:$('txType').value,category:$('txCategory').value.trim(),merchant:$('txMerchant').value.trim(),source:$('txSource').value,reconciliation_status:$('txRecon').value,amount_min:$('txMin').value.trim(),amount_max:$('txMax').value.trim()};state.txMeta.page=1;loadTransactions()};
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
