@@ -858,6 +858,12 @@ function bindDynamic(){
     notice(x.message);await refresh();
   }catch(error){notice(error.message,true)}
  });
+ if($('addFinanceCategory'))$('addFinanceCategory').onclick=()=>openFinanceCategoryForm();
+ document.querySelectorAll('[data-category-edit]').forEach(b=>b.onclick=()=>openFinanceCategoryForm(b.dataset.categoryEdit));
+ document.querySelectorAll('[data-category-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this Finance category? Existing transaction classifications will remain unchanged.'))return;try{const x=await api(API+'/categories/'+encodeURIComponent(b.dataset.categoryArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-category-restore]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/categories/'+encodeURIComponent(b.dataset.categoryRestore)+'/restore',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-rule-edit]').forEach(b=>b.onclick=()=>openFinanceRuleForm(b.dataset.ruleEdit));
+ document.querySelectorAll('[data-rule-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this merchant suggestion rule?'))return;try{const x=await api(I+'/rules/'+encodeURIComponent(b.dataset.ruleDelete),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  if($('runAnalysis'))$('runAnalysis').onclick=async()=>{try{await api(I+'/analyse',{method:'POST',body:JSON.stringify({scope:state.scope})});notice('Finance analysis refreshed.');await refresh()}catch(error){notice(error.message,true)}};
 }
 function openDrawer(title,body,eyebrow='DETAIL'){$('fmDrawerEyebrow').textContent=eyebrow;$('fmDrawerTitle').textContent=title;$('fmDrawerBody').innerHTML=body;$('fmDrawer').classList.add('open');$('fmDrawer').setAttribute('aria-hidden','false');$('fmBackdrop').hidden=false}
