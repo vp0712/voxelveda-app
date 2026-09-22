@@ -12,8 +12,8 @@ function normalizeCategory(input={}){
  const name=text(input.name,120); if(name.length<2) throw Object.assign(new Error('Category name must be at least 2 characters.'),{statusCode:400,code:'INVALID_CATEGORY_NAME'});
  const scope=text(input.scope||'BOTH',20).toUpperCase(); if(!CATEGORY_SCOPES.has(scope)) throw Object.assign(new Error('Category scope must be Personal, Business or Both.'),{statusCode:400,code:'INVALID_CATEGORY_SCOPE'});
  const gst=text(input.gst_default||'REVIEW',20).toUpperCase(); if(!GST_DEFAULTS.has(gst)) throw Object.assign(new Error('Choose a valid GST default.'),{statusCode:400,code:'INVALID_CATEGORY_GST_DEFAULT'});
- const colour=text(input.colour,20)||null; if(colour && !/^#[0-9a-f]{6}$/i.test(colour)) throw Object.assign(new Error('Category colour must be a six-digit hex colour.'),{statusCode:400,code:'INVALID_CATEGORY_COLOUR'});
- return {name,scope,gst_default:gst,colour:text(input.colour??input.color,20)||null,icon:text(input.icon,40)||null,parent_category_id:(input.parent_category_id??input.parent_id)?Number(input.parent_category_id??input.parent_id):null};
+ const colour=text(input.colour??input.color,20)||null; if(colour && !/^#[0-9a-f]{6}$/i.test(colour)) throw Object.assign(new Error('Category colour must be a six-digit hex colour.'),{statusCode:400,code:'INVALID_CATEGORY_COLOUR'});
+ return {name,scope,gst_default:gst,colour,icon:text(input.icon,40)||null,parent_category_id:(input.parent_category_id??input.parent_id)?Number(input.parent_category_id??input.parent_id):null};
 }
 function normalizePreferences(input={}){
  const default_workspace=text(input.default_workspace||'ALL',20).toUpperCase(); if(!WORKSPACES.has(default_workspace)) throw Object.assign(new Error('Invalid default workspace.'),{statusCode:400,code:'INVALID_DEFAULT_WORKSPACE'});
