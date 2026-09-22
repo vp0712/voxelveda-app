@@ -12,7 +12,7 @@ const routes = read('routes/financeRoutes.js');
 
 assert.match(migration, /CREATE TABLE IF NOT EXISTS bank_transaction_original_data/, 'Immutable original bank-data table is required.');
 assert.match(migration, /UNIQUE KEY uq_bank_transaction_original \(bank_transaction_id\)/, 'Original data must remain one-to-one with a committed bank transaction.');
-assert.match(migration, /COALESCE\(sr\.override_original_json/, 'Backfill must preserve pre-correction payload for manually corrected statement rows.');
+assert.match(migration, /COALESCE\(sr\.raw_payload_json, sr\.override_original_json/, 'Backfill must prefer raw source payload and retain pre-correction fallback data.');
 assert.match(controller, /function originalStatementPayload\(row\)/, 'Statement importer must derive immutable source payload.');
 assert.match(controller, /INSERT IGNORE INTO bank_transaction_original_data/, 'Commit must capture original statement data.');
 assert.match(controller, /exports\.getOriginalBankTransaction/, 'Original transaction API is required.');
