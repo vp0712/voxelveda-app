@@ -224,6 +224,71 @@ exports.getTransactions = async (req, res) => {
   } catch (error) { return fail(res, error, 'Failed to load separated transaction ledger'); }
 };
 
+exports.createManualTransaction = async (req, res) => {
+  let db;
+  try {
+    await ensureFinanceSchema();
+    const accountId = Number(req.body.bank_account_id || 0);
+    if (!accountId) throw new FinanceError('Choose a financial account.', 400, 'BANK_ACCOUNT_REQUIRED');
+    const type = String(req.body.type || '').trim().toUpperCase();
+    if (!['INCOME','EXPENSE','ADJUSTMENT_IN','ADJUSTMENT_OUT'].includes(type)) {
+      throw new FinanceError('Manual movement type must be Income, Expense, Adjustment In or Adjustment Out.', 400, 'INVALID_MANUAL_TRANSACTION_TYPE');
+    }
+    const transactionDate = dateOnly(req.body.transaction_date);
+    if (!transactionDate) throw new FinanceError('A valid transaction date is required.', 400, 'DATE_REQUIRED');
+    const amount = money.fromCents(money.toCents(req.body.amount));
+    if (money.toCents(amount) <= 0n) throw new FinanceError('Amount must be greater than zero.', 400, 'INVALID_AMOUNT');
+    const description = String(req.body.description || '').trim().slice(0,500);
+    if (!description) throw new FinanceError('Description is required.', 400, 'DESCRIPTION_REQUIRED');
+
+    db = await pool.getConnection();
+    await db.beginTransaction();
+    const [[account]] = await db.query(
+      `SELECT * FROM bank_accounts ba WHERE ba.id=? AND ba.status='ACTIVE' AND ${privacy.visibilitySql('ba', req)} FOR UPDATE`,
+      [accountId, ...privacy.visibilityParams(req)]
+    );
+    if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
+
+    const accountScope = String(account.ownership_scope || 'UNCLASSIFIED').toUpperCase();
+    const requestedScope = String(req.body.ownership_scope || accountScope).trim().toUpperCase();
+    const allowedScopes = new Set(['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
+    if (!allowedScopes.has(requestedScope)) throw new FinanceError('Choose a valid ownership scope.', 400, 'INVALID_TRANSACTION_SCOPE');
+    const ownershipScope = ['MIXED','UNCLASSIFIED'].includes(accountScope) ? requestedScope : accountScope;
+    const debit = ['EXPENSE','ADJUSTMENT_OUT'].includes(type) ? amount : '0.00';
+    const credit = ['INCOME','ADJUSTMENT_IN'].includes(type) ? amount : '0.00';
+    const reference = String(req.body.reference || '').trim().slice(0,120) || null;
+    const merchant = String(req.body.merchant_name || '').trim().slice(0,255) || null;
+    const category = String(req.body.category || '').trim().slice(0,120) || null;
+    const fingerprint = crypto.createHash('sha256').update([
+      'MANUAL', account.id, transactionDate, description.toLowerCase(), reference || '',
+      debit, credit, String(req.user?.id || ''), String(Date.now()), crypto.randomBytes(8).toString('hex')
+    ].join('|')).digest('hex');
+
+    const [insert] = await db.query(
+      `INSERT INTO bank_transactions
+       (bank_account_id,row_hash,transaction_date,posting_date,description,reference,debit,credit,running_balance,
+        merchant_name,category,currency,ownership_scope,classification_status,reconciliation_status,
+        is_internal_transfer,source_type,source_provider,review_source_status,manual_override,imported_by,imported_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'UNRECONCILED',0,'MANUAL','VOXEL_VEDA','MANUAL',1,?,NOW())`,
+      [account.id,fingerprint,transactionDate,dateOnly(req.body.posting_date)||transactionDate,description,reference,
+        debit,credit,null,merchant,category,account.currency,ownershipScope,category?'CLASSIFIED':'UNCLASSIFIED',req.user.id]
+    );
+    await logAudit(db, audit(req, {
+      action:'MANUAL_BANK_TRANSACTION_CREATED', module:'finance_intelligence', recordType:'bank_transaction',
+      recordId:insert.insertId, newValue:{bank_account_id:account.id,transaction_date:transactionDate,type,amount,currency:account.currency,ownership_scope:ownershipScope,category}
+    }));
+    await db.commit();
+    return res.status(201).json({
+      message:'Manual financial movement recorded in the canonical bank/cash ledger.',
+      id:insert.insertId, currency:account.currency, ownership_scope:ownershipScope
+    });
+  } catch (error) {
+    if (db) await db.rollback();
+    return fail(res,error,'Failed to create manual financial movement');
+  } finally { if (db) db.release(); }
+};
+
+
 function reportScope(value) {
   const scope = String(value || 'ALL').trim().toUpperCase();
   const allowed = new Set(['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
