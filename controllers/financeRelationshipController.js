@@ -195,3 +195,83 @@ exports.addReimbursementPayment=async(req,res)=>{
     return res.status(201).json({message:'Reimbursement payment linked.',status:next,remaining_amount:money.fromCents(remaining-requested)});
   }catch(error){await db.rollback().catch(()=>{});return fail(res,error,'Failed to link reimbursement payment.')}finally{db.release()}
 };
+
+
+exports.getTransferLinks=async(req,res)=>{
+  try{
+    await ensureFinanceSchema();const id=Number(req.params.id||0);
+    const [rows]=await pool.query(
+      `SELECT tl.*,d.transaction_date AS debit_date,d.description AS debit_description,d.bank_account_id AS debit_account_id,
+              c.transaction_date AS credit_date,c.description AS credit_description,c.bank_account_id AS credit_account_id,
+              da.nickname AS debit_account_name,ca.nickname AS credit_account_name
+         FROM finance_transfer_links tl
+         JOIN bank_transactions d ON d.id=tl.debit_bank_transaction_id
+         JOIN bank_transactions c ON c.id=tl.credit_bank_transaction_id
+         JOIN bank_accounts da ON da.id=d.bank_account_id
+         JOIN bank_accounts ca ON ca.id=c.bank_account_id
+        WHERE (tl.debit_bank_transaction_id=? OR tl.credit_bank_transaction_id=?) AND tl.status='ACTIVE'
+        ORDER BY tl.created_at DESC`,[id,id]);
+    return res.json({transaction_id:id,links:rows});
+  }catch(error){return fail(res,error,'Failed to load transfer links.')}
+};
+
+exports.linkTransfer=async(req,res)=>{
+  const db=await pool.getConnection();
+  try{
+    await ensureFinanceSchema();const firstId=Number(req.params.id||0),secondId=Number(req.body.counterpart_transaction_id||0);
+    if(!secondId||secondId===firstId)throw new FinanceError('Choose a different counterpart transaction.',400,'TRANSFER_COUNTERPART_REQUIRED');
+    await privacy.assertBankTransactionAccess(pool,secondId,req);
+    await db.beginTransaction();const first=await transactionForUpdate(db,firstId,req),second=await transactionForUpdate(db,secondId,req);
+    const firstDebit=money.toCents(first.debit||0),firstCredit=money.toCents(first.credit||0),secondDebit=money.toCents(second.debit||0),secondCredit=money.toCents(second.credit||0);
+    let debit,credit;
+    if(firstDebit>0n&&secondCredit>0n){debit=first;credit=second}
+    else if(secondDebit>0n&&firstCredit>0n){debit=second;credit=first}
+    else throw new FinanceError('A transfer pair must contain one debit and one credit.',400,'TRANSFER_DIRECTION_INVALID');
+    if(String(debit.currency)!==String(credit.currency))throw new FinanceError('Cross-currency transfer matching requires stored FX evidence and is not enabled.',409,'TRANSFER_FX_EVIDENCE_REQUIRED');
+    if(money.toCents(debit.debit)!==money.toCents(credit.credit))throw new FinanceError('Transfer amounts must match exactly unless verified FX evidence exists.',400,'TRANSFER_AMOUNT_MISMATCH');
+    if(Number(debit.bank_account_id)===Number(credit.bank_account_id))throw new FinanceError('Transfer counterpart must be in a different account.',400,'TRANSFER_ACCOUNT_MUST_DIFFER');
+    const [[existing]]=await db.query(
+      `SELECT id FROM finance_transfer_links
+        WHERE status='ACTIVE' AND (debit_bank_transaction_id IN (?,?) OR credit_bank_transaction_id IN (?,?)) LIMIT 1 FOR UPDATE`,
+      [debit.id,credit.id,debit.id,credit.id]
+    );
+    if(existing)throw new FinanceError('One of these transactions is already linked to an active transfer.',409,'TRANSFER_ALREADY_LINKED');
+    const transferUid=uid('TRANSFER');
+    await db.query(
+      `INSERT INTO finance_transfer_links
+       (transfer_uid,debit_bank_transaction_id,credit_bank_transaction_id,debit_amount,credit_amount,currency,note,created_by)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [transferUid,debit.id,credit.id,debit.debit,credit.credit,debit.currency,String(req.body.note||'').trim().slice(0,1000)||null,userId(req)]
+    );
+    await db.query('UPDATE bank_transactions SET is_internal_transfer=1 WHERE id IN (?,?)',[debit.id,credit.id]);
+    await logAudit(db,audit(req,'INTERNAL_TRANSFER_LINKED','finance_transfer_link',transferUid,null,{
+      debit_bank_transaction_id:debit.id,credit_bank_transaction_id:credit.id,amount:debit.debit,currency:debit.currency
+    }));
+    await db.commit();
+    return res.status(201).json({message:'Internal transfer pair confirmed. The pair is excluded from income and expense totals.',transfer_uid:transferUid,amount:debit.debit,currency:debit.currency});
+  }catch(error){await db.rollback().catch(()=>{});return fail(res,error,'Failed to link internal transfer.')}finally{db.release()}
+};
+
+exports.unlinkTransfer=async(req,res)=>{
+  const db=await pool.getConnection();
+  try{
+    await db.beginTransaction();const transactionId=Number(req.params.id||0),linkId=Number(req.params.linkId||0);
+    await transactionForUpdate(db,transactionId,req);
+    const [[link]]=await db.query(
+      `SELECT * FROM finance_transfer_links
+        WHERE id=? AND status='ACTIVE' AND (debit_bank_transaction_id=? OR credit_bank_transaction_id=?) FOR UPDATE`,
+      [linkId,transactionId,transactionId]
+    );
+    if(!link)throw new FinanceError('Active transfer link not found.',404,'TRANSFER_LINK_NOT_FOUND');
+    await db.query("UPDATE finance_transfer_links SET status='VOID',voided_by=?,voided_at=NOW() WHERE id=?",[userId(req),linkId]);
+    for(const txId of [link.debit_bank_transaction_id,link.credit_bank_transaction_id]){
+      const [[other]]=await db.query(
+        `SELECT id FROM finance_transfer_links WHERE status='ACTIVE'
+          AND (debit_bank_transaction_id=? OR credit_bank_transaction_id=?) LIMIT 1`,[txId,txId]
+      );
+      if(!other)await db.query('UPDATE bank_transactions SET is_internal_transfer=0 WHERE id=?',[txId]);
+    }
+    await logAudit(db,audit(req,'INTERNAL_TRANSFER_UNLINKED','finance_transfer_link',linkId,link,{status:'VOID'}));
+    await db.commit();return res.json({message:'Transfer pair unlinked. Source transactions remain unchanged.'});
+  }catch(error){await db.rollback().catch(()=>{});return fail(res,error,'Failed to unlink internal transfer.')}finally{db.release()}
+};
