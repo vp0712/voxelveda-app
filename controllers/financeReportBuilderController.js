@@ -195,10 +195,10 @@ exports.runSaved=async(req,res)=>{
     const reportUid=safeText(req.params.uid,64);
     const [[row]]=await pool.query('SELECT id,definition_json FROM finance_saved_reports WHERE report_uid=? AND created_by=? LIMIT 1',[reportUid,userId(req)]);
     if(!row)throw new FinanceError('Saved report not found.',404,'SAVED_REPORT_NOT_FOUND');
-    const definition=typeof row.definition_json==='string'?JSON.parse(row.definition_json):row.definition_json;
-    const report=await buildReport(req,definition);
-    await pool.query('UPDATE finance_saved_reports SET last_run_at=NOW() WHERE id=?',[row.id]);
-    return res.json(report);
+    const stored=typeof row.definition_json==='string'?JSON.parse(row.definition_json):row.definition_json;
+    const overrides=definitionFrom(req.query||{});
+    const definition={...stored,...overrides};
+    return res.json(await buildReport(req,definition));
   }catch(error){return fail(res,error,'Failed to run saved Finance report.')}
 };
 
