@@ -9,14 +9,14 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''}
 };
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['statements','▤','Statements'],['receipts','▧','Receipts']]],
- ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast']]],
+ ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports']]],
  ['CONTROL',[['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
@@ -24,9 +24,9 @@ const NAV_GROUPS=[
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
-const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
+const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
 const nativeMoney=(v,c)=>money(v,c||'AUD');
-const date=v=>v?new Intl.DateTimeFormat('en-AU',{dateStyle:'medium'}).format(new Date(String(v).slice(0,10)+'T00:00:00')):'—';
+const date=v=>{if(!v)return '—';const d=new Date(String(v).slice(0,10)+'T00:00:00');const fmt=state.userPreferences?.date_format||'DD/MM/YYYY';if(fmt==='YYYY-MM-DD')return String(v).slice(0,10);if(fmt==='MM/DD/YYYY')return new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)};
 async function api(path,options={}){const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});let body={};try{body=await r.json()}catch{}if(!r.ok){const e=new Error(body.message||'Request failed');e.status=r.status;e.code=body.code;throw e}return body}
 function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
 function navButtons(){
@@ -50,7 +50,8 @@ function title(v){return ({
  reimbursements:['Reimbursements','Track employee-paid expenses through submission, approval and linked repayment.'],
  budgets:['Budgets','Personal and banking budget controls backed by current finance records.'],
  savings:['Savings Goals','Track goals and contributions without pretending that progress automatically moves cash.'],
- forecast:['Cash Flow Calendar','Upcoming internal payment instructions and obligations; no claim of direct bank execution.'],
+ forecast:['Forecast','Evidence-based planning from Personal Money Smart, Financial Health and Roadmap Intelligence.'],
+ calendar:['Cash Flow Calendar','Known company/banking and personal planning events shown separately by scope and currency.'],
  insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
  rules:['Categories & Rules','Merchant categorisation rules create suggestions; they do not silently post changes.'],
  review:['Data Quality Review','Uncategorised, unreconciled, coverage and other review queues.'],
@@ -126,11 +127,27 @@ function currencyRows(){
 function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — consolidated total unavailable until verified FX rates are available.':''}
 function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
 function emptyState(title,message,action=''){return `<div class="fm-empty"><strong>${esc(title)}</strong><span>${esc(message)}</span>${action}</div>`}
+function dashboardCardVisible(key){
+ const configured=state.userPreferences?.dashboard_cards;
+ if(!Array.isArray(configured)||!configured.length)return true;
+ return key==='attention'||configured.includes(key);
+}
 async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
+ const prefPayload=await loadResource('userPreferences',API+'/preferences');
+ state.userPreferences=prefPayload?.preferences||state.userPreferences;
+ if(!state.preferencesApplied&&state.userPreferences){
+  const pref=state.userPreferences;
+  if(['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
+  if(pref.default_period)state.period=pref.default_period;
+  if(pref.default_account_id)state.account=String(pref.default_account_id);
+  state.preferencesApplied=true;
+  if($('fmScope'))$('fmScope').value=state.scope;
+  if($('fmPeriod'))$('fmPeriod').value=state.period;
+ }
  const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,categories]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,categories,smart,health,roadmaps]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -161,7 +178,10 @@ async function loadBase(){
   loadResource('archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)),
   loadResource('cashflowCalendar',OS+'/cashflow-calendar?days=90'),
   loadResource('accountingPeriods',API+'/accounting-periods'),
-  loadResource('categories',API+'/categories?include_archived=true')
+  loadResource('categories',API+'/categories?include_archived=true'),
+  loadResource('smart',API+'/personal-money/smart'),
+  loadResource('health',API+'/personal-money/health'),
+  loadResource('roadmaps',API+'/personal-money/roadmaps')
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
@@ -169,12 +189,13 @@ async function loadBase(){
  state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
- state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;state.categories=categories||null;
+ state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;state.categories=categories||null;state.smart=smart||null;state.health=health||null;state.roadmaps=roadmaps||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
   state.accounts=accounts?.accounts||[];
  }
+ if(state.account&&!state.accounts.some(a=>String(a.id)===String(state.account)))state.account='';
  const sel=$('fmAccount'),keep=state.account;
  sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
  sel.value=keep;
@@ -198,7 +219,12 @@ function overview(){
  const cats=Array.isArray(state.dash?.categories)?state.dash.categories:[];const catList=cats.slice(0,8).map(x=>`<button class="fm-distribution" data-category="${esc(x.category)}"><span>${esc(x.category)} · ${esc(x.currency)}</span><b>${nativeMoney(x.spent,x.currency)}</b></button>`).join('')||emptyState('No expense distribution','No expenses exist in the selected period.');
  const q=state.quality||{};const ins=state.insights?.summary||{};const attention=[['Uncategorised',q.unclassified_transactions??q.unclassified,'transactions'],['Unreconciled',q.unreconciled_transactions??q.unreconciled,'reconciliation'],['Ownership missing',q.ownership_missing,'review'],['History coverage unknown',q.unknown_history_coverage,'accounts'],['Transfer candidates',ins.transfer_candidates,'insights'],['Anomalies',ins.anomalies,'insights']].filter(x=>num(x[1])>0);
  const attentionHtml=attention.length?attention.map(([l,n,v])=>`<button class="fm-attention" data-viewjump="${v}"><b>${num(n)}</b><span>${esc(l)}</span></button>`).join(''):emptyState('No current attention items','No review counts were returned for the selected scope.');
- return hero()+`<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Cash Flow Trend</h2><p>Real money in/out grouped by month and native currency.</p></div></div><div class="fm-chart" role="img" aria-label="Cash flow trend">${chart}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Expense Distribution</h2><p>Click a category to drill into matching transactions.</p></div></div><div class="fm-distributions">${catList}</div></div></article></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Needs your attention</h2><p>Direct queues, not decorative alerts.</p></div></div><div class="fm-attention-grid">${attentionHtml}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounts</h2><p>Balances are current positions and never period-filtered.</p></div><button data-viewjump="accounts">Manage</button></div><div class="fm-list">${accountRows||emptyState('No accounts','Add an account or import a statement.')}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Recent transactions</h2><p>Drill into current classification and immutable source evidence.</p></div><button data-viewjump="transactions">View all</button></div><div class="fm-list">${recentRows()}</div></div></article>`;
+ const cashflowCard=dashboardCardVisible('cashflow')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Cash Flow Trend</h2><p>Real money in/out grouped by month and native currency.</p></div></div><div class="fm-chart" role="img" aria-label="Cash flow trend">'+chart+'</div></div></article>':'';
+ const expenseCard=dashboardCardVisible('expenses')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Expense Distribution</h2><p>Click a category to drill into matching transactions.</p></div></div><div class="fm-distributions">'+catList+'</div></div></article>':'';
+ const accountCard=dashboardCardVisible('accounts')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounts</h2><p>Balances are current positions and never period-filtered.</p></div><button data-viewjump="accounts">Manage</button></div><div class="fm-list">'+(accountRows||emptyState('No accounts','Add an account or import a statement.'))+'</div></div></article>':'';
+ const recentCard=dashboardCardVisible('recent')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Recent transactions</h2><p>Drill into current classification and immutable source evidence.</p></div><button data-viewjump="transactions">View all</button></div><div class="fm-list">'+recentRows()+'</div></div></article>':'';
+ const attentionCard='<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Needs your attention</h2><p>Direct queues, not decorative alerts.</p></div></div><div class="fm-attention-grid">'+attentionHtml+'</div></div></article>';
+ return hero()+((cashflowCard||expenseCard)?'<div class="fm-grid two">'+cashflowCard+expenseCard+'</div>':'')+'<div class="fm-grid two">'+attentionCard+accountCard+'</div>'+recentCard;
 }
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
@@ -252,15 +278,29 @@ function notificationsView(){
  return resourceError('notifications','Finance Notifications')+'<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Notifications</h2><p>'+num(state.notifications?.total)+' active notification(s).</p></div><button id="markAllNotifications">Mark all read</button></div><div class="fm-list">'+(items.map(n=>'<div class="fm-row"><div><h3>'+esc(n.title)+'</h3><p>'+esc(n.message||'')+' · '+esc(n.category||'')+'</p></div><div class="fm-row-right">'+statusBadge(n.priority||'NORMAL')+'<small>'+date(n.created_at)+'</small>'+(n.is_read?'':'<button data-notification-read="'+n.id+'">Mark read</button>')+'</div></div>').join('')||emptyState('No notifications','No active Finance/user notifications are available.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Preferences</h2><p>Per-user in-app, email and digest settings.</p></div></div><div class="fm-list">'+(prefs.map(p=>'<div class="fm-row"><div><h3>'+esc(p.category)+'</h3><p>'+esc(p.digest_frequency||'IMMEDIATE')+(p.quiet_hours_start?' · quiet '+esc(p.quiet_hours_start)+'–'+esc(p.quiet_hours_end||''):'')+'</p></div><label class="fm-check"><input type="checkbox" data-notification-pref="'+esc(p.category)+'" '+(Number(p.in_app_enabled)?'checked':'')+'> In app</label></div>').join('')||'<p class="fm-helper">Preferences are created when a category is configured.</p>')+'</div></div></article></div>';
 }
 function forecastView(){
- const data=state.cashflowCalendar||{},events=data.events||[];
- const currencies=[...new Set(events.map(e=>e.currency).filter(Boolean))];
- const totals=currencies.map(currency=>({
-  currency,total:events.filter(e=>e.currency===currency).reduce((sum,e)=>sum+num(e.amount),0),
-  count:events.filter(e=>e.currency===currency).length
- }));
- const summary=totals.length?totals.map(x=>'<div class="fm-kpi"><span>'+esc(x.currency)+' upcoming</span><strong>'+nativeMoney(x.total,x.currency)+'</strong><small>'+x.count+' internal payment instruction(s)</small></div>').join(''):'<div class="fm-kpi"><span>Upcoming</span><strong>—</strong><small>No scheduled payment instructions in the next 90 days.</small></div>';
- const rows=events.map(e=>'<div class="fm-row"><div><h3>'+esc(e.title||'Payment instruction')+'</h3><p>'+date(e.date)+' · '+esc(e.account_name||'No account')+' · '+esc(e.schedule_type||'ONE_OFF')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(e.amount,e.currency||'AUD')+'</b>'+statusBadge(e.status||'PENDING')+'</div></div>').join('');
- return resourceError('cashflowCalendar','Cash Flow Calendar')+'<div class="fm-grid four">'+summary+'</div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>90-Day Cash Flow Calendar</h2><p>'+esc(data.from||'')+' → '+esc(data.to||'')+' · internal approval/payment-instruction records only.</p></div></div><div class="fm-list">'+(rows||emptyState('No upcoming payment instructions','No approved/internal payment obligations were returned for the next 90 days.'))+'</div><p class="fm-helper">This calendar does not claim that Voxel Veda executes a bank transfer. It reflects the existing internal Banking OS scheduling and approval records.</p></div></article>';
+ const smartErr=resourceError('smart','Smart Money forecast'),healthErr=resourceError('health','Financial Health'),roadErr=resourceError('roadmaps','Roadmap Intelligence');
+ const safe=Object.entries(state.smart?.safe_to_spend_by_currency||{});
+ const health=Object.entries(state.health?.by_currency||{});
+ const roadmaps=state.roadmaps?.roadmaps||[];
+ const safeCards=safe.map(([currency,row])=>'<div class="fm-kpi"><span>'+esc(currency)+' safe to spend</span><strong>'+nativeMoney(row.safe_to_spend,currency)+'</strong><small>Visible funds '+nativeMoney(row.visible_funds,currency)+' · known 30-day outflows '+nativeMoney(row.known_outflows_30d,currency)+' · safety buffer '+nativeMoney(row.safety_buffer,currency)+'</small></div>').join('');
+ const healthRows=health.map(([currency,row])=>'<div class="fm-row"><div><h3>'+esc(currency)+' financial health</h3><p>Projected month-end spending '+nativeMoney(row.projected_month_end_spending,currency)+' · recurring outflows 30d '+nativeMoney(row.known_recurring_outflows_30d,currency)+'</p></div><div class="fm-row-right"><b>'+nativeMoney(row.safe_after_buffer_and_known_bills,currency)+'</b><small>safe after known bills · runway '+(row.runway_months===null||row.runway_months===undefined?'—':esc(row.runway_months)+' months')+'</small></div></div>').join('');
+ const roadmapRows=roadmaps.map(r=>'<div class="fm-row"><div><h3>'+esc(r.name)+'</h3><p>'+esc(r.plan_type)+' · '+esc(r.intelligence?.forecast_basis||'Not enough data')+'</p></div><div class="fm-row-right"><b>'+esc(r.intelligence?.trajectory||'NOT_ENOUGH_DATA')+'</b><small>Target '+nativeMoney(r.target_value,r.currency)+' · forecast '+date(r.intelligence?.forecast_completion_date)+'</small></div></div>').join('');
+ return smartErr+healthErr+roadErr+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Forecast & Safe-to-Spend</h2><p>Planning estimates use existing Personal Money evidence. Expected income is not counted as available cash, no forecast mutates financial records, and this view does not create or execute an internal payment instruction or bank transfer.</p></div></div><div class="fm-grid four">'+(safeCards||'<div class="fm-kpi"><span>Safe to spend</span><strong>—</strong><small>No personal planning balance is available.</small></div>')+'</div></div></article>'+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial Health Projection</h2><p>Pace indicators, not guaranteed future outcomes.</p></div></div><div class="fm-list">'+(healthRows||emptyState('No projection','Personal Financial Health has no current projection data.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Roadmap Intelligence</h2><p>Forecast dates are based on recorded progress or your explicit monthly target.</p></div></div><div class="fm-list">'+(roadmapRows||emptyState('No roadmaps','Create a Personal Money roadmap to track a goal or debt plan.'))+'</div></div></article></div>';
+}
+function calendarView(){
+ const business=state.cashflowCalendar?.events||[],personal=state.smart?.cashflow_calendar||[];
+ const businessRows=business.map(e=>'<div class="fm-row"><div><h3>'+esc(e.title||'Payment instruction')+'</h3><p>'+date(e.date)+' · '+esc(e.status||'')+' · '+esc(e.account_name||'No account')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(e.amount,e.currency||'AUD')+'</b><small>'+esc(e.schedule_type||e.type||'PAYMENT')+'</small></div></div>').join('');
+ const personalRows=personal.map(e=>'<div class="fm-row"><div><h3>'+esc(e.name||e.counterparty||e.title||'Personal item')+'</h3><p>'+date(e.date||e.due_date)+' · '+esc(e.frequency||e.type||'')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(e.amount,e.currency||'AUD')+'</b><small>'+esc(e.direction||'')</small></div></div>').join('');
+ return resourceError('cashflowCalendar','Banking Cash Flow Calendar')+resourceError('smart','Personal Money Calendar')+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Company / Banking Calendar</h2><p>Known approval/payment-instruction events for the next 90 days. This does not claim direct bank execution.</p></div></div><div class="fm-list">'+(businessRows||emptyState('No upcoming banking events','No visible pending payment events were returned.'))+'</div></div></article>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Personal Money Calendar</h2><p>Approved recurring reminders and Personal Money planning events remain separate from Company Finance.</p></div></div><div class="fm-list">'+(personalRows||emptyState('No personal events','No known Personal Money events are due in the planning window.'))+'</div></div></article></div>';
+}
+function userPreferencesCard(){
+ const p=state.userPreferences||{},cards=Array.isArray(p.dashboard_cards)?p.dashboard_cards:[];
+ const checked=key=>!cards.length||cards.includes(key);
+ return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>User Preferences</h2><p>Personal defaults only. They never change another user\'s Finance workspace or financial records.</p></div></div><form id="financePreferencesForm" class="fm-form"><div class="fm-form-grid"><label>Default workspace<select name="default_workspace"><option value="ALL" '+(p.default_workspace==='ALL'?'selected':'')+'>Consolidated</option><option value="PERSONAL" '+(p.default_workspace==='PERSONAL'?'selected':'')+'>Personal</option><option value="BUSINESS" '+(p.default_workspace==='BUSINESS'?'selected':'')+'>Company</option></select></label><label>Default account<select name="default_account_id"><option value="">All permitted accounts</option>'+state.accounts.map(a=>'<option value="'+a.id+'" '+(String(p.default_account_id||'')===String(a.id)?'selected':'')+'>'+esc(a.nickname||'Account')+' · '+esc(a.currency||'AUD')+'</option>').join('')+'</select></label><label>Default period<select name="default_period">'+[['month','This Month'],['last_month','Last Month'],['last30','Last 30 Days'],['quarter','This Quarter'],['fy','Current Financial Year'],['year','Calendar Year']].map(([v,l])=>'<option value="'+v+'" '+(p.default_period===v?'selected':'')+'>'+l+'</option>').join('')+'</select></label><label>Preferred reporting currency<input name="reporting_currency" maxlength="3" value="'+esc(p.reporting_currency||'')+'" placeholder="AUD"></label><label>Date format<select name="date_format"><option '+(p.date_format==='DD/MM/YYYY'?'selected':'')+'>DD/MM/YYYY</option><option '+(p.date_format==='MM/DD/YYYY'?'selected':'')+'>MM/DD/YYYY</option><option '+(p.date_format==='YYYY-MM-DD'?'selected':'')+'>YYYY-MM-DD</option></select></label><label>Number format<select name="number_format"><option value="en-AU" '+(p.number_format==='en-AU'?'selected':'')+'>Australia</option><option value="en-US" '+(p.number_format==='en-US'?'selected':'')+'>United States</option><option value="en-GB" '+(p.number_format==='en-GB'?'selected':'')+'>United Kingdom</option></select></label></div><fieldset><legend>Overview cards</legend><label class="fm-check"><input type="checkbox" name="dashboard_cards" value="cashflow" '+(checked('cashflow')?'checked':'')+'> Cash Flow Trend</label><label class="fm-check"><input type="checkbox" name="dashboard_cards" value="expenses" '+(checked('expenses')?'checked':'')+'> Expense Distribution</label><label class="fm-check"><input type="checkbox" name="dashboard_cards" value="accounts" '+(checked('accounts')?'checked':'')+'> Accounts</label><label class="fm-check"><input type="checkbox" name="dashboard_cards" value="recent" '+(checked('recent')?'checked':'')+'> Recent Transactions</label><p class="fm-helper">Needs Your Attention always remains visible for safety and data quality.</p></fieldset><p class="fm-helper">A reporting-currency preference never relabels native amounts. Conversion remains disabled unless verified FX evidence exists.</p><div class="fm-form-actions"><button class="primary" type="submit">Save preferences</button></div></form></div></article>';
 }
 function accountingPeriodsCard(){
  const periods=state.accountingPeriods?.accounting_periods||[];
@@ -327,7 +367,7 @@ function settingsView(){
  const caps=state.capabilities?.capabilities||{},st=state.companySettings?.settings||{};
  const companyError=resourceError('companySettings','Company settings');
  const company='<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Company & Reporting Settings</h2><p>These values feed branded financial reports where supported.</p></div><button id="openCompanySettings">Edit</button></div>'+companyError+'<div class="fm-detail-grid"><span>Legal name<b>'+esc(st.company_legal_name||'Voxel Veda Pty Ltd')+'</b></span><span>Trading name<b>'+esc(st.trading_name||'Voxel Veda')+'</b></span><span>ABN<b>'+esc(st.abn||'Not configured')+'</b></span><span>Email<b>'+esc(st.company_email||'Not configured')+'</b></span><span>Website<b>'+esc(st.website||'https://voxelveda.com')+'</b></span><span>Base currency<b>'+esc(st.base_currency||state.setup?.settings?.default_currency||'AUD')+'</b></span><span>Financial year start<b>'+esc(st.financial_year_start||'07-01')+'</b></span><span>GST registration<b>'+esc(st.gst_registration||'UNKNOWN')+'</b></span></div></div></article>';
- return company+accountingPeriodsCard()+connectionsView()+'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Capability Registry</h2><p>Unsupported workflows are explicitly identified rather than presented as dead buttons.</p></div></div><div class="fm-capability-grid">'+Object.entries(caps).map(([k,v])=>'<div class="fm-capability"><div><b>'+esc(k.replaceAll('_',' '))+'</b><p>'+esc(v.note||'')+'</p></div>'+statusBadge(v.status)+'</div>').join('')+'</div></div></article>';
+ return company+userPreferencesCard()+accountingPeriodsCard()+connectionsView()+'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Capability Registry</h2><p>Unsupported workflows are explicitly identified rather than presented as dead buttons.</p></div></div><div class="fm-capability-grid">'+Object.entries(caps).map(([k,v])=>'<div class="fm-capability"><div><b>'+esc(k.replaceAll('_',' '))+'</b><p>'+esc(v.note||'')+'</p></div>'+statusBadge(v.status)+'</div>').join('')+'</div></div></article>';
 }
 function transfersView(){
  const rows=state.transferCandidates?.candidates||[];
@@ -390,6 +430,7 @@ function simpleView(v){
  if(['savings','debt','recurring'].includes(v))return personalCard(v);
  if(v==='reports')return reportView();
  if(v==='forecast')return forecastView();
+ if(v==='calendar')return calendarView();
  if(v==='receipts')return receiptsView();
  if(v==='review')return reviewView();
  if(v==='personal')return personalView();
@@ -824,6 +865,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-transfer-debit]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/bank-transactions/'+b.dataset.transferDebit+'/transfer-links',{method:'POST',body:JSON.stringify({counterpart_transaction_id:Number(b.dataset.transferCredit)})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-refund-link]').forEach(b=>b.onclick=()=>openRefundLink(b.dataset.refundLink,b.dataset.refundCurrency));
  document.querySelectorAll('[data-reimb-action]').forEach(b=>b.onclick=async()=>{const action=b.dataset.reimbAction,id=b.dataset.reimbId;let body={};if(action==='reject'){const reason=prompt('Reason for rejecting this reimbursement:');if(!reason)return;body={reason}}try{const x=await api(API+'/reimbursements/'+id+'/'+action,{method:'POST',body:JSON.stringify(body)});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+ if($('financePreferencesForm'))$('financePreferencesForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const body=Object.fromEntries(fd.entries());body.dashboard_cards=fd.getAll('dashboard_cards');body.default_account_id=body.default_account_id?Number(body.default_account_id):null;body.reporting_currency=String(body.reporting_currency||'').toUpperCase()||null;try{const x=await api(API+'/preferences',{method:'PUT',body:JSON.stringify(body)});state.userPreferences=x.preferences;notice(x.message);render()}catch(error){notice(error.message,true)}};
  if($('txApply'))$('txApply').onclick=()=>{state.txFilters={...state.txFilters,q:$('txSearch').value.trim(),type:$('txType').value,category:$('txCategory').value.trim(),merchant:$('txMerchant').value.trim(),source:$('txSource').value,reconciliation_status:$('txRecon').value,amount_min:$('txMin').value.trim(),amount_max:$('txMax').value.trim()};state.txMeta.page=1;loadTransactions()};
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
