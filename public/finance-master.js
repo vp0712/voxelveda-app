@@ -9,24 +9,24 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,smart:null,health:null,roadmaps:null,categories:null,userPreferences:null,preferencesApplied:false,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''}
 };
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['statements','▤','Statements'],['receipts','▧','Receipts']]],
- ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast']]],
- ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
+ ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
+ ['INTELLIGENCE',[['insights','✦','Insights'],['categories','◈','Categories'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports']]],
  ['CONTROL',[['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
-const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
+const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
 const nativeMoney=(v,c)=>money(v,c||'AUD');
-const date=v=>v?new Intl.DateTimeFormat('en-AU',{dateStyle:'medium'}).format(new Date(String(v).slice(0,10)+'T00:00:00')):'—';
+const date=v=>{if(!v)return '—';const d=new Date(String(v).slice(0,10)+'T00:00:00');const fmt=state.userPreferences?.date_format||'DD/MM/YYYY';if(fmt==='YYYY-MM-DD')return String(v).slice(0,10);if(fmt==='MM/DD/YYYY')return new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)};
 async function api(path,options={}){const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});let body={};try{body=await r.json()}catch{}if(!r.ok){const e=new Error(body.message||'Request failed');e.status=r.status;e.code=body.code;throw e}return body}
 function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
 function navButtons(){
@@ -50,8 +50,10 @@ function title(v){return ({
  reimbursements:['Reimbursements','Track employee-paid expenses through submission, approval and linked repayment.'],
  budgets:['Budgets','Personal and banking budget controls backed by current finance records.'],
  savings:['Savings Goals','Track goals and contributions without pretending that progress automatically moves cash.'],
- forecast:['Cash Flow Calendar','Upcoming internal payment instructions and obligations; no claim of direct bank execution.'],
+ forecast:['Forecast','Evidence-based planning from Personal Money Smart/Health/Roadmaps plus scheduled Banking OS obligations.'],
+ calendar:['Cash Flow Calendar','Upcoming known banking/payment and personal planning events kept separate by scope and currency.'],
  insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
+ categories:['Categories','Manage current/system category metadata without changing immutable original bank categories.'],
  rules:['Categories & Rules','Merchant categorisation rules create suggestions; they do not silently post changes.'],
  review:['Data Quality Review','Uncategorised, unreconciled, coverage and other review queues.'],
  reconciliation:['Reconciliation','Bank transaction reconciliation inside the master Finance OS.'],
@@ -126,11 +128,27 @@ function currencyRows(){
 function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — consolidated total unavailable until verified FX rates are available.':''}
 function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
 function emptyState(title,message,action=''){return `<div class="fm-empty"><strong>${esc(title)}</strong><span>${esc(message)}</span>${action}</div>`}
+function dashboardCardVisible(key){
+ const configured=state.userPreferences?.dashboard_cards;
+ if(!Array.isArray(configured)||!configured.length)return true;
+ return key==='attention'||configured.includes(key);
+}
 async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
+ const prefPayload=await loadResource('userPreferences',API+'/preferences');
+ state.userPreferences=prefPayload?.preferences||state.userPreferences;
+ if(!state.preferencesApplied&&state.userPreferences){
+  const pref=state.userPreferences;
+  if(['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
+  if(pref.default_period)state.period=pref.default_period;
+  if(pref.default_account_id)state.account=String(pref.default_account_id);
+  state.preferencesApplied=true;
+  if($('fmScope'))$('fmScope').value=state.scope;
+  if($('fmPeriod'))$('fmPeriod').value=state.period;
+ }
  const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,smart,health,roadmaps,categories]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -160,20 +178,26 @@ async function loadBase(){
   loadResource('savedReports',API+'/reports/saved'),
   loadResource('archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)),
   loadResource('cashflowCalendar',OS+'/cashflow-calendar?days=90'),
-  loadResource('accountingPeriods',API+'/accounting-periods')
+  loadResource('accountingPeriods',API+'/accounting-periods'),
+  loadResource('smart',API+'/personal-money/smart'),
+  loadResource('health',API+'/personal-money/health'),
+  loadResource('roadmaps',API+'/personal-money/roadmaps'),
+  loadResource('categories',API+'/categories')
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
- else{state.tx=[]}
+ else state.tx=[];
  state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
  state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;
+ state.smart=smart||null;state.health=health||null;state.roadmaps=roadmaps||null;state.categories=categories||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
   state.accounts=accounts?.accounts||[];
  }
+ if(state.account&&!state.accounts.some(a=>String(a.id)===String(state.account)))state.account='';
  const sel=$('fmAccount'),keep=state.account;
  sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
  sel.value=keep;
