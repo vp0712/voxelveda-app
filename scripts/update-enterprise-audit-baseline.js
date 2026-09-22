@@ -45,18 +45,18 @@ audit = audit.replace(
 );
 
 const marker = '## Automated baseline refresh';
-const section = marker + '\\n\\n'
+const section = marker + '\n\n'
   + 'This baseline is refreshed automatically from merged \`main\` by \`.github/workflows/enterprise-audit-refresh.yml\`. '
   + 'The workflow regenerates the machine-readable inventory from the exact source commit, updates this baseline metadata, '
-  + 'verifies provenance, and commits only generated audit evidence using a CI-skip commit. Narrative historical findings remain '
-  + 'historical evidence; current production/provider status is maintained separately in \`docs/PRODUCTION_ASSURANCE_STATUS.md\`.\\n';
+  + 'verifies provenance, and publishes generated audit evidence as a workflow artifact. Narrative historical findings remain '
+  + 'historical evidence; current production/provider status is maintained separately in \`docs/PRODUCTION_ASSURANCE_STATUS.md\`.\n';
 
 if (audit.includes(marker)) {
   audit = audit.replace(/## Automated baseline refresh[\s\S]*?(?=\n## )/, section.trimEnd());
 } else {
-  const assurance = audit.indexOf('\\n## Assurance state');
-  if (assurance < 0) throw new Error('Assurance state heading not found');
-  audit = audit.slice(0, assurance) + '\\n\\n' + section + audit.slice(assurance);
+  const assuranceMatch = /\n##\s+Assurance state\s*\n/i.exec(audit);
+  if (!assuranceMatch) throw new Error('Assurance state heading not found');
+  const assurance = assuranceMatch.index;\n  audit = audit.slice(0, assurance) + '\n\n' + section.trimEnd() + '\n' + audit.slice(assurance);
 }
 
 fs.writeFileSync(auditPath, audit);
