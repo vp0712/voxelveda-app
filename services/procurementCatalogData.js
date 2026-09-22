@@ -16,27 +16,20 @@ function loadWorkbookData() {
     workbookChunks.map((chunk) => Buffer.from(chunk, 'base64'))
   );
   const raw = zlib.inflateSync(compressed).toString('utf8');
-  const sheets = JSON.parse(raw);
+  const data = JSON.parse(raw);
 
-  const bom = sheets['A-Z BOM'] || [];
-  if (!Array.isArray(bom) || bom.length !== 237) {
+  if (!Array.isArray(data.bom) || data.bom.length !== 237) {
     throw new Error(
-      `Procurement A-Z BOM row count mismatch: expected 237 rows including header, got ${Array.isArray(bom) ? bom.length : 0}`
+      `Procurement A-Z BOM row count mismatch: expected 237 rows including header, got ${Array.isArray(data.bom) ? data.bom.length : 0}`
+    );
+  }
+  if (!Array.isArray(data.order1) || data.order1.length !== 94) {
+    throw new Error(
+      `Procurement Order 1 row count mismatch: expected 94 rows including header, got ${Array.isArray(data.order1) ? data.order1.length : 0}`
     );
   }
 
-  return {
-    bom,
-    dashboard: sheets['Dashboard'] || [],
-    packaging: sheets['Packaging System'] || [],
-    suppliers: sheets['Supplier Directory'] || [],
-    storage: sheets['Storage Map'] || [],
-    readme: sheets['Read Me'] || [],
-    order1: sheets['Order 1 - Launch'] || [],
-    order2: sheets['Order 2 - Scale'] || [],
-    order3: sheets['Order 3 - Expansion'] || [],
-    buyingSequence: sheets['Buying Sequence'] || []
-  };
+  return data;
 }
 
 module.exports = loadWorkbookData();
