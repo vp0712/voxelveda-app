@@ -56,7 +56,8 @@ if (audit.includes(marker)) {
 } else {
   const assuranceMatch = /\n##\s+Assurance state\s*\n/i.exec(audit);
   if (!assuranceMatch) throw new Error('Assurance state heading not found');
-  const assurance = assuranceMatch.index;\n  audit = audit.slice(0, assurance) + '\n\n' + section.trimEnd() + '\n' + audit.slice(assurance);
+  const assurance = assuranceMatch.index;
+  audit = audit.slice(0, assurance) + '\n\n' + section.trimEnd() + '\n' + audit.slice(assurance);
 }
 
 fs.writeFileSync(auditPath, audit);
