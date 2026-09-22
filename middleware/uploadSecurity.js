@@ -7,6 +7,7 @@ const ALLOWED_UPLOADS = new Map([
   ['.png', ['image/png']],
   ['.jpg', ['image/jpeg']],
   ['.jpeg', ['image/jpeg']],
+  ['.heic', ['image/heic', 'image/heif']],
   ['.webp', ['image/webp']],
   ['.gif', ['image/gif']],
   ['.csv', ['text/csv', 'application/csv', 'application/vnd.ms-excel']],
@@ -54,6 +55,7 @@ function matchesSignature(ext, bytes) {
   if (ext === '.pdf') return bytes.slice(0, 5).toString() === '%PDF-';
   if (ext === '.png') return hex.startsWith('89504e470d0a1a0a');
   if (['.jpg', '.jpeg'].includes(ext)) return hex.startsWith('ffd8ff');
+  if (ext === '.heic') { const brand=bytes.slice(4,12).toString('ascii'); return brand.startsWith('ftyp') && /(heic|heix|hevc|hevx|mif1|msf1)/i.test(bytes.toString('ascii')); }
   if (ext === '.gif') return ['GIF87a', 'GIF89a'].includes(bytes.slice(0, 6).toString());
   if (ext === '.webp') return bytes.slice(0, 4).toString() === 'RIFF' && bytes.slice(8, 12).toString() === 'WEBP';
   if (['.docx', '.xlsx'].includes(ext)) return hex.startsWith('504b0304');
