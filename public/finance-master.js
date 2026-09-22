@@ -6,7 +6,7 @@ const I=API+'/intelligence';
 const OS=API+'/banking-os';
 const state={
   view:'overview',scope:'ALL',account:'',period:'month',customFrom:'',customTo:'',
-  dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],reviews:[],
+  dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
   transferCandidates:null,refundCandidates:null,reimbursements:null,
@@ -120,11 +120,12 @@ async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
  const base=filterQuery();
- const [capabilities,dash,tx,st,reviews,personal,attention,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
   loadResource('statementPayload',I+'/statements'+base),
+  loadResource('removedStatementPayload',I+'/statements-removed'),
   loadResource('reviewPayload',I+'/statement-reviews'),
   loadResource('personal',API+'/personal-money'),
   loadResource('personalAttention',API+'/personal-money/attention'),
@@ -143,7 +144,7 @@ async function loadBase(){
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
  else{state.tx=[]}
- state.statements=st?.statements||[];state.reviews=reviews?.sessions||[];
+ state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
  state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;
@@ -188,7 +189,11 @@ function transactions(){
 }
 function statements(){
  const pending=state.reviews.filter(x=>x.status==='PENDING_REVIEW');
- return `<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Import Wizard</h2><p>Choose account → upload → extract → review → duplicate validation → commit.</p></div><button data-quick="statement">Start import</button></div><div class="fm-list">${pending.slice(0,8).map(x=>`<div class="fm-row" data-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ${esc(x.source_format||'')} · ${num(x.total_rows)} rows</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small></div></div>`).join('')||emptyState('No pending reviews','New statement uploads will appear here before they affect the ledger.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Supported formats</h2><p>Only formats handled by the current parser are shown.</p></div></div><div class="fm-format-grid"><span>CSV</span><span>PDF</span><span>OFX</span><span>QFX</span><span>QIF</span><span>XLSX</span></div><p class="fm-helper">Every extracted row is staged through the protected server review engine before commit.</p></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Vault</h2><p>Committed history with coverage and import quality.</p></div></div>${resourceError('statementPayload','Statement Vault')}<div class="fm-list">${state.statements.map(x=>`<div class="fm-row"><div><h3>${esc(x.original_name||'Statement')}</h3><p>${esc(x.account_name||'')} · ${date(x.statement_start_date)} – ${date(x.statement_end_date)} · ${esc(x.source_format||'')}</p></div><div class="fm-row-right"><b>${num(x.imported_rows)} imported</b><small>${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small></div></div>`).join('')||emptyState('No committed statements','Use the import wizard to build verified account history.')}</div></div></article>`;
+ return `<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Import Wizard</h2><p>Choose account → upload → extract → review → duplicate validation → commit.</p></div><button data-quick="statement">Start import</button></div><div class="fm-list">${pending.slice(0,8).map(x=>`<div class="fm-row" data-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ${esc(x.source_format||'')} · ${num(x.total_rows)} rows</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small></div></div>`).join('')||emptyState('No pending reviews','New statement uploads will appear here before they affect the ledger.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Supported formats</h2><p>Only formats handled by the current parser are shown.</p></div></div><div class="fm-format-grid"><span>CSV</span><span>PDF</span><span>OFX</span><span>QFX</span><span>QIF</span><span>XLSX</span></div><p class="fm-helper">Every extracted row is staged through the protected server review engine before commit.</p></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Vault</h2><p>Committed history with coverage and import quality.</p></div></div>${resourceError('statementPayload','Statement Vault')}<div class="fm-list">${state.statements.map(x=>`<div class="fm-row"><div><h3>${esc(x.original_name||'Statement')}</h3><p>${esc(x.account_name||'')} · ${date(x.statement_start_date)} – ${date(x.statement_end_date)} · ${esc(x.source_format||'')}</p></div><div class="fm-row-right"><b>${num(x.imported_rows)} imported</b><small>${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small><button type="button" data-statement-remove="${esc(x.import_uid)}">Remove</button></div></div>`).join('')||emptyState('No committed statements','Use the import wizard to build verified account history.')}</div></div></article>${removedStatementsSection()}`;
+}
+function removedStatementsSection(){
+ const rows=(state.removedStatements||[]).map(x=>'<div class="fm-row"><div><h3>'+esc(x.original_name||'Removed statement')+'</h3><p>'+esc(x.account_name||'')+' · '+date(x.statement_start_date)+' – '+date(x.statement_end_date)+' · '+esc(x.source_format||'')+'</p></div><div class="fm-row-right">'+statusBadge('REMOVED')+'<small>Excluded from active reports and analysis</small><div class="fm-inline-actions"><button type="button" data-statement-restore="'+esc(x.import_uid)+'">Restore</button><button type="button" class="bad" data-statement-purge="'+esc(x.import_uid)+'">Danger Zone purge</button></div></div></div>').join('')||emptyState('No removed statements','Soft-removed statements will appear here for controlled recovery.');
+ return '<details class="fm-card fm-removed-statements"><summary class="fm-pad"><strong>Removed Statements</strong><span>'+(state.removedStatements||[]).length+' recoverable</span></summary><div class="fm-pad"><p class="fm-helper">Restore returns the statement to active history. Permanent deletion is hidden in this controlled recovery area, requires step-up authentication, and cannot be undone.</p><div class="fm-list">'+rows+'</div></div></details>';
 }
 function personalCard(kind){
  const p=state.personal||{};const a=state.personalAttention||{};
@@ -591,6 +596,9 @@ function bindDynamic(){
  document.querySelectorAll('[data-tx]').forEach(r=>r.onclick=()=>transactionDetail(r.dataset.tx));
  document.querySelectorAll('[data-account]').forEach(r=>r.onclick=()=>accountDetail(r.dataset.account));
  document.querySelectorAll('[data-review]').forEach(r=>r.onclick=()=>openStatementReview(r.dataset.review));
+ document.querySelectorAll('[data-statement-remove]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this statement from active reports and analysis? You can restore it later.'))return;try{const x=await api(I+'/statements/'+encodeURIComponent(b.dataset.statementRemove)+'/remove',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-statement-restore]').forEach(b=>b.onclick=async()=>{try{const x=await api(I+'/statements/'+encodeURIComponent(b.dataset.statementRestore)+'/restore',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-statement-purge]').forEach(b=>b.onclick=async()=>{const uid=b.dataset.statementPurge;const typed=prompt('Permanent deletion cannot be undone. Type exactly: PURGE '+uid);if(typed!=='PURGE '+uid)return;try{const x=await api(I+'/statements/'+encodeURIComponent(uid)+'/purge',{method:'POST',body:JSON.stringify({confirmation:typed})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{state.txFilters.category=b.dataset.category;state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()});
  document.querySelectorAll('[data-scope-jump]').forEach(b=>b.onclick=()=>{state.scope=b.dataset.scopeJump;$('fmScope').value=state.scope;refresh()});
  document.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>{location.href=b.dataset.export});
