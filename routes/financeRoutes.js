@@ -16,6 +16,7 @@ const openBanking = require('../controllers/openBankingController');
 const financeReceipt = require('../controllers/financeReceiptController');
 const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
+const financeReportBuilder = require('../controllers/financeReportBuilderController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -71,6 +72,12 @@ router.post('/transactions/:id/void', requireAnyPermission('VOID_TRANSACTION'), 
 router.get('/journals', controller.getJournals);
 router.post('/journals', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CREATE_MANUAL_JOURNAL'), controller.createJournal);
 router.get('/reports', controller.getReports);
+router.get('/reports/builder', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.generate);
+router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.csv);
+router.get('/reports/saved', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.listSaved);
+router.post('/reports/saved', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.save);
+router.get('/reports/saved/:uid/run', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.runSaved);
+router.delete('/reports/saved/:uid', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.remove);
 router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), controller.downloadTrialBalanceCsv);
 router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
 

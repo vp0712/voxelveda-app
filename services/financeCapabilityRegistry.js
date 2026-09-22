@@ -21,7 +21,7 @@ const STATIC_CAPABILITIES = Object.freeze({
   accounting_period_locking: { status: 'READY', source: 'finance operations', note: 'Locked periods prevent normal financial modification.' },
   statement_soft_delete_restore: { status: 'READY', source: 'statement data management', note: 'Statement removal and restore are controlled; purge requires stronger permission and step-up.' },
   account_lifecycle: { status: 'READY', source: 'bank account lifecycle', note: 'Archive, inactive, restore and protected removal workflows exist.' },
-  reporting_pdf_csv: { status: 'PARTIAL', note: 'Accountant PDF and trial-balance CSV exist; full report builder and XLSX coverage are not complete.' },
+  reporting_pdf_csv: { status: 'PARTIAL', note: 'Branded accountant PDF, trial-balance CSV, permission-scoped filtered CSV/XLSX and owner-scoped saved report definitions are implemented; the full requested report catalogue and filtered branded PDF catalogue are not yet complete.' },
   fx_reporting: { status: 'NOT_SUPPORTED', note: 'No trusted shared FX-rate service is configured. Mixed currencies must remain separate.' }
 });
 

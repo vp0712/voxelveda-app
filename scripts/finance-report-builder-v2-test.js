@@ -1,0 +1,41 @@
+'use strict';
+
+const fs=require('node:fs');
+const path=require('node:path');
+function read(file){return fs.readFileSync(path.join(__dirname,'..',file),'utf8')}
+function assert(value,message){if(!value)throw new Error(message)}
+
+const controller=read('controllers/financeReportBuilderController.js');
+const routes=read('routes/financeRoutes.js');
+const client=read('public/finance-master.js');
+const migration=read('migrations/20260923_finance_saved_reports.sql');
+
+assert(controller.includes("trustedTotals.cashTotalsByCurrency"),'report builder must use Trusted Totals');
+assert(controller.includes("trustedTotals.categorySpendByCurrency"),'category report must use Trusted Totals');
+assert(controller.includes("privacy.visibilitySql('ba',req)"),'report builder must enforce finance account visibility');
+assert(controller.includes("bt.bank_account_id IN"),'multi-account filter is missing');
+assert(controller.includes("finance_refund_links"),'refund report semantics are missing');
+assert(controller.includes("secure_documents"),'receipt status filter is missing');
+assert(controller.includes("Mixed currencies") || controller.includes("Currency"),'currency handling contract is missing');
+assert(controller.includes("LIMIT 20000"),'filtered report must use a bounded server query');
+assert(controller.includes("csvCell"),'CSV escaping is missing');
+assert(controller.includes("FILTERED_REPORT_EXPORTED"),'filtered export audit logging is missing');
+
+assert(routes.includes("router.get('/reports/builder'"),'report builder route is missing');
+assert(routes.includes("router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE')"),'filtered CSV must require export permission, step-up and sensitive export approval');
+assert(routes.includes("router.get('/reports/saved'"),'saved report list route is missing');
+assert(routes.includes("router.post('/reports/saved'"),'saved report save route is missing');
+assert(routes.includes("router.delete('/reports/saved/:uid'"),'saved report delete route is missing');
+
+assert(migration.includes('finance_saved_reports'),'saved report table migration is missing');
+assert(migration.includes('created_by'),'saved reports must be owner scoped');
+
+assert(client.includes('Report Builder 2.0'),'master Finance report builder UI is missing');
+assert(client.includes('reportAccounts'),'multi-account report control is missing');
+assert(client.includes('generateBuiltReport'),'report generation handler is missing');
+assert(client.includes('exportBuiltReportXlsx'),'XLSX report export is missing');
+assert(client.includes("API+'/reports/builder.csv?'"),'CSV report export is missing');
+assert(client.includes("API+'/reports/saved'"),'saved report UI is missing');
+assert(client.includes('Currencies are never converted or relabelled'),'currency safety disclosure is missing');
+
+console.log('FINANCE_REPORT_BUILDER_V2_TEST_OK');
