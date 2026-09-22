@@ -24,7 +24,7 @@ assert.match(routes, /personal-money\/smart\/safety-buffer'.*EDIT_FINANCE/, 'Cha
 assert.match(ui, /Create reminder/, 'UI must require an explicit action before a detected pattern becomes a reminder.');
 assert.match(ui, /Set Safety Buffer/, 'UI must expose the safety buffer clearly.');
 assert.match(ui, /60-day cash-flow calendar/, 'UI must explain the cash-flow horizon.');
-assert.match(html, /personal-money-smart\.js/, 'Finance Intelligence must load the Smart Money interface.');
+assert.match(html, /finance-master\.js/, 'Finance OS must load the unified master client.');
 assert.match(migration, /uniq_personal_recurring_detected_source/, 'Detected recurring sources must have duplicate protection.');
 assert.match(migration, /personal_money_safety_buffers/, 'Safety buffers must be persisted per user and currency.');
 
