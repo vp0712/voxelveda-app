@@ -2,6 +2,7 @@ const STATIC_CAPABILITIES = Object.freeze({
   statement_import: { status: 'READY', source: 'statement review engine', note: 'CSV, PDF, OFX, QFX, QIF and XLSX are accepted by the protected review pipeline.' },
   statement_original_data: { status: 'READY', source: 'bank_transaction_original_data', note: 'Imported source evidence is preserved separately from current classification.' },
   transaction_edit_classification: { status: 'READY', source: 'finance intelligence', note: 'Category and allowed ownership changes are audited and permission checked.' },
+  transaction_archive_restore: { status: 'PARTIAL', source: 'bank_transactions archive metadata', note: 'Transactions can be logically archived and restored with preserved source evidence, audit logging and step-up on restore; production workflow verification is still required before READY.' },
   transaction_split: { status: 'PARTIAL', source: 'bank_transaction_splits', note: 'Canonical split relationships and exact-total validation are implemented; production workflow verification is still required before READY.' },
   refund_linking: { status: 'PARTIAL', source: 'finance_refund_links', note: 'Refund-to-expense linking exists with same-currency and remaining-balance validation; production report netting verification is still required.' },
   reimbursements: { status: 'PARTIAL', source: 'finance_reimbursements', note: 'Draft, submit, approve, reject and payment-link lifecycle exists; production verification is still required.' },
