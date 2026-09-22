@@ -19,6 +19,7 @@ const financeRelationships = require('../controllers/financeRelationshipControll
 const financeReportBuilder = require('../controllers/financeReportBuilderController');
 const financeTransactionLifecycle = require('../controllers/financeTransactionLifecycleController');
 const financeCategories = require('../controllers/financeCategoryController');
+const financeUserPreferences = require('../controllers/financeUserPreferencesController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -58,6 +59,8 @@ const financeReceiptUpload = multer(secureMulterOptions(financeReceiptStorage, 1
 
 
 router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => res.json(financeCapabilities()));
+router.get('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.get);
+router.put('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.save);
 router.get('/overview', controller.getOverview);
 router.get('/financial-years', controller.getFinancialYears);
 router.post('/financial-years/:id/check', requireAnyPermission('EDIT_FINANCE'), controller.runYearEndCheck);
