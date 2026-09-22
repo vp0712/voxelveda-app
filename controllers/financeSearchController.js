@@ -4,6 +4,7 @@ const pool=require('../config/db');
 const privacy=require('../services/financePrivacyService');
 const { FinanceError }=require('../services/financeDomain');
 const { ensureFinanceSchema }=require('../services/financeSchema');
+const money=require('../utils/money');
 
 function fail(res,error,message){
   if(error instanceof FinanceError)return res.status(error.statusCode||400).json({message:error.message,code:error.code});
@@ -116,13 +117,13 @@ exports.companySummary=async(req,res)=>{
     ]);
     const settings=Object.fromEntries(settingRows.map(r=>[r.setting_key,r.setting_value]));
     const outstanding=bills.filter(b=>!['PAID','VOID'].includes(String(b.status).toUpperCase()));
-    const payable=outstanding.reduce((sum,b)=>sum+Number(b.balance||0),0);
-    const capex=assets.reduce((sum,a)=>sum+Number(a.purchase_cost||0),0);
+    const payableCents=outstanding.reduce((sum,b)=>sum+money.toCents(b.balance||0),0n);
+    const capexCents=assets.reduce((sum,a)=>sum+money.toCents(a.purchase_cost||0),0n);
     const currency=String(settings.base_currency||'AUD').toUpperCase();
     return res.json({
-      currency,supplier_payables:payable.toFixed(2),supplier_bill_count:outstanding.length,
+      currency,supplier_payables:money.fromCents(payableCents),supplier_bill_count:outstanding.length,
       pending_supplier_approvals:bills.filter(b=>String(b.status).toUpperCase()==='PENDING_APPROVAL').length,
-      open_accountant_queries:queries.length,active_asset_count:assets.length,recorded_asset_cost:capex.toFixed(2),
+      open_accountant_queries:queries.length,active_asset_count:assets.length,recorded_asset_cost:money.fromCents(capexCents),
       gst_registration:settings.gst_registration||'UNKNOWN',bills:bills.slice(0,20),accountant_queries:queries.slice(0,12),assets:assets.slice(0,12),
       receivables:{status:'NOT_CONFIGURED',note:'No dedicated customer receivables workflow is exposed here; no receivable balance is invented.'}
     });
