@@ -20,6 +20,7 @@ const financeReportBuilder = require('../controllers/financeReportBuilderControl
 const financeTransactionLifecycle = require('../controllers/financeTransactionLifecycleController');
 const financeCategories = require('../controllers/financeCategoryController');
 const financeUserPreferences = require('../controllers/financeUserPreferencesController');
+const financeSearch = require('../controllers/financeSearchController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -58,7 +59,11 @@ const financeReceiptStorage = multer.diskStorage({
 const financeReceiptUpload = multer(secureMulterOptions(financeReceiptStorage, 12));
 
 
+router.use(financePrivacy.resolveBankingAccessScope);
+
 router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => res.json(financeCapabilities()));
+router.get('/search', requireAnyPermission('VIEW_BANKING'), financeSearch.search);
+router.get('/company-summary', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeSearch.companySummary);
 router.get('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.get);
 router.put('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.save);
 router.get('/overview', controller.getOverview);

@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,companySummary:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''}
 };
 const NAV_GROUPS=[
@@ -147,7 +147,7 @@ async function loadBase(){
   if($('fmPeriod'))$('fmPeriod').value=state.period;
  }
  const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,categories,smart,health,roadmaps]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,categories,smart,health,roadmaps,companySummary]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -181,7 +181,8 @@ async function loadBase(){
   loadResource('categories',API+'/categories?include_archived=true'),
   loadResource('smart',API+'/personal-money/smart'),
   loadResource('health',API+'/personal-money/health'),
-  loadResource('roadmaps',API+'/personal-money/roadmaps')
+  loadResource('roadmaps',API+'/personal-money/roadmaps'),
+  loadResource('companySummary',API+'/company-summary')
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
@@ -189,7 +190,7 @@ async function loadBase(){
  state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
- state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;state.categories=categories||null;state.smart=smart||null;state.health=health||null;state.roadmaps=roadmaps||null;
+ state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;state.categories=categories||null;state.smart=smart||null;state.health=health||null;state.roadmaps=roadmaps||null;state.companySummary=companySummary||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
@@ -310,8 +311,13 @@ function accountingPeriodsCard(){
 
 function companyView(){
  if(state.scope!=='BUSINESS')return `<article class="fm-card"><div class="fm-pad">${emptyState('Company workspace','Switch the Workspace filter to Company for business-only finance.','<button class="fm-primary" data-scope-jump="BUSINESS">Switch to Company</button>')}</div></article>`;
- const bills=state.os?.approval_inbox||[];
- return overview()+`<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Company controls</h2><p>Company-only finance remains separated from owner-only Personal Money.</p></div></div><div class="fm-grid four"><div class="fm-kpi"><span>Approval inbox</span><strong>${bills.length}</strong><small>Banking payment instructions awaiting approval</small></div><div class="fm-kpi"><span>Overdue obligations</span><strong>${num(state.os?.obligations?.overdue)}</strong><small>Internal payment workflow obligations</small></div></div></div></article>`+accountingPeriodsCard();
+ const summary=state.companySummary,approvals=state.os?.approval_inbox||[];
+ const permission=resourceError('companySummary','Company Finance');
+ if(!summary)return overview()+permission+accountingPeriodsCard();
+ const currency=summary.currency||'AUD';
+ const billRows=(summary.bills||[]).slice(0,12).map(b=>'<button class="fm-row fm-row-button" data-company-bill="'+b.id+'"><div><h3>'+esc(b.supplier_name||b.bill_uid)+'</h3><p>'+esc(b.supplier_invoice_no||b.bill_uid)+' · due '+date(b.due_date)+' · '+esc(b.status)+'</p></div><div class="fm-row-right"><b>'+nativeMoney(b.balance,currency)+'</b><small>remaining</small></div></button>').join('');
+ const queryRows=(summary.accountant_queries||[]).slice(0,8).map(q=>'<div class="fm-row"><div><h3>'+esc(q.subject||q.query_uid)+'</h3><p>'+esc(q.priority||'')+' · due '+date(q.due_date)+'</p></div>'+statusBadge(q.status)+'</div>').join('');
+ return overview()+permission+'<div class="fm-grid four"><div class="fm-kpi"><span>Supplier payables</span><strong>'+nativeMoney(summary.supplier_payables,currency)+'</strong><small>'+num(summary.supplier_bill_count)+' outstanding bill(s)</small></div><div class="fm-kpi"><span>Supplier approvals</span><strong>'+num(summary.pending_supplier_approvals)+'</strong><small>Awaiting supplier-bill approval</small></div><div class="fm-kpi"><span>Banking approvals</span><strong>'+approvals.length+'</strong><small>Internal payment instructions awaiting approval</small></div><div class="fm-kpi"><span>Recorded assets</span><strong>'+nativeMoney(summary.recorded_asset_cost,currency)+'</strong><small>'+num(summary.active_asset_count)+' active asset record(s)</small></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Supplier Payables</h2><p>Existing supplier-bill ledger. Click a bill for items and payment history.</p></div></div><div class="fm-list">'+(billRows||emptyState('No supplier payables','No active supplier bills were returned.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accountant Queries</h2><p>Open collaboration questions for Company Finance.</p></div></div><div class="fm-list">'+(queryRows||emptyState('No open accountant queries','No unresolved accountant queries.'))+'</div><p class="fm-helper">Customer receivables are not shown as a fabricated balance: '+esc(summary.receivables?.note||'No dedicated receivables workflow is configured.')+'</p></div></article></div>'+accountingPeriodsCard();
 }
 function consolidatedView(){
  if(state.scope!=='ALL')return `<article class="fm-card"><div class="fm-pad">${emptyState('Consolidated workspace','Switch to Consolidated to see all permitted accounts while ownership remains visible.','<button class="fm-primary" data-scope-jump="ALL">Switch to Consolidated</button>')}</div></article>`;
@@ -854,6 +860,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-transaction-restore]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/bank-transactions/'+b.dataset.transactionRestore+'/restore',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-tx]').forEach(r=>r.onclick=()=>transactionDetail(r.dataset.tx));
  document.querySelectorAll('[data-account]').forEach(r=>r.onclick=()=>accountDetail(r.dataset.account));
+ document.querySelectorAll('[data-company-bill]').forEach(b=>b.onclick=()=>supplierBillDetail(b.dataset.companyBill));
  document.querySelectorAll('[data-review]').forEach(r=>r.onclick=()=>openStatementReview(r.dataset.review));
  document.querySelectorAll('[data-statement-remove]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this statement from active reports and analysis? You can restore it later.'))return;try{const x=await api(I+'/statements/'+encodeURIComponent(b.dataset.statementRemove)+'/remove',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-statement-restore]').forEach(b=>b.onclick=async()=>{try{const x=await api(I+'/statements/'+encodeURIComponent(b.dataset.statementRestore)+'/restore',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
@@ -983,6 +990,28 @@ function openNew(kind='expense',presetAccount=''){
  $('fmEntryForm').onsubmit=async e=>{e.preventDefault();try{const x=await saveManualMovement(e.currentTarget);$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
 async function refresh(){notice('');$('fmContent').innerHTML='<div class="fm-loading"><span></span><b>Refreshing finance workspace…</b></div>';await loadBase();render()}
+async function supplierBillDetail(id){
+ try{
+  const data=await api(API+'/supplier-bills/'+encodeURIComponent(id)),b=data.bill||{},items=data.items||[],payments=data.payments||[];
+  const currency=state.companySummary?.currency||state.companySettings?.settings?.base_currency||'AUD';
+  openDrawer(b.supplier_name||b.bill_uid||'Supplier Bill','<div class="fm-grid four"><div class="fm-kpi"><span>Total</span><strong>'+nativeMoney(b.total_amount,currency)+'</strong></div><div class="fm-kpi"><span>Paid</span><strong>'+nativeMoney(b.paid_amount,currency)+'</strong></div><div class="fm-kpi"><span>Balance</span><strong>'+nativeMoney(num(b.total_amount)-num(b.paid_amount),currency)+'</strong></div><div class="fm-kpi"><span>Status</span><strong>'+esc(b.status||'')+'</strong></div></div><article class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Invoice<b>'+esc(b.supplier_invoice_no||'—')+'</b></span><span>Issue date<b>'+date(b.issue_date)+'</b></span><span>Due date<b>'+date(b.due_date)+'</b></span><span>Job reference<b>'+esc(b.job_reference||'—')+'</b></span></div></div></article><article class="fm-card"><div class="fm-pad"><h3>Bill items</h3><div class="fm-list">'+(items.map(x=>'<div class="fm-row"><div><h3>'+esc(x.description)+'</h3><p>'+esc(x.quantity)+' × '+nativeMoney(x.unit_price,currency)+'</p></div><b>'+nativeMoney(x.total_amount,currency)+'</b></div>').join('')||emptyState('No items','No bill line items returned.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><h3>Payment history</h3><div class="fm-list">'+(payments.map(x=>'<div class="fm-row"><div><h3>'+date(x.payment_date)+'</h3><p>'+esc(x.reference||x.payment_uid||'')+'</p></div><b>'+nativeMoney(x.amount,currency)+'</b></div>').join('')||emptyState('No payments','No payment has been recorded for this bill.'))+'</div></div></article>','SUPPLIER BILL');
+ }catch(error){notice(error.message,true)}
+}
+async function globalFinanceSearch(input){
+ const q=String(input||'').trim();if(q.length<2){notice('Enter at least two characters to search Finance.',true);return}
+ try{
+  const data=await api(API+'/search?q='+encodeURIComponent(q)),g=data.groups||{};
+  const section=(title,rows,render)=>rows?.length?'<section class="fm-search-group"><h3>'+esc(title)+'</h3><div class="fm-list">'+rows.map(render).join('')+'</div></section>':'';
+  const html=section('Transactions',g.transactions,r=>'<button class="fm-row fm-row-button" data-search-tx="'+r.id+'"><div><h3>'+esc(r.merchant_name||r.description)+'</h3><p>'+date(r.transaction_date)+' · '+esc(r.account_name||'')+' · '+esc(r.reference||'')+'</p></div><b>'+nativeMoney(Math.abs(num(r.credit)-num(r.debit)),r.currency||'AUD')+'</b></button>')+
+   section('Accounts',g.accounts,r=>'<button class="fm-row fm-row-button" data-search-account="'+r.id+'"><div><h3>'+esc(r.nickname)+'</h3><p>'+esc(r.institution||'')+' · '+esc(r.account_type||'')+' · '+esc(r.ownership_scope||'')+'</p></div><b>'+esc(r.currency||'')+'</b></button>')+
+   section('Statements',g.statements,r=>'<button class="fm-row fm-row-button" data-search-view="statements"><div><h3>'+esc(r.original_name)+'</h3><p>'+esc(r.account_name||'')+' · '+date(r.statement_start_date)+' – '+date(r.statement_end_date)+'</p></div><b>'+esc(r.source_format||'')+'</b></button>')+
+   section('Receipts',g.receipts,r=>'<button class="fm-row fm-row-button" data-search-tx="'+r.bank_transaction_id+'"><div><h3>'+esc(r.original_name)+'</h3><p>'+esc(r.merchant_name||r.description||'')+' · '+esc(r.account_name||'')+'</p></div><small>'+date(r.created_at)+'</small></button>')+
+   section('Categories',g.categories,r=>'<button class="fm-row fm-row-button" data-search-view="categories"><div><h3>'+esc(r.name)+'</h3><p>'+esc(r.scope||'')+' · GST '+esc(r.gst_default||'REVIEW')+'</p></div></button>')+
+   section('Supplier Bills',g.supplier_bills,r=>'<button class="fm-row fm-row-button" data-search-bill="'+r.id+'"><div><h3>'+esc(r.supplier_name||r.bill_uid)+'</h3><p>'+esc(r.supplier_invoice_no||'')+' · '+esc(r.status||'')+'</p></div><b>'+nativeMoney(r.balance,state.companySummary?.currency||'AUD')+'</b></button>');
+  openDrawer('Search: '+q,html||emptyState('No Finance results','No permitted Finance records matched this search.'),'GLOBAL SEARCH');
+  setTimeout(()=>{document.querySelectorAll('[data-search-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.searchTx));document.querySelectorAll('[data-search-account]').forEach(b=>b.onclick=()=>accountDetail(b.dataset.searchAccount));document.querySelectorAll('[data-search-bill]').forEach(b=>b.onclick=()=>supplierBillDetail(b.dataset.searchBill));document.querySelectorAll('[data-search-view]').forEach(b=>b.onclick=()=>{closeDrawer();go(b.dataset.searchView)})},0);
+ }catch(error){notice(error.message,true)}
+}
 function runFinanceCommand(input){
  const q=String(input||'').trim();const command=q.toLowerCase();
  const direct={
@@ -1000,7 +1029,7 @@ function runFinanceCommand(input){
   'review centre':()=>go('review')
  };
  if(direct[command]){direct[command]();return true}
- if(command.startsWith('search ')){state.txFilters.q=q.slice(7).trim();state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions();return true}
+ if(command.startsWith('search ')){globalFinanceSearch(q.slice(7).trim());return true}
  return false;
 }
 function bind(){
@@ -1012,7 +1041,7 @@ function bind(){
  $('fmCurrencyMode').onchange=()=>notice('Reporting-currency conversion is unavailable because no verified FX-rate service is configured. Native currency mode remains active.');
  $('fmRefresh').onclick=refresh;$('fmNew').onclick=()=>openNew('expense');$('fmDrawerClose').onclick=closeDrawer;$('fmBackdrop').onclick=closeDrawer;$('fmModalClose').onclick=()=> $('fmModal').close();
  $('fmSearch').placeholder='Search finance or type a command: add expense, upload statement, create report';
- $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){const value=e.currentTarget.value.trim();if(runFinanceCommand(value))return;state.txFilters.q=value;state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()}};
+ $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){const value=e.currentTarget.value.trim();if(runFinanceCommand(value))return;globalFinanceSearch(value)}};
 }
 document.addEventListener('DOMContentLoaded',async()=>{bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h))state.view=h;navButtons();try{await loadBase();render()}catch(e){notice(e.message||'Finance workspace failed to load',true)}})
 })();

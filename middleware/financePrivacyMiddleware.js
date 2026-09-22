@@ -99,8 +99,7 @@ function filterAccountList(req, res, next) {
   const original = res.json.bind(res);
   res.json = (payload) => {
     if (payload && Array.isArray(payload.bank_accounts)) {
-      const owner = privacy.userId(req);
-      payload = { ...payload, bank_accounts: payload.bank_accounts.filter((row) => privacy.accountVisible(row, owner)) };
+      payload = { ...payload, bank_accounts: payload.bank_accounts.filter((row) => privacy.requestAccountVisible(row, req)) };
     }
     return original(payload);
   };
