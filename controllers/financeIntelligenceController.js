@@ -122,32 +122,61 @@ exports.getTransactions = async (req, res) => {
     const allowedScopes = new Set(['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
     if (!allowedScopes.has(scope)) throw new FinanceError('Transaction scope must be All, Personal, Business, Mixed or Unclassified.', 400, 'INVALID_TRANSACTION_SCOPE');
 
-    const limit = Math.min(250, Math.max(10, Number.parseInt(req.query.limit, 10) || 100));
+    const limit = Math.min(250, Math.max(10, Number.parseInt(req.query.limit, 10) || 50));
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const offset = (page - 1) * limit;
     const q = String(req.query.q || '').trim().slice(0, 120);
     const accountId = Number(req.query.account_id || 0);
     const category = String(req.query.category || '').trim().slice(0, 120);
-    const clauses = [privacy.visibilitySql('ba', req)];
-    const params = [...privacy.visibilityParams(req)];
+    const merchant = String(req.query.merchant || '').trim().slice(0, 120);
+    const currency = String(req.query.currency || '').trim().toUpperCase().slice(0, 3);
+    const source = String(req.query.source || '').trim().toUpperCase().slice(0, 40);
+    const reconciliation = String(req.query.reconciliation_status || '').trim().toUpperCase().slice(0, 40);
+    const reviewStatus = String(req.query.review_status || '').trim().toUpperCase().slice(0, 40);
+    const bank = String(req.query.bank || '').trim().slice(0, 120);
+    const type = String(req.query.type || '').trim().toUpperCase().slice(0, 40);
+    const from = reportDate(req.query.from, 'From date');
+    const to = reportDate(req.query.to, 'To date');
+    if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
+    const amountMin = req.query.amount_min === undefined || req.query.amount_min === '' ? null : Number(req.query.amount_min);
+    const amountMax = req.query.amount_max === undefined || req.query.amount_max === '' ? null : Number(req.query.amount_max);
+    if (amountMin !== null && !Number.isFinite(amountMin)) throw new FinanceError('Minimum amount must be a number.', 400, 'INVALID_AMOUNT_FILTER');
+    if (amountMax !== null && !Number.isFinite(amountMax)) throw new FinanceError('Maximum amount must be a number.', 400, 'INVALID_AMOUNT_FILTER');
+    if (amountMin !== null && amountMax !== null && amountMin > amountMax) throw new FinanceError('Minimum amount cannot exceed maximum amount.', 400, 'INVALID_AMOUNT_FILTER');
 
+    const clauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
+    const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
     if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
+    if (from) { clauses.push('bt.transaction_date>=?'); params.push(from); }
+    if (to) { clauses.push('bt.transaction_date<=?'); params.push(to); }
+    if (currency) { clauses.push('bt.currency=?'); params.push(currency); }
+    if (source) { clauses.push('bt.source_type=?'); params.push(source); }
+    if (reconciliation) { clauses.push('bt.reconciliation_status=?'); params.push(reconciliation); }
+    if (reviewStatus) { clauses.push('bt.review_source_status=?'); params.push(reviewStatus); }
+    if (bank) { clauses.push('ba.institution LIKE ?'); params.push(`%${bank}%`); }
+    if (merchant) { clauses.push('bt.merchant_name LIKE ?'); params.push(`%${merchant}%`); }
     if (category) {
       if (category.toUpperCase() === 'UNCLASSIFIED') clauses.push("(bt.category IS NULL OR bt.category='')");
       else { clauses.push('bt.category=?'); params.push(category); }
     }
+    if (type === 'TRANSFER') clauses.push('bt.is_internal_transfer=1');
+    else if (type === 'INCOME') clauses.push('bt.credit>0 AND bt.is_internal_transfer=0');
+    else if (type === 'EXPENSE') clauses.push('bt.debit>0 AND bt.is_internal_transfer=0');
+    else if (type && type !== 'ALL') throw new FinanceError('Transaction type filter must be Income, Expense, Transfer or All.', 400, 'INVALID_TRANSACTION_TYPE_FILTER');
+    if (amountMin !== null) { clauses.push('GREATEST(bt.debit,bt.credit)>=?'); params.push(amountMin); }
+    if (amountMax !== null) { clauses.push('GREATEST(bt.debit,bt.credit)<=?'); params.push(amountMax); }
     if (q) {
-      clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.reference LIKE ? OR bt.category LIKE ? OR ba.nickname LIKE ?)');
+      clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.reference LIKE ? OR bt.category LIKE ? OR ba.nickname LIKE ? OR ba.institution LIKE ?)');
       const like = `%${q}%`;
-      params.push(like, like, like, like, like);
+      params.push(like, like, like, like, like, like);
     }
     const where = clauses.join(' AND ');
 
     const [[count]] = await pool.query(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(bt.credit),0) AS total_in,
-              COALESCE(SUM(bt.debit),0) AS total_out,
+              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS total_in,
+              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS total_out,
               SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
          FROM bank_transactions bt
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
@@ -171,14 +200,19 @@ exports.getTransactions = async (req, res) => {
 
     return res.json({
       scope,
-      category: category || null,
+      filters: { q: q || null, account_id: accountId || null, category: category || null, merchant: merchant || null,
+        currency: currency || null, source: source || null, reconciliation_status: reconciliation || null,
+        review_status: reviewStatus || null, bank: bank || null, type: type || null, from, to, amount_min: amountMin, amount_max: amountMax },
       page,
       limit,
       total: Number(count.total || 0),
+      total_pages: Math.max(1, Math.ceil(Number(count.total || 0) / limit)),
       summary: {
         money_in: count.total_in || '0.00',
         money_out: count.total_out || '0.00',
-        manual_overrides: Number(count.manual_overrides || 0)
+        net_cash_flow: money.subtract(count.total_in || 0, count.total_out || 0),
+        manual_overrides: Number(count.manual_overrides || 0),
+        transfer_policy: 'Internal transfers are excluded from money-in and money-out totals.'
       },
       transactions: rows,
       separation: {
@@ -188,6 +222,70 @@ exports.getTransactions = async (req, res) => {
       }
     });
   } catch (error) { return fail(res, error, 'Failed to load separated transaction ledger'); }
+};
+
+exports.createManualTransaction = async (req, res) => {
+  let db;
+  try {
+    await ensureFinanceSchema();
+    const accountId = Number(req.body.bank_account_id || 0);
+    if (!accountId) throw new FinanceError('Choose a financial account.', 400, 'BANK_ACCOUNT_REQUIRED');
+    const type = String(req.body.type || '').trim().toUpperCase();
+    if (!['INCOME','EXPENSE','ADJUSTMENT_IN','ADJUSTMENT_OUT'].includes(type)) {
+      throw new FinanceError('Manual movement type must be Income, Expense, Adjustment In or Adjustment Out.', 400, 'INVALID_MANUAL_TRANSACTION_TYPE');
+    }
+    const transactionDate = dateOnly(req.body.transaction_date);
+    if (!transactionDate) throw new FinanceError('A valid transaction date is required.', 400, 'DATE_REQUIRED');
+    const amount = money.fromCents(money.toCents(req.body.amount));
+    if (money.toCents(amount) <= 0n) throw new FinanceError('Amount must be greater than zero.', 400, 'INVALID_AMOUNT');
+    const description = String(req.body.description || '').trim().slice(0,500);
+    if (!description) throw new FinanceError('Description is required.', 400, 'DESCRIPTION_REQUIRED');
+
+    db = await pool.getConnection();
+    await db.beginTransaction();
+    const [[account]] = await db.query(
+      `SELECT * FROM bank_accounts ba WHERE ba.id=? AND ba.status='ACTIVE' AND ${privacy.visibilitySql('ba', req)} FOR UPDATE`,
+      [accountId, ...privacy.visibilityParams(req)]
+    );
+    if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
+
+    const accountScope = String(account.ownership_scope || 'UNCLASSIFIED').toUpperCase();
+    const requestedScope = String(req.body.ownership_scope || accountScope).trim().toUpperCase();
+    const allowedScopes = new Set(['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
+    if (!allowedScopes.has(requestedScope)) throw new FinanceError('Choose a valid ownership scope.', 400, 'INVALID_TRANSACTION_SCOPE');
+    const ownershipScope = ['MIXED','UNCLASSIFIED'].includes(accountScope) ? requestedScope : accountScope;
+    const debit = ['EXPENSE','ADJUSTMENT_OUT'].includes(type) ? amount : '0.00';
+    const credit = ['INCOME','ADJUSTMENT_IN'].includes(type) ? amount : '0.00';
+    const reference = String(req.body.reference || '').trim().slice(0,120) || null;
+    const merchant = String(req.body.merchant_name || '').trim().slice(0,255) || null;
+    const category = String(req.body.category || '').trim().slice(0,120) || null;
+    const fingerprint = crypto.createHash('sha256').update([
+      'MANUAL', account.id, transactionDate, description.toLowerCase(), reference || '',
+      debit, credit, String(req.user?.id || ''), String(Date.now()), crypto.randomBytes(8).toString('hex')
+    ].join('|')).digest('hex');
+
+    const [insert] = await db.query(
+      `INSERT INTO bank_transactions
+       (bank_account_id,row_hash,transaction_date,posting_date,description,reference,debit,credit,running_balance,
+        merchant_name,category,currency,ownership_scope,classification_status,reconciliation_status,
+        is_internal_transfer,source_type,source_provider,review_source_status,manual_override,imported_by,imported_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'UNRECONCILED',0,'MANUAL','VOXEL_VEDA','MANUAL',1,?,NOW())`,
+      [account.id,fingerprint,transactionDate,dateOnly(req.body.posting_date)||transactionDate,description,reference,
+        debit,credit,null,merchant,category,account.currency,ownershipScope,category?'CLASSIFIED':'UNCLASSIFIED',req.user.id]
+    );
+    await logAudit(db, audit(req, {
+      action:'MANUAL_BANK_TRANSACTION_CREATED', module:'finance_intelligence', recordType:'bank_transaction',
+      recordId:insert.insertId, newValue:{bank_account_id:account.id,transaction_date:transactionDate,type,amount,currency:account.currency,ownership_scope:ownershipScope,category}
+    }));
+    await db.commit();
+    return res.status(201).json({
+      message:'Manual financial movement recorded in the canonical bank/cash ledger.',
+      id:insert.insertId, currency:account.currency, ownership_scope:ownershipScope
+    });
+  } catch (error) {
+    if (db) await db.rollback();
+    return fail(res,error,'Failed to create manual financial movement');
+  } finally { if (db) db.release(); }
 };
 
 
@@ -613,6 +711,7 @@ exports.getBankingDashboard = async (req, res) => {
     const to = reportDate(req.query.to, 'To date');
     if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
 
+    const accountId = Number(req.query.account_id || 0);
     const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
     const txClauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
@@ -622,6 +721,10 @@ exports.getBankingDashboard = async (req, res) => {
       accountParams.push(scope);
       txClauses.push('bt.ownership_scope=?');
       txParams.push(scope);
+    }
+    if (accountId) {
+      accountClauses.push('ba.id=?'); accountParams.push(accountId);
+      txClauses.push('bt.bank_account_id=?'); txParams.push(accountId);
     }
     if (from) { txClauses.push('bt.transaction_date>=?'); txParams.push(from); }
     if (to) { txClauses.push('bt.transaction_date<=?'); txParams.push(to); }
@@ -681,13 +784,10 @@ exports.getBankingDashboard = async (req, res) => {
                 COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
                 COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-          WHERE bt.transaction_date>=DATE_SUB(CURDATE(),INTERVAL 12 MONTH)
-            AND ${privacy.visibilitySql('ba', req)}
-            ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
-            AND bt.reconciliation_status<>'IGNORED'
+          WHERE ${txWhere}
           GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
           ORDER BY bt.currency,month`,
-        [...privacy.visibilityParams(req), ...(scope !== 'ALL' ? [scope] : [])]
+        txParams
       ).then(([rows]) => rows),
       pool.query(
         `SELECT bt.id,bt.bank_account_id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,
@@ -710,11 +810,10 @@ exports.getBankingDashboard = async (req, res) => {
            JOIN bank_transactions bt ON bt.id=fi.bank_transaction_id
            JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE fi.recurring_frequency IS NOT NULL AND fi.status<>'DISMISSED'
-            AND ${privacy.visibilitySql('ba', req)}
-            ${scope !== 'ALL' ? 'AND bt.ownership_scope=?' : ''}
+            AND ${txWhere}
           GROUP BY fi.recurring_frequency,fi.merchant_normalized,bt.currency,merchant
           ORDER BY last_seen DESC LIMIT 30`,
-        [...privacy.visibilityParams(req), ...(scope !== 'ALL' ? [scope] : [])]
+        txParams
       ).then(([rows]) => rows)
     ]);
 
@@ -803,6 +902,7 @@ exports.getBankingDashboard = async (req, res) => {
 
     return res.json({
       scope,
+      account_id: accountId || null,
       period: { from: from || null, to: to || null },
       currency_rule: 'Currencies are never added together. Choose a currency to analyse balances and spending.',
       accounts,

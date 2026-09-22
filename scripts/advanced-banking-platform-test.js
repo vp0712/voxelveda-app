@@ -81,7 +81,8 @@ assert(financeRoutes.includes("/rows/:rowId/override"), 'manual correction route
 assert(financeRoutes.includes("requireStepUp('IMPORT_BANK_TRANSACTIONS')"), 'manual correction must keep finance step-up protection');
 assert(bankGradeUi.includes('Fix & include') && bankGradeUi.includes('Manual override'), 'mobile rejected-row correction UI missing');
 assert(bankGradeUi.includes('Voxel Veda Company') && bankGradeUi.includes('Personal') && bankGradeUi.includes('Mixed'), 'separated ledger scope controls missing');
-assert(financePage.includes('/finance-bank-grade-review.js'), 'bank-grade finance enhancer is not loaded by the finance page');
+assert(financePage.includes('/finance-master.js'), 'unified Finance OS client is not loaded by the finance page');
+assert(read('public/finance-master.js').includes('CURRENT CLASSIFICATION') && read('public/finance-master.js').includes('ORIGINAL BANK DATA'), 'unified Finance OS transaction evidence workflow is missing');
 assert(financeIntelligence.includes('exports.getStatementLibrary'), 'statement library API missing');
 assert(financeIntelligence.includes('exports.getStatementReport'), 'per-statement report API missing');
 assert(financeIntelligence.includes('exports.getSpendingReport'), 'spending report API missing');
@@ -92,7 +93,7 @@ assert(statementReportUi.includes('Imported statement library'), 'statement libr
 assert(statementReportUi.includes('Spending by category') && statementReportUi.includes('Where you spent'), 'spending analysis UI incomplete');
 assert(statementReportUi.includes('Export CSV') && statementReportUi.includes('Print / Save PDF'), 'report export controls missing');
 assert(statementReportUi.includes('legacy statement') || statementReportUi.includes('Legacy import'), 'legacy provenance boundary missing');
-assert(financePage.includes('/finance-statement-report-center.js'), 'statement report center is not loaded by finance page');
+assert(read('public/finance-master.js').includes('Statement Import Wizard') && read('public/finance-master.js').includes('Statement Vault'), 'statement workflows must be integrated into the unified Finance OS');
 assert(financeIntelligence.includes('exports.getTransactionDetail'), 'transaction detail action API missing');
 assert(financeIntelligence.includes('exports.updateTransaction'), 'transaction management API missing');
 assert(financeIntelligence.includes('exports.bulkCategorizeTransactions'), 'bulk category API missing');
@@ -135,7 +136,7 @@ assert(financeIntelligence.includes('balances_by_currency') && financeIntelligen
 assert(financeIntelligence.includes('exports.getBankingBudgets') && financeIntelligence.includes('exports.saveBankingBudget'), 'bank-connected category budget endpoints missing');
 assert(financeRoutes.includes("/intelligence/banking-dashboard") && financeRoutes.includes("/intelligence/budgets"), 'premium banking API routes missing');
 assert(bankGradeUi.includes('window.VoxelVedaFinanceLedger'), 'transaction editor bridge missing');
-assert(renderer.includes('/premium-banking-app.js?v=20260919-access-fix'), 'premium banking app must be served by renderer with the current cache-safe version');
+assert(renderer.includes("const ADVANCED_BANKING_JS = '/premium-banking-app.js?v=20260919-access-fix'"), 'legacy premium banking asset reference must remain identifiable during deprecation');
 assert(premiumCss.includes('.vv-pb-donut') && premiumCss.includes('.vv-pb-line-svg') && premiumCss.includes('.vv-pb-budget'), 'premium banking chart/budget styles missing');
 assert(adminPage.includes('openBankingWorkspace()') && adminPage.includes('appBankingAlertBadge'), 'installed app Banking navigation entry missing');
 assert(adminPage.includes('Banking & Insights') && adminPage.includes('Open Banking App'), 'app Banking shortcuts missing');
@@ -146,7 +147,8 @@ assert(adminClient.includes('Budget over limit') && adminClient.includes('Bank c
 assert(adminClient.includes('15 * 60 * 1000'), 'app Banking alert refresh cadence missing');
 assert(ui.includes("source')==='app") && ui.includes("window.location.assign('/admin?view=finance')"), 'premium Banking return-to-app path missing');
 assert(appServer.includes("'premium-banking-app.js','premium-banking-app.css'"), 'premium Banking assets must be no-store to prevent stale installed-app UI');
-assert(renderer.includes('ADVANCED_BANKING_JS'), 'advanced banking UI must be served through page renderer');
+assert(renderer.includes('Legacy premium banking UI is no longer injected globally'), 'legacy banking client must not compete with the unified Finance OS');
+assert(!renderer.includes('rendered.includes(ADVANCED_BANKING_JS)'), 'global renderer must not inject the legacy premium banking client');
 assert(!renderer.includes('rendered.includes(FINANCE_PDF_ENHANCER_JS)'), 'legacy PDF parser must not be injected alongside PDF v3');
 assert(renderer.includes("const CANONICAL_LOGO = '/logo.png'"), 'canonical original logo contract changed');
 console.log('Advanced Australian banking platform architecture checks passed.');

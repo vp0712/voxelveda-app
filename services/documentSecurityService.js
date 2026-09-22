@@ -10,7 +10,7 @@ const { logSecurityEvent } = require('./sessionService');
 const { isStepUpFresh, stepUpTtlMinutes } = require('./stepUpService');
 
 const UPLOAD_ROOT = path.resolve(__dirname, '..', 'uploads');
-const MODULE_PERMISSION = Object.freeze({ rfq: 'VIEW_RFQS', careers: 'VIEW_STAFF_HR' });
+const MODULE_PERMISSION = Object.freeze({ rfq: 'VIEW_RFQS', careers: 'VIEW_STAFF_HR', finance: 'VIEW_BANKING' });
 const CLASSIFICATIONS = new Set(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']);
 const ACCESS_POLICIES = Object.freeze({
   PUBLIC: 'AUTHENTICATED', INTERNAL: 'MODULE_OR_OWNER',

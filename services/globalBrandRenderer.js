@@ -25,7 +25,7 @@ function injectGlobalBrand(html) {
   if (!rendered.includes('id="vvGlobalBrandLoader"')) rendered = rendered.replace(/<body([^>]*)>/i, (match) => `${match}${loaderMarkup}`);
   // PDF v3 is loaded by the Finance-only advanced banking client. Do not inject the
   // legacy PDF parser globally because two capture-phase import handlers can compete.
-  if (!rendered.includes(ADVANCED_BANKING_JS)) rendered = rendered.replace(/<\/body>/i, `  <script src="${ADVANCED_BANKING_JS}" defer></script>\n</body>`);
+  // Legacy premium banking UI is no longer injected globally. The unified Finance OS owns Finance interactions.
   if (!rendered.includes(BRAND_JS)) rendered = rendered.replace(/<\/body>/i, `  <script src="${BRAND_JS}" defer></script>\n</body>`);
 
   return rendered;
