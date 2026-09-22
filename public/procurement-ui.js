@@ -8,7 +8,10 @@
     user: null,
     tab: 'requisitions',
     loading: false,
-    data: { summary: {}, suppliers: [], requisitions: [], supplier_rfqs: [], purchase_orders: [], receipts: [], bill_matches: [], returns: [] }
+    catalogQuery: '',
+    catalogPriority: '',
+    catalogPhase: '',
+    data: { summary: {}, catalog: {}, suppliers: [], requisitions: [], supplier_rfqs: [], purchase_orders: [], receipts: [], bill_matches: [], returns: [] }
   };
 
   const escapeHtml = (value) => String(value == null ? '' : value)
@@ -166,6 +169,71 @@
     </article>`).join('');
   }
 
+
+  function renderCatalog() {
+    const rows = Array.isArray(state.data.catalog?.bom) ? state.data.catalog.bom.slice(1) : [];
+    if (!rows.length) return empty('No master BOM data', 'The procurement master plan has not been loaded.');
+    const query = String(state.catalogQuery || '').trim().toLowerCase();
+    const priority = state.catalogPriority || '';
+    const phase = state.catalogPhase || '';
+    const filtered = rows.filter((row) => {
+      const haystack = row.slice(0, 18).map((value) => String(value ?? '')).join(' ').toLowerCase();
+      return (!query || haystack.includes(query))
+        && (!priority || String(row[9] || '') === priority)
+        && (!phase || String(row[10] || '') === phase);
+    });
+    const priorities = [...new Set(rows.map((row) => String(row[9] || '')).filter(Boolean))].sort();
+    const phases = [...new Set(rows.map((row) => String(row[10] || '')).filter(Boolean))].sort();
+    const plan = state.data.catalog || {};
+    const planCard = (label, sheet, tone) => {
+      const cap = Number(sheet?.[4]?.[1] || 0);
+      const total = Number(sheet?.[5]?.[1] || 0);
+      const buffer = Number(sheet?.[5]?.[4] || (cap - total));
+      return `<article class="procurement-record"><div class="procurement-record-head"><div><span>Purchase plan</span><h3>${escapeHtml(label)}</h3></div><span class="procurement-status ${tone}">${total <= cap ? 'Within Cap' : 'Over Cap'}</span></div><dl><div><dt>Cap</dt><dd>${formatMoney(cap)}</dd></div><div><dt>Estimated</dt><dd>${formatMoney(total)}</dd></div><div><dt>Buffer</dt><dd>${formatMoney(buffer)}</dd></div></dl><p>${escapeHtml(sheet?.[6]?.[1] || '')}</p></article>`;
+    };
+    const cards = [
+      planCard('Order 1 — Launch', plan.order1, 'good'),
+      planCard('Order 2 — Scale', plan.order2, 'pending'),
+      planCard('Order 3 — Expansion', plan.order3, 'pending')
+    ].join('');
+    const records = filtered.map((row) => {
+      const auUrl = row[14];
+      const chinaUrl = row[16];
+      const priorityTone = String(row[9]) === 'P1' ? 'danger' : String(row[9]) === 'P2' ? 'pending' : 'good';
+      return `<article class="procurement-record">
+        <div class="procurement-record-head"><div><span>#${escapeHtml(row[0])} · ${escapeHtml(row[1])} · ${escapeHtml(row[2])}</span><h3>${escapeHtml(row[3])}</h3></div><span class="procurement-status ${priorityTone}">${escapeHtml(row[9] || '-')}</span></div>
+        <p><strong>${escapeHtml(row[5] || '')}</strong>${row[4] ? ` · ${escapeHtml(row[4])}` : ''}</p>
+        <dl>
+          <div><dt>Start qty</dt><dd>${escapeHtml(row[6] ?? 0)}</dd></div>
+          <div><dt>AU unit</dt><dd>${formatMoney(row[7] || 0)}</dd></div>
+          <div><dt>China landed</dt><dd>${formatMoney(row[8] || 0)}</dd></div>
+          <div><dt>AU startup</dt><dd>${formatMoney(row[18] || 0)}</dd></div>
+          <div><dt>Potential saving</dt><dd>${formatMoney(row[20] || 0)}</dd></div>
+          <div><dt>Phase</dt><dd>${escapeHtml(row[10] || '-')}</dd></div>
+          <div><dt>Storage</dt><dd>${escapeHtml(row[11] || '-')}</dd></div>
+          <div><dt>Reorder</dt><dd>${escapeHtml(row[12] ?? 0)}</dd></div>
+        </dl>
+        <p>${escapeHtml(row[17] || '')}</p>
+        <div class="procurement-actions">
+          ${auUrl ? `<a class="secondary-btn" href="${escapeHtml(auUrl)}" target="_blank" rel="noopener">AU Supplier</a>` : ''}
+          ${chinaUrl ? `<a class="secondary-btn" href="${escapeHtml(chinaUrl)}" target="_blank" rel="noopener">China Source</a>` : ''}
+        </div>
+      </article>`;
+    }).join('');
+    return `
+      <div class="procurement-record" style="margin-bottom:16px">
+        <div class="procurement-record-head"><div><span>Imported master procurement plan</span><h3>Voxel Veda A–Z BOM</h3></div><strong>${filtered.length} / ${rows.length} items</strong></div>
+        <div class="procurement-form-grid">
+          <label><span>Search BOM</span><input type="search" data-procurement-catalog-search value="${escapeHtml(state.catalogQuery)}" placeholder="Item, brand, category, supplier, storage…"></label>
+          <label><span>Priority</span><select data-procurement-catalog-priority><option value="">All priorities</option>${priorities.map((value) => `<option value="${escapeHtml(value)}" ${value === state.catalogPriority ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('')}</select></label>
+          <label><span>Phase</span><select data-procurement-catalog-phase><option value="">All phases</option>${phases.map((value) => `<option value="${escapeHtml(value)}" ${value === state.catalogPhase ? 'selected' : ''}>${escapeHtml(value)}</option>`).join('')}</select></label>
+        </div>
+      </div>
+      <div class="procurement-summary" style="margin-bottom:16px">${cards}</div>
+      ${records || empty('No matching BOM items', 'Change the BOM search or filters.')}
+    `;
+  }
+
   function render() {
     summary();
     root.querySelectorAll('[data-procurement-tab]').forEach((button) => button.classList.toggle('active', button.dataset.procurementTab === state.tab));
@@ -175,12 +243,12 @@
       sourcing: has('MANAGE_SUPPLIER_RFQ') ? '<button type="button" class="primary-btn" data-procurement-action="new-rfq">Issue Supplier RFQ</button>' : '',
       orders: has('CREATE_PURCHASE_ORDER') ? '<button type="button" class="primary-btn" data-procurement-action="new-po">New Purchase Order</button>' : '',
       receiving: has('RECEIVE_PURCHASE_ORDER') ? '<button type="button" class="primary-btn" data-procurement-action="receive">Receive Goods</button>' : '',
-      matches: '', returns: ''
+      matches: '', returns: '', catalog: ''
     };
     actions.innerHTML = tabActions[state.tab] || '';
     const list = root.querySelector('[data-procurement-list]');
     if (state.loading) list.innerHTML = empty('Loading procurement', 'Checking approvals, supplier quotes and receiving records.');
-    else list.innerHTML = ({ requisitions: renderRequisitions, sourcing: renderSourcing, orders: renderOrders, receiving: renderReceiving, matches: renderMatches, returns: renderReturns })[state.tab]();
+    else list.innerHTML = ({ requisitions: renderRequisitions, sourcing: renderSourcing, orders: renderOrders, receiving: renderReceiving, matches: renderMatches, returns: renderReturns, catalog: renderCatalog })[state.tab]();
   }
 
   async function load() {
@@ -439,6 +507,26 @@
     if (remove && form()) {
       const rows = form().querySelectorAll('[data-procurement-line]');
       if (rows.length > 1) remove.closest('[data-procurement-line]')?.remove();
+    }
+  });
+
+  root.addEventListener('input', (event) => {
+    if (event.target.matches('[data-procurement-catalog-search]')) {
+      state.catalogQuery = event.target.value;
+      render();
+      root.querySelector('[data-procurement-catalog-search]')?.focus();
+      const input = root.querySelector('[data-procurement-catalog-search]');
+      if (input) input.setSelectionRange(input.value.length, input.value.length);
+    }
+  });
+  root.addEventListener('change', (event) => {
+    if (event.target.matches('[data-procurement-catalog-priority]')) {
+      state.catalogPriority = event.target.value;
+      render();
+    }
+    if (event.target.matches('[data-procurement-catalog-phase]')) {
+      state.catalogPhase = event.target.value;
+      render();
     }
   });
 
