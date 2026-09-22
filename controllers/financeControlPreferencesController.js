@@ -95,7 +95,8 @@ exports.restoreCategory=async(req,res)=>{
 exports.getPreferences=async(req,res)=>{
  try{
   const [[row]]=await pool.query('SELECT * FROM finance_user_preferences WHERE user_id=?',[uid(req)]);
-  return res.json({preferences:row?{...row,dashboard_cards:row.dashboard_cards_json?JSON.parse(row.dashboard_cards_json):[]}:{default_workspace:'ALL',default_account_id:null,reporting_currency:null,default_period:'month',dashboard_cards:[],date_format:'DD/MM/YYYY',number_format:'en-AU'}});
+  const dashboardCards=row?(Array.isArray(row.dashboard_cards_json)?row.dashboard_cards_json:(row.dashboard_cards_json?JSON.parse(row.dashboard_cards_json):[])):[];
+  return res.json({preferences:row?{...row,dashboard_cards:dashboardCards}:{default_workspace:'ALL',default_account_id:null,reporting_currency:null,default_period:'month',dashboard_cards:[],date_format:'DD/MM/YYYY',number_format:'en-AU'}});
  }catch(error){return fail(res,error,'Failed to load Finance preferences.')}
 };
 
