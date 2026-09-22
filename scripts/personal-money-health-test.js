@@ -35,6 +35,6 @@ assert(ui.includes('Financial Health'), 'Financial Health must be visible in the
 assert(ui.includes('After safety buffer + known bills'), 'UI must explain spendable money after known commitments.');
 assert(ui.includes('Debt payoff illustration'), 'UI must label debt payoff as an illustration.');
 assert(ui.includes('How these numbers are calculated'), 'UI must expose methodology instead of hiding formulas.');
-assert(html.includes('/personal-money-health.js?v=20260916-financial-health'), 'Finance Intelligence must load the Financial Health UI.');
+assert.match(html, /finance-master\.js/, 'Finance OS must load the unified master client.');
 
 console.log('Personal Financial Health regression checks passed.');
