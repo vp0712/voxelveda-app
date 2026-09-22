@@ -3,7 +3,7 @@
 const WORKSPACES = new Set(['ALL','PERSONAL','BUSINESS']);
 const PERIODS = new Set(['today','yesterday','week','last7','month','last_month','last30','quarter','previous_quarter','fy','previous_fy','year','custom']);
 const CATEGORY_SCOPES = new Set(['PERSONAL','BUSINESS','BOTH']);
-const GST_DEFAULTS = new Set(['REVIEW','GST','GST_FREE','INPUT_TAXED','NOT_APPLICABLE']);
+const GST_DEFAULTS = new Set(['REVIEW','GST','GST_ON_EXPENSES','GST_ON_INCOME','GST_FREE','INPUT_TAXED','NO_GST','OUT_OF_SCOPE','NOT_APPLICABLE']);
 const DATE_FORMATS = new Set(['DD/MM/YYYY','MM/DD/YYYY','YYYY-MM-DD']);
 const NUMBER_FORMATS = new Set(['en-AU','en-US','en-GB']);
 
@@ -13,7 +13,7 @@ function normalizeCategory(input={}){
  const scope=text(input.scope||'BOTH',20).toUpperCase(); if(!CATEGORY_SCOPES.has(scope)) throw Object.assign(new Error('Category scope must be Personal, Business or Both.'),{statusCode:400,code:'INVALID_CATEGORY_SCOPE'});
  const gst=text(input.gst_default||'REVIEW',20).toUpperCase(); if(!GST_DEFAULTS.has(gst)) throw Object.assign(new Error('Choose a valid GST default.'),{statusCode:400,code:'INVALID_CATEGORY_GST_DEFAULT'});
  const colour=text(input.colour,20)||null; if(colour && !/^#[0-9a-f]{6}$/i.test(colour)) throw Object.assign(new Error('Category colour must be a six-digit hex colour.'),{statusCode:400,code:'INVALID_CATEGORY_COLOUR'});
- return {name,scope,gst_default:gst,colour,icon:text(input.icon,40)||null,parent_category_id:input.parent_category_id?Number(input.parent_category_id):null};
+ return {name,scope,gst_default:gst,colour:text(input.colour??input.color,20)||null,icon:text(input.icon,40)||null,parent_category_id:(input.parent_category_id??input.parent_id)?Number(input.parent_category_id??input.parent_id):null};
 }
 function normalizePreferences(input={}){
  const default_workspace=text(input.default_workspace||'ALL',20).toUpperCase(); if(!WORKSPACES.has(default_workspace)) throw Object.assign(new Error('Invalid default workspace.'),{statusCode:400,code:'INVALID_DEFAULT_WORKSPACE'});
