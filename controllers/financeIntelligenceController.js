@@ -158,8 +158,12 @@ exports.getTransactions = async (req, res) => {
     if (bank) { clauses.push('ba.institution LIKE ?'); params.push(`%${bank}%`); }
     if (merchant) { clauses.push('bt.merchant_name LIKE ?'); params.push(`%${merchant}%`); }
     if (category) {
-      if (category.toUpperCase() === 'UNCLASSIFIED') clauses.push("(bt.category IS NULL OR bt.category='')");
-      else { clauses.push('bt.category=?'); params.push(category); }
+      if (category.toUpperCase() === 'UNCLASSIFIED') {
+        clauses.push("((NOT EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id) AND (bt.category IS NULL OR bt.category='')) OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND (sx.category IS NULL OR sx.category='')))");
+      } else {
+        clauses.push("(bt.category=? OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND sx.category=?))");
+        params.push(category, category);
+      }
     }
     if (type === 'TRANSFER') clauses.push('bt.is_internal_transfer=1');
     else if (type === 'INCOME') clauses.push('bt.credit>0 AND bt.is_internal_transfer=0');
@@ -176,13 +180,12 @@ exports.getTransactions = async (req, res) => {
 
     const [[count]] = await pool.query(
       `SELECT COUNT(*) AS total,
-              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS total_in,
-              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS total_out,
               SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
          FROM bank_transactions bt
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
         WHERE ${where}`, params
     );
+    const summaryByCurrency = await trustedTotals.cashTotalsByCurrency(pool, where, params);
     const [rows] = await pool.query(
       `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.posting_date, bt.description, bt.reference,
               bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.category, bt.currency,
@@ -209,12 +212,12 @@ exports.getTransactions = async (req, res) => {
       total: Number(count.total || 0),
       total_pages: Math.max(1, Math.ceil(Number(count.total || 0) / limit)),
       summary: {
-        money_in: count.total_in || '0.00',
-        money_out: count.total_out || '0.00',
-        net_cash_flow: money.subtract(count.total_in || 0, count.total_out || 0),
+        ...trustedTotals.singleCurrencySummary(summaryByCurrency),
         manual_overrides: Number(count.manual_overrides || 0),
-        transfer_policy: 'Internal transfers are excluded from money-in and money-out totals.'
+        transfer_policy: 'Internal transfers are excluded from money-in and money-out totals.',
+        refund_policy: 'Linked refunds are cash inflow but are separated from ordinary money-in.'
       },
+      summary_by_currency: summaryByCurrency,
       transactions: rows,
       separation: {
         business_label: 'Voxel Veda Company',
