@@ -62,6 +62,8 @@ function assessProductionReadiness(env = process.env) {
   if (production && !env.WEBHOOK_SIGNING_KEY) warnings.push('WEBHOOK_SIGNING_KEY is not configured; signed integration webhooks remain disabled');
   if (production && !env.OUTBOUND_ALLOWED_HOSTS) warnings.push('OUTBOUND_ALLOWED_HOSTS is empty; backend URL fetches remain deny-by-default');
   if (production && env.BACKUP_STATUS_PROVIDER !== 'configured') warnings.push('Database backup status is not attested by a configured provider');
+  if (production && env.BACKUP_STATUS_PROVIDER === 'configured' && !String(env.BACKUP_STATUS_URL || '').trim()) warnings.push('Database backup provider metadata is configured but BACKUP_STATUS_URL is missing; live backup/restore evidence is unavailable');
+  if (production && String(env.BACKUP_STATUS_URL || '').trim() && !validHttpsUrl(env.BACKUP_STATUS_URL)) failures.push('BACKUP_STATUS_URL must use HTTPS in production');
   if (production && rateLimitStore !== 'redis') warnings.push('Rate limiting is process-local; configure a shared Redis-backed limiter before scaling beyond one replica');
   if (production && env.FORCE_CANONICAL_HOST !== 'true') warnings.push('Canonical-host enforcement remains disabled until custom-domain DNS and TLS are verified');
   let databaseUser = String(env.DB_USER || '').toLowerCase();

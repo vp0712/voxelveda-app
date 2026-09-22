@@ -9,7 +9,7 @@ const valid = {
   APP_URL: 'https://app.voxelveda.com', TRUST_PROXY: 'true',
   ALLOW_LEGACY_QUERY_TOKENS: 'false', ENABLE_ADMIN_BOOTSTRAP: 'false',
   ALLOW_PUBLIC_ADMIN_REGISTRATION: 'false', DEBUG_AUTH_BYPASS: 'false',
-  RATE_LIMIT_STORE: 'redis', RATE_LIMIT_FAILURE_POLICY: 'deny', REDIS_URL: 'redis://redis.internal:6379', MALWARE_SCANNER_PROVIDER: 'clamav', BACKUP_STATUS_PROVIDER: 'configured',
+  RATE_LIMIT_STORE: 'redis', RATE_LIMIT_FAILURE_POLICY: 'deny', REDIS_URL: 'redis://redis.internal:6379', MALWARE_SCANNER_PROVIDER: 'clamav', BACKUP_STATUS_PROVIDER: 'configured', BACKUP_STATUS_URL: 'https://backup-status.example.com/health',
   FORCE_CANONICAL_HOST: 'true', WEBHOOK_SIGNING_KEY: 'w'.repeat(48), OUTBOUND_ALLOWED_HOSTS: 'api.example.com',
   DB_USER: 'voxelveda_app', DB_TLS_REQUIRED: 'true'
 };
@@ -34,5 +34,13 @@ assert.equal(assessProductionReadiness(urlConfigured).ready, true);
 const honestWarnings = assessProductionReadiness({ ...valid, MALWARE_SCANNER_PROVIDER: '', BACKUP_STATUS_PROVIDER: 'unverified', RATE_LIMIT_STORE: 'memory', FORCE_CANONICAL_HOST: 'false' });
 assert.equal(honestWarnings.ready, true);
 assert.equal(honestWarnings.warnings.length, 4);
+
+const falsePositiveBackup = assessProductionReadiness({ ...valid, BACKUP_STATUS_URL: '' });
+assert.equal(falsePositiveBackup.ready, true);
+assert(falsePositiveBackup.warnings.some((warning) => warning.includes('BACKUP_STATUS_URL')));
+
+const insecureBackupUrl = assessProductionReadiness({ ...valid, BACKUP_STATUS_URL: 'http://backup-status.example.com/health' });
+assert.equal(insecureBackupUrl.ready, false);
+assert(insecureBackupUrl.failures.some((failure) => failure.includes('BACKUP_STATUS_URL')));
 
 console.log('Production-readiness tests passed.');
