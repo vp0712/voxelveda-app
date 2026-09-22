@@ -91,8 +91,12 @@ app.use('/api/public/rfq', boundedJson('16kb'));
 app.use('/api/public/ai-lead', boundedJson('32kb'));
 app.use(express.json({limit:process.env.JSON_BODY_LIMIT||'1mb',type:['application/json','application/csp-report','application/reports+json'],verify:captureRawBody}));
 app.use(express.urlencoded({extended:false,limit:process.env.FORM_BODY_LIMIT||'1mb'}));
-app.use(csrfProtection);
+// Browser-generated CSP reports cannot carry the application's CSRF token.
+// Keep this telemetry endpoint narrowly scoped, rate-limited and schema-sanitised,
+// but register it before CSRF enforcement so CSP violations do not create false
+// production errors. All normal state-changing application APIs remain protected.
 app.post('/api/security/csp-report', rateLimitPolicy('csp_report'), securityTelemetryController.recordCspViolation);
+app.use(csrfProtection);
 app.get('/api/health',readinessController.health);
 app.get('/api/ready',readinessController.ready);
 app.use((req,res,next)=>{if(process.env.FORCE_CANONICAL_HOST!=='true'||['/api/health','/api/ready'].includes(req.path))return next();const currentHost=String(req.hostname||'').toLowerCase();const canonicalHost=new URL(urls.app).hostname;const fallbackHost=String(process.env.RAILWAY_FALLBACK_HOST||'voxelveda-app-production.up.railway.app').toLowerCase();if(currentHost!==fallbackHost||currentHost===canonicalHost)return next();return res.redirect(302,new URL(req.originalUrl||'/',`${urls.app}/`).toString())});
