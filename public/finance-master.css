@@ -55,3 +55,5 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .fm-form fieldset{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:7px}.fm-form fieldset legend{font-size:.62rem;font-weight:900;padding:0 5px;color:var(--ink)}
 .fm-form fieldset .fm-check{background:#f8fafb;border-radius:9px;padding:8px 10px}
 @media(max-width:700px){.fm-form fieldset{padding:9px}}
+
+.fm-search-group{display:grid;gap:7px;margin:0 0 18px}.fm-search-group>h3{margin:0;padding-bottom:7px;border-bottom:1px solid var(--line);font-size:.65rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.fm-row-button{width:100%;border:0;background:#fff;text-align:left;cursor:pointer;color:inherit}.fm-row-button:hover{background:#f7f9fa}.fm-row-button:focus-visible{outline:3px solid #3f69a8;outline-offset:2px}
