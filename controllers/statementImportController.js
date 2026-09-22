@@ -603,8 +603,8 @@ exports.commit = async (req, res) => {
       if (chunkHashes.length) {
         const idPlaceholders = chunkHashes.map(() => '?').join(',');
         const [ledgerRows] = await db.query(
-          `SELECT id,row_hash FROM bank_transactions WHERE bank_account_id=? AND row_hash IN (${idPlaceholders})`,
-          [account.id, ...chunkHashes]
+          `SELECT id,row_hash FROM bank_transactions WHERE bank_account_id=? AND import_batch_uid=? AND row_hash IN (${idPlaceholders})`,
+          [account.id, batchUid, ...chunkHashes]
         );
         const ledgerByHash = new Map(ledgerRows.map((item) => [item.row_hash, item.id]));
         for (const row of chunk) {
