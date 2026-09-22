@@ -16,8 +16,8 @@ for(const name of ['Overview','Accounts','Transactions','Statements','Cash','Bud
   assert(js.includes(name),`Navigation must contain ${name}`);
 }
 assert.match(js,/banking-dashboard/,'Finance OS must use real banking dashboard data.');
-assert.match(js,/intelligence\/transactions/,'Finance OS must use the real transaction explorer endpoint.');
-assert.match(js,/intelligence\/statements/,'Finance OS must use the real statement vault endpoint.');
+assert.match(js,/I\+'\/transactions'/,'Finance OS must use the real transaction explorer endpoint.');
+assert.match(js,/I\+'\/statements'/,'Finance OS must use the real statement vault endpoint.');
 assert.match(js,/bank-transactions\/'\+id\+'\/original/,'Transaction detail must surface immutable original bank data.');
 assert.match(js,/api\(API\+'\/transactions'/,'Manual transaction workflow must write to the finance ledger API.');
 assert.match(css,/@media\(max-width:700px\)/,'Finance OS must have a dedicated mobile layout.');
