@@ -15,7 +15,7 @@ assert(migration.includes('finance_system_categories'),'system category table mi
 assert(controller.includes("const SCOPES=new Set(['PERSONAL','BUSINESS','BOTH'])"),'category scope contract missing');
 assert(controller.includes("const GST_DEFAULTS=new Set(['REVIEW'"),'GST review-default contract missing');
 assert(controller.includes("values.scope==='PERSONAL'?userId(req):null"),'personal category ownership isolation missing');
-assert(controller.includes("c.scope='PERSONAL' AND c.owner_user_id=?"),'personal category visibility isolation missing');
+assert(controller.includes("scope='PERSONAL' AND \\${alias}.owner_user_id=?") || (controller.includes("alias='c'") && controller.includes("owner_user_id=?")),'personal category visibility isolation missing');
 assert(controller.includes('FINANCE_CATEGORY_CREATED'),'category create audit missing');
 assert(controller.includes('FINANCE_CATEGORY_ARCHIVED'),'category archive audit missing');
 assert(controller.includes('CATEGORY_HAS_ACTIVE_CHILDREN'),'parent/child archive guard missing');
