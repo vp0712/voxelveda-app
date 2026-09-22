@@ -14,6 +14,7 @@ const bankingReadiness = require('../controllers/financeBankingReadinessControll
 const bankingOS = require('../controllers/bankingOperatingSystemController');
 const openBanking = require('../controllers/openBankingController');
 const financeReceipt = require('../controllers/financeReceiptController');
+const financeRelationships = require('../controllers/financeRelationshipController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -222,6 +223,17 @@ router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), finance
 router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
 router.get('/bank-transactions/:id/original', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), statementReview.getOriginalBankTransaction);
+router.get('/bank-transactions/:id/splits', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getSplits);
+router.put('/bank-transactions/:id/splits', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.replaceSplits);
+router.get('/bank-transactions/:id/refund-links', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getRefundLinks);
+router.post('/bank-transactions/:id/refund-links', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.linkRefund);
+router.delete('/bank-transactions/:id/refund-links/:linkId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.unlinkRefund);
+router.get('/reimbursements', requireAnyPermission('VIEW_BANKING'), financeRelationships.listReimbursements);
+router.post('/reimbursements', requireAnyPermission('EDIT_FINANCE'), financeRelationships.createReimbursement);
+router.post('/reimbursements/:id/submit', requireAnyPermission('EDIT_FINANCE'), (req,res,next)=>{req.params.action='submit';next();}, financeRelationships.transitionReimbursement);
+router.post('/reimbursements/:id/approve', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPROVE_REIMBURSEMENT'), (req,res,next)=>{req.params.action='approve';next();}, financeRelationships.transitionReimbursement);
+router.post('/reimbursements/:id/reject', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPROVE_REIMBURSEMENT'), (req,res,next)=>{req.params.action='reject';next();}, financeRelationships.transitionReimbursement);
+router.post('/reimbursements/:id/payments', requireAnyPermission('EDIT_FINANCE'), requireStepUp('LINK_REIMBURSEMENT_PAYMENT'), financeRelationships.addReimbursementPayment);
 router.get('/bank-transactions/:id/receipts', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeReceipt.list);
 router.post('/bank-transactions/:id/receipts', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeReceiptUpload.single('file'), validateUploadedFile, financeReceipt.upload);
 router.delete('/bank-transactions/:id/receipts/:documentId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeReceipt.unlink);
