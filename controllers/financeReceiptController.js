@@ -5,6 +5,7 @@ const pool = require('../config/db');
 const { registerDocument } = require('../services/documentSecurityService');
 const { logAudit } = require('../services/auditService');
 const { FinanceError } = require('../services/financeDomain');
+const privacy = require('../services/financePrivacyService');
 
 function auditEntry(req, action, recordId, values) {
   return {
@@ -108,8 +109,8 @@ exports.center = async (req, res) => {
   try {
     const q = String(req.query.q || '').trim().slice(0, 120);
     const scope = String(req.query.scope || 'ALL').trim().toUpperCase();
-    const clauses = [require('../services/financePrivacyService').visibilitySql('ba', req)];
-    const params = [...require('../services/financePrivacyService').visibilityParams(req)];
+    const clauses = [privacy.visibilitySql('ba', req)];
+    const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') {
       if (!['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(scope)) throw new FinanceError('Invalid receipt scope.', 400, 'INVALID_RECEIPT_SCOPE');
       clauses.push('bt.ownership_scope=?'); params.push(scope);
@@ -131,8 +132,8 @@ exports.center = async (req, res) => {
       params
     );
 
-    const missingClauses = [require('../services/financePrivacyService').visibilitySql('ba', req), "bt.reconciliation_status<>'IGNORED'", 'bt.debit>0', 'bt.is_internal_transfer=0'];
-    const missingParams = [...require('../services/financePrivacyService').visibilityParams(req)];
+    const missingClauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status<>'IGNORED'", 'bt.debit>0', 'bt.is_internal_transfer=0'];
+    const missingParams = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { missingClauses.push('bt.ownership_scope=?'); missingParams.push(scope); }
     if (q) {
       missingClauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR ba.nickname LIKE ?)');
