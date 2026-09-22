@@ -57,6 +57,8 @@ async function run() {
   assert.match(service, /probeTlsOnce/);
   assert.match(service, /DB_TLS_REJECT_UNAUTHORIZED/);
   assert.match(service, /ENCRYPTION_ONLY/);
+  assert.match(service, /strict_certificate_trust_error/);
+  assert(service.indexOf("const encryptionOnly = await probeTlsOnce(false)") > service.indexOf('const strict = await probeTlsOnce(true)'), 'TLS capability diagnostics must try an isolated encryption-only probe after strict verification fails');
   assert.match(service, /SHOW SESSION STATUS LIKE 'Ssl_cipher'/);
   assert.match(service, /DB_TLS_REQUIRED: 'true'/);
   assert.match(service, /connection\.end\(\)/);
