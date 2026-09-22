@@ -24,7 +24,10 @@ assert.match(ui, /Archive/);
 assert.match(ui, /Set inactive/);
 assert.match(ui, /Restore/);
 assert.match(ui, /Permanently delete/);
-assert.match(ui, /accountLifecycle/);
+assert.match(ui, /data-account-action/);
+assert.match(ui, /accounts\/'\+id\+'\/archive/);
+assert.match(ui, /accounts\/'\+id\+'\/inactive/);
+assert.match(ui, /accounts\/'\+id\+'\/restore/);
 
 assert.match(controllerSource, /INFORMATION_SCHEMA\.COLUMNS/);
 assert.match(controllerSource, /COLUMN_NAME = 'bank_account_id'/);
