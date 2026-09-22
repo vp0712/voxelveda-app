@@ -30,6 +30,6 @@ assert.match(client, /Owner-private/, 'UI must visibly explain owner privacy.');
 assert.match(client, /Currencies stay separate/, 'UI must explain multi-currency separation.');
 assert.match(client, /Borrowed & lent/, 'Borrowed/lent workflow must be visible.');
 assert.match(client, /Budgets & forecast/, 'Budget and forecast workflow must be visible.');
-assert.match(html, /\/personal-money-center\.js/, 'Finance Intelligence page must load Personal Money Center.');
+assert.match(html, /finance-master\.js/, 'Finance OS must load the unified master client.');
 
 console.log('Personal Money Center regression tests passed.');
