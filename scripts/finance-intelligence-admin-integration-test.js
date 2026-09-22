@@ -15,9 +15,9 @@ assert(rendered.includes('data-title="Finance Intelligence"'), 'admin sidebar mu
 assert(rendered.includes('Open Finance Intelligence'), 'admin banking tab must expose Finance Intelligence launch button');
 assert(appSource.includes("app.get('/finance-intelligence',noIndex,pageAuth({workspaceOnly:true})"), 'Finance Intelligence page must use workspace page authentication');
 assert(appSource.includes("app.get('/finance-intelligence.html',redirectPreservingQuery('/finance-intelligence'))"), 'direct .html route must redirect to protected route');
-assert(financeHtml.includes('Five simple steps'), 'guided five-step workflow must be visible');
-assert(financeHtml.includes('Analyse Transactions'), 'analysis button must be visible');
-assert(financeHtml.includes('finance-intelligence-advanced.js'), 'advanced finance UI script must be loaded');
+assert(financeHtml.includes('FINANCE OPERATING SYSTEM'), 'master Finance OS shell must be visible');
+assert(financeHtml.includes('finance-master.css'), 'master Finance OS stylesheet must be loaded');
+assert(financeHtml.includes('finance-master.js'), 'master Finance OS client must be loaded');
 assert(routes.includes("'/intelligence/analyse'"), 'analysis API route must exist');
 assert(routes.includes("'/intelligence/insights/:id/apply'"), 'insight apply API route must exist');
 assert(migration.includes('finance_transaction_insights'), 'transaction insight schema must exist');
