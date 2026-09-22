@@ -15,7 +15,10 @@ async function run() {
         money_in: '1200.00',
         money_out: '500.00',
         linked_refund_inflow: '200.00',
-        transfer_movement: '1000.00'
+        transfer_movement: '1000.00',
+        cash_out: '40.00',
+        cash_in: '0.00',
+        unclassified: 2
       }]];
     }
   };
@@ -31,7 +34,10 @@ async function run() {
     linked_refund_inflow: '200.00',
     net_cash_flow: '700.00',
     net_economic_expense: '300.00',
-    transfer_movement: '1000.00'
+    transfer_movement: '1000.00',
+    cash_out: '40.00',
+    cash_in: '0.00',
+    unclassified: 2
   });
   assert.match(cashSql, /bt\.is_internal_transfer=0/, 'cash totals must exclude confirmed transfers from money-in/out');
   assert.match(cashSql, /finance_refund_links/, 'cash totals must identify linked refunds');
