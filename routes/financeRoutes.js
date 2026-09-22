@@ -18,6 +18,7 @@ const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
 const financeReportBuilder = require('../controllers/financeReportBuilderController');
 const financeTransactionLifecycle = require('../controllers/financeTransactionLifecycleController');
+const financeCategories = require('../controllers/financeCategoryController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -72,6 +73,10 @@ router.post('/transactions/:id/post', requireAnyPermission('POST_TRANSACTION'), 
 router.post('/transactions/:id/void', requireAnyPermission('VOID_TRANSACTION'), requireStepUp('VOID_FINANCIAL_TRANSACTION'), controller.voidTransaction);
 router.get('/journals', controller.getJournals);
 router.post('/journals', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CREATE_MANUAL_JOURNAL'), controller.createJournal);
+router.get('/categories', requireAnyPermission('VIEW_BANKING'), financeCategories.list);
+router.post('/categories', requireAnyPermission('EDIT_FINANCE'), financeCategories.save);
+router.post('/categories/:id/archive', requireAnyPermission('EDIT_FINANCE'), financeCategories.archive);
+router.post('/categories/:id/restore', requireAnyPermission('EDIT_FINANCE'), financeCategories.restore);
 router.get('/reports', controller.getReports);
 router.get('/reports/builder', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.generate);
 router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.csv);
