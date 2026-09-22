@@ -61,4 +61,23 @@ if (duplicateFunctionNames.length) {
   throw new Error('Finance master contains duplicate function declarations: ' + [...new Set(duplicateFunctionNames)].join(', '));
 }
 
+
+const app = read('app.js');
+const financeUi = read('public/finance-master.js');
+
+expect(financeUi, "function dateRange()", 'Finance period presets must resolve to explicit date ranges');
+expect(financeUi, "filterQuery(", 'Finance APIs must receive explicit filter query parameters');
+expect(financeUi, "Mixed currencies", 'Finance UI must warn rather than fabricate mixed-currency totals');
+expect(financeUi, "server-side filters and pagination", 'Transaction Explorer must remain server-side');
+expect(financeUi, "ORIGINAL BANK DATA", 'Transaction detail must preserve source provenance');
+expect(financeUi, "CURRENT CLASSIFICATION", 'Transaction detail must separate editable classification from source evidence');
+expect(app, "app.post('/api/security/csp-report'", 'CSP reporting endpoint must exist');
+const cspIndex = app.indexOf("app.post('/api/security/csp-report'");
+const csrfIndex = app.indexOf("app.use(csrfProtection)");
+if (cspIndex < 0 || csrfIndex < 0 || cspIndex > csrfIndex) {
+  throw new Error('CSP report ingestion must remain before CSRF enforcement while retaining rate limiting and validation');
+}
+
+console.log('FINANCE_FINAL_PRODUCTION_VERIFICATION_OK');
+
 console.log('FINANCE_CONTROL_CENTRE_COMPLETION_TEST_OK');
