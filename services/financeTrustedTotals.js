@@ -20,7 +20,10 @@ async function cashTotalsByCurrency(db, whereSql, params) {
             COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
             COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0
               THEN LEAST(COALESCE(bt.credit,0),COALESCE(rf.linked_refund_amount,0)) ELSE 0 END),0) AS linked_refund_inflow,
-            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=1 THEN GREATEST(COALESCE(bt.debit,0),COALESCE(bt.credit,0)) ELSE 0 END),0) AS transfer_movement
+            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=1 THEN GREATEST(COALESCE(bt.debit,0),COALESCE(bt.credit,0)) ELSE 0 END),0) AS transfer_movement,
+            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 AND bt.category='Cash' THEN bt.debit ELSE 0 END),0) AS cash_out,
+            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 AND bt.category='Cash' THEN bt.credit ELSE 0 END),0) AS cash_in,
+            SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified
        FROM bank_transactions bt
        JOIN bank_accounts ba ON ba.id=bt.bank_account_id
        LEFT JOIN (
@@ -48,7 +51,10 @@ async function cashTotalsByCurrency(db, whereSql, params) {
       linked_refund_inflow: refunds,
       net_cash_flow: money.fromCents(money.toCents(moneyIn) - money.toCents(moneyOut)),
       net_economic_expense: money.fromCents(money.toCents(moneyOut) - money.toCents(refunds)),
-      transfer_movement: money.fromCents(money.toCents(row.transfer_movement || 0))
+      transfer_movement: money.fromCents(money.toCents(row.transfer_movement || 0)),
+      cash_out: money.fromCents(money.toCents(row.cash_out || 0)),
+      cash_in: money.fromCents(money.toCents(row.cash_in || 0)),
+      unclassified: Number(row.unclassified || 0)
     };
   });
 }
