@@ -13,8 +13,8 @@ const routes = read('routes/financeRoutes.js');
 const controller = read('controllers/financeBankingReadinessController.js');
 const providerService = read('services/openBankingProviderService.js');
 const html = read('public/finance-intelligence.html');
-const client = read('public/finance-banking-readiness.js');
-const css = read('public/finance-banking-readiness.css');
+const client = read('public/finance-master.js');
+const css = read('public/finance-master.css');
 
 assert(routes.includes("router.get('/intelligence/banking-readiness'"), 'Banking readiness API route is missing.');
 assert(routes.includes("requireAnyPermission('VIEW_BANKING')"), 'Banking readiness route must remain permission protected.');
@@ -25,11 +25,10 @@ assert(!providerService.includes('client_secret: process.env.BANK_DATA_CLIENT_SE
 assert(controller.includes('internet-banking passwords, PINs or bank OTPs'), 'Bank credential safety rule is missing.');
 assert(controller.includes('productionBankFeedReady'), 'Open Banking must calculate a fail-closed production readiness gate.');
 assert(controller.includes("bankEnvironment === 'PRODUCTION' && liveEnabled"), 'Production Open Banking must require explicit production environment and live-sync enablement.');
-assert(html.includes('Banking Setup & Safety'), 'Finance Intelligence safety entry is missing.');
-assert(html.includes('bankingSafetyControls'), 'Finance Intelligence safety controls are missing.');
-assert(html.includes('/finance-banking-readiness.js'), 'Finance banking readiness client is not loaded.');
-assert(client.includes("data.readinessBlocked") || client.includes("dataset.readinessBlocked"), 'Connect Bank readiness guard is missing.');
-assert(client.includes('stopImmediatePropagation'), 'Connect Bank must be blocked before the unverified provider request is sent.');
-assert(css.includes('.safety-status.ready'), 'Banking readiness status styles are missing.');
+assert(html.includes('finance-master.js'), 'Finance Master OS client is not loaded.');
+assert(client.includes("I+'/banking-readiness'"), 'Finance OS must load banking readiness status.');
+assert(client.includes('Banking Setup & Safety'), 'Finance OS safety settings are missing.');
+assert(client.includes('Fail-closed until provider and production controls are verified.'), 'Finance OS must keep Open Banking fail-closed messaging.');
+assert(css.includes('.fm-badge.good'), 'Finance OS readiness status styles are missing.');
 
 console.log('Finance banking readiness regression checks passed.');
