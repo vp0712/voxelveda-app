@@ -81,7 +81,8 @@ assert(financeRoutes.includes("/rows/:rowId/override"), 'manual correction route
 assert(financeRoutes.includes("requireStepUp('IMPORT_BANK_TRANSACTIONS')"), 'manual correction must keep finance step-up protection');
 assert(bankGradeUi.includes('Fix & include') && bankGradeUi.includes('Manual override'), 'mobile rejected-row correction UI missing');
 assert(bankGradeUi.includes('Voxel Veda Company') && bankGradeUi.includes('Personal') && bankGradeUi.includes('Mixed'), 'separated ledger scope controls missing');
-assert(financePage.includes('/finance-bank-grade-review.js'), 'bank-grade finance enhancer is not loaded by the finance page');
+assert(financePage.includes('/finance-master.js'), 'unified Finance OS client is not loaded by the finance page');
+assert(read('public/finance-master.js').includes('CURRENT CLASSIFICATION') && read('public/finance-master.js').includes('ORIGINAL BANK DATA'), 'unified Finance OS transaction evidence workflow is missing');
 assert(financeIntelligence.includes('exports.getStatementLibrary'), 'statement library API missing');
 assert(financeIntelligence.includes('exports.getStatementReport'), 'per-statement report API missing');
 assert(financeIntelligence.includes('exports.getSpendingReport'), 'spending report API missing');
@@ -92,7 +93,7 @@ assert(statementReportUi.includes('Imported statement library'), 'statement libr
 assert(statementReportUi.includes('Spending by category') && statementReportUi.includes('Where you spent'), 'spending analysis UI incomplete');
 assert(statementReportUi.includes('Export CSV') && statementReportUi.includes('Print / Save PDF'), 'report export controls missing');
 assert(statementReportUi.includes('legacy statement') || statementReportUi.includes('Legacy import'), 'legacy provenance boundary missing');
-assert(financePage.includes('/finance-statement-report-center.js'), 'statement report center is not loaded by finance page');
+assert(read('public/finance-master.js').includes('Statement Import Wizard') && read('public/finance-master.js').includes('Statement Vault'), 'statement workflows must be integrated into the unified Finance OS');
 assert(financeIntelligence.includes('exports.getTransactionDetail'), 'transaction detail action API missing');
 assert(financeIntelligence.includes('exports.updateTransaction'), 'transaction management API missing');
 assert(financeIntelligence.includes('exports.bulkCategorizeTransactions'), 'bulk category API missing');
