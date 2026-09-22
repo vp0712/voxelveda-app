@@ -16,7 +16,8 @@ assert(rendered.includes('Open Finance Intelligence'), 'admin banking tab must e
 assert(appSource.includes("app.get('/finance-intelligence',noIndex,pageAuth({workspaceOnly:true})"), 'Finance Intelligence page must use workspace page authentication');
 assert(appSource.includes("app.get('/finance-intelligence.html',redirectPreservingQuery('/finance-intelligence'))"), 'direct .html route must redirect to protected route');
 assert(financeHtml.includes('FINANCE OPERATING SYSTEM'), 'master Finance OS must be visible');
-const masterFinance = fs.readFileSync(path.join(root, 'public', 'finance-master.js'), 'utf8');\nassert(masterFinance.includes('Analyse Transactions'), 'analysis action must be visible in the Master OS review center');
+const masterFinance = fs.readFileSync(path.join(root, 'public', 'finance-master.js'), 'utf8');
+assert(masterFinance.includes('Analyse Transactions'), 'analysis action must be visible in the Master OS review center');
 assert(financeHtml.includes('finance-master.js'), 'master finance UI script must be loaded');
 assert(routes.includes("'/intelligence/analyse'"), 'analysis API route must exist');
 assert(routes.includes("'/intelligence/insights/:id/apply'"), 'insight apply API route must exist');
