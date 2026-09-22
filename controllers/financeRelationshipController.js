@@ -275,3 +275,48 @@ exports.unlinkTransfer=async(req,res)=>{
     await db.commit();return res.json({message:'Transfer pair unlinked. Source transactions remain unchanged.'});
   }catch(error){await db.rollback().catch(()=>{});return fail(res,error,'Failed to unlink internal transfer.')}finally{db.release()}
 };
+
+
+exports.listTransferCandidates=async(req,res)=>{
+  try{
+    await ensureFinanceSchema();
+    const debitVisibility=privacy.visibilitySql('da',req),creditVisibility=privacy.visibilitySql('ca',req);
+    const debitParams=privacy.visibilityParams(req),creditParams=privacy.visibilityParams(req);
+    const [rows]=await pool.query(
+      `SELECT d.id AS debit_transaction_id,c.id AS credit_transaction_id,d.transaction_date AS debit_date,c.transaction_date AS credit_date,
+              d.debit AS amount,d.currency,d.description AS debit_description,c.description AS credit_description,
+              da.nickname AS debit_account,ca.nickname AS credit_account,
+              ABS(DATEDIFF(d.transaction_date,c.transaction_date)) AS day_distance
+         FROM bank_transactions d
+         JOIN bank_accounts da ON da.id=d.bank_account_id
+         JOIN bank_transactions c ON c.currency=d.currency AND c.credit=d.debit AND c.credit>0 AND c.bank_account_id<>d.bank_account_id
+         JOIN bank_accounts ca ON ca.id=c.bank_account_id
+        WHERE d.debit>0 AND d.is_internal_transfer=0 AND c.is_internal_transfer=0
+          AND d.reconciliation_status<>'IGNORED' AND c.reconciliation_status<>'IGNORED'
+          AND ABS(DATEDIFF(d.transaction_date,c.transaction_date))<=5
+          AND ${debitVisibility} AND ${creditVisibility}
+          AND NOT EXISTS (SELECT 1 FROM finance_transfer_links tl WHERE tl.status='ACTIVE'
+                           AND (tl.debit_bank_transaction_id IN (d.id,c.id) OR tl.credit_bank_transaction_id IN (d.id,c.id)))
+        ORDER BY day_distance ASC,GREATEST(d.transaction_date,c.transaction_date) DESC,d.debit DESC LIMIT 100`,
+      [...debitParams,...creditParams]
+    );
+    return res.json({candidates:rows.map(row=>({...row,confidence:Number(row.day_distance)===0?'HIGH':Number(row.day_distance)<=2?'MEDIUM':'LOW'}))});
+  }catch(error){return fail(res,error,'Failed to load transfer candidates.')}
+};
+
+exports.listRefundCandidates=async(req,res)=>{
+  try{
+    await ensureFinanceSchema();const visibility=privacy.visibilitySql('ba',req),params=privacy.visibilityParams(req);
+    const [rows]=await pool.query(
+      `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.reference,bt.credit,bt.currency,bt.ownership_scope,
+              ba.nickname AS account_name,ba.institution,
+              CASE WHEN UPPER(CONCAT_WS(' ',bt.description,bt.merchant_name,bt.reference)) REGEXP 'REFUND|REVERSAL|REVERSED|CHARGEBACK|RETURN|CASHBACK'
+                   THEN 'HIGH' ELSE 'REVIEW' END AS confidence,
+              EXISTS(SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE') AS linked
+         FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+        WHERE bt.credit>0 AND bt.is_internal_transfer=0 AND bt.reconciliation_status<>'IGNORED' AND ${visibility}
+        ORDER BY (confidence='HIGH') DESC,bt.transaction_date DESC,bt.id DESC LIMIT 150`,params
+    );
+    return res.json({candidates:rows});
+  }catch(error){return fail(res,error,'Failed to load refund candidates.')}
+};
