@@ -1,3 +1,23 @@
+CREATE TABLE IF NOT EXISTS finance_transfer_links (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  transfer_uid VARCHAR(64) NOT NULL,
+  debit_bank_transaction_id BIGINT NOT NULL,
+  credit_bank_transaction_id BIGINT NOT NULL,
+  debit_amount DECIMAL(18,2) NOT NULL,
+  credit_amount DECIMAL(18,2) NOT NULL,
+  currency CHAR(3) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+  note TEXT NULL,
+  created_by INT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  voided_by INT NULL,
+  voided_at DATETIME NULL,
+  UNIQUE KEY uniq_finance_transfer_uid (transfer_uid),
+  UNIQUE KEY uniq_finance_transfer_pair (debit_bank_transaction_id, credit_bank_transaction_id),
+  INDEX idx_finance_transfer_debit (debit_bank_transaction_id, status),
+  INDEX idx_finance_transfer_credit (credit_bank_transaction_id, status)
+);
+
 CREATE TABLE IF NOT EXISTS bank_transaction_splits (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   split_uid VARCHAR(64) NOT NULL,
