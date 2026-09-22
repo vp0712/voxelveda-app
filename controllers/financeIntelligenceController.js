@@ -576,10 +576,10 @@ exports.getStatementReport = async (req, res) => {
     ]);
     const enrichedSummary = summaryByCurrency.map((row) => {
       const currencyCategories = categories.filter((entry) => entry.currency === row.currency);
-      const cashSpent = currencyCategories.filter((entry) => String(entry.category).toLowerCase() === 'cash').reduce((sum, entry) => sum + Number(entry.spent || 0), 0);
+      const cashSpentCents = currencyCategories.filter((entry) => String(entry.category).toLowerCase() === 'cash').reduce((sum, entry) => sum + money.toCents(entry.spent || 0), 0n);
       const unclassified = currencyCategories.filter((entry) => String(entry.category).toLowerCase() === 'unclassified').reduce((sum, entry) => sum + Number(entry.source_transaction_count || 0), 0);
       const manual = manualRows.find((entry) => String(entry.currency).toUpperCase() === row.currency);
-      return { ...row, net_flow: row.net_cash_flow, cash_spent: money.fromCents(money.toCents(cashSpent)), unclassified, manual_overrides: Number(manual?.manual_overrides || 0) };
+      return { ...row, net_flow: row.net_cash_flow, cash_spent: money.fromCents(cashSpentCents), unclassified, manual_overrides: Number(manual?.manual_overrides || 0) };
     });
     return res.json({
       statement: {
@@ -674,9 +674,9 @@ exports.getSpendingReport = async (req, res) => {
 
     const enrichedSummary = summaryByCurrency.map((row) => {
       const currencyCategories = categories.filter((entry) => entry.currency === row.currency);
-      const cashSpent = currencyCategories
+      const cashSpentCents = currencyCategories
         .filter((entry) => String(entry.category).toLowerCase() === 'cash')
-        .reduce((sum, entry) => sum + Number(entry.spent || 0), 0);
+        .reduce((sum, entry) => sum + money.toCents(entry.spent || 0), 0n);
       const unclassified = currencyCategories
         .filter((entry) => String(entry.category).toLowerCase() === 'unclassified')
         .reduce((sum, entry) => sum + Number(entry.source_transaction_count || 0), 0);
@@ -684,7 +684,7 @@ exports.getSpendingReport = async (req, res) => {
       return {
         ...row,
         net_flow: row.net_cash_flow,
-        cash_spent: money.fromCents(money.toCents(cashSpent)),
+        cash_spent: money.fromCents(cashSpentCents),
         unclassified,
         manual_overrides: Number(manual?.manual_overrides || 0)
       };
@@ -910,7 +910,10 @@ exports.getBankingDashboard = async (req, res) => {
         money_out: Number(row.money_out || 0),
         net_flow: Number(row.net_cash_flow || 0),
         net_economic_expense: Number(row.net_economic_expense || 0),
-        transfer_movement: Number(row.transfer_movement || 0)
+        transfer_movement: Number(row.transfer_movement || 0),
+        cash_out: Number(row.cash_out || 0),
+        cash_in: Number(row.cash_in || 0),
+        unclassified: Number(row.unclassified || 0)
       })),
       categories: categories.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.source_transaction_count || 0) })),
       merchants: merchants.map((row) => ({ ...row, spent: Number(row.spent || 0), transaction_count: Number(row.transaction_count || 0) })),
