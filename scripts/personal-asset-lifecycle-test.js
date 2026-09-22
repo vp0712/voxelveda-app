@@ -30,7 +30,7 @@ assert(ui.includes("const API='/api/finance/personal-money/net-worth/lifecycle'"
 assert(ui.includes('Nothing renews or pays automatically'), 'UI must explain no-auto-pay behavior.');
 assert(ui.includes('Raw uploads stay disabled until malware scanning is configured'), 'UI must explain why uploads are not enabled yet.');
 assert(ui.includes('Asset Protection'), 'Asset Protection must be visible in the mobile UI.');
-assert(html.includes('/personal-asset-lifecycle.js?v=20260916-asset-protection'), 'Finance Intelligence must load Asset Protection UI.');
+assert.match(html, /finance-master\.js/, 'Finance OS must load the unified master client.');
 
 assert(ui.includes('/personal-wealth-planning.js?v=20260916-wealth-planning'), 'Asset Protection must load the Wealth Planning UI.');
 assert(planning.includes("health:'/api/finance/personal-money/health'"), 'Wealth Planning must reuse the protected Personal Financial Health endpoint.');
