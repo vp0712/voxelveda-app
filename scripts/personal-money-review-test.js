@@ -34,7 +34,7 @@ assert(ui.includes('Confirm + use'), 'UI must expose a separate explicit future-
 assert(ui.includes('Not this payment'), 'UI must allow dismissing a wrong match.');
 assert(ui.includes('nothing deleted') || ui.includes('never delete'), 'UI must explain duplicate warnings are non-destructive.');
 assert(ui.includes('window.confirm'), 'UI must confirm before applying a suggested transaction match.');
-assert(html.includes('/personal-money-review.js?v=20260916-review-inbox'), 'Finance Intelligence must load the Smart Review Inbox UI.');
+assert.match(html, /finance-master\.js/, 'Finance OS must load the unified master client.');
 
 assert(migration.includes('personal_money_recurring_matches'), 'Review Inbox migration must create the match ledger.');
 assert(migration.includes('UNIQUE KEY uq_personal_recurring_match_transaction'), 'Match ledger must prevent duplicate pair decisions.');
