@@ -51,3 +51,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:700px){.fm-timeline-item{grid-template-columns:1fr;gap:4px}}
 
 .fm-form select[multiple]{height:auto;min-height:118px;padding:8px}.fm-form label>small{display:block;margin-top:5px;color:var(--muted);font-size:.56rem}.fm-table-wrap{max-width:100%;overflow:auto}
+
+.fm-colour-dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:-1px;border:1px solid rgba(0,0,0,.15)}
+.fm-form fieldset{border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:7px}.fm-form fieldset legend{font-size:.62rem;font-weight:900;padding:0 5px;color:var(--ink)}
+.fm-form fieldset .fm-check{background:#f8fafb;border-radius:9px;padding:8px 10px}
+@media(max-width:700px){.fm-form fieldset{padding:9px}.fm-colour-dot{width:9px;height:9px}}
