@@ -1,4 +1,7 @@
 const express = require('express');
+const fs = require('node:fs');
+const path = require('node:path');
+const multer = require('multer');
 const controller = require('../controllers/financeController');
 const operations = require('../controllers/financeOperationsController');
 const intelligence = require('../controllers/financeIntelligenceController');
@@ -10,6 +13,7 @@ const reconciliationCenter = require('../controllers/financeReconciliationCenter
 const bankingReadiness = require('../controllers/financeBankingReadinessController');
 const bankingOS = require('../controllers/bankingOperatingSystemController');
 const openBanking = require('../controllers/openBankingController');
+const financeReceipt = require('../controllers/financeReceiptController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
@@ -35,9 +39,18 @@ const requireSensitiveExportApproval = require('../middleware/sensitiveExportMid
 const highRiskPaymentGuard = require('../middleware/highRiskPaymentMiddleware');
 const statementPreviewSanitizer = require('../middleware/statementPreviewSanitizer');
 const financePrivacy = require('../middleware/financePrivacyMiddleware');
+const { sanitizeUploadName, secureMulterOptions, validateUploadedFile } = require('../middleware/uploadSecurity');
 const { financeCapabilities } = require('../services/financeCapabilityRegistry');
 
 const router = express.Router();
+const financeUploadDir = path.join(__dirname, '..', 'uploads', 'finance');
+if (!fs.existsSync(financeUploadDir)) fs.mkdirSync(financeUploadDir, { recursive: true });
+const financeReceiptStorage = multer.diskStorage({
+  destination(req, file, cb) { cb(null, financeUploadDir); },
+  filename(req, file, cb) { cb(null, `receipt_${req.params.id}_${Date.now()}_${sanitizeUploadName(file.originalname)}`); }
+});
+const financeReceiptUpload = multer(secureMulterOptions(financeReceiptStorage, 12));
+
 
 router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => res.json(financeCapabilities()));
 router.get('/overview', controller.getOverview);
@@ -209,6 +222,9 @@ router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), finance
 router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
 router.get('/bank-transactions/:id/original', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), statementReview.getOriginalBankTransaction);
+router.get('/bank-transactions/:id/receipts', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeReceipt.list);
+router.post('/bank-transactions/:id/receipts', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeReceiptUpload.single('file'), validateUploadedFile, financeReceipt.upload);
+router.delete('/bank-transactions/:id/receipts/:documentId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeReceipt.unlink);
 router.post('/bank-transactions/:id/reconcile', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('RECONCILE_BANK_TRANSACTION'), operations.reconcileBankTransaction);
 router.post('/bank-transactions/:id/ignore', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), requireStepUp('IGNORE_BANK_TRANSACTION'), operations.ignoreBankTransaction);
 
