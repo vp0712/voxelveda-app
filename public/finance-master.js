@@ -241,6 +241,24 @@ function settingsView(){
  const caps=state.capabilities?.capabilities||{};
  return connectionsView()+`<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Capability Registry</h2><p>Unsupported workflows are explicitly identified rather than presented as dead buttons.</p></div></div><div class="fm-capability-grid">${Object.entries(caps).map(([k,v])=>`<div class="fm-capability"><div><b>${esc(k.replaceAll('_',' '))}</b><p>${esc(v.note||'')}</p></div>${statusBadge(v.status)}</div>`).join('')}</div></div></article>`;
 }
+
+function transfersView(){
+ const rows=state.transferCandidates?.candidates||[];
+ return `${resourceError('transferCandidates','Transfer candidates')}<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transfer Matching</h2><p>Confirm equal opposite movements between permitted accounts. Confirmed pairs remain visible as cash movement but are excluded from income/expense totals.</p></div></div><div class="fm-list">${rows.map(x=>`<div class="fm-row"><div><h3>${esc(x.debit_account)} → ${esc(x.credit_account)}</h3><p>${date(x.debit_date)} / ${date(x.credit_date)} · ${esc(x.debit_description||'')} ↔ ${esc(x.credit_description||'')}</p></div><div class="fm-row-right"><b>${nativeMoney(x.amount,x.currency)}</b><small>${esc(x.confidence)} confidence</small><button type="button" data-transfer-debit="${x.debit_transaction_id}" data-transfer-credit="${x.credit_transaction_id}">Confirm pair</button></div></div>`).join('')||emptyState('No transfer candidates','No unlinked equal opposite account movements were found within five days.')}</div></div></article>`;
+}
+function refundsView(){
+ const rows=state.refundCandidates?.candidates||[];
+ return `${resourceError('refundCandidates','Refund candidates')}<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Refund Review</h2><p>Likely merchant refunds stay separate from ordinary revenue until linked to an original expense.</p></div></div><div class="fm-list">${rows.map(x=>`<div class="fm-row" data-tx="${x.id}"><div><h3>${esc(x.merchant_name||x.description||'Credit')}</h3><p>${date(x.transaction_date)} · ${esc(x.account_name||'')} · ${esc(x.confidence)}</p></div><div class="fm-row-right"><b class="good">${nativeMoney(x.credit,x.currency)}</b><small>${Number(x.linked)?'Linked refund':'Unlinked credit'}</small>${Number(x.linked)?'':`<button type="button" data-refund-link="${x.id}" data-refund-currency="${esc(x.currency)}">Link refund</button>`}</div></div>`).join('')||emptyState('No credit candidates','No visible non-transfer credits are awaiting refund review.')}</div></div></article>`;
+}
+function reimbursementsView(){
+ const rows=state.reimbursements?.reimbursements||[];
+ return `${resourceError('reimbursements','Reimbursements')}<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Reimbursement Lifecycle</h2><p>Employee-paid expenses stay linked to the canonical expense and any settlement payment.</p></div></div><div class="fm-list">${rows.map(x=>`<div class="fm-row"><div><h3>${esc(x.merchant_name||x.description||'Expense')}</h3><p>${date(x.transaction_date)} · ${esc(x.account_name||'')} · claimant #${esc(x.claimant_user_id)}</p></div><div class="fm-row-right"><b>${nativeMoney(x.remaining_amount,x.currency)} remaining</b><small>${esc(x.status)} · requested ${nativeMoney(x.requested_amount,x.currency)}</small><div class="fm-inline-actions">${x.status==='DRAFT'?'<button data-reimb-action="submit" data-reimb-id="'+x.id+'">Submit</button>':''}${x.status==='SUBMITTED'?'<button data-reimb-action="approve" data-reimb-id="'+x.id+'">Approve</button><button data-reimb-action="reject" data-reimb-id="'+x.id+'">Reject</button>':''}</div></div></div>`).join('')||emptyState('No reimbursements','Create a reimbursement from an eligible expense transaction.')}</div></div></article>`;
+}
+function openRefundLink(refundId,currency){
+ $('fmModalEyebrow').textContent='REFUND LINK';$('fmModalTitle').textContent='Link refund to original expense';
+ $('fmModalBody').innerHTML=`<form id="refundLinkForm" class="fm-form"><label>Original expense transaction ID<input name="expense_id" inputmode="numeric" required></label><label>Amount (${esc(currency)})<input name="amount" inputmode="decimal" placeholder="Leave blank to use available amount"></label><label>Note<textarea name="note"></textarea></label><p class="fm-helper">Cross-currency linking is blocked until verified FX evidence exists.</p><div class="fm-form-actions"><button class="primary">Link refund</button></div></form>`;
+ $('fmModal').showModal();$('refundLinkForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(API+'/bank-transactions/'+refundId+'/refund-links',{method:'POST',body:JSON.stringify({original_expense_transaction_id:Number(fd.get('expense_id')),linked_amount:fd.get('amount')||undefined,note:fd.get('note')||null})});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
+}
 function simpleView(v){
  if(['budgets','savings','debt','recurring'].includes(v))return personalCard(v);
  if(v==='reports')return reportView();
@@ -249,6 +267,9 @@ function simpleView(v){
  if(v==='company')return companyView();
  if(v==='consolidated')return consolidatedView();
  if(v==='cash')return cashView();
+ if(v==='transfers')return transfersView();
+ if(v==='refunds')return refundsView();
+ if(v==='reimbursements')return reimbursementsView();
  if(v==='insights')return insightsView();
  if(v==='rules')return rulesView();
  if(v==='reconciliation')return reconciliationView();
