@@ -105,14 +105,21 @@ function resourceError(name,label){
 function currencyRows(){
  const balances=Array.isArray(state.dash?.balances_by_currency)?state.dash.balances_by_currency:[];
  const flows=Array.isArray(state.dash?.flow_by_currency)?state.dash.flow_by_currency:[];
- return [...new Set([...balances.map(x=>x.currency),...flows.map(x=>x.currency)].filter(Boolean))].map(currency=>({
-  currency,
-  balance:num(balances.find(x=>x.currency===currency)?.balance),
-  money_in:num(flows.find(x=>x.currency===currency)?.money_in),
-  money_out:num(flows.find(x=>x.currency===currency)?.money_out),
-  net_flow:num(flows.find(x=>x.currency===currency)?.net_flow),
-  unclassified:num(flows.find(x=>x.currency===currency)?.unclassified)
- }));
+ return [...new Set([...balances.map(x=>x.currency),...flows.map(x=>x.currency)].filter(Boolean))].map(currency=>{
+  const flow=flows.find(x=>x.currency===currency)||{};
+  return {
+   currency,
+   balance:num(balances.find(x=>x.currency===currency)?.balance),
+   money_in:num(flow.money_in),
+   ordinary_money_in:num(flow.ordinary_money_in),
+   refund_inflow:num(flow.linked_refund_inflow),
+   money_out:num(flow.money_out),
+   net_flow:num(flow.net_flow),
+   net_economic_expense:num(flow.net_economic_expense),
+   transfer_movement:num(flow.transfer_movement),
+   unclassified:num(flow.unclassified)
+  };
+ });
 }
 function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — consolidated total unavailable until verified FX rates are available.':''}
 function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
@@ -168,8 +175,8 @@ function hero(){
  const err=resourceError('dash','Financial overview');if(err)return err;
  const rows=currencyRows();const mixed=mixedCurrencyMessage(rows);const one=rows[0]||{currency:'AUD',balance:0,money_in:0,money_out:0,net_flow:0};
  const position=rows.length===1?nativeMoney(one.balance,one.currency):'Mixed currencies';
- const kpis=rows.length?rows.map(r=>`<div class="fm-kpi"><span>${esc(r.currency)} · Available balance</span><strong>${nativeMoney(r.balance,r.currency)}</strong><small>Current balance — not period filtered</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money in</span><strong class="good">${nativeMoney(r.money_in,r.currency)}</strong><small>Selected period</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money out</span><strong class="bad">${nativeMoney(r.money_out,r.currency)}</strong><small>Selected period · transfers excluded</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Net cash flow</span><strong>${nativeMoney(r.net_flow,r.currency)}</strong><small>Income minus expense</small></div>`).join(''):'<div class="fm-empty">No visible financial activity.</div>';
- return `<div class="fm-grid two"><article class="fm-card fm-hero"><div class="fm-pad"><small>TOTAL FINANCIAL POSITION</small><strong>${position}</strong><p>${mixed||'Current account position. Period activity is shown separately.'}</p><div class="fm-hero-actions"><button class="accent" data-quick="expense">Add movement</button><button data-quick="statement">Upload statement</button><button data-viewjump="reports">Reports</button></div></div></article><div class="fm-grid two">${kpis}</div></div>`;
+ const kpis=rows.length?rows.map(r=>`<div class="fm-kpi"><span>${esc(r.currency)} · Available balance</span><strong>${nativeMoney(r.balance,r.currency)}</strong><small>Current balance — not period filtered</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money in</span><strong class="good">${nativeMoney(r.money_in,r.currency)}</strong><small>Cash inflow · includes ${nativeMoney(r.refund_inflow,r.currency)} linked refunds</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Money out</span><strong class="bad">${nativeMoney(r.money_out,r.currency)}</strong><small>Cash outflow · confirmed transfers excluded</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Net cash flow</span><strong>${nativeMoney(r.net_flow,r.currency)}</strong><small>Cash in minus cash out</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Linked refunds</span><strong class="good">${nativeMoney(r.refund_inflow,r.currency)}</strong><small>Not treated as ordinary revenue</small></div><div class="fm-kpi"><span>${esc(r.currency)} · Net economic expense</span><strong>${nativeMoney(r.net_economic_expense,r.currency)}</strong><small>Money out less linked refunds</small></div>`).join(''):'<div class="fm-empty">No visible financial activity.</div>';
+ return `<div class="fm-grid two"><article class="fm-card fm-hero"><div class="fm-pad"><small>TOTAL FINANCIAL POSITION</small><strong>${position}</strong><p>${mixed||'Current account position. Period activity is shown separately from balances.'}</p><div class="fm-hero-actions"><button class="accent" data-quick="expense">Add movement</button><button data-quick="statement">Upload statement</button><button data-viewjump="reports">Reports</button></div></div></article><div class="fm-grid two">${kpis}</div></div>`;
 }
 function recentRows(){
  const rows=state.dash?.recent_transactions||state.tx.slice(0,8);
