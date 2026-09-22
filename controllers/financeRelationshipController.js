@@ -96,6 +96,7 @@ exports.linkRefund=async(req,res)=>{
     await privacy.assertBankTransactionAccess(pool,expenseId,req);
     db=await pool.getConnection();await db.beginTransaction();
     const refund=await transactionForUpdate(db,refundId,req),expense=await transactionForUpdate(db,expenseId,req);
+    if(Number(refund.is_internal_transfer||0))throw new FinanceError('An internal transfer cannot also be treated as a merchant refund.',409,'REFUND_TRANSFER_FORBIDDEN');
     if(money.toCents(refund.credit||0)<=0n)throw new FinanceError('The refund transaction must be a credit.',400,'REFUND_CREDIT_REQUIRED');
     if(money.toCents(expense.debit||0)<=0n)throw new FinanceError('The original transaction must be an expense debit.',400,'ORIGINAL_EXPENSE_DEBIT_REQUIRED');
     if(String(refund.currency)!==String(expense.currency))throw new FinanceError('Cross-currency refund linking requires verified FX evidence and is not enabled.',409,'REFUND_FX_EVIDENCE_REQUIRED');
@@ -185,10 +186,17 @@ exports.addReimbursementPayment=async(req,res)=>{
     const [[row]]=await db.query("SELECT * FROM finance_reimbursements WHERE id=? FOR UPDATE",[id]);if(!row)throw new FinanceError('Reimbursement not found.',404,'REIMBURSEMENT_NOT_FOUND');
     await privacy.assertBankTransactionAccess(db,row.expense_bank_transaction_id,req);const payment=await transactionForUpdate(db,paymentId,req);
     if(!['APPROVED','PARTIALLY_REIMBURSED'].includes(row.status))throw new FinanceError('Reimbursement must be approved before a payment can be linked.',409,'REIMBURSEMENT_NOT_APPROVED');
+    if(Number(payment.is_internal_transfer||0))throw new FinanceError('An internal transfer cannot settle a reimbursement.',409,'REIMBURSEMENT_TRANSFER_PAYMENT_FORBIDDEN');
+    const paymentDebit=money.toCents(payment.debit||0);
+    if(paymentDebit<=0n)throw new FinanceError('The reimbursement settlement must reference an outgoing debit transaction.',400,'REIMBURSEMENT_PAYMENT_DEBIT_REQUIRED');
     if(String(payment.currency)!==String(row.currency))throw new FinanceError('Cross-currency reimbursement settlement requires verified FX evidence.',409,'REIMBURSEMENT_FX_EVIDENCE_REQUIRED');
     const [[paid]]=await db.query('SELECT COALESCE(SUM(amount),0) AS amount FROM finance_reimbursement_payments WHERE reimbursement_id=?',[id]);
-    const remaining=money.toCents(row.requested_amount)-money.toCents(paid.amount||0);const requested=req.body.amount?money.toCents(req.body.amount):remaining;
+    const [[paymentAllocated]]=await db.query('SELECT COALESCE(SUM(amount),0) AS amount FROM finance_reimbursement_payments WHERE payment_bank_transaction_id=?',[paymentId]);
+    const remaining=money.toCents(row.requested_amount)-money.toCents(paid.amount||0);
+    const paymentRemaining=paymentDebit-money.toCents(paymentAllocated.amount||0);
+    const requested=req.body.amount?money.toCents(req.body.amount):(remaining<paymentRemaining?remaining:paymentRemaining);
     if(requested<=0n||requested>remaining)throw new FinanceError('Payment amount exceeds the reimbursement balance.',400,'REIMBURSEMENT_PAYMENT_INVALID');
+    if(requested>paymentRemaining)throw new FinanceError('Payment amount exceeds the unused debit available on the linked bank transaction.',400,'REIMBURSEMENT_PAYMENT_OVERALLOCATED');
     await db.query('INSERT INTO finance_reimbursement_payments (reimbursement_id,payment_bank_transaction_id,amount,created_by) VALUES (?,?,?,?)',[id,paymentId,money.fromCents(requested),userId(req)]);
     const next=requested===remaining?'FULLY_REIMBURSED':'PARTIALLY_REIMBURSED';await db.query('UPDATE finance_reimbursements SET status=? WHERE id=?',[next,id]);
     await logAudit(db,audit(req,'REIMBURSEMENT_PAYMENT_LINKED','finance_reimbursement',id,{status:row.status},{status:next,payment_bank_transaction_id:paymentId,amount:money.fromCents(requested)}));await db.commit();
