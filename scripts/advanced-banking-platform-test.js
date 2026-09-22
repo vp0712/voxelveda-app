@@ -136,7 +136,7 @@ assert(financeIntelligence.includes('balances_by_currency') && financeIntelligen
 assert(financeIntelligence.includes('exports.getBankingBudgets') && financeIntelligence.includes('exports.saveBankingBudget'), 'bank-connected category budget endpoints missing');
 assert(financeRoutes.includes("/intelligence/banking-dashboard") && financeRoutes.includes("/intelligence/budgets"), 'premium banking API routes missing');
 assert(bankGradeUi.includes('window.VoxelVedaFinanceLedger'), 'transaction editor bridge missing');
-assert(renderer.includes('/premium-banking-app.js?v=20260919-access-fix'), 'premium banking app must be served by renderer with the current cache-safe version');
+assert(renderer.includes("const ADVANCED_BANKING_JS = '/premium-banking-app.js?v=20260919-access-fix'"), 'legacy premium banking asset reference must remain identifiable during deprecation');
 assert(premiumCss.includes('.vv-pb-donut') && premiumCss.includes('.vv-pb-line-svg') && premiumCss.includes('.vv-pb-budget'), 'premium banking chart/budget styles missing');
 assert(adminPage.includes('openBankingWorkspace()') && adminPage.includes('appBankingAlertBadge'), 'installed app Banking navigation entry missing');
 assert(adminPage.includes('Banking & Insights') && adminPage.includes('Open Banking App'), 'app Banking shortcuts missing');
@@ -147,7 +147,8 @@ assert(adminClient.includes('Budget over limit') && adminClient.includes('Bank c
 assert(adminClient.includes('15 * 60 * 1000'), 'app Banking alert refresh cadence missing');
 assert(ui.includes("source')==='app") && ui.includes("window.location.assign('/admin?view=finance')"), 'premium Banking return-to-app path missing');
 assert(appServer.includes("'premium-banking-app.js','premium-banking-app.css'"), 'premium Banking assets must be no-store to prevent stale installed-app UI');
-assert(renderer.includes('ADVANCED_BANKING_JS'), 'advanced banking UI must be served through page renderer');
+assert(renderer.includes('Legacy premium banking UI is no longer injected globally'), 'legacy banking client must not compete with the unified Finance OS');
+assert(!renderer.includes('rendered.includes(ADVANCED_BANKING_JS)'), 'global renderer must not inject the legacy premium banking client');
 assert(!renderer.includes('rendered.includes(FINANCE_PDF_ENHANCER_JS)'), 'legacy PDF parser must not be injected alongside PDF v3');
 assert(renderer.includes("const CANONICAL_LOGO = '/logo.png'"), 'canonical original logo contract changed');
 console.log('Advanced Australian banking platform architecture checks passed.');
