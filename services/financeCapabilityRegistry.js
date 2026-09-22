@@ -14,6 +14,7 @@ const STATIC_CAPABILITIES = Object.freeze({
   savings_goals: { status: 'PARTIAL', note: 'Personal savings goal tracking exists; contributions do not automatically move ledger money.' },
   borrow_lend: { status: 'PARTIAL', note: 'Personal debt/payment lifecycle exists and is owner isolated; canonical consolidated reporting is still being aligned.' },
   recurring_money: { status: 'PARTIAL', note: 'Personal recurring items and intelligence suggestions exist; no payment execution occurs.' },
+  category_manager: { status: 'PARTIAL', source: 'finance_system_categories', note: 'Scoped Personal/Business/Both category hierarchy, archive/restore, visual metadata and GST review defaults are implemented; production workflow verification is still required before READY.' },
   category_rules: { status: 'READY', source: 'finance transaction intelligence', note: 'Rules create suggestions and never silently post or reconcile transactions.' },
   insights: { status: 'READY', source: 'finance transaction intelligence', note: 'Insights are evidence-backed and linked to source transactions.' },
   open_banking: { status: 'RUNTIME_STATUS', note: 'Actual readiness comes from /api/finance/intelligence/banking-readiness and remains fail-closed.' },
