@@ -102,3 +102,64 @@ exports.unlink = async (req, res) => {
     return res.status(500).json({ message: 'Failed to unlink receipt.', code: 'FINANCE_RECEIPT_UNLINK_FAILED' });
   } finally { db.release(); }
 };
+
+
+exports.center = async (req, res) => {
+  try {
+    const q = String(req.query.q || '').trim().slice(0, 120);
+    const scope = String(req.query.scope || 'ALL').trim().toUpperCase();
+    const clauses = [require('../services/financePrivacyService').visibilitySql('ba', req)];
+    const params = [...require('../services/financePrivacyService').visibilityParams(req)];
+    if (scope !== 'ALL') {
+      if (!['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(scope)) throw new FinanceError('Invalid receipt scope.', 400, 'INVALID_RECEIPT_SCOPE');
+      clauses.push('bt.ownership_scope=?'); params.push(scope);
+    }
+    if (q) {
+      clauses.push('(sd.original_name LIKE ? OR bt.description LIKE ? OR bt.merchant_name LIKE ? OR ba.nickname LIKE ?)');
+      const like = `%${q}%`; params.push(like, like, like, like);
+    }
+    const [receipts] = await pool.query(
+      `SELECT sd.id,sd.original_name,sd.mime_type,sd.size_bytes,sd.classification,sd.scan_status,sd.uploaded_by,sd.created_at,
+              bt.id AS bank_transaction_id,bt.transaction_date,bt.description,bt.merchant_name,bt.debit,bt.credit,bt.currency,
+              bt.ownership_scope,ba.id AS bank_account_id,ba.nickname AS account_name,ba.institution
+         FROM secure_documents sd
+         JOIN bank_transactions bt ON CAST(bt.id AS CHAR)=sd.record_id
+         JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+        WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND sd.deleted_at IS NULL
+          AND ${clauses.join(' AND ')}
+        ORDER BY sd.created_at DESC LIMIT 250`,
+      params
+    );
+
+    const missingClauses = [require('../services/financePrivacyService').visibilitySql('ba', req), "bt.reconciliation_status<>'IGNORED'", 'bt.debit>0', 'bt.is_internal_transfer=0'];
+    const missingParams = [...require('../services/financePrivacyService').visibilityParams(req)];
+    if (scope !== 'ALL') { missingClauses.push('bt.ownership_scope=?'); missingParams.push(scope); }
+    if (q) {
+      missingClauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR ba.nickname LIKE ?)');
+      const like = `%${q}%`; missingParams.push(like, like, like);
+    }
+    const [missing] = await pool.query(
+      `SELECT bt.id AS bank_transaction_id,bt.transaction_date,bt.description,bt.merchant_name,bt.debit,bt.currency,
+              bt.ownership_scope,ba.id AS bank_account_id,ba.nickname AS account_name,ba.institution
+         FROM bank_transactions bt
+         JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         LEFT JOIN secure_documents sd ON sd.module='finance' AND sd.record_type='bank_transaction'
+              AND sd.record_id=CAST(bt.id AS CHAR) AND sd.deleted_at IS NULL
+        WHERE ${missingClauses.join(' AND ')}
+        GROUP BY bt.id,ba.id
+        HAVING COUNT(sd.id)=0
+        ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 250`,
+      missingParams
+    );
+    return res.json({
+      receipts: receipts.map((row) => ({ ...row, download_url: `/api/documents/${row.id}/download` })),
+      missing_receipts: missing,
+      counts: { attached: receipts.length, missing: missing.length },
+      privacy: 'Results include only transactions visible through Finance account permissions.'
+    });
+  } catch (error) {
+    if (error instanceof FinanceError) return res.status(error.statusCode || 400).json({ message: error.message, code: error.code });
+    console.error('Finance receipt centre failed:', error);
+    return res.status(500).json({ message: 'Failed to load Finance receipts.', code: 'FINANCE_RECEIPT_CENTRE_FAILED' });
+  }
+};
