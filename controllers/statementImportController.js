@@ -120,7 +120,33 @@ function normalizeRow(accountId, accountCurrency, input, rowNo) {
     validation_status: validationStatus,
     validation_message: messages.join('; ').slice(0, 500) || null,
     selected: validationStatus === 'REJECTED' ? 0 : 1,
-    row_hash: transactionDate ? statementRowHash(accountId, { ...row, transaction_date: transactionDate, debit, credit, running_balance: runningBalance }) : null
+    row_hash: transactionDate ? statementRowHash(accountId, { ...row, transaction_date: transactionDate, debit, credit, running_balance: runningBalance }) : null,
+    raw_payload_json: JSON.stringify(row)
+  };
+}
+
+function originalStatementPayload(row) {
+  if (!row) return null;
+  const candidates = [row.raw_payload_json, row.override_original_json];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    if (typeof candidate === 'object') return candidate;
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object') return parsed;
+    } catch {}
+  }
+  return {
+    transaction_date: row.transaction_date,
+    posting_date: row.posting_date,
+    description: row.description,
+    merchant_name: row.merchant_name,
+    reference: row.reference,
+    category: row.category,
+    debit: row.debit,
+    credit: row.credit,
+    running_balance: row.running_balance,
+    currency: row.currency
   };
 }
 
@@ -176,10 +202,10 @@ async function insertReviewRows(db, sessionId, normalized) {
     await db.query(
       `INSERT INTO statement_import_rows
        (import_session_id, row_no, transaction_date, posting_date, description, reference, debit, credit, running_balance,
-        merchant_name, category, currency, row_hash, validation_status, validation_message, selected)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        merchant_name, category, currency, row_hash, validation_status, validation_message, selected, raw_payload_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [sessionId, row.row_no, row.transaction_date, row.posting_date, row.description, row.reference, row.debit, row.credit,
-        row.running_balance, row.merchant_name, row.category, row.currency, row.row_hash, row.validation_status, row.validation_message, row.selected]
+        row.running_balance, row.merchant_name, row.category, row.currency, row.row_hash, row.validation_status, row.validation_message, row.selected, row.raw_payload_json]
     );
   }
 }
@@ -572,6 +598,34 @@ exports.commit = async (req, res) => {
       const inserted = Number(insert.affectedRows || 0);
       imported += inserted;
       duplicates += Math.max(0, chunk.length - inserted);
+
+      const chunkHashes = chunk.map((row) => row.row_hash).filter(Boolean);
+      if (chunkHashes.length) {
+        const idPlaceholders = chunkHashes.map(() => '?').join(',');
+        const [ledgerRows] = await db.query(
+          `SELECT id,row_hash FROM bank_transactions WHERE bank_account_id=? AND row_hash IN (${idPlaceholders})`,
+          [account.id, ...chunkHashes]
+        );
+        const ledgerByHash = new Map(ledgerRows.map((item) => [item.row_hash, item.id]));
+        for (const row of chunk) {
+          const bankTransactionId = ledgerByHash.get(row.row_hash);
+          if (!bankTransactionId) continue;
+          await db.query(
+            `INSERT IGNORE INTO bank_transaction_original_data
+             (bank_transaction_id,bank_account_id,source_type,source_statement_uid,source_statement_row_id,
+              original_transaction_date,original_posting_date,original_description,original_merchant_string,
+              original_reference,original_bank_category,original_debit,original_credit,original_running_balance,
+              original_currency,original_payload_json,captured_by)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [
+              bankTransactionId, account.id, 'STATEMENT_IMPORT', session.import_uid, row.id,
+              row.transaction_date, row.posting_date, row.description, row.merchant_name,
+              row.reference, row.category, row.debit, row.credit, row.running_balance,
+              row.currency || account.currency, JSON.stringify(originalStatementPayload(row)), req.user.id
+            ]
+          );
+        }
+      }
     }
 
     await db.query(
@@ -626,6 +680,50 @@ exports.commit = async (req, res) => {
     if (db) await db.rollback();
     return fail(res, error, 'Failed to commit statement review');
   } finally { if (db) db.release(); }
+};
+
+exports.getOriginalBankTransaction = async (req, res) => {
+  try {
+    await ensureFinanceSchema();
+    const id = Number(req.params.id || 0);
+    const [[row]] = await pool.query(
+      `SELECT
+         bt.id AS bank_transaction_id, bt.bank_account_id, bt.source_type, bt.statement_import_uid,
+         original.source_statement_row_id, original.original_transaction_date, original.original_posting_date,
+         original.original_description, original.original_merchant_string, original.original_reference,
+         original.original_bank_category, original.original_debit, original.original_credit,
+         original.original_running_balance, original.original_currency, original.original_payload_json,
+         original.captured_at,
+         ba.nickname AS account_name, ba.institution
+       FROM bank_transactions bt
+       JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+       LEFT JOIN bank_transaction_original_data original ON original.bank_transaction_id=bt.id
+       WHERE bt.id=? LIMIT 1`,
+      [id]
+    );
+    if (!row) throw new FinanceError('Bank transaction not found.', 404, 'BANK_TRANSACTION_NOT_FOUND');
+    return res.json({
+      transaction_id: row.bank_transaction_id,
+      account: { id: row.bank_account_id, name: row.account_name, institution: row.institution },
+      source_type: row.source_type,
+      source_statement_uid: row.statement_import_uid || null,
+      source_statement_row_id: row.source_statement_row_id || null,
+      original: row.original_description === null && row.original_payload_json === null ? null : {
+        transaction_date: row.original_transaction_date,
+        posting_date: row.original_posting_date,
+        description: row.original_description,
+        merchant_string: row.original_merchant_string,
+        reference: row.original_reference,
+        bank_category: row.original_bank_category,
+        debit: row.original_debit,
+        credit: row.original_credit,
+        running_balance: row.original_running_balance,
+        currency: row.original_currency,
+        raw_payload: row.original_payload_json,
+        captured_at: row.captured_at
+      }
+    });
+  } catch (error) { return fail(res, error, 'Failed to load original bank transaction'); }
 };
 
 exports.reject = async (req, res) => {
