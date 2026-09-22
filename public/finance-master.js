@@ -561,6 +561,23 @@ function openPersonalForm(kind){
   try{await api(path,{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice('Saved.');await refresh()}catch(error){notice(error.message,true)}
  };
 }
+
+async function openSplitEditor(transactionId,amount,currency){
+ try{
+  const current=await api(API+'/bank-transactions/'+transactionId+'/splits'),existing=current.splits||[];
+  $('fmModalEyebrow').textContent='TRANSACTION SPLIT';$('fmModalTitle').textContent='Split '+nativeMoney(amount,currency);
+  $('fmModalBody').innerHTML=`<form id="splitForm" class="fm-form"><div id="splitLines"></div><button type="button" id="addSplitLine">+ Add split line</button><p class="fm-helper">The server requires split lines to equal the parent amount exactly. The source transaction itself is never rewritten or duplicated.</p><div class="fm-form-actions"><button class="primary">Save split</button></div></form>`;
+  const holder=$('splitLines');
+  const addLine=(line={})=>{const row=document.createElement('div');row.className='fm-split-line';row.innerHTML=`<div class="fm-form-grid"><label>Amount<input name="amount" inputmode="decimal" value="${esc(line.amount||'')}" required></label><label>GST<input name="gst_amount" inputmode="decimal" value="${esc(line.gst_amount||'0.00')}"></label></div><div class="fm-form-grid"><label>Category<input name="category" value="${esc(line.category||'')}"></label><label>Ownership<select name="ownership_scope"><option ${line.ownership_scope==='BUSINESS'?'selected':''}>BUSINESS</option><option ${line.ownership_scope==='PERSONAL'?'selected':''}>PERSONAL</option><option ${line.ownership_scope==='MIXED'?'selected':''}>MIXED</option><option ${!line.ownership_scope||line.ownership_scope==='UNCLASSIFIED'?'selected':''}>UNCLASSIFIED</option></select></label></div><label>Note<input name="note" value="${esc(line.note||'')}"></label><button type="button" class="fm-remove-line">Remove line</button>`;row.querySelector('.fm-remove-line').onclick=()=>row.remove();holder.appendChild(row)};
+  (existing.length?existing:[{},{}]).forEach(addLine);$('addSplitLine').onclick=()=>addLine();
+  $('fmModal').showModal();$('splitForm').onsubmit=async e=>{e.preventDefault();const splits=[...holder.querySelectorAll('.fm-split-line')].map(row=>({amount:row.querySelector('[name="amount"]').value,gst_amount:row.querySelector('[name="gst_amount"]').value,category:row.querySelector('[name="category"]').value,ownership_scope:row.querySelector('[name="ownership_scope"]').value,note:row.querySelector('[name="note"]').value}));try{const x=await api(API+'/bank-transactions/'+transactionId+'/splits',{method:'PUT',body:JSON.stringify({splits})});$('fmModal').close();notice(x.message);await transactionDetail(transactionId)}catch(error){notice(error.message,true)}};
+ }catch(error){notice(error.message,true)}
+}
+function openReimbursementForm(transactionId,amount,currency){
+ $('fmModalEyebrow').textContent='REIMBURSEMENT';$('fmModalTitle').textContent='Create reimbursement';
+ $('fmModalBody').innerHTML=`<form id="reimbursementForm" class="fm-form"><label>Requested amount (${esc(currency)})<input name="requested_amount" inputmode="decimal" value="${esc(amount)}" required></label><label>Note<textarea name="note"></textarea></label><p class="fm-helper">This creates an internal reimbursement record linked to the source expense. It does not execute a bank payment.</p><div class="fm-form-actions"><button class="primary">Create draft</button></div></form>`;
+ $('fmModal').showModal();$('reimbursementForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(API+'/reimbursements',{method:'POST',body:JSON.stringify({expense_bank_transaction_id:Number(transactionId),requested_amount:fd.get('requested_amount'),note:fd.get('note')||null})});$('fmModal').close();notice(x.message);await refresh();go('reimbursements')}catch(error){notice(error.message,true)}};
+}
 function render(){
  const [t,sub]=title(state.view);$('fmTitle').textContent=t;$('fmSubtitle').textContent=sub;navButtons();
  $('fmContent').innerHTML=state.view==='overview'?overview():state.view==='accounts'?accounts():state.view==='transactions'?transactions():state.view==='statements'?statements():simpleView(state.view);
