@@ -9,14 +9,14 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''}
 };
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['statements','▤','Statements'],['receipts','▧','Receipts']]],
- ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals']]],
+ ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports']]],
  ['CONTROL',[['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
@@ -50,6 +50,7 @@ function title(v){return ({
  reimbursements:['Reimbursements','Track employee-paid expenses through submission, approval and linked repayment.'],
  budgets:['Budgets','Personal and banking budget controls backed by current finance records.'],
  savings:['Savings Goals','Track goals and contributions without pretending that progress automatically moves cash.'],
+ forecast:['Cash Flow Calendar','Upcoming internal payment instructions and obligations; no claim of direct bank execution.'],
  insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
  rules:['Categories & Rules','Merchant categorisation rules create suggestions; they do not silently post changes.'],
  review:['Data Quality Review','Uncategorised, unreconciled, coverage and other review queues.'],
@@ -129,7 +130,7 @@ async function loadBase(){
  const setup=await loadResource('setup',API+'/setup');
  state.setup=setup||state.setup;
  const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions]=await Promise.all([
+ const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods]=await Promise.all([
   loadResource('capabilities',API+'/capabilities'),
   loadResource('dash',I+'/banking-dashboard'+base),
   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
@@ -157,7 +158,9 @@ async function loadBase(){
   loadResource('companySettings','/api/settings'),
   loadResource('receiptCenter',API+'/receipts?scope='+encodeURIComponent(state.scope)),
   loadResource('savedReports',API+'/reports/saved'),
-  loadResource('archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope))
+  loadResource('archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)),
+  loadResource('cashflowCalendar',OS+'/cashflow-calendar?days=90'),
+  loadResource('accountingPeriods',API+'/accounting-periods')
  ]);
  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
@@ -165,7 +168,7 @@ async function loadBase(){
  state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
  state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
  state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
- state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;
+ state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;
  state.accounts=dash?.accounts||[];
  if(!state.accounts.length){
   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
@@ -247,10 +250,27 @@ function notificationsView(){
  const items=state.notifications?.notifications||[],prefs=state.notificationPrefs?.preferences||[];
  return resourceError('notifications','Finance Notifications')+'<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Notifications</h2><p>'+num(state.notifications?.total)+' active notification(s).</p></div><button id="markAllNotifications">Mark all read</button></div><div class="fm-list">'+(items.map(n=>'<div class="fm-row"><div><h3>'+esc(n.title)+'</h3><p>'+esc(n.message||'')+' · '+esc(n.category||'')+'</p></div><div class="fm-row-right">'+statusBadge(n.priority||'NORMAL')+'<small>'+date(n.created_at)+'</small>'+(n.is_read?'':'<button data-notification-read="'+n.id+'">Mark read</button>')+'</div></div>').join('')||emptyState('No notifications','No active Finance/user notifications are available.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Preferences</h2><p>Per-user in-app, email and digest settings.</p></div></div><div class="fm-list">'+(prefs.map(p=>'<div class="fm-row"><div><h3>'+esc(p.category)+'</h3><p>'+esc(p.digest_frequency||'IMMEDIATE')+(p.quiet_hours_start?' · quiet '+esc(p.quiet_hours_start)+'–'+esc(p.quiet_hours_end||''):'')+'</p></div><label class="fm-check"><input type="checkbox" data-notification-pref="'+esc(p.category)+'" '+(Number(p.in_app_enabled)?'checked':'')+'> In app</label></div>').join('')||'<p class="fm-helper">Preferences are created when a category is configured.</p>')+'</div></div></article></div>';
 }
+function forecastView(){
+ const data=state.cashflowCalendar||{},events=data.events||[];
+ const currencies=[...new Set(events.map(e=>e.currency).filter(Boolean))];
+ const totals=currencies.map(currency=>({
+  currency,total:events.filter(e=>e.currency===currency).reduce((sum,e)=>sum+num(e.amount),0),
+  count:events.filter(e=>e.currency===currency).length
+ }));
+ const summary=totals.length?totals.map(x=>'<div class="fm-kpi"><span>'+esc(x.currency)+' upcoming</span><strong>'+nativeMoney(x.total,x.currency)+'</strong><small>'+x.count+' internal payment instruction(s)</small></div>').join(''):'<div class="fm-kpi"><span>Upcoming</span><strong>—</strong><small>No scheduled payment instructions in the next 90 days.</small></div>';
+ const rows=events.map(e=>'<div class="fm-row"><div><h3>'+esc(e.title||'Payment instruction')+'</h3><p>'+date(e.date)+' · '+esc(e.account_name||'No account')+' · '+esc(e.schedule_type||'ONE_OFF')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(e.amount,e.currency||'AUD')+'</b>'+statusBadge(e.status||'PENDING')+'</div></div>').join('');
+ return resourceError('cashflowCalendar','Cash Flow Calendar')+'<div class="fm-grid four">'+summary+'</div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>90-Day Cash Flow Calendar</h2><p>'+esc(data.from||'')+' → '+esc(data.to||'')+' · internal approval/payment-instruction records only.</p></div></div><div class="fm-list">'+(rows||emptyState('No upcoming payment instructions','No approved/internal payment obligations were returned for the next 90 days.'))+'</div><p class="fm-helper">This calendar does not claim that Voxel Veda executes a bank transfer. It reflects the existing internal Banking OS scheduling and approval records.</p></div></article>';
+}
+function accountingPeriodsCard(){
+ const periods=state.accountingPeriods?.accounting_periods||[];
+ const rows=periods.map(p=>'<div class="fm-row"><div><h3>'+esc(p.period_key||p.label||'Accounting period')+'</h3><p>'+date(p.start_date)+' → '+date(p.end_date)+(p.lock_reason?' · '+esc(p.lock_reason):'')+'</p></div><div class="fm-row-right">'+statusBadge(p.status)+'<select data-period-target="'+p.id+'" data-period-key="'+esc(p.period_key||'')+'" data-period-current="'+esc(p.status||'OPEN')+'"><option '+(p.status==='OPEN'?'selected':'')+'>OPEN</option><option '+(p.status==='REVIEWING'?'selected':'')+'>REVIEWING</option><option '+(p.status==='READY'?'selected':'')+'>READY</option><option '+(p.status==='LOCKED'?'selected':'')+'>LOCKED</option></select><button data-period-apply="'+p.id+'">Apply</button></div></div>').join('');
+ return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounting Period Control</h2><p>Open → Reviewing → Ready → Locked. Server validation blocks unsafe locks and every change is audited.</p></div></div>'+resourceError('accountingPeriods','Accounting periods')+'<div class="fm-list">'+(rows||emptyState('No accounting periods','Configure a financial year and periods before using period locks.'))+'</div></div></article>';
+}
+
 function companyView(){
  if(state.scope!=='BUSINESS')return `<article class="fm-card"><div class="fm-pad">${emptyState('Company workspace','Switch the Workspace filter to Company for business-only finance.','<button class="fm-primary" data-scope-jump="BUSINESS">Switch to Company</button>')}</div></article>`;
  const bills=state.os?.approval_inbox||[];
- return overview()+`<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Company controls</h2><p>Company-only finance remains separated from owner-only Personal Money.</p></div></div><div class="fm-grid four"><div class="fm-kpi"><span>Approval inbox</span><strong>${bills.length}</strong><small>Banking payment instructions awaiting approval</small></div><div class="fm-kpi"><span>Overdue obligations</span><strong>${num(state.os?.obligations?.overdue)}</strong><small>Internal payment workflow obligations</small></div></div></div></article>`;
+ return overview()+`<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Company controls</h2><p>Company-only finance remains separated from owner-only Personal Money.</p></div></div><div class="fm-grid four"><div class="fm-kpi"><span>Approval inbox</span><strong>${bills.length}</strong><small>Banking payment instructions awaiting approval</small></div><div class="fm-kpi"><span>Overdue obligations</span><strong>${num(state.os?.obligations?.overdue)}</strong><small>Internal payment workflow obligations</small></div></div></div></article>`+accountingPeriodsCard();
 }
 function consolidatedView(){
  if(state.scope!=='ALL')return `<article class="fm-card"><div class="fm-pad">${emptyState('Consolidated workspace','Switch to Consolidated to see all permitted accounts while ownership remains visible.','<button class="fm-primary" data-scope-jump="ALL">Switch to Consolidated</button>')}</div></article>`;
@@ -285,7 +305,7 @@ function settingsView(){
  const caps=state.capabilities?.capabilities||{},st=state.companySettings?.settings||{};
  const companyError=resourceError('companySettings','Company settings');
  const company='<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Company & Reporting Settings</h2><p>These values feed branded financial reports where supported.</p></div><button id="openCompanySettings">Edit</button></div>'+companyError+'<div class="fm-detail-grid"><span>Legal name<b>'+esc(st.company_legal_name||'Voxel Veda Pty Ltd')+'</b></span><span>Trading name<b>'+esc(st.trading_name||'Voxel Veda')+'</b></span><span>ABN<b>'+esc(st.abn||'Not configured')+'</b></span><span>Email<b>'+esc(st.company_email||'Not configured')+'</b></span><span>Website<b>'+esc(st.website||'https://voxelveda.com')+'</b></span><span>Base currency<b>'+esc(st.base_currency||state.setup?.settings?.default_currency||'AUD')+'</b></span><span>Financial year start<b>'+esc(st.financial_year_start||'07-01')+'</b></span><span>GST registration<b>'+esc(st.gst_registration||'UNKNOWN')+'</b></span></div></div></article>';
- return company+connectionsView()+'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Capability Registry</h2><p>Unsupported workflows are explicitly identified rather than presented as dead buttons.</p></div></div><div class="fm-capability-grid">'+Object.entries(caps).map(([k,v])=>'<div class="fm-capability"><div><b>'+esc(k.replaceAll('_',' '))+'</b><p>'+esc(v.note||'')+'</p></div>'+statusBadge(v.status)+'</div>').join('')+'</div></div></article>';
+ return company+accountingPeriodsCard()+connectionsView()+'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Capability Registry</h2><p>Unsupported workflows are explicitly identified rather than presented as dead buttons.</p></div></div><div class="fm-capability-grid">'+Object.entries(caps).map(([k,v])=>'<div class="fm-capability"><div><b>'+esc(k.replaceAll('_',' '))+'</b><p>'+esc(v.note||'')+'</p></div>'+statusBadge(v.status)+'</div>').join('')+'</div></div></article>';
 }
 function transfersView(){
  const rows=state.transferCandidates?.candidates||[];
@@ -347,6 +367,7 @@ function simpleView(v){
  if(v==='budgets')return budgetsView();
  if(['savings','debt','recurring'].includes(v))return personalCard(v);
  if(v==='reports')return reportView();
+ if(v==='forecast')return forecastView();
  if(v==='receipts')return receiptsView();
  if(v==='review')return reviewView();
  if(v==='personal')return personalView();
