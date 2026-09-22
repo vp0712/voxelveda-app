@@ -231,6 +231,8 @@ router.put('/bank-transactions/:id/splits', requireAnyPermission('EDIT_FINANCE')
 router.get('/bank-transactions/:id/refund-links', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getRefundLinks);
 router.post('/bank-transactions/:id/refund-links', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.linkRefund);
 router.delete('/bank-transactions/:id/refund-links/:linkId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.unlinkRefund);
+router.get('/relationship-candidates/transfers', requireAnyPermission('VIEW_BANKING'), financeRelationships.listTransferCandidates);
+router.get('/relationship-candidates/refunds', requireAnyPermission('VIEW_BANKING'), financeRelationships.listRefundCandidates);
 router.get('/reimbursements', requireAnyPermission('VIEW_BANKING'), financeRelationships.listReimbursements);
 router.post('/reimbursements', requireAnyPermission('EDIT_FINANCE'), financeRelationships.createReimbursement);
 router.post('/reimbursements/:id/submit', requireAnyPermission('EDIT_FINANCE'), (req,res,next)=>{req.params.action='submit';next();}, financeRelationships.transitionReimbursement);
