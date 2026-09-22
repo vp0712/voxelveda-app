@@ -811,6 +811,31 @@ function bindDynamic(){
  if($('reportSave'))$('reportSave').onclick=()=>saveBuiltReport().catch(error=>notice(error.message,true));
  document.querySelectorAll('[data-report-run]').forEach(b=>b.onclick=async()=>{try{state.reportResult=await api(API+'/reports/saved/'+encodeURIComponent(b.dataset.reportRun)+'/run');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-report-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this saved report definition?'))return;try{const x=await api(API+'/reports/saved/'+encodeURIComponent(b.dataset.reportDelete),{method:'DELETE'});notice(x.message);await refresh();state.view='reports';render()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-period-apply]').forEach(button=>button.onclick=async()=>{
+  const id=button.dataset.periodApply;
+  const select=document.querySelector('[data-period-target="'+id+'"]');
+  if(!select)return;
+  const status=String(select.value||'').toUpperCase();
+  const current=String(select.dataset.periodCurrent||'OPEN').toUpperCase();
+  const key=select.dataset.periodKey||'';
+  if(status===current){notice('Accounting period is already '+status+'.');return}
+  let reason='',confirmation='';
+  if(status==='LOCKED'){
+    reason=prompt('Reason for locking '+key+':')||'';
+    if(!reason.trim())return;
+    confirmation=prompt('Type exactly: LOCK '+key)||'';
+    if(confirmation!=='LOCK '+key){notice('Lock confirmation did not match.',true);return}
+  }else if(current==='LOCKED'){
+    reason=prompt('Reason for unlocking '+key+':')||'';
+    if(!reason.trim())return;
+  }else{
+    reason=prompt('Reason for changing '+key+' to '+status+' (optional):')||'';
+  }
+  try{
+    const x=await api(API+'/accounting-periods/'+encodeURIComponent(id)+'/status',{method:'POST',body:JSON.stringify({status,reason,confirmation})});
+    notice(x.message);await refresh();
+  }catch(error){notice(error.message,true)}
+ });
  if($('runAnalysis'))$('runAnalysis').onclick=async()=>{try{await api(I+'/analyse',{method:'POST',body:JSON.stringify({scope:state.scope})});notice('Finance analysis refreshed.');await refresh()}catch(error){notice(error.message,true)}};
 }
 function openDrawer(title,body,eyebrow='DETAIL'){$('fmDrawerEyebrow').textContent=eyebrow;$('fmDrawerTitle').textContent=title;$('fmDrawerBody').innerHTML=body;$('fmDrawer').classList.add('open');$('fmDrawer').setAttribute('aria-hidden','false');$('fmBackdrop').hidden=false}
