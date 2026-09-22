@@ -228,6 +228,9 @@ router.post('/bank-transactions/:id/transfer-links', requireAnyPermission('EDIT_
 router.delete('/bank-transactions/:id/transfer-links/:linkId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.unlinkTransfer);
 router.get('/bank-transactions/:id/splits', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getSplits);
 router.put('/bank-transactions/:id/splits', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.replaceSplits);
+router.get('/bank-transactions/:id/transfer-links', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getTransferLinks);
+router.post('/bank-transactions/:id/transfer-links', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.linkTransfer);
+router.delete('/bank-transactions/:id/transfer-links/:linkId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.unlinkTransfer);
 router.get('/bank-transactions/:id/refund-links', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), financeRelationships.getRefundLinks);
 router.post('/bank-transactions/:id/refund-links', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.linkRefund);
 router.delete('/bank-transactions/:id/refund-links/:linkId', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeRelationships.unlinkRefund);
