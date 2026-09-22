@@ -24,11 +24,29 @@ function inflateEmbeddedJson(base64, label) {
 }
 
 function loadProcurementCatalog() {
-  const data = inflateEmbeddedJson(DATA_B64, 'catalog');
-  data.bom = inflateEmbeddedJson(MASTER_BOM_B64, 'A-Z_BOM');
+  const bom = inflateEmbeddedJson(MASTER_BOM_B64, 'A-Z_BOM');
+  if (!Array.isArray(bom) || bom.length !== 237) {
+    throw new Error(`Procurement BOM integrity check failed: expected 237 rows including header, got ${Array.isArray(bom) ? bom.length : 'invalid'}`);
+  }
 
-  if (!Array.isArray(data.bom) || data.bom.length !== 237) {
-    throw new Error(`Procurement BOM integrity check failed: expected 237 rows including header, got ${Array.isArray(data.bom) ? data.bom.length : 'invalid'}`);
+  let data = {
+    bom,
+    dashboard: [],
+    packaging: [],
+    suppliers: [],
+    storage: [],
+    readme: [],
+    order1: [],
+    order2: [],
+    order3: [],
+    buyingSequence: []
+  };
+
+  try {
+    const supplemental = inflateEmbeddedJson(DATA_B64, 'supplemental-catalog');
+    data = { ...data, ...supplemental, bom };
+  } catch (error) {
+    console.warn(`PROCUREMENT_SUPPLEMENTAL_CATALOG_DEGRADED code=${error.code || 'DECODE_FAILED'} master_bom_preserved=yes`);
   }
 
   console.log('PROCUREMENT_MASTER_BOM_OK items=236 rows=237 source=A-Z_BOM');
