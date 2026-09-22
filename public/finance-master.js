@@ -292,6 +292,45 @@ function openRefundLink(refundId,currency){
  $('fmModalBody').innerHTML=`<form id="refundLinkForm" class="fm-form"><label>Original expense transaction ID<input name="expense_id" inputmode="numeric" required></label><label>Amount (${esc(currency)})<input name="amount" inputmode="decimal" placeholder="Leave blank to use available amount"></label><label>Note<textarea name="note"></textarea></label><p class="fm-helper">Cross-currency linking is blocked until verified FX evidence exists.</p><div class="fm-form-actions"><button class="primary">Link refund</button></div></form>`;
  $('fmModal').showModal();$('refundLinkForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(API+'/bank-transactions/'+refundId+'/refund-links',{method:'POST',body:JSON.stringify({original_expense_transaction_id:Number(fd.get('expense_id')),linked_amount:fd.get('amount')||undefined,note:fd.get('note')||null})});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
+
+function openDebtPayment(id){
+ const debt=(state.personal?.debts||[]).find(x=>String(x.id)===String(id));
+ $('fmModalEyebrow').textContent='BORROW & LEND';$('fmModalTitle').textContent='Record repayment';
+ $('fmModalBody').innerHTML='<form id="debtPaymentForm" class="fm-form"><p class="fm-helper">'+esc(debt?.counterparty||'')+' · '+nativeMoney(debt?.outstanding_amount||0,debt?.currency||'AUD')+' remaining</p><label>Amount<input name="amount" inputmode="decimal" required></label><label>Wallet (optional)<select name="wallet_id"><option value="">No wallet movement</option>'+((state.personal?.wallets||[]).filter(w=>!debt||w.currency===debt.currency).map(w=>'<option value="'+esc(w.id)+'">'+esc(w.name)+' · '+esc(w.currency)+'</option>').join(''))+'</select></label><label>Date/time<input name="paid_at" type="datetime-local"></label><label>Note<textarea name="note"></textarea></label><div class="fm-form-actions"><button class="primary">Record repayment</button></div></form>';
+ $('fmModal').showModal();
+ $('debtPaymentForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(API+'/personal-money/debts/'+encodeURIComponent(id)+'/payments',{method:'POST',body:JSON.stringify(Object.fromEntries(fd.entries()))});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
+}
+function openGoalContribution(id){
+ const goal=(state.personalAttention?.goals||[]).find(x=>String(x.id)===String(id));
+ $('fmModalEyebrow').textContent='SAVINGS GOAL';$('fmModalTitle').textContent='Add goal progress';
+ $('fmModalBody').innerHTML='<form id="goalContributionForm" class="fm-form"><p class="fm-helper">'+esc(goal?.name||'Goal')+' · '+nativeMoney(goal?.remaining_amount||0,goal?.currency||'AUD')+' remaining. This updates goal progress only; it does not move bank cash automatically.</p><label>Amount<input name="amount" inputmode="decimal" required></label><label>Date/time<input name="contributed_at" type="datetime-local"></label><label>Note<textarea name="note"></textarea></label><div class="fm-form-actions"><button class="primary">Add progress</button></div></form>';
+ $('fmModal').showModal();
+ $('goalContributionForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(API+'/personal-money/goals/'+encodeURIComponent(id)+'/contributions',{method:'POST',body:JSON.stringify(Object.fromEntries(fd.entries()))});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
+}
+function openBankBudget(){
+ $('fmModalEyebrow').textContent='BANKING BUDGET';$('fmModalTitle').textContent='Create or update budget';
+ $('fmModalBody').innerHTML='<form id="bankBudgetForm" class="fm-form"><div class="fm-form-grid"><label>Scope<select name="ownership_scope"><option>BUSINESS</option><option>PERSONAL</option><option>MIXED</option><option>UNCLASSIFIED</option><option>ALL</option></select></label><label>Cycle<select name="cycle"><option>WEEKLY</option><option>FORTNIGHTLY</option><option selected>MONTHLY</option></select></label></div><div class="fm-form-grid"><label>Category<input name="category" required></label><label>Currency<input name="currency" value="AUD" maxlength="3" required></label></div><div class="fm-form-grid"><label>Limit<input name="limit_amount" inputmode="decimal" required></label><label>Anchor date<input name="cycle_anchor_date" type="date"></label></div><div class="fm-form-actions"><button class="primary">Save budget</button></div></form>';
+ $('fmModal').showModal();
+ $('bankBudgetForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(I+'/budgets',{method:'POST',body:JSON.stringify(Object.fromEntries(fd.entries()))});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
+}
+function saveCurrentView(){
+ const current=state.txFilters.q||state.txFilters.merchant||state.txFilters.category;
+ if(!current){notice('Enter a transaction search, merchant or category filter before saving a view.',true);return}
+ const name=prompt('Name this saved transaction view:');if(!name)return;
+ const query=[state.txFilters.q,state.txFilters.merchant,state.txFilters.category].filter(Boolean).join(' ').slice(0,180);
+ api(API+'/personal-money/saved-views',{method:'POST',body:JSON.stringify({name,query_text:query,pinned:true})}).then(async x=>{notice(x.message);await refresh()}).catch(e=>notice(e.message,true));
+}
+function savedViewsCard(){
+ const views=state.savedViews?.saved_views||[];
+ return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Saved Views</h2><p>Owner-private search definitions; no transaction snapshots are duplicated.</p></div><button id="saveCurrentView">Save current</button></div><div class="fm-list">'+(views.map(v=>'<div class="fm-row"><div><h3>'+esc(v.name)+'</h3><p>'+esc(v.query_text)+'</p></div><div class="fm-row-right"><button data-saved-open="'+esc(v.id)+'" data-query="'+esc(v.query_text)+'">Open</button><button data-saved-delete="'+esc(v.id)+'">Delete</button></div></div>').join('')||emptyState('No saved views','Save a useful transaction search for quick reuse.'))+'</div></div></article>';
+}
+function openCompanySettings(){
+ const st=state.companySettings?.settings||{},fs=state.setup?.settings||{};
+ $('fmModalEyebrow').textContent='FINANCE SETTINGS';$('fmModalTitle').textContent='Company & reporting profile';
+ $('fmModalBody').innerHTML='<form id="companySettingsForm" class="fm-form"><div class="fm-form-grid"><label>Legal name<input name="company_legal_name" value="'+esc(st.company_legal_name||'Voxel Veda Pty Ltd')+'"></label><label>Trading name<input name="trading_name" value="'+esc(st.trading_name||'Voxel Veda')+'"></label></div><label>Address<textarea name="company_address">'+esc(st.company_address||'')+'</textarea></label><div class="fm-form-grid"><label>ABN<input name="abn" value="'+esc(st.abn||'')+'"></label><label>Email<input name="company_email" value="'+esc(st.company_email||'')+'"></label></div><div class="fm-form-grid"><label>Phone<input name="support_phone" value="'+esc(st.support_phone||'')+'"></label><label>Website<input name="website" value="'+esc(st.website||'https://voxelveda.com')+'"></label></div><div class="fm-form-grid"><label>Base currency<input name="base_currency" maxlength="3" value="'+esc(st.base_currency||fs.default_currency||'AUD')+'"></label><label>Financial year starts<input name="financial_year_start" placeholder="07-01" value="'+esc(st.financial_year_start||'07-01')+'"></label></div><label>GST registration<select name="gst_registration"><option value="UNKNOWN">Unknown</option><option value="REGISTERED" '+(st.gst_registration==='REGISTERED'?'selected':'')+'>Registered</option><option value="NOT_REGISTERED" '+(st.gst_registration==='NOT_REGISTERED'?'selected':'')+'>Not registered</option></select></label><label>Report footer<input name="report_footer" value="'+esc(st.report_footer||'Confidential Financial Information')+'"></label><p class="fm-helper">Saving company profile requires the existing privileged system-settings permission and step-up verification.</p><div class="fm-form-actions"><button class="primary">Save company profile</button></div></form>';
+ $('fmModal').showModal();
+ $('companySettingsForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const body=Object.fromEntries(fd.entries());body.base_currency=String(body.base_currency||'AUD').toUpperCase();try{const x=await api('/api/settings',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
+}
 function simpleView(v){
  if(v==='budgets')return budgetsView();
  if(['savings','debt','recurring'].includes(v))return personalCard(v);
