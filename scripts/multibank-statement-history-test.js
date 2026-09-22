@@ -13,8 +13,8 @@ assert(controller.includes('getPortfolioHistoryReport'),'combined portfolio hist
 assert(controller.includes('GROUP BY bt.currency'),'combined report groups money by currency');
 assert(controller.includes("Currencies are reported separately and are never added together"),'combined report forbids fake cross-currency totals');
 assert(controller.includes('bank_net_position_by_currency'),'bank net position is currency separated');
-assert(controller.includes('statements: statementRows[0]'),'portfolio report contains statement history');
-assert(controller.includes('transactions: transactionRows[0]'),'portfolio report contains full transaction history');
+assert(controller.includes('statements: statementRows'),'portfolio report contains statement history');
+assert(controller.includes('transactions: transactionRows'),'portfolio report contains full transaction history');
 
 assert(importController.includes('autoStatementCategory'),'automatic statement categorisation exists');
 for(const category of ['Rent & Housing','Utilities','Health & Pharmacy','Transport','Shopping','Education & Training','Tax & Government']){
