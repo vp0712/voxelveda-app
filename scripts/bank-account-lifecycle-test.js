@@ -5,7 +5,7 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const routes = fs.readFileSync(path.join(root, 'routes', 'financeRoutes.js'), 'utf8');
 const html = fs.readFileSync(path.join(root, 'public', 'finance-intelligence.html'), 'utf8');
-const ui = fs.readFileSync(path.join(root, 'public', 'finance-account-lifecycle.js'), 'utf8');
+const ui = fs.readFileSync(path.join(root, 'public', 'finance-master.js'), 'utf8');
 const controllerSource = fs.readFileSync(path.join(root, 'controllers', 'bankAccountLifecycleController.js'), 'utf8');
 const controller = require('../controllers/bankAccountLifecycleController');
 
@@ -18,14 +18,16 @@ assert.match(routes, /requireStepUp\('CHANGE_BANK_DETAILS'\)/);
 assert.match(routes, /financePrivacy\.accountParam\('id'\)/);
 assert.match(routes, /\/intelligence\/active-overview/);
 
-assert.match(html, /finance-account-lifecycle\.css/);
-assert.match(html, /finance-account-lifecycle\.js/);
+assert.match(html, /finance-master\.css/);
+assert.match(html, /finance-master\.js/);
 assert.match(ui, /Archive/);
 assert.match(ui, /Set inactive/);
 assert.match(ui, /Restore/);
 assert.match(ui, /Permanently delete/);
-assert.match(ui, /deletion_check/);
-assert.match(ui, /active-overview/);
+assert.match(ui, /data-account-action/);
+assert.match(ui, /accounts\/'\+id\+'\/archive/);
+assert.match(ui, /accounts\/'\+id\+'\/inactive/);
+assert.match(ui, /accounts\/'\+id\+'\/restore/);
 
 assert.match(controllerSource, /INFORMATION_SCHEMA\.COLUMNS/);
 assert.match(controllerSource, /COLUMN_NAME = 'bank_account_id'/);
