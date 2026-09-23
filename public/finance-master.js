@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -19,7 +19,7 @@ const FINANCE_REQUEST_TIMEOUT_MS=12000;
 const FINANCE_HYDRATION_BATCH_SIZE=5;
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
- ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
+ ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['bankops','⌁','Banking Operations'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
@@ -79,6 +79,7 @@ function title(v){return ({
  consolidated:['Consolidated','Permitted Personal and Company accounts shown side-by-side without blurring ownership.'],
  accounts:['Accounts','Bank, savings, credit, cash and loan accounts with coverage and lifecycle controls.'],
  transactions:['Transaction Explorer','Server-filtered financial movements with preserved source evidence.'],
+ bankops:['Banking Operations','Money spaces, beneficiaries and controlled payment instructions inside the same Finance OS.'],
  history:['History Import Centre','Load complete historical statements account-by-account without mixing banks or ownership.'],
  statements:['Statement Vault','Upload, review, duplicate-check and commit statements without overwriting source evidence.'],
  receipts:['Receipts','Private receipt vault and missing-receipt review queue over visible Finance transactions.'],
@@ -240,7 +241,7 @@ async function hydrateSupplementary(cycle){
   ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],
   ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing?date='+encodeURIComponent(localIsoDay())],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
   ['readiness',I+'/banking-readiness'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
-  ['os',OS+'/command-center'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
+  ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
   ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
   ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
   ['roadmaps',API+'/personal-money/roadmaps'],['personalBankDash',I+'/banking-dashboard'+scopeDashboardQuery('PERSONAL')],['businessBankDash',I+'/banking-dashboard'+scopeDashboardQuery('BUSINESS')],['openBankProviders',I+'/open-banking/providers'],['openBankSessions',I+'/open-banking/sessions'],['bankConnectionData','/api/integrations/webhooks/banking/connections'],['bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs']
@@ -487,6 +488,53 @@ function insightsView(){
  const transactionRows=rows.map(x=>`<div class="fm-row" data-tx="${x.bank_transaction_id}"><div><h3>${esc(x.merchant_name||x.description||'Transaction insight')}</h3><p>${x.suggested_category?'Category suggestion: '+esc(x.suggested_category)+' · ':''}${x.recurring_frequency?'Recurring '+esc(x.recurring_frequency)+' · ':''}${x.transfer_candidate_uid?'Transfer candidate · ':''}anomaly ${num(x.anomaly_score)}</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${date(x.transaction_date)}</small></div></div>`).join('');
  return `${resourceError('insights','Finance Insights')}<div class="fm-control-intro"><p>SPENDING & COST INTELLIGENCE</p><h2>See where money goes before calling it “waste”</h2><span>The system surfaces concentration, recurring commitments, negative cash-flow trends, unusual transactions and runway pressure from your real ledger. It does not label a legitimate expense as waste without evidence.</span><div class="fm-control-quick"><button id="runAnalysis" type="button">Refresh analysis</button><button data-viewjump="budgets">Budgets</button><button data-viewjump="reports">Spending reports</button><button data-viewjump="transactions">Transactions</button></div></div><section class="fm-intelligence-grid">${currencyCards||emptyState('Not enough history yet','Import and classify more complete statement history to build spending intelligence.')}</section><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Top spending merchants</h2><p>Largest visible merchant outflows in the selected period. Tap a merchant to inspect matching transactions.</p></div></div><div class="fm-list">${topMerchants||emptyState('No merchant spending','No merchant expenses are available for this period.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Recurring commitments</h2><p>Detected repeated payments that may deserve review when reducing costs.</p></div></div><div class="fm-list">${recurringRows||emptyState('No recurring pattern detected','Recurring patterns appear after enough repeated history is available.')}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transaction intelligence queue</h2><p>Evidence-backed category, recurrence, transfer and anomaly findings linked to underlying transactions.</p></div></div><div class="fm-list">${transactionRows||emptyState('No transaction insights','Refresh analysis or import more verified history.')}</div></div></article>`;
 }
+function bankingOperationsView(){
+ const data=state.bankingOps||{},spaces=data.spaces||[],beneficiaries=data.beneficiaries||[],payments=data.payments||[],access=data.access||{},caps=data.capabilities?.features||data.capabilities||{};
+ const spaceRows=spaces.map(s=>'<div class="fm-row"><div><h3>'+esc(s.name)+'</h3><p>'+esc(s.purpose||'Money space')+' · '+esc(s.ownership_scope)+' · '+esc(s.currency)+'</p></div><div class="fm-row-right"><b>'+nativeMoney(s.allocated_amount,s.currency)+' / '+nativeMoney(s.target_amount,s.currency)+'</b><small>Reserve '+nativeMoney(s.minimum_reserve,s.currency)+'</small><button data-space-archive="'+esc(s.space_uid)+'">Archive</button></div></div>').join('');
+ const beneficiaryRows=beneficiaries.map(b=>'<div class="fm-row"><div><h3>'+esc(b.name)+'</h3><p>'+esc(b.nickname||b.bank_name||'Beneficiary')+' · '+esc(b.ownership_scope)+' · '+esc(b.currency)+'</p></div><div class="fm-row-right">'+statusBadge(b.trusted?'TRUSTED':'UNVERIFIED')+'<small>'+esc(b.bsb_masked||'')+' '+esc(b.account_masked||b.payid_masked||'')+'</small></div></div>').join('');
+ const paymentRows=payments.map(p=>{
+  const terminal=['COMPLETED','REJECTED','CANCELLED'].includes(String(p.status||''));
+  const canApprove=Boolean(access.can_approve)&&String(p.status)==='PENDING_APPROVAL'&&Number(p.created_by)!==Number(data.current_user_id);
+  const actions='<div class="fm-inline-actions">'+(String(p.status)==='DRAFT'?'<button data-payment-submit="'+esc(p.payment_uid)+'">Submit</button>':'')+(canApprove?'<button data-payment-decision="APPROVE" data-payment-uid="'+esc(p.payment_uid)+'">Approve</button><button class="bad" data-payment-decision="REJECT" data-payment-uid="'+esc(p.payment_uid)+'">Reject</button>':'')+(!terminal?'<button data-payment-cancel="'+esc(p.payment_uid)+'">Cancel</button>':'')+'</div>';
+  return '<div class="fm-row"><div><h3>'+esc(p.payee_name||'Payment instruction')+'</h3><p>'+esc(p.payment_type||'')+' · '+esc(p.ownership_scope||'')+' · due '+date(p.due_date)+(p.reference_text?' · '+esc(p.reference_text):'')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(p.amount,p.currency)+'</b>'+statusBadge(p.status)+actions+'</div></div>';
+ }).join('');
+ const capabilityNote=caps.payment_execution===false||caps.external_payment_execution===false
+  ?'External bank payment execution is not enabled. Drafts and approvals are internal instructions only; Voxel Veda does not claim money has moved.'
+  :'Payment execution remains provider-capability gated; no money movement is assumed from an approval.';
+ return resourceError('bankingOps','Banking Operations')+
+ '<div class="fm-control-intro"><p>BANKING OPERATIONS</p><h2>Prepare and control money movement without a second Banking app</h2><span>'+esc(capabilityNote)+'</span><div class="fm-control-quick"><button id="newPaymentDraft">+ Payment draft</button><button id="newMoneySpace">+ Money space</button><button id="newBeneficiary">+ Beneficiary</button><button data-viewjump="connections">Bank connections</button></div></div>'+
+ '<div class="fm-grid four"><div class="fm-kpi"><span>Draft payments</span><strong>'+num(data.operating_intelligence?.drafts)+'</strong></div><div class="fm-kpi"><span>Pending approvals</span><strong>'+num(data.operating_intelligence?.pending_approvals)+'</strong></div><div class="fm-kpi"><span>Ready for execution</span><strong>'+num(data.operating_intelligence?.ready_for_execution)+'</strong><small>Still provider-gated</small></div><div class="fm-kpi"><span>Overdue obligations</span><strong>'+num(data.operating_intelligence?.overdue)+'</strong></div></div>'+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Money Spaces</h2><p>Internal planning allocations by ownership and currency. They do not move bank cash.</p></div><button id="newMoneySpaceInline">+ Add</button></div><div class="fm-list">'+(spaceRows||emptyState('No money spaces','Create an internal allocation for tax, payroll, equipment or another purpose.'))+'</div></div></article>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Beneficiaries</h2><p>Saved payee details for controlled payment preparation.</p></div><button id="newBeneficiaryInline">+ Add</button></div><div class="fm-list">'+(beneficiaryRows||emptyState('No beneficiaries','Add a beneficiary before preparing repeat external payment instructions.'))+'</div></div></article></div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Payment workflow</h2><p>Draft → submit → independent approval → ready-for-execution. External execution remains capability-gated.</p></div><button id="newPaymentDraftInline">+ Draft payment</button></div><div class="fm-list">'+(paymentRows||emptyState('No payment instructions','Create a draft only when you want an internal payment workflow record.'))+'</div></div></article>';
+}
+function openMoneySpaceForm(){
+ $('fmModalEyebrow').textContent='BANKING OPERATIONS';$('fmModalTitle').textContent='New money space';
+ $('fmModalBody').innerHTML='<form id="moneySpaceForm" class="fm-form"><label>Name<input name="name" required placeholder="Tax reserve, Payroll, Equipment..."></label><div class="fm-form-grid"><label>Ownership<select name="ownership_scope"><option>BUSINESS</option><option>PERSONAL</option></select></label><label>Currency<input name="currency" value="AUD" maxlength="3" required></label></div><label>Purpose<input name="purpose"></label><div class="fm-form-grid"><label>Target amount<input name="target_amount" inputmode="decimal" value="0"></label><label>Allocated amount<input name="allocated_amount" inputmode="decimal" value="0"></label></div><label>Minimum reserve<input name="minimum_reserve" inputmode="decimal" value="0"></label><p class="fm-helper">A Money Space is an internal planning allocation. It does not transfer or reserve money at your bank.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary">Create space</button></div></form>';
+ $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
+ $('moneySpaceForm').onsubmit=async e=>{e.preventDefault();try{const x=await api(OS+'/spaces',{method:'POST',body:JSON.stringify(Object.fromEntries(new FormData(e.currentTarget).entries()))});$('fmModal').close();notice(x.message);await refresh();state.view='bankops';render()}catch(error){notice(error.message,true)}};
+}
+function openBeneficiaryForm(){
+ $('fmModalEyebrow').textContent='BANKING OPERATIONS';$('fmModalTitle').textContent='New beneficiary';
+ $('fmModalBody').innerHTML='<form id="beneficiaryForm" class="fm-form"><label>Payee name<input name="name" required></label><div class="fm-form-grid"><label>Nickname<input name="nickname"></label><label>Bank name<input name="bank_name"></label></div><div class="fm-form-grid"><label>Ownership<select name="ownership_scope"><option>BUSINESS</option><option>PERSONAL</option></select></label><label>Currency<input name="currency" value="AUD" maxlength="3" required></label></div><div class="fm-form-grid"><label>Masked BSB<input name="bsb_masked" placeholder="***-123"></label><label>Masked account<input name="account_masked" placeholder="******789"></label></div><label>PayID (masked)<input name="payid_masked"></label><label class="fm-check"><input name="trusted" type="checkbox"> Trusted beneficiary after independent verification</label><p class="fm-helper">This stores beneficiary metadata only. Bank credentials, PINs and OTPs are never collected here.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary">Save beneficiary</button></div></form>';
+ $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
+ $('beneficiaryForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),body=Object.fromEntries(fd.entries());body.trusted=fd.get('trusted')==='on';try{const x=await api(OS+'/beneficiaries',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh();state.view='bankops';render()}catch(error){notice(error.message,true)}};
+}
+function openPaymentDraftForm(){
+ const data=state.bankingOps||{},accounts=data.accounts||[],beneficiaries=data.beneficiaries||[];
+ $('fmModalEyebrow').textContent='CONTROLLED PAYMENT';$('fmModalTitle').textContent='New payment draft';
+ $('fmModalBody').innerHTML='<form id="paymentDraftForm" class="fm-form"><label>Source account<select name="bank_account_id" required><option value="">Choose permitted account</option>'+accounts.map(a=>'<option value="'+a.id+'">'+esc(a.nickname||'Account')+' · '+esc(a.currency||'AUD')+' · '+esc(a.ownership_scope||'')+'</option>').join('')+'</select></label><label>Saved beneficiary<select name="beneficiary_id"><option value="">None / manual payee</option>'+beneficiaries.map(b=>'<option value="'+b.id+'">'+esc(b.name)+' · '+esc(b.currency)+'</option>').join('')+'</select></label><label>Payee name<input name="payee_name" required></label><div class="fm-form-grid"><label>Payment type<select name="payment_type"><option>EXTERNAL</option><option>INTERNAL</option><option>BILL</option><option>REIMBURSEMENT</option></select></label><label>Ownership<select name="ownership_scope"><option>BUSINESS</option><option>PERSONAL</option></select></label></div><div class="fm-form-grid"><label>Amount<input name="amount" inputmode="decimal" required></label><label>Currency<input name="currency" value="AUD" maxlength="3" required></label></div><div class="fm-form-grid"><label>Due date<input name="due_date" type="date"></label><label>Schedule<select name="schedule_type"><option>ONCE</option><option>SCHEDULED</option></select></label></div><label>Reference<input name="reference_text"></label><p class="fm-helper">Creating this record does not send money. Submission and approval remain separate; actual external execution requires a verified provider capability.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary">Create draft</button></div></form>';
+ $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
+ $('paymentDraftForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),body=Object.fromEntries(fd.entries());body.bank_account_id=Number(body.bank_account_id);body.beneficiary_id=body.beneficiary_id?Number(body.beneficiary_id):null;try{const x=await api(OS+'/payments',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh();state.view='bankops';render()}catch(error){notice(error.message,true)}};
+}
+async function bankingPaymentAction(uid,action,decision=''){
+ try{
+  const path=action==='decision'?OS+'/payments/'+encodeURIComponent(uid)+'/decision':OS+'/payments/'+encodeURIComponent(uid)+'/'+action;
+  const body=action==='decision'?{decision,note:decision==='REJECT'?(prompt('Reason for rejecting this payment:')||''):''}:{};
+  if(action==='decision'&&decision==='REJECT'&&!body.note)return;
+  const x=await api(path,{method:'POST',body:JSON.stringify(body)});notice(x.message);await refresh();state.view='bankops';render();
+ }catch(error){notice(error.message,true)}
+}
 function rulesView(){
  const rules=state.rules?.rules||[],categories=state.categories?.categories||[];
  const active=categories.filter(c=>Number(c.active)&&!c.archived_at),archived=categories.filter(c=>!Number(c.active)||c.archived_at);
@@ -685,6 +733,7 @@ function simpleView(v){
  if(v==='personal')return personalView();
  if(v==='company')return companyView();
  if(v==='consolidated')return consolidatedView();
+ if(v==='bankops')return bankingOperationsView();
  if(v==='cash')return cashView();
  if(v==='transfers')return transfersView();
  if(v==='refunds')return refundsView();
@@ -1238,6 +1287,16 @@ function bindDynamic(){
     notice(x.message);await refresh();
   }catch(error){notice(error.message,true)}
  });
+ if($('newMoneySpace'))$('newMoneySpace').onclick=openMoneySpaceForm;
+ if($('newMoneySpaceInline'))$('newMoneySpaceInline').onclick=openMoneySpaceForm;
+ if($('newBeneficiary'))$('newBeneficiary').onclick=openBeneficiaryForm;
+ if($('newBeneficiaryInline'))$('newBeneficiaryInline').onclick=openBeneficiaryForm;
+ if($('newPaymentDraft'))$('newPaymentDraft').onclick=openPaymentDraftForm;
+ if($('newPaymentDraftInline'))$('newPaymentDraftInline').onclick=openPaymentDraftForm;
+ document.querySelectorAll('[data-space-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this Money Space?'))return;try{const x=await api(OS+'/spaces/'+encodeURIComponent(b.dataset.spaceArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await refresh();state.view='bankops';render()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-payment-submit]').forEach(b=>b.onclick=()=>bankingPaymentAction(b.dataset.paymentSubmit,'submit'));
+ document.querySelectorAll('[data-payment-cancel]').forEach(b=>b.onclick=()=>bankingPaymentAction(b.dataset.paymentCancel,'cancel'));
+ document.querySelectorAll('[data-payment-decision]').forEach(b=>b.onclick=()=>bankingPaymentAction(b.dataset.paymentUid,'decision',b.dataset.paymentDecision));
  document.querySelectorAll('[data-bank-connect]').forEach(b=>b.onclick=()=>startBankConsent(b.dataset.bankConnect));
  document.querySelectorAll('[data-bank-sync]').forEach(b=>b.onclick=()=>syncBankConnection(b.dataset.bankSync));
  document.querySelectorAll('[data-bank-reauthorize]').forEach(b=>b.onclick=()=>startBankConsent(b.dataset.bankReauthorize));

@@ -93,3 +93,12 @@ assert.match(js,/FINANCE DATA MIGRATION/,'Setup Centre must explain the historic
 assert.match(js,/Complete these in order to make reports reliable/,'Setup Centre must expose ordered data-quality controls.');
 assert.match(js,/Account migration map/,'Setup Centre must show every account separately before consolidation.');
 assert.match(js,/No step silently fabricates balances, classifications or FX rates/,'Setup Centre must preserve finance correctness boundaries.');
+
+assert.match(js,/\['bankops','⌁','Banking Operations'\]/,'Unified Finance OS must expose Banking Operations.');
+assert.match(js,/function bankingOperationsView\(\)/,'Banking Operations view is missing.');
+assert.match(js,/OS\+'\/spaces'/,'Money Spaces must use the canonical Banking OS API.');
+assert.match(js,/OS\+'\/beneficiaries'/,'Beneficiaries must use the canonical Banking OS API.');
+assert.match(js,/OS\+'\/payments'/,'Payment drafts must use the canonical Banking OS API.');
+assert.match(js,/Creating this record does not send money/,'Payment draft UI must not imply bank execution.');
+assert.match(js,/actual external execution requires a verified provider capability/,'Payment execution capability boundary must remain explicit.');
+assert.match(js,/data-payment-decision/,'Independent approval actions must be integrated into the Finance OS.');
