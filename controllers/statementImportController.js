@@ -4,6 +4,7 @@ const money = require('../utils/money');
 const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
+const { applyAutoRulesToImport } = require('../services/financeRuleEngine');
 
 const FORMATS = new Set(['CSV', 'PDF', 'OFX', 'QFX', 'QIF', 'XLSX']);
 
@@ -628,6 +629,18 @@ exports.commit = async (req, res) => {
       }
     }
 
+    const autoRuleResult = await applyAutoRulesToImport(db, { batchUid, userId: req.user.id });
+    for (const change of autoRuleResult.changes) {
+      await logAudit(db, audit(req, {
+        action: 'FINANCE_RULE_AUTO_APPLIED',
+        module: 'finance_intelligence',
+        recordType: 'bank_transaction',
+        recordId: change.transaction_id,
+        oldValue: change.old_value,
+        newValue: { ...change.new_value, finance_category_rule_id: change.rule_id }
+      }));
+    }
+
     await db.query(
       `INSERT INTO bank_import_batches (batch_uid, bank_account_id, original_name, imported_rows, duplicate_rows, rejected_rows, imported_by)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -665,7 +678,7 @@ exports.commit = async (req, res) => {
       );
     }
     const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null } }));
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
     await db.commit();
     return res.json({
       message: `${imported} statement transactions committed after review.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
@@ -673,6 +686,7 @@ exports.commit = async (req, res) => {
       duplicates,
       manual_overrides: manualOverrides,
       excluded_balance_markers: repaired.repaired,
+      auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period },
       batch_uid: batchUid,
       coverage: { start: minDate, end: maxDate }
     });

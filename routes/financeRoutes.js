@@ -186,6 +186,7 @@ router.get('/intelligence/transactions', requireAnyPermission('VIEW_BANKING'), i
 router.post('/intelligence/transactions', requireAnyPermission('EDIT_FINANCE'), intelligence.createManualTransaction);
 router.get('/intelligence/transactions/:id', requireAnyPermission('VIEW_BANKING'), intelligence.getTransactionDetail);
 router.post('/intelligence/transactions/:id', requireAnyPermission('EDIT_FINANCE'), intelligence.updateTransaction);
+router.post('/intelligence/transactions/bulk/review', requireAnyPermission('EDIT_FINANCE'), intelligence.bulkReviewTransactions);
 router.post('/intelligence/transactions/bulk/category', requireAnyPermission('EDIT_FINANCE'), intelligence.bulkCategorizeTransactions);
 router.get('/intelligence/statements', requireAnyPermission('VIEW_BANKING'), intelligence.getStatementLibrary);
 router.get('/intelligence/statements/:uid/report', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), intelligence.getStatementReport);
