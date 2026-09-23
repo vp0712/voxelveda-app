@@ -50,6 +50,18 @@ async function api(path,options={}){
  }finally{clearTimeout(timer)}
 }
 function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
+function signalFinanceReady(){
+ try{window.dispatchEvent(new CustomEvent('finance:ready',{detail:{view:state.view,cycle:loadCycle}}))}catch{}
+}
+function renderFinanceFatal(error,title='Finance could not start'){
+ const message=error?.message||'Finance workspace failed to load';
+ notice(message,true);
+ const content=$('fmContent');
+ if(content)content.innerHTML=`<div class="fm-state fm-state-error"><strong>${esc(title)}</strong><p>The loading request ended safely instead of leaving this screen stuck. Retry the Finance workspace.</p><button type="button" data-retry="1">Retry</button><button type="button" data-hard-reload="1">Reload page</button></div>`;
+ bindDynamic();
+ document.querySelector('[data-hard-reload]')?.addEventListener('click',()=>location.reload());
+ try{window.dispatchEvent(new CustomEvent('finance:fatal',{detail:{message}}))}catch{}
+}
 function navButtons(){
  $('fmNav').innerHTML=NAV_GROUPS.map(([group,items])=>`<div class="fm-nav-group"><small>${esc(group)}</small>${items.map(([v,i,l])=>`<button type="button" data-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span>${l}</button>`).join('')}</div>`).join('');
  $('fmNav').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
@@ -192,7 +204,7 @@ async function loadBase(){
    loadResource('statementPayload',I+'/statements'+base,cycle)
   ]);
   if(cycle!==loadCycle)return cycle;
-  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
+  state.capabilities=capabilities||null;state.dash=dash||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
  else{state.tx=[]}
   state.statements=st?.statements||[];
@@ -1055,8 +1067,10 @@ function openNew(kind='expense',presetAccount=''){
 }
 async function refresh(){
  notice('');$('fmContent').innerHTML='<div class="fm-loading"><span></span><b>Refreshing finance workspace…</b></div>';
- const cycle=await loadBase();render();
- void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be refreshed.',true));
+ try{
+  const cycle=await loadBase();render();signalFinanceReady();
+  void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be refreshed.',true));
+ }catch(error){renderFinanceFatal(error,'Finance refresh failed')}
 }
 async function supplierBillDetail(id){
  try{
@@ -1114,12 +1128,8 @@ function bind(){
 document.addEventListener('DOMContentLoaded',async()=>{
  bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h))state.view=h;navButtons();
  try{
-  const cycle=await loadBase();render();
+  const cycle=await loadBase();render();signalFinanceReady();
   void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be loaded.',true));
- }catch(e){
-  notice(e.message||'Finance workspace failed to load',true);
-  $('fmContent').innerHTML='<div class="fm-state fm-state-error"><strong>Finance could not start</strong><p>The loading request ended safely. Refresh to try again.</p><button type="button" data-retry="1">Retry</button></div>';
-  bindDynamic();
- }
+ }catch(error){renderFinanceFatal(error)}
 })
 })();
