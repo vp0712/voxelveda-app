@@ -21,6 +21,7 @@ const financePerformanceRisk = require('../controllers/financePerformanceRiskCon
 const financeAnomalyExplain = require('../controllers/financeAnomalyExplainController');
 const financePlanningControl = require('../controllers/financePlanningControlController');
 const financeJobProfitability = require('../controllers/financeJobProfitabilityController');
+const financeMarginAllocation = require('../controllers/financeMarginAllocationController');
 const financeAccountantHandover = require('../controllers/financeAccountantHandoverController');
 const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
@@ -75,6 +76,14 @@ router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => 
 router.get('/search', requireAnyPermission('VIEW_BANKING'), financeSearch.search);
 router.get('/company-summary', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeSearch.companySummary);
 router.get('/job-profitability', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeJobProfitability.getCenter);
+router.get('/margin-allocation', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeMarginAllocation.getCenter);
+router.post('/margin-allocation/entities', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeMarginAllocation.createEntity);
+router.put('/margin-allocation/entities/:uid', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeMarginAllocation.updateEntity);
+router.post('/margin-allocation/entities/:uid/status', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeMarginAllocation.setEntityStatus);
+router.post('/margin-allocation/allocations', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeMarginAllocation.allocate);
+router.post('/margin-allocation/allocations/:uid/reverse', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), requireStepUp('REVERSE_MARGIN_ALLOCATION'), financeMarginAllocation.reverseAllocation);
+router.post('/margin-allocation/invoice-links', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeMarginAllocation.linkInvoice);
+router.post('/margin-allocation/invoice-links/:uid/reverse', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), requireStepUp('REVERSE_MARGIN_INVOICE_LINK'), financeMarginAllocation.reverseInvoiceLink);
 router.get('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.get);
 router.put('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.save);
 router.get('/fx-rates', requireAnyPermission('VIEW_BANKING'), financeFx.list);
