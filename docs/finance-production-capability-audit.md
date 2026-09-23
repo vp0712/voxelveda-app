@@ -40,7 +40,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Company Finance | Dedicated business bank ledger plus real customer invoice receivables/payments, supplier payables, assets, approvals and accountant controls | PARTIAL pending authenticated production journey verification |
 | Personal Money | Dedicated personal bank-ledger workspace plus separately labelled owner-only wallets, briefing, budgets, goals, debts, recurring, saved views and planning intelligence | PARTIAL pending authenticated production journey verification |
 | Consolidated | Side-by-side Personal and Company bank dashboards with ownership-preserving drill-down and no cross-currency aggregation | PARTIAL pending authenticated production journey verification |
-| Reports | Full standard report catalogue is exposed through one Report Centre with saved definitions and protected branded PDF/CSV/XLSX exports | PARTIAL pending authenticated production journey verification |
+| Reports | Specialized standard catalogue (cash flow, bank-style account statement with running balance, category, merchant, cash, transfers, refunds, reimbursements, GST review, reconciliation, data quality, Personal/Company monthly) with saved definitions and protected branded PDF/CSV/XLSX exports | PARTIAL pending authenticated production journey verification |
 | Notifications | User notification centre and preferences surfaced in Finance | PARTIAL |
 | User preferences | Default workspace/account/period/format/dashboard cards | PARTIAL |
 | Team access | Server-side Banking/Finance permissions | READY core |

@@ -58,9 +58,12 @@ function buildFilters(req,definition=null){
   const src=definition||req.query||{};
   const reportType=safeText(src.report_type||'TRANSACTION_REGISTER',40).toUpperCase();
   if(!VALID_TYPES.has(reportType)) throw new FinanceError('Unsupported report type.',400,'INVALID_REPORT_TYPE');
-  const scope=safeText(src.scope||'ALL',20).toUpperCase();
+  let scope=safeText(src.scope||'ALL',20).toUpperCase();
+  if(reportType==='PERSONAL_MONTHLY_SUMMARY') scope='PERSONAL';
+  if(reportType==='COMPANY_MONTHLY_SUMMARY') scope='BUSINESS';
   if(!VALID_SCOPES.has(scope)) throw new FinanceError('Invalid report workspace.',400,'INVALID_REPORT_SCOPE');
   const accountIds=parseIds(src.account_ids);
+  if(reportType==='ACCOUNT_STATEMENT' && accountIds.length!==1) throw new FinanceError('Account Statement requires exactly one account.',400,'ACCOUNT_STATEMENT_ACCOUNT_REQUIRED');
   const currency=safeText(src.currency,3).toUpperCase();
   let transactionType=safeText(src.transaction_type,30).toUpperCase();
   if(!transactionType && ['INCOME','EXPENSE','TRANSFER','REFUND'].includes(reportType)) transactionType=reportType;
@@ -89,6 +92,7 @@ function buildFilters(req,definition=null){
   if(transactionType==='EXPENSE') clauses.push('bt.debit>0 AND bt.is_internal_transfer=0');
   if(transactionType==='INCOME') clauses.push("bt.credit>0 AND bt.is_internal_transfer=0 AND NOT EXISTS (SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE')");
   if(transactionType==='REFUND') clauses.push("bt.credit>0 AND EXISTS (SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE')");
+  if(reportType==='CASH') clauses.push("(UPPER(COALESCE(ba.account_type,'')) LIKE '%CASH%' OR UPPER(COALESCE(ba.nickname,'')) LIKE '%CASH%' OR UPPER(COALESCE(ba.financial_purpose,'')) LIKE '%CASH%')");
   if(q){clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.reference LIKE ? OR ba.nickname LIKE ? OR ba.institution LIKE ?)');const like=`%${q}%`;params.push(like,like,like,like,like)}
   return {report_type:reportType,scope,from,to,account_ids:accountIds,currency:core.currency,transaction_type:transactionType||null,category:category||null,merchant:merchant||null,source:source||null,reconciliation_status:recon||null,receipt_status:receipt||null,q:q||null,where:clauses.join(' AND '),params};
 }
@@ -122,14 +126,18 @@ async function reportCoverage(req,filters){
 async function buildReport(req,definition=null){
   await ensureFinanceSchema();
   const f=buildFilters(req,definition);
-  const [summaryByCurrency,categories,transactions,merchants,coverage]=await Promise.all([
+  const needMonthly=['CASH_FLOW','INCOME_VS_EXPENSE','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY'].includes(f.report_type);
+  const needGst=f.report_type==='GST_SUMMARY';
+  const needReimbursements=f.report_type==='REIMBURSEMENT';
+
+  const [summaryByCurrency,categories,transactions,merchants,coverage,monthly,gstSummary,reimbursements]=await Promise.all([
     trustedTotals.cashTotalsByCurrency(pool,f.where,f.params),
     trustedTotals.categorySpendByCurrency(pool,f.where,f.params,200),
     pool.query(
-      `SELECT bt.id,bt.transaction_date,bt.posting_date,bt.description,bt.reference,bt.merchant_name,bt.category,
-              bt.debit,bt.credit,bt.currency,bt.ownership_scope,bt.reconciliation_status,bt.source_type,
-              bt.is_internal_transfer,ba.nickname AS account_name,ba.institution,
-              EXISTS(SELECT 1 FROM secure_documents sd WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND sd.record_id=CAST(bt.id AS CHAR) AND sd.deleted_at IS NULL) AS has_receipt
+      `SELECT bt.id,bt.bank_account_id,bt.transaction_date,bt.posting_date,bt.description,bt.reference,bt.merchant_name,bt.merchant_normalized,bt.category,
+              bt.debit,bt.credit,bt.running_balance,bt.currency,bt.ownership_scope,bt.reconciliation_status,bt.source_type,
+              bt.is_internal_transfer,bt.project_ref,bt.gst_treatment,bt.reviewed_at,ba.nickname AS account_name,ba.institution,ba.account_type,
+              EXISTS(SELECT 1 FROM secure_documents sd WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND CAST(sd.record_id AS UNSIGNED)=bt.id AND sd.deleted_at IS NULL) AS has_receipt
          FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
         WHERE ${f.where}
         ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 20000`,f.params
@@ -144,12 +152,76 @@ async function buildReport(req,definition=null){
         GROUP BY bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
         ORDER BY bt.currency,spent DESC LIMIT 500`,f.params
     ).then(([rows])=>rows),
-    reportCoverage(req,f)
+    reportCoverage(req,f),
+    needMonthly?pool.query(
+      `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,COUNT(*) AS transaction_count,
+              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
+              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
+              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 AND bt.credit>0 AND NOT EXISTS (SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE') THEN bt.credit ELSE 0 END),0) AS ordinary_money_in,
+              COALESCE(SUM(CASE WHEN bt.credit>0 AND EXISTS (SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE') THEN bt.credit ELSE 0 END),0) AS refund_inflow
+         FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+        WHERE ${f.where}
+        GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
+        ORDER BY bt.currency,month`,f.params
+    ).then(([rows])=>rows.map(row=>({...row,net_cash_flow:Number(row.money_in||0)-Number(row.money_out||0)}))):Promise.resolve([]),
+    needGst?pool.query(
+      `SELECT bt.currency,COALESCE(NULLIF(bt.gst_treatment,''),'UNREVIEWED') AS gst_treatment,
+              COUNT(DISTINCT bt.id) AS transaction_count,
+              COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS gross_expense,
+              COALESCE(SUM(COALESCE(gs.recorded_split_gst,0)),0) AS recorded_split_gst
+         FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         LEFT JOIN (SELECT parent_bank_transaction_id,SUM(gst_amount) AS recorded_split_gst FROM bank_transaction_splits GROUP BY parent_bank_transaction_id) gs ON gs.parent_bank_transaction_id=bt.id
+        WHERE ${f.where}
+        GROUP BY bt.currency,COALESCE(NULLIF(bt.gst_treatment,''),'UNREVIEWED')
+        ORDER BY bt.currency,gst_treatment`,f.params
+    ).then(([rows])=>rows):Promise.resolve([]),
+    needReimbursements?pool.query(
+      `SELECT fr.id,fr.reimbursement_uid,fr.expense_bank_transaction_id,fr.claimant_user_id,fr.requested_amount,fr.currency,fr.status,
+              fr.created_at,fr.submitted_at,fr.approved_at,fr.rejected_at,fr.rejection_reason,
+              bt.transaction_date,bt.merchant_name,bt.description,ba.nickname AS account_name,
+              COALESCE(SUM(frp.amount),0) AS paid_amount
+         FROM finance_reimbursements fr
+         JOIN bank_transactions bt ON bt.id=fr.expense_bank_transaction_id
+         JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         LEFT JOIN finance_reimbursement_payments frp ON frp.reimbursement_id=fr.id
+        WHERE ${f.where}
+        GROUP BY fr.id
+        ORDER BY fr.created_at DESC LIMIT 5000`,f.params
+    ).then(([rows])=>rows.map(row=>({...row,remaining_amount:Math.max(0,Number(row.requested_amount||0)-Number(row.paid_amount||0))}))):Promise.resolve([])
   ]);
+
+  const reconciliationSummary={};
+  for(const row of transactions){
+    const key=String(row.reconciliation_status||'UNKNOWN').toUpperCase();
+    reconciliationSummary[key]=(reconciliationSummary[key]||0)+1;
+  }
+  const dataQuality={
+    source_transactions:transactions.length,
+    unclassified:transactions.filter(row=>!String(row.category||'').trim()).length,
+    ownership_unclassified:transactions.filter(row=>String(row.ownership_scope||'').toUpperCase()==='UNCLASSIFIED').length,
+    unreconciled:transactions.filter(row=>String(row.reconciliation_status||'').toUpperCase()==='UNRECONCILED').length,
+    missing_receipts:transactions.filter(row=>Number(row.debit||0)>0&&!Number(row.has_receipt)).length,
+    unreviewed:transactions.filter(row=>!row.reviewed_at).length,
+    coverage_status:coverage.status
+  };
+  let accountStatement=null;
+  if(f.report_type==='ACCOUNT_STATEMENT'){
+    const ordered=[...transactions].sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||Number(a.id)-Number(b.id));
+    const first=ordered[0]||null,last=ordered[ordered.length-1]||null;
+    accountStatement={
+      account_id:f.account_ids[0],
+      account_name:first?.account_name||last?.account_name||coverage.accounts[0]?.account_name||null,
+      currency:first?.currency||last?.currency||coverage.accounts[0]?.currency||null,
+      opening_running_balance:first?.running_balance??null,
+      closing_running_balance:last?.running_balance??null,
+      transaction_count:ordered.length
+    };
+  }
+
   const reportId=uid();
   return {
     metadata:{
-      report_id:reportId,report_version:2,
+      report_id:reportId,report_version:3,
       report_type:f.report_type,scope:f.scope,account_ids:f.account_ids,from:f.from,to:f.to,currency:f.currency,transaction_type:f.transaction_type,
       category:f.category,merchant:f.merchant,source:f.source,reconciliation_status:f.reconciliation_status,receipt_status:f.receipt_status,q:f.q,
       generated_at:new Date().toISOString(),generated_by:userId(req),source_transaction_count:transactions.length,
@@ -158,27 +230,40 @@ async function buildReport(req,definition=null){
     },
     summary:trustedTotals.singleCurrencySummary(summaryByCurrency),
     summary_by_currency:summaryByCurrency,
-    categories,merchants,transactions,coverage
+    categories,merchants,transactions,coverage,monthly,gst_summary:gstSummary,reimbursements,
+    reconciliation_summary:reconciliationSummary,data_quality:dataQuality,account_statement:accountStatement
   };
 }
-
 exports.generate=async(req,res)=>{
   try{return res.json(await buildReport(req))}catch(error){return fail(res,error,'Failed to build filtered Finance report.')}
 };
 
+function csvDataset(report){
+  const type=report.metadata.report_type;
+  if(type==='CATEGORY') return {header:['Currency','Category','Source Transactions','Split Lines','Amount'],rows:report.categories.map(r=>[r.currency,r.category,r.source_transaction_count,r.split_line_count,r.spent])};
+  if(type==='MERCHANT') return {header:['Currency','Merchant','Transactions','Spent','Received'],rows:report.merchants.map(r=>[r.currency,r.merchant,r.transaction_count,r.spent,r.received])};
+  if(['CASH_FLOW','INCOME_VS_EXPENSE','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY'].includes(type)) return {header:['Month','Currency','Transactions','Money In','Ordinary Money In','Refund Inflow','Money Out','Net Cash Flow'],rows:report.monthly.map(r=>[r.month,r.currency,r.transaction_count,r.money_in,r.ordinary_money_in,r.refund_inflow,r.money_out,r.net_cash_flow])};
+  if(type==='GST_SUMMARY') return {header:['Currency','GST Treatment','Transactions','Gross Expense','Recorded Split GST'],rows:report.gst_summary.map(r=>[r.currency,r.gst_treatment,r.transaction_count,r.gross_expense,r.recorded_split_gst])};
+  if(type==='REIMBURSEMENT') return {header:['UID','Date','Account','Merchant','Currency','Requested','Paid','Remaining','Status'],rows:report.reimbursements.map(r=>[r.reimbursement_uid,r.transaction_date,r.account_name,r.merchant_name||r.description,r.currency,r.requested_amount,r.paid_amount,r.remaining_amount,r.status])};
+  if(type==='RECONCILIATION') return {header:['Status','Transactions'],rows:Object.entries(report.reconciliation_summary||{})};
+  if(type==='DATA_QUALITY') return {header:['Metric','Value'],rows:Object.entries(report.data_quality||{})};
+  const statement=type==='ACCOUNT_STATEMENT';
+  return {
+    header:statement?['Date','Posting Date','Description','Reference','Debit','Credit','Running Balance','Currency','Reconciliation','Receipt']:
+      ['Date','Posting Date','Account','Institution','Merchant','Description','Reference','Category','Scope','Currency','Debit','Credit','Type','Source','Reconciliation','Receipt'],
+    rows:report.transactions.map(t=>statement?
+      [t.transaction_date,t.posting_date,t.description,t.reference,t.debit,t.credit,t.running_balance,t.currency,t.reconciliation_status,Number(t.has_receipt)?'ATTACHED':'MISSING']:
+      [t.transaction_date,t.posting_date,t.account_name,t.institution,t.merchant_name,t.description,t.reference,t.category,t.ownership_scope,t.currency,t.debit,t.credit,Number(t.is_internal_transfer)?'TRANSFER':Number(t.debit)>0?'EXPENSE':'INCOME',t.source_type,t.reconciliation_status,Number(t.has_receipt)?'ATTACHED':'MISSING'])
+  };
+}
 exports.csv=async(req,res)=>{
   try{
-    const report=await buildReport(req);
-    const header=['Date','Posting Date','Account','Institution','Merchant','Description','Reference','Category','Scope','Currency','Debit','Credit','Type','Source','Reconciliation','Receipt'];
-    const rows=report.transactions.map(t=>[
-      t.transaction_date,t.posting_date,t.account_name,t.institution,t.merchant_name,t.description,t.reference,t.category,t.ownership_scope,t.currency,
-      t.debit,t.credit,Number(t.is_internal_transfer)?'TRANSFER':Number(t.debit)>0?'EXPENSE':'INCOME',t.source_type,t.reconciliation_status,Number(t.has_receipt)?'ATTACHED':'MISSING'
-    ]);
+    const report=await buildReport(req),dataset=csvDataset(report);
     const meta=[
-      ['Report Scope',report.metadata.scope],['Period From',report.metadata.from||''],['Period To',report.metadata.to||''],
-      ['Currency Treatment',report.metadata.currency_treatment],['Generated At',report.metadata.generated_at],['Source Transaction Count',report.metadata.source_transaction_count]
+      ['Report Type',report.metadata.report_type],['Report Scope',report.metadata.scope],['Period From',report.metadata.from||''],['Period To',report.metadata.to||''],
+      ['History Completeness',report.metadata.history_completeness],['Currency Treatment',report.metadata.currency_treatment],['Generated At',report.metadata.generated_at],['Source Transaction Count',report.metadata.source_transaction_count]
     ];
-    const csv=[...meta.map(r=>r.map(csvCell).join(',')), '', header.map(csvCell).join(','), ...rows.map(r=>r.map(csvCell).join(','))].join('\r\n');
+    const csv=[...meta.map(r=>r.map(csvCell).join(',')), '', dataset.header.map(csvCell).join(','), ...dataset.rows.map(r=>r.map(csvCell).join(','))].join('\r\n');
     res.setHeader('Content-Type','text/csv; charset=utf-8');
     res.setHeader('Content-Disposition','attachment; filename="voxel-veda-finance-report.csv"');
     await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report','CSV',{filters:report.metadata,format:'CSV'}));
@@ -277,6 +362,48 @@ async function createReportWorkbook(report,profile,title){
     coverage.columns=[12,26,12,14,16,16,16].map(width=>({width}));
     for(let row=coverageHeader.number+1;row<=coverage.rowCount;row+=1)for(let col=5;col<=7;col+=1)coverage.getCell(row,col).numFmt='dd/mm/yyyy';
     styleTable(coverage,coverageHeader.number,7,coverage.rowCount);
+
+    if(report.monthly?.length){
+      const monthly=workbook.addWorksheet('Monthly');
+      addWorkbookMetadata(monthly,report,profile,title);
+      const h=monthly.addRow(['Month','Currency','Transactions','Money In','Ordinary Money In','Refund Inflow','Money Out','Net Cash Flow']);
+      for(const row of report.monthly)monthly.addRow([row.month,row.currency,row.transaction_count,Number(row.money_in||0),Number(row.ordinary_money_in||0),Number(row.refund_inflow||0),Number(row.money_out||0),Number(row.net_cash_flow||0)]);
+      monthly.columns=[14,12,14,16,20,16,16,18].map(width=>({width}));
+      for(let row=h.number+1;row<=monthly.rowCount;row+=1)for(let col=4;col<=8;col+=1)monthly.getCell(row,col).numFmt='#,##0.00;[Red]-#,##0.00';
+      styleTable(monthly,h.number,8,monthly.rowCount);
+    }
+    if(report.gst_summary?.length){
+      const gst=workbook.addWorksheet('GST Review');
+      addWorkbookMetadata(gst,report,profile,title);
+      const h=gst.addRow(['Currency','GST Treatment','Transactions','Gross Expense','Recorded Split GST']);
+      for(const row of report.gst_summary)gst.addRow([row.currency,row.gst_treatment,row.transaction_count,Number(row.gross_expense||0),Number(row.recorded_split_gst||0)]);
+      gst.columns=[12,24,14,18,20].map(width=>({width}));
+      for(let row=h.number+1;row<=gst.rowCount;row+=1){gst.getCell(row,4).numFmt='#,##0.00;[Red]-#,##0.00';gst.getCell(row,5).numFmt='#,##0.00;[Red]-#,##0.00'}
+      styleTable(gst,h.number,5,gst.rowCount);
+    }
+    if(report.reimbursements?.length){
+      const reimb=workbook.addWorksheet('Reimbursements');
+      addWorkbookMetadata(reimb,report,profile,title);
+      const h=reimb.addRow(['UID','Expense Date','Account','Merchant','Currency','Requested','Paid','Remaining','Status']);
+      for(const row of report.reimbursements)reimb.addRow([row.reimbursement_uid,excelDate(row.transaction_date),row.account_name||'',row.merchant_name||row.description||'',row.currency,Number(row.requested_amount||0),Number(row.paid_amount||0),Number(row.remaining_amount||0),row.status]);
+      reimb.columns=[24,14,22,30,12,16,16,16,18].map(width=>({width}));
+      for(let row=h.number+1;row<=reimb.rowCount;row+=1){reimb.getCell(row,2).numFmt='dd/mm/yyyy';for(let col=6;col<=8;col+=1)reimb.getCell(row,col).numFmt='#,##0.00;[Red]-#,##0.00'}
+      styleTable(reimb,h.number,9,reimb.rowCount);
+    }
+    if(report.metadata.report_type==='RECONCILIATION'){
+      const recon=workbook.addWorksheet('Reconciliation');
+      addWorkbookMetadata(recon,report,profile,title);
+      const h=recon.addRow(['Status','Transactions']);
+      for(const [status,count] of Object.entries(report.reconciliation_summary||{}))recon.addRow([status,count]);
+      recon.columns=[24,16].map(width=>({width}));styleTable(recon,h.number,2,recon.rowCount);
+    }
+    if(report.metadata.report_type==='DATA_QUALITY'){
+      const quality=workbook.addWorksheet('Data Quality');
+      addWorkbookMetadata(quality,report,profile,title);
+      const h=quality.addRow(['Metric','Value']);
+      for(const [metric,value] of Object.entries(report.data_quality||{}))quality.addRow([metric,value]);
+      quality.columns=[30,22].map(width=>({width}));styleTable(quality,h.number,2,quality.rowCount);
+    }
     return workbook;
 }
 
@@ -364,8 +491,34 @@ exports.pdf=async(req,res)=>{
         if(doc.y>724)doc.addPage();
         doc.fontSize(8).text(`${row.merchant||'Unknown'} · ${row.currency} · spent ${printableAmount(row.spent,row.currency)} · received ${printableAmount(row.received,row.currency)} · ${row.transaction_count} transaction(s)`);
       }
+    }else if(['CASH_FLOW','INCOME_VS_EXPENSE','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY'].includes(report.metadata.report_type)){
+      doc.moveDown().fontSize(13).text('Monthly cash flow');
+      for(const row of report.monthly||[]){
+        if(doc.y>724)doc.addPage();
+        doc.fontSize(8).text(`${row.month} · ${row.currency} · in ${printableAmount(row.money_in,row.currency)} · out ${printableAmount(row.money_out,row.currency)} · net ${printableAmount(row.net_cash_flow,row.currency)}`);
+      }
+    }else if(report.metadata.report_type==='GST_SUMMARY'){
+      doc.moveDown().fontSize(13).text('GST review summary');
+      doc.fontSize(7.5).fillColor('#6b7280').text('Recorded split GST is reported from reviewed split data only; this report does not invent GST where none is recorded.').fillColor('#111827');
+      for(const row of report.gst_summary||[]){
+        if(doc.y>724)doc.addPage();
+        doc.fontSize(8).text(`${row.currency} · ${row.gst_treatment} · ${row.transaction_count} transaction(s) · gross expense ${printableAmount(row.gross_expense,row.currency)} · recorded split GST ${printableAmount(row.recorded_split_gst,row.currency)}`);
+      }
+    }else if(report.metadata.report_type==='REIMBURSEMENT'){
+      doc.moveDown().fontSize(13).text('Reimbursements');
+      for(const row of report.reimbursements||[]){
+        if(doc.y>716)doc.addPage();
+        doc.fontSize(8).text(`${String(row.transaction_date||'').slice(0,10)} · ${row.account_name||''} · ${row.merchant_name||row.description||''} · ${row.status}`);
+        doc.fontSize(7.5).fillColor('#6b7280').text(`Requested ${printableAmount(row.requested_amount,row.currency)} · paid ${printableAmount(row.paid_amount,row.currency)} · remaining ${printableAmount(row.remaining_amount,row.currency)}`).fillColor('#111827');
+      }
+    }else if(report.metadata.report_type==='RECONCILIATION'){
+      doc.moveDown().fontSize(13).text('Reconciliation summary');
+      for(const [status,count] of Object.entries(report.reconciliation_summary||{}))doc.fontSize(8).text(`${status}: ${count} transaction(s)`);
+    }else if(report.metadata.report_type==='DATA_QUALITY'){
+      doc.moveDown().fontSize(13).text('Data quality summary');
+      for(const [metric,value] of Object.entries(report.data_quality||{}))doc.fontSize(8).text(`${String(metric).replaceAll('_',' ')}: ${value}`);
     }else{
-      doc.moveDown().fontSize(13).text('Transactions');
+      doc.moveDown().fontSize(13).text(report.metadata.report_type==='ACCOUNT_STATEMENT'?'Account statement transactions':'Transactions');
       for(const row of report.transactions||[]){
         if(doc.y>716)doc.addPage();
         const amount=Number(row.debit)>0?-Number(row.debit||0):Number(row.credit||0);
@@ -374,7 +527,9 @@ exports.pdf=async(req,res)=>{
           {width:380,continued:true}
         );
         doc.text(printableAmount(Math.abs(amount),row.currency),{width:115,align:'right'});
-        if(row.category||row.reconciliation_status){
+        if(report.metadata.report_type==='ACCOUNT_STATEMENT'){
+          doc.fontSize(7).fillColor('#6b7280').text(`Debit ${printableAmount(row.debit,row.currency)} · Credit ${printableAmount(row.credit,row.currency)} · Running balance ${row.running_balance===null||row.running_balance===undefined?'—':printableAmount(row.running_balance,row.currency)} · ${row.reconciliation_status||''}`);
+        }else if(row.category||row.reconciliation_status){
           doc.fontSize(7).fillColor('#6b7280').text(`${row.category||'Uncategorised'} · ${row.reconciliation_status||''} · ${row.source_type||''}`);
         }
       }

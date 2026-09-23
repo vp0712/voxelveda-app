@@ -102,3 +102,9 @@ assert.match(js,/OS\+'\/payments'/,'Payment drafts must use the canonical Bankin
 assert.match(js,/Creating this record does not send money/,'Payment draft UI must not imply bank execution.');
 assert.match(js,/actual external execution requires a verified provider capability/,'Payment execution capability boundary must remain explicit.');
 assert.match(js,/data-payment-decision/,'Independent approval actions must be integrated into the Finance OS.');
+
+assert.match(js,/function reportSpecificPreview\(/,'Finance Report Centre must render report-specific results.');
+assert.match(js,/Account Statement needs exactly one account/,'Account Statement UI must require one account before generation.');
+assert.match(js,/GST review summary/,'Finance Report Centre must expose GST review results.');
+assert.match(js,/Reimbursement lifecycle/,'Finance Report Centre must expose reimbursement report results.');
+assert.match(js,/Data quality controls/,'Finance Report Centre must expose data-quality report results.');

@@ -56,3 +56,17 @@ assert(client.includes("API+'/reports/saved'"),'saved report UI is missing');
 assert(client.includes('Currencies are never converted or relabelled'),'currency safety disclosure is missing');
 
 console.log('FINANCE_REPORT_BUILDER_V2_TEST_OK');
+
+assert(controller.includes("report_version:3"),'specialized report contract version is missing');
+assert(controller.includes("ACCOUNT_STATEMENT_ACCOUNT_REQUIRED"),'Account Statement must require exactly one account');
+assert(controller.includes("reportType==='CASH'"),'Cash report must restrict to cash-purpose accounts');
+assert(controller.includes("gst_summary:gstSummary"),'GST report dataset is missing');
+assert(controller.includes("reimbursements,"),'reimbursement report dataset is missing');
+assert(controller.includes("reconciliation_summary:reconciliationSummary"),'reconciliation report summary is missing');
+assert(controller.includes("data_quality:dataQuality"),'data-quality report summary is missing');
+assert(controller.includes("function csvDataset(report)"),'report-specific CSV datasets are missing');
+assert(controller.includes("workbook.addWorksheet('GST Review')"),'GST XLSX worksheet is missing');
+assert(controller.includes("workbook.addWorksheet('Reimbursements')"),'reimbursement XLSX worksheet is missing');
+assert(controller.includes("GST review summary"),'GST PDF section is missing');
+assert(controller.includes("Reconciliation summary"),'reconciliation PDF section is missing');
+assert(controller.includes("Running balance"),'bank-style Account Statement PDF must expose running balance');
