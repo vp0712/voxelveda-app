@@ -67,3 +67,9 @@ assert(advanced.includes('/api/finance/anomaly-explain-control'),'Advanced Contr
 assert(advanced.includes('function anomalyExplainability()'),'Advanced anomaly/explainability section missing.');
 assert(advanced.includes('data-fac-open="anomaly"'),'Advanced Control must drill into full anomaly/explainability workspace.');
 assert(advanced.includes('data-fac-tx'),'Advanced Control must expose source transaction drill-down for explainability.');
+
+assert(advanced.includes('function executiveReadinessBoard()'),'Executive readiness board function missing.');
+assert(advanced.includes('Executive Control Readiness Board'),'Executive readiness board UI missing.');
+assert(advanced.includes('CFO Daily Brief'),'CFO Daily Brief missing.');
+assert(advanced.includes('No fake composite finance score'),'Readiness board must reject misleading composite scoring.');
+assert(advanced.includes('data-fac-jump="facReadiness"'),'Readiness board must be directly navigable.');
