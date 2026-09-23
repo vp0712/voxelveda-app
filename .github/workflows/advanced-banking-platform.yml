@@ -32,13 +32,11 @@ on:
       - 'scripts/banking-account-scope-test.js'
       - 'routes/bankingPortalRoutes.js'
       - 'controllers/statementImportController.js'
-      - 'public/finance-statement-report-center.js'
       - 'public/finance-master.js'
       - 'public/finance-master.css'
       - 'public/finance-intelligence.html'
       - 'controllers/financeIntelligenceController.js'
       - 'routes/financeRoutes.js'
-      - 'public/finance-pdf-v3.js'
       - 'services/globalBrandRenderer.js'
       - 'scripts/advanced-banking-platform-test.js'
       - '.github/workflows/advanced-banking-platform.yml'
@@ -68,7 +66,6 @@ jobs:
           node --check routes/integrationWebhookRoutes.js
           node --check middleware/statementPreviewSanitizer.js
           node --check public/admin-dashboard.js
-          node --check public/finance-pdf-v3.js
           node --check public/finance-master.js
           node --check scripts/advanced-banking-platform-test.js
           node --check scripts/banking-os-multi-user-test.js
@@ -88,7 +85,6 @@ jobs:
           node --check controllers/advancedBankingController.js
           node --check controllers/statementDataManagementController.js
           node --check controllers/statementImportController.js
-          node --check public/finance-statement-report-center.js
           node --check routes/bankingPortalRoutes.js
       - name: Architecture and security contract
         run: node scripts/advanced-banking-platform-test.js
