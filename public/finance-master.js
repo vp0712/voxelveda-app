@@ -21,7 +21,7 @@ const NAV_GROUPS=[
  ['HOME',[['advanced','⚡','Control Centre'],['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['bankops','⌁','Banking Operations'],['cash','¤','Cash'],['currency','FX','Currency Centre'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
- ['PLANNING',[['planning','▦','FP&A Planning'],['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar'],['treasury','▥','Treasury'],['performance','▤','Performance & Stress']]],
+ ['PLANNING',[['planning','▦','FP&A Planning'],['profitability','◩','Profitability & Margin'],['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar'],['treasury','▥','Treasury'],['performance','▤','Performance & Stress']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['anomaly','≈','Anomaly & Explain'],['rules','⌁','Rules'],['review','!','Review Centre'],['controlactions','!','Control Actions'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports'],['handover','▣','Accountant Handover'],['taxcontrol','§','Tax & Evidence'],['evidenceaudit','⌘','Evidence & Audit']]],
  ['CONTROL',[['closeassurance','✓','Close & Assurance'],['protection','◇','Protection Register'],['securityprivacy','⌾','Security & Privacy'],['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
@@ -81,6 +81,7 @@ async function api(path,options={}){
  }finally{clearTimeout(timer)}
 }
 function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
+window.__voxelFinanceApi=api;window.__voxelFinanceNotice=notice;
 function signalFinanceReady(){
  try{window.dispatchEvent(new CustomEvent('finance:ready',{detail:{view:state.view,cycle:loadCycle}}))}catch{}
 }
@@ -127,6 +128,7 @@ function title(v){return ({
  calendar:['Cash Flow Calendar','Known company/banking and personal planning events shown separately by scope and currency.'],
  treasury:['Treasury & Working Capital','Business liquidity, runway, receivable/payable aging and near-term supplier obligations without silent FX.'],
  performance:['Performance & Stress Control','Budget pace, 6-month cash-flow trend, runway and 30/90-day downside stress by scope and native currency.'],
+ profitability:['Profitability & Margin Control','Customer/project/service/product cash margin from explicit BUSINESS bank allocations with separate invoice billing context.'],
  anomaly:['Anomaly & Explainability','30-day change analysis, category and merchant shifts, large outliers and transparent data-readiness evidence.'],
  advanced:['Advanced Finance Control','Executive cockpit, action queue, 7/30/90/365 forecasting, scenario planning, risk, evidence and Company CFO controls.'],
  insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
@@ -1219,7 +1221,18 @@ function ensureAdvancedControlLoaded(){
  if(window.__financeAdvancedControlMount){mount();return}
  const existing=document.querySelector('script[data-finance-advanced-control]');
  if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}
- const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v9';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
+ const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v10';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
+}
+function ensureProfitabilityControlLoaded(){
+ const mount=()=>{try{window.dispatchEvent(new CustomEvent('finance:profitability-mount'))}catch{};window.__financeProfitabilityMount?.()};
+ if(window.__financeProfitabilityMount){mount();return}
+ const existing=document.querySelector('script[data-finance-profitability-control]');
+ if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}
+ const script=document.createElement('script');script.src='/finance-profitability-control.js?v=20260924-profitability-v1';script.defer=true;script.dataset.financeProfitabilityControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeProfitabilityMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Profitability & Margin Control failed to load</strong><p>The rest of Finance remains available.</p></div>'};document.head.appendChild(script);
+}
+function profitabilityControlView(){
+ setTimeout(ensureProfitabilityControlLoaded,0);
+ return '<div id="financeProfitabilityMount"><div class="fm-state"><strong>Opening Profitability & Margin Control…</strong><p>Loading explicit BUSINESS bank allocations and invoice billing context.</p></div></div>';
 }
 function advancedControlView(){
  setTimeout(ensureAdvancedControlLoaded,0);
@@ -1295,6 +1308,7 @@ function securityPrivacyView(){
  '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h2>Personal / Company privacy boundary</h2><p>Personal Money, personal assets, protection records and personal audit history are owner-scoped. Company Finance remains permission-scoped and is not merged with Personal data simply because the same person can access both.</p></div></article><article class="fm-card"><div class="fm-pad"><h2>Sensitive-action boundary</h2><p>Payment approvals, close locks, accountant exports and other sensitive Finance operations continue to use server-side permissions and step-up authentication. This page cannot bypass those controls.</p></div></article></div>';
 }
 function simpleView(v){
+ if(v==='profitability')return profitabilityControlView();
  if(v==='advanced')return advancedControlView();
  if(v==='more')return moreView();
  if(v==='setupcentre')return setupCentreView();
