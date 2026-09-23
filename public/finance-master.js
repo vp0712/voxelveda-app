@@ -1655,7 +1655,7 @@ function bind(){
  $('fmPeriod').onchange=e=>{state.period=e.target.value;const custom=state.period==='custom';$('fmFromWrap').hidden=!custom;$('fmToWrap').hidden=!custom;if(!custom)refresh()};
  $('fmFrom').onchange=e=>{state.customFrom=e.target.value;if(state.period==='custom'&&state.customTo)refresh()};
  $('fmTo').onchange=e=>{state.customTo=e.target.value;if(state.period==='custom'&&state.customFrom)refresh()};
- $('fmCurrencyMode').onchange=()=>notice('Reporting-currency conversion is unavailable because no verified FX-rate service is configured. Native currency mode remains active.');
+ $('fmCurrencyMode').onchange=e=>{if(e.target.value==='MANAGEMENT'){e.target.value='NATIVE';go('currency');notice('Management conversion uses only your saved FX evidence. Native bank amounts remain unchanged.')}else notice('Native currency mode keeps every bank amount in its original currency.');};
  $('fmRefresh').onclick=refresh;$('fmNew').onclick=()=>openNew('expense');$('fmDrawerClose').onclick=closeDrawer;$('fmBackdrop').onclick=closeDrawer;$('fmModalClose').onclick=()=> $('fmModal').close();
  $('fmSearch').placeholder='Search finance or type a command: add expense, upload statement, create report';
  $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){const value=e.currentTarget.value.trim();if(runFinanceCommand(value))return;globalFinanceSearch(value)}};

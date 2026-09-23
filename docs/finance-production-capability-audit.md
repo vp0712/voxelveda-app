@@ -47,7 +47,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Accounting period locking | Open/review/ready/locked transitions with protected lock workflow | READY core |
 | Open Banking | Unified provider readiness, consent-session launch, connected-bank sync/disconnect and sync history; still fail-closed when provider configuration/live enablement is incomplete | RUNTIME STATUS |
 | Receipt OCR | No verified OCR provider | UNAVAILABLE |
-| FX reporting | Owner-scoped explicit FX evidence register plus reversible management conversion layer; native bank values remain authoritative and missing rates fail closed | PARTIAL pending authenticated production journey verification |
+| FX reporting | Owner-scoped explicit FX evidence register, direct Currency Centre navigation and reversible management conversion layer; native bank values remain authoritative and missing rates fail closed | PARTIAL pending authenticated production journey verification |
 | Banking operations | Money Spaces, beneficiaries, draft/submit/independent-approval/cancel payment instructions are integrated in the unified Finance OS; external execution stays capability-gated | PARTIAL / external execution NOT SUPPORTED |
 
 ## Correctness defects already fixed

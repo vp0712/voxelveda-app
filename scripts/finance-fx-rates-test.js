@@ -28,3 +28,7 @@ assert(client.includes('Finance will not invent an exchange rate.'),'Missing FX 
 assert(client.includes('This creates management-reporting evidence only'),'FX form must disclose that it does not rewrite native transactions.');
 
 console.log('FINANCE_FX_RATES_TEST_OK');
+
+assert(html.includes('value="MANAGEMENT">Management conversion'),'Finance filter bar must expose the evidence-based management conversion centre.');
+assert(!client.includes('Reporting-currency conversion is unavailable because no verified FX-rate service is configured'),'Finance must not claim FX conversion is unavailable after the explicit FX register exists.');
+assert(client.includes("go('currency')"),'Management conversion selector must route to the Currency Centre.');
