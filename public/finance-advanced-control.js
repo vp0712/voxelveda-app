@@ -2,7 +2,7 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v4';
+const VERSION='20260924-advanced-control-v5';
 const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
@@ -24,6 +24,7 @@ const SOURCES=[
   ['readiness','/api/finance/intelligence/banking-readiness'],
   ['reviewInbox','/api/finance/personal-money/review-inbox'],
   ['closeAssurance','/api/finance/close-assurance'],
+  ['treasury','/api/finance/treasury-control'],
   ['handover','/api/finance/accountant-handover']
 ];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -273,6 +274,13 @@ function decisionIntelligence(){
  '<div class="fac-kpis"><div class="fac-kpi"><span>'+esc(state.compare.a.label)+' projected</span><b>'+money(a.projected,cur)+'</b><small>Scenario impact '+money(a.delta,cur)+'</small></div><div class="fac-kpi"><span>'+esc(state.compare.b.label)+' projected</span><b>'+money(b.projected,cur)+'</b><small>Scenario impact '+money(b.delta,cur)+'</small></div><div class="fac-kpi"><span>Difference B − A</span><b>'+money(difference,cur)+'</b><small>Arithmetic comparison, not a recommendation</small></div><div class="fac-kpi"><span>Known baseline</span><b>'+money(a.base,cur)+'</b><small>Recorded recurring schedule only</small></div></div>'+
  '<div class="fac-note">Decision boundary: the model excludes unknown discretionary spending, fees, interest accrual, investment return, tax effects and unrecorded income. It compares assumptions; it does not tell you which choice to make.</div></section>';
 }
+function treasuryControl(){
+ const t=state.data.treasury||{},wc=t.working_capital||{},cash=t.bank_cash_by_currency||{},flow=t.operating_flow_by_currency||{};
+ const cashRows=Object.entries(cash).map(([c,v])=>'<div class="fac-row"><div><h4>'+esc(c)+' business cash</h4><p>90-day average monthly outflow '+money(flow[c]?.average_monthly_outflow_90d||0,c)+' · runway '+(flow[c]?.runway_days===null||flow[c]?.runway_days===undefined?'—':flow[c].runway_days+' days')+'</p></div><b>'+money(v,c)+'</b></div>').join('');
+ return '<section id="facTreasury" class="fac-section"><header><div><h3>Treasury & Working Capital</h3><p>Business cash, supplier obligations and customer receivables without assuming collections or silent FX.</p></div>'+statusChip(num(wc.overdue_payables)>0?'HIGH':'CONTROLLED')+'</header>'+
+ '<div class="fac-kpis"><div class="fac-kpi"><span>Receivables</span><b>'+money(wc.receivables||0,wc.currency||'AUD')+'</b><small>Open invoice balances</small></div><div class="fac-kpi"><span>Payables</span><b>'+money(wc.payables||0,wc.currency||'AUD')+'</b><small>Open supplier balances</small></div><div class="fac-kpi"><span>Due ≤30d</span><b>'+money(wc.supplier_obligations_due_30d||0,wc.currency||'AUD')+'</b><small>Coverage '+(wc.due_30_cash_coverage_ratio===null||wc.due_30_cash_coverage_ratio===undefined?'—':num(wc.due_30_cash_coverage_ratio).toFixed(2)+'×')+'</small></div><div class="fac-kpi"><span>Overdue payables</span><b>'+money(wc.overdue_payables||0,wc.currency||'AUD')+'</b><small>Requires review if non-zero</small></div></div>'+
+ '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Business cash & runway</h4><div class="fac-list">'+(cashRows||'<div class="fac-empty">No business bank cash returned.</div>')+'</div></article><article class="fac-card"><h4>Control boundary</h4><div class="fac-note">'+esc(t.rules?.receivables||'Receivables are not assumed as forecast inflows.')+'</div><div class="fac-note" style="margin-top:8px">'+esc(t.rules?.payments||'No payment is executed from this view.')+'</div><div class="fac-toolbar"><button data-fac-open="treasury">Open Treasury</button><button data-fac-open="company">Company Finance</button><button data-fac-open="closeassurance">Close Assurance</button></div></article></div></section>';
+}
 function sourceHealth(){
  const rows=SOURCES.map(([n,u])=>{const err=state.errors[n];return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+'</div></div>'+statusChip(err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):'READY')+'</div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
@@ -280,8 +288,8 @@ function sourceHealth(){
 
 function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
- executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+treasuryControl()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }

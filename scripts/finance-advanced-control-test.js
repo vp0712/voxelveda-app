@@ -6,14 +6,14 @@ const master=fs.readFileSync('public/finance-master.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 
-assert(advanced.includes("VERSION='20260924-advanced-control-v4'"),'Advanced Finance release id is missing.');
+assert(advanced.includes("VERSION='20260924-advanced-control-v5'"),'Advanced Finance release id is missing.');
 assert(master.includes("['advanced','⚡','Control Centre']"),'Advanced Control must be the canonical Finance home module.');
 assert(master.includes('function advancedControlView()'),'Advanced Control must mount inside the master Finance OS.');
 assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be the default Finance landing.');
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
-assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v4'),'Master OS must load the versioned Advanced Control asset.');
+assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v5'),'Master OS must load the versioned Advanced Control asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
-assert(html.includes('/finance-master.js?v=20260924-close-assurance-v1'),'Canonical Finance HTML must cache-bust the Advanced Control release.');
+assert(html.includes('/finance-master.js?v=20260924-treasury-control-v1'),'Canonical Finance HTML must cache-bust the Advanced Control release.');
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
@@ -53,3 +53,6 @@ assert(advanced.includes('data-fac-open="closeassurance"'),'Advanced Control mus
 
 assert(advanced.includes('function accountantHandoverStatus()'),'Advanced Control must surface Accountant Handover readiness.');
 assert(advanced.includes('data-fac-open="handover"'),'Advanced Control must drill into Accountant Handover.');
+
+assert(advanced.includes('/api/finance/treasury-control'),'Advanced Finance Control must hydrate Treasury evidence.');
+assert(advanced.includes('Treasury & Working Capital'),'Advanced Finance Control must surface Treasury & Working Capital.');
