@@ -6,19 +6,19 @@ const master=fs.readFileSync('public/finance-master.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 
-assert(advanced.includes("VERSION='20260924-advanced-control-v5'"),'Advanced Finance release id is missing.');
+assert(advanced.includes("VERSION='20260924-advanced-control-v6'"),'Advanced Finance release id is missing.');
 assert(master.includes("['advanced','⚡','Control Centre']"),'Advanced Control must be the canonical Finance home module.');
 assert(master.includes('function advancedControlView()'),'Advanced Control must mount inside the master Finance OS.');
 assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be the default Finance landing.');
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
-assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v5'),'Master OS must load the versioned Advanced Control asset.');
+assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v6'),'Master OS must load the versioned Advanced Control asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
 assert(html.includes('/finance-master.js?v=20260924-governance-control-v1'),'Canonical Finance HTML must cache-bust the current canonical Finance release.');
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
   'Subscription, Debt & Savings Intelligence','Risk, Integrity & Control Readiness',
-  'Tax, Evidence & Year-End Readiness','Company CFO Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Evidence Source Health'
+  'Tax, Evidence & Year-End Readiness','Company CFO Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Performance & Stress Control','Evidence Source Health'
 ]) assert(advanced.includes(label),`Advanced Finance Control must expose ${label}.`);
 
 for(const endpoint of [
@@ -27,7 +27,7 @@ for(const endpoint of [
   '/api/finance/personal-money/data-quality-integrity','/api/finance/personal-money/net-worth',
   '/api/finance/personal-money/net-worth/lifecycle','/api/finance/company-summary',
   '/api/finance/banking-os/command-center','/api/finance/intelligence/data-quality',
-  '/api/finance/receipts','/api/finance/reimbursements','/api/finance/accountant-handover','/api/finance/personal-money/review-inbox','/api/finance/intelligence/banking-readiness','/api/notifications','/api/finance/intelligence/rules','/api/finance/close-assurance'
+  '/api/finance/receipts','/api/finance/reimbursements','/api/finance/accountant-handover','/api/finance/personal-money/review-inbox','/api/finance/intelligence/banking-readiness','/api/notifications','/api/finance/intelligence/rules','/api/finance/close-assurance','/api/finance/performance-risk-control'
 ]) assert(advanced.includes(endpoint),`Advanced Control must use protected canonical source ${endpoint}.`);
 
 for(const horizon of ['7,30,90,365','knownProjection','scenarioProjection'])
@@ -56,3 +56,6 @@ assert(advanced.includes('data-fac-open="handover"'),'Advanced Control must dril
 
 assert(advanced.includes('/api/finance/treasury-control'),'Advanced Finance Control must hydrate Treasury evidence.');
 assert(advanced.includes('Treasury & Working Capital'),'Advanced Finance Control must surface Treasury & Working Capital.');
+
+assert(advanced.includes('function performanceRiskControl()'),'Advanced Performance & Stress section is missing.');
+assert(advanced.includes('data-fac-open="performance"'),'Advanced Control must drill into Performance & Stress.');
