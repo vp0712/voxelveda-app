@@ -2,7 +2,7 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v3';
+const VERSION='20260924-advanced-control-v4';
 const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
@@ -23,7 +23,8 @@ const SOURCES=[
   ['bankingOps','/api/finance/banking-os'],
   ['readiness','/api/finance/intelligence/banking-readiness'],
   ['reviewInbox','/api/finance/personal-money/review-inbox'],
-  ['closeAssurance','/api/finance/close-assurance']
+  ['closeAssurance','/api/finance/close-assurance'],
+  ['handover','/api/finance/accountant-handover']
 ];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
@@ -236,6 +237,12 @@ function companyCfo(){
  return '<section id="facCompany" class="fac-section"><header><div><h3>Company CFO Control</h3><p>Receivables, payables, approvals, liquidity and accounting attention.</p></div></header><div class="fac-kpis"><div class="fac-kpi"><span>Customer receivables</span><b>'+money(c.customer_receivables,cur)+'</b><small>'+num(c.open_customer_invoice_count)+' open invoice(s)</small></div><div class="fac-kpi"><span>Supplier payables</span><b>'+money(c.supplier_payables,cur)+'</b><small>'+num(c.supplier_bill_count)+' outstanding bill(s)</small></div><div class="fac-kpi"><span>Pending supplier approvals</span><b>'+num(c.pending_supplier_approvals)+'</b><small>Company workflow</small></div><div class="fac-kpi"><span>Open accountant queries</span><b>'+num(c.open_accountant_queries)+'</b><small>Company accounting</small></div><div class="fac-kpi"><span>Month-end close readiness</span><b>'+esc(close.readiness_status||'—')+'</b><small>'+num(close.blocker_count)+' blocker(s) · '+num(close.warning_count)+' warning(s)</small></div></div><div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Banking command metrics</h4><div class="fac-list">'+(rows||'<div class="fac-empty">No banking command metrics available.</div>')+'</div></article><article class="fac-card"><h4>Control notes</h4><div class="fac-list"><div class="fac-row"><div><h4>GST registration</h4><p>'+esc(c.gst_registration||'UNKNOWN')+'</p></div>'+statusChip(c.gst_registration&&c.gst_registration!=='UNKNOWN'?'CONFIGURED':'REVIEW')+'</div><div class="fac-row"><div><h4>Payment approvals waiting</h4><p>'+num(cmd.approval_inbox?.length)+' approval item(s) returned for your role.</p></div>'+statusChip(cmd.approval_inbox?.length?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Close & Assurance</h4><p>'+esc(close.period?.period_key||'Current period')+' · '+esc(close.run?.status||'not certified')+'</p></div><div class="fac-right">'+statusChip(close.blocker_count?'HIGH':close.run?.status==='CERTIFIED'?'CLEAR':'REVIEW')+'<button data-fac-open="closeassurance">Open close</button></div></div><div class="fac-row"><div><h4>Overdue obligations</h4><p>'+num(cmd.obligations?.overdue)+' overdue payment instruction(s).</p></div>'+statusChip(cmd.obligations?.overdue?'HIGH':'CLEAR')+'</div></div></article></div></section>';
 }
 
+function accountantHandoverStatus(){
+ const h=state.data.handover||{},g=h.gaps||{},c=h.close||{};
+ return '<section id="facHandover" class="fac-section"><header><div><h3>Accountant Handover Readiness</h3><p>Company-only year-end evidence status with versioned handover snapshots.</p></div>'+statusChip(h.handover_status||'REVIEW')+'</header>'+
+ '<div class="fac-kpis"><div class="fac-kpi"><span>Blockers</span><b>'+num(h.blocker_count)+'</b><small>Must be resolved before clean handover</small></div><div class="fac-kpi"><span>Warnings</span><b>'+num(h.warning_count)+'</b><small>Review before external delivery</small></div><div class="fac-kpi"><span>Certified periods</span><b>'+num(c.certified)+' / '+num(c.period_count)+'</b><small>'+num(c.snapshots)+' close snapshot(s)</small></div><div class="fac-kpi"><span>Evidence snapshots</span><b>'+((h.exports||[]).length)+'</b><small>Versioned SHA-256 manifests</small></div></div>'+
+ '<div class="fac-list" style="margin-top:10px"><div class="fac-row"><div><h4>Bank evidence gaps</h4><p>'+num(g.bank_unreconciled)+' unreconciled · '+num(g.bank_unclassified)+' unclassified · '+num(g.missing_receipts)+' missing receipt(s)</p></div>'+statusChip(num(g.bank_unreconciled)+num(g.bank_unclassified)+num(g.missing_receipts)?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Year-end workflow</h4><p>'+num(g.open_accountant_queries)+' open accountant question(s) · '+num(g.periods_not_certified)+' period(s) not certified</p></div><div class="fac-right"><button data-fac-open="handover">Open handover</button></div></div></div></section>';
+}
 function automationApprovalControl(){
  const approvals=state.data.command?.approval_inbox||state.data.bankingOps?.approval_inbox||[];
  const rules=state.data.rules?.rules||state.data.rules||[];
@@ -273,8 +280,8 @@ function sourceHealth(){
 
 function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
- executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+automationApprovalControl()+sourceHealth()+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }
