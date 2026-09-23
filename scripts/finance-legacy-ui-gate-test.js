@@ -23,7 +23,8 @@ assert(app.includes("app.get('/finance-reconciliation.html'"),'legacy reconcilia
 for(const asset of ['finance-intelligence.html','finance-master.js','finance-master.css','finance-bootstrap-guard.js','finance-advanced-control.js']){
   assert(app.includes("'"+asset+"'"),'canonical Finance asset allowlist missing '+asset);
 }
-assert(html.includes('/finance-master.js')&&html.includes('/finance-master.css'),'canonical Finance page must load the master frontend.');\nassert(app.includes("'finance-advanced-control.js'"),'canonical Advanced Finance Control asset missing from allowlist.');
+assert(html.includes('/finance-master.js')&&html.includes('/finance-master.css'),'canonical Finance page must load the master frontend.');
+assert(app.includes("'finance-advanced-control.js'"),'canonical Advanced Finance Control asset missing from allowlist.');
 for(const old of ['advanced-banking-ui.js','finance-dashboard-v2.js','finance-intelligence-advanced.js','finance-import-wizard.js','finance-reconciliation.js','personal-finance-command-center.js']){
   assert(!html.includes(old),'canonical Finance HTML must not load '+old);
 }
