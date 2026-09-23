@@ -52,5 +52,5 @@ assert(protection.includes('INSURANCE')&&protection.includes('Protection boundar
 assert(protection.includes('annualByCurrency'),'Protection costs must remain separated by native currency.');
 assert(protection.includes('never renews or pays anything automatically'),'Protection register must prohibit implied automation.');
 
-assert(html.includes('/finance-master.js?v=20260924-anomaly-explain-v1'),'Finance master release must be cache-busted for governance controls.');
+assert(html.includes('/finance-master.js?v=20260924-job-profitability-v1'),'Finance master release must be cache-busted for governance controls.');
 console.log('FINANCE_GOVERNANCE_CONTROLS_OK');
