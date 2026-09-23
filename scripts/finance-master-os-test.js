@@ -136,7 +136,7 @@ assert.match(js,/Never enter a bank password, bank PIN or bank OTP/,'Finance ste
 
 assert.match(js,/\['advanced','⚡','Control Centre'\]/,'Advanced Finance Control must be a first-class canonical home module.');
 assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control view must be mounted inside the master Finance OS.');
-assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v5/,'Advanced Finance Control must use the canonical versioned asset.');
+assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v6/,'Advanced Finance Control must use the canonical versioned asset.');
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
 assert.match(js,/const MOBILE_NAV=\[\['advanced','⚡','Control'\]/,'Mobile Finance Home must open Advanced Control.');
@@ -149,3 +149,6 @@ assert.match(js,/if\(v==='handover'\)return accountantHandoverView\(\);/,'Accoun
 
 assert.match(js,/\['treasury','▥','Treasury'\]/,'Treasury must be a canonical Finance planning module.');
 assert.match(js,/function treasuryControlView\(\)/,'Treasury Control view must exist inside Finance Master OS.');
+
+assert.match(js,/\['performance','▤','Performance & Stress'\]/,'Performance & Stress Control must be a first-class canonical module.');
+assert.match(js,/function performanceRiskView\(\)/,'Performance & Stress Control view must be mounted inside the master Finance OS.');
