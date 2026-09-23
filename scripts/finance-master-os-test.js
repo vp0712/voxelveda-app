@@ -9,7 +9,7 @@ const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
 assert.match(html,/finance-master\.css\?v=20260923-control-centre/,'Master finance stylesheet must be loaded.');
-assert.match(html,/finance-master\.js\?v=20260924-anomaly-explain-v1/,'Master finance client must be loaded with the current cache-busting release id.');
+assert.match(html,/finance-master\\.js\\?v=20260924-job-profitability-v1/,'Master finance client must be loaded with the current cache-busting release id.');
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');
