@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,companySummary:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -237,7 +237,7 @@ async function hydrateSupplementary(cycle){
   ['os',OS+'/command-center'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
   ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
   ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
-  ['roadmaps',API+'/personal-money/roadmaps']
+  ['roadmaps',API+'/personal-money/roadmaps'],['openBankProviders',I+'/open-banking/providers'],['openBankSessions',I+'/open-banking/sessions'],['bankConnectionData','/api/integrations/webhooks/banking/connections'],['bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs']
  ];
  for(let index=0;index<resources.length;index+=FINANCE_HYDRATION_BATCH_SIZE){
   if(cycle!==loadCycle)return;
@@ -495,8 +495,42 @@ function teamView(){
  return `${resourceError('team','Team Finance Access')}<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Team Finance Access</h2><p>Access is enforced on the server, not by hiding frontend controls.</p></div></div><div class="fm-list">${users.map(u=>`<div class="fm-row"><div><h3>${esc(u.name||u.email||'User')}</h3><p>${esc(u.role||'')} · ${esc(u.access_level||u.banking_access||'')}</p></div>${statusBadge(u.status||'ACTIVE')}</div>`).join('')||emptyState('No team data','No finance team access records were returned.')}</div></div></article>`;
 }
 function connectionsView(){
- const r=state.readiness||{};
- return `${resourceError('readiness','Banking Connections')}<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Banking Setup & Safety</h2><p>${esc(r.headline||'Readiness unavailable')}</p></div>${statusBadge(r.overall)}</div><div class="fm-list">${(r.controls||[]).map(c=>`<div class="fm-row"><div><h3>${esc(c.plain_name||c.label)}</h3><p>${esc(c.detail||c.description||'')}</p></div>${statusBadge(c.status)}</div>`).join('')}</div></div></article><article class="fm-card"><div class="fm-pad"><h2>Connection status</h2><p class="fm-helper">${esc(r.open_banking?.explanation||'Fail-closed until provider and production controls are verified.')}</p><div class="fm-list">${(r.connections||[]).map(c=>`<div class="fm-row"><div><h3>${esc(c.institution||c.provider)}</h3><p>Consent: ${esc(c.consent_status||'')} · last sync ${date(c.last_sync_completed_at)}</p></div>${statusBadge(c.last_sync_status||c.consent_status)}</div>`).join('')||emptyState('No live connections','Manual statement import remains the supported fallback.')}</div></div></article></div>`;
+ const r=state.readiness||{},providers=state.openBankProviders?.providers||[],sessions=state.openBankSessions?.sessions||[],connections=state.bankConnectionData?.connections||[];
+ const providerCards=providers.map(p=>`<article class="fm-connection-card"><div><span class="fm-account-type">${esc(p.key||p.name||'PROVIDER')}</span><h3>${esc(p.name||p.key||'Open Banking provider')}</h3><p>${p.configured?'Provider credentials are configured.':'Missing configuration: '+esc((p.missing||[]).join(', ')||'not ready')}</p></div><div>${statusBadge(p.configured?'READY':'NOT CONFIGURED')}${p.configured?`<button class="fm-primary" data-bank-connect="${esc(p.key)}">Connect bank</button>`:''}</div></article>`).join('');
+ const connectionRows=connections.map(c=>`<div class="fm-row"><div><h3>${esc(c.institution||c.provider||'Bank connection')}</h3><p>${esc(c.provider||'')} · consent ${esc(c.consent_status||'')} · last sync ${c.last_sync_completed_at?new Date(c.last_sync_completed_at).toLocaleString('en-AU'):'never'}</p><small>${(c.accounts||[]).map(a=>esc(a.account_name||'Account')+' · '+esc(a.currency||'')).join(' · ')}</small></div><div class="fm-row-right">${statusBadge(c.status||c.last_sync_status||c.consent_status)}<div class="fm-inline-actions"><button data-bank-sync="${esc(c.connection_uid)}">Sync now</button><button data-bank-reauthorize="${esc(c.provider||'BASIQ')}">Renew consent</button><button class="bad" data-bank-disconnect="${esc(c.connection_uid)}">Disconnect</button></div></div></div>`).join('');
+ const sessionRows=sessions.slice(0,20).map(s=>`<div class="fm-row"><div><h3>${esc(s.provider)} consent</h3><p>${esc(s.environment||'')} · created ${s.created_at?new Date(s.created_at).toLocaleString('en-AU'):'—'} · expires ${s.expires_at?new Date(s.expires_at).toLocaleString('en-AU'):'—'}</p></div><div class="fm-row-right">${statusBadge(s.status)}${['CREATED','AWAITING_USER'].includes(String(s.status||''))?`<button data-consent-cancel="${esc(s.session_uid)}">Cancel</button>`:''}</div></div>`).join('');
+ const syncRows=(state.bankSyncJobs?.runs||state.bankSyncJobs?.sync_runs||[]).slice(0,12).map(s=>`<div class="fm-row"><div><h3>${esc(s.provider||'Bank sync')} · ${esc(s.trigger_type||'')}</h3><p>${s.started_at?new Date(s.started_at).toLocaleString('en-AU'):'—'} · ${num(s.transactions_seen)} seen · ${num(s.transactions_inserted)} inserted · ${num(s.duplicates_skipped)} duplicates skipped</p></div>${statusBadge(s.status)}</div>`).join('');
+ return `${resourceError('readiness','Banking Connections')}<div class="fm-control-intro"><p>OPEN BANKING & MANUAL IMPORT</p><h2>Connect where available; statements always remain the fallback</h2><span>Voxel Veda never asks for or stores your bank password, PIN or OTP. Consent happens on the provider/bank-controlled page. Imported and synced transactions land in the same canonical Finance ledger.</span><div class="fm-control-quick"><button data-viewjump="history">Import statements</button><button data-viewjump="accounts">Manage accounts</button><button data-viewjump="review">Review data</button></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Provider readiness</h2><p>${esc(r.headline||state.openBankProviders?.recommendation?.reason||'Open Banking readiness')}</p></div>${statusBadge(r.overall||'RUNTIME STATUS')}</div><div class="fm-connection-grid">${providerCards||emptyState('No provider configured','Use statement import until an Australian Open Banking provider is configured.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Connected banks</h2><p>Sync controls operate on existing provider consents and preserve historical data when disconnected.</p></div></div>${resourceError('bankConnectionData','Connected banks')}<div class="fm-list">${connectionRows||emptyState('No bank connected','Connect a configured provider or use History Import for complete statement history.')}</div></div></article></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Consent sessions</h2><p>Provider-controlled authorization sessions for the signed-in user.</p></div></div>${resourceError('openBankSessions','Consent sessions')}<div class="fm-list">${sessionRows||emptyState('No consent sessions','Starting a bank connection creates a short-lived consent session.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Sync history</h2><p>Evidence of provider syncs, inserted transactions and duplicate suppression.</p></div></div>${resourceError('bankSyncJobs','Bank sync history')}<div class="fm-list">${syncRows||emptyState('No sync history','No provider sync has run for this user.')}</div></div></article></div>`;
+}
+async function startBankConsent(provider){
+ try{
+  const result=await api(I+'/open-banking/consent',{method:'POST',body:JSON.stringify({provider})});
+  const url=String(result.consent_url||'');
+  if(!/^https:\/\//i.test(url))throw new Error('Provider did not return a secure consent URL.');
+  notice(result.message||'Bank consent session created.');
+  const opened=window.open(url,'_blank','noopener,noreferrer');
+  if(!opened)window.location.assign(url);
+  await loadResource('openBankSessions',I+'/open-banking/sessions');
+  if(state.view==='connections')render();
+ }catch(error){notice(error.message,true)}
+}
+async function syncBankConnection(uid){
+ try{
+  const x=await api('/api/integrations/webhooks/banking/connections/'+encodeURIComponent(uid)+'/sync',{method:'POST',body:'{}',timeoutMs:30000});
+  notice(x.message||'Bank synchronization started/completed.');
+  await Promise.all([loadResource('bankConnectionData','/api/integrations/webhooks/banking/connections'),loadResource('bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs')]);
+  if(state.view==='connections')render();
+ }catch(error){notice(error.message,true)}
+}
+async function disconnectBankConnection(uid){
+ if(!confirm('Disconnect this bank connection? Existing imported/synced financial history will be preserved.'))return;
+ try{
+  const x=await api('/api/integrations/webhooks/banking/connections/'+encodeURIComponent(uid)+'/disconnect',{method:'POST',body:'{}'});
+  notice(x.message);await refresh();state.view='connections';render();
+ }catch(error){notice(error.message,true)}
+}
+async function cancelBankConsent(uid){
+ try{const x=await api(I+'/open-banking/sessions/'+encodeURIComponent(uid)+'/cancel',{method:'POST',body:'{}'});notice(x.message);await loadResource('openBankSessions',I+'/open-banking/sessions');if(state.view==='connections')render()}catch(error){notice(error.message,true)}
 }
 function settingsView(){
  const caps=state.capabilities?.capabilities||{},st=state.companySettings?.settings||{};
@@ -1136,6 +1170,11 @@ function bindDynamic(){
     notice(x.message);await refresh();
   }catch(error){notice(error.message,true)}
  });
+ document.querySelectorAll('[data-bank-connect]').forEach(b=>b.onclick=()=>startBankConsent(b.dataset.bankConnect));
+ document.querySelectorAll('[data-bank-sync]').forEach(b=>b.onclick=()=>syncBankConnection(b.dataset.bankSync));
+ document.querySelectorAll('[data-bank-reauthorize]').forEach(b=>b.onclick=()=>startBankConsent(b.dataset.bankReauthorize));
+ document.querySelectorAll('[data-bank-disconnect]').forEach(b=>b.onclick=()=>disconnectBankConnection(b.dataset.bankDisconnect));
+ document.querySelectorAll('[data-consent-cancel]').forEach(b=>b.onclick=()=>cancelBankConsent(b.dataset.consentCancel));
  if($('addFinanceCategory'))$('addFinanceCategory').onclick=()=>openFinanceCategoryForm();
  document.querySelectorAll('[data-category-edit]').forEach(b=>b.onclick=()=>openFinanceCategoryForm(b.dataset.categoryEdit));
  document.querySelectorAll('[data-category-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this Finance category? Existing transaction classifications will remain unchanged.'))return;try{const x=await api(API+'/categories/'+encodeURIComponent(b.dataset.categoryArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});

@@ -58,3 +58,11 @@ assert.match(js,/data-account-edit/,'Account workspace must provide account edit
 assert.match(js,/data-personal-new="wallet"/,'Personal Money must expose wallet creation.');
 assert.match(js,/personal-money\/wallets/,'Personal wallet form must save to the owner-isolated wallet API.');
 assert.match(js,/fx_rate_to_wallet/,'Personal multi-currency cash entry must expose an explicit FX rate instead of inventing conversion.');
+
+assert.match(js,/open-banking\/providers/,'Unified Finance OS must load Open Banking provider readiness.');
+assert.match(js,/open-banking\/sessions/,'Unified Finance OS must load provider consent sessions.');
+assert.match(js,/function startBankConsent\(/,'Finance OS must expose provider-controlled bank consent.');
+assert.match(js,/Provider did not return a secure consent URL/,'Bank consent UI must reject non-HTTPS provider redirects.');
+assert.match(js,/function syncBankConnection\(/,'Finance OS must expose connected-bank sync.');
+assert.match(js,/function disconnectBankConnection\(/,'Finance OS must expose controlled bank disconnect while preserving history.');
+assert.match(js,/never asks for or stores your bank password, PIN or OTP/,'Bank connection safety boundary must be visible.');
