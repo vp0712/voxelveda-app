@@ -14,6 +14,7 @@ const bankingReadiness = require('../controllers/financeBankingReadinessControll
 const bankingOS = require('../controllers/bankingOperatingSystemController');
 const openBanking = require('../controllers/openBankingController');
 const financeReceipt = require('../controllers/financeReceiptController');
+const financeCashControl = require('../controllers/financeCashControlController');
 const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
 const financeReportBuilder = require('../controllers/financeReportBuilderController');
@@ -257,6 +258,11 @@ router.get('/bank-accounts', requireAnyPermission('VIEW_BANKING'), financePrivac
 router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountBody('id'), financePrivacy.protectScopeConversion('id', 'ownership_scope'), requireStepUp('CHANGE_BANK_DETAILS'), operations.saveBankAccount);
 router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
+router.get('/cash-control', requireAnyPermission('VIEW_BANKING'), financeCashControl.getCenter);
+router.post('/cash-control/counts', requireAnyPermission('EDIT_FINANCE'), financeCashControl.recordCount);
+router.post('/cash-control/counts/:uid/review', requireAnyPermission('EDIT_FINANCE'), requireStepUp('REVIEW_CASH_VARIANCE'), financeCashControl.reviewCount);
+router.post('/cash-control/transfers', requireAnyPermission('EDIT_FINANCE'), requireStepUp('RECORD_CASH_TRANSFER'), financeCashControl.createTransfer);
+router.post('/cash-control/transfers/:uid/reverse', requireAnyPermission('EDIT_FINANCE'), requireStepUp('REVERSE_CASH_TRANSFER'), financeCashControl.reverseTransfer);
 router.get('/receipts', requireAnyPermission('VIEW_BANKING'), financeReceipt.center);
 router.get('/bank-transactions-archived', requireAnyPermission('VIEW_BANKING'), financeTransactionLifecycle.listArchived);
 router.post('/bank-transactions/:id/archive', requireAnyPermission('EDIT_FINANCE'), financePrivacy.bankTransactionParam('id'), financeTransactionLifecycle.archive);
