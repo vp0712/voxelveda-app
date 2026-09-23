@@ -9,11 +9,11 @@ const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
 assert.match(html,/finance-master\.css\?v=20260923-control-centre/,'Master finance stylesheet must be loaded.');
-assert.match(html,/finance-master\\.js\\?v=20260924-job-profitability-v1/,'Master finance client must be loaded with the current cache-busting release id.');
+assert.match(html,/finance-master\\.js\\?v=20260924-counterparty-v1/,'Master finance client must be loaded with the current cache-busting release id.');
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');
-for(const name of ['Overview','My Money','Company Finance','Consolidated','Accounts','Transactions','Cash','Transfers','Refunds','Reimbursements','Borrow & Lend','Recurring','Statements','Budgets','Savings Goals','Advanced Control','Insights','Rules','Review Centre','Reconciliation','Reports','Notifications','Team Access','Banking Connections','Finance Settings','Close & Assurance']){
+for(const name of ['Overview','My Money','Company Finance','Consolidated','Accounts','Transactions','Cash','Transfers','Refunds','Reimbursements','Customers & Suppliers','Borrow & Lend','Recurring','Statements','Budgets','Savings Goals','Advanced Control','Insights','Rules','Review Centre','Reconciliation','Reports','Notifications','Team Access','Banking Connections','Finance Settings','Close & Assurance']){
   assert(js.includes(name),`Navigation must contain ${name}`);
 }
 assert.match(js,/banking-dashboard/,'Finance OS must use real banking dashboard data.');
@@ -136,7 +136,7 @@ assert.match(js,/Never enter a bank password, bank PIN or bank OTP/,'Finance ste
 
 assert.match(js,/\['advanced','⚡','Control Centre'\]/,'Advanced Finance Control must be a first-class canonical home module.');
 assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control view must be mounted inside the master Finance OS.');
-assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v9/,'Advanced Finance Control must use the canonical versioned asset.');
+assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v10/,'Advanced Finance Control must use the canonical versioned asset.');
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
 assert.match(js,/const MOBILE_NAV=\[\['advanced','⚡','Control'\]/,'Mobile Finance Home must open Advanced Control.');
@@ -158,3 +158,6 @@ assert.match(js,/function controlActionsView\(\)/,'Control Actions view must be 
 
 assert.match(js,/\['anomaly','≈','Anomaly & Explain'\]/,'Anomaly & Explainability must be a first-class canonical module.');
 assert.match(js,/function anomalyExplainView\(\)/,'Anomaly & Explainability view must be mounted inside the master Finance OS.');
+
+assert.match(js,/function counterpartyControlView\(\)/,'Finance OS must expose Customers & Suppliers counterparty control.');
+assert.match(js,/counterparty-control/,'Finance OS must hydrate Counterparty Control.');

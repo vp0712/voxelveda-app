@@ -9,8 +9,8 @@ const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 const suite=fs.readFileSync('scripts/finance-production-regression-suite.js','utf8');
 
 assert(master.includes("view:'advanced',scope:'ALL'"),'Finance must open on the Control Centre.');
-assert(html.includes('/finance-master.js?v=20260924-job-profitability-v1'),'Canonical Finance release cache id is stale.');
-assert(advanced.includes("VERSION='20260924-advanced-control-v9'"),'Advanced Control release id is stale.');
+assert(html.includes('/finance-master.js?v=20260924-counterparty-v1'),'Canonical Finance release cache id is stale.');
+assert(advanced.includes("VERSION='20260924-advanced-control-v10'"),'Advanced Control release id is stale.');
 
 const navBlock=master.slice(master.indexOf('const NAV_GROUPS=['),master.indexOf('];',master.indexOf('const NAV_GROUPS=['))+2);
 const navKeys=[...navBlock.matchAll(/\['([a-z0-9]+)','[^']*','[^']+'\]/g)].map(m=>m[1]);
@@ -62,5 +62,6 @@ for(const phrase of ['TODO','COMING SOON','NOT IMPLEMENTED','PLACEHOLDER ONLY'])
 assert(master.includes('FINANCE_REQUEST_TIMEOUT_MS=12000'),'Finance requests must remain bounded.');
 assert(master.includes('FINANCE_HYDRATION_BATCH_SIZE=5'),'Finance hydration must remain batched.');
 assert(suite.includes('"finance-job-profitability-test.js"'),'Job Profitability must remain in the production regression suite.');
+assert(suite.includes('"finance-counterparty-control-test.js"'),'Counterparty Control must remain in the production regression suite.');
 assert(suite.includes('"finance-full-surface-acceptance-test.js"'),'Full-surface acceptance must gate production.');
 console.log('FINANCE_FULL_SURFACE_ACCEPTANCE_OK '+navKeys.length+' modules');
