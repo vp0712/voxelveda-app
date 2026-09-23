@@ -85,6 +85,10 @@ exports.getDashboard = async (req, res) => {
       `SELECT id, name, currency, balance, active, created_at, updated_at
        FROM personal_money_wallets WHERE user_id = ? AND active = 1 ORDER BY created_at`, [userId]
     );
+    const [archivedWallets] = await pool.query(
+      `SELECT id, name, currency, balance, active, created_at, updated_at
+       FROM personal_money_wallets WHERE user_id = ? AND active = 0 ORDER BY updated_at DESC LIMIT 100`, [userId]
+    );
     const [debts] = await pool.query(
       `SELECT id, direction, counterparty, principal_amount, outstanding_amount, currency, due_date, status, note, created_at
        FROM personal_money_debts WHERE user_id = ? ORDER BY FIELD(status,'OPEN','PARTIAL','SETTLED'), due_date IS NULL, due_date, created_at DESC LIMIT 100`, [userId]
@@ -151,7 +155,7 @@ exports.getDashboard = async (req, res) => {
     return res.json({
       privacy: 'Owner-only personal ledger. No company finance user can read another user’s Personal Money Center records.',
       currency_rule: 'Currencies are reported separately. Voxel Veda does not add AUD, USD, INR or other currencies together without an explicit conversion.',
-      wallets, wallet_totals: walletTotals, debts, debt_totals_by_currency: debtByCurrency, entries, budgets: enrichedBudgets,
+      wallets, archived_wallets: archivedWallets, wallet_totals: walletTotals, debts, debt_totals_by_currency: debtByCurrency, entries, budgets: enrichedBudgets,
       cash_flow_by_currency: cashFlowByCurrency,
       forecast: {
         method: 'Uses the last 90 days of personal cash income/spending separately for each wallet currency. It is an estimate, not an accounting or investment prediction.',
@@ -172,6 +176,17 @@ exports.createWallet = async (req, res) => {
     await pool.query(`INSERT INTO personal_money_wallets (id,user_id,name,currency,balance) VALUES (?,?,?,?,?)`, [id,userId,name,walletCurrency,opening]);
     return res.status(201).json({ message: 'Wallet created.', id });
   } catch (error) { return respondError(res, error, 'Failed to create wallet.'); }
+};
+
+exports.setWalletActive = async (req,res) => {
+  try {
+    const userId=uid(req); const desired=Boolean(req.body.active);
+    const wallet=await ownedWallet(pool,userId,req.params.id,false);
+    if(desired===Boolean(Number(wallet.active))) return res.json({message:desired?'Wallet is already active.':'Wallet is already archived.'});
+    if(!desired && Math.abs(Number(wallet.balance||0))>0.0001) throw Object.assign(new Error('Move the wallet balance to zero before archiving it.'),{statusCode:409});
+    await pool.query('UPDATE personal_money_wallets SET active=? WHERE id=? AND user_id=?',[desired?1:0,wallet.id,userId]);
+    return res.json({message:desired?'Wallet restored.':'Wallet archived. Historical Personal Money entries remain preserved.'});
+  } catch(error){ return respondError(res,error,'Failed to update wallet lifecycle.'); }
 };
 
 exports.createEntry = async (req, res) => {
@@ -245,4 +260,13 @@ exports.saveBudget = async (req,res) => {
     await pool.query(`INSERT INTO personal_money_budgets (id,user_id,month_start,category,currency,limit_amount) VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE limit_amount=VALUES(limit_amount),updated_at=CURRENT_TIMESTAMP`,[id,userId,month,category,budgetCurrency,limit]);
     return res.json({message:'Budget saved.'});
   } catch(error){ return respondError(res,error,'Failed to save budget.'); }
+};
+
+exports.deleteBudget = async (req,res) => {
+  try {
+    const userId=uid(req);
+    const [result]=await pool.query('DELETE FROM personal_money_budgets WHERE id=? AND user_id=?',[req.params.id,userId]);
+    if(!result.affectedRows) return res.status(404).json({message:'Personal budget not found.'});
+    return res.json({message:'Personal budget removed. No transaction or wallet history was deleted.'});
+  } catch(error){ return respondError(res,error,'Failed to remove personal budget.'); }
 };

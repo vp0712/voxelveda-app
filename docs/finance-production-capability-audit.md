@@ -29,11 +29,11 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Internal transfers | Explicit debit/credit pair relationship, same-currency validation, excluded from income/expense | PARTIAL until production user-flow verification |
 | Refunds | Explicit refund-to-expense links, same-currency and remaining-balance validation, trusted-total netting | PARTIAL until production report/user-flow verification |
 | Reimbursements | Draft/submit/approve/reject/payment-link lifecycle | PARTIAL until production user-flow verification |
-| Cash | Canonical cash account creation plus owner-only Personal Money wallets, wallet creation and explicit-FX cash movements | PARTIAL pending authenticated production journey verification |
-| Budgets | Personal budgets plus banking-ledger budgets with create/archive and usage tracking | PARTIAL |
-| Savings goals | Goal management plus explicit progress contributions that do not silently move bank cash | PARTIAL |
+| Cash | Canonical cash account creation plus owner-only Personal Money wallets, explicit-FX movements, zero-balance archive and controlled restore | PARTIAL pending authenticated production journey verification |
+| Budgets | Personal budgets plus banking-ledger budgets with create/update/remove or archive controls and usage tracking | PARTIAL pending authenticated production journey verification |
+| Savings goals | Goal management, pause/resume and explicit progress contributions that do not silently move bank cash | PARTIAL pending authenticated production journey verification |
 | Borrow & Lend | Owner-only debt lifecycle and repayment workflow | PARTIAL |
-| Recurring money | Personal recurring lifecycle plus finance-intelligence suggestions; no bank execution | PARTIAL |
+| Recurring money | Personal recurring create/complete/archive/restore lifecycle plus finance-intelligence suggestions; no bank execution | PARTIAL pending authenticated production journey verification |
 | Categories | Original bank category preserved separately from editable system category; category manager exposed | PARTIAL |
 | Rules | Suggestion-only merchant/category rules with priority | READY core |
 | Insights | Spending-health cards, top-merchant concentration, recurring commitments, runway/safe-to-spend signals and evidence-backed transaction insights | READY core / integrated UI |

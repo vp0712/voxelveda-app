@@ -65,6 +65,10 @@ exports.getAttentionCenter = async (req, res) => {
       `SELECT id,name,item_type,amount,currency,frequency,next_due_date,category,counterparty,reminder_days,active,last_completed_date,note
        FROM personal_money_recurring_items WHERE user_id=? AND active=1 ORDER BY next_due_date,name`, [userId]
     );
+    const [archivedRecurring] = await pool.query(
+      `SELECT id,name,item_type,amount,currency,frequency,next_due_date,category,counterparty,reminder_days,active,last_completed_date,note
+       FROM personal_money_recurring_items WHERE user_id=? AND active=0 ORDER BY updated_at DESC LIMIT 100`, [userId]
+    );
     const [goals] = await pool.query(
       `SELECT id,name,target_amount,current_amount,currency,target_date,priority,status,note,created_at
        FROM personal_money_savings_goals WHERE user_id=? ORDER BY FIELD(status,'ACTIVE','PAUSED','COMPLETED'), FIELD(priority,'HIGH','MEDIUM','LOW'), target_date IS NULL, target_date`, [userId]
@@ -171,6 +175,7 @@ exports.getAttentionCenter = async (req, res) => {
       explanation:'Attention Center shows reminders and planning signals only. It never pays bills, moves money, or posts company accounting entries automatically.',
       alerts: alerts.sort((a,b) => (severityRank[a.severity] ?? 99) - (severityRank[b.severity] ?? 99)),
       recurring: recurring.map((r) => ({ ...r, amount:Number(r.amount), annualized_cost:r.item_type==='INCOME'?0:annualized(r.amount,r.frequency) })),
+      archived_recurring: archivedRecurring.map((r) => ({ ...r, amount:Number(r.amount) })),
       goals: enrichedGoals,
       current_budgets: budgets.map((b) => ({ ...b, limit_amount:Number(b.limit_amount), spent_amount:Number(b.spent_amount), used_percent:Number(b.limit_amount)>0?Math.round(Number(b.spent_amount)/Number(b.limit_amount)*1000)/10:0 })),
       annual_recurring_cost_by_currency: recurringTotals,
@@ -200,6 +205,27 @@ exports.completeRecurring = async (req,res) => {
     await pool.query(`UPDATE personal_money_recurring_items SET last_completed_date=?,next_due_date=? WHERE id=? AND user_id=?`,[completed,next,row.id,userId]);
     return res.json({message:`Marked completed. Next due date moved to ${next}. No payment transaction was created.`,next_due_date:next});
   } catch(error){ return respondError(res,error,'Failed to update recurring item.'); }
+};
+
+exports.setRecurringActive = async (req,res) => {
+  try {
+    const userId=uid(req); const active=Boolean(req.body.active);
+    const [result]=await pool.query('UPDATE personal_money_recurring_items SET active=? WHERE id=? AND user_id=?',[active?1:0,req.params.id,userId]);
+    if(!result.affectedRows) return res.status(404).json({message:'Recurring item not found.'});
+    return res.json({message:active?'Recurring item restored.':'Recurring item archived. No bank payment or transaction was created.'});
+  } catch(error){ return respondError(res,error,'Failed to update recurring item.'); }
+};
+
+exports.setGoalStatus = async (req,res) => {
+  try {
+    const userId=uid(req); const status=String(req.body.status||'').trim().toUpperCase();
+    if(!['ACTIVE','PAUSED'].includes(status)) return res.status(400).json({message:'Savings goal status can only be Active or Paused here. Completion is driven by recorded progress.'});
+    const [[goal]]=await pool.query('SELECT id,status FROM personal_money_savings_goals WHERE id=? AND user_id=? LIMIT 1',[req.params.id,userId]);
+    if(!goal) return res.status(404).json({message:'Savings goal not found.'});
+    if(goal.status==='COMPLETED') return res.status(409).json({message:'Completed savings goals are not reopened automatically.'});
+    await pool.query('UPDATE personal_money_savings_goals SET status=? WHERE id=? AND user_id=?',[status,goal.id,userId]);
+    return res.json({message:status==='PAUSED'?'Savings goal paused.':'Savings goal resumed.'});
+  } catch(error){ return respondError(res,error,'Failed to update savings goal.'); }
 };
 
 exports.createGoal = async (req,res) => {

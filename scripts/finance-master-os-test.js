@@ -112,3 +112,8 @@ assert.match(js,/Data quality controls/,'Finance Report Centre must expose data-
 assert.match(js,/\['currency','FX','Currency Centre'\]/,'Finance OS must expose the Currency Centre.');
 assert.match(js,/function managementConversionCard\(\)/,'Finance OS must calculate explicit evidence-based management conversions.');
 assert.match(js,/Finance will not invent an exchange rate/,'Missing FX evidence must remain fail-closed.');
+
+assert.match(js,/data-wallet-active/,'Personal Money must expose recoverable wallet lifecycle controls.');
+assert.match(js,/data-personal-budget-delete/,'Personal Money budgets must be removable without deleting financial history.');
+assert.match(js,/data-recurring-active/,'Recurring Money must support archive and restore.');
+assert.match(js,/data-goal-status/,'Savings Goals must support pause and resume lifecycle controls.');
