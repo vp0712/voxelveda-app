@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,debtPlanner:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,debtPlanner:null,closeAssurance:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -24,7 +24,7 @@ const NAV_GROUPS=[
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports'],['taxcontrol','§','Tax & Evidence']]],
- ['CONTROL',[['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
+ ['CONTROL',[['closeassurance','✓','Close & Assurance'],['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
 const MOBILE_NAV=[['advanced','⚡','Control'],['accounts','▣','Accounts'],['transactions','↕','Transactions'],['statements','▤','Statements'],['more','☰','More']];
@@ -133,6 +133,7 @@ function title(v){return ({
  reports:['Reports','Trusted exports and report-ready filtered transaction data.'],
  taxcontrol:['Tax & Evidence Readiness','Owner-private tax preparation, receipt gaps and evidence readiness without inventing tax treatment.'],
  team:['Team Finance Access','Server-enforced banking and finance access controls.'],
+ closeassurance:['Close & Assurance','Month-end evidence, certification, stale-signoff protection and controlled period locking.'],
  setupcentre:['Finance Setup Centre','Complete the real data migration and control checks required for a reliable Finance OS.'],
  notifications:['Finance Notifications','User-specific finance alerts and notification preferences.'],
  connections:['Banking Connections','Open Banking readiness and sync status; fail-closed when not configured.'],
@@ -295,7 +296,7 @@ async function hydrateSupplementary(cycle){
   ['readiness',I+'/banking-readiness'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
   ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
   ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
-  ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['cashControl',API+'/cash-control'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
+  ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['cashControl',API+'/cash-control'],['closeAssurance',API+'/close-assurance'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
   ['roadmaps',API+'/personal-money/roadmaps'],['debtPlanner',API+'/personal-money/debt-planner'],['netWorth',API+'/personal-money/net-worth'],['assetLifecycle',API+'/personal-money/net-worth/lifecycle'],['fxRates',API+'/fx-rates'],['personalBankDash',I+'/banking-dashboard'+scopeDashboardQuery('PERSONAL')],['businessBankDash',I+'/banking-dashboard'+scopeDashboardQuery('BUSINESS')],['openBankProviders',I+'/open-banking/providers'],['openBankSessions',I+'/open-banking/sessions'],['bankConnectionData','/api/integrations/webhooks/banking/connections'],['bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs']
  ];
  for(let index=0;index<resources.length;index+=FINANCE_HYDRATION_BATCH_SIZE){
@@ -439,6 +440,29 @@ function personalCard(kind){
  return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>'+label+'</h2><p>Owner-only Personal Money records. They are not silently added to company/bank totals.</p></div><button data-personal-new="'+kind+'">+ Add</button></div><div class="fm-list">'+(rows||emptyState('No records yet','Use Add to create the first record.'))+'</div></div></article>';
 }
 
+async function loadCloseAssurance(periodId){
+ try{
+  const path=API+'/close-assurance'+(periodId?'?period_id='+encodeURIComponent(periodId):'');
+  state.closeAssurance=await api(path);state.resources.closeAssurance={status:'ready',error:null};render();
+ }catch(error){state.resources.closeAssurance={status:'error',error};notice(error.message,true);render()}
+}
+function closeAssuranceView(){
+ const c=state.closeAssurance||{},period=c.period||{},checks=c.checks||[],run=c.run||{},periods=c.periods||state.accountingPeriods?.accounting_periods||[],snaps=c.snapshots||[];
+ const blockers=checks.filter(x=>x.severity==='BLOCKER'&&!x.pass),warnings=checks.filter(x=>x.severity==='WARNING'&&!x.pass);
+ const periodOptions=periods.map(p=>'<option value="'+esc(p.id)+'" '+(String(p.id)===String(period.id)?'selected':'')+'>'+esc(p.period_key)+' · '+esc(p.financial_year_label||'')+' · '+date(p.start_date)+' → '+date(p.end_date)+' · '+esc(p.status)+'</option>').join('');
+ const checkRows=checks.map(x=>'<div class="fm-row"><div><h3>'+esc(x.title)+'</h3><p>'+esc(x.severity)+' · expected '+esc(x.target??0)+(x.amount?' · exposure '+money(x.amount,state.companySummary?.currency||'AUD'):'')+'</p></div><div class="fm-row-right">'+statusBadge(x.pass?'CLEAR':x.severity)+'<b>'+num(x.actual)+'</b>'+(x.pass?'':'<button data-viewjump="'+esc(x.action_view||'review')+'">Resolve</button>')+'</div></div>').join('');
+ const info=c.informational||{},pay=info.open_payables||{},rec=info.open_receivables||{};
+ const snapRows=snaps.map(s=>'<div class="fm-row"><div><h3>'+date(s.captured_at)+' · '+esc(s.readiness_status)+'</h3><p>Evidence '+esc(String(s.evidence_hash||'').slice(0,16))+'… · '+num(s.blocker_count)+' blocker(s) · '+num(s.warning_count)+' warning(s)</p></div>'+statusBadge(s.blocker_count?'NOT READY':'SNAPSHOT')+'</div>').join('');
+ const canCertify=period.id&&period.status!=='LOCKED'&&num(c.blocker_count)===0;
+ const canLock=period.id&&period.status==='READY'&&run.status==='CERTIFIED'&&run.certified_fingerprint;
+ const canReopen=period.id&&period.status!=='LOCKED'&&run.status==='CERTIFIED';
+ return resourceError('closeAssurance','Close & Assurance')+
+ '<div class="fm-control-intro"><p>MONTH-END CLOSE & ASSURANCE</p><h2>Prove the period is clean before you lock it</h2><span>Close certification fingerprints live financial evidence. If measured evidence changes after sign-off, period locking fails until you certify again.</span><div class="fm-control-quick"><button id="closeRefresh">Refresh evidence</button><button id="closeSnapshot">Capture snapshot</button>'+(canCertify?'<button id="closeCertify">Certify close</button>':'')+(canLock?'<button id="closeLock">Lock period</button>':'')+(canReopen?'<button id="closeReopen">Reopen certification</button>':'')+'</div></div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounting period</h2><p>Select the month/period whose evidence must be closed.</p></div>'+statusBadge(period.status||'UNKNOWN')+'</div><label>Period<select id="closePeriod">'+periodOptions+'</select></label><div class="fm-grid four" style="margin-top:12px"><div class="fm-kpi"><span>Close readiness</span><strong>'+esc(c.readiness_status||'—')+'</strong><small>'+esc(period.period_key||'No period')+'</small></div><div class="fm-kpi"><span>Blocking controls</span><strong>'+num(c.blocker_count)+'</strong><small>Must be zero to certify</small></div><div class="fm-kpi"><span>Warnings</span><strong>'+num(c.warning_count)+'</strong><small>Visible but not lock blockers</small></div><div class="fm-kpi"><span>Certification</span><strong>'+esc(run.status||'NOT STARTED')+'</strong><small>'+(run.certified_at?'Certified '+date(run.certified_at):'Evidence fingerprint required')+'</small></div></div></div></article>'+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Close controls</h2><p>Hard blockers and warnings are calculated from the canonical ledgers.</p></div></div><div class="fm-list">'+(checkRows||emptyState('No close controls loaded','Refresh close evidence.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Balance-sheet context</h2><p>Open balances are context, not automatic blockers.</p></div></div><div class="fm-list"><div class="fm-row"><div><h3>Open supplier payables</h3><p>'+num(pay.count)+' outstanding bill(s) as of period end</p></div><b>'+money(pay.amount||0,state.companySummary?.currency||'AUD')+'</b></div><div class="fm-row"><div><h3>Open customer receivables</h3><p>'+num(rec.count)+' outstanding invoice(s) as of period end</p></div><b>'+money(rec.amount||0,state.companySummary?.currency||'AUD')+'</b></div><div class="fm-state"><strong>Lock boundary</strong><p>A certified fingerprint is mandatory. Any measured evidence change after certification makes the sign-off stale and the lock endpoint rejects it.</p></div></div></div></article></div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Immutable close evidence history</h2><p>Snapshots are retained even when certification is reopened.</p></div><small>'+snaps.length+' snapshot(s)</small></div><div class="fm-list">'+(snapRows||emptyState('No close snapshots','Capture evidence before certification or major close review.'))+'</div></div></article>'+
+ (blockers.length?'<div class="fm-state fm-state-error"><strong>Period cannot be certified yet</strong><p>'+blockers.map(x=>esc(x.title)+' ('+num(x.actual)+')').join(' · ')+'</p></div>':warnings.length?'<div class="fm-state"><strong>Ready to certify with warnings</strong><p>'+warnings.map(x=>esc(x.title)+' ('+num(x.actual)+')').join(' · ')+'</p></div>':'<div class="fm-state"><strong>All measured close controls are clear</strong><p>You may capture evidence and certify. Certification still does not lock the period automatically.</p></div>');
+}
 function recurringControlView(){
  const a=state.personalAttention||{},active=a.recurring||[],archived=a.archived_recurring||[];
  const factor={WEEKLY:52,FORTNIGHTLY:26,MONTHLY:12,QUARTERLY:4,YEARLY:1};
@@ -1101,7 +1125,7 @@ function ensureAdvancedControlLoaded(){
  if(window.__financeAdvancedControlMount){mount();return}
  const existing=document.querySelector('script[data-finance-advanced-control]');
  if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}
- const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v2';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
+ const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v3';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
 }
 function advancedControlView(){
  setTimeout(ensureAdvancedControlLoaded,0);
@@ -1117,6 +1141,7 @@ function simpleView(v){
  if(v==='savings')return savingsControlView();
  if(v==='recurring')return recurringControlView();
  if(v==='taxcontrol')return taxEvidenceControlView();
+ if(v==='closeassurance')return closeAssuranceView();
  if(v==='reports')return reportView();
  if(v==='networth')return netWorthView();
  if(v==='forecast')return forecastView();
@@ -1625,6 +1650,12 @@ function bindDynamic(){
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
  document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>openNew(b.dataset.quick));
  document.querySelectorAll('[data-personal-new]').forEach(b=>b.onclick=()=>openPersonalForm(b.dataset.personalNew));
+ if($('closePeriod'))$('closePeriod').onchange=e=>loadCloseAssurance(e.target.value);
+ if($('closeRefresh'))$('closeRefresh').onclick=()=>loadCloseAssurance(state.closeAssurance?.period?.id);
+ if($('closeSnapshot'))$('closeSnapshot').onclick=async()=>{const id=state.closeAssurance?.period?.id;if(!id)return;try{const x=await api(API+'/close-assurance/'+id+'/snapshot',{method:'POST',body:'{}'});notice(x.message);await loadCloseAssurance(id)}catch(error){notice(error.message,true)}};
+ if($('closeCertify'))$('closeCertify').onclick=async()=>{const id=state.closeAssurance?.period?.id;if(!id)return;const note=prompt('Close certification note (optional):')||'';try{const x=await api(API+'/close-assurance/'+id+'/certify',{method:'POST',body:JSON.stringify({certification_note:note})});notice(x.message);await loadCloseAssurance(id)}catch(error){notice(error.message,true)}};
+ if($('closeReopen'))$('closeReopen').onclick=async()=>{const id=state.closeAssurance?.period?.id;if(!id)return;const reason=prompt('Reason for reopening this close certification:')||'';if(!reason.trim())return;try{const x=await api(API+'/close-assurance/'+id+'/reopen',{method:'POST',body:JSON.stringify({reason})});notice(x.message);await loadCloseAssurance(id)}catch(error){notice(error.message,true)}};
+ if($('closeLock'))$('closeLock').onclick=async()=>{const p=state.closeAssurance?.period;if(!p?.id)return;const reason=prompt('Reason for locking '+p.period_key+':')||'';if(!reason.trim())return;const confirmation=prompt('Type exactly: LOCK '+p.period_key)||'';if(confirmation!=='LOCK '+p.period_key){notice('Lock confirmation did not match.',true);return}try{const x=await api(API+'/accounting-periods/'+p.id+'/status',{method:'POST',body:JSON.stringify({status:'LOCKED',reason,confirmation})});notice(x.message);await refresh();state.view='closeassurance';await loadCloseAssurance(p.id)}catch(error){notice(error.message,true)}};
  if($('cashCountNew'))$('cashCountNew').onclick=openCashCountForm;
  if($('cashCountNewInline'))$('cashCountNewInline').onclick=openCashCountForm;
  if($('cashTransferNew'))$('cashTransferNew').onclick=openCashTransferForm;
