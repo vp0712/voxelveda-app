@@ -22,6 +22,20 @@ function fail(res,error,message) {
   if (error instanceof FinanceError) return res.status(error.statusCode||400).json({message:error.message,code:error.code});
   console.error(message,error);return res.status(500).json({message,code:'FINANCE_RELATIONSHIP_ERROR'});
 }
+function parseJson(value) {
+  if(value===null||value===undefined||value==='')return null;
+  if(typeof value==='object')return value;
+  try{return JSON.parse(value)}catch{return value}
+}
+function reimbursementPaymentState({requestedAmount,paidAmount,paymentAmount,paymentDebit,paymentAllocated}) {
+  const requested=money.toCents(requestedAmount),paid=money.toCents(paidAmount||0),payment=money.toCents(paymentAmount),
+    available=money.toCents(paymentDebit||0)-money.toCents(paymentAllocated||0),remaining=requested-paid;
+  if(remaining<=0n)throw new FinanceError('Reimbursement is already fully reimbursed.',409,'REIMBURSEMENT_ALREADY_PAID');
+  if(payment<=0n||payment>remaining)throw new FinanceError('Payment amount exceeds the reimbursement balance.',400,'REIMBURSEMENT_PAYMENT_INVALID');
+  if(available<=0n||payment>available)throw new FinanceError('Payment amount exceeds the unallocated value of the selected settlement transaction.',400,'REIMBURSEMENT_PAYMENT_OVERALLOCATED');
+  const balance=remaining-payment;
+  return {payment:money.fromCents(payment),remaining:money.fromCents(balance),status:balance===0n?'FULLY_REIMBURSED':'PARTIALLY_REIMBURSED'};
+}
 async function transactionForUpdate(db,id,req) {
   await privacy.assertBankTransactionAccess(db, id, req);
   const [[row]]=await db.query(
@@ -132,13 +146,76 @@ exports.listReimbursements=async(req,res)=>{
     const status=String(req.query.status||'').toUpperCase();if(status&&REIMBURSEMENT_STATUSES.has(status)){clauses.push('r.status=?');params.push(status)}
     const [rows]=await pool.query(
       `SELECT r.*,bt.transaction_date,bt.description,bt.merchant_name,bt.debit AS expense_amount,ba.nickname AS account_name,ba.institution,
+              claimant.name AS claimant_name,claimant.email AS claimant_email,
               COALESCE(SUM(rp.amount),0) AS paid_amount
          FROM finance_reimbursements r JOIN bank_transactions bt ON bt.id=r.expense_bank_transaction_id
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id LEFT JOIN finance_reimbursement_payments rp ON rp.reimbursement_id=r.id
+         LEFT JOIN users claimant ON claimant.id=r.claimant_user_id
         WHERE ${clauses.join(' AND ')}
         GROUP BY r.id,bt.id,ba.id ORDER BY r.created_at DESC LIMIT 250`,params);
     return res.json({reimbursements:rows.map(row=>({...row,remaining_amount:money.fromCents(money.toCents(row.requested_amount)-money.toCents(row.paid_amount||0))}))});
   }catch(error){return fail(res,error,'Failed to load reimbursements.')}
+};
+
+exports.getReimbursement=async(req,res)=>{
+  try{
+    await ensureFinanceSchema();const id=Number(req.params.id||0);
+    const [[row]]=await pool.query(
+      `SELECT r.*,bt.transaction_date,bt.description,bt.merchant_name,bt.debit AS expense_amount,bt.currency AS expense_currency,
+              bt.category,bt.ownership_scope,bt.reference,ba.id AS bank_account_id,ba.nickname AS account_name,ba.institution,
+              claimant.name AS claimant_name,claimant.email AS claimant_email,creator.name AS created_by_name,
+              approver.name AS approved_by_name,rejector.name AS rejected_by_name
+         FROM finance_reimbursements r
+         JOIN bank_transactions bt ON bt.id=r.expense_bank_transaction_id
+         JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         LEFT JOIN users claimant ON claimant.id=r.claimant_user_id
+         LEFT JOIN users creator ON creator.id=r.created_by
+         LEFT JOIN users approver ON approver.id=r.approved_by
+         LEFT JOIN users rejector ON rejector.id=r.rejected_by
+        WHERE r.id=? LIMIT 1`,[id]);
+    if(!row)throw new FinanceError('Reimbursement not found.',404,'REIMBURSEMENT_NOT_FOUND');
+    await privacy.assertBankTransactionAccess(pool,row.expense_bank_transaction_id,req);
+    const [payments]=await pool.query(
+      `SELECT rp.id,rp.payment_bank_transaction_id,rp.amount,rp.created_by,rp.created_at,
+              bt.transaction_date,bt.description,bt.merchant_name,bt.debit,bt.currency,ba.nickname AS account_name,
+              u.name AS linked_by_name
+         FROM finance_reimbursement_payments rp
+         JOIN bank_transactions bt ON bt.id=rp.payment_bank_transaction_id
+         JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+         LEFT JOIN users u ON u.id=rp.created_by
+        WHERE rp.reimbursement_id=? ORDER BY rp.created_at,rp.id`,[id]);
+    const paid=payments.reduce((total,payment)=>total+money.toCents(payment.amount||0),0n);
+    const remaining=money.toCents(row.requested_amount)-paid;
+    const [timeline]=await pool.query(
+      `SELECT al.id,al.action,al.actor_id,al.old_value,al.new_value,al.result,al.request_id,al.created_at,u.name AS actor_name
+         FROM audit_logs al LEFT JOIN users u ON u.id=al.actor_id
+        WHERE (al.record_type='finance_reimbursement' AND al.record_id=?)
+           OR (al.record_type='bank_transaction' AND al.record_id=? AND al.action='REIMBURSEMENT_CREATED')
+        ORDER BY al.id ASC LIMIT 500`,[String(id),String(row.expense_bank_transaction_id)]);
+    let candidates=[];
+    if(['APPROVED','PARTIALLY_REIMBURSED'].includes(row.status)&&remaining>0n){
+      const visibility=privacy.visibilitySql('ba',req),visibilityParams=privacy.visibilityParams(req);
+      const [candidateRows]=await pool.query(
+        `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.debit,bt.currency,
+                ba.nickname AS account_name,COALESCE(SUM(allocation.amount),0) AS allocated_amount
+           FROM bank_transactions bt
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           LEFT JOIN finance_reimbursement_payments allocation ON allocation.payment_bank_transaction_id=bt.id
+          WHERE ${visibility} AND bt.id<>? AND bt.debit>0 AND bt.is_internal_transfer=0
+            AND bt.currency=? AND bt.archived_at IS NULL
+            AND (bt.ownership_scope='BUSINESS' OR ba.ownership_scope='BUSINESS')
+          GROUP BY bt.id,ba.id
+         HAVING bt.debit>COALESCE(SUM(allocation.amount),0)
+          ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 100`,[...visibilityParams,row.expense_bank_transaction_id,row.currency]);
+      candidates=candidateRows.map(candidate=>({...candidate,available_amount:money.fromCents(money.toCents(candidate.debit)-money.toCents(candidate.allocated_amount||0))}));
+    }
+    return res.json({
+      reimbursement:{...row,paid_amount:money.fromCents(paid),remaining_amount:money.fromCents(remaining)},
+      payments,candidates,
+      timeline:timeline.map(event=>({...event,old_value:parseJson(event.old_value),new_value:parseJson(event.new_value)})),
+      settlement_note:'Settlement links an existing visible company debit. It never manufactures or executes a bank payment.'
+    });
+  }catch(error){return fail(res,error,'Failed to load reimbursement.')}
 };
 
 exports.createReimbursement=async(req,res)=>{
@@ -185,16 +262,24 @@ exports.addReimbursementPayment=async(req,res)=>{
     const [[row]]=await db.query("SELECT * FROM finance_reimbursements WHERE id=? FOR UPDATE",[id]);if(!row)throw new FinanceError('Reimbursement not found.',404,'REIMBURSEMENT_NOT_FOUND');
     await privacy.assertBankTransactionAccess(db,row.expense_bank_transaction_id,req);const payment=await transactionForUpdate(db,paymentId,req);
     if(!['APPROVED','PARTIALLY_REIMBURSED'].includes(row.status))throw new FinanceError('Reimbursement must be approved before a payment can be linked.',409,'REIMBURSEMENT_NOT_APPROVED');
+    if(paymentId===Number(row.expense_bank_transaction_id))throw new FinanceError('The original expense cannot also be its reimbursement settlement.',400,'REIMBURSEMENT_PAYMENT_SAME_AS_EXPENSE');
+    if(money.toCents(payment.debit||0)<=0n||money.toCents(payment.credit||0)>0n||Number(payment.is_internal_transfer))throw new FinanceError('Settlement must be an existing non-transfer debit transaction.',400,'REIMBURSEMENT_PAYMENT_DEBIT_REQUIRED');
+    if(payment.archived_at)throw new FinanceError('An archived transaction cannot settle a reimbursement.',409,'REIMBURSEMENT_PAYMENT_ARCHIVED');
+    if(String(payment.ownership_scope)!=='BUSINESS'&&String(payment.account_scope)!=='BUSINESS')throw new FinanceError('Settlement must use a company transaction or company account.',400,'REIMBURSEMENT_COMPANY_PAYMENT_REQUIRED');
     if(String(payment.currency)!==String(row.currency))throw new FinanceError('Cross-currency reimbursement settlement requires verified FX evidence.',409,'REIMBURSEMENT_FX_EVIDENCE_REQUIRED');
     const [[paid]]=await db.query('SELECT COALESCE(SUM(amount),0) AS amount FROM finance_reimbursement_payments WHERE reimbursement_id=?',[id]);
-    const remaining=money.toCents(row.requested_amount)-money.toCents(paid.amount||0);const requested=req.body.amount?money.toCents(req.body.amount):remaining;
-    if(requested<=0n||requested>remaining)throw new FinanceError('Payment amount exceeds the reimbursement balance.',400,'REIMBURSEMENT_PAYMENT_INVALID');
-    await db.query('INSERT INTO finance_reimbursement_payments (reimbursement_id,payment_bank_transaction_id,amount,created_by) VALUES (?,?,?,?)',[id,paymentId,money.fromCents(requested),userId(req)]);
-    const next=requested===remaining?'FULLY_REIMBURSED':'PARTIALLY_REIMBURSED';await db.query('UPDATE finance_reimbursements SET status=? WHERE id=?',[next,id]);
-    await logAudit(db,audit(req,'REIMBURSEMENT_PAYMENT_LINKED','finance_reimbursement',id,{status:row.status},{status:next,payment_bank_transaction_id:paymentId,amount:money.fromCents(requested)}));await db.commit();
-    return res.status(201).json({message:'Reimbursement payment linked.',status:next,remaining_amount:money.fromCents(remaining-requested)});
+    const [[allocated]]=await db.query('SELECT COALESCE(SUM(amount),0) AS amount FROM finance_reimbursement_payments WHERE payment_bank_transaction_id=?',[paymentId]);
+    const remaining=money.toCents(row.requested_amount)-money.toCents(paid.amount||0);
+    const requested=req.body.amount?req.body.amount:money.fromCents(remaining);
+    const settlement=reimbursementPaymentState({requestedAmount:row.requested_amount,paidAmount:paid.amount||0,paymentAmount:requested,paymentDebit:payment.debit,paymentAllocated:allocated.amount||0});
+    await db.query('INSERT INTO finance_reimbursement_payments (reimbursement_id,payment_bank_transaction_id,amount,created_by) VALUES (?,?,?,?)',[id,paymentId,settlement.payment,userId(req)]);
+    await db.query('UPDATE finance_reimbursements SET status=? WHERE id=?',[settlement.status,id]);
+    await logAudit(db,audit(req,'REIMBURSEMENT_PAYMENT_LINKED','finance_reimbursement',id,{status:row.status},{status:settlement.status,payment_bank_transaction_id:paymentId,amount:settlement.payment}));await db.commit();
+    return res.status(201).json({message:'Reimbursement payment linked.',status:settlement.status,remaining_amount:settlement.remaining});
   }catch(error){await db.rollback().catch(()=>{});return fail(res,error,'Failed to link reimbursement payment.')}finally{db.release()}
 };
+
+exports._test={reimbursementPaymentState};
 
 
 exports.getTransferLinks=async(req,res)=>{
