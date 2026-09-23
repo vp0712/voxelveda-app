@@ -93,6 +93,7 @@ exports.getCenter=async(req,res)=>{
     return res.json({
       currency,
       currency_note:'Legacy customer invoice and supplier bill ledgers do not store per-document currency. Counterparty Control therefore presents them in the configured Company base currency and never combines them with foreign-currency bank balances.',
+      aging_rule:'Customer invoice aging uses invoice creation age because the legacy invoice ledger has no contractual due-date field. Supplier aging uses recorded supplier-bill due dates.',
       receivables:{
         open_balance:money(sumRows(openCustomers,'balance_due')),
         open_count:openCustomers.length,
