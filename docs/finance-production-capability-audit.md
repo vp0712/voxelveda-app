@@ -74,6 +74,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 
 19. Banking Command Centre now surfaces permission-scoped liquidity, runway, obligations, independent approval inbox and banking attention directly inside the single Finance OS; legacy Banking test contracts now validate the canonical master frontend.
 
+20. Setup Centre now includes Finance Runtime Health: loaded/loading/restricted/failed service counts plus per-service retries, while core-ledger failures use the existing controlled full refresh. Optional service failure therefore remains visible and isolated instead of becoming a permanent application loader.
+
 ## Production infrastructure evidence
 
 ### Database transport

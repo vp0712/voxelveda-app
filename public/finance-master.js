@@ -179,11 +179,15 @@ function receiptQuery(){
  Object.entries(state.receiptFilters).forEach(([key,value])=>{if(value!==''&&value!==false&&value!==null&&value!==undefined)p.set(key,value===true?'true':String(value))});
  return '?'+p.toString();
 }
-function setResource(name,status,data=null,error=null){state.resources[name]={status,data,error};if(data!==null)state[name]=data}
+function setResource(name,status,data=null,error=null,path=null){
+ const prior=state.resources[name]||{};
+ state.resources[name]={status,data,error,path:path||prior.path||null};
+ if(data!==null)state[name]=data;
+}
 async function loadResource(name,path,cycle=null){
- if(cycle===null||cycle===loadCycle)setResource(name,'loading');
- try{const data=await api(path);if(cycle===null||cycle===loadCycle)setResource(name,'loaded',data);return data}
- catch(error){if(cycle===null||cycle===loadCycle)setResource(name,error.status===403?'permission':'error',null,error);return null}
+ if(cycle===null||cycle===loadCycle)setResource(name,'loading',null,null,path);
+ try{const data=await api(path);if(cycle===null||cycle===loadCycle)setResource(name,'loaded',data,null,path);return data}
+ catch(error){if(cycle===null||cycle===loadCycle)setResource(name,error.status===403?'permission':'error',null,error,path);return null}
 }
 function resourceData(name){return state.resources[name]?.status==='loaded'?state.resources[name].data:null}
 function syncSupplementaryState(){
@@ -827,6 +831,29 @@ async function loadReceiptCenter(){
  const data=await loadResource('receiptCenter',API+'/receipts'+receiptQuery());state.receiptCenter=data||null;render();
 }
 
+function financeRuntimeHealthCard(){
+ const entries=Object.entries(state.resources||{}).filter(([,r])=>r&&r.status);
+ const loaded=entries.filter(([,r])=>r.status==='loaded').length;
+ const loading=entries.filter(([,r])=>r.status==='loading').length;
+ const restricted=entries.filter(([,r])=>r.status==='permission').length;
+ const failed=entries.filter(([,r])=>r.status==='error');
+ const healthy=failed.length===0&&loading===0;
+ const labels={txPayload:'Transaction ledger',statementPayload:'Statement vault',personal:'Personal Money',personalAttention:'Personal attention',companySummary:'Company Finance',insights:'Insights',quality:'Data quality',removedStatementPayload:'Removed statements',reviewPayload:'Statement reviews',briefing:'Daily briefing',savedViews:'Saved views',bankingBudgets:'Banking budgets',readiness:'Banking readiness',rules:'Rules',reconciliation:'Reconciliation',history:'History coverage',team:'Team access',os:'Banking command centre',bankingOps:'Banking operations',transferCandidates:'Transfer matching',refundCandidates:'Refund matching',reimbursements:'Reimbursements',notifications:'Notifications',notificationPrefs:'Notification preferences',companySettings:'Company settings',receiptCenter:'Receipts',savedReports:'Saved reports',archivedTransactions:'Archived transactions',cashflowCalendar:'Cash-flow calendar',accountingPeriods:'Accounting periods',categories:'Categories',smart:'Smart planning',health:'Financial health',roadmaps:'Roadmaps',fxRates:'FX evidence',personalBankDash:'Personal Banking',businessBankDash:'Company Banking',openBankProviders:'Open Banking providers',openBankSessions:'Consent sessions',bankConnectionData:'Connected banks',bankSyncJobs:'Bank sync history'};
+ const failures=failed.map(([name,r])=>'<div class="fm-row"><div><h3>'+esc(labels[name]||name)+'</h3><p>'+esc(r.error?.message||'Service request failed')+'</p></div><button data-resource-retry="'+esc(name)+'">Retry this service</button></div>').join('');
+ return '<article class="fm-card fm-runtime-health"><div class="fm-pad"><div class="fm-card-head"><div><h2>Finance Runtime Health</h2><p>One failed optional service must never leave the entire Finance OS loading forever.</p></div>'+statusBadge(healthy?'READY':failed.length?'DEGRADED':'LOADING')+'</div><div class="fm-grid four"><div class="fm-kpi"><span>Loaded services</span><strong>'+loaded+'</strong><small>Responded successfully</small></div><div class="fm-kpi"><span>Loading</span><strong>'+loading+'</strong><small>Bounded by request timeouts</small></div><div class="fm-kpi"><span>Restricted</span><strong>'+restricted+'</strong><small>Permission boundaries, not fake errors</small></div><div class="fm-kpi"><span>Failed</span><strong>'+failed.length+'</strong><small>Retryable without a permanent spinner</small></div></div>'+(failures?'<div class="fm-runtime-failures"><div class="fm-card-head"><div><h3>Service failures</h3><p>Retry only the failed component. Core-ledger failures use a controlled full refresh.</p></div></div><div class="fm-list">'+failures+'</div></div>':'<p class="fm-helper">No Finance service failure is currently recorded in this browser session.</p>')+'</div></article>';
+}
+async function retryFinanceResource(name){
+ const core=new Set(['setup','userPreferences','capabilities','dash','txPayload','statementPayload','accountPayload']);
+ if(core.has(name)){await refresh();return}
+ const resource=state.resources?.[name],path=resource?.path;
+ if(!path){notice('This Finance service does not have a retry path. Refresh the workspace instead.',true);return}
+ const button=document.querySelector('[data-resource-retry="'+CSS.escape(name)+'"]');if(button){button.disabled=true;button.textContent='Retrying…'}
+ await loadResource(name,path,loadCycle);syncSupplementaryState();
+ const current=state.resources?.[name];
+ if(current?.status==='loaded')notice((name.replace(/([A-Z])/g,' $1'))+' recovered.');
+ else notice(current?.error?.message||'This Finance service is still unavailable.',true);
+ if(canProgressivelyRender(loadCycle))render();
+}
 function setupCentreView(){
  const accounts=state.accounts||[],statements=state.statements||[],pending=state.reviews.filter(x=>x.status==='PENDING_REVIEW');
  const quality=state.quality||{},receiptCounts=state.receiptCenter?.counts||{},saved=state.savedReports?.saved_reports||[];
@@ -846,7 +873,7 @@ function setupCentreView(){
  const completed=steps.filter(s=>s.done).length,percent=Math.round((completed/steps.length)*100);
  const stepRows=steps.map((s,i)=>`<button class="fm-setup-step ${s.done?'done':''}" data-viewjump="${s.action}"><span class="fm-setup-index">${s.done?'✓':i+1}</span><div><b>${esc(s.label)}</b><small>${esc(s.note)}</small></div><i>›</i></button>`).join('');
  const accountRows=accounts.map(a=>{const c=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};const covered=c.transaction_start||a.history_start_date;return `<div class="fm-row"><div><h3>${esc(a.nickname||'Account')}</h3><p>${esc(a.institution||'Manual')} · ${esc(a.account_type||'Account')} · ${esc(a.currency||'AUD')}</p></div><div class="fm-row-right">${statusBadge(a.ownership_scope||'UNCLASSIFIED')}<small>${covered?'History '+date(c.transaction_start||a.history_start_date)+' → '+date(c.transaction_end||a.history_end_date):'No history loaded'}</small><button data-account-edit="${a.id}">Edit</button><button data-history-import="${a.id}">Import</button></div></div>`}).join('');
- return `<section class="fm-setup-hero"><div><p>FINANCE DATA MIGRATION</p><h2>${percent}% setup complete</h2><span>This is the controlled path from scattered bank statements to one trusted Finance OS. No step silently fabricates balances, classifications or FX rates.</span></div><div class="fm-setup-ring" style="--progress:${percent}"><strong>${percent}%</strong><small>${completed}/${steps.length} controls</small></div></section><div class="fm-setup-grid"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Migration checklist</h2><p>Complete these in order to make reports reliable.</p></div></div><div class="fm-setup-list">${stepRows}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Account migration map</h2><p>Each bank/card/cash account remains independently traceable even when Consolidated reporting is selected.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-list">${accountRows||emptyState('No accounts yet','Create every real account before importing historical statements.')}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>What happens to your old data</h2><p>Statement rows are staged first. Duplicate or rejected rows do not enter the ledger. Committed source data stays preserved separately from editable category, ownership, receipt and reconciliation decisions.</p></div></div><div class="fm-grid four"><div class="fm-kpi"><span>Accounts</span><strong>${accounts.length}</strong><small>Real financial containers</small></div><div class="fm-kpi"><span>Committed statements</span><strong>${statements.length}</strong><small>Historical source files</small></div><div class="fm-kpi"><span>Pending reviews</span><strong>${pending.length}</strong><small>Not yet committed</small></div><div class="fm-kpi"><span>Ledger transactions</span><strong>${num(state.txMeta?.total)}</strong><small>Current filtered view count</small></div></div><div class="fm-form-actions"><button class="primary" data-viewjump="history">Continue historical import</button><button data-viewjump="review">Open data-quality review</button><button data-viewjump="reports">Open Report Centre</button></div></div></article>`;
+ return `<section class="fm-setup-hero"><div><p>FINANCE DATA MIGRATION</p><h2>${percent}% setup complete</h2><span>This is the controlled path from scattered bank statements to one trusted Finance OS. No step silently fabricates balances, classifications or FX rates.</span></div><div class="fm-setup-ring" style="--progress:${percent}"><strong>${percent}%</strong><small>${completed}/${steps.length} controls</small></div></section><div class="fm-setup-grid"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Migration checklist</h2><p>Complete these in order to make reports reliable.</p></div></div><div class="fm-setup-list">${stepRows}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Account migration map</h2><p>Each bank/card/cash account remains independently traceable even when Consolidated reporting is selected.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-list">${accountRows||emptyState('No accounts yet','Create every real account before importing historical statements.')}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>What happens to your old data</h2><p>Statement rows are staged first. Duplicate or rejected rows do not enter the ledger. Committed source data stays preserved separately from editable category, ownership, receipt and reconciliation decisions.</p></div></div><div class="fm-grid four"><div class="fm-kpi"><span>Accounts</span><strong>${accounts.length}</strong><small>Real financial containers</small></div><div class="fm-kpi"><span>Committed statements</span><strong>${statements.length}</strong><small>Historical source files</small></div><div class="fm-kpi"><span>Pending reviews</span><strong>${pending.length}</strong><small>Not yet committed</small></div><div class="fm-kpi"><span>Ledger transactions</span><strong>${num(state.txMeta?.total)}</strong><small>Current filtered view count</small></div></div><div class="fm-form-actions"><button class="primary" data-viewjump="history">Continue historical import</button><button data-viewjump="review">Open data-quality review</button><button data-viewjump="reports">Open Report Centre</button></div></div></article>${financeRuntimeHealthCard()}`;
 }
 function moreView(){
  const groups=NAV_GROUPS.map(([group,items])=>{
@@ -1415,6 +1442,7 @@ function bindDynamic(){
  });
  document.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>{location.href=b.dataset.export});
  document.querySelectorAll('[data-retry]').forEach(b=>b.onclick=refresh);
+ document.querySelectorAll('[data-resource-retry]').forEach(b=>b.onclick=()=>retryFinanceResource(b.dataset.resourceRetry));
  document.querySelectorAll('[data-transfer-debit]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/bank-transactions/'+b.dataset.transferDebit+'/transfer-links',{method:'POST',body:JSON.stringify({counterpart_transaction_id:Number(b.dataset.transferCredit)})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-refund-link]').forEach(b=>b.onclick=()=>openRefundLink(b.dataset.refundLink,b.dataset.refundCurrency));
  document.querySelectorAll('[data-reimb-open]').forEach(b=>b.onclick=()=>reimbursementDetail(b.dataset.reimbOpen));

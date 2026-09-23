@@ -64,3 +64,9 @@ run().catch((error) => {
   console.error(error);
   process.exitCode = 1;
 });
+
+assert.match(source,/function financeRuntimeHealthCard\(\)/,'Setup Centre must surface Finance runtime health.');
+assert.match(source,/function retryFinanceResource\(name\)/,'Failed supplementary Finance services must be retryable individually.');
+assert.match(source,/path:path\|\|prior\.path\|\|null/,'Finance resource state must retain the exact retry path.');
+assert.match(source,/One failed optional service must never leave the entire Finance OS loading forever/,'Runtime health must state the no-permanent-spinner contract.');
+assert.match(source,/data-resource-retry/,'Runtime health failure rows must expose per-service retry controls.');

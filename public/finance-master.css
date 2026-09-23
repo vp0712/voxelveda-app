@@ -109,3 +109,6 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .fm-team-access-list{display:grid;gap:8px}.fm-team-account{border:1px solid var(--line);border-radius:12px;padding:10px 11px;display:flex;justify-content:space-between;gap:12px;align-items:center}.fm-team-account b,.fm-team-account small{display:block}.fm-team-account b{font-size:.68rem}.fm-team-account small{font-size:.55rem;color:var(--muted);margin-top:3px}.fm-team-account select{min-width:160px;border:1px solid var(--line);border-radius:9px;background:#fff;padding:8px;font-weight:800}
 @media(max-width:700px){.fm-team-account{align-items:flex-start;display:grid}.fm-team-account select{width:100%;min-width:0}}
+
+.fm-runtime-health{margin-top:13px}.fm-runtime-failures{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.fm-runtime-failures .fm-row button{white-space:nowrap}
+@media(max-width:700px){.fm-runtime-failures .fm-row{align-items:flex-start}.fm-runtime-failures .fm-row button{width:100%;margin-top:7px}}
