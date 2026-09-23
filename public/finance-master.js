@@ -23,7 +23,7 @@ const NAV_GROUPS=[
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
- ['REPORTING',[['reports','▧','Reports']]],
+ ['REPORTING',[['reports','▧','Reports'],['taxcontrol','§','Tax & Evidence']]],
  ['CONTROL',[['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
@@ -131,6 +131,7 @@ function title(v){return ({
  review:['Data Quality Review','Uncategorised, unreconciled, coverage and other review queues.'],
  reconciliation:['Reconciliation','Bank transaction reconciliation inside the master Finance OS.'],
  reports:['Reports','Trusted exports and report-ready filtered transaction data.'],
+ taxcontrol:['Tax & Evidence Readiness','Owner-private tax preparation, receipt gaps and evidence readiness without inventing tax treatment.'],
  team:['Team Finance Access','Server-enforced banking and finance access controls.'],
  setupcentre:['Finance Setup Centre','Complete the real data migration and control checks required for a reliable Finance OS.'],
  notifications:['Finance Notifications','User-specific finance alerts and notification preferences.'],
@@ -437,6 +438,52 @@ function personalCard(kind){
  }).join('');
  return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>'+label+'</h2><p>Owner-only Personal Money records. They are not silently added to company/bank totals.</p></div><button data-personal-new="'+kind+'">+ Add</button></div><div class="fm-list">'+(rows||emptyState('No records yet','Use Add to create the first record.'))+'</div></div></article>';
 }
+
+function recurringControlView(){
+ const a=state.personalAttention||{},active=a.recurring||[],archived=a.archived_recurring||[];
+ const factor={WEEKLY:52,FORTNIGHTLY:26,MONTHLY:12,QUARTERLY:4,YEARLY:1};
+ const by={};let due30=0,subscriptions=0;
+ const today=new Date(localIsoDay()+'T00:00:00');
+ for(const r of active){
+  const c=String(r.currency||'AUD').toUpperCase();by[c]||={annual:0,monthly:0,count:0,subscriptions:0};
+  if(String(r.item_type||'').toUpperCase()!=='INCOME'){
+   const annual=num(r.amount)*(factor[String(r.frequency||'').toUpperCase()]||0);by[c].annual+=annual;by[c].monthly+=annual/12;by[c].count++;
+   if(String(r.item_type||'').toUpperCase()==='SUBSCRIPTION'){by[c].subscriptions++;subscriptions++}
+  }
+  if(r.next_due_date){const d=new Date(String(r.next_due_date).slice(0,10)+'T00:00:00');const days=Math.ceil((d-today)/86400000);if(days>=0&&days<=30)due30++}
+ }
+ const cards=Object.entries(by).map(([c,x])=>'<div class="fm-kpi"><span>'+esc(c)+' · recurring outflow</span><strong>'+nativeMoney(x.monthly,c)+'/mo</strong><small>'+nativeMoney(x.annual,c)+'/yr · '+x.count+' active outgoing item(s)</small></div><div class="fm-kpi"><span>'+esc(c)+' · subscriptions</span><strong>'+x.subscriptions+'</strong><small>Active subscription records</small></div>').join('');
+ const row=r=>{const live=Number(r.active)!==0,status=live?(r.frequency||'ACTIVE'):'ARCHIVED';return '<div class="fm-row"><div><h3>'+esc(r.name||'Recurring item')+'</h3><p>'+esc(r.item_type||'BILL')+' · '+esc(status)+(r.category?' · '+esc(r.category):'')+(r.counterparty?' · '+esc(r.counterparty):'')+'</p><small>Next '+date(r.next_due_date)+(r.last_completed_date?' · last completed '+date(r.last_completed_date):'')+'</small></div><div class="fm-row-right"><b>'+nativeMoney(r.amount,r.currency||'AUD')+'</b><small>'+esc(String(r.frequency||'').toLowerCase())+'</small><div class="fm-inline-actions">'+(live?'<button data-recurring-complete="'+esc(r.id)+'">Mark completed</button><button data-recurring-active="0" data-recurring-id="'+esc(r.id)+'">Archive</button>':'<button data-recurring-active="1" data-recurring-id="'+esc(r.id)+'">Restore</button>')+'</div></div></div>'};
+ return resourceError('personalAttention','Recurring Control')+
+ '<div class="fm-control-intro"><p>SUBSCRIPTION & RECURRING CONTROL</p><h2>Know every repeating commitment before it becomes a surprise</h2><span>Annualised cost is derived from your saved schedule only. Nothing is paid, cancelled or renewed automatically.</span><div class="fm-control-quick"><button data-personal-new="recurring">+ Recurring item</button><button data-viewjump="calendar">Cash-flow calendar</button><button data-viewjump="forecast">Forecast</button></div></div>'+
+ '<div class="fm-grid four"><div class="fm-kpi"><span>Active recurring items</span><strong>'+active.length+'</strong><small>'+subscriptions+' subscription(s)</small></div><div class="fm-kpi"><span>Due in next 30 days</span><strong>'+due30+'</strong><small>Based on recorded next due dates</small></div>'+(cards||'<div class="fm-kpi"><span>Recurring outflow</span><strong>—</strong><small>No active outgoing schedule.</small></div>')+'</div>'+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Active commitments</h2><p>Bills, subscriptions and repeating income schedules.</p></div><button data-personal-new="recurring">+ Add</button></div><div class="fm-list">'+(active.map(row).join('')||emptyState('No active recurring items','Add bills, subscriptions or recurring income to start.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Archived commitments</h2><p>Retained history; restoring does not create a payment.</p></div></div><div class="fm-list">'+(archived.map(row).join('')||emptyState('No archived recurring items','Archived schedules remain available here.'))+'</div></div></article></div>';
+}
+function savingsControlView(){
+ const goals=state.personalAttention?.goals||[],active=goals.filter(g=>g.status==='ACTIVE'),paused=goals.filter(g=>g.status==='PAUSED'),completed=goals.filter(g=>g.status==='COMPLETED');
+ const by={};
+ for(const g of goals){const c=String(g.currency||'AUD').toUpperCase();by[c]||={target:0,current:0,remaining:0,active:0};by[c].target+=num(g.target_amount);by[c].current+=num(g.current_amount);by[c].remaining+=Math.max(0,num(g.target_amount)-num(g.current_amount));if(g.status==='ACTIVE')by[c].active++}
+ const cards=Object.entries(by).map(([c,x])=>'<div class="fm-kpi"><span>'+esc(c)+' · saved progress</span><strong>'+nativeMoney(x.current,c)+'</strong><small>Target '+nativeMoney(x.target,c)+'</small></div><div class="fm-kpi"><span>'+esc(c)+' · remaining</span><strong>'+nativeMoney(x.remaining,c)+'</strong><small>'+x.active+' active goal(s)</small></div>').join('');
+ const now=new Date(localIsoDay()+'T00:00:00');
+ const rows=goals.map(g=>{const target=num(g.target_amount),current=num(g.current_amount),remaining=Math.max(0,target-current),pct=target>0?Math.min(100,current/target*100):0;let pace='No target date';if(g.target_date&&remaining>0){const d=new Date(String(g.target_date).slice(0,10)+'T00:00:00'),days=Math.ceil((d-now)/86400000);if(days<0)pace='Target date passed';else{const months=Math.max(days/30.4375,1/30.4375);pace=nativeMoney(remaining/months,g.currency||'AUD')+'/mo needed'}}const actions=g.status==='ACTIVE'?'<button data-goal-contribute="'+esc(g.id)+'">Add progress</button><button data-goal-status="PAUSED" data-goal-id="'+esc(g.id)+'">Pause</button>':g.status==='PAUSED'?'<button data-goal-status="ACTIVE" data-goal-id="'+esc(g.id)+'">Resume</button>':'';return '<div class="fm-row"><div style="min-width:0;flex:1"><h3>'+esc(g.name||'Savings goal')+'</h3><p>'+esc(g.priority||'MEDIUM')+' priority · target '+date(g.target_date)+' · '+esc(pace)+'</p><div class="fm-progress"><i style="width:'+pct.toFixed(1)+'%"></i></div><small>'+pct.toFixed(1)+'% complete</small></div><div class="fm-row-right"><b>'+nativeMoney(current,g.currency||'AUD')+' / '+nativeMoney(target,g.currency||'AUD')+'</b>'+statusBadge(g.status)+'<small>'+nativeMoney(remaining,g.currency||'AUD')+' remaining</small><div class="fm-inline-actions">'+actions+'</div></div></div>'}).join('');
+ return resourceError('personalAttention','Savings Goal Control')+
+ '<div class="fm-control-intro"><p>SAVINGS GOAL CONTROL</p><h2>Turn targets into measurable funding pace</h2><span>Goal progress is planning evidence only. Updating progress never moves money from a bank account or wallet automatically.</span><div class="fm-control-quick"><button data-personal-new="savings">+ Savings goal</button><button data-viewjump="forecast">Forecast</button><button data-viewjump="networth">Net worth</button></div></div>'+
+ '<div class="fm-grid four"><div class="fm-kpi"><span>Active goals</span><strong>'+active.length+'</strong><small>'+paused.length+' paused</small></div><div class="fm-kpi"><span>Completed goals</span><strong>'+completed.length+'</strong><small>Historical progress retained</small></div>'+cards+'</div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Goal funding plan</h2><p>Current progress, remaining amount and required monthly pace where a target date exists.</p></div><button data-personal-new="savings">+ Add</button></div><div class="fm-list">'+(rows||emptyState('No savings goals','Create a goal and track progress without pretending cash moved.'))+'</div></div></article>';
+}
+function taxEvidenceControlView(){
+ const tax=state.health?.tax_readiness||{},life=state.assetLifecycle||{},receipts=state.receiptCenter||{},quality=state.quality||{};
+ const counts=receipts.counts||{},docs=life.documents||[],expiring=docs.filter(d=>d.days_until_expiry!==null&&d.days_until_expiry!==undefined&&num(d.days_until_expiry)<=30).length;
+ const cats=tax.categories||[],review=tax.review_items||[];
+ const catRows=cats.slice(0,20).map(c=>'<div class="fm-row"><div><h3>'+esc(c.category||'Uncategorised')+'</h3><p>'+num(c.item_count||c.count||0)+' review item(s)</p></div><b>'+nativeMoney(c.amount,c.currency||'AUD')+'</b></div>').join('');
+ const reviewRows=review.slice(0,30).map(r=>'<div class="fm-row"><div><h3>'+esc(r.category||r.entry_type||'Review item')+'</h3><p>'+date(r.occurred_at)+' · '+esc(r.counterparty||r.wallet_name||'')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(r.amount,r.currency||'AUD')+'</b>'+statusBadge('REVIEW')+'</div></div>').join('');
+ return resourceError('health','Tax readiness')+resourceError('assetLifecycle','Evidence lifecycle')+
+ '<div class="fm-control-intro"><p>TAX & EVIDENCE READINESS</p><h2>Prepare clean evidence before accountant or year-end handover</h2><span>This workspace organises records; it does not decide tax deductibility, calculate lodged tax liability or submit anything to the ATO.</span><div class="fm-control-quick"><button data-viewjump="receipts">Receipt Centre</button><button data-viewjump="reports">GST / reports</button><button data-viewjump="networth">Private documents</button></div></div>'+
+ '<div class="fm-grid four"><div class="fm-kpi"><span>Financial year</span><strong>'+esc(tax.financial_year?.label||'Current FY')+'</strong><small>Preparation scope</small></div><div class="fm-kpi"><span>Tax review queue</span><strong>'+review.length+'</strong><small>Review candidates, not deduction claims</small></div><div class="fm-kpi"><span>Receipt exceptions</span><strong>'+(num(counts.missing)+num(counts.requested))+'</strong><small>Missing + requested evidence</small></div><div class="fm-kpi"><span>Evidence due / expired</span><strong>'+expiring+'</strong><small>Within 30 days</small></div></div>'+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Review categories</h2><p>Recorded Personal Money activity grouped for review only.</p></div></div><div class="fm-list">'+(catRows||emptyState('No tax review categories','No matching review data was returned.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Readiness controls</h2><p>Concrete gaps that should be resolved before handover.</p></div></div><div class="fm-list"><div class="fm-row"><div><h3>Unclassified bank transactions</h3><p>Classification affects reporting quality.</p></div><b>'+num(quality.unclassified)+'</b></div><div class="fm-row"><div><h3>Unreconciled transactions</h3><p>Reconciliation evidence still incomplete.</p></div><b>'+num(quality.unreconciled)+'</b></div><div class="fm-row"><div><h3>Private document references</h3><p>Asset / liability evidence references retained owner-only.</p></div><b>'+docs.length+'</b></div></div></div></article></div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Tax review items</h2><p>Recorded items requiring human review. Categories do not create tax treatment automatically.</p></div></div><div class="fm-list">'+(reviewRows||emptyState('No tax review items','No current review candidate was returned.'))+'</div></div></article>';
+}
+
 function debtControlView(){
  const planner=state.debtPlanner||{},debts=planner.debts||state.personal?.debts||[],people=planner.people||[],by=planner.by_currency||{};
  const summary=Object.entries(by).map(([c,x])=>'<div class="fm-kpi"><span>'+esc(c)+' · I owe</span><strong>'+nativeMoney(x.borrowed_open,c)+'</strong><small>'+num(x.overdue_count)+' overdue · '+num(x.due_30_count)+' due within 30d</small></div><div class="fm-kpi"><span>'+esc(c)+' · Owed to me</span><strong>'+nativeMoney(x.lent_open,c)+'</strong><small>'+nativeMoney(x.scheduled_monthly_equivalent,c)+'/mo planned across schedules</small></div>').join('');
@@ -1067,7 +1114,9 @@ function simpleView(v){
  if(v==='history')return historyImportView();
  if(v==='budgets')return budgetsView();
  if(v==='debt')return debtControlView();
- if(['savings','recurring'].includes(v))return personalCard(v);
+ if(v==='savings')return savingsControlView();
+ if(v==='recurring')return recurringControlView();
+ if(v==='taxcontrol')return taxEvidenceControlView();
  if(v==='reports')return reportView();
  if(v==='networth')return netWorthView();
  if(v==='forecast')return forecastView();
