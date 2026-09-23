@@ -27,6 +27,7 @@ const NAV_GROUPS=[
  ['CONTROL',[['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
+const MOBILE_NAV=[['overview','⌂','Home'],['accounts','▣','Accounts'],['transactions','↕','Transactions'],['statements','▤','Statements'],['more','☰','More']];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
 const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
@@ -65,6 +66,11 @@ function renderFinanceFatal(error,title='Finance could not start'){
 function navButtons(){
  $('fmNav').innerHTML=NAV_GROUPS.map(([group,items])=>`<div class="fm-nav-group"><small>${esc(group)}</small>${items.map(([v,i,l])=>`<button type="button" data-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span>${l}</button>`).join('')}</div>`).join('');
  $('fmNav').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
+ const mobile=$('fmMobileNav');
+ if(mobile){
+  mobile.innerHTML=MOBILE_NAV.map(([v,i,l])=>`<button type="button" data-mobile-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span><b>${l}</b></button>`).join('');
+  mobile.querySelectorAll('[data-mobile-view]').forEach(b=>b.onclick=()=>go(b.dataset.mobileView));
+ }
 }
 function title(v){return ({
  overview:['Finance Overview','Balances and selected-period cash flow are deliberately separated.'],
@@ -93,7 +99,8 @@ function title(v){return ({
  team:['Team Finance Access','Server-enforced banking and finance access controls.'],
  notifications:['Finance Notifications','User-specific finance alerts and notification preferences.'],
  connections:['Banking Connections','Open Banking readiness and sync status; fail-closed when not configured.'],
- settings:['Finance Settings','Capability status, safety controls and company finance configuration.']
+ settings:['Finance Settings','Capability status, safety controls and company finance configuration.'],
+ more:['Finance Control Centre','Every Finance module and workflow in one place.']
  })[v]||['Finance','Finance workspace']}
 
 function isoDay(d){return d.toISOString().slice(0,10)}
@@ -249,6 +256,24 @@ function recentRows(){
  const rows=state.dash?.recent_transactions||state.tx.slice(0,8);
  return rows.length?rows.slice(0,8).map(r=>{const amount=num(r.credit||0)-num(r.debit||0);return `<div class="fm-row" data-tx="${r.id}"><div><h3>${esc(r.merchant_name||r.description||'Transaction')}</h3><p>${date(r.transaction_date)} · ${esc(r.account_name||'Account')} · ${esc(r.category||'Uncategorised')}</p></div><div class="fm-row-right"><b class="${amount<0?'bad':'good'}">${nativeMoney(Math.abs(amount),r.currency||'AUD')}</b><small>${Number(r.is_internal_transfer)?'Internal transfer':esc(r.reconciliation_status||'')}</small></div></div>`}).join(''):emptyState('No transactions','Import a statement or add a manual financial movement.');
 }
+function financeCommandCentre(){
+ const q=state.quality||{},ins=state.insights?.summary||{};
+ const quick=[
+  ['expense','＋','Add expense','Manual movement'],
+  ['income','↗','Add income','Manual movement'],
+  ['statement','⇩','Import statement','CSV · PDF · OFX · QFX · QIF · XLSX'],
+  ['account','▣','Add account','Bank · cash · card · loan']
+ ];
+ const workflowButtons=quick.map(([kind,icon,label,note])=>`<button class="fm-command-action" data-quick="${kind}"><span>${icon}</span><b>${label}</b><small>${note}</small></button>`).join('');
+ const health=[
+  ['Uncategorised',q.unclassified_transactions??q.unclassified,'review'],
+  ['Unreconciled',q.unreconciled_transactions??q.unreconciled,'reconciliation'],
+  ['Transfer candidates',ins.transfer_candidates,'transfers'],
+  ['Missing receipts',state.receiptCenter?.counts?.missing,'receipts']
+ ];
+ const healthButtons=health.map(([label,value,view])=>`<button class="fm-health-chip" data-viewjump="${view}"><span>${esc(label)}</span><b>${num(value)}</b></button>`).join('');
+ return `<section class="fm-command-centre"><div class="fm-command-head"><div><p>FINANCE COMMAND CENTRE</p><h2>Run the whole money system from one workspace</h2><span>Company, Personal and Consolidated views share one canonical transaction ledger while ownership stays separate.</span></div><button data-viewjump="more">All modules</button></div><div class="fm-command-actions">${workflowButtons}</div><div class="fm-health-strip">${healthButtons}</div></section>`;
+}
 function overview(){
  const err=resourceError('dash','Finance dashboard');if(err)return err;
  const accountRows=state.accounts.slice(0,6).map(a=>`<div class="fm-row" data-account="${a.id}"><div><h3>${esc(a.nickname||a.account_name||'Account')}</h3><p>${esc(a.institution||'Financial account')} · ${esc(a.ownership_scope||'')}</p></div><div class="fm-row-right"><b>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</b><small>${esc(a.currency||'AUD')}</small></div></div>`).join('');
@@ -262,7 +287,7 @@ function overview(){
  const accountCard=dashboardCardVisible('accounts')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounts</h2><p>Balances are current positions and never period-filtered.</p></div><button data-viewjump="accounts">Manage</button></div><div class="fm-list">'+(accountRows||emptyState('No accounts','Add an account or import a statement.'))+'</div></div></article>':'';
  const recentCard=dashboardCardVisible('recent')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Recent transactions</h2><p>Drill into current classification and immutable source evidence.</p></div><button data-viewjump="transactions">View all</button></div><div class="fm-list">'+recentRows()+'</div></div></article>':'';
  const attentionCard='<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Needs your attention</h2><p>Direct queues, not decorative alerts.</p></div></div><div class="fm-attention-grid">'+attentionHtml+'</div></div></article>';
- return hero()+((cashflowCard||expenseCard)?'<div class="fm-grid two">'+cashflowCard+expenseCard+'</div>':'')+'<div class="fm-grid two">'+attentionCard+accountCard+'</div>'+recentCard;
+ return financeCommandCentre()+hero()+((cashflowCard||expenseCard)?'<div class="fm-grid two">'+cashflowCard+expenseCard+'</div>':'')+'<div class="fm-grid two">'+attentionCard+accountCard+'</div>'+recentCard;
 }
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
@@ -490,7 +515,19 @@ async function loadReceiptCenter(){
  const data=await loadResource('receiptCenter',API+'/receipts'+receiptQuery());state.receiptCenter=data||null;render();
 }
 
+function moreView(){
+ const groups=NAV_GROUPS.map(([group,items])=>{
+  const filtered=items.filter(([view])=>!['overview','accounts','transactions','statements'].includes(view));
+  if(!filtered.length)return '';
+  return `<section class="fm-module-group"><header><small>${esc(group)}</small></header><div class="fm-module-grid">${filtered.map(([view,icon,label])=>{
+   const [heading,description]=title(view);
+   return `<button class="fm-module-card" data-viewjump="${view}"><span>${icon}</span><div><b>${esc(label)}</b><small>${esc(description)}</small></div><i>›</i></button>`;
+  }).join('')}</div></section>`;
+ }).join('');
+ return `<div class="fm-control-intro"><p>ONE FINANCE OPERATING SYSTEM</p><h2>All finance modules</h2><span>No separate Banking V3/V4/V5 screens. Every workflow below opens inside the same Finance OS and uses the same canonical data.</span><div class="fm-control-quick"><button data-quick="statement">Import history</button><button data-quick="expense">Add expense</button><button data-quick="income">Add income</button><button data-viewjump="reports">Build report</button></div></div>${groups}`;
+}
 function simpleView(v){
+ if(v==='more')return moreView();
  if(v==='budgets')return budgetsView();
  if(['savings','debt','recurring'].includes(v))return personalCard(v);
  if(v==='reports')return reportView();
@@ -1163,7 +1200,7 @@ function bind(){
  $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){const value=e.currentTarget.value.trim();if(runFinanceCommand(value))return;globalFinanceSearch(value)}};
 }
 document.addEventListener('DOMContentLoaded',async()=>{
- bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h))state.view=h;navButtons();
+ bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h)||h==='more')state.view=h;navButtons();
  try{
   const cycle=await loadBase();render();signalFinanceReady();
   void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be loaded.',true));
