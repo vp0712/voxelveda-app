@@ -123,3 +123,9 @@ assert.match(js,/OS\+'\/team\/'\+encodeURIComponent\(user\.id\)\+'\/access'/,'De
 assert.match(js,/Personal accounts are intentionally excluded/,'Team Access UI must explicitly preserve Personal Money privacy.');
 assert.match(js,/PREPARE = create payment instructions/,'Team Access must explain preparation rights.');
 assert.match(js,/APPROVE = approve another preparer/,'Team Access must explain approval separation of duties.');
+
+assert.match(js,/id="bankingAlertForm"/,'Finance Notifications must expose banking alert thresholds.');
+assert.match(js,/OS\+'\/alerts'/,'Banking alert preferences must save through the canonical Banking OS route.');
+assert.match(js,/low_balance_threshold/,'Finance alerts must expose a low-balance threshold.');
+assert.match(js,/large_transaction_threshold/,'Finance alerts must expose a large-transaction threshold.');
+assert.match(js,/Current banking attention/,'Finance alerts must surface Banking command-centre attention.');
