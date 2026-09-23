@@ -81,6 +81,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 
 21. Existing owner-private Net Worth and Asset Protection backends are now surfaced inside the single Finance OS instead of remaining a disconnected legacy UI: asset/liability creation, valuation/balance updates, snapshots, reminders and private HTTPS document references all use their existing protected routes.
 
+22. A production legacy Finance frontend gate now blocks any non-canonical `finance-*`, `personal-finance-*` or `advanced-banking-ui*` HTML/CSS/JS asset with HTTP 410. `/banking` and the old reconciliation page redirect into the single Finance OS, preventing old UI bundles from resurfacing even if stale files remain in repository history.
+
 ## Production infrastructure evidence
 
 ### Database transport
