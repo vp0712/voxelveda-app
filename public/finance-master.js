@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,debtPlanner:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,handover:null,personalIntegrity:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,debtPlanner:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,controlActions:null,handover:null,personalIntegrity:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -22,7 +22,7 @@ const NAV_GROUPS=[
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['bankops','⌁','Banking Operations'],['cash','¤','Cash'],['currency','FX','Currency Centre'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar'],['treasury','▥','Treasury'],['performance','▤','Performance & Stress']]],
- ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
+ ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['controlactions','!','Control Actions'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports'],['handover','▣','Accountant Handover'],['taxcontrol','§','Tax & Evidence'],['evidenceaudit','⌘','Evidence & Audit']]],
  ['CONTROL',[['closeassurance','✓','Close & Assurance'],['protection','◇','Protection Register'],['securityprivacy','⌾','Security & Privacy'],['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
@@ -131,6 +131,7 @@ function title(v){return ({
  insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
  rules:['Categories & Rules','Merchant categorisation rules create suggestions; they do not silently post changes.'],
  review:['Data Quality Review','Uncategorised, unreconciled, coverage and other review queues.'],
+ controlactions:['Control Actions','Owned Finance issues with due dates, overdue visibility, progress notes and resolution evidence.'],
  reconciliation:['Reconciliation','Bank transaction reconciliation inside the master Finance OS.'],
  reports:['Reports','Trusted exports and report-ready filtered transaction data.'],
  handover:['Accountant Handover & Audit Pack','Company-only year-end readiness, close evidence, bank coverage, AP/AR, accountant questions and versioned evidence exports.'],
@@ -299,7 +300,7 @@ async function hydrateSupplementary(cycle){
  const resources=[
   ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],
   ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing?date='+encodeURIComponent(localIsoDay())],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
-  ['readiness',I+'/banking-readiness'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
+  ['readiness',I+'/banking-readiness'],['controlActions',API+'/issues'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
   ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
   ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
   ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['cashControl',API+'/cash-control'],['closeAssurance',API+'/close-assurance'],['treasuryControl',API+'/treasury-control'],['performanceRisk',API+'/performance-risk-control'],['handover',API+'/accountant-handover'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
@@ -1176,7 +1177,7 @@ function ensureAdvancedControlLoaded(){
  if(window.__financeAdvancedControlMount){mount();return}
  const existing=document.querySelector('script[data-finance-advanced-control]');
  if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}
- const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v6';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
+ const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v7';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
 }
 function advancedControlView(){
  setTimeout(ensureAdvancedControlLoaded,0);
@@ -1274,6 +1275,7 @@ function simpleView(v){
  if(v==='calendar')return calendarView();
  if(v==='receipts')return receiptsView();
  if(v==='review')return reviewView();
+ if(v==='controlactions')return controlActionsView();
  if(v==='personal')return personalView();
  if(v==='company')return companyView();
  if(v==='consolidated')return consolidatedView();
@@ -1380,6 +1382,18 @@ async function exportBuiltReportXlsx(){
  location.href=API+'/reports/builder.xlsx?'+reportQuery(def);
 }
 
+function controlActionsView(){
+ const payload=state.controlActions||{},items=payload.issues||[],s=payload.summary||{};
+ const active=items.filter(x=>['OPEN','IN_PROGRESS'].includes(String(x.status||'').toUpperCase()));
+ const rows=active.map(x=>'<div class="fm-row"><div><h3>'+esc(x.title||x.issue_type||'Finance control action')+'</h3><p>'+esc(x.message||'')+' · '+esc(x.module||'finance')+(x.due_date?' · due '+date(x.due_date):' · no due date')+(x.assignee_name?' · owner '+esc(x.assignee_name):' · unassigned')+'</p>'+(x.last_progress_note?'<small>Latest progress: '+esc(x.last_progress_note)+'</small>':'')+'</div><div class="fm-row-right">'+statusBadge(x.overdue?'OVERDUE':x.severity||x.status)+'<small>'+esc(x.status||'OPEN')+'</small><div class="fm-inline-actions">'+(!x.assigned_to?'<button data-control-take="'+x.id+'">Take ownership</button>':'')+(x.status==='OPEN'?'<button data-control-start="'+x.id+'">Start</button>':'')+'<button data-control-due="'+x.id+'" data-due="'+esc(String(x.due_date||'').slice(0,10))+'">Due date</button><button data-control-progress="'+x.id+'">Progress note</button><button data-control-resolve="'+x.id+'">Resolve</button></div></div></div>').join('');
+ return resourceError('controlActions','Control Actions')+
+ '<div class="fm-control-intro"><p>CONTROL ACTIONS</p><h2>Every Finance exception needs an owner, due date and resolution trail</h2><span>This is the existing Finance issue register made operational. It does not create another ledger or task database; resolution history stays attached to the Finance issue and audit trail.</span><div class="fm-control-quick"><button data-viewjump="review">Review Centre</button><button data-viewjump="closeassurance">Close & Assurance</button><button data-viewjump="performance">Performance & Stress</button></div></div>'+
+ '<div class="fm-grid four"><div class="fm-kpi"><span>Open</span><strong>'+num(s.open_count)+'</strong><small>Not started</small></div><div class="fm-kpi"><span>In progress</span><strong>'+num(s.in_progress_count)+'</strong><small>Owned work underway</small></div><div class="fm-kpi"><span>Overdue</span><strong>'+num(s.overdue_active)+'</strong><small>Open/in-progress past due</small></div><div class="fm-kpi"><span>Unassigned</span><strong>'+num(s.unassigned_active)+'</strong><small>Needs an owner</small></div></div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Active control-action queue</h2><p>Blocking errors stay non-ignorable. Resolve only with a written reason/evidence note.</p></div><span>'+num(s.mine_active)+' assigned to me</span></div><div class="fm-list">'+(rows||emptyState('No active control actions','There are no open or in-progress Finance issues.'))+'</div></div></article>';
+}
+async function updateControlAction(id,body){
+ try{const x=await api(API+'/issues/'+encodeURIComponent(id),{method:'POST',body:JSON.stringify(body)});notice(x.message);await loadResource('controlActions',API+'/issues');state.view='controlactions';render()}catch(error){notice(error.message,true)}
+}
 function reviewView(){
  const q=state.quality||{},ins=state.insights?.summary||{},archived=state.archivedTransactions?.archived_transactions||[];
  const cards=[['Uncategorised',q.unclassified_transactions??q.unclassified,'transactions'],['Unreconciled',q.unreconciled_transactions??q.unreconciled,'reconciliation'],['Ownership missing',q.ownership_missing,'transactions'],['Unknown history coverage',q.unknown_history_coverage,'accounts'],['Transfer candidates',ins.transfer_candidates,'insights'],['Category suggestions',ins.category_suggestions,'insights'],['Anomalies',ins.anomalies,'insights'],['Archived transactions',archived.length,'review']];
@@ -1767,6 +1781,12 @@ function render(){
 }
 async function go(v){state.view=v;history.replaceState(null,'','#'+v);render()}
 function bindDynamic(){
+ document.querySelectorAll('[data-control-take]').forEach(b=>b.onclick=()=>updateControlAction(b.dataset.controlTake,{assign_to_me:true,status:'IN_PROGRESS',progress_note:'Ownership accepted.'}));
+ document.querySelectorAll('[data-control-start]').forEach(b=>b.onclick=()=>updateControlAction(b.dataset.controlStart,{status:'IN_PROGRESS',assign_to_me:true,progress_note:'Control action started.'}));
+ document.querySelectorAll('[data-control-due]').forEach(b=>b.onclick=()=>{const due=prompt('Due date (YYYY-MM-DD). Leave blank to clear:',b.dataset.due||'');if(due===null)return;updateControlAction(b.dataset.controlDue,{due_date:due})});
+ document.querySelectorAll('[data-control-progress]').forEach(b=>b.onclick=()=>{const note=prompt('Progress / evidence note:');if(!note?.trim())return;updateControlAction(b.dataset.controlProgress,{progress_note:note,status:'IN_PROGRESS',assign_to_me:true})});
+ document.querySelectorAll('[data-control-resolve]').forEach(b=>b.onclick=()=>{const reason=prompt('Resolution evidence / reason:');if(!reason?.trim())return;updateControlAction(b.dataset.controlResolve,{status:'RESOLVED',reason})});
+
  document.querySelectorAll('[data-viewjump]').forEach(b=>b.onclick=()=>go(b.dataset.viewjump));
  document.querySelectorAll('[data-history-import]').forEach(b=>b.onclick=()=>openHistoricalImport(b.dataset.historyImport));
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));

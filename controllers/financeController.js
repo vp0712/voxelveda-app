@@ -359,38 +359,116 @@ exports.getIssues = async (req, res) => {
     await ensureFinanceSchema();
     const clauses = ['1 = 1'];
     const params = [];
-    for (const [queryKey, column] of [['financial_year_id', 'financial_year_id'], ['severity', 'severity'], ['status', 'status'], ['module', 'module']]) {
+    for (const [queryKey, column] of [['financial_year_id', 'fi.financial_year_id'], ['severity', 'fi.severity'], ['status', 'fi.status'], ['module', 'fi.module'], ['assigned_to', 'fi.assigned_to']]) {
       if (req.query[queryKey]) { clauses.push(`${column} = ?`); params.push(req.query[queryKey]); }
     }
+    if (String(req.query.mine || '').toLowerCase() === 'true') { clauses.push('fi.assigned_to = ?'); params.push(req.user.id); }
+    if (String(req.query.overdue || '').toLowerCase() === 'true') clauses.push("fi.status IN ('OPEN','IN_PROGRESS') AND fic.due_date < CURRENT_DATE");
     const [rows] = await pool.query(
-      `SELECT * FROM finance_issues WHERE ${clauses.join(' AND ')} ORDER BY FIELD(severity, 'BLOCKING_ERROR', 'WARNING', 'INFO'), created_at DESC LIMIT 500`,
+      `SELECT fi.*, fic.due_date, fic.assigned_by, fic.assigned_at, fic.last_progress_note, fic.last_progress_by, fic.last_progress_at,
+              assignee.name AS assignee_name, assignee.email AS assignee_email,
+              resolver.name AS resolved_by_name,
+              CASE WHEN fi.status IN ('OPEN','IN_PROGRESS') AND fic.due_date IS NOT NULL AND fic.due_date < CURRENT_DATE THEN 1 ELSE 0 END AS overdue
+         FROM finance_issues fi
+         LEFT JOIN finance_issue_controls fic ON fic.finance_issue_id=fi.id
+         LEFT JOIN users assignee ON assignee.id=fi.assigned_to AND assignee.deleted_at IS NULL
+         LEFT JOIN users resolver ON resolver.id=fi.resolved_by AND resolver.deleted_at IS NULL
+        WHERE ${clauses.join(' AND ')}
+        ORDER BY
+          CASE WHEN fi.status IN ('OPEN','IN_PROGRESS') AND fic.due_date IS NOT NULL AND fic.due_date < CURRENT_DATE THEN 0 ELSE 1 END,
+          FIELD(fi.severity, 'BLOCKING_ERROR', 'WARNING', 'INFO'),
+          fic.due_date IS NULL, fic.due_date, fi.created_at DESC
+        LIMIT 500`,
       params
     );
-    res.json({ issues: rows });
+    const [summaryRows] = await pool.query(
+      `SELECT
+          SUM(fi.status='OPEN') AS open_count,
+          SUM(fi.status='IN_PROGRESS') AS in_progress_count,
+          SUM(fi.status IN ('OPEN','IN_PROGRESS') AND fi.severity='BLOCKING_ERROR') AS blocking_active,
+          SUM(fi.status IN ('OPEN','IN_PROGRESS') AND fi.assigned_to IS NULL) AS unassigned_active,
+          SUM(fi.status IN ('OPEN','IN_PROGRESS') AND fic.due_date IS NOT NULL AND fic.due_date < CURRENT_DATE) AS overdue_active,
+          SUM(fi.status IN ('OPEN','IN_PROGRESS') AND fi.assigned_to=?) AS mine_active
+        FROM finance_issues fi LEFT JOIN finance_issue_controls fic ON fic.finance_issue_id=fi.id`, [req.user.id]
+    );
+    const summary=summaryRows[0]||{};
+    res.json({
+      rule:'Control Actions extend the existing Finance issue register. Assignment and due dates do not create a second ledger or alter financial records.',
+      issues: rows.map(row=>({...row,overdue:Boolean(Number(row.overdue||0))})),
+      summary:Object.fromEntries(Object.entries(summary).map(([key,value])=>[key,Number(value||0)]))
+    });
   } catch (error) {
     return sendError(res, error, 'Failed to load finance issues');
   }
 };
 
 exports.updateIssue = async (req, res) => {
+  const connection = await pool.getConnection();
   try {
     await ensureFinanceSchema();
-    const status = String(req.body.status || '').toUpperCase();
-    const reason = String(req.body.reason || '').trim();
-    if (!['OPEN', 'IN_PROGRESS', 'RESOLVED', 'IGNORED'].includes(status)) throw new FinanceError('Invalid issue status.');
-    const [[issue]] = await pool.query(`SELECT * FROM finance_issues WHERE id = ?`, [req.params.id]);
+    await connection.beginTransaction();
+    const [[issue]] = await connection.query(`SELECT * FROM finance_issues WHERE id = ? FOR UPDATE`, [req.params.id]);
     if (!issue) throw new FinanceError('Issue not found.', 404);
+
+    const status = req.body.status === undefined ? String(issue.status || 'OPEN').toUpperCase() : String(req.body.status || '').toUpperCase();
+    const reason = String(req.body.reason || '').trim();
+    const progressNote = String(req.body.progress_note || '').trim().slice(0, 2000) || null;
+    if (!['OPEN', 'IN_PROGRESS', 'RESOLVED', 'IGNORED'].includes(status)) throw new FinanceError('Invalid issue status.');
     if (status === 'IGNORED' && issue.severity === 'BLOCKING_ERROR') throw new FinanceError('Blocking finance issues cannot be ignored.', 409, 'BLOCKING_ISSUE');
     if (['RESOLVED', 'IGNORED'].includes(status) && !reason) throw new FinanceError('A resolution reason is required.');
-    await pool.query(
-      `UPDATE finance_issues SET status = ?, resolution_note = ?, ignored_reason = ?, resolved_by = ?, resolved_at = ? WHERE id = ?`,
-      [status, status === 'RESOLVED' ? reason : null, status === 'IGNORED' ? reason : null,
-        ['RESOLVED', 'IGNORED'].includes(status) ? req.user.id : null, ['RESOLVED', 'IGNORED'].includes(status) ? new Date() : null, req.params.id]
+
+    let assignedTo=issue.assigned_to===null?null:Number(issue.assigned_to);
+    let assignmentChanged=false;
+    if (req.body.assign_to_me === true) { assignedTo=Number(req.user.id); assignmentChanged=assignedTo!==Number(issue.assigned_to||0); }
+    if (req.body.unassign === true) { assignedTo=null; assignmentChanged=issue.assigned_to!==null; }
+    if (req.body.assigned_to !== undefined && req.body.assigned_to !== null && req.body.assigned_to !== '') {
+      const candidate=Number(req.body.assigned_to);
+      if (!Number.isInteger(candidate)||candidate<=0) throw new FinanceError('Assigned user is invalid.');
+      const [[activeUser]]=await connection.query('SELECT id FROM users WHERE id=? AND active=1 AND deleted_at IS NULL LIMIT 1',[candidate]);
+      if(!activeUser) throw new FinanceError('Assigned user is not an active account.',400,'INVALID_ISSUE_ASSIGNEE');
+      assignedTo=candidate;assignmentChanged=assignedTo!==Number(issue.assigned_to||0);
+    }
+
+    let dueDate;
+    if (req.body.due_date === undefined) {
+      const [[existingControl]]=await connection.query('SELECT due_date FROM finance_issue_controls WHERE finance_issue_id=? LIMIT 1',[issue.id]);
+      dueDate=existingControl?.due_date||null;
+    } else {
+      const raw=String(req.body.due_date||'').trim();
+      if(raw&&!/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new FinanceError('Due date must use YYYY-MM-DD.');
+      dueDate=raw||null;
+    }
+
+    await connection.query(
+      `UPDATE finance_issues SET status=?, assigned_to=?, resolution_note=?, ignored_reason=?, resolved_by=?, resolved_at=? WHERE id=?`,
+      [status,assignedTo,status==='RESOLVED'?reason:null,status==='IGNORED'?reason:null,
+       ['RESOLVED','IGNORED'].includes(status)?req.user.id:null,['RESOLVED','IGNORED'].includes(status)?new Date():null,issue.id]
     );
-    await logAudit(pool, requestAudit(req, { action: 'ISSUE_STATUS_CHANGED', module: 'finance', recordType: 'finance_issue', recordId: req.params.id, oldValue: issue, newValue: { status, reason } }));
-    res.json({ message: 'Finance issue updated.' });
+    await connection.query(
+      `INSERT INTO finance_issue_controls
+        (finance_issue_id,due_date,assigned_by,assigned_at,last_progress_note,last_progress_by,last_progress_at)
+       VALUES (?,?,?,?,?,?,?)
+       ON DUPLICATE KEY UPDATE
+        due_date=VALUES(due_date),
+        assigned_by=IF(VALUES(assigned_at) IS NULL,assigned_by,VALUES(assigned_by)),
+        assigned_at=COALESCE(VALUES(assigned_at),assigned_at),
+        last_progress_note=COALESCE(VALUES(last_progress_note),last_progress_note),
+        last_progress_by=IF(VALUES(last_progress_note) IS NULL,last_progress_by,VALUES(last_progress_by)),
+        last_progress_at=IF(VALUES(last_progress_note) IS NULL,last_progress_at,VALUES(last_progress_at)),
+        updated_at=CURRENT_TIMESTAMP`,
+      [issue.id,dueDate,assignmentChanged?req.user.id:null,assignmentChanged?new Date():null,progressNote,progressNote?req.user.id:null,progressNote?new Date():null]
+    );
+    await logAudit(connection, requestAudit(req, {
+      action:'ISSUE_CONTROL_UPDATED',module:'finance',recordType:'finance_issue',recordId:req.params.id,oldValue:issue,
+      newValue:{status,assigned_to:assignedTo,due_date:dueDate,progress_note:progressNote,reason:reason||null}
+    }));
+    await connection.commit();
+    res.json({ message: status==='RESOLVED' ? 'Finance control action resolved with evidence.' : 'Finance control action updated.', status, assigned_to:assignedTo, due_date:dueDate });
   } catch (error) {
+    await connection.rollback().catch(()=>{});
     return sendError(res, error, 'Failed to update finance issue');
+  } finally {
+    connection.release();
   }
 };
 

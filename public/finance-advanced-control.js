@@ -2,7 +2,7 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v6';
+const VERSION='20260924-advanced-control-v7';
 const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
@@ -16,6 +16,7 @@ const SOURCES=[
   ['company','/api/finance/company-summary'],
   ['command','/api/finance/banking-os/command-center'],
   ['quality','/api/finance/intelligence/data-quality'],
+  ['issues','/api/finance/issues'],
   ['receipts','/api/finance/receipts'],
   ['reimbursements','/api/finance/reimbursements'],
   ['rules','/api/finance/intelligence/rules'],
@@ -144,6 +145,7 @@ function actionQueue(){
  for(const a of state.data.lifecycle?.alerts||[])out.push({severity:a.priority||'MEDIUM',title:a.title||a.kind||'Asset/lifecycle reminder',detail:a.detail||'',source:'Protection'});
  for(const a of state.data.command?.attention||[])out.push({severity:a.severity||'MEDIUM',title:String(a.code||'Banking attention').replaceAll('_',' '),detail:a.message||'',source:'Banking'});
  const rc=state.data.receipts?.counts||{};if(num(rc.missing)+num(rc.requested)>0)out.push({severity:'WATCH',title:'Receipt evidence needs attention',detail:(num(rc.missing)+num(rc.requested))+' receipt item(s) missing or requested.',source:'Receipts'});
+ for(const i of state.data.issues?.issues||[]){if(['OPEN','IN_PROGRESS'].includes(String(i.status||'').toUpperCase()))out.push({severity:i.overdue?'HIGH':i.severity||'REVIEW',title:i.title||'Finance control action',detail:(i.assignee_name?'Owner '+i.assignee_name:'Unassigned')+(i.due_date?' · due '+date(i.due_date):'')+(i.message?' · '+i.message:''),source:'Control Actions'});}
  return out.sort((a,b)=>({URGENT:0,CRITICAL:0,HIGH:1,MEDIUM:2,WATCH:2,LOW:3}[String(a.severity).toUpperCase()]??4)-({URGENT:0,CRITICAL:0,HIGH:1,MEDIUM:2,WATCH:2,LOW:3}[String(b.severity).toUpperCase()]??4));
 }
 
@@ -290,6 +292,10 @@ function performanceRiskControl(){
  '<div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No performance position returned.</div>')+'</div>'+
  '<div class="fac-note" style="margin-top:10px">Stress figures use recent actual cash-flow patterns and remain separated by scope/currency. They do not predict markets, revenues or outcomes and do not execute any financial action.</div></section>';
 }
+function controlActionsSummary(){
+ const p=state.data.issues||{},s=p.summary||{},rows=(p.issues||[]).filter(x=>['OPEN','IN_PROGRESS'].includes(String(x.status||'').toUpperCase())).slice(0,10).map(x=>'<div class="fac-row"><div><h4>'+esc(x.title||'Finance control action')+'</h4><p>'+(x.assignee_name?'Owner '+esc(x.assignee_name):'Unassigned')+(x.due_date?' · due '+date(x.due_date):'')+'</p></div><div class="fac-right">'+statusChip(x.overdue?'OVERDUE':x.severity||x.status)+'</div></div>').join('');
+ return '<section id="facControlActions" class="fac-section"><header><div><h3>Control Actions</h3><p>Ownership and due-date control over the existing Finance issue register.</p></div><button data-fac-open="controlactions">Open queue</button></header><div class="fac-kpis"><div class="fac-kpi"><span>Open</span><b>'+num(s.open_count)+'</b></div><div class="fac-kpi"><span>In progress</span><b>'+num(s.in_progress_count)+'</b></div><div class="fac-kpi"><span>Overdue</span><b>'+num(s.overdue_active)+'</b></div><div class="fac-kpi"><span>Unassigned</span><b>'+num(s.unassigned_active)+'</b></div></div><div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No active Finance control action.</div>')+'</div></section>';
+}
 function sourceHealth(){
  const rows=SOURCES.map(([n,u])=>{const err=state.errors[n];return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+'</div></div>'+statusChip(err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):'READY')+'</div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
@@ -297,8 +303,8 @@ function sourceHealth(){
 
 function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
- executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+treasuryControl()+performanceRiskControl()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ executive()+actions()+controlActionsSummary()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+treasuryControl()+performanceRiskControl()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }
