@@ -25,7 +25,7 @@ const files = [
   'utils/session.js', 'utils/tokenRevocation.js', 'utils/money.js', 'utils/securityRedaction.js', 'utils/secureLogger.js',
   'public/login.js', 'public/auth-lifecycle.js', 'public/mfa.js', 'public/security-page.js', 'public/step-up.js',
   'public/admin-dashboard.js', 'public/staff.js', 'public/workflow-ui.js', 'public/procurement-ui.js', 'public/qr-widget.js',
-  'public/finance-master.js', 'public/finance-advanced-control.js', 'public/finance-bootstrap-guard.js', 'public/finance-statement-parsers.js',
+  'public/finance-master.js', 'public/finance-advanced-control.js', 'public/finance-bootstrap-guard.js',
   'public/service-worker.js', 'scripts/finance-advanced-control-test.js', 'scripts/finance-cash-control-test.js', 'scripts/personal-debt-control-test.js', 'scripts/finance-master-os-test.js', 'scripts/finance-legacy-ui-gate-test.js', 'scripts/enterprise-wave-a-test.js', 'scripts/wave-b-pr1-platform-guards-test.js', 'scripts/wave-b-pr2-worker-safety-test.js', 'scripts/wave-b-pr3-qms-fail-closed-test.js', 'scripts/generate-enterprise-inventory.js', 'scripts/update-enterprise-audit-baseline.js', 'scripts/check-enterprise-audit-provenance.js'
 ];
 
