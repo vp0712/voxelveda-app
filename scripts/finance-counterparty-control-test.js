@@ -7,6 +7,7 @@ const master=fs.readFileSync('public/finance-master.js','utf8');
 
 assert(routes.includes("router.get('/counterparty-control'"),'Counterparty Control route missing.');
 assert(routes.includes("financeCounterparty.getCenter"),'Counterparty Control controller not wired.');
+assert(routes.includes("router.get('/counterparty-control', requireAnyPermission('VIEW_BUSINESS_BANKING')"),'Counterparty Control must require business-banking visibility.');
 for(const marker of ['receivables','payables','customer_invoices','supplier_bills','counterparties','concentration'])
   assert(controller.includes(marker),`Counterparty engine missing ${marker}.`);
 assert(controller.includes("invoice creation age"),'Customer aging limitation must be explicit.');
