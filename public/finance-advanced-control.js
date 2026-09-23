@@ -2,8 +2,8 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v1';
-const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}};
+const VERSION='20260924-advanced-control-v2';
+const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
   ['attention','/api/finance/personal-money/attention'],
@@ -17,7 +17,12 @@ const SOURCES=[
   ['command','/api/finance/banking-os/command-center'],
   ['quality','/api/finance/intelligence/data-quality'],
   ['receipts','/api/finance/receipts'],
-  ['reimbursements','/api/finance/reimbursements']
+  ['reimbursements','/api/finance/reimbursements'],
+  ['rules','/api/finance/intelligence/rules'],
+  ['notifications','/api/notifications'],
+  ['bankingOps','/api/finance/banking-os'],
+  ['readiness','/api/finance/intelligence/banking-readiness'],
+  ['reviewInbox','/api/finance/personal-money/review-inbox']
 ];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
@@ -230,6 +235,36 @@ function companyCfo(){
  return '<section id="facCompany" class="fac-section"><header><div><h3>Company CFO Control</h3><p>Receivables, payables, approvals, liquidity and accounting attention.</p></div></header><div class="fac-kpis"><div class="fac-kpi"><span>Customer receivables</span><b>'+money(c.customer_receivables,cur)+'</b><small>'+num(c.open_customer_invoice_count)+' open invoice(s)</small></div><div class="fac-kpi"><span>Supplier payables</span><b>'+money(c.supplier_payables,cur)+'</b><small>'+num(c.supplier_bill_count)+' outstanding bill(s)</small></div><div class="fac-kpi"><span>Pending supplier approvals</span><b>'+num(c.pending_supplier_approvals)+'</b><small>Company workflow</small></div><div class="fac-kpi"><span>Open accountant queries</span><b>'+num(c.open_accountant_queries)+'</b><small>Company accounting</small></div></div><div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Banking command metrics</h4><div class="fac-list">'+(rows||'<div class="fac-empty">No banking command metrics available.</div>')+'</div></article><article class="fac-card"><h4>Control notes</h4><div class="fac-list"><div class="fac-row"><div><h4>GST registration</h4><p>'+esc(c.gst_registration||'UNKNOWN')+'</p></div>'+statusChip(c.gst_registration&&c.gst_registration!=='UNKNOWN'?'CONFIGURED':'REVIEW')+'</div><div class="fac-row"><div><h4>Payment approvals waiting</h4><p>'+num(cmd.approval_inbox?.length)+' approval item(s) returned for your role.</p></div>'+statusChip(cmd.approval_inbox?.length?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Overdue obligations</h4><p>'+num(cmd.obligations?.overdue)+' overdue payment instruction(s).</p></div>'+statusChip(cmd.obligations?.overdue?'HIGH':'CLEAR')+'</div></div></article></div></section>';
 }
 
+function automationApprovalControl(){
+ const approvals=state.data.command?.approval_inbox||state.data.bankingOps?.approval_inbox||[];
+ const rules=state.data.rules?.rules||state.data.rules||[];
+ const notices=state.data.notifications?.notifications||[];
+ const reviews=state.data.reviewInbox?.items||state.data.reviewInbox?.matches||state.data.reviewInbox?.reviews||[];
+ const readiness=state.data.readiness||{};
+ const capability=readiness.overall_status||readiness.status||readiness.readiness_status||'REVIEW';
+ const approvalRows=(Array.isArray(approvals)?approvals:[]).slice(0,12).map(x=>'<div class="fac-row"><div><h4>'+esc(x.title||x.payee_name||x.reference||'Payment approval')+'</h4><p>'+esc(x.message||x.description||x.status||'Approval workflow item')+'</p></div><div class="fac-right">'+statusChip(x.status||x.severity||'REVIEW')+'</div></div>').join('');
+ const reviewRows=(Array.isArray(reviews)?reviews:[]).slice(0,10).map(x=>'<div class="fac-row"><div><h4>'+esc(x.title||x.merchant_name||x.description||'Recurring review')+'</h4><p>'+esc(x.message||x.reason||x.status||'Review suggested recurring match')+'</p></div><div class="fac-right">'+statusChip(x.status||'REVIEW')+'</div></div>').join('');
+ return '<section id="facAutomation" class="fac-section"><header><div><h3>Automation & Approval Control</h3><p>Rules may suggest or queue work; protected actions still require the canonical review/step-up workflow.</p></div>'+statusChip(capability)+'</header>'+
+ '<div class="fac-kpis"><div class="fac-kpi"><span>Payment approvals</span><b>'+((Array.isArray(approvals)?approvals:[]).length)+'</b><small>Role/step-up controlled</small></div><div class="fac-kpi"><span>Categorisation rules</span><b>'+((Array.isArray(rules)?rules:[]).length)+'</b><small>Suggestion automation</small></div><div class="fac-kpi"><span>Recurring reviews</span><b>'+((Array.isArray(reviews)?reviews:[]).length)+'</b><small>Confirm before applying</small></div><div class="fac-kpi"><span>Notifications</span><b>'+((Array.isArray(notices)?notices:[]).length)+'</b><small>Current attention feed</small></div></div>'+
+ '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Approval inbox</h4><div class="fac-list">'+(approvalRows||'<div class="fac-empty">No payment approval item is currently returned.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="bankops">Open Banking Operations</button><button data-fac-open="team">Team Access</button></div></article><article class="fac-card"><h4>Automation review</h4><div class="fac-list">'+(reviewRows||'<div class="fac-empty">No recurring-match review item is currently returned.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="rules">Rules</button><button data-fac-open="review">Review Centre</button><button data-fac-open="notifications">Alerts</button></div></article></div>'+
+ '<div class="fac-note" style="margin-top:10px">Automation boundary: this control centre never auto-approves payments, auto-reconciles transactions, auto-deletes evidence, or silently changes ownership/category. Sensitive execution remains behind the existing protected workflow.</div></section>';
+}
+function planProjection(cur,plan,days){
+ const base=knownProjection(cur,days),months=days/30.4375;
+ const delta=(num(plan.monthlyIncomeDelta)-num(plan.monthlySpendingDelta)-num(plan.monthlySavingTarget))*months-num(plan.oneTimeCost);
+ return {base:base.projected,delta,projected:base.projected+delta};
+}
+function decisionIntelligence(){
+ const cs=currencies();if(!cs.includes(state.scenario.currency))state.scenario.currency=cs[0];
+ const cur=state.scenario.currency,days=Number(state.compare.horizon||365),a=planProjection(cur,state.compare.a,days),b=planProjection(cur,state.compare.b,days);
+ const difference=b.projected-a.projected;
+ const form=(key,p)=>'<article class="fac-card"><h4>'+esc(p.label)+'</h4><div class="fac-scenario"><label>Label<input data-compare="'+key+'" data-field="label" value="'+esc(p.label)+'"></label><label>Monthly income change<input data-compare="'+key+'" data-field="monthlyIncomeDelta" type="number" step="0.01" value="'+esc(p.monthlyIncomeDelta)+'"></label><label>Monthly spending change<input data-compare="'+key+'" data-field="monthlySpendingDelta" type="number" step="0.01" value="'+esc(p.monthlySpendingDelta)+'"></label><label>One-time cost<input data-compare="'+key+'" data-field="oneTimeCost" type="number" step="0.01" min="0" value="'+esc(p.oneTimeCost)+'"></label><label>Monthly savings target<input data-compare="'+key+'" data-field="monthlySavingTarget" type="number" step="0.01" min="0" value="'+esc(p.monthlySavingTarget)+'"></label></div></article>';
+ return '<section id="facDecision" class="fac-section"><header><div><h3>Decision Intelligence — Plan A vs Plan B</h3><p>Compare two planning assumptions against the same known-schedule baseline without writing anything to the ledger.</p></div><span class="fac-chip ok">READ-ONLY MODEL</span></header>'+
+ '<div class="fac-card"><div class="fac-inline"><label>Currency <select id="facCompareCurrency">'+cs.map(c=>'<option '+(c===cur?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label><label>Horizon <select id="facCompareHorizon">'+[30,90,180,365,730].map(d=>'<option value="'+d+'" '+(days===d?'selected':'')+'>'+d+' days</option>').join('')+'</select></label></div></div>'+
+ '<div class="fac-grid two">'+form('a',state.compare.a)+form('b',state.compare.b)+'</div>'+
+ '<div class="fac-kpis"><div class="fac-kpi"><span>'+esc(state.compare.a.label)+' projected</span><b>'+money(a.projected,cur)+'</b><small>Scenario impact '+money(a.delta,cur)+'</small></div><div class="fac-kpi"><span>'+esc(state.compare.b.label)+' projected</span><b>'+money(b.projected,cur)+'</b><small>Scenario impact '+money(b.delta,cur)+'</small></div><div class="fac-kpi"><span>Difference B − A</span><b>'+money(difference,cur)+'</b><small>Arithmetic comparison, not a recommendation</small></div><div class="fac-kpi"><span>Known baseline</span><b>'+money(a.base,cur)+'</b><small>Recorded recurring schedule only</small></div></div>'+
+ '<div class="fac-note">Decision boundary: the model excludes unknown discretionary spending, fees, interest accrual, investment return, tax effects and unrecorded income. It compares assumptions; it does not tell you which choice to make.</div></section>';
+}
 function sourceHealth(){
  const rows=SOURCES.map(([n,u])=>{const err=state.errors[n];return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+'</div></div>'+statusChip(err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):'READY')+'</div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
@@ -237,16 +272,20 @@ function sourceHealth(){
 
 function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button></div></section>'+
- executive()+actions()+forecast()+scenario()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+sourceHealth()+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }
 function bind(){
  document.getElementById('facRefresh')?.addEventListener('click',load);
  document.querySelectorAll('[data-fac-jump]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.facJump)?.scrollIntoView({behavior:'smooth',block:'start'})));
+ document.querySelectorAll('[data-fac-open]').forEach(b=>b.addEventListener('click',()=>document.querySelector('[data-view="'+b.dataset.facOpen+'"]')?.click()));
  const ids=[['facScenarioCurrency','currency'],['facIncomeDelta','monthlyIncomeDelta'],['facSpendDelta','monthlySpendingDelta'],['facOneTime','oneTimeCost'],['facSavingTarget','monthlySavingTarget']];
  for(const [id,key] of ids)document.getElementById(id)?.addEventListener(id==='facScenarioCurrency'?'change':'input',e=>{state.scenario[key]=id==='facScenarioCurrency'?e.target.value:num(e.target.value);render()});
+ document.getElementById('facCompareCurrency')?.addEventListener('change',e=>{state.scenario.currency=e.target.value;render()});
+ document.getElementById('facCompareHorizon')?.addEventListener('change',e=>{state.compare.horizon=num(e.target.value)||365;render()});
+ document.querySelectorAll('[data-compare]').forEach(input=>input.addEventListener('input',e=>{const plan=state.compare[e.target.dataset.compare],field=e.target.dataset.field;if(!plan||!field)return;plan[field]=field==='label'?e.target.value:num(e.target.value);render()}));
 }
 function mount(){
  style();
