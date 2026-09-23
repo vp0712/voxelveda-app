@@ -36,7 +36,7 @@ on:
       - 'controllers/statementImportController.js'
       - 'public/finance-intelligence.js'
       - 'public/finance-statement-report-center.js'
-      - 'controllers/financeIntelligenceController.js'
+      - 'public/finance-master.js'\n      - 'public/finance-master.css'\n      - 'public/finance-intelligence.html'\n      - 'controllers/financeIntelligenceController.js'
       - 'routes/financeRoutes.js'
       - 'public/finance-pdf-v3.js'
       - 'services/globalBrandRenderer.js'
@@ -95,7 +95,7 @@ jobs:
           node --check middleware/statementPreviewSanitizer.js
           node --check public/premium-banking-app.js
           node --check public/admin-dashboard.js
-          node --check public/finance-pdf-v3.js
+          node --check public/finance-pdf-v3.js\n          node --check public/finance-master.js
           node --check scripts/advanced-banking-platform-test.js
           node --check scripts/banking-os-multi-user-test.js
           node --check scripts/banking-command-center-test.js

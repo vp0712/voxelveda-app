@@ -3,11 +3,10 @@ function read(p){return fs.readFileSync(p,'utf8')}
 function assert(v,m){if(!v){console.error('FAIL:',m);process.exitCode=1}else console.log('PASS:',m)}
 const controller=read('controllers/financeIntelligenceController.js');
 const importController=read('controllers/statementImportController.js');
-const importer=read('public/finance-intelligence.js');
-const pdf=read('public/finance-pdf-v3.js');
-const reports=read('public/finance-statement-report-center.js');
+const ui=read('public/finance-master.js');
+const reportBuilder=read('controllers/financeReportBuilderController.js');
 const financeRoutes=read('routes/financeRoutes.js');
-const bankingRoutes=read('routes/bankingPortalRoutes.js');
+const app=read('app.js');
 
 assert(controller.includes('getPortfolioHistoryReport'),'combined portfolio history endpoint exists');
 assert(controller.includes('GROUP BY bt.currency'),'combined report groups money by currency');
@@ -23,23 +22,21 @@ for(const category of ['Rent & Housing','Utilities','Health & Pharmacy','Transpo
 assert(importController.includes('closing_balance_applied'),'newest approved statement can advance account ledger balance');
 assert(importController.includes("String(maxDate) >= String(account.history_end_date)"),'older statements cannot overwrite a newer account balance');
 
-assert(importer.includes("data-currency="),'account selector exposes account currency');
-assert(importer.includes("row.currency || accountCurrency"),'missing row currency falls back to selected account currency');
-assert(importer.includes("location.pathname === '/banking'"),'statement importer supports standalone banking portal');
-assert(pdf.includes("['/finance-intelligence','/banking']"),'PDF parser runs in both finance and banking portal');
-assert(pdf.includes("parseGeometry(pages, accountCurrency='AUD')"),'PDF parser accepts account currency');
-assert(!pdf.includes("currency:'AUD',category:categoryFromText"),'PDF parser no longer hardcodes AUD transaction currency');
+assert(ui.includes('function openHistoricalImport('),'canonical Finance OS includes historical statement import');
+assert(ui.includes('multiple required'),'historical import supports multiple files for one selected account');
+assert(ui.includes("currency:String(row.currency||account.currency||'AUD').toUpperCase()"),'missing statement row currency falls back to the selected account currency');
+assert(ui.includes("accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx""),'historical import supports the required statement formats');
+assert(ui.includes('Nothing is committed automatically.'),'historical imports remain review-before-commit');
+assert(app.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'there is no separate Banking UI');
 
-assert(reports.includes("'/reports/portfolio-history'"),'overall report uses portfolio history endpoint');
-assert(reports.includes('summary_by_currency'),'report renders currency-separated summaries');
-assert(reports.includes('portfolioDonut'),'report includes spending pie chart');
-assert(reports.includes('portfolioLine'),'report includes monthly line chart');
-assert(reports.includes('All accounts combined'),'report supports combined account selection');
-assert(reports.includes('Print / Save PDF'),'report remains PDF-exportable');
+assert(reportBuilder.includes("VALID_TYPES = new Set"),'unified report builder exposes the standard report catalogue');
+assert(reportBuilder.includes('ACCOUNT_STATEMENT'),'bank-style account statement reporting exists');
+assert(reportBuilder.includes('summary_by_currency'),'reports preserve currency-separated summaries');
+assert(ui.includes('Standard Report Catalogue'),'the unified Finance OS exposes reporting in the same application');
+assert(ui.includes('id="reportPdf"')&&ui.includes('id="reportCsv"')&&ui.includes('id="reportXlsx"'),'report PDF/CSV/XLSX actions remain available');
 
-assert(financeRoutes.includes("'/intelligence/reports/portfolio-history'"),'finance route exposes portfolio report');
-assert(bankingRoutes.includes("'/intelligence/reports/portfolio-history'"),'standalone banking route exposes portfolio report');
-assert(bankingRoutes.includes("'/intelligence/accounts/:id/statements/preview'"),'standalone banking portal supports statement preview');
-assert(bankingRoutes.includes("'/intelligence/statement-reviews/:uid/commit'"),'standalone banking portal supports reviewed statement commit');
+assert(financeRoutes.includes("'/intelligence/reports/portfolio-history'"),'finance route exposes portfolio history');
+assert(financeRoutes.includes("'/intelligence/accounts/:id/statements/preview'"),'Finance OS supports protected statement preview');
+assert(financeRoutes.includes("'/intelligence/statement-reviews/:uid/commit'"),'Finance OS supports reviewed statement commit');
 
 if(process.exitCode)process.exit(process.exitCode);

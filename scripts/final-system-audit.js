@@ -143,16 +143,15 @@ for (const file of publicFiles.filter((f) => f.endsWith('.js'))) {
 
 // 10) Statement-import reliability contracts.
 const statementController = read('controllers/statementImportController.js');
-const financeUi = read('public/finance-intelligence.js');
-const financeWizard = read('public/finance-import-wizard.js');
+const financeUi = read('public/finance-master.js');
 const statementContracts = [
   [statementController, "existingSession.status === 'PENDING_REVIEW'", 'pending statement reviews must reopen'],
   [statementController, "session.status === 'IMPORTED'", 'statement commit must be idempotent'],
   [statementController, 'isBalanceMarker', 'balance markers must be identified'],
   [statementController, "validation_status IN ('VALID','WARNING')", 'commit must only import valid/warning rows'],
-  [financeUi, "row.validation_status === 'REJECTED'", 'rejected rows must be disabled in review UI'],
-  [financeWizard, "status === 'DUPLICATE' || status === 'REJECTED'", 'duplicate/rejected rows must be locked in wizard'],
-  [financeWizard, 'resetApprovalUi', 'failed approval must restore the approval UI']
+  [financeUi, "['DUPLICATE','REJECTED'].includes(row.validation_status)", 'duplicate/rejected rows must be disabled in the canonical review UI'],
+  [financeUi, 'data-review-commit', 'statement review commit action must exist in the canonical Finance OS'],
+  [financeUi, 'openStatementReview', 'statement review errors must remain inside the canonical Finance OS']
 ];
 for (const [source, marker, message] of statementContracts) if (!source.includes(marker)) fail(`Statement import contract missing: ${message}`);
 
