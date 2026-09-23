@@ -136,7 +136,7 @@ assert.match(js,/Never enter a bank password, bank PIN or bank OTP/,'Finance ste
 
 assert.match(js,/\['advanced','⚡','Control Centre'\]/,'Advanced Finance Control must be a first-class canonical home module.');
 assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control view must be mounted inside the master Finance OS.');
-assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v2/,'Advanced Finance Control must use the canonical versioned asset.');
+assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v3/,'Advanced Finance Control must use the canonical versioned asset.');
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
 assert.match(js,/const MOBILE_NAV=\[\['advanced','⚡','Control'\]/,'Mobile Finance Home must open Advanced Control.');
