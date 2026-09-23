@@ -129,3 +129,7 @@ assert.match(js,/OS\+'\/alerts'/,'Banking alert preferences must save through th
 assert.match(js,/low_balance_threshold/,'Finance alerts must expose a low-balance threshold.');
 assert.match(js,/large_transaction_threshold/,'Finance alerts must expose a large-transaction threshold.');
 assert.match(js,/Current banking attention/,'Finance alerts must surface Banking command-centre attention.');
+
+assert.match(js,/function requestFinanceStepUp\(\)/,'Canonical Finance OS must handle step-up verification itself.');
+assert.match(js,/body\.code==='STEP_UP_REQUIRED'/,'Sensitive Finance actions must retry through the current master frontend.');
+assert.match(js,/Never enter a bank password, bank PIN or bank OTP/,'Finance step-up must separate app credentials from bank credentials.');

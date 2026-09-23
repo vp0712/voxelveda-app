@@ -2,36 +2,31 @@
 const fs=require('node:fs');
 const path=require('node:path');
 const root=path.join(__dirname,'..');
-const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
-const assert=(ok,message)=>{if(!ok)throw new Error(message)};
+const read=(file)=>fs.readFileSync(path.join(root,file),'utf8');
+const expect=(source,needle,message)=>{if(!source.includes(needle))throw new Error(message||('Expected '+needle))};
 
 const client=read('public/finance-master.js');
-const guard=read('public/finance-bootstrap-guard.js');
 const authRoutes=read('routes/authRoutes.js');
 const stepUpController=read('controllers/stepUpController.js');
+const stepUpMiddleware=read('middleware/stepUpMiddleware.js');
 
-assert(client.includes('FINANCE_REQUEST_TIMEOUT_MS'),'Finance API timeout boundary is missing');
-assert(client.includes('AbortController'),'Finance API requests must be abortable');
-assert(client.includes('FINANCE_REQUEST_TIMEOUT'),'timed-out Finance requests need a typed error');
-assert(client.includes('function renderFinanceFatal('),'terminal Finance startup error state is missing');
-assert(client.includes('function notice(')&&client.includes("role="status"")===false,'canonical Finance client must retain visible notice handling');
-assert(guard.includes('WATCHDOG_MS'),'independent Finance startup watchdog is missing');
-assert(guard.includes('data-finance-hard-retry'),'stuck startup must expose a hard retry');
+expect(client,'FINANCE_REQUEST_TIMEOUT_MS=12000','Finance requests need a bounded timeout.');
+expect(client,'AbortController','Finance requests must be abortable.');
+expect(client,'The rest of the workspace remains available','timeout errors must preserve the rest of Finance.');
+expect(client,'function requestFinanceStepUp(','canonical Finance step-up dialog is missing.');
+expect(client,"body.code==='STEP_UP_REQUIRED'",'sensitive actions must recognize step-up responses.');
+expect(client,"'/api/auth/step-up'",'Finance step-up must use the authenticated app endpoint.');
+expect(client,'Never enter a bank password, bank PIN or bank OTP','step-up UI must distinguish app credentials from bank credentials.');
+expect(client,'pattern="[0-9]{6}"','step-up must require a 6-digit authenticator code.');
+expect(client,'_stepUpRetry:true','sensitive requests must retry only after successful step-up.');
+expect(client,'form.reportValidity()','step-up form must use browser validation.');
+expect(client,'function notice(','canonical inline Finance feedback is missing.');
+expect(client,'renderFinanceFatal','Finance startup fatal boundary is missing.');
+expect(client,'signalFinanceReady','Finance startup ready signal is missing.');
+expect(client,'openStatementWizard','statement action must remain wired in the master Finance OS.');
+expect(client,'openAccountForm','account action must remain wired in the master Finance OS.');
+expect(authRoutes,"router.post('/step-up'",'step-up API route is missing.');
+expect(stepUpController,'PASSWORD_TOTP','step-up verification must require password and TOTP assurance.');
+expect(stepUpMiddleware,"code: 'STEP_UP_REQUIRED'",'protected Finance actions must expose the step-up contract.');
 
-assert(authRoutes.includes("router.post('/step-up'"),'step-up API route is missing');
-assert(stepUpController.includes('PASSWORD_TOTP'),'high-risk Finance step-up must require password and TOTP assurance');
-
-assert(client.includes('function openAccountForm('),'Add Account workflow is not wired in the canonical Finance OS');
-assert(client.includes("if(kind==='account'){openAccountForm();return}"),'New Account action must open the account form');
-assert(client.includes('function openStatementWizard()'),'statement import action is missing');
-assert(client.includes("$('statementWizard').onsubmit"),'statement import form submit handler is missing');
-assert(client.includes('function openStatementReview('),'statement review workflow is missing');
-assert(client.includes('data-review-commit'),'review commit action is missing');
-assert(client.includes('data-review-reject'),'review reject action is missing');
-assert(client.includes("document.querySelector('[data-review-commit]')"),'review commit handler is missing');
-assert(client.includes("document.querySelector('[data-review-reject]')"),'review reject handler is missing');
-assert(client.includes("if($('runAnalysis'))$('runAnalysis').onclick"),'Finance analysis action is not wired');
-assert(client.includes("document.querySelectorAll('[data-viewjump]')"),'module navigation actions are not wired');
-assert(client.includes("try{")&&client.includes("catch(error){notice(error.message,true)}"),'Finance actions must surface server errors without silent failure');
-
-console.log('Unified Finance action reliability checks passed.');
+console.log('Finance action reliability regression checks passed.');

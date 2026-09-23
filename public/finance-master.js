@@ -33,13 +33,43 @@ const num=v=>Number(v||0);
 const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
 const nativeMoney=(v,c)=>money(v,c||'AUD');
 const date=v=>{if(!v)return '—';const d=new Date(String(v).slice(0,10)+'T00:00:00');const fmt=state.userPreferences?.date_format||'DD/MM/YYYY';if(fmt==='YYYY-MM-DD')return String(v).slice(0,10);if(fmt==='MM/DD/YYYY')return new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)};
+let financeStepUpPromise=null;
+function requestFinanceStepUp(){
+ if(financeStepUpPromise)return financeStepUpPromise;
+ financeStepUpPromise=new Promise((resolve,reject)=>{
+  let settled=false;
+  const finish=(error)=>{if(settled)return;settled=true;financeStepUpPromise=null;error?reject(error):resolve()};
+  $('fmModalEyebrow').textContent='SECURITY VERIFICATION';$('fmModalTitle').textContent='Confirm sensitive Finance action';
+  $('fmModalBody').innerHTML=`<form id="financeStepUpForm" class="fm-form"><p class="fm-helper">Enter your Voxel Veda account password and current 6-digit authenticator code. Never enter a bank password, bank PIN or bank OTP here.</p><label>Voxel Veda password<input name="password" type="password" autocomplete="current-password" required></label><label>Authenticator code<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required></label><div id="financeStepUpStatus" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-stepup-cancel="1">Cancel</button><button class="primary" type="submit">Verify & continue</button></div></form>`;
+  const modal=$('fmModal'),form=$('financeStepUpForm'),status=$('financeStepUpStatus');modal.showModal();
+  document.querySelector('[data-stepup-cancel]')?.addEventListener('click',()=>{modal.close();finish(new Error('Security verification cancelled.'))},{once:true});
+  modal.addEventListener('close',()=>{if(!settled)finish(new Error('Security verification cancelled.'))},{once:true});
+  form.onsubmit=async e=>{
+   e.preventDefault();if(!form.reportValidity())return;
+   const fd=new FormData(form),button=form.querySelector('button[type="submit"]');button.disabled=true;
+   status.hidden=false;status.className='fm-state';status.textContent='Verifying…';
+   try{
+    const response=await fetch('/api/auth/step-up',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:fd.get('password'),code:String(fd.get('code')||'').replace(/\s/g,'')})});
+    let payload={};try{payload=await response.json()}catch{}
+    if(!response.ok)throw new Error(payload.message||'Security verification failed.');
+    settled=true;financeStepUpPromise=null;modal.close();resolve(payload);
+   }catch(error){status.className='fm-state fm-state-error';status.textContent=error.message;button.disabled=false}
+  };
+ });
+ return financeStepUpPromise;
+}
 async function api(path,options={}){
- const {timeoutMs=FINANCE_REQUEST_TIMEOUT_MS,headers={},...requestOptions}=options;
+ const {timeoutMs=FINANCE_REQUEST_TIMEOUT_MS,headers={},_stepUpRetry=false,...requestOptions}=options;
  const controller=new AbortController();
  const timer=setTimeout(()=>controller.abort(),Math.max(1000,Number(timeoutMs)||FINANCE_REQUEST_TIMEOUT_MS));
  try{
   const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...headers},...requestOptions,signal:controller.signal});
   let body={};try{body=await r.json()}catch{}
+  if(!r.ok&&body.code==='STEP_UP_REQUIRED'&&!_stepUpRetry&&path!=='/api/auth/step-up'){
+   clearTimeout(timer);
+   await requestFinanceStepUp();
+   return api(path,{...options,_stepUpRetry:true});
+  }
   if(!r.ok){const e=new Error(body.message||'Request failed');e.status=r.status;e.code=body.code;throw e}
   return body;
  }catch(error){
