@@ -25,6 +25,7 @@ const financeFx = require('../controllers/financeFxController');
 const financeSearch = require('../controllers/financeSearchController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
+const personalDebtPlanning = require('../controllers/personalDebtPlanningController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
@@ -123,7 +124,10 @@ router.post('/personal-money/canonical-restore-upload/:id/execute', requireAnyPe
 router.post('/personal-money/wallets', requireAnyPermission('EDIT_FINANCE'), personalMoney.createWallet);
 router.post('/personal-money/wallets/:id/active', requireAnyPermission('EDIT_FINANCE'), personalMoney.setWalletActive);
 router.post('/personal-money/entries', requireAnyPermission('EDIT_FINANCE'), personalMoney.createEntry);
+router.get('/personal-money/debt-planner', requireAnyPermission('VIEW_BANKING'), personalDebtPlanning.getPlanner);
 router.post('/personal-money/debts', requireAnyPermission('EDIT_FINANCE'), personalMoney.createDebt);
+router.get('/personal-money/debts/:id/statement', requireAnyPermission('VIEW_BANKING'), personalDebtPlanning.getStatement);
+router.put('/personal-money/debts/:id/terms', requireAnyPermission('EDIT_FINANCE'), personalDebtPlanning.saveTerms);
 router.get('/personal-money/debts/:id', requireAnyPermission('VIEW_BANKING'), personalMoney.getDebtDetail);
 router.put('/personal-money/debts/:id', requireAnyPermission('EDIT_FINANCE'), personalMoney.updateDebtDetail);
 router.post('/personal-money/debts/:id/payments', requireAnyPermission('EDIT_FINANCE'), personalMoney.recordDebtPayment);
