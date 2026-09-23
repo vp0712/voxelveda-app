@@ -13,7 +13,7 @@ const routes = read('routes/financeRoutes.js');
 const intelligence = read('controllers/financeIntelligenceController.js');
 const transactionIntelligence = read('controllers/financeTransactionIntelligenceController.js');
 const reconciliation = read('controllers/financeReconciliationCenterController.js');
-const client = read('public/finance-intelligence-advanced.js');
+const client = read('public/finance-master.js');
 
 assert.match(privacy, /ownership_scope = 'BUSINESS' OR .*created_by = \?/s, 'Private finance visibility must be BUSINESS-or-owner only.');
 assert.match(privacy, /Return 404 rather than 403/, 'Private resource existence should remain undisclosed.');
@@ -31,8 +31,9 @@ assert.match(transactionIntelligence, /const paired = new Set\(\)/, 'Transfer ma
 assert.match(transactionIntelligence, /exports\.getRules/, 'Smart Rules list endpoint is required.');
 assert.match(transactionIntelligence, /exports\.updateRule/, 'Smart Rules update endpoint is required.');
 assert.match(transactionIntelligence, /exports\.deleteRule/, 'Smart Rules delete endpoint is required.');
-assert.match(client, /Personal finance is private to you/, 'Finance Intelligence must visibly explain personal finance privacy.');
-assert.match(client, /Smart Rules/, 'Smart Rules button/manager must be visible to the user.');
-assert.match(client, /99% confidence suggestion/, 'Rules UI must explain confidence and review-only behavior.');
+assert.match(client, /Owner-only debt lifecycle/, 'Canonical Finance OS must visibly preserve owner-private Personal Money semantics.');
+assert.match(client, /Merchant & Category Rules/, 'Rules manager must be visible inside the canonical Finance OS.');
+assert.match(client, /Suggest Only is the default/, 'Rules UI must explain suggestion-first behavior.');
+assert.match(client, /never changes source evidence, amounts, payments, transfers or reconciliation/, 'Rules UI must state its non-destructive boundary.');
 
 console.log('Finance privacy and Smart Rules regression tests passed.');
