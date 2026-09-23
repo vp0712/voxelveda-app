@@ -78,7 +78,8 @@ const canonicalFinanceUiAssets = new Set([
   'finance-intelligence.html',
   'finance-master.js',
   'finance-master.css',
-  'finance-bootstrap-guard.js'
+  'finance-bootstrap-guard.js',
+  'finance-advanced-control.js'
 ]);
 function isRetiredFinanceUiAsset(asset){
   const name=String(asset||'').toLowerCase();
