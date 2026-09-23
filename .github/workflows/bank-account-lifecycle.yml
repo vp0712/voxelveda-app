@@ -6,8 +6,8 @@ on:
       - 'controllers/bankAccountLifecycleController.js'
       - 'routes/financeRoutes.js'
       - 'public/finance-intelligence.html'
-      - 'public/finance-account-lifecycle.js'
-      - 'public/finance-account-lifecycle.css'
+      - 'public/finance-master.js'
+      - 'public/finance-master.css'
       - 'scripts/bank-account-lifecycle-test.js'
       - '.github/workflows/bank-account-lifecycle.yml'
   push:
@@ -16,8 +16,8 @@ on:
       - 'controllers/bankAccountLifecycleController.js'
       - 'routes/financeRoutes.js'
       - 'public/finance-intelligence.html'
-      - 'public/finance-account-lifecycle.js'
-      - 'public/finance-account-lifecycle.css'
+      - 'public/finance-master.js'
+      - 'public/finance-master.css'
       - 'scripts/bank-account-lifecycle-test.js'
       - '.github/workflows/bank-account-lifecycle.yml'
 
@@ -38,7 +38,7 @@ jobs:
       - name: Syntax and lifecycle contracts
         run: |
           node --check controllers/bankAccountLifecycleController.js
-          node --check public/finance-account-lifecycle.js
+          node --check public/finance-master.js
           node scripts/bank-account-lifecycle-test.js
       - name: Finance regression checks
         run: |
