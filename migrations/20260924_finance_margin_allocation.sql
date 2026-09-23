@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS finance_margin_entities (
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   UNIQUE KEY uniq_finance_margin_entity_uid (entity_uid),
-  INDEX idx_finance_profitability_entity_status (status,entity_type,name)
+  INDEX idx_finance_margin_entity_status (status,entity_type,name)
 );
 
 CREATE TABLE IF NOT EXISTS finance_margin_allocations (
