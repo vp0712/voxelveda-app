@@ -18,7 +18,7 @@ for(const p of ['/banking-os/command-center','/banking-os/approval-inbox','/bank
 assert(routes.includes("'/banking-os/payments/:uid/cancel'"),'payment cancel route exists');
 assert(routes.includes("'/banking-os/spaces/:uid/archive'"),'space archive route exists');
 
-for(const term of ['Banking Command Centre','Approval Inbox','30d projected','runway ','Banking attention','Overdue obligations','openAccountDetail'])assert(ui.includes(term),'unified Finance OS includes '+term);
+for(const term of ['Banking Command Centre','Approval Inbox','30d projected','runway ','Banking attention','Overdue obligations','accountDetail('])assert(ui.includes(term),'unified Finance OS includes '+term);
 assert(ui.includes("['os',OS+'/command-center']"),'Finance OS hydrates command-centre intelligence');
 assert(ui.includes("['cashflowCalendar',OS+'/cashflow-calendar?days=90']"),'Finance OS hydrates 90-day cash-flow calendar');
 assert(css.includes('.fm-command-centre')&&css.includes('.fm-kpi'),'unified command and KPI styling exists');
