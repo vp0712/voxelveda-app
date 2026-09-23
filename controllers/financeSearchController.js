@@ -56,7 +56,7 @@ exports.search=async(req,res)=>{
         `SELECT sd.id,sd.original_name,sd.created_at,bt.id AS bank_transaction_id,bt.transaction_date,
                 bt.merchant_name,bt.description,ba.nickname AS account_name
            FROM secure_documents sd
-           JOIN bank_transactions bt ON sd.module='finance' AND sd.record_type='bank_transaction' AND sd.record_id=CAST(bt.id AS CHAR)
+           JOIN bank_transactions bt ON sd.module='finance' AND sd.record_type='bank_transaction' AND CAST(sd.record_id AS UNSIGNED)=bt.id
            JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE sd.deleted_at IS NULL AND ${visibility}
             AND (sd.original_name LIKE ? OR bt.merchant_name LIKE ? OR bt.description LIKE ? OR ba.nickname LIKE ?)
@@ -107,8 +107,8 @@ exports.companySummary=async(req,res)=>{
           WHERE sb.status<>'VOID' ORDER BY COALESCE(sb.due_date,sb.issue_date),sb.id LIMIT 100`
       ).then(([rows])=>rows),
       pool.query(
-        `SELECT id,query_uid,subject,status,priority,raised_at,due_date
-           FROM accountant_queries WHERE status NOT IN ('CLOSED','RESOLVED') ORDER BY raised_at LIMIT 100`
+        `SELECT id,query_uid,question,status,raised_at,assigned_to
+           FROM accountant_queries WHERE status<>'RESOLVED' ORDER BY raised_at LIMIT 100`
       ).then(([rows])=>rows),
       pool.query(
         `SELECT id,asset_number,description,category,purchase_date,purchase_cost,accounting_status

@@ -8,13 +8,13 @@ const financeHtml=read('public/finance-intelligence.html');
 const staff=read('public/staff.js');
 const html=read('public/staff-dashboard.html');
 
-assert(app.includes("app.get('/banking',noIndex,pageAuth(),sendPage('finance-intelligence.html'))"),'authenticated standalone banking page exists');
+assert(app.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'legacy /banking entry must redirect into the unified Finance OS');
 assert(app.includes("app.use('/api/banking',auth,bankingPortalRoutes)"),'standalone banking API is mounted independently');
 assert(!routes.includes("requirePermission('VIEW_FINANCE')"),'standalone banking router does not require VIEW_FINANCE');
 assert(routes.includes("requireAnyPermission('VIEW_BANKING','VIEW_PERSONAL_BANKING','VIEW_BUSINESS_BANKING')"),'banking view permission is required');
 assert(routes.includes("requireAnyPermission('EDIT_BANK_DETAILS','CONNECT_BANK_ACCOUNT','MANAGE_BANK_CONNECTION')"),'bank consent remains privileged');
 assert(routes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'payment approval remains explicitly permission-gated');
-assert(financeHtml.includes('/finance-master.js'),'standalone /banking route must use the same unified Finance OS frontend');
+assert(financeHtml.includes('/finance-master.js'),'canonical Finance route must use the unified Finance OS frontend');
 assert(financeHtml.includes('FINANCE OPERATING SYSTEM'),'standalone /banking route must not render a duplicate Banking dashboard');
 assert(!financeHtml.includes('finance-bank-app-v5'),'retired V5 frontend must not be reintroduced');
 assert(ui.includes("const STANDALONE = location.pathname === '/banking'"),'standalone API mode is explicit');

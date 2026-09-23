@@ -279,7 +279,7 @@ exports.center = async (req, res) => {
                 bt.id AS bank_transaction_id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,bt.currency,
                 bt.ownership_scope,ba.id AS bank_account_id,ba.nickname AS account_name,ba.institution
            FROM secure_documents sd
-           JOIN bank_transactions bt ON CAST(bt.id AS CHAR)=sd.record_id
+           JOIN bank_transactions bt ON CAST(sd.record_id AS UNSIGNED)=bt.id
            JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND sd.deleted_at IS NULL
             AND ${visible.clauses.join(' AND ')}
@@ -290,7 +290,7 @@ exports.center = async (req, res) => {
       const visible = transactionWhere(req, filters);
       const clauses = [...visible.clauses, "bt.reconciliation_status<>'IGNORED'", 'bt.debit>0', 'bt.is_internal_transfer=0',
         `NOT EXISTS (SELECT 1 FROM secure_documents active_doc WHERE active_doc.module='finance'
-          AND active_doc.record_type='bank_transaction' AND active_doc.record_id=CAST(bt.id AS CHAR) AND active_doc.deleted_at IS NULL)`];
+          AND active_doc.record_type='bank_transaction' AND CAST(active_doc.record_id AS UNSIGNED)=bt.id AND active_doc.deleted_at IS NULL)`];
       const params = [...visible.params];
       const automatic = configuredThreshold === null ? '0=1' : `(rr.id IS NULL AND bt.ownership_scope='BUSINESS' AND bt.debit>=?)`;
       if (filters.status === 'REQUESTED') clauses.push("rr.status='REQUESTED'");
@@ -324,7 +324,7 @@ exports.center = async (req, res) => {
       [recoverable] = await pool.query(
         `SELECT sd.id,sd.original_name,sd.deleted_at,sd.deleted_by,bt.id AS bank_transaction_id,bt.transaction_date,
                 bt.description,bt.merchant_name,ba.nickname AS account_name
-           FROM secure_documents sd JOIN bank_transactions bt ON CAST(bt.id AS CHAR)=sd.record_id
+           FROM secure_documents sd JOIN bank_transactions bt ON CAST(sd.record_id AS UNSIGNED)=bt.id
            JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND sd.deleted_at IS NOT NULL
             AND ${visible.clauses.join(' AND ')}

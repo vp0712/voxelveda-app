@@ -1028,7 +1028,7 @@ exports.getBankingDashboard = async (req, res) => {
     return res.json({
       scope,
       account_id: accountId || null,
-      period: { from: from || null, to: to || null },
+      period: { from: filters.from || null, to: filters.to || null },
       currency_rule: 'Currencies are never added together. Choose a currency to analyse balances and spending.',
       accounts,
       balances_by_currency: balances.map((row) => ({ currency: row.currency, account_count: Number(row.account_count || 0), balance: Number(row.balance || 0) })),
@@ -1053,7 +1053,7 @@ exports.getBankingDashboard = async (req, res) => {
       detected_recurring: detectedRecurring.map((row) => ({ ...row, typical_amount: Number(row.typical_amount || 0), matched_transactions: Number(row.matched_transactions || 0) })),
       intelligence_by_currency: intelligence
     });
-  } catch (error) { return fail(res, error, 'Failed to load premium banking dashboard'); }
+  } catch (error) { return fail(res, error, 'Failed to load Finance dashboard'); }
 };
 
 

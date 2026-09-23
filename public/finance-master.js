@@ -97,6 +97,7 @@ function title(v){return ({
  })[v]||['Finance','Finance workspace']}
 
 function isoDay(d){return d.toISOString().slice(0,10)}
+function localIsoDay(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function dateRange(){
  const now=new Date(); const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
  const clone=()=>new Date(today.getTime()); let from=null,to=isoDay(today);
@@ -223,7 +224,7 @@ async function hydrateSupplementary(cycle){
  const base=filterQuery();
  const resources=[
   ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],
-  ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing'],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
+  ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing?date='+encodeURIComponent(localIsoDay())],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
   ['readiness',I+'/banking-readiness'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
   ['os',OS+'/command-center'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
   ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
@@ -355,7 +356,7 @@ function companyView(){
  if(!summary)return overview()+permission+accountingPeriodsCard();
  const currency=summary.currency||'AUD';
  const billRows=(summary.bills||[]).slice(0,12).map(b=>'<button class="fm-row fm-row-button" data-company-bill="'+b.id+'"><div><h3>'+esc(b.supplier_name||b.bill_uid)+'</h3><p>'+esc(b.supplier_invoice_no||b.bill_uid)+' · due '+date(b.due_date)+' · '+esc(b.status)+'</p></div><div class="fm-row-right"><b>'+nativeMoney(b.balance,currency)+'</b><small>remaining</small></div></button>').join('');
- const queryRows=(summary.accountant_queries||[]).slice(0,8).map(q=>'<div class="fm-row"><div><h3>'+esc(q.subject||q.query_uid)+'</h3><p>'+esc(q.priority||'')+' · due '+date(q.due_date)+'</p></div>'+statusBadge(q.status)+'</div>').join('');
+ const queryRows=(summary.accountant_queries||[]).slice(0,8).map(q=>'<div class="fm-row"><div><h3>'+esc(q.question||q.query_uid)+'</h3><p>Raised '+date(q.raised_at)+'</p></div>'+statusBadge(q.status)+'</div>').join('');
  return overview()+permission+'<div class="fm-grid four"><div class="fm-kpi"><span>Supplier payables</span><strong>'+nativeMoney(summary.supplier_payables,currency)+'</strong><small>'+num(summary.supplier_bill_count)+' outstanding bill(s)</small></div><div class="fm-kpi"><span>Supplier approvals</span><strong>'+num(summary.pending_supplier_approvals)+'</strong><small>Awaiting supplier-bill approval</small></div><div class="fm-kpi"><span>Banking approvals</span><strong>'+approvals.length+'</strong><small>Internal payment instructions awaiting approval</small></div><div class="fm-kpi"><span>Recorded assets</span><strong>'+nativeMoney(summary.recorded_asset_cost,currency)+'</strong><small>'+num(summary.active_asset_count)+' active asset record(s)</small></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Supplier Payables</h2><p>Existing supplier-bill ledger. Click a bill for items and payment history.</p></div></div><div class="fm-list">'+(billRows||emptyState('No supplier payables','No active supplier bills were returned.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accountant Queries</h2><p>Open collaboration questions for Company Finance.</p></div></div><div class="fm-list">'+(queryRows||emptyState('No open accountant queries','No unresolved accountant queries.'))+'</div><p class="fm-helper">Customer receivables are not shown as a fabricated balance: '+esc(summary.receivables?.note||'No dedicated receivables workflow is configured.')+'</p></div></article></div>'+accountingPeriodsCard();
 }
 function consolidatedView(){
