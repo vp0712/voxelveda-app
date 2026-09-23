@@ -32,7 +32,7 @@ exports.getCenter=async(req,res)=>{
   try{
     await ensureFinanceSchema();
     const [settingRows,bankAccounts,businessFlow,bills,invoices]=await Promise.all([
-      pool.query("SELECT setting_key,setting_value FROM app_settings WHERE setting_key='base_currency'").then(([rows])=>rows),
+      pool.query("SELECT 'base_currency' AS setting_key, COALESCE((SELECT setting_value FROM app_settings WHERE setting_key='base_currency' LIMIT 1),(SELECT default_currency FROM finance_settings WHERE id=1),'AUD') AS setting_value").then(([rows])=>rows),
       pool.query(`SELECT id,nickname,institution,currency,account_type,available_balance,current_ledger_balance,status
                     FROM bank_accounts
                    WHERE status='ACTIVE' AND ownership_scope='BUSINESS'
@@ -45,7 +45,7 @@ exports.getCenter=async(req,res)=>{
                              AND bt.credit>0 AND bt.is_internal_transfer=0 AND bt.reconciliation_status<>'IGNORED'
                             THEN bt.credit ELSE 0 END),0) AS inflow_90d
         FROM bank_accounts ba
-        LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
+        LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id AND bt.ownership_scope='BUSINESS' AND bt.archived_at IS NULL
        WHERE ba.status='ACTIVE' AND ba.ownership_scope='BUSINESS'
        GROUP BY ba.currency ORDER BY ba.currency`).then(([rows])=>rows),
       pool.query(`SELECT sb.id,sb.bill_uid,sb.supplier_invoice_no,sb.issue_date,sb.due_date,sb.status,
