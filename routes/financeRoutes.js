@@ -21,6 +21,7 @@ const financePerformanceRisk = require('../controllers/financePerformanceRiskCon
 const financeAnomalyExplain = require('../controllers/financeAnomalyExplainController');
 const financePlanningControl = require('../controllers/financePlanningControlController');
 const financeJobProfitability = require('../controllers/financeJobProfitabilityController');
+const financeCounterparty = require('../controllers/financeCounterpartyController');
 const financeAccountantHandover = require('../controllers/financeAccountantHandoverController');
 const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
@@ -75,6 +76,7 @@ router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => 
 router.get('/search', requireAnyPermission('VIEW_BANKING'), financeSearch.search);
 router.get('/company-summary', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeSearch.companySummary);
 router.get('/job-profitability', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeJobProfitability.getCenter);
+router.get('/counterparty-control', requireAnyPermission('VIEW_BANKING'), financeCounterparty.getCenter);
 router.get('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.get);
 router.put('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.save);
 router.get('/fx-rates', requireAnyPermission('VIEW_BANKING'), financeFx.list);
