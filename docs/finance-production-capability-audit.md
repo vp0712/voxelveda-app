@@ -19,7 +19,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Feature | Current implementation | Classification |
 |---|---|---|
 | Accounts | Full create/edit account workflow, account cards/workspace, history coverage, lifecycle controls, protected danger zone | READY backend / integrated UI |
-| Transactions | Server pagination/filter/search, manual canonical movements, classification edit, archive/restore, source evidence | READY core / production workflow verification continues |
+| Transactions | Server pagination/filter/search, manual canonical movements, classification edit, recoverable wrong-entry deletion/archive/restore and source evidence | READY core / production workflow verification continues |
 | Original bank evidence | Immutable `bank_transaction_original_data` separated from current classification | READY |
 | Statement import | CSV/PDF/OFX/QFX/QIF/XLSX protected preview/review/duplicate/commit pipeline plus multi-file historical staging per account and an ordered Setup Centre migration checklist | READY core / integrated history centre |
 | Duplicate protection | Exact row hash plus review classification | READY |
@@ -32,7 +32,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Cash | Canonical cash account creation plus owner-only Personal Money wallets, explicit-FX movements, zero-balance archive and controlled restore | PARTIAL pending authenticated production journey verification |
 | Budgets | Personal budgets plus banking-ledger budgets with create/update/remove or archive controls and usage tracking | PARTIAL pending authenticated production journey verification |
 | Savings goals | Goal management, pause/resume and explicit progress contributions that do not silently move bank cash | PARTIAL pending authenticated production journey verification |
-| Borrow & Lend | Owner-only debt lifecycle and repayment workflow | PARTIAL |
+| Borrow & Lend | Owner-only debt detail, due-date/note/counterparty maintenance, repayment history and repayment workflow | PARTIAL pending authenticated production journey verification |
 | Recurring money | Personal recurring create/complete/archive/restore lifecycle plus finance-intelligence suggestions; no bank execution | PARTIAL pending authenticated production journey verification |
 | Categories | Original bank category preserved separately from editable system category; category manager exposed | PARTIAL |
 | Rules | Suggestion-only merchant/category rules with priority | READY core |

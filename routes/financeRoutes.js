@@ -123,6 +123,8 @@ router.post('/personal-money/wallets', requireAnyPermission('EDIT_FINANCE'), per
 router.post('/personal-money/wallets/:id/active', requireAnyPermission('EDIT_FINANCE'), personalMoney.setWalletActive);
 router.post('/personal-money/entries', requireAnyPermission('EDIT_FINANCE'), personalMoney.createEntry);
 router.post('/personal-money/debts', requireAnyPermission('EDIT_FINANCE'), personalMoney.createDebt);
+router.get('/personal-money/debts/:id', requireAnyPermission('VIEW_BANKING'), personalMoney.getDebtDetail);
+router.put('/personal-money/debts/:id', requireAnyPermission('EDIT_FINANCE'), personalMoney.updateDebtDetail);
 router.post('/personal-money/debts/:id/payments', requireAnyPermission('EDIT_FINANCE'), personalMoney.recordDebtPayment);
 router.post('/personal-money/budgets', requireAnyPermission('EDIT_FINANCE'), personalMoney.saveBudget);
 router.delete('/personal-money/budgets/:id', requireAnyPermission('EDIT_FINANCE'), personalMoney.deleteBudget);

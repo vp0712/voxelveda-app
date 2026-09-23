@@ -270,3 +270,35 @@ exports.deleteBudget = async (req,res) => {
     return res.json({message:'Personal budget removed. No transaction or wallet history was deleted.'});
   } catch(error){ return respondError(res,error,'Failed to remove personal budget.'); }
 };
+
+exports.getDebtDetail = async (req,res) => {
+  try {
+    const userId=uid(req);
+    const [[debt]]=await pool.query(
+      `SELECT id,direction,counterparty,principal_amount,outstanding_amount,currency,due_date,status,note,created_at,updated_at
+         FROM personal_money_debts WHERE id=? AND user_id=? LIMIT 1`,[req.params.id,userId]
+    );
+    if(!debt) return res.status(404).json({message:'Borrowed/lent record not found.'});
+    const [payments]=await pool.query(
+      `SELECT p.id,p.wallet_id,p.amount,p.currency,p.paid_at,p.note,w.name AS wallet_name
+         FROM personal_money_debt_payments p
+         LEFT JOIN personal_money_wallets w ON w.id=p.wallet_id AND w.user_id=p.user_id
+        WHERE p.debt_id=? AND p.user_id=? ORDER BY p.paid_at DESC,p.created_at DESC`,[debt.id,userId]
+    );
+    return res.json({debt:{...debt,principal_amount:Number(debt.principal_amount),outstanding_amount:Number(debt.outstanding_amount)},payments:payments.map(p=>({...p,amount:Number(p.amount)}))});
+  } catch(error){ return respondError(res,error,'Failed to load borrowed/lent record.'); }
+};
+
+exports.updateDebtDetail = async (req,res) => {
+  try {
+    const userId=uid(req);
+    const [[debt]]=await pool.query('SELECT id FROM personal_money_debts WHERE id=? AND user_id=? LIMIT 1',[req.params.id,userId]);
+    if(!debt) return res.status(404).json({message:'Borrowed/lent record not found.'});
+    const counterparty=clean(req.body.counterparty,160);
+    if(!counterparty) return res.status(400).json({message:'Person or organisation name is required.'});
+    const due=dateOnly(req.body.due_date);
+    const note=clean(req.body.note,500);
+    await pool.query('UPDATE personal_money_debts SET counterparty=?,due_date=?,note=? WHERE id=? AND user_id=?',[counterparty,due,note,debt.id,userId]);
+    return res.json({message:'Borrow / lend details updated. Principal, currency and payment history were not changed.'});
+  } catch(error){ return respondError(res,error,'Failed to update borrowed/lent record.'); }
+};
