@@ -18,6 +18,7 @@ const financeCashControl = require('../controllers/financeCashControlController'
 const financeCloseAssurance = require('../controllers/financeCloseAssuranceController');
 const financeTreasury = require('../controllers/financeTreasuryController');
 const financePerformanceRisk = require('../controllers/financePerformanceRiskController');
+const financeProfitability = require('../controllers/financeProfitabilityController');
 const financeAnomalyExplain = require('../controllers/financeAnomalyExplainController');
 const financePlanningControl = require('../controllers/financePlanningControlController');
 const financeAccountantHandover = require('../controllers/financeAccountantHandoverController');
@@ -106,6 +107,15 @@ router.get('/reports/saved', requireAnyPermission('VIEW_BANKING'), financeReport
 router.post('/reports/saved', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.save);
 router.get('/reports/saved/:uid/run', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.runSaved);
 router.delete('/reports/saved/:uid', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.remove);
+router.get('/profitability-control', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeProfitability.getCenter);
+router.post('/profitability-control/entities', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeProfitability.createEntity);
+router.put('/profitability-control/entities/:uid', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeProfitability.updateEntity);
+router.post('/profitability-control/entities/:uid/status', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeProfitability.setEntityStatus);
+router.post('/profitability-control/allocations', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeProfitability.allocate);
+router.post('/profitability-control/allocations/:uid/reverse', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), requireStepUp('REVERSE_PROFITABILITY_ALLOCATION'), financeProfitability.reverseAllocation);
+router.post('/profitability-control/invoice-links', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeProfitability.linkInvoice);
+router.post('/profitability-control/invoice-links/:uid/reverse', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), requireStepUp('REVERSE_PROFITABILITY_INVOICE_LINK'), financeProfitability.reverseInvoiceLink);
+
 router.get('/accountant-handover', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeAccountantHandover.getCenter);
 router.post('/accountant-handover/:financialYearId/snapshot', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeAccountantHandover.captureSnapshot);
 router.get('/accountant-handover/:financialYearId.pdf', requireAnyPermission('VIEW_BUSINESS_BANKING'), requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), financeAccountantHandover.pdf);
