@@ -1,34 +1,34 @@
-const fs = require('node:fs');
-const path = require('node:path');
+'use strict';
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const read=(file)=>fs.readFileSync(path.join(root,file),'utf8');
+const expect=(source,needle,message)=>{if(!source.includes(needle))throw new Error(message||`Expected ${needle}`)};
+const reject=(source,needle,message)=>{if(source.includes(needle))throw new Error(message||`Unexpected ${needle}`)};
 
-function read(file) { return fs.readFileSync(path.join(__dirname, '..', file), 'utf8'); }
-function expect(source, needle, message) { if (!source.includes(needle)) throw new Error(message || `Expected ${needle}`); }
-function reject(source, needle, message) { if (source.includes(needle)) throw new Error(message || `Unexpected ${needle}`); }
+const controller=read('controllers/financeReconciliationCenterController.js');
+const routes=read('routes/financeRoutes.js');
+const ui=read('public/finance-master.js');
+const css=read('public/finance-master.css');
+const app=read('app.js');
 
-const controller = read('controllers/financeReconciliationCenterController.js');
-const routes = read('routes/financeRoutes.js');
-const html = read('public/finance-reconciliation.html');
-const js = read('public/finance-reconciliation.js');
-const css = read('public/finance-reconciliation.css');
-const advanced = read('public/finance-intelligence-advanced.js');
+expect(controller,"if (reconciliation === 'RECONCILED') return 'RECONCILED'",'Actual reconciliation status must remain authoritative.');
+expect(controller,"return 'READY'",'Classified transactions need a Ready workflow state.');
+expect(controller,"ft.status='POSTED'",'Match candidates must be posted finance transactions.');
+expect(controller,"ft.reconciliation_status <> 'RECONCILED'",'Already reconciled finance records must not be suggested.');
+expect(controller,"classification_status='CLASSIFIED'",'Classification must mark the bank transaction classified.');
+reject(controller,"SET reconciliation_status='RECONCILED'",'Classification must never directly mark a bank transaction reconciled.');
 
-expect(controller, "if (reconciliation === 'RECONCILED') return 'RECONCILED'", 'Actual reconciliation status must remain authoritative.');
-expect(controller, "return 'READY'", 'Classified transactions need a Ready workflow state.');
-expect(controller, "ft.status='POSTED'", 'Match candidates must be posted finance transactions.');
-expect(controller, "ft.reconciliation_status <> 'RECONCILED'", 'Already reconciled finance records must not be suggested.');
-expect(controller, "classification_status='CLASSIFIED'", 'Classification must mark the bank transaction classified.');
-reject(controller, "SET reconciliation_status='RECONCILED'", 'Classification must never directly mark a bank transaction reconciled.');
-expect(routes, "router.get('/intelligence/reconciliation'", 'Reconciliation list route is missing.');
-expect(routes, "router.get('/intelligence/reconciliation/:id/candidates'", 'Reconciliation candidate route is missing.');
-expect(routes, "requireStepUp('APPLY_FINANCE_INTELLIGENCE')", 'Classification changes must retain step-up verification.');
-expect(html, 'Needs action', 'Plain-language Needs action workflow is missing.');
-expect(html, 'Ready', 'Plain-language Ready workflow is missing.');
-expect(html, 'Reconciled', 'Reconciled workflow is missing.');
-expect(html, '/finance-action-reliability.js', 'Security-check UI must load on reconciliation page.');
-expect(js, '/api/finance/bank-transactions/${state.active.id}/reconcile', 'UI must use the existing reconciliation engine.');
-expect(js, '/api/finance/bank-transactions/${state.ignoreId}/ignore', 'UI must use the audited ignore endpoint.');
-expect(js, "const matchable = ['READY','PARTIAL'].includes(row.workflow_status)", 'Ready and partial rows must support proper matching, including transfers.');
-expect(css, '@media(max-width:620px)', 'Reconciliation center must have mobile layout rules.');
-expect(advanced, 'openReconciliationCenter', 'Finance Intelligence must expose the Reconciliation Center button.');
+expect(routes,"router.get('/intelligence/reconciliation'",'Reconciliation list route is missing.');
+expect(routes,"router.get('/intelligence/reconciliation/:id/candidates'",'Reconciliation candidate route is missing.');
+expect(routes,"requireStepUp('APPLY_FINANCE_INTELLIGENCE')",'Classification changes must retain step-up verification.');
+
+expect(ui,'function reconciliationView()','Canonical Finance OS must integrate reconciliation.');
+for(const label of ['Needs action','Ready','Partial','Reconciled'])expect(ui,label,`Reconciliation view missing ${label}`);
+expect(ui,"['reconciliation','✓','Reconciliation']", 'Canonical navigation must expose Reconciliation.');
+expect(ui,"I+'/reconciliation'+filterQuery()", 'Canonical Finance OS must load the protected reconciliation API.');
+expect(css,'.fm-mobile-nav','Reconciliation must remain reachable in the responsive Finance shell.');
+expect(app,"app.get('/finance-reconciliation'",'Legacy reconciliation route must redirect to Finance OS.');
+expect(app,"/finance-intelligence#reconciliation",'Legacy reconciliation route must target the integrated reconciliation view.');
 
 console.log('Finance reconciliation center regression checks passed.');
