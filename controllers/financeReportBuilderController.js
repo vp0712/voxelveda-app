@@ -4,10 +4,12 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const PDFDocument = require('pdfkit');
+const ExcelJS = require('exceljs');
 const pool = require('../config/db');
 const privacy = require('../services/financePrivacyService');
 const money = require('../utils/money');
 const trustedTotals = require('../services/financeTrustedTotals');
+const { buildCoreBankTransactionFilter, parseAccountIds } = require('../services/financeFilterContract');
 const { FinanceError } = require('../services/financeDomain');
 const { logAudit } = require('../services/auditService');
 const { ensureFinanceSchema } = require('../services/financeSchema');
@@ -29,8 +31,7 @@ function parseDate(value,label) {
   return v;
 }
 function parseIds(value) {
-  const values = Array.isArray(value) ? value : String(value||'').split(',');
-  return [...new Set(values.map(Number).filter(Number.isInteger).filter(v=>v>0))].slice(0,50);
+  return parseAccountIds(value);
 }
 function safeText(value,max=120){return String(value||'').trim().slice(0,max)}
 function csvCell(value) {
@@ -59,11 +60,8 @@ function buildFilters(req,definition=null){
   if(!VALID_TYPES.has(reportType)) throw new FinanceError('Unsupported report type.',400,'INVALID_REPORT_TYPE');
   const scope=safeText(src.scope||'ALL',20).toUpperCase();
   if(!VALID_SCOPES.has(scope)) throw new FinanceError('Invalid report workspace.',400,'INVALID_REPORT_SCOPE');
-  const from=parseDate(src.from,'From date'),to=parseDate(src.to,'To date');
-  if(from&&to&&from>to) throw new FinanceError('From date cannot be after To date.',400,'INVALID_REPORT_RANGE');
   const accountIds=parseIds(src.account_ids);
   const currency=safeText(src.currency,3).toUpperCase();
-  if(currency && !/^[A-Z]{3}$/.test(currency)) throw new FinanceError('Currency must be a 3-letter code.',400,'INVALID_REPORT_CURRENCY');
   let transactionType=safeText(src.transaction_type,30).toUpperCase();
   if(!transactionType && ['INCOME','EXPENSE','TRANSFER','REFUND'].includes(reportType)) transactionType=reportType;
   const category=safeText(src.category,120),merchant=safeText(src.merchant,120);
@@ -74,14 +72,10 @@ function buildFilters(req,definition=null){
   if(receipt && !VALID_RECEIPT.has(receipt)) throw new FinanceError('Invalid receipt filter.',400,'INVALID_REPORT_RECEIPT');
   if(transactionType && !['INCOME','EXPENSE','TRANSFER','REFUND','ALL'].includes(transactionType)) throw new FinanceError('Invalid transaction type filter.',400,'INVALID_REPORT_TRANSACTION_TYPE');
 
-  const clauses=[privacy.visibilitySql('ba',req)];
-  const params=[...privacy.visibilityParams(req)];
-  if(recon!=='IGNORED') clauses.push("bt.reconciliation_status<>'IGNORED'");
-  if(scope!=='ALL'){clauses.push('bt.ownership_scope=?');params.push(scope)}
-  if(accountIds.length){clauses.push(`bt.bank_account_id IN (${accountIds.map(()=>'?').join(',')})`);params.push(...accountIds)}
-  if(from){clauses.push('bt.transaction_date>=?');params.push(from)}
-  if(to){clauses.push('bt.transaction_date<=?');params.push(to)}
-  if(currency){clauses.push('bt.currency=?');params.push(currency)}
+  const core=buildCoreBankTransactionFilter(req,{scope,account_ids:accountIds,from:src.from,to:src.to,currency},{includeIgnored:recon==='IGNORED'});
+  const {from,to}=core;
+  const clauses=[...core.clauses];
+  const params=[...core.params];
   if(category){
     clauses.push("(bt.category=? OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND sx.category=?))");
     params.push(category,category);
@@ -96,13 +90,39 @@ function buildFilters(req,definition=null){
   if(transactionType==='INCOME') clauses.push("bt.credit>0 AND bt.is_internal_transfer=0 AND NOT EXISTS (SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE')");
   if(transactionType==='REFUND') clauses.push("bt.credit>0 AND EXISTS (SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE')");
   if(q){clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.reference LIKE ? OR ba.nickname LIKE ? OR ba.institution LIKE ?)');const like=`%${q}%`;params.push(like,like,like,like,like)}
-  return {report_type:reportType,scope,from,to,account_ids:accountIds,currency:currency||null,transaction_type:transactionType||null,category:category||null,merchant:merchant||null,source:source||null,reconciliation_status:recon||null,receipt_status:receipt||null,q:q||null,where:clauses.join(' AND '),params};
+  return {report_type:reportType,scope,from,to,account_ids:accountIds,currency:core.currency,transaction_type:transactionType||null,category:category||null,merchant:merchant||null,source:source||null,reconciliation_status:recon||null,receipt_status:receipt||null,q:q||null,where:clauses.join(' AND '),params};
+}
+
+async function reportCoverage(req,filters){
+  const clauses=[privacy.visibilitySql('ba',req)];
+  const params=[...privacy.visibilityParams(req)];
+  if(filters.scope!=='ALL'){clauses.push('ba.ownership_scope=?');params.push(filters.scope)}
+  if(filters.account_ids.length){clauses.push(`ba.id IN (${filters.account_ids.map(()=>'?').join(',')})`);params.push(...filters.account_ids)}
+  const [rows]=await pool.query(
+    `SELECT ba.id,ba.nickname,ba.currency,ba.history_start_date,ba.history_end_date,
+            MIN(bt.transaction_date) AS earliest_transaction,MAX(bt.transaction_date) AS latest_transaction,
+            MAX(sif.statement_end_date) AS last_statement_date
+       FROM bank_accounts ba
+       LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id AND bt.reconciliation_status<>'IGNORED'
+       LEFT JOIN statement_import_files sif ON sif.bank_account_id=ba.id AND sif.parse_status='IMPORTED'
+      WHERE ${clauses.join(' AND ')}
+      GROUP BY ba.id ORDER BY ba.nickname`,params
+  );
+  const accounts=rows.map(row=>{
+    const start=String(row.history_start_date||row.earliest_transaction||'').slice(0,10)||null;
+    const end=String(row.history_end_date||row.latest_transaction||'').slice(0,10)||null;
+    const status=!start||!end?'UNKNOWN':(filters.from&&start>filters.from)||(filters.to&&end<filters.to)?'PARTIAL':'COMPLETE';
+    return {account_id:row.id,account_name:row.nickname,currency:row.currency,status,history_start:start,history_end:end,last_statement_date:String(row.last_statement_date||'').slice(0,10)||null};
+  });
+  const statuses=new Set(accounts.map(row=>row.status));
+  const status=statuses.has('UNKNOWN')?'UNKNOWN':statuses.has('PARTIAL')?'PARTIAL':accounts.length?'COMPLETE':'UNKNOWN';
+  return {status,accounts,note:status==='COMPLETE'?'Selected account history covers the requested period.':status==='PARTIAL'?'Historical report may be incomplete because selected account coverage does not span the full period.':'Historical completeness is unknown because one or more selected accounts have no verified coverage range.'};
 }
 
 async function buildReport(req,definition=null){
   await ensureFinanceSchema();
   const f=buildFilters(req,definition);
-  const [summaryByCurrency,categories,transactions,merchants]=await Promise.all([
+  const [summaryByCurrency,categories,transactions,merchants,coverage]=await Promise.all([
     trustedTotals.cashTotalsByCurrency(pool,f.where,f.params),
     trustedTotals.categorySpendByCurrency(pool,f.where,f.params,200),
     pool.query(
@@ -123,18 +143,22 @@ async function buildReport(req,definition=null){
         WHERE ${f.where}
         GROUP BY bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
         ORDER BY bt.currency,spent DESC LIMIT 500`,f.params
-    ).then(([rows])=>rows)
+    ).then(([rows])=>rows),
+    reportCoverage(req,f)
   ]);
+  const reportId=uid();
   return {
     metadata:{
+      report_id:reportId,report_version:2,
       report_type:f.report_type,scope:f.scope,account_ids:f.account_ids,from:f.from,to:f.to,currency:f.currency,transaction_type:f.transaction_type,
       category:f.category,merchant:f.merchant,source:f.source,reconciliation_status:f.reconciliation_status,receipt_status:f.receipt_status,q:f.q,
       generated_at:new Date().toISOString(),generated_by:userId(req),source_transaction_count:transactions.length,
-      currency_treatment:'Native currencies remain separate unless a verified FX service exists.'
+      currency_treatment:'Native currencies remain separate unless a verified FX service exists.',
+      history_completeness:coverage.status,history_completeness_note:coverage.note
     },
     summary:trustedTotals.singleCurrencySummary(summaryByCurrency),
     summary_by_currency:summaryByCurrency,
-    categories,merchants,transactions
+    categories,merchants,transactions,coverage
   };
 }
 
@@ -160,6 +184,114 @@ exports.csv=async(req,res)=>{
     await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report','CSV',{filters:report.metadata,format:'CSV'}));
     return res.send('\uFEFF'+csv);
   }catch(error){return fail(res,error,'Failed to export filtered Finance CSV.')}
+};
+
+function excelDate(value){
+  const raw=String(value||'').slice(0,10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw)?new Date(`${raw}T00:00:00Z`):null;
+}
+
+function addWorkbookMetadata(sheet,report,profile,title){
+  const meta=report.metadata;
+  sheet.addRow([profile.legalName,title]);
+  sheet.addRow(['Report ID',meta.report_id,'Version',meta.report_version]);
+  sheet.addRow(['Workspace',meta.scope,'Period',`${meta.from||'All'} to ${meta.to||'Now'}`]);
+  sheet.addRow(['Accounts',meta.account_ids.length?meta.account_ids.join(', '):'All permitted','Currency',meta.currency||'Native currencies']);
+  sheet.addRow(['Generated',new Date(meta.generated_at),'Generated by user',meta.generated_by]);
+  sheet.addRow(['History completeness',meta.history_completeness,'Source transactions',meta.source_transaction_count]);
+  sheet.addRow(['Filters',[meta.transaction_type,meta.category,meta.merchant,meta.source,meta.reconciliation_status,meta.receipt_status,meta.q].filter(Boolean).join(' | ')||'None']);
+  sheet.addRow(['Currency treatment',meta.currency_treatment]);
+  sheet.addRow(['Coverage note',meta.history_completeness_note]);
+  sheet.addRow([]);
+  sheet.mergeCells('A1:P1');
+  const titleCell=sheet.getCell('A1');
+  titleCell.font={bold:true,size:16,color:{argb:'FF111111'}};
+  titleCell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF8BC34A'}};
+  titleCell.alignment={vertical:'middle'};
+  sheet.getRow(1).height=26;
+  for(let row=2;row<=9;row+=1){
+    sheet.getCell(row,1).font={bold:true,color:{argb:'FF444444'}};
+    sheet.getCell(row,3).font={bold:true,color:{argb:'FF444444'}};
+  }
+  sheet.getCell('B5').numFmt='dd/mm/yyyy hh:mm';
+}
+
+function styleTable(sheet,headerRow,lastColumn,lastRow){
+  const header=sheet.getRow(headerRow);
+  header.font={bold:true,color:{argb:'FFFFFFFF'}};
+  header.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF111111'}};
+  header.alignment={vertical:'middle'};
+  header.height=22;
+  sheet.views=[{state:'frozen',ySplit:headerRow,xSplit:0}];
+  sheet.autoFilter={from:{row:headerRow,column:1},to:{row:Math.max(headerRow,lastRow),column:lastColumn}};
+  for(let row=headerRow+1;row<=lastRow;row+=1){
+    if((row-headerRow)%2===0)sheet.getRow(row).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF3F5F7'}};
+  }
+}
+
+async function createReportWorkbook(report,profile,title){
+    const workbook=new ExcelJS.Workbook();
+    workbook.creator=profile.legalName;
+    workbook.company=profile.legalName;
+    workbook.subject=title;
+    workbook.created=new Date(report.metadata.generated_at);
+    workbook.modified=workbook.created;
+
+    const transactions=workbook.addWorksheet('Transactions',{properties:{tabColor:{argb:'FF8BC34A'}}});
+    addWorkbookMetadata(transactions,report,profile,title);
+    const txHeader=transactions.addRow(['Date','Posting Date','Account','Institution','Merchant','Description','Reference','Category','Scope','Currency','Debit','Credit','Type','Source','Reconciliation','Receipt']);
+    for(const row of report.transactions){
+      transactions.addRow([
+        excelDate(row.transaction_date),excelDate(row.posting_date),row.account_name||'',row.institution||'',row.merchant_name||'',row.description||'',
+        row.reference||'',row.category||'',row.ownership_scope||'',row.currency||'',Number(row.debit||0),Number(row.credit||0),
+        Number(row.is_internal_transfer)?'TRANSFER':Number(row.debit)>0?'EXPENSE':'INCOME',row.source_type||'',row.reconciliation_status||'',Number(row.has_receipt)?'ATTACHED':'MISSING'
+      ]);
+    }
+    transactions.columns=[12,12,22,22,24,38,20,22,15,11,14,14,14,18,18,12].map(width=>({width}));
+    for(let row=txHeader.number+1;row<=transactions.rowCount;row+=1){
+      transactions.getCell(row,1).numFmt='dd/mm/yyyy';transactions.getCell(row,2).numFmt='dd/mm/yyyy';
+      transactions.getCell(row,11).numFmt='#,##0.00;[Red]-#,##0.00';transactions.getCell(row,12).numFmt='#,##0.00;[Red]-#,##0.00';
+    }
+    styleTable(transactions,txHeader.number,16,transactions.rowCount);
+
+    const summary=workbook.addWorksheet('Summary');
+    addWorkbookMetadata(summary,report,profile,title);
+    const summaryHeader=summary.addRow(['Currency','Transactions','Money In','Ordinary Money In','Refund Inflow','Money Out','Net Cash Flow','Net Economic Expense','Transfer Movement','Cash In','Cash Out','Unclassified']);
+    for(const row of report.summary_by_currency)summary.addRow([row.currency,row.source_transaction_count,Number(row.money_in),Number(row.ordinary_money_in),Number(row.linked_refund_inflow),Number(row.money_out),Number(row.net_cash_flow),Number(row.net_economic_expense),Number(row.transfer_movement),Number(row.cash_in),Number(row.cash_out),row.unclassified]);
+    summary.columns=[12,14,16,19,16,16,17,21,18,14,14,14].map(width=>({width}));
+    for(let row=summaryHeader.number+1;row<=summary.rowCount;row+=1)for(let col=3;col<=11;col+=1)summary.getCell(row,col).numFmt='#,##0.00;[Red]-#,##0.00';
+    styleTable(summary,summaryHeader.number,12,summary.rowCount);
+
+    const categories=workbook.addWorksheet('Categories');
+    addWorkbookMetadata(categories,report,profile,title);
+    const categoryHeader=categories.addRow(['Currency','Category','Source Transactions','Split Lines','Amount']);
+    for(const row of report.categories)categories.addRow([row.currency,row.category,row.source_transaction_count,row.split_line_count,Number(row.spent)]);
+    categories.columns=[12,30,20,14,18].map(width=>({width}));
+    for(let row=categoryHeader.number+1;row<=categories.rowCount;row+=1)categories.getCell(row,5).numFmt='#,##0.00;[Red]-#,##0.00';
+    styleTable(categories,categoryHeader.number,5,categories.rowCount);
+
+    const coverage=workbook.addWorksheet('Coverage');
+    addWorkbookMetadata(coverage,report,profile,title);
+    const coverageHeader=coverage.addRow(['Account ID','Account','Currency','Status','History Start','History End','Last Statement']);
+    for(const row of report.coverage.accounts)coverage.addRow([row.account_id,row.account_name,row.currency,row.status,excelDate(row.history_start),excelDate(row.history_end),excelDate(row.last_statement_date)]);
+    coverage.columns=[12,26,12,14,16,16,16].map(width=>({width}));
+    for(let row=coverageHeader.number+1;row<=coverage.rowCount;row+=1)for(let col=5;col<=7;col+=1)coverage.getCell(row,col).numFmt='dd/mm/yyyy';
+    styleTable(coverage,coverageHeader.number,7,coverage.rowCount);
+    return workbook;
+}
+
+exports.xlsx=async(req,res)=>{
+  try{
+    const report=await buildReport(req),profile=await reportCompanyProfile(),title=reportTitle(report.metadata.report_type);
+    const workbook=await createReportWorkbook(report,profile,title);
+    const buffer=await workbook.xlsx.writeBuffer();
+    const safeName=title.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report',report.metadata.report_id,{filters:report.metadata,format:'XLSX',worksheets:workbook.worksheets.length}));
+    res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition',`attachment; filename="Voxel-Veda-${safeName}.xlsx"`);
+    res.setHeader('Content-Length',buffer.length);
+    return res.send(buffer);
+  }catch(error){return fail(res,error,'Failed to export filtered Finance XLSX.')}
 };
 
 function reportTitle(reportType) {
@@ -316,4 +448,4 @@ exports.runSaved=async(req,res)=>{
   }catch(error){return fail(res,error,'Failed to run saved Finance report.')}
 };
 
-module.exports._test={buildFilters,definitionFrom};
+module.exports._test={buildFilters,definitionFrom,createReportWorkbook};

@@ -6,6 +6,7 @@ const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
 const trustedTotals = require('../services/financeTrustedTotals');
+const { buildCoreBankTransactionFilter } = require('../services/financeFilterContract');
 
 const VALID_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const DASHBOARD_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'ALL']);
@@ -119,39 +120,32 @@ exports.getOverview = async (req, res) => {
 exports.getTransactions = async (req, res) => {
   try {
     await ensureFinanceSchema();
-    const scope = String(req.query.scope || 'ALL').trim().toUpperCase();
-    const allowedScopes = new Set(['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
-    if (!allowedScopes.has(scope)) throw new FinanceError('Transaction scope must be All, Personal, Business, Mixed or Unclassified.', 400, 'INVALID_TRANSACTION_SCOPE');
+    const core = spendingWhere(req);
+    const scope = core.scope;
 
     const limit = Math.min(250, Math.max(10, Number.parseInt(req.query.limit, 10) || 50));
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const offset = (page - 1) * limit;
     const q = String(req.query.q || '').trim().slice(0, 120);
-    const accountId = Number(req.query.account_id || 0);
+    const accountId = core.accountId;
     const category = String(req.query.category || '').trim().slice(0, 120);
     const merchant = String(req.query.merchant || '').trim().slice(0, 120);
-    const currency = String(req.query.currency || '').trim().toUpperCase().slice(0, 3);
+    const currency = core.currency || '';
     const source = String(req.query.source || '').trim().toUpperCase().slice(0, 40);
     const reconciliation = String(req.query.reconciliation_status || '').trim().toUpperCase().slice(0, 40);
     const reviewStatus = String(req.query.review_status || '').trim().toUpperCase().slice(0, 40);
     const bank = String(req.query.bank || '').trim().slice(0, 120);
     const type = String(req.query.type || '').trim().toUpperCase().slice(0, 40);
-    const from = reportDate(req.query.from, 'From date');
-    const to = reportDate(req.query.to, 'To date');
-    if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
+    const from = core.from;
+    const to = core.to;
     const amountMin = req.query.amount_min === undefined || req.query.amount_min === '' ? null : Number(req.query.amount_min);
     const amountMax = req.query.amount_max === undefined || req.query.amount_max === '' ? null : Number(req.query.amount_max);
     if (amountMin !== null && !Number.isFinite(amountMin)) throw new FinanceError('Minimum amount must be a number.', 400, 'INVALID_AMOUNT_FILTER');
     if (amountMax !== null && !Number.isFinite(amountMax)) throw new FinanceError('Maximum amount must be a number.', 400, 'INVALID_AMOUNT_FILTER');
     if (amountMin !== null && amountMax !== null && amountMin > amountMax) throw new FinanceError('Minimum amount cannot exceed maximum amount.', 400, 'INVALID_AMOUNT_FILTER');
 
-    const clauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
-    const params = [...privacy.visibilityParams(req)];
-    if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
-    if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
-    if (from) { clauses.push('bt.transaction_date>=?'); params.push(from); }
-    if (to) { clauses.push('bt.transaction_date<=?'); params.push(to); }
-    if (currency) { clauses.push('bt.currency=?'); params.push(currency); }
+    const clauses = [...core.clauses];
+    const params = [...core.params];
     if (source) { clauses.push('bt.source_type=?'); params.push(source); }
     if (reconciliation) { clauses.push('bt.reconciliation_status=?'); params.push(reconciliation); }
     if (reviewStatus) { clauses.push('bt.review_source_status=?'); params.push(reviewStatus); }
@@ -308,20 +302,9 @@ function reportDate(value, label) {
 }
 
 function spendingWhere(req, options = {}) {
-  const scope = reportScope(req.query.scope);
-  const from = reportDate(req.query.from, 'From date');
-  const to = reportDate(req.query.to, 'To date');
-  if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
-  const accountId = Number(req.query.account_id || 0);
   const statementUid = String(options.statementUid || req.query.statement_uid || '').trim().slice(0, 80);
-  const clauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
-  const params = [...privacy.visibilityParams(req)];
-  if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
-  if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
-  if (from) { clauses.push('bt.transaction_date>=?'); params.push(from); }
-  if (to) { clauses.push('bt.transaction_date<=?'); params.push(to); }
-  if (statementUid) { clauses.push('bt.statement_import_uid=?'); params.push(statementUid); }
-  return { scope, from, to, accountId, statementUid, where: clauses.join(' AND '), params };
+  const core = buildCoreBankTransactionFilter(req, req.query, { statementUid });
+  return { ...core, accountId: core.account_id || 0, statementUid };
 }
 
 
@@ -718,29 +701,20 @@ exports.getSpendingReport = async (req, res) => {
 exports.getBankingDashboard = async (req, res) => {
   try {
     await ensureFinanceSchema();
-    const scope = normalizeDashboardScope(req.query.scope);
-    const from = reportDate(req.query.from, 'From date');
-    const to = reportDate(req.query.to, 'To date');
-    if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
-
-    const accountId = Number(req.query.account_id || 0);
+    const filters = spendingWhere(req);
+    const scope = normalizeDashboardScope(filters.scope);
+    const accountId = filters.accountId;
     const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
-    const txClauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
-    const txParams = [...privacy.visibilityParams(req)];
+    const txWhere = filters.where;
+    const txParams = filters.params;
     if (scope !== 'ALL') {
       accountClauses.push('ba.ownership_scope=?');
       accountParams.push(scope);
-      txClauses.push('bt.ownership_scope=?');
-      txParams.push(scope);
     }
     if (accountId) {
       accountClauses.push('ba.id=?'); accountParams.push(accountId);
-      txClauses.push('bt.bank_account_id=?'); txParams.push(accountId);
     }
-    if (from) { txClauses.push('bt.transaction_date>=?'); txParams.push(from); }
-    if (to) { txClauses.push('bt.transaction_date<=?'); txParams.push(to); }
-    const txWhere = txClauses.join(' AND ');
 
     const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
       pool.query(
@@ -1474,3 +1448,5 @@ exports.getStatementWarehouse = async (req, res) => {
     });
   } catch (error) { return fail(res,error,'Failed to load statement money warehouse'); }
 };
+
+module.exports._test={spendingWhere};

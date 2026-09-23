@@ -492,19 +492,7 @@ async function saveBuiltReport(){
 }
 async function exportBuiltReportXlsx(){
  const def=reportDefinitionFromUi();if(!def)return;
- const result=await api(API+'/reports/builder?'+reportQuery(def));if(!result)return;
- if(!window.XLSX){notice('XLSX library is unavailable in this browser session.',true);return}
- const rows=(result.transactions||[]).map(t=>({
-  Date:String(t.transaction_date||'').slice(0,10),PostingDate:String(t.posting_date||'').slice(0,10),Account:t.account_name||'',Institution:t.institution||'',
-  Merchant:t.merchant_name||'',Description:t.description||'',Reference:t.reference||'',Category:t.category||'',Scope:t.ownership_scope||'',Currency:t.currency||'',
-  Debit:Number(t.debit||0),Credit:Number(t.credit||0),Type:Number(t.is_internal_transfer)?'TRANSFER':Number(t.debit)>0?'EXPENSE':'INCOME',
-  Source:t.source_type||'',Reconciliation:t.reconciliation_status||'',Receipt:Number(t.has_receipt)?'ATTACHED':'MISSING'
- }));
- const meta=[['Voxel Veda Finance Report'],['Scope',result.metadata?.scope||''],['From',result.metadata?.from||''],['To',result.metadata?.to||''],['Currency treatment',result.metadata?.currency_treatment||''],['Generated',result.metadata?.generated_at||''],['Source transaction count',result.metadata?.source_transaction_count||0]];
- const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet(meta);XLSX.utils.sheet_add_json(ws,rows,{origin:'A9',skipHeader:false});XLSX.utils.book_append_sheet(wb,ws,'Transactions');
- const summary=XLSX.utils.json_to_sheet(result.summary_by_currency||[]);XLSX.utils.book_append_sheet(wb,summary,'Summary');
- const cats=XLSX.utils.json_to_sheet(result.categories||[]);XLSX.utils.book_append_sheet(wb,cats,'Categories');
- XLSX.writeFile(wb,'Voxel-Veda-Finance-Report.xlsx');
+ location.href=API+'/reports/builder.xlsx?'+reportQuery(def);
 }
 
 function reviewView(){
