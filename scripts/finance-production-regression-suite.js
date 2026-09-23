@@ -18,6 +18,7 @@ const tests=[
   "finance-anomaly-explain-control-test.js",
   "finance-fpa-planning-control-test.js",
   "finance-job-profitability-test.js",
+  "finance-margin-allocation-test.js",
   "finance-control-actions-test.js",
   "finance-governance-controls-test.js",
   "finance-accountant-handover-test.js",
