@@ -40,7 +40,7 @@ async function run() {
   assert(Date.now() - startedAt < 2000, 'The timeout guard must end a hanging request promptly in the regression test.');
 
   assert.match(source, /const FINANCE_HYDRATION_BATCH_SIZE=5;/, 'Supplementary Finance APIs must use bounded batches.');
-  assert.match(source, /const cycle=await loadBase\(\);render\(\);\s*void hydrateSupplementary\(cycle\)/, 'Core Finance must render before supplementary hydration.');
+  assert.match(source, /const cycle=await loadBase\(\);render\(\);signalFinanceReady\(\);\s*void hydrateSupplementary\(cycle\)/, 'Core Finance must render and clear the startup watchdog before supplementary hydration.');
   assert.match(source, /cycle===loadCycle/, 'Stale Finance loads must be prevented from replacing current filter state.');
   assert.doesNotMatch(source, /Loading finance workspace[^]*await hydrateSupplementary/, 'Initial loading markup must not wait for supplementary services.');
   assert.doesNotMatch(source, /state\.os=os\|\|null/, 'Core bootstrap must not reference the supplementary os variable before it exists.');
