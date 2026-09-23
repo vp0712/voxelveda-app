@@ -9,6 +9,7 @@ const migration=read('migrations/20260924_finance_fx_rates.sql');
 const controller=read('controllers/financeFxController.js');
 const routes=read('routes/financeRoutes.js');
 const client=read('public/finance-master.js');
+const html=read('public/finance-intelligence.html');
 
 for(const token of ['finance_fx_rates','from_currency','to_currency','effective_date','source_note','uniq_finance_fx_user_day'])assert(migration.includes(token),'FX migration missing '+token);
 assert(controller.includes('WHERE user_id=?'),'FX evidence must be scoped to the signed-in user.');
@@ -27,8 +28,8 @@ assert(client.includes('function managementConversionCard('),'Management convers
 assert(client.includes('Finance will not invent an exchange rate.'),'Missing FX evidence must fail closed instead of inventing a conversion.');
 assert(client.includes('This creates management-reporting evidence only'),'FX form must disclose that it does not rewrite native transactions.');
 
-console.log('FINANCE_FX_RATES_TEST_OK');
-
 assert(html.includes('value="MANAGEMENT">Management conversion'),'Finance filter bar must expose the evidence-based management conversion centre.');
 assert(!client.includes('Reporting-currency conversion is unavailable because no verified FX-rate service is configured'),'Finance must not claim FX conversion is unavailable after the explicit FX register exists.');
 assert(client.includes("go('currency')"),'Management conversion selector must route to the Currency Centre.');
+
+console.log('FINANCE_FX_RATES_TEST_OK');
