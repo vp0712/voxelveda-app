@@ -36,7 +36,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Recurring money | Personal recurring lifecycle plus finance-intelligence suggestions; no bank execution | PARTIAL |
 | Categories | Original bank category preserved separately from editable system category; category manager exposed | PARTIAL |
 | Rules | Suggestion-only merchant/category rules with priority | READY core |
-| Insights | Evidence-backed insights linked to underlying transactions | READY core |
+| Insights | Spending-health cards, top-merchant concentration, recurring commitments, runway/safe-to-spend signals and evidence-backed transaction insights | READY core / integrated UI |
 | Company Finance | Business-only scope, supplier/accounting command-centre data, payables/receivables surfaces | PARTIAL |
 | Personal Money | Owner-only dashboards, briefing, budgets, goals, debts, recurring, saved views and planning intelligence | PARTIAL integrated |
 | Consolidated | Selected permitted accounts with ownership separation | PARTIAL |

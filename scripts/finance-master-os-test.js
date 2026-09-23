@@ -66,3 +66,10 @@ assert.match(js,/Provider did not return a secure consent URL/,'Bank consent UI 
 assert.match(js,/function syncBankConnection\(/,'Finance OS must expose connected-bank sync.');
 assert.match(js,/function disconnectBankConnection\(/,'Finance OS must expose controlled bank disconnect while preserving history.');
 assert.match(js,/never asks for or stores your bank password, PIN or OTP/,'Bank connection safety boundary must be visible.');
+
+assert.match(js,/SPENDING & COST INTELLIGENCE/,'Finance OS must expose spending/cost intelligence.');
+assert.match(js,/average_monthly_spend/,'Spending intelligence must expose evidence-backed monthly spend.');
+assert.match(js,/recurring_monthly_estimate/,'Spending intelligence must surface recurring commitments.');
+assert.match(js,/safe_to_spend_7d/,'Spending intelligence must surface short-horizon safe-to-spend evidence.');
+assert.match(js,/data-merchant-filter/,'Top merchant spending must drill into the transaction ledger.');
+assert.match(js,/does not label a legitimate expense as waste without evidence/,'Waste analysis must remain evidence-based rather than making unsupported judgments.');
