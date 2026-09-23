@@ -44,3 +44,5 @@ assert(advanced.includes("['handover','/api/finance/accountant-handover']"),'Adv
 assert(advanced.includes('Accountant Handover Readiness'),'Advanced Control handover status missing.');
 assert(advanced.includes('data-fac-open="handover"'),'Advanced Control must drill into Handover.');
 console.log('FINANCE_ACCOUNTANT_HANDOVER_OK');
+
+assert((routes.match(/VIEW_BUSINESS_BANKING/g)||[]).length>=3,'Handover snapshot/PDF must require Company Finance visibility in addition to edit/export permissions.');
