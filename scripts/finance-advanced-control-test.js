@@ -13,7 +13,7 @@ assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be 
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
 assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v2'),'Master OS must load the versioned Advanced Control asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
-assert(html.includes('/finance-master.js?v=20260924-advanced-control-v1'),'Canonical Finance HTML must cache-bust the Advanced Control release.');
+assert(html.includes('/finance-master.js?v=20260924-advanced-control-v2'),'Canonical Finance HTML must cache-bust the Advanced Control release.');
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
