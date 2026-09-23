@@ -20,7 +20,6 @@ const financeRoutes=read('routes/financeRoutes.js');
 const bankingRoutes=read('routes/bankingPortalRoutes.js');
 const integrationRoutes=read('routes/integrationWebhookRoutes.js');
 const sanitizer=read('middleware/statementPreviewSanitizer.js');
-const pdf=read('public/finance-pdf-v3.js');
 const ui=read('public/finance-master.js');
 const css=read('public/finance-master.css');
 const html=read('public/finance-intelligence.html');
@@ -55,8 +54,7 @@ assert(bankingRoutes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'Bankin
 
 assert(sanitizer.includes('unreadable_date_rows'),'row-level unreadable-date diagnostics missing');
 assert(!sanitizer.includes('STATEMENT_DATES_UNREADABLE'),'one unreadable row must not fail the whole statement');
-for(const marker of ['extractGeometry','findColumns','running_balance_delta','parser_confidence','statementPeriod','inferYear','reconciliation_status','semanticDirection'])assert(pdf.includes(marker),`PDF parser missing ${marker}`);
-assert(pdf.includes("status='REJECTED'")&&pdf.includes('PDF_V3_GEOMETRY_2'),'PDF parser review controls/version missing');
+for(const marker of ['function loadPdfJs()','parsePdfLines','PDF parser timed out','This PDF does not expose transaction direction safely enough for automatic import','Nothing was imported.'])assert(ui.includes(marker),`canonical PDF import safety missing ${marker}`);
 for(const marker of ['STATEMENT_PREVIEW_REPARSED','existingImportable === 0','parserChanged','STATEMENT_REJECTED_ROW_OVERRIDDEN','CORRECTED_ROW_DUPLICATE','BALANCE_MARKER_LOCKED','override_original_json'])assert(statementController.includes(marker),`statement control missing ${marker}`);
 assert(statementController.includes('statement_import_uid, statement_row_id, review_source_status, manual_override'),'statement provenance must flow into canonical bank transactions');
 
