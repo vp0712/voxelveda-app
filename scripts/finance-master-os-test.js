@@ -9,11 +9,11 @@ const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
 assert.match(html,/finance-master\.css\?v=20260923-control-centre/,'Master finance stylesheet must be loaded.');
-assert.match(html,/finance-master\.js\?v=20260924-advanced-control-v2/,'Master finance client must be loaded with the current cache-busting release id.');
+assert.match(html,/finance-master\\.js\\?v=20260924-close-assurance-v1/,'Master finance client must be loaded with the current cache-busting release id.');
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');
-for(const name of ['Overview','My Money','Company Finance','Consolidated','Accounts','Transactions','Cash','Transfers','Refunds','Reimbursements','Borrow & Lend','Recurring','Statements','Budgets','Savings Goals','Advanced Control','Insights','Rules','Review Centre','Reconciliation','Reports','Notifications','Team Access','Banking Connections','Finance Settings']){
+for(const name of ['Overview','My Money','Company Finance','Consolidated','Accounts','Transactions','Cash','Transfers','Refunds','Reimbursements','Borrow & Lend','Recurring','Statements','Budgets','Savings Goals','Advanced Control','Insights','Rules','Review Centre','Reconciliation','Reports','Notifications','Team Access','Banking Connections','Finance Settings','Close & Assurance']){
   assert(js.includes(name),`Navigation must contain ${name}`);
 }
 assert.match(js,/banking-dashboard/,'Finance OS must use real banking dashboard data.');
@@ -140,3 +140,6 @@ assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v2/,'
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
 assert.match(js,/const MOBILE_NAV=\[\['advanced','⚡','Control'\]/,'Mobile Finance Home must open Advanced Control.');
+
+assert.match(js,/MONTH-END CLOSE & ASSURANCE/,'Finance OS must expose the period Close & Assurance centre.');
+assert.match(js,/close-assurance/,'Finance OS must use the canonical Close Assurance API.');

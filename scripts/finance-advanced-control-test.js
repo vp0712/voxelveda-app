@@ -6,14 +6,14 @@ const master=fs.readFileSync('public/finance-master.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 
-assert(advanced.includes("VERSION='20260924-advanced-control-v2'"),'Advanced Finance release id is missing.');
+assert(advanced.includes("VERSION='20260924-advanced-control-v3'"),'Advanced Finance release id is missing.');
 assert(master.includes("['advanced','⚡','Control Centre']"),'Advanced Control must be the canonical Finance home module.');
 assert(master.includes('function advancedControlView()'),'Advanced Control must mount inside the master Finance OS.');
 assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be the default Finance landing.');
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
-assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v2'),'Master OS must load the versioned Advanced Control asset.');
+assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v3'),'Master OS must load the versioned Advanced Control asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
-assert(html.includes('/finance-master.js?v=20260924-advanced-control-v2'),'Canonical Finance HTML must cache-bust the Advanced Control release.');
+assert(html.includes('/finance-master.js?v=20260924-close-assurance-v1'),'Canonical Finance HTML must cache-bust the Advanced Control release.');
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
@@ -27,7 +27,7 @@ for(const endpoint of [
   '/api/finance/personal-money/data-quality-integrity','/api/finance/personal-money/net-worth',
   '/api/finance/personal-money/net-worth/lifecycle','/api/finance/company-summary',
   '/api/finance/banking-os/command-center','/api/finance/intelligence/data-quality',
-  '/api/finance/receipts','/api/finance/reimbursements','/api/finance/personal-money/review-inbox','/api/finance/intelligence/banking-readiness','/api/notifications','/api/finance/intelligence/rules'
+  '/api/finance/receipts','/api/finance/reimbursements','/api/finance/personal-money/review-inbox','/api/finance/intelligence/banking-readiness','/api/notifications','/api/finance/intelligence/rules','/api/finance/close-assurance'
 ]) assert(advanced.includes(endpoint),`Advanced Control must use protected canonical source ${endpoint}.`);
 
 for(const horizon of ['7,30,90,365','knownProjection','scenarioProjection'])
@@ -47,3 +47,6 @@ console.log('ADVANCED_FINANCE_CONTROL_OK');
 assert(advanced.includes('data-fac-open'),'Advanced Control must drill into canonical actionable modules.');
 assert(advanced.includes('function decisionIntelligence()'),'Plan A/B decision intelligence is missing.');
 assert(advanced.includes('Arithmetic comparison, not a recommendation'),'Decision comparison must stay descriptive rather than prescriptive.');
+
+assert(advanced.includes('Month-end close readiness'),'Advanced Control must surface period-close readiness.');
+assert(advanced.includes('data-fac-open="closeassurance"'),'Advanced Control must drill into Close & Assurance.');
