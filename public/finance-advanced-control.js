@@ -1,0 +1,259 @@
+(() => {
+'use strict';
+
+const MOUNT_ID='financeAdvancedControlMount';
+const VERSION='20260924-advanced-control-v1';
+const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}};
+const SOURCES=[
+  ['personal','/api/finance/personal-money'],
+  ['attention','/api/finance/personal-money/attention'],
+  ['smart','/api/finance/personal-money/smart'],
+  ['health','/api/finance/personal-money/health'],
+  ['roadmaps','/api/finance/personal-money/roadmaps'],
+  ['integrity','/api/finance/personal-money/data-quality-integrity'],
+  ['netWorth','/api/finance/personal-money/net-worth'],
+  ['lifecycle','/api/finance/personal-money/net-worth/lifecycle'],
+  ['company','/api/finance/company-summary'],
+  ['command','/api/finance/banking-os/command-center'],
+  ['quality','/api/finance/intelligence/data-quality'],
+  ['receipts','/api/finance/receipts'],
+  ['reimbursements','/api/finance/reimbursements']
+];
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>Number(v||0);
+const todayIso=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())};
+const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'currency',currency:c||'AUD',maximumFractionDigits:2}).format(num(v))}catch{return num(v).toFixed(2)+' '+(c||'AUD')}};
+const date=v=>{if(!v)return '—';try{return new Intl.DateTimeFormat('en-AU',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(String(v).slice(0,10)+'T00:00:00'))}catch{return String(v)}};
+const tone=s=>{s=String(s||'').toUpperCase();if(['URGENT','CRITICAL','HIGH','FAILED','OVERDUE'].includes(s))return 'high';if(['MEDIUM','WATCH','WARNING','ACTION_SOON','REVIEW'].includes(s))return 'watch';return 'ok'};
+const statusChip=(label)=>'<span class="fac-chip '+tone(label)+'">'+esc(String(label||'INFO').replaceAll('_',' '))+'</span>';
+
+function style(){
+ if(document.querySelector('style[data-finance-advanced-control]'))return;
+ const s=document.createElement('style');s.dataset.financeAdvancedControl='1';
+ s.textContent=`
+ .fac{display:grid;gap:14px}.fac-hero{padding:20px;border:1px solid rgba(87,126,255,.26);border-radius:20px;background:linear-gradient(135deg,rgba(30,64,175,.08),rgba(14,116,144,.06));box-shadow:0 16px 40px rgba(0,0,0,.05)}
+ .fac-hero h2{margin:4px 0 6px;font-size:clamp(1.35rem,3vw,2rem)}.fac-hero p{margin:0;color:var(--muted,#687386)}.fac-eyebrow{font-size:.72rem;font-weight:900;letter-spacing:.12em;color:#4f6fdf}
+ .fac-toolbar,.fac-jumps,.fac-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.fac-toolbar{margin-top:14px}.fac-toolbar button,.fac-jumps button{min-height:40px}.fac-jumps{margin-top:10px}
+ .fac-section{scroll-margin-top:110px}.fac-section>header{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;margin-bottom:9px}.fac-section>header h3{margin:0;font-size:1.05rem}.fac-section>header p{margin:3px 0 0;color:var(--muted,#687386);font-size:.84rem}
+ .fac-grid{display:grid;gap:10px}.fac-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.fac-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.fac-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .fac-card{padding:14px;border:1px solid rgba(127,127,127,.16);border-radius:15px;background:var(--panel,#fff);min-width:0}.fac-card small{color:var(--muted,#687386)}.fac-card strong{display:block;font-size:1.18rem;margin-top:5px}.fac-card h4{margin:0 0 7px}
+ .fac-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.fac-kpi{padding:13px;border:1px solid rgba(127,127,127,.16);border-radius:14px;background:rgba(127,127,127,.025)}.fac-kpi span{font-size:.72rem;color:var(--muted,#687386);text-transform:uppercase;letter-spacing:.04em}.fac-kpi b{display:block;margin-top:5px;font-size:1.12rem}
+ .fac-list{display:grid;gap:8px}.fac-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:11px;border:1px solid rgba(127,127,127,.14);border-radius:12px}.fac-row h4{margin:0 0 3px;font-size:.92rem}.fac-row p{margin:0;color:var(--muted,#687386);font-size:.8rem}.fac-right{text-align:right;display:grid;gap:4px;justify-items:end}
+ .fac-chip{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:.68rem;font-weight:850;background:rgba(59,130,246,.1)}.fac-chip.high{background:rgba(239,68,68,.12);color:#b42318}.fac-chip.watch{background:rgba(245,158,11,.14);color:#9a6700}.fac-chip.ok{background:rgba(34,197,94,.12);color:#16794a}
+ .fac-table-wrap{overflow:auto}.fac-table{width:100%;border-collapse:collapse;min-width:650px}.fac-table th,.fac-table td{padding:8px;border-bottom:1px solid rgba(127,127,127,.14);text-align:left;font-size:.8rem}.fac-table th{font-size:.7rem;text-transform:uppercase;color:var(--muted,#687386);letter-spacing:.04em}
+ .fac-bars{display:grid;gap:7px}.fac-bar{display:grid;grid-template-columns:minmax(110px,1fr) 3fr auto;gap:8px;align-items:center;font-size:.78rem}.fac-bar-track{height:8px;border-radius:999px;background:rgba(127,127,127,.12);overflow:hidden}.fac-bar-track i{display:block;height:100%;background:currentColor}
+ .fac-scenario{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.fac-scenario label{display:grid;gap:5px;font-size:.78rem}.fac-scenario input,.fac-scenario select{width:100%}.fac-note{padding:12px;border:1px dashed rgba(127,127,127,.25);border-radius:13px;color:var(--muted,#687386);font-size:.8rem}
+ .fac-loading{padding:24px;text-align:center;border:1px dashed rgba(127,127,127,.25);border-radius:16px}.fac-source{font-size:.73rem;color:var(--muted,#687386)}.fac-empty{padding:14px;border:1px dashed rgba(127,127,127,.22);border-radius:12px;color:var(--muted,#687386)}
+ .fac-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fac-check{display:flex;justify-content:space-between;gap:10px;padding:10px;border:1px solid rgba(127,127,127,.14);border-radius:11px;align-items:center}
+ @media(max-width:950px){.fac-grid.four,.fac-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fac-grid.three{grid-template-columns:1fr 1fr}.fac-scenario{grid-template-columns:1fr 1fr}}
+ @media(max-width:650px){.fac-grid.four,.fac-grid.three,.fac-grid.two,.fac-kpis,.fac-control-grid,.fac-scenario{grid-template-columns:1fr}.fac-section>header,.fac-row{flex-direction:column}.fac-right{text-align:left;justify-items:start}.fac-toolbar>*{flex:1;min-width:130px}.fac-jumps{display:grid;grid-template-columns:1fr 1fr}.fac-bar{grid-template-columns:1fr}.fac-bar-track{order:3}}
+ `;
+ document.head.appendChild(s);
+}
+
+async function get(name,url){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+ try{
+  const r=await fetch(url,{credentials:'same-origin',signal:controller.signal,headers:{Accept:'application/json'}});
+  let body={};try{body=await r.json()}catch{}
+  if(!r.ok){const e=new Error(body.message||('Request failed ('+r.status+')'));e.status=r.status;throw e}
+  state.data[name]=body;delete state.errors[name];return body;
+ }catch(e){
+  state.errors[name]=e?.name==='AbortError'?'Timed out':e.message||'Unavailable';return null;
+ }finally{clearTimeout(timer)}
+}
+async function load(){
+ if(state.loading)return;state.loading=true;
+ const root=document.getElementById(MOUNT_ID);if(!root){state.loading=false;return}
+ root.innerHTML='<div class="fac-loading"><b>Building Advanced Finance Control…</b><p>Loading protected finance evidence in bounded batches.</p></div>';
+ state.data={};state.errors={};
+ for(let i=0;i<SOURCES.length;i+=4)await Promise.allSettled(SOURCES.slice(i,i+4).map(([n,u])=>get(n,u)));
+ state.loading=false;render();
+}
+
+function currencies(){
+ const set=new Set();
+ const h=state.data.health?.by_currency||{};Object.keys(h).forEach(x=>set.add(x));
+ const s=state.data.smart?.safe_to_spend_by_currency||{};Object.keys(s).forEach(x=>set.add(x));
+ const n=state.data.netWorth?.totals_by_currency||{};Object.keys(n).forEach(x=>set.add(x));
+ const p=state.data.personal?.wallet_totals||{};Object.keys(p).forEach(x=>set.add(x));
+ const c=state.data.command?.summary_by_currency||{};Object.keys(c).forEach(x=>set.add(x));
+ if(!set.size)set.add('AUD');return [...set].sort();
+}
+function visibleFunds(cur){
+ const row=state.data.smart?.safe_to_spend_by_currency?.[cur]||{};
+ if(row.visible_funds!==undefined&&row.visible_funds!==null)return num(row.visible_funds);
+ const h=state.data.health?.by_currency?.[cur]||{};
+ return num(h.bank_balance)+num(h.manual_wallet_balance);
+}
+function safeSpend(cur){return num(state.data.smart?.safe_to_spend_by_currency?.[cur]?.safe_to_spend)}
+function netWorth(cur){
+ const x=state.data.netWorth?.totals_by_currency?.[cur];
+ if(x)return num(x.net_worth);
+ const values=Object.values(state.data.netWorth?.totals_by_currency||{});const row=values.find(r=>String(r.currency||'').toUpperCase()===cur);return num(row?.net_worth);
+}
+function monthlyFlow(cur){
+ const h=state.data.health?.by_currency?.[cur]||{};
+ return {income:num(h.current_month_income),spend:num(h.current_month_spending),avgSpend:num(h.average_monthly_spending_90d),runway:h.runway_months};
+}
+function addMonthsClamped(dateObj,months){
+ const d=new Date(dateObj.getTime()),day=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+months);const last=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(day,last));return d;
+}
+function nextRecurring(dateObj,freq){
+ const d=new Date(dateObj.getTime());freq=String(freq||'MONTHLY').toUpperCase();
+ if(freq==='WEEKLY'){d.setDate(d.getDate()+7);return d}
+ if(freq==='FORTNIGHTLY'){d.setDate(d.getDate()+14);return d}
+ if(freq==='QUARTERLY')return addMonthsClamped(d,3);
+ if(freq==='YEARLY')return addMonthsClamped(d,12);
+ return addMonthsClamped(d,1);
+}
+function knownProjection(cur,days){
+ const start=new Date(todayIso()+'T00:00:00'),end=new Date(start.getTime()+days*86400000);
+ let inflow=0,outflow=0,count=0;
+ for(const r of state.data.attention?.recurring||[]){
+  if(String(r.currency||'AUD').toUpperCase()!==cur||!r.next_due_date)continue;
+  let d=new Date(String(r.next_due_date).slice(0,10)+'T00:00:00');
+  if(Number.isNaN(d.getTime()))continue;
+  let guard=0;
+  while(d<=end&&guard<400){
+   if(d>=start){const a=num(r.amount);if(String(r.item_type||'').toUpperCase()==='INCOME')inflow+=a;else outflow+=a;count++}
+   d=nextRecurring(d,r.frequency);guard++;
+  }
+ }
+ return {days,inflow,outflow,net:inflow-outflow,events:count,projected:visibleFunds(cur)+inflow-outflow};
+}
+function scenarioProjection(cur,days){
+ const base=knownProjection(cur,days),months=days/30.4375,s=state.scenario;
+ const delta=(num(s.monthlyIncomeDelta)-num(s.monthlySpendingDelta)-num(s.monthlySavingTarget))*months-num(s.oneTimeCost);
+ return {...base,scenario_delta:delta,scenario_projected:base.projected+delta};
+}
+
+function actionQueue(){
+ const out=[];
+ for(const a of state.data.attention?.alerts||[])out.push({severity:a.severity||'MEDIUM',title:a.title||'Personal finance alert',detail:a.explanation||a.action||'',source:'Personal Attention'});
+ for(const f of state.data.integrity?.findings||[])out.push({severity:f.severity||'WATCH',title:f.title||f.type||'Integrity review',detail:(f.count?f.count+' item(s) · ':'')+(f.next_step||f.why||''),source:'Integrity'});
+ for(const a of state.data.lifecycle?.alerts||[])out.push({severity:a.priority||'MEDIUM',title:a.title||a.kind||'Asset/lifecycle reminder',detail:a.detail||'',source:'Protection'});
+ for(const a of state.data.command?.attention||[])out.push({severity:a.severity||'MEDIUM',title:String(a.code||'Banking attention').replaceAll('_',' '),detail:a.message||'',source:'Banking'});
+ const rc=state.data.receipts?.counts||{};if(num(rc.missing)+num(rc.requested)>0)out.push({severity:'WATCH',title:'Receipt evidence needs attention',detail:(num(rc.missing)+num(rc.requested))+' receipt item(s) missing or requested.',source:'Receipts'});
+ return out.sort((a,b)=>({URGENT:0,CRITICAL:0,HIGH:1,MEDIUM:2,WATCH:2,LOW:3}[String(a.severity).toUpperCase()]??4)-({URGENT:0,CRITICAL:0,HIGH:1,MEDIUM:2,WATCH:2,LOW:3}[String(b.severity).toUpperCase()]??4));
+}
+
+function executive(){
+ const cs=currencies();
+ const rows=cs.map(cur=>{
+  const f=monthlyFlow(cur),cmd=state.data.command?.summary_by_currency?.[cur]||{};
+  return '<div class="fac-card"><small>'+esc(cur)+' CONTROL POSITION</small><strong>'+money(visibleFunds(cur),cur)+'</strong><div class="fac-source">Visible personal funds</div><div class="fac-kpis" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><span>Safe to spend</span><b>'+money(safeSpend(cur),cur)+'</b></div><div><span>Net worth</span><b>'+money(netWorth(cur),cur)+'</b></div><div><span>90d avg spend/mo</span><b>'+money(f.avgSpend,cur)+'</b></div><div><span>Banking 30d liquidity</span><b>'+money(cmd.projected_liquidity_30d,cur)+'</b></div></div></div>';
+ }).join('');
+ const queue=actionQueue();
+ const critical=queue.filter(x=>['URGENT','CRITICAL','HIGH'].includes(String(x.severity).toUpperCase())).length;
+ const integrity=state.data.integrity?.summary||{};
+ const rc=state.data.receipts?.counts||{};
+ return '<section id="facExecutive" class="fac-section"><header><div><h3>Executive Cockpit</h3><p>Personal, banking, company and evidence controls without collapsing currencies.</p></div>'+statusChip(critical?'HIGH ATTENTION':'CONTROLLED')+'</header>'+
+ '<div class="fac-kpis"><div class="fac-kpi"><span>High-priority actions</span><b>'+critical+'</b><small>From current protected sources</small></div><div class="fac-kpi"><span>Unclassified transactions</span><b>'+num(integrity.unclassified_bank_transactions)+'</b><small>Personal integrity</small></div><div class="fac-kpi"><span>Unreconciled transactions</span><b>'+num(integrity.unreconciled_bank_transactions)+'</b><small>Personal integrity</small></div><div class="fac-kpi"><span>Receipt exceptions</span><b>'+(num(rc.missing)+num(rc.requested))+'</b><small>Missing + requested</small></div></div>'+
+ '<div class="fac-grid '+(cs.length>1?'two':'')+'" style="margin-top:10px">'+rows+'</div></section>';
+}
+
+function actions(){
+ const rows=actionQueue().slice(0,40).map(a=>'<div class="fac-row"><div><h4>'+esc(a.title)+'</h4><p>'+esc(a.detail||'Review the underlying source before making a change.')+'</p><small class="fac-source">'+esc(a.source)+'</small></div><div class="fac-right">'+statusChip(a.severity)+'</div></div>').join('');
+ return '<section id="facActions" class="fac-section"><header><div><h3>Action Queue</h3><p>One prioritised queue; no automatic posting, payment, deletion, reconciliation or classification.</p></div><span class="fac-source">'+actionQueue().length+' current signal(s)</span></header><div class="fac-list">'+(rows||'<div class="fac-empty">No current action signal was returned.</div>')+'</div></section>';
+}
+
+function forecast(){
+ const cs=currencies(),horizons=[7,30,90,365];
+ const tables=cs.map(cur=>'<article class="fac-card"><h4>'+esc(cur)+' known-schedule forecast</h4><div class="fac-table-wrap"><table class="fac-table"><thead><tr><th>Horizon</th><th>Starting funds</th><th>Known income</th><th>Known outflows</th><th>Known projection</th></tr></thead><tbody>'+
+ horizons.map(d=>{const p=knownProjection(cur,d);return '<tr><td>'+d+' days</td><td>'+money(visibleFunds(cur),cur)+'</td><td>'+money(p.inflow,cur)+'</td><td>'+money(p.outflow,cur)+'</td><td><b>'+money(p.projected,cur)+'</b></td></tr>'}).join('')+
+ '</tbody></table></div><p class="fac-source">Uses recorded recurring items only. Unknown discretionary spending, fees, interest, investment return and unrecorded income are excluded.</p></article>').join('');
+ return '<section id="facForecast" class="fac-section"><header><div><h3>7 / 30 / 90 / 365-day Forecast</h3><p>Evidence-backed recurring schedule projection by native currency.</p></div></header><div class="fac-grid '+(cs.length>1?'two':'')+'">'+tables+'</div></section>';
+}
+
+function scenario(){
+ const cs=currencies();if(!cs.includes(state.scenario.currency))state.scenario.currency=cs[0];
+ const cur=state.scenario.currency,horizons=[7,30,90,365];
+ const cards=horizons.map(d=>{const p=scenarioProjection(cur,d);return '<div class="fac-kpi"><span>'+d+' DAY SCENARIO</span><b>'+money(p.scenario_projected,cur)+'</b><small>Base '+money(p.projected,cur)+' · scenario impact '+money(p.scenario_delta,cur)+'</small></div>'}).join('');
+ return '<section id="facScenario" class="fac-section"><header><div><h3>Scenario Lab</h3><p>Change assumptions locally without writing to the ledger.</p></div><span class="fac-chip ok">NO DATA MUTATION</span></header>'+
+ '<div class="fac-card"><div class="fac-scenario"><label>Currency<select id="facScenarioCurrency">'+cs.map(c=>'<option '+(c===cur?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label><label>Monthly income change<input id="facIncomeDelta" type="number" step="0.01" value="'+esc(state.scenario.monthlyIncomeDelta)+'"></label><label>Monthly spending change<input id="facSpendDelta" type="number" step="0.01" value="'+esc(state.scenario.monthlySpendingDelta)+'"></label><label>One-time cost<input id="facOneTime" type="number" step="0.01" min="0" value="'+esc(state.scenario.oneTimeCost)+'"></label><label>Monthly savings target<input id="facSavingTarget" type="number" step="0.01" min="0" value="'+esc(state.scenario.monthlySavingTarget)+'"></label></div><div class="fac-kpis" style="margin-top:12px">'+cards+'</div><div class="fac-note" style="margin-top:10px">Scenario values are temporary planning assumptions only. They do not change balances, budgets, goals, repayments, bank transactions or accounting records.</div></div></section>';
+}
+
+function recurringDebt(){
+ const recurring=(state.data.attention?.recurring||[]).filter(r=>String(r.item_type||'').toUpperCase()!=='INCOME');
+ const debts=state.data.personal?.debts||[];
+ const byCur={};
+ recurring.forEach(r=>{const c=r.currency||'AUD';(byCur[c]??={monthly:0,annual:0,count:0});const f={WEEKLY:52,FORTNIGHTLY:26,MONTHLY:12,QUARTERLY:4,YEARLY:1}[String(r.frequency||'').toUpperCase()]||0;byCur[c].annual+=num(r.amount)*f;byCur[c].monthly+=num(r.amount)*f/12;byCur[c].count++});
+ const summary=Object.entries(byCur).map(([c,x])=>'<div class="fac-kpi"><span>'+esc(c)+' recurring</span><b>'+money(x.monthly,c)+'/mo</b><small>'+money(x.annual,c)+'/yr · '+x.count+' item(s)</small></div>').join('');
+ const rRows=recurring.slice(0,20).map(r=>'<div class="fac-row"><div><h4>'+esc(r.name||'Recurring item')+'</h4><p>'+esc(r.item_type||'BILL')+' · '+esc(r.frequency||'')+' · next '+date(r.next_due_date)+'</p></div><div class="fac-right"><b>'+money(r.amount,r.currency||'AUD')+'</b></div></div>').join('');
+ const dRows=debts.filter(d=>String(d.status||'').toUpperCase()!=='SETTLED').slice(0,20).map(d=>'<div class="fac-row"><div><h4>'+esc(d.counterparty||'Debt')+'</h4><p>'+esc(d.direction||'')+' · due '+date(d.due_date)+'</p></div><div class="fac-right"><b>'+money(d.outstanding_amount,d.currency||'AUD')+'</b>'+statusChip(d.due_date&&String(d.due_date).slice(0,10)<todayIso()?'OVERDUE':d.status||'OPEN')+'</div></div>').join('');
+ return '<section id="facPersonal" class="fac-section"><header><div><h3>Subscription, Debt & Savings Intelligence</h3><p>Recurring cost pressure, borrowed/lent exposure and goal context.</p></div></header><div class="fac-kpis">'+(summary||'<div class="fac-kpi"><span>Recurring</span><b>—</b><small>No recorded recurring outflow.</small></div>')+'</div><div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Recurring / subscriptions</h4><div class="fac-list">'+(rRows||'<div class="fac-empty">No recurring outgoing item.</div>')+'</div></article><article class="fac-card"><h4>Borrowed / lent money</h4><div class="fac-list">'+(dRows||'<div class="fac-empty">No open debt record.</div>')+'</div></article></div></section>';
+}
+
+function riskIntegrity(){
+ const findings=state.data.integrity?.findings||[],life=state.data.lifecycle?.alerts||[],cmd=state.data.command?.attention||[];
+ const all=[
+  ...findings.map(x=>({severity:x.severity,title:x.title,detail:(x.count?x.count+' item(s) · ':'')+(x.why||x.next_step||'')})),
+  ...life.map(x=>({severity:x.priority,title:x.title,detail:x.detail})),
+  ...cmd.map(x=>({severity:x.severity,title:String(x.code||'Banking').replaceAll('_',' '),detail:x.message}))
+ ];
+ const rows=all.slice(0,30).map(x=>'<div class="fac-row"><div><h4>'+esc(x.title||'Risk signal')+'</h4><p>'+esc(x.detail||'')+'</p></div><div class="fac-right">'+statusChip(x.severity)+'</div></div>').join('');
+ const s=state.data.integrity?.summary||{};
+ const checks=[
+  ['Duplicate review',num(s.possible_duplicate_groups)===0,num(s.possible_duplicate_groups)+' group(s)'],
+  ['History coverage gaps',num(s.possible_missing_periods)===0,num(s.possible_missing_periods)+' possible gap(s)'],
+  ['Classification',num(s.unclassified_bank_transactions)===0,num(s.unclassified_bank_transactions)+' unclassified'],
+  ['Reconciliation',num(s.unreconciled_bank_transactions)===0,num(s.unreconciled_bank_transactions)+' unreconciled'],
+  ['Cash detail',num(s.unclassified_cash_movements)===0,num(s.unclassified_cash_movements)+' incomplete cash record(s)'],
+  ['Wallet double-count risk',num(s.wallet_bank_double_count_risks)===0,num(s.wallet_bank_double_count_risks)+' signal(s)']
+ ];
+ return '<section id="facRisk" class="fac-section"><header><div><h3>Risk, Integrity & Control Readiness</h3><p>Concrete data-quality and operational risk signals—not invented financial advice.</p></div></header><div class="fac-control-grid">'+checks.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div><div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No active risk/control signal returned.</div>')+'</div></section>';
+}
+
+function taxEvidence(){
+ const tax=state.data.health?.tax_readiness||{},docs=state.data.lifecycle?.documents||[],issues=state.data.integrity?.summary||{};
+ const fy=tax.financial_year?.label||'Current FY',review=(tax.review_items||[]).length;
+ const expiring=docs.filter(d=>d.days_until_expiry!==null&&d.days_until_expiry!==undefined&&num(d.days_until_expiry)<=30).length;
+ const checklist=[
+  ['Transactions classified',num(issues.unclassified_bank_transactions)===0,num(issues.unclassified_bank_transactions)+' remaining'],
+  ['Transactions reconciled',num(issues.unreconciled_bank_transactions)===0,num(issues.unreconciled_bank_transactions)+' remaining'],
+  ['Duplicate groups reviewed',num(issues.possible_duplicate_groups)===0,num(issues.possible_duplicate_groups)+' possible group(s)'],
+  ['History gaps reviewed',num(issues.possible_missing_periods)===0,num(issues.possible_missing_periods)+' possible period(s)'],
+  ['Evidence expiry',expiring===0,expiring+' due/expired within 30d']
+ ];
+ const cat=(tax.categories||[]).slice(0,12);
+ const max=Math.max(1,...cat.map(x=>num(x.amount)));
+ return '<section id="facYearEnd" class="fac-section"><header><div><h3>Tax, Evidence & Year-End Readiness</h3><p>Preparation controls only; this does not calculate tax liability or legal deductibility.</p></div><span class="fac-chip watch">'+esc(fy)+'</span></header>'+
+ '<div class="fac-kpis"><div class="fac-kpi"><span>Tax review items</span><b>'+review+'</b><small>Preparation queue</small></div><div class="fac-kpi"><span>Private document refs</span><b>'+docs.length+'</b><small>Owner-only evidence references</small></div><div class="fac-kpi"><span>Evidence due/expired</span><b>'+expiring+'</b><small>Within 30 days</small></div><div class="fac-kpi"><span>Accountant questions</span><b>'+num(state.data.company?.open_accountant_queries)+'</b><small>Company finance</small></div></div>'+
+ '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Year-end control checklist</h4><div class="fac-list">'+checklist.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div></article><article class="fac-card"><h4>Review categories</h4><div class="fac-bars">'+(cat.map(x=>'<div class="fac-bar"><span>'+esc(x.category||'Uncategorised')+'</span><div class="fac-bar-track"><i style="width:'+Math.min(100,num(x.amount)/max*100)+'%"></i></div><b>'+money(x.amount,x.currency||'AUD')+'</b></div>').join('')||'<div class="fac-empty">No tax-preparation category data.</div>')+'</div></article></div><div class="fac-note" style="margin-top:10px">Recorded income is not automatically taxable income. Review candidates are not deduction claims. Currencies remain separate unless verified FX evidence exists.</div></section>';
+}
+
+function companyCfo(){
+ const c=state.data.company||{},cmd=state.data.command||{},cur=c.currency||'AUD';
+ const by=cmd.summary_by_currency||{};
+ const rows=Object.entries(by).map(([cc,x])=>'<div class="fac-row"><div><h4>'+esc(cc)+' liquidity</h4><p>Runway '+(x.runway_days===null||x.runway_days===undefined?'—':esc(x.runway_days)+' days')+' · merchant concentration '+num(x.merchant_concentration_percent).toFixed(1)+'%</p></div><div class="fac-right"><b>'+money(x.projected_liquidity_30d,cc)+'</b><small>projected 30d liquidity</small></div></div>').join('');
+ return '<section id="facCompany" class="fac-section"><header><div><h3>Company CFO Control</h3><p>Receivables, payables, approvals, liquidity and accounting attention.</p></div></header><div class="fac-kpis"><div class="fac-kpi"><span>Customer receivables</span><b>'+money(c.customer_receivables,cur)+'</b><small>'+num(c.open_customer_invoice_count)+' open invoice(s)</small></div><div class="fac-kpi"><span>Supplier payables</span><b>'+money(c.supplier_payables,cur)+'</b><small>'+num(c.supplier_bill_count)+' outstanding bill(s)</small></div><div class="fac-kpi"><span>Pending supplier approvals</span><b>'+num(c.pending_supplier_approvals)+'</b><small>Company workflow</small></div><div class="fac-kpi"><span>Open accountant queries</span><b>'+num(c.open_accountant_queries)+'</b><small>Company accounting</small></div></div><div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Banking command metrics</h4><div class="fac-list">'+(rows||'<div class="fac-empty">No banking command metrics available.</div>')+'</div></article><article class="fac-card"><h4>Control notes</h4><div class="fac-list"><div class="fac-row"><div><h4>GST registration</h4><p>'+esc(c.gst_registration||'UNKNOWN')+'</p></div>'+statusChip(c.gst_registration&&c.gst_registration!=='UNKNOWN'?'CONFIGURED':'REVIEW')+'</div><div class="fac-row"><div><h4>Payment approvals waiting</h4><p>'+num(cmd.approval_inbox?.length)+' approval item(s) returned for your role.</p></div>'+statusChip(cmd.approval_inbox?.length?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Overdue obligations</h4><p>'+num(cmd.obligations?.overdue)+' overdue payment instruction(s).</p></div>'+statusChip(cmd.obligations?.overdue?'HIGH':'CLEAR')+'</div></div></article></div></section>';
+}
+
+function sourceHealth(){
+ const rows=SOURCES.map(([n,u])=>{const err=state.errors[n];return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+'</div></div>'+statusChip(err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):'READY')+'</div>'}).join('');
+ return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
+}
+
+function render(){
+ const root=document.getElementById(MOUNT_ID);if(!root)return;
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button></div></section>'+
+ executive()+actions()+forecast()+scenario()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+sourceHealth()+
+ '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
+ bind();
+}
+function bind(){
+ document.getElementById('facRefresh')?.addEventListener('click',load);
+ document.querySelectorAll('[data-fac-jump]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.facJump)?.scrollIntoView({behavior:'smooth',block:'start'})));
+ const ids=[['facScenarioCurrency','currency'],['facIncomeDelta','monthlyIncomeDelta'],['facSpendDelta','monthlySpendingDelta'],['facOneTime','oneTimeCost'],['facSavingTarget','monthlySavingTarget']];
+ for(const [id,key] of ids)document.getElementById(id)?.addEventListener(id==='facScenarioCurrency'?'change':'input',e=>{state.scenario[key]=id==='facScenarioCurrency'?e.target.value:num(e.target.value);render()});
+}
+function mount(){
+ style();
+ const root=document.getElementById(MOUNT_ID);if(!root)return;
+ if(Object.keys(state.data).length&&!state.loading)render();else load();
+}
+window.__financeAdvancedControlMount=mount;
+window.addEventListener('finance:advanced-mount',mount);
+if(document.readyState!=='loading')setTimeout(mount,0);else document.addEventListener('DOMContentLoaded',()=>setTimeout(mount,0));
+})();
