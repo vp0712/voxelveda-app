@@ -51,7 +51,7 @@
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "security:secrets": "node scripts/secret-scan.js",
     "readiness:check": "node scripts/check-production-readiness.js",
-    "build": "npm run check && node scripts/finance-advanced-control-test.js && node scripts/finance-cash-control-test.js && node scripts/personal-debt-control-test.js && node scripts/finance-personal-control-surfaces-test.js && node scripts/finance-close-assurance-test.js && node scripts/finance-treasury-control-test.js && node scripts/finance-accountant-handover-test.js && node scripts/finance-master-os-test.js && node scripts/finance-legacy-ui-gate-test.js",
+    "build": "npm run check && node scripts/finance-production-regression-suite.js",
     "cap:sync:ios": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
     "test:finance-original-data": "node scripts/finance-original-bank-data-test.js",
@@ -77,7 +77,8 @@
     "test:finance-personal-controls": "node scripts/finance-personal-control-surfaces-test.js",
     "test:finance-close-assurance": "node scripts/finance-close-assurance-test.js",
     "test:finance-accountant-handover": "node scripts/finance-accountant-handover-test.js",
-    "test:finance-treasury-control": "node scripts/finance-treasury-control-test.js"
+    "test:finance-treasury-control": "node scripts/finance-treasury-control-test.js",
+    "test:finance-production": "node scripts/finance-production-regression-suite.js"
   },
   "dependencies": {
     "@capacitor/android": "8.3.1",
