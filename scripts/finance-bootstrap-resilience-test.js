@@ -40,12 +40,12 @@ async function run() {
   assert(Date.now() - startedAt < 2000, 'The timeout guard must end a hanging request promptly in the regression test.');
 
   assert.match(source, /const FINANCE_HYDRATION_BATCH_SIZE=5;/, 'Supplementary Finance APIs must use bounded batches.');
-  assert.match(source, /const cycle=await loadBase\(\);render\(\);signalFinanceReady\(\);\s*void hydrateSupplementary\(cycle\)/, 'Core Finance must render and clear the startup watchdog before supplementary hydration.');
+  assert.match(source, /primeFinanceCoreLoading\(\);render\(\);signalFinanceReady\(\);/, 'Finance must render an interactive shell and clear the startup watchdog before waiting on network data.');
   assert.match(source, /cycle===loadCycle/, 'Stale Finance loads must be prevented from replacing current filter state.');
   assert.doesNotMatch(source, /Loading finance workspace[^]*await hydrateSupplementary/, 'Initial loading markup must not wait for supplementary services.');
   assert.doesNotMatch(source, /state\.os=os\|\|null/, 'Core bootstrap must not reference the supplementary os variable before it exists.');
-  assert.match(source, /renderFinanceFatal\(error/, 'Refresh and startup paths must render a terminal failure state instead of leaving a spinner.');
-  assert.match(source, /render\(\);signalFinanceReady\(\)/, 'Successful core render must signal the independent startup watchdog.');
+  assert.match(source, /Finance refresh stopped safely/, 'Refresh failures must preserve the current Finance screen instead of replacing it with a permanent loader.');
+  assert.match(source, /primeFinanceCoreLoading\(\);render\(\);signalFinanceReady\(\)/, 'Startup must signal ready immediately after the first usable render.');
   assert.match(guard, /WATCHDOG_MS=26000/, 'Independent watchdog timeout must remain bounded.');
   assert.match(guard, /#fmContent \.fm-loading/, 'Watchdog must only replace an actually stuck Finance loader.');
   assert.match(guard, /data-finance-hard-retry/, 'Watchdog failure state must provide a hard reload action.');
@@ -70,3 +70,8 @@ assert.match(source,/function retryFinanceResource\(name\)/,'Failed supplementar
 assert.match(source,/path:path\|\|prior\.path\|\|null/,'Finance resource state must retain the exact retry path.');
 assert.match(source,/One failed optional service must never leave the entire Finance OS loading forever/,'Runtime health must state the no-permanent-spinner contract.');
 assert.match(source,/data-resource-retry/,'Runtime health failure rows must expose per-service retry controls.');
+
+assert.doesNotMatch(source,/fmContent'\)\.innerHTML='<div class="fm-loading"><span><\/span><b>Refreshing finance workspace/,'Refresh must never blank the Finance OS behind a blocking spinner.');
+assert.match(source,/function primeFinanceCoreLoading\(\)/,'Startup must prime component-level loading states before first render.');
+assert.match(source,/This section is loading independently\. The rest of Finance remains usable\./,'Loading must be component-local and explicitly non-blocking.');
+assert.match(source,/data-resource-retry/,'Failed Finance components must expose targeted retry instead of a whole-app loading loop.');

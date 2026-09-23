@@ -199,8 +199,10 @@ function canProgressivelyRender(cycle){
 }
 function resourceError(name,label){
  const r=state.resources[name];if(!r||r.status==='loaded')return '';
- const message=r.status==='permission'?'You do not have permission to view this finance component.':(r.error?.message||'This finance component is unavailable.');
- return `<div class="fm-state fm-state-error"><strong>${esc(label)}</strong><p>${esc(message)}</p><button type="button" data-retry="1">Retry</button></div>`;
+ if(r.status==='loading')return `<div class="fm-state"><strong>${esc(label)} is updating</strong><p>This section is loading independently. The rest of Finance remains usable.</p></div>`;
+ if(r.status==='permission')return `<div class="fm-state"><strong>${esc(label)} restricted</strong><p>You do not have permission to view this finance component.</p></div>`;
+ const message=r.error?.message||'This finance component is unavailable.';
+ return `<div class="fm-state fm-state-error"><strong>${esc(label)}</strong><p>${esc(message)}</p><button type="button" data-resource-retry="${esc(name)}">Retry this service</button></div>`;
 }
 function currencyRows(){
  const balances=Array.isArray(state.dash?.balances_by_currency)?state.dash.balances_by_currency:[];
@@ -228,6 +230,18 @@ function dashboardCardVisible(key){
  const configured=state.userPreferences?.dashboard_cards;
  if(!Array.isArray(configured)||!configured.length)return true;
  return key==='attention'||configured.includes(key);
+}
+function primeFinanceCoreLoading(){
+ const base=filterQuery();
+ const resources=[
+  ['setup',API+'/setup'],
+  ['userPreferences',API+'/preferences'],
+  ['capabilities',API+'/capabilities'],
+  ['dash',I+'/banking-dashboard'+base],
+  ['txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})],
+  ['statementPayload',I+'/statements'+base]
+ ];
+ resources.forEach(([name,path])=>setResource(name,'loading',null,null,path));
 }
 async function loadBase(){
   const cycle=++loadCycle;
@@ -1610,11 +1624,18 @@ function openNew(kind='expense',presetAccount=''){
  $('fmEntryForm').onsubmit=async e=>{e.preventDefault();try{const x=await saveManualMovement(e.currentTarget);$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
 async function refresh(){
- notice('');$('fmContent').innerHTML='<div class="fm-loading"><span></span><b>Refreshing finance workspace…</b></div>';
+ const button=$('fmRefresh');if(button){button.disabled=true;button.dataset.originalText=button.dataset.originalText||button.textContent;button.textContent='Refreshing…'}
+ notice('Refreshing Finance data. Current screen stays available.');
  try{
   const cycle=await loadBase();render();signalFinanceReady();
+  notice('Finance data refreshed.');
   void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be refreshed.',true));
- }catch(error){renderFinanceFatal(error,'Finance refresh failed')}
+ }catch(error){
+  notice('Finance refresh stopped safely: '+(error?.message||'unknown error'),true);
+  signalFinanceReady();
+ }finally{
+  if(button){button.disabled=false;button.textContent=button.dataset.originalText||'Refresh'}
+ }
 }
 async function supplierBillDetail(id){
  try{
@@ -1690,9 +1711,12 @@ function bind(){
 }
 document.addEventListener('DOMContentLoaded',async()=>{
  bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h)||h==='more')state.view=h;navButtons();
+ primeFinanceCoreLoading();render();signalFinanceReady();
  try{
-  const cycle=await loadBase();render();signalFinanceReady();
+  const cycle=await loadBase();render();
   void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be loaded.',true));
- }catch(error){renderFinanceFatal(error)}
+ }catch(error){
+  notice('Finance started in recovery mode: '+(error?.message||'core data could not be loaded'),true);
+ }
 })
 })();

@@ -76,6 +76,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 
 20. Setup Centre now includes Finance Runtime Health: loaded/loading/restricted/failed service counts plus per-service retries, while core-ledger failures use the existing controlled full refresh. Optional service failure therefore remains visible and isolated instead of becoming a permanent application loader.
 
+21. The blocking full-screen Finance spinner has been removed from normal startup and refresh. Finance now renders an interactive shell immediately, loads core components independently, preserves the current screen during refresh, and isolates service failures behind targeted retry controls.
+
 ## Production infrastructure evidence
 
 ### Database transport
