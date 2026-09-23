@@ -51,7 +51,7 @@
     "security:audit": "npm audit --omit=dev --audit-level=high",
     "security:secrets": "node scripts/secret-scan.js",
     "readiness:check": "node scripts/check-production-readiness.js",
-    "build": "npm run check",
+    "build": "npm run check && node scripts/finance-advanced-control-test.js && node scripts/finance-cash-control-test.js && node scripts/finance-master-os-test.js && node scripts/finance-legacy-ui-gate-test.js",
     "cap:sync:ios": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios",
     "test:finance-original-data": "node scripts/finance-original-bank-data-test.js",
