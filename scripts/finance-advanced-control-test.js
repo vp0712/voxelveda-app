@@ -7,8 +7,9 @@ const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 
 assert(advanced.includes("VERSION='20260924-advanced-control-v1'"),'Advanced Finance release id is missing.');
-assert(master.includes("['advanced','⚡','Advanced Control']"),'Advanced Control must be in canonical Finance navigation.');
+assert(master.includes("['advanced','⚡','Control Centre']"),'Advanced Control must be the canonical Finance home module.');
 assert(master.includes('function advancedControlView()'),'Advanced Control must mount inside the master Finance OS.');
+assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be the default Finance landing.');
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
 assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v1'),'Master OS must load the versioned Advanced Control asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
