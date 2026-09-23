@@ -22,7 +22,7 @@ const NAV_GROUPS=[
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['bankops','⌁','Banking Operations'],['cash','¤','Cash'],['currency','FX','Currency Centre'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
- ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
+ ['INTELLIGENCE',[['advanced','⚡','Advanced Control'],['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports']]],
  ['CONTROL',[['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
@@ -125,7 +125,7 @@ function title(v){return ({
  networth:['Net Worth','Owner-private assets, liabilities, snapshots and protection reminders with currencies kept separate.'],
  forecast:['Forecast','Evidence-based planning from Personal Money Smart, Financial Health and Roadmap Intelligence.'],
  calendar:['Cash Flow Calendar','Known company/banking and personal planning events shown separately by scope and currency.'],
- insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
+ advanced:['Advanced Finance Control','Executive cockpit, action queue, 7/30/90/365 forecasting, scenario planning, risk, evidence and Company CFO controls.'],\n insights:['Finance Insights','Evidence-backed finance intelligence linked to underlying transactions.'],
  rules:['Categories & Rules','Merchant categorisation rules create suggestions; they do not silently post changes.'],
  review:['Data Quality Review','Uncategorised, unreconciled, coverage and other review queues.'],
  reconciliation:['Reconciliation','Bank transaction reconciliation inside the master Finance OS.'],
@@ -990,7 +990,18 @@ function moreView(){
    return `<button class="fm-module-card" data-viewjump="${view}"><span>${icon}</span><div><b>${esc(label)}</b><small>${esc(description)}</small></div><i>›</i></button>`;
   }).join('')}</div></section>`;
  }).join('');
- return `<div class="fm-control-intro"><p>ONE FINANCE OPERATING SYSTEM</p><h2>All finance modules</h2><span>No separate Banking V3/V4/V5 screens. Every workflow below opens inside the same Finance OS and uses the same canonical data.</span><div class="fm-control-quick"><button data-viewjump="history">Import history</button><button data-quick="expense">Add expense</button><button data-quick="income">Add income</button><button data-viewjump="reports">Build report</button></div></div>${groups}`;
+ return `<div class="fm-control-intro"><p>ONE FINANCE OPERATING SYSTEM</p><h2>All finance modules</h2><span>No separate Banking V3/V4/V5 screens. Every workflow below opens inside the same Finance OS and uses the same canonical data.</span><div class="fm-control-quick"><button data-viewjump="advanced">Advanced Control</button><button data-viewjump="history">Import history</button><button data-quick="expense">Add expense</button><button data-quick="income">Add income</button><button data-viewjump="reports">Build report</button></div></div>${groups}`;
+}
+function ensureAdvancedControlLoaded(){
+ const mount=()=>{try{window.dispatchEvent(new CustomEvent('finance:advanced-mount'))}catch{};window.__financeAdvancedControlMount?.()};
+ if(window.__financeAdvancedControlMount){mount();return}
+ const existing=document.querySelector('script[data-finance-advanced-control]');
+ if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}
+ const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v1';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
+}
+function advancedControlView(){
+ setTimeout(ensureAdvancedControlLoaded,0);
+ return '<div id="financeAdvancedControlMount"><div class="fm-state"><strong>Opening Advanced Finance Control…</strong><p>Loading the advanced decision-support layer over the same canonical Finance OS.</p></div></div>';
 }
 function simpleView(v){
  if(v==='more')return moreView();
