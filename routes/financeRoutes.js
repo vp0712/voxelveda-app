@@ -103,8 +103,8 @@ router.post('/reports/saved', requireAnyPermission('VIEW_BANKING'), financeRepor
 router.get('/reports/saved/:uid/run', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.runSaved);
 router.delete('/reports/saved/:uid', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.remove);
 router.get('/accountant-handover', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeAccountantHandover.getCenter);
-router.post('/accountant-handover/:financialYearId/snapshot', requireAnyPermission('EDIT_FINANCE'), financeAccountantHandover.captureSnapshot);
-router.get('/accountant-handover/:financialYearId.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), financeAccountantHandover.pdf);
+router.post('/accountant-handover/:financialYearId/snapshot', requireAnyPermission('VIEW_BUSINESS_BANKING'), requireAnyPermission('EDIT_FINANCE'), financeAccountantHandover.captureSnapshot);
+router.get('/accountant-handover/:financialYearId.pdf', requireAnyPermission('VIEW_BUSINESS_BANKING'), requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), financeAccountantHandover.pdf);
 router.get('/exports/trial-balance.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), controller.downloadTrialBalanceCsv);
 router.get('/exports/accountant-review.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_ACCOUNTANT_PACK'), requireSensitiveExportApproval('ACCOUNTANT_PACK'), controller.downloadAccountantPdf);
 
