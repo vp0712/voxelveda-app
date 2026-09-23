@@ -205,7 +205,8 @@ exports.captureSnapshot=async(req,res)=>{
   try{
     await ensureFinanceSchema();
     await db.beginTransaction();
-    const fy=await resolveYear(db,req.params.financialYearId);
+    const selectedYear=await resolveYear(db,req.params.financialYearId);
+    const [[fy]]=await db.query('SELECT * FROM financial_years WHERE id=? LIMIT 1 FOR UPDATE',[selectedYear.id]);
     const pack=await buildPack(db,fy);
     const payload=manifest(pack),json=JSON.stringify(payload),checksum=crypto.createHash('sha256').update(json).digest('hex');
     const [[last]]=await db.query('SELECT version_no FROM accountant_exports WHERE financial_year_id=? ORDER BY version_no DESC LIMIT 1 FOR UPDATE',[fy.id]);
