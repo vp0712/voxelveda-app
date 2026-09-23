@@ -5,6 +5,7 @@ const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
 const controller=fs.readFileSync('controllers/financeJobProfitabilityController.js','utf8');
 const master=fs.readFileSync('public/finance-master.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
+const advanced=fs.readFileSync('public/finance-advanced-control.js','utf8');
 
 assert(routes.includes("router.get('/job-profitability'"),'Job Profitability route missing.');
 assert(routes.includes("requireAnyPermission('VIEW_BUSINESS_BANKING')"),'Job Profitability must require business banking visibility.');
@@ -22,3 +23,8 @@ for(const marker of ["['profitability','◈','Job Profitability']","function job
  assert(master.includes(marker),'Job Profitability UI missing '+marker);
 assert(html.includes('/finance-master.js?v=20260924-job-profitability-v1'),'Finance master release must be cache-busted for Job Profitability.');
 console.log('FINANCE_JOB_PROFITABILITY_OK');
+
+assert(advanced.includes("['jobProfitability','/api/finance/job-profitability']"),'Job Profitability must hydrate in Advanced Control.');
+assert(advanced.includes('function jobProfitabilityControl()'),'Job Profitability must be surfaced in Advanced Control.');
+assert(advanced.includes('Job Profitability & Cost Allocation'),'Advanced Job Profitability section missing.');
+assert(advanced.includes('data-fac-open="profitability"'),'Advanced Job Profitability must drill into the canonical workspace.');
