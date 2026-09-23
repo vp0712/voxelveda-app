@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,debtPlanner:null,closeAssurance:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,debtPlanner:null,closeAssurance:null,handover:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -23,7 +23,7 @@ const NAV_GROUPS=[
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
- ['REPORTING',[['reports','▧','Reports'],['taxcontrol','§','Tax & Evidence']]],
+ ['REPORTING',[['reports','▧','Reports'],['handover','▣','Accountant Handover'],['taxcontrol','§','Tax & Evidence']]],
  ['CONTROL',[['closeassurance','✓','Close & Assurance'],['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
@@ -131,6 +131,7 @@ function title(v){return ({
  review:['Data Quality Review','Uncategorised, unreconciled, coverage and other review queues.'],
  reconciliation:['Reconciliation','Bank transaction reconciliation inside the master Finance OS.'],
  reports:['Reports','Trusted exports and report-ready filtered transaction data.'],
+ handover:['Accountant Handover & Audit Pack','Company-only year-end readiness, close evidence, bank coverage, AP/AR, accountant questions and versioned evidence exports.'],
  taxcontrol:['Tax & Evidence Readiness','Owner-private tax preparation, receipt gaps and evidence readiness without inventing tax treatment.'],
  team:['Team Finance Access','Server-enforced banking and finance access controls.'],
  closeassurance:['Close & Assurance','Month-end evidence, certification, stale-signoff protection and controlled period locking.'],
@@ -296,7 +297,7 @@ async function hydrateSupplementary(cycle){
   ['readiness',I+'/banking-readiness'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
   ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
   ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
-  ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['cashControl',API+'/cash-control'],['closeAssurance',API+'/close-assurance'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
+  ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['cashControl',API+'/cash-control'],['closeAssurance',API+'/close-assurance'],['handover',API+'/accountant-handover'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
   ['roadmaps',API+'/personal-money/roadmaps'],['debtPlanner',API+'/personal-money/debt-planner'],['netWorth',API+'/personal-money/net-worth'],['assetLifecycle',API+'/personal-money/net-worth/lifecycle'],['fxRates',API+'/fx-rates'],['personalBankDash',I+'/banking-dashboard'+scopeDashboardQuery('PERSONAL')],['businessBankDash',I+'/banking-dashboard'+scopeDashboardQuery('BUSINESS')],['openBankProviders',I+'/open-banking/providers'],['openBankSessions',I+'/open-banking/sessions'],['bankConnectionData','/api/integrations/webhooks/banking/connections'],['bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs']
  ];
  for(let index=0;index<resources.length;index+=FINANCE_HYDRATION_BATCH_SIZE){
@@ -445,6 +446,21 @@ async function loadCloseAssurance(periodId){
   const path=API+'/close-assurance'+(periodId?'?period_id='+encodeURIComponent(periodId):'');
   state.closeAssurance=await api(path);state.resources.closeAssurance={status:'ready',error:null};render();
  }catch(error){state.resources.closeAssurance={status:'error',error};notice(error.message,true);render()}
+}
+function accountantHandoverView(){
+ const h=state.handover||{},fy=h.year||{},years=h.financial_years||[],g=h.gaps||{},c=h.close||{},ap=h.payables||{},ar=h.receivables||{};
+ const options=years.map(y=>'<option value="'+esc(y.id)+'" '+(String(y.id)===String(fy.id)?'selected':'')+'>'+esc(y.label)+' · '+date(y.start_date)+' → '+date(y.end_date)+' · '+esc(y.status)+'</option>').join('');
+ const accountRows=(h.bank_accounts||[]).map(a=>'<div class="fm-row"><div><h3>'+esc(a.nickname)+' · '+esc(a.currency)+'</h3><p>'+esc(a.institution||'')+' · '+esc(a.earliest_transaction||'—')+' to '+esc(a.latest_transaction||'—')+' · '+num(a.transaction_count)+' business transaction(s)</p></div><div class="fm-row-right">'+statusBadge(a.coverage_status)+'<small>'+num(a.unreconciled_count)+' unreconciled · '+num(a.unclassified_count)+' unclassified · '+num(a.missing_receipt_count)+' missing receipt(s)</small></div></div>').join('');
+ const periodRows=(h.accounting_periods||[]).map(p=>'<div class="fm-row"><div><h3>'+esc(p.period_key)+'</h3><p>'+date(p.start_date)+' → '+date(p.end_date)+' · '+num(p.snapshot_count)+' close snapshot(s)</p></div><div class="fm-row-right">'+statusBadge(p.status)+'<small>Close '+esc(p.close_status||'NOT CERTIFIED')+'</small></div></div>').join('');
+ const queryRows=(h.accountant_queries||[]).filter(q=>q.status!=='RESOLVED').slice(0,30).map(q=>'<div class="fm-row"><div><h3>'+esc(q.question)+'</h3><p>'+esc(q.module||'finance')+' · raised '+date(q.raised_at)+'</p></div>'+statusBadge(q.status)+'</div>').join('');
+ const exportRows=(h.exports||[]).slice(0,12).map(x=>'<div class="fm-row"><div><h3>Version '+esc(x.version_no)+' · '+esc(x.export_uid)+'</h3><p>'+date(x.generated_at)+' · SHA-256 '+esc(String(x.checksum_sha256||'').slice(0,20))+'…</p></div>'+statusBadge(x.export_status||'SNAPSHOT')+'</div>').join('');
+ return resourceError('handover','Accountant Handover')+
+ '<div class="fm-control-intro"><p>ACCOUNTANT HANDOVER & AUDIT PACK</p><h2>One company-only year-end evidence workspace</h2><span>Build a versioned handover from canonical Company Finance evidence. Personal Money, personal cash wallets, personal debts and Personal bank transaction detail are excluded.</span><div class="fm-control-quick"><button id="handoverRunCheck">Run FY readiness check</button><button id="handoverSnapshot">Capture evidence snapshot</button><button id="handoverPdf">Download branded PDF</button><button data-viewjump="closeassurance">Close & Assurance</button></div></div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial year</h2><p>Select the handover period.</p></div>'+statusBadge(h.handover_status||'UNKNOWN')+'</div><label>Financial year<select id="handoverYear">'+options+'</select></label><div class="fm-grid four" style="margin-top:12px"><div class="fm-kpi"><span>Handover status</span><strong>'+esc(h.handover_status||'—')+'</strong><small>'+num(h.blocker_count)+' blocker(s) · '+num(h.warning_count)+' warning(s)</small></div><div class="fm-kpi"><span>Close certification</span><strong>'+num(c.certified)+' / '+num(c.period_count)+'</strong><small>'+num(c.snapshots)+' immutable snapshot(s)</small></div><div class="fm-kpi"><span>Supplier payables</span><strong>'+nativeMoney(ap.balance||0,ap.currency||'AUD')+'</strong><small>'+num(ap.count)+' open at year end</small></div><div class="fm-kpi"><span>Customer receivables</span><strong>'+nativeMoney(ar.balance||0,ar.currency||'AUD')+'</strong><small>'+num(ar.count)+' open at year end</small></div></div></div></article>'+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Evidence gaps</h2><p>Concrete items to resolve before external handover.</p></div></div><div class="fm-list">'+Object.entries(g).map(([k,v])=>'<div class="fm-row"><div><h3>'+esc(k.replaceAll('_',' '))+'</h3></div><b>'+num(v)+'</b></div>').join('')+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Versioned evidence history</h2><p>Each snapshot stores a SHA-256 manifest checksum without changing finance records.</p></div></div><div class="fm-list">'+(exportRows||emptyState('No handover snapshot','Capture a snapshot before sending data externally.'))+'</div></div></article></div>'+
+ '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Business bank coverage</h2><p>Only BUSINESS-classified transaction evidence is measured.</p></div><button data-viewjump="history">Import missing history</button></div><div class="fm-list">'+(accountRows||emptyState('No business bank evidence','Classify Company bank accounts and import complete history.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Period close evidence</h2><p>Every period should be reviewed/certified before year-end handover.</p></div><button data-viewjump="closeassurance">Open close controls</button></div><div class="fm-list">'+(periodRows||emptyState('No accounting periods','Finance Setup must create accounting periods.'))+'</div></div></article></div>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Open accountant questions</h2><p>Unresolved questions remain visible in the handover evidence.</p></div></div><div class="fm-list">'+(queryRows||emptyState('No open accountant questions','No unresolved accountant query is recorded for this year.'))+'</div></div></article>'+
+ '<div class="fm-state"><strong>Export boundary</strong><p>The branded PDF is a handover/control summary. Trial Balance, GST Summary, Transaction Register and Data Quality reports remain source-detail exports in Reports and retain their own step-up/sensitive-export controls.</p></div>';
 }
 function closeAssuranceView(){
  const c=state.closeAssurance||{},period=c.period||{},checks=c.checks||[],run=c.run||{},periods=c.periods||state.accountingPeriods?.accounting_periods||[],snaps=c.snapshots||[];
@@ -1141,6 +1157,7 @@ function simpleView(v){
  if(v==='savings')return savingsControlView();
  if(v==='recurring')return recurringControlView();
  if(v==='taxcontrol')return taxEvidenceControlView();
+ if(v==='handover')return accountantHandoverView();
  if(v==='closeassurance')return closeAssuranceView();
  if(v==='reports')return reportView();
  if(v==='networth')return netWorthView();
@@ -1650,6 +1667,10 @@ function bindDynamic(){
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
  document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>openNew(b.dataset.quick));
  document.querySelectorAll('[data-personal-new]').forEach(b=>b.onclick=()=>openPersonalForm(b.dataset.personalNew));
+ if($('handoverYear'))$('handoverYear').onchange=async e=>{await loadResource('handover',API+'/accountant-handover?financial_year_id='+encodeURIComponent(e.target.value));render()};
+ if($('handoverRunCheck'))$('handoverRunCheck').onclick=async()=>{const id=state.handover?.year?.id;if(!id)return;try{const x=await api(API+'/financial-years/'+id+'/check',{method:'POST',body:'{}'});notice(x.message);await loadResource('handover',API+'/accountant-handover?financial_year_id='+id);render()}catch(error){notice(error.message,true)}};
+ if($('handoverSnapshot'))$('handoverSnapshot').onclick=async()=>{const id=state.handover?.year?.id;if(!id)return;try{const x=await api(API+'/accountant-handover/'+id+'/snapshot',{method:'POST',body:'{}'});notice(x.message);await loadResource('handover',API+'/accountant-handover?financial_year_id='+id);render()}catch(error){notice(error.message,true)}};
+ if($('handoverPdf'))$('handoverPdf').onclick=async()=>{const id=state.handover?.year?.id;if(!id)return;try{await requestFinanceStepUp();location.href=API+'/accountant-handover/'+id+'.pdf'}catch(error){notice(error.message,true)}};
  if($('closePeriod'))$('closePeriod').onchange=e=>loadCloseAssurance(e.target.value);
  if($('closeRefresh'))$('closeRefresh').onclick=()=>loadCloseAssurance(state.closeAssurance?.period?.id);
  if($('closeSnapshot'))$('closeSnapshot').onclick=async()=>{const id=state.closeAssurance?.period?.id;if(!id)return;try{const x=await api(API+'/close-assurance/'+id+'/snapshot',{method:'POST',body:'{}'});notice(x.message);await loadCloseAssurance(id)}catch(error){notice(error.message,true)}};
