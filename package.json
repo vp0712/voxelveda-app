@@ -81,7 +81,8 @@
     "test:finance-production": "node scripts/finance-production-regression-suite.js",
     "test:finance-performance-risk": "node scripts/finance-performance-risk-control-test.js",
     "test:finance-control-actions": "node scripts/finance-control-actions-test.js",
-    "test:finance-anomaly-explain": "node scripts/finance-anomaly-explain-control-test.js"
+    "test:finance-anomaly-explain": "node scripts/finance-anomaly-explain-control-test.js",
+    "test:finance-margin-allocation": "node scripts/finance-margin-allocation-test.js"
   },
   "dependencies": {
     "@capacitor/android": "8.3.1",
