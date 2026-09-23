@@ -18,6 +18,7 @@ const financeCashControl = require('../controllers/financeCashControlController'
 const financeCloseAssurance = require('../controllers/financeCloseAssuranceController');
 const financeTreasury = require('../controllers/financeTreasuryController');
 const financePerformanceRisk = require('../controllers/financePerformanceRiskController');
+const financeAnomalyExplain = require('../controllers/financeAnomalyExplainController');
 const financePlanningControl = require('../controllers/financePlanningControlController');
 const financeAccountantHandover = require('../controllers/financeAccountantHandoverController');
 const financeAudit = require('../controllers/financeAuditController');
@@ -272,6 +273,7 @@ router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
 router.get('/treasury-control', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeTreasury.getCenter);
 router.get('/performance-risk-control', requireAnyPermission('VIEW_BANKING'), financePerformanceRisk.getCenter);
+router.get('/anomaly-explain-control', requireAnyPermission('VIEW_BANKING'), financeAnomalyExplain.getCenter);
 router.get('/planning-control', requireAnyPermission('VIEW_BANKING'), financePlanningControl.getCenter);
 router.post('/planning-control/plans', requireAnyPermission('EDIT_FINANCE'), financePlanningControl.createPlan);
 router.post('/planning-control/plans/:uid/clone', requireAnyPermission('EDIT_FINANCE'), financePlanningControl.clonePlan);

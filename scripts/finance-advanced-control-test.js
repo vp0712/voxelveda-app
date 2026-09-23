@@ -6,19 +6,19 @@ const master=fs.readFileSync('public/finance-master.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 
-assert(advanced.includes("VERSION='20260924-advanced-control-v7'"),'Advanced Finance release id is missing.');
+assert(advanced.includes("VERSION='20260924-advanced-control-v9'"),'Advanced Finance release id is missing.');
 assert(master.includes("['advanced','⚡','Control Centre']"),'Advanced Control must be the canonical Finance home module.');
 assert(master.includes('function advancedControlView()'),'Advanced Control must mount inside the master Finance OS.');
 assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be the default Finance landing.');
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
-assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v7'),'Master OS must load the versioned Advanced Control asset.');
+assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v9'),'Master OS must load the versioned Advanced Control asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
 assert(html.includes('/finance-master.js?v=20260924-performance-risk-v1'),'Canonical Finance HTML must cache-bust the current canonical Finance release.');
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
   'Subscription, Debt & Savings Intelligence','Risk, Integrity & Control Readiness',
-  'Tax, Evidence & Year-End Readiness','Company CFO Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Performance & Stress Control','Control Actions','Evidence Source Health'
+  'Tax, Evidence & Year-End Readiness','Company CFO Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Performance & Stress Control','CFO Anomaly & Explainability','Control Actions','Evidence Source Health'
 ]) assert(advanced.includes(label),`Advanced Finance Control must expose ${label}.`);
 
 for(const endpoint of [
@@ -62,3 +62,8 @@ assert(advanced.includes('data-fac-open="performance"'),'Advanced Control must d
 
 assert(advanced.includes('function controlActionsSummary()'),'Advanced Control Actions summary is missing.');
 assert(advanced.includes('data-fac-open="controlactions"'),'Advanced Control must drill into Control Actions.');
+
+assert(advanced.includes('/api/finance/anomaly-explain-control'),'Advanced Control must hydrate anomaly/explainability evidence.');
+assert(advanced.includes('function anomalyExplainability()'),'Advanced anomaly/explainability section missing.');
+assert(advanced.includes('data-fac-open="anomaly"'),'Advanced Control must drill into full anomaly/explainability workspace.');
+assert(advanced.includes('data-fac-tx'),'Advanced Control must expose source transaction drill-down for explainability.');
