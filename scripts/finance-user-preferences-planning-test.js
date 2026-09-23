@@ -44,11 +44,6 @@ const ui=read('public/finance-master.js');
 [
  "['forecast','◷','Forecast']",
  "['calendar','▦','Cash Flow Calendar']",
- "loadResource('userPreferences',API+'/preferences')",
- "loadResource('smart',API+'/personal-money/smart')",
- "loadResource('health',API+'/personal-money/health')",
- "loadResource('roadmaps',API+'/personal-money/roadmaps')",
- "loadResource('cashflowCalendar',OS+'/cashflow-calendar?days=90')",
  'function forecastView()',
  'function calendarView()',
  'function userPreferencesCard()',
@@ -59,6 +54,13 @@ const ui=read('public/finance-master.js');
  'no forecast mutates financial records',
  'This does not claim direct bank execution'
 ].forEach(token=>expect(ui,token,'Finance planning/preference UI contract missing'));
+[
+ /loadResource\('userPreferences',API\+'\/preferences'(?:,cycle)?\)/,
+ /\['smart',API\+'\/personal-money\/smart'\]/,
+ /\['health',API\+'\/personal-money\/health'\]/,
+ /\['roadmaps',API\+'\/personal-money\/roadmaps'\]/,
+ /\['cashflowCalendar',OS\+'\/cashflow-calendar\?days=90'\]/
+].forEach(pattern=>assert.match(ui,pattern,'Finance planning/preference resource contract missing'));
 
 const functions=[...ui.matchAll(/(?:^|\n)(?:async )?function\s+([A-Za-z0-9_]+)\s*\(/g)].map(m=>m[1]);
 const duplicates=[...new Set(functions.filter((name,index)=>functions.indexOf(name)!==index))];

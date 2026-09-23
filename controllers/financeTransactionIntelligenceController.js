@@ -3,6 +3,14 @@ const pool = require('../config/db');
 const { logAudit } = require('../services/auditService');
 const { FinanceError } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
+const {
+  cleanMerchant,
+  normalizeTags,
+  parseTags,
+  normalizeRuleMode,
+  normalizeGstTreatment,
+  exactRuleMatch
+} = require('../services/financeRuleEngine');
 
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -16,17 +24,6 @@ function fail(res, error, message) {
   if (error instanceof FinanceError) return res.status(error.statusCode || 400).json({ message: error.message, code: error.code });
   console.error(`${message}:`, error);
   return res.status(500).json({ message, code: 'FINANCE_TRANSACTION_INTELLIGENCE_ERROR' });
-}
-
-function cleanMerchant(value) {
-  return String(value || '')
-    .toUpperCase()
-    .replace(/\b(VISA|MASTERCARD|DEBIT|CREDIT|PURCHASE|PAYMENT|EFTPOS|CARD|POS|TRANSFER|OSKO|PAYID|DIRECT DEBIT|BPAY)\b/g, ' ')
-    .replace(/\b\d{4,}\b/g, ' ')
-    .replace(/[^A-Z0-9&.' -]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 255);
 }
 
 const CATEGORY_RULES = [
@@ -112,7 +109,7 @@ exports.runAnalysis = async (req, res) => {
     if (!transactions.length) return res.json({ message: 'No visible bank transactions are available to analyse yet.', analysed: 0 });
 
     const [rules] = await pool.query(
-      `SELECT id, merchant_pattern, category, ownership_scope, priority
+      `SELECT id, merchant_pattern, category, ownership_scope, gst_treatment,tags_json,application_mode,priority
          FROM finance_category_rules
         WHERE created_by=? AND enabled=1
         ORDER BY priority DESC, updated_at DESC, id DESC`, [privacy.userId(req)]
@@ -162,6 +159,17 @@ exports.runAnalysis = async (req, res) => {
       const group = merchantGroups.get(tx.merchant_clean || `TX-${tx.id}`) || [tx];
       const text = `${tx.merchant_clean} ${tx.description || ''}`;
       const userRule = matchingUserRule(tx.merchant_clean, rules);
+      if (userRule) {
+        const matchKind = exactRuleMatch(tx, userRule) ? 'EXACT' : 'FUZZY';
+        await db.query(
+          `INSERT INTO finance_transaction_rule_matches
+           (finance_category_rule_id,bank_transaction_id,match_kind,status,matched_at)
+           VALUES (?,?,?,'SUGGESTED',NOW())
+           ON DUPLICATE KEY UPDATE match_kind=VALUES(match_kind),status=IF(status='APPLIED','APPLIED','SUGGESTED'),matched_at=NOW()`,
+          [userRule.id, tx.id, matchKind]
+        );
+        await db.query('UPDATE finance_category_rules SET last_used_at=NOW() WHERE id=?', [userRule.id]);
+      }
       const builtIn = categorySuggestion(text);
       const category = userRule?.category ? { category: userRule.category, confidence: 0.99, source: 'SAVED_RULE' } : builtIn;
       if (userRule) savedRuleCount += 1;
@@ -330,13 +338,22 @@ exports.dismissInsight = async (req, res) => {
 exports.getRules = async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT id, rule_uid, merchant_pattern, category, ownership_scope, priority, enabled, created_at, updated_at
-         FROM finance_category_rules WHERE created_by=? ORDER BY enabled DESC, priority DESC, updated_at DESC, id DESC`,
+      `SELECT r.id,r.rule_uid,r.merchant_pattern,r.category,r.ownership_scope,r.gst_treatment,r.tags_json,
+              r.application_mode,r.priority,r.enabled,r.created_by,r.created_at,r.updated_at,r.last_used_at,
+              COALESCE(u.name,u.email,CONCAT('User #',r.created_by)) AS creator_name,
+              COUNT(m.id) AS matched_transaction_count,
+              SUM(CASE WHEN m.status='APPLIED' THEN 1 ELSE 0 END) AS applied_transaction_count
+         FROM finance_category_rules r
+         LEFT JOIN users u ON u.id=r.created_by
+         LEFT JOIN finance_transaction_rule_matches m ON m.finance_category_rule_id=r.id
+        WHERE r.created_by=?
+        GROUP BY r.id,u.id
+        ORDER BY r.enabled DESC,r.priority DESC,r.updated_at DESC,r.id DESC`,
       [privacy.userId(req)]
     );
     return res.json({
-      rules: rows,
-      explanation: 'These are your own remembered merchant rules. They create high-confidence suggestions but never post, reconcile, or change a transaction until you approve the suggestion.'
+      rules: rows.map((row) => ({ ...row, tags: parseTags(row.tags_json) })),
+      explanation: 'Suggest Only is the default. Auto Apply is restricted to exact merchant matches on future reviewed statement imports, open periods and safe classification fields only. Rules never alter source amounts, transfers, payments or reconciliation.'
     });
   } catch (error) { return fail(res, error, 'Failed to load smart finance rules'); }
 };
@@ -344,15 +361,45 @@ exports.getRules = async (req, res) => {
 exports.updateRule = async (req, res) => {
   try {
     const id = Number(req.params.id || 0);
-    const category = String(req.body.category || '').trim().slice(0, 120) || null;
-    const scope = validScope(req.body.ownership_scope, true);
-    const enabled = req.body.enabled === false ? 0 : 1;
-    const priority = Math.max(1, Math.min(999, Number(req.body.priority || 200)));
-    if (!category && !scope) throw new FinanceError('A rule needs a category, a money scope, or both.', 400, 'EMPTY_FINANCE_RULE');
     const [[existing]] = await pool.query('SELECT * FROM finance_category_rules WHERE id=? AND created_by=?', [id, privacy.userId(req)]);
     if (!existing) throw new FinanceError('Smart rule not found.', 404, 'FINANCE_RULE_NOT_FOUND');
-    await pool.query('UPDATE finance_category_rules SET category=?, ownership_scope=?, priority=?, enabled=? WHERE id=? AND created_by=?', [category, scope, priority, enabled, id, privacy.userId(req)]);
-    await logAudit(pool, audit(req, { action: 'FINANCE_RULE_UPDATED', module: 'finance_intelligence', recordType: 'finance_category_rule', recordId: id, oldValue: existing, newValue: { category, ownership_scope: scope, priority, enabled } }));
+    const merchantPattern = cleanMerchant(req.body.merchant_pattern === undefined ? existing.merchant_pattern : req.body.merchant_pattern);
+    if (merchantPattern.length < 2) throw new FinanceError('Merchant pattern must contain at least two useful characters.', 400, 'FINANCE_RULE_PATTERN_REQUIRED');
+    const category = String(req.body.category || '').trim().slice(0, 120) || null;
+    const scope = validScope(req.body.ownership_scope, true);
+    const gstTreatment = normalizeGstTreatment(req.body.gst_treatment, true);
+    const tags = normalizeTags(req.body.tags);
+    const applicationMode = normalizeRuleMode(req.body.application_mode);
+    const enabled = req.body.enabled === false ? 0 : 1;
+    const priority = Math.max(1, Math.min(999, Number(req.body.priority || 200)));
+    if (!category && !scope && !gstTreatment && !tags.length) throw new FinanceError('A rule needs at least one safe classification change.', 400, 'EMPTY_FINANCE_RULE');
+    if (applicationMode === 'AUTO_APPLY' && merchantPattern.length < 3) throw new FinanceError('Auto Apply requires a precise merchant pattern.', 400, 'AUTO_RULE_PATTERN_TOO_BROAD');
+    let availableCategory = null;
+    if (category) {
+      [[availableCategory]] = await pool.query(
+        `SELECT id,scope FROM finance_system_categories c WHERE c.name=? AND c.active=1 AND c.archived_at IS NULL
+          AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL) OR (c.scope='PERSONAL' AND c.owner_user_id=?)) LIMIT 1`,
+        [category, privacy.userId(req)]
+      );
+      if (!availableCategory && category !== (existing.category || null)) throw new FinanceError('Choose an active Finance category available to this user.', 400, 'FINANCE_CATEGORY_NOT_AVAILABLE');
+    }
+    if (applicationMode === 'AUTO_APPLY' && category && !availableCategory) {
+      throw new FinanceError('Auto Apply requires an active managed Finance category.', 409, 'AUTO_RULE_CATEGORY_NOT_MANAGED');
+    }
+    if (applicationMode === 'AUTO_APPLY' && availableCategory) {
+      if (availableCategory.scope !== 'BOTH' && !scope) throw new FinanceError('Auto Apply needs an ownership scope for a scoped category.', 400, 'AUTO_RULE_SCOPE_REQUIRED');
+      if (availableCategory.scope === 'PERSONAL' && scope !== 'PERSONAL') throw new FinanceError('A Personal category can only auto apply to Personal transactions.', 400, 'AUTO_RULE_SCOPE_MISMATCH');
+      if (availableCategory.scope === 'BUSINESS' && scope !== 'BUSINESS') throw new FinanceError('A Business category can only auto apply to Company transactions.', 400, 'AUTO_RULE_SCOPE_MISMATCH');
+    }
+    await pool.query(
+      `UPDATE finance_category_rules
+          SET merchant_pattern=?,category=?,ownership_scope=?,gst_treatment=?,tags_json=?,application_mode=?,priority=?,enabled=?,updated_by=?
+        WHERE id=? AND created_by=?`,
+      [merchantPattern, category, scope, gstTreatment, tags.length ? JSON.stringify(tags) : null,
+        applicationMode, priority, enabled, privacy.userId(req), id, privacy.userId(req)]
+    );
+    const nextValue = { merchant_pattern: merchantPattern, category, ownership_scope: scope, gst_treatment: gstTreatment, tags, application_mode: applicationMode, priority, enabled };
+    await logAudit(pool, audit(req, { action: 'FINANCE_RULE_UPDATED', module: 'finance_intelligence', recordType: 'finance_category_rule', recordId: id, oldValue: existing, newValue: nextValue }));
     return res.json({ message: enabled ? 'Smart rule updated and enabled.' : 'Smart rule saved but disabled.' });
   } catch (error) { return fail(res, error, 'Failed to update smart finance rule'); }
 };
@@ -362,8 +409,8 @@ exports.deleteRule = async (req, res) => {
     const id = Number(req.params.id || 0);
     const [[existing]] = await pool.query('SELECT * FROM finance_category_rules WHERE id=? AND created_by=?', [id, privacy.userId(req)]);
     if (!existing) throw new FinanceError('Smart rule not found.', 404, 'FINANCE_RULE_NOT_FOUND');
-    await pool.query('DELETE FROM finance_category_rules WHERE id=? AND created_by=?', [id, privacy.userId(req)]);
-    await logAudit(pool, audit(req, { action: 'FINANCE_RULE_DELETED', module: 'finance_intelligence', recordType: 'finance_category_rule', recordId: id, oldValue: existing }));
-    return res.json({ message: 'Smart rule deleted.' });
+    await pool.query('UPDATE finance_category_rules SET enabled=0,updated_by=? WHERE id=? AND created_by=?', [privacy.userId(req), id, privacy.userId(req)]);
+    await logAudit(pool, audit(req, { action: 'FINANCE_RULE_ARCHIVED', module: 'finance_intelligence', recordType: 'finance_category_rule', recordId: id, oldValue: existing, newValue: { enabled: 0 } }));
+    return res.json({ message: 'Smart rule disabled. Match history remains available for audit.' });
   } catch (error) { return fail(res, error, 'Failed to delete smart finance rule'); }
 };

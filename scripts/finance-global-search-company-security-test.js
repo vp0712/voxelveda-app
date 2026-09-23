@@ -26,7 +26,7 @@ expect(controller,'supplier_bills','Global search/company summary must reuse sup
 expect(controller,'money.toCents','Company monetary totals must use decimal-safe money utilities');
 expect(controller,"receivables:{status:'NOT_CONFIGURED'",'Unsupported receivables must be labelled rather than invented');
 
-expect(ui,"loadResource('companySummary',API+'/company-summary')",'Master Finance UI must load the permission-scoped company summary');
+assert.match(ui,/\['companySummary',API\+'\/company-summary'\]/,'Master Finance UI must load the permission-scoped company summary');
 expect(ui,'async function globalFinanceSearch(input)','Grouped global Finance search UI missing');
 expect(ui,"section('Transactions'",'Transaction search group missing');
 expect(ui,"section('Accounts'",'Account search group missing');

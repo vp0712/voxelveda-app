@@ -26,7 +26,7 @@ assert(controller.includes("validation_status IN ('VALID','WARNING')"), 'commit 
 assert(controller.includes('repairPendingReview'), 'stale pending review repair missing');
 assert(controller.includes("validation_status='REJECTED'"), 'balance marker persistence repair missing');
 assert(controller.includes('NO_IMPORTABLE_TRANSACTIONS'), 'clear no-importable-transactions response missing');
-assert(controller.includes('await db.commit();\n      return res.status(422).json'), 'no-importable repair must commit before response instead of rolling back');
+assert(/await db\.commit\(\);\r?\n\s+return res\.status\(422\)\.json/.test(controller), 'no-importable repair must commit before response instead of rolling back');
 assert(controller.includes('repaired_balance_markers'), 'statement commit audit must record repaired balance markers');
 assert(routes.includes('/statements/preview'), 'statement preview route missing');
 assert(routes.includes('/statement-reviews/:uid/commit'), 'statement commit route missing');

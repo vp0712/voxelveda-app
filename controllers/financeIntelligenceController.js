@@ -6,6 +6,8 @@ const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
 const trustedTotals = require('../services/financeTrustedTotals');
+const { buildCoreBankTransactionFilter } = require('../services/financeFilterContract');
+const { cleanMerchant, normalizeTags, normalizeGstTreatment } = require('../services/financeRuleEngine');
 
 const VALID_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const DASHBOARD_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'ALL']);
@@ -119,44 +121,37 @@ exports.getOverview = async (req, res) => {
 exports.getTransactions = async (req, res) => {
   try {
     await ensureFinanceSchema();
-    const scope = String(req.query.scope || 'ALL').trim().toUpperCase();
-    const allowedScopes = new Set(['ALL', 'PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
-    if (!allowedScopes.has(scope)) throw new FinanceError('Transaction scope must be All, Personal, Business, Mixed or Unclassified.', 400, 'INVALID_TRANSACTION_SCOPE');
+    const core = spendingWhere(req);
+    const scope = core.scope;
 
     const limit = Math.min(250, Math.max(10, Number.parseInt(req.query.limit, 10) || 50));
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
     const offset = (page - 1) * limit;
     const q = String(req.query.q || '').trim().slice(0, 120);
-    const accountId = Number(req.query.account_id || 0);
+    const accountId = core.accountId;
     const category = String(req.query.category || '').trim().slice(0, 120);
     const merchant = String(req.query.merchant || '').trim().slice(0, 120);
-    const currency = String(req.query.currency || '').trim().toUpperCase().slice(0, 3);
+    const currency = core.currency || '';
     const source = String(req.query.source || '').trim().toUpperCase().slice(0, 40);
     const reconciliation = String(req.query.reconciliation_status || '').trim().toUpperCase().slice(0, 40);
     const reviewStatus = String(req.query.review_status || '').trim().toUpperCase().slice(0, 40);
     const bank = String(req.query.bank || '').trim().slice(0, 120);
     const type = String(req.query.type || '').trim().toUpperCase().slice(0, 40);
-    const from = reportDate(req.query.from, 'From date');
-    const to = reportDate(req.query.to, 'To date');
-    if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
+    const from = core.from;
+    const to = core.to;
     const amountMin = req.query.amount_min === undefined || req.query.amount_min === '' ? null : Number(req.query.amount_min);
     const amountMax = req.query.amount_max === undefined || req.query.amount_max === '' ? null : Number(req.query.amount_max);
     if (amountMin !== null && !Number.isFinite(amountMin)) throw new FinanceError('Minimum amount must be a number.', 400, 'INVALID_AMOUNT_FILTER');
     if (amountMax !== null && !Number.isFinite(amountMax)) throw new FinanceError('Maximum amount must be a number.', 400, 'INVALID_AMOUNT_FILTER');
     if (amountMin !== null && amountMax !== null && amountMin > amountMax) throw new FinanceError('Minimum amount cannot exceed maximum amount.', 400, 'INVALID_AMOUNT_FILTER');
 
-    const clauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
-    const params = [...privacy.visibilityParams(req)];
-    if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
-    if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
-    if (from) { clauses.push('bt.transaction_date>=?'); params.push(from); }
-    if (to) { clauses.push('bt.transaction_date<=?'); params.push(to); }
-    if (currency) { clauses.push('bt.currency=?'); params.push(currency); }
+    const clauses = [...core.clauses];
+    const params = [...core.params];
     if (source) { clauses.push('bt.source_type=?'); params.push(source); }
     if (reconciliation) { clauses.push('bt.reconciliation_status=?'); params.push(reconciliation); }
     if (reviewStatus) { clauses.push('bt.review_source_status=?'); params.push(reviewStatus); }
     if (bank) { clauses.push('ba.institution LIKE ?'); params.push(`%${bank}%`); }
-    if (merchant) { clauses.push('bt.merchant_name LIKE ?'); params.push(`%${merchant}%`); }
+    if (merchant) { clauses.push('COALESCE(bt.merchant_normalized,bt.merchant_name) LIKE ?'); params.push(`%${merchant}%`); }
     if (category) {
       if (category.toUpperCase() === 'UNCLASSIFIED') {
         clauses.push("((NOT EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id) AND (bt.category IS NULL OR bt.category='')) OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND (sx.category IS NULL OR sx.category='')))");
@@ -172,9 +167,9 @@ exports.getTransactions = async (req, res) => {
     if (amountMin !== null) { clauses.push('GREATEST(bt.debit,bt.credit)>=?'); params.push(amountMin); }
     if (amountMax !== null) { clauses.push('GREATEST(bt.debit,bt.credit)<=?'); params.push(amountMax); }
     if (q) {
-      clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.reference LIKE ? OR bt.category LIKE ? OR ba.nickname LIKE ? OR ba.institution LIKE ?)');
+      clauses.push('(bt.description LIKE ? OR bt.merchant_name LIKE ? OR bt.merchant_normalized LIKE ? OR bt.reference LIKE ? OR bt.category LIKE ? OR bt.project_ref LIKE ? OR ba.nickname LIKE ? OR ba.institution LIKE ?)');
       const like = `%${q}%`;
-      params.push(like, like, like, like, like, like);
+      params.push(like, like, like, like, like, like, like, like);
     }
     const where = clauses.join(' AND ');
 
@@ -188,8 +183,9 @@ exports.getTransactions = async (req, res) => {
     const summaryByCurrency = await trustedTotals.cashTotalsByCurrency(pool, where, params);
     const [rows] = await pool.query(
       `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.posting_date, bt.description, bt.reference,
-              bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.category, bt.currency,
+              bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.merchant_normalized, bt.category, bt.currency,
               bt.ownership_scope, bt.classification_status, bt.reconciliation_status, bt.is_internal_transfer, bt.ignored_reason,
+              bt.project_ref,bt.tags_json,bt.gst_treatment,bt.reviewed_at,bt.reviewed_by,
               bt.source_type, bt.source_provider, bt.statement_import_uid, bt.statement_row_id, bt.review_source_status, bt.manual_override, bt.imported_at,
               ba.nickname AS account_name, ba.institution, ba.entity_name,
               sif.original_name AS statement_name, sif.source_format AS statement_format
@@ -308,20 +304,95 @@ function reportDate(value, label) {
 }
 
 function spendingWhere(req, options = {}) {
-  const scope = reportScope(req.query.scope);
-  const from = reportDate(req.query.from, 'From date');
-  const to = reportDate(req.query.to, 'To date');
-  if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
-  const accountId = Number(req.query.account_id || 0);
   const statementUid = String(options.statementUid || req.query.statement_uid || '').trim().slice(0, 80);
-  const clauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
-  const params = [...privacy.visibilityParams(req)];
-  if (scope !== 'ALL') { clauses.push('bt.ownership_scope=?'); params.push(scope); }
-  if (accountId) { clauses.push('bt.bank_account_id=?'); params.push(accountId); }
-  if (from) { clauses.push('bt.transaction_date>=?'); params.push(from); }
-  if (to) { clauses.push('bt.transaction_date<=?'); params.push(to); }
-  if (statementUid) { clauses.push('bt.statement_import_uid=?'); params.push(statementUid); }
-  return { scope, from, to, accountId, statementUid, where: clauses.join(' AND '), params };
+  const core = buildCoreBankTransactionFilter(req, req.query, { statementUid });
+  return { ...core, accountId: core.account_id || 0, statementUid };
+}
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value || {}, key);
+}
+
+function normalizeBulkChanges(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const changes = {};
+  if (hasOwn(source, 'category')) changes.category = String(source.category || '').trim().slice(0, 120) || null;
+  if (hasOwn(source, 'ownership_scope')) changes.ownership_scope = normalizeScope(source.ownership_scope, 'UNCLASSIFIED');
+  if (hasOwn(source, 'merchant_normalized')) changes.merchant_normalized = cleanMerchant(source.merchant_normalized) || null;
+  if (hasOwn(source, 'project_ref')) changes.project_ref = String(source.project_ref || '').trim().slice(0, 120) || null;
+  if (hasOwn(source, 'tags')) changes.tags = normalizeTags(source.tags);
+  if (hasOwn(source, 'gst_treatment')) changes.gst_treatment = normalizeGstTreatment(source.gst_treatment, true);
+  if (hasOwn(source, 'reviewed')) {
+    if (typeof source.reviewed !== 'boolean') throw new FinanceError('Reviewed must be true or false.', 400, 'INVALID_REVIEWED_STATUS');
+    changes.reviewed = source.reviewed;
+  }
+  if (!Object.keys(changes).length) throw new FinanceError('Choose at least one bulk review change.', 400, 'BULK_CHANGES_REQUIRED');
+  return changes;
+}
+
+function bulkValue(row, key) {
+  if (key === 'tags') {
+    if (!row.tags_json) return [];
+    try { return normalizeTags(JSON.parse(row.tags_json)); } catch { return normalizeTags(row.tags_json); }
+  }
+  if (key === 'reviewed') return Boolean(row.reviewed_at);
+  return row[key] === undefined ? null : row[key];
+}
+
+function bulkRowChanges(row, changes) {
+  const delta = {};
+  for (const [key, value] of Object.entries(changes)) {
+    const current = bulkValue(row, key);
+    if (JSON.stringify(current) !== JSON.stringify(value)) delta[key] = { from: current, to: value };
+  }
+  return delta;
+}
+
+async function assertCategoryVisible(db, req, category) {
+  if (!category) return;
+  const [[row]] = await db.query(
+    `SELECT id FROM finance_system_categories c
+      WHERE c.name=? AND c.active=1 AND c.archived_at IS NULL
+        AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL)
+          OR (c.scope='PERSONAL' AND c.owner_user_id=?))
+      LIMIT 1`,
+    [category, privacy.userId(req)]
+  );
+  if (!row) throw new FinanceError('Choose an active Finance category available to this user.', 400, 'FINANCE_CATEGORY_NOT_AVAILABLE');
+}
+
+async function assertClassificationPeriodsOpen(db, rows) {
+  const dates = [...new Set(rows.map((row) => dateOnly(row.transaction_date)).filter(Boolean))];
+  for (const effectiveDate of dates) {
+    const [[period]] = await db.query(
+      `SELECT ap.status,fy.status AS financial_year_status
+         FROM accounting_periods ap
+         JOIN financial_years fy ON fy.id=ap.financial_year_id
+        WHERE ? BETWEEN ap.start_date AND ap.end_date LIMIT 1`,
+      [effectiveDate]
+    );
+    if (!period) throw new FinanceError(`No accounting period is configured for ${effectiveDate}.`, 409, 'PERIOD_NOT_CONFIGURED');
+    if (period.status === 'LOCKED' || ['LOCKED', 'ARCHIVED'].includes(String(period.financial_year_status || '').toUpperCase())) {
+      throw new FinanceError(`The accounting period containing ${effectiveDate} is locked.`, 423, 'PERIOD_LOCKED');
+    }
+  }
+}
+
+async function bulkVisibleTransactions(db, req, ids, forUpdate = false) {
+  const placeholders = ids.map(() => '?').join(',');
+  const suffix = forUpdate ? ' FOR UPDATE' : '';
+  const [rows] = await db.query(
+    `SELECT bt.*,ba.ownership_scope AS account_scope,ba.created_by AS account_created_by
+       FROM bank_transactions bt
+       JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+      WHERE bt.id IN (${placeholders}) AND bt.archived_at IS NULL AND ${privacy.visibilitySql('ba', req)}
+      ORDER BY bt.id${suffix}`,
+    [...ids, ...privacy.visibilityParams(req)]
+  );
+  if (rows.length !== ids.length) {
+    throw new FinanceError('One or more selected transactions are unavailable. No changes were made.', 403, 'BULK_REVIEW_ACCESS_MISMATCH');
+  }
+  return rows;
 }
 
 
@@ -354,8 +425,10 @@ exports.updateTransaction = async (req, res) => {
     db = await pool.getConnection();
     await db.beginTransaction();
     const row = await visibleBankTransaction(id, req, db, true);
+    await assertClassificationPeriodsOpen(db, [row]);
 
     const category = String(req.body.category || '').trim().slice(0,120) || null;
+    if (category !== (row.category || null)) await assertCategoryVisible(db, req, category);
     const requestedScope = String(req.body.ownership_scope || row.ownership_scope || '').trim().toUpperCase();
     const allowedScopes = new Set(['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
     if (!allowedScopes.has(requestedScope)) throw new FinanceError('Choose Personal, Business, Mixed or Needs owner.', 400, 'INVALID_TRANSACTION_SCOPE');
@@ -364,23 +437,35 @@ exports.updateTransaction = async (req, res) => {
     const canOverrideScope = accountScope === 'MIXED' || accountScope === 'UNCLASSIFIED';
     const nextScope = canOverrideScope ? requestedScope : accountScope || requestedScope;
 
-    const internalTransfer = req.body.is_internal_transfer === true ? 1 : 0;
-    const ignored = req.body.ignored === true;
-    const ignoredReason = ignored ? String(req.body.ignored_reason || '').trim().slice(0,500) : null;
-    if (ignored && ignoredReason.length < 3) throw new FinanceError('Add a short reason before excluding a transaction from reports.', 400, 'IGNORE_REASON_REQUIRED');
-    const reconciliationStatus = ignored ? 'IGNORED' : (row.reconciliation_status === 'IGNORED' ? 'UNRECONCILED' : row.reconciliation_status);
+    const internalTransfer = hasOwn(req.body, 'is_internal_transfer')
+      ? (req.body.is_internal_transfer === true ? 1 : 0)
+      : Number(row.is_internal_transfer || 0);
+    const ignored = hasOwn(req.body, 'ignored') ? req.body.ignored === true : row.reconciliation_status === 'IGNORED';
+    const ignoredReason = ignored
+      ? String(hasOwn(req.body, 'ignored_reason') ? req.body.ignored_reason : row.ignored_reason || '').trim().slice(0,500)
+      : null;
+    if (hasOwn(req.body, 'ignored') && ignored && ignoredReason.length < 3) throw new FinanceError('Add a short reason before excluding a transaction from reports.', 400, 'IGNORE_REASON_REQUIRED');
+    const reconciliationStatus = ignored ? 'IGNORED' : (hasOwn(req.body, 'ignored') && row.reconciliation_status === 'IGNORED' ? 'UNRECONCILED' : row.reconciliation_status);
     const rememberRule = req.body.remember_rule === true;
+    const merchantNormalized = hasOwn(req.body, 'merchant_normalized') ? cleanMerchant(req.body.merchant_normalized) || null : row.merchant_normalized;
+    const projectRef = hasOwn(req.body, 'project_ref') ? String(req.body.project_ref || '').trim().slice(0, 120) || null : row.project_ref;
+    const tags = hasOwn(req.body, 'tags') ? normalizeTags(req.body.tags) : bulkValue(row, 'tags');
+    const gstTreatment = hasOwn(req.body, 'gst_treatment') ? normalizeGstTreatment(req.body.gst_treatment, true) : row.gst_treatment;
+    const reviewed = hasOwn(req.body, 'reviewed') ? req.body.reviewed === true : Boolean(row.reviewed_at);
 
     await db.query(
       `UPDATE bank_transactions
           SET category=?, classification_status=?, ownership_scope=?, is_internal_transfer=?,
-              reconciliation_status=?, ignored_reason=?
+              reconciliation_status=?, ignored_reason=?, merchant_normalized=?,project_ref=?,tags_json=?,gst_treatment=?,
+              reviewed_at=IF(?,COALESCE(reviewed_at,NOW()),NULL),reviewed_by=IF(?,COALESCE(reviewed_by,?),NULL)
         WHERE id=?`,
-      [category, category ? 'CLASSIFIED' : 'UNCLASSIFIED', nextScope, internalTransfer, reconciliationStatus, ignoredReason, id]
+      [category, category ? 'CLASSIFIED' : 'UNCLASSIFIED', nextScope, internalTransfer, reconciliationStatus, ignoredReason,
+        merchantNormalized, projectRef, tags.length ? JSON.stringify(tags) : null, gstTreatment,
+        reviewed, reviewed, req.user.id, id]
     );
 
     if (rememberRule && category) {
-      const pattern = String(row.merchant_name || row.description || '').trim().slice(0,255);
+      const pattern = String(merchantNormalized || row.merchant_name || row.description || '').trim().slice(0,255);
       if (pattern) {
         const [[existing]] = await db.query(
           'SELECT id FROM finance_category_rules WHERE created_by=? AND merchant_pattern=? ORDER BY id DESC LIMIT 1',
@@ -411,7 +496,12 @@ exports.updateTransaction = async (req, res) => {
         ownership_scope: row.ownership_scope,
         is_internal_transfer: row.is_internal_transfer,
         reconciliation_status: row.reconciliation_status,
-        ignored_reason: row.ignored_reason
+        ignored_reason: row.ignored_reason,
+        merchant_normalized: row.merchant_normalized,
+        project_ref: row.project_ref,
+        tags: bulkValue(row, 'tags'),
+        gst_treatment: row.gst_treatment,
+        reviewed: Boolean(row.reviewed_at)
       },
       newValue: {
         category,
@@ -419,6 +509,11 @@ exports.updateTransaction = async (req, res) => {
         is_internal_transfer: internalTransfer,
         reconciliation_status: reconciliationStatus,
         ignored_reason: ignoredReason,
+        merchant_normalized: merchantNormalized,
+        project_ref: projectRef,
+        tags,
+        gst_treatment: gstTreatment,
+        reviewed,
         remembered_rule: rememberRule
       }
     }));
@@ -435,50 +530,95 @@ exports.updateTransaction = async (req, res) => {
   } finally { if (db) db.release(); }
 };
 
-exports.bulkCategorizeTransactions = async (req, res) => {
+exports.bulkReviewTransactions = async (req, res) => {
   let db;
   try {
     await ensureFinanceSchema();
-    const ids = [...new Set((Array.isArray(req.body.transaction_ids) ? req.body.transaction_ids : []).map(Number).filter(Number.isInteger))];
+    const ids = [...new Set((Array.isArray(req.body.transaction_ids) ? req.body.transaction_ids : []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
     if (!ids.length) throw new FinanceError('Select at least one transaction.', 400, 'TRANSACTIONS_REQUIRED');
-    if (ids.length > 200) throw new FinanceError('Bulk category updates are limited to 200 transactions at a time.', 413, 'BULK_CATEGORY_LIMIT');
-    const category = String(req.body.category || '').trim().slice(0,120);
-    if (!category) throw new FinanceError('Choose a category.', 400, 'CATEGORY_REQUIRED');
+    if (ids.length > 200) throw new FinanceError('Bulk review is limited to 200 transactions at a time.', 413, 'BULK_REVIEW_LIMIT');
+    const changes = normalizeBulkChanges(req.body.changes || (hasOwn(req.body, 'category') ? { category: req.body.category } : {}));
+    const preview = req.body.preview === true;
 
     db = await pool.getConnection();
     await db.beginTransaction();
-    let updated = 0;
-    const visibleIds = [];
-    for (const id of ids) {
-      try {
-        await visibleBankTransaction(id, req, db, true);
-        visibleIds.push(id);
-      } catch (error) {
-        if (error instanceof FinanceError && error.code === 'BANK_TRANSACTION_NOT_FOUND') continue;
-        throw error;
-      }
+    const rows = await bulkVisibleTransactions(db, req, ids, !preview);
+    await assertCategoryVisible(db, req, changes.category);
+    if (changes.ownership_scope) {
+      const conflicting = rows.find((row) => {
+        const accountScope = String(row.account_scope || '').toUpperCase();
+        return !['MIXED', 'UNCLASSIFIED'].includes(accountScope) && accountScope !== changes.ownership_scope;
+      });
+      if (conflicting) throw new FinanceError('Ownership is fixed by one or more selected accounts. No changes were made.', 409, 'BULK_SCOPE_LOCKED_TO_ACCOUNT');
     }
-    for (const id of visibleIds) {
-      const [result] = await db.query(
-        "UPDATE bank_transactions SET category=?, classification_status='CLASSIFIED' WHERE id=?",
-        [category, id]
-      );
-      updated += Number(result.affectedRows || 0);
+    const accountingFields = ['category', 'ownership_scope', 'merchant_normalized', 'project_ref', 'tags', 'gst_treatment'];
+    if (accountingFields.some((field) => hasOwn(changes, field))) await assertClassificationPeriodsOpen(db, rows);
+
+    const affected = rows.map((row) => ({ row, delta: bulkRowChanges(row, changes) })).filter((item) => Object.keys(item.delta).length);
+    const response = {
+      selected_count: rows.length,
+      affected_count: affected.length,
+      unchanged_count: rows.length - affected.length,
+      fields: Object.keys(changes),
+      recovery: 'Each applied transaction records its prior and replacement classification in the existing audit chain.'
+    };
+    if (preview) {
+      await db.rollback();
+      return res.json({ message: `${affected.length} transaction(s) would be changed. Review this count before applying.`, preview: true, ...response });
+    }
+
+    const expectedCount = Number(req.body.expected_count);
+    if (!Number.isInteger(expectedCount) || expectedCount < 0) {
+      throw new FinanceError('Preview this bulk review before applying it.', 409, 'BULK_REVIEW_PREVIEW_REQUIRED');
+    }
+    if (expectedCount !== affected.length) {
+      throw new FinanceError('The affected transaction count changed after preview. Review the selection again.', 409, 'BULK_REVIEW_PREVIEW_STALE');
+    }
+
+    for (const { row, delta } of affected) {
+      const fields = [];
+      const params = [];
+      if (hasOwn(changes, 'category')) {
+        fields.push("category=?", "classification_status=?");
+        params.push(changes.category, changes.category ? 'CLASSIFIED' : 'UNCLASSIFIED');
+      }
+      if (hasOwn(changes, 'ownership_scope')) { fields.push('ownership_scope=?'); params.push(changes.ownership_scope); }
+      if (hasOwn(changes, 'merchant_normalized')) { fields.push('merchant_normalized=?'); params.push(changes.merchant_normalized); }
+      if (hasOwn(changes, 'project_ref')) { fields.push('project_ref=?'); params.push(changes.project_ref); }
+      if (hasOwn(changes, 'tags')) { fields.push('tags_json=?'); params.push(changes.tags.length ? JSON.stringify(changes.tags) : null); }
+      if (hasOwn(changes, 'gst_treatment')) { fields.push('gst_treatment=?'); params.push(changes.gst_treatment); }
+      if (hasOwn(changes, 'reviewed')) {
+        fields.push(changes.reviewed ? 'reviewed_at=NOW()' : 'reviewed_at=NULL');
+        fields.push(changes.reviewed ? 'reviewed_by=?' : 'reviewed_by=NULL');
+        if (changes.reviewed) params.push(req.user.id);
+      }
+      params.push(row.id);
+      await db.query(`UPDATE bank_transactions SET ${fields.join(',')} WHERE id=?`, params);
+      await logAudit(db, audit(req, {
+        action: 'BANK_TRANSACTION_BULK_REVIEWED',
+        module: 'finance_intelligence',
+        recordType: 'bank_transaction',
+        recordId: row.id,
+        oldValue: Object.fromEntries(Object.entries(delta).map(([key, value]) => [key, value.from])),
+        newValue: Object.fromEntries(Object.entries(delta).map(([key, value]) => [key, value.to]))
+      }));
     }
     await logAudit(db, audit(req, {
-      action: 'BANK_TRANSACTIONS_BULK_CATEGORIZED',
+      action: 'BANK_TRANSACTIONS_BULK_REVIEW_COMPLETED',
       module: 'finance_intelligence',
-      recordType: 'bank_transaction',
-      recordId: visibleIds.join(',').slice(0,180),
-      newValue: { category, requested: ids.length, updated }
+      recordType: 'bank_transaction_bulk_review',
+      recordId: ids.join(',').slice(0,180),
+      newValue: { requested: ids.length, affected: affected.length, fields: Object.keys(changes) }
     }));
     await db.commit();
-    return res.json({ message: `${updated} transaction(s) categorised as ${category}.`, updated });
+    return res.json({ message: `${affected.length} transaction(s) updated after preview confirmation.`, preview: false, ...response });
   } catch (error) {
     if (db) await db.rollback();
-    return fail(res, error, 'Failed to categorise selected transactions');
+    return fail(res, error, 'Failed to apply bulk transaction review');
   } finally { if (db) db.release(); }
 };
+
+exports.bulkCategorizeTransactions = (req, res) => exports.bulkReviewTransactions(req, res);
 
 exports.getStatementLibrary = async (req, res) => {
   try {
@@ -718,29 +858,20 @@ exports.getSpendingReport = async (req, res) => {
 exports.getBankingDashboard = async (req, res) => {
   try {
     await ensureFinanceSchema();
-    const scope = normalizeDashboardScope(req.query.scope);
-    const from = reportDate(req.query.from, 'From date');
-    const to = reportDate(req.query.to, 'To date');
-    if (from && to && from > to) throw new FinanceError('From date cannot be after To date.', 400, 'INVALID_REPORT_RANGE');
-
-    const accountId = Number(req.query.account_id || 0);
+    const filters = spendingWhere(req);
+    const scope = normalizeDashboardScope(filters.scope);
+    const accountId = filters.accountId;
     const accountClauses = ["ba.status='ACTIVE'", privacy.visibilitySql('ba', req)];
     const accountParams = [...privacy.visibilityParams(req)];
-    const txClauses = [privacy.visibilitySql('ba', req), "bt.reconciliation_status <> 'IGNORED'"];
-    const txParams = [...privacy.visibilityParams(req)];
+    const txWhere = filters.where;
+    const txParams = filters.params;
     if (scope !== 'ALL') {
       accountClauses.push('ba.ownership_scope=?');
       accountParams.push(scope);
-      txClauses.push('bt.ownership_scope=?');
-      txParams.push(scope);
     }
     if (accountId) {
       accountClauses.push('ba.id=?'); accountParams.push(accountId);
-      txClauses.push('bt.bank_account_id=?'); txParams.push(accountId);
     }
-    if (from) { txClauses.push('bt.transaction_date>=?'); txParams.push(from); }
-    if (to) { txClauses.push('bt.transaction_date<=?'); txParams.push(to); }
-    const txWhere = txClauses.join(' AND ');
 
     const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
       pool.query(
@@ -1474,3 +1605,5 @@ exports.getStatementWarehouse = async (req, res) => {
     });
   } catch (error) { return fail(res,error,'Failed to load statement money warehouse'); }
 };
+
+module.exports._test={spendingWhere,normalizeBulkChanges,bulkRowChanges};

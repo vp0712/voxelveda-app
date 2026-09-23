@@ -98,7 +98,8 @@ assert(financeIntelligence.includes('exports.getTransactionDetail'), 'transactio
 assert(financeIntelligence.includes('exports.updateTransaction'), 'transaction management API missing');
 assert(financeIntelligence.includes('exports.bulkCategorizeTransactions'), 'bulk category API missing');
 assert(financeIntelligence.includes('BANK_TRANSACTION_UPDATED'), 'transaction action audit evidence missing');
-assert(financeIntelligence.includes('BANK_TRANSACTIONS_BULK_CATEGORIZED'), 'bulk category audit evidence missing');
+assert(financeIntelligence.includes('BANK_TRANSACTION_BULK_REVIEWED'), 'per-transaction bulk review audit evidence missing');
+assert(financeIntelligence.includes('BANK_TRANSACTIONS_BULK_REVIEW_COMPLETED'), 'bulk review completion audit evidence missing');
 assert(financeIntelligence.includes('scope_locked_to_account'), 'account-scope protection evidence missing');
 assert(financeRoutes.includes("/intelligence/transactions/:id"), 'transaction management routes missing');
 assert(financeRoutes.includes("/intelligence/transactions/bulk/category"), 'bulk category route missing');

@@ -30,8 +30,11 @@ for (const marker of [
   'exports.linkRefund',
   'REFUND_FX_EVIDENCE_REQUIRED',
   'exports.createReimbursement',
+  'exports.getReimbursement',
   'exports.transitionReimbursement',
   'exports.addReimbursementPayment',
+  'REIMBURSEMENT_PAYMENT_OVERALLOCATED',
+  'REIMBURSEMENT_COMPANY_PAYMENT_REQUIRED',
   'exports.linkTransfer',
   'TRANSFER_FX_EVIDENCE_REQUIRED',
   'TRANSFER_AMOUNT_MISMATCH',
@@ -51,6 +54,8 @@ for (const route of [
 
 assert(routes.includes("financePrivacy.bankTransactionParam('id')"), 'transaction relationship routes must keep server-side privacy guards');
 assert(routes.includes("requireStepUp('APPROVE_REIMBURSEMENT')"), 'reimbursement approval must require step-up');
+assert(routes.includes("requireStepUp('LINK_REIMBURSEMENT_PAYMENT')"), 'reimbursement settlement linking must require step-up');
+assert(routes.includes("requireStepUp('RESTORE_FINANCE_DOCUMENT')"), 'receipt recovery must require step-up');
 assert(routes.includes('validateUploadedFile'), 'receipt upload must retain secure file validation');
 assert(receipts.includes('registerDocument'), 'receipts must reuse protected document storage');
 assert(receipts.includes('FINANCE_RECEIPT_ATTACHED'), 'receipt attachment must be audited');
