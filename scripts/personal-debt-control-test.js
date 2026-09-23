@@ -24,7 +24,7 @@ assert(migration.includes('CREATE TABLE IF NOT EXISTS personal_money_debt_terms'
 assert(schema.includes('CREATE TABLE IF NOT EXISTS personal_money_debt_terms'),'Debt planning schema bootstrap missing.');
 assert(!/\b(?:DROP|TRUNCATE)\b/i.test(migration),'Debt planning migration must be additive.');
 
-for(const marker of ['PEOPLE & DEBT CONTROL','People exposure','Debt & repayment schedules','function openDebtTermsForm()','async function debtStatement(id)'])
+for(const marker of ['PEOPLE & DEBT CONTROL','People exposure','Debt & repayment schedules','function openDebtTermsForm(id)','async function debtStatement(id)'])
  assert(master.includes(marker),`Debt Control UI missing ${marker}`);
 assert(master.includes("['debtPlanner',API+'/personal-money/debt-planner']"),'Debt Planner must hydrate inside canonical Finance OS.');
 assert(master.includes("if(v==='debt')return debtControlView();"),'Borrow & Lend navigation must open Debt Control.');
