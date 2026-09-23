@@ -36,7 +36,7 @@ assert(!/method:['"](?:POST|PUT|PATCH|DELETE)/.test(evidence),'Evidence/Audit mu
 const security=master.slice(master.indexOf('function securityPrivacyView()'),master.indexOf('function simpleView(v)'));
 assert(security.includes('maskFinanceSessionIp')&&security.includes('financeSessionAgent'),'Security view must reduce raw session telemetry.');
 assert(security.includes('recovery_codes_remaining'),'Security view may show only recovery-code count.');
-assert(!security.includes('recovery_codes]')&&!security.includes('.recovery_codes'),'Security view must not display recovery code material.');
+assert(!/\.recovery_codes\b|['\"]recovery_codes['\"]/.test(security),'Security view must not display raw recovery code material.');
 assert(master.includes("confirm('Sign out this other session?')"),'Single-session revoke must require explicit confirmation.');
 assert(master.includes("confirm('Sign out every other active session and keep only this one?')"),'Bulk session revoke must require explicit confirmation.');
 assert(master.includes("method:'DELETE'")&&master.includes("/api/auth/sessions/revoke-others"),'Security session controls must use authenticated session routes.');
