@@ -4,6 +4,7 @@ const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
 const money = require('../utils/money');
 const { FinanceError, dateOnly, basQuarterForDate } = require('../services/financeDomain');
+const { computePeriodCloseReadiness } = require('../services/financeCloseAssuranceService');
 
 const BILL_STATUSES = new Set(['DRAFT', 'PENDING_APPROVAL', 'APPROVED', 'PARTIALLY_PAID', 'PAID', 'OVERDUE', 'VOID']);
 const PERIOD_STATUSES = new Set(['OPEN', 'REVIEWING', 'READY', 'LOCKED']);
@@ -642,6 +643,17 @@ exports.updateAccountingPeriod = async (req, res) => {
     if (status === 'LOCKED') {
       if (!reason) throw new FinanceError('A lock reason is required.', 400, 'REASON_REQUIRED');
       if (confirmation !== `LOCK ${period.period_key}`) throw new FinanceError(`Type LOCK ${period.period_key} to confirm.`, 400, 'CONFIRMATION_REQUIRED');
+      const [[closeRun]] = await db.query("SELECT * FROM finance_period_close_runs WHERE accounting_period_id=? LIMIT 1 FOR UPDATE",[period.id]);
+      if(!closeRun || closeRun.status!=='CERTIFIED' || !closeRun.certified_fingerprint){
+        throw new FinanceError('Certify this period in Close & Assurance before locking it.',409,'FINANCE_CLOSE_CERTIFICATION_REQUIRED');
+      }
+      const closeReadiness=await computePeriodCloseReadiness(db,period.id);
+      if(closeReadiness.blocker_count){
+        throw new FinanceError('Close evidence is no longer clean. Resolve blockers and certify the period again before locking.',409,'FINANCE_CLOSE_NOT_READY',closeReadiness.blockers);
+      }
+      if(closeRun.certified_fingerprint!==closeReadiness.fingerprint){
+        throw new FinanceError('Financial close evidence changed after certification. Capture current evidence and certify again before locking.',409,'FINANCE_CLOSE_CERTIFICATION_STALE');
+      }
       const [[unreconciled]] = await db.query(
         `SELECT COUNT(*) AS count FROM finance_transactions WHERE effective_date BETWEEN ? AND ? AND status = 'POSTED' AND reconciliation_status = 'UNRECONCILED'`,
         [period.start_date, period.end_date]

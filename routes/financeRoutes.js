@@ -15,6 +15,7 @@ const bankingOS = require('../controllers/bankingOperatingSystemController');
 const openBanking = require('../controllers/openBankingController');
 const financeReceipt = require('../controllers/financeReceiptController');
 const financeCashControl = require('../controllers/financeCashControlController');
+const financeCloseAssurance = require('../controllers/financeCloseAssuranceController');
 const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
 const financeReportBuilder = require('../controllers/financeReportBuilderController');
@@ -262,6 +263,10 @@ router.get('/bank-accounts', requireAnyPermission('VIEW_BANKING'), financePrivac
 router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountBody('id'), financePrivacy.protectScopeConversion('id', 'ownership_scope'), requireStepUp('CHANGE_BANK_DETAILS'), operations.saveBankAccount);
 router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
+router.get('/close-assurance', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeCloseAssurance.getCenter);
+router.post('/close-assurance/:periodId/snapshot', requireAnyPermission('EDIT_FINANCE'), financeCloseAssurance.captureSnapshot);
+router.post('/close-assurance/:periodId/certify', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), financeCloseAssurance.certify);
+router.post('/close-assurance/:periodId/reopen', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), financeCloseAssurance.reopen);
 router.get('/cash-control', requireAnyPermission('VIEW_BANKING'), financeCashControl.getCenter);
 router.post('/cash-control/counts', requireAnyPermission('EDIT_FINANCE'), financeCashControl.recordCount);
 router.post('/cash-control/counts/:uid/review', requireAnyPermission('EDIT_FINANCE'), requireStepUp('REVIEW_CASH_VARIANCE'), financeCashControl.reviewCount);
