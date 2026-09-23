@@ -33,6 +33,13 @@ for(const [key,renderer] of Object.entries(directRender)){
   assert(master.includes("if(v==='"+key+"')return "+renderer+";"),`Finance view ${key} is not bound to ${renderer}`);
 }
 for(const core of ['overview','accounts','transactions','statements','settings'])assert(navKeys.includes(core),`Core Finance navigation missing ${core}`);
+const simpleViewBlock=master.slice(master.indexOf('function simpleView(v){'),master.indexOf('window.__financeOpenTransaction',master.indexOf('function simpleView(v){')));
+const explicitlyBound=new Set([...simpleViewBlock.matchAll(/v==='([^']+)'/g)].map(m=>m[1]));
+const coreRendered=new Set(['overview','accounts','transactions','statements','settings']);
+for(const key of navKeys){
+  assert(coreRendered.has(key)||explicitlyBound.has(key),`every Finance navigation module must resolve explicitly: ${key}`);
+}
+
 
 for(const source of [
  "['cashControl',API+'/cash-control']","['debtPlanner',API+'/personal-money/debt-planner']",
