@@ -20,7 +20,7 @@ assert.equal(new Set(navKeys).size,navKeys.length,'Finance navigation contains d
 const directRender={
   advanced:'advancedControlView()',personal:'personalView()',company:'companyView()',consolidated:'consolidatedView()',
   bankops:'bankingOperationsView()',cash:'cashView()',currency:'currencyView()',transfers:'transfersView()',refunds:'refundsView()',
-  reimbursements:'reimbursementsView()',debt:'debtControlView()',recurring:'recurringControlView()',history:'historyImportView()',
+  reimbursements:'reimbursementsView()',counterparties:'counterpartyControlView()',debt:'debtControlView()',recurring:'recurringControlView()',history:'historyImportView()',
   receipts:'receiptsView()',planning:'planningControlView()',budgets:'budgetsView()',savings:'savingsControlView()',networth:'netWorthView()',
   forecast:'forecastView()',calendar:'calendarView()',treasury:'treasuryControlView()',performance:'performanceRiskView()',
   profitability:'jobProfitabilityView()',insights:'insightsView()',anomaly:'anomalyExplainView()',rules:'rulesView()',review:'reviewView()',
@@ -38,12 +38,12 @@ for(const source of [
  "['cashControl',API+'/cash-control']","['debtPlanner',API+'/personal-money/debt-planner']",
  "['closeAssurance',API+'/close-assurance']","['treasuryControl',API+'/treasury-control']",
  "['performanceRisk',API+'/performance-risk-control']","['anomalyExplain',API+'/anomaly-explain-control']",
- "['planningControl',API+'/planning-control']","['jobProfitability',API+'/job-profitability'",
+ "['planningControl',API+'/planning-control']","['jobProfitability',API+'/job-profitability'","['counterpartyControl',API+'/counterparty-control']",
  "['handover',API+'/accountant-handover']","['personalIntegrity',API+'/personal-money/data-quality-integrity']"
 ]) assert(master.includes(source),`Finance hydration source missing ${source}`);
 
 for(const route of [
- "router.get('/job-profitability'","router.get('/cash-control'","router.get('/personal-money/debt-planner'",
+ "router.get('/job-profitability'","router.get('/counterparty-control'","router.get('/cash-control'","router.get('/personal-money/debt-planner'",
  "router.get('/close-assurance'","router.get('/treasury-control'","router.get('/performance-risk-control'",
  "router.get('/anomaly-explain-control'","router.get('/planning-control'","router.get('/accountant-handover'",
  "router.get('/reports/builder'","router.get('/personal-money/data-quality-integrity'"
