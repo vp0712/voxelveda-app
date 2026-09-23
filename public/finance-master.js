@@ -706,10 +706,46 @@ async function parseXlsx(file) {
   return parseCsv(window.XLSX.utils.sheet_to_csv(firstSheet));
 }
 
+let pdfJsLoadPromise=null;
+function loadPdfJs(){
+  if(window.pdfjsLib)return Promise.resolve(window.pdfjsLib);
+  if(pdfJsLoadPromise)return pdfJsLoadPromise;
+  pdfJsLoadPromise=new Promise((resolve,reject)=>{
+    const existing=document.querySelector('script[data-finance-pdfjs]');
+    const script=existing||document.createElement('script');
+    let settled=false;
+    const finish=(error)=>{
+      if(settled)return;
+      settled=true;
+      clearTimeout(timer);
+      if(error){
+        pdfJsLoadPromise=null;
+        reject(error);
+        return;
+      }
+      if(!window.pdfjsLib){
+        pdfJsLoadPromise=null;
+        reject(new Error('PDF parser loaded without exposing PDF.js.'));
+        return;
+      }
+      resolve(window.pdfjsLib);
+    };
+    const timer=setTimeout(()=>finish(new Error('PDF parser timed out. Use CSV/OFX or try the PDF again.')),10000);
+    script.addEventListener('load',()=>finish(),{once:true});
+    script.addEventListener('error',()=>finish(new Error('PDF parser could not be downloaded. Use CSV/OFX or try again when the network is stable.')),{once:true});
+    if(!existing){
+      script.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+      script.async=true;
+      script.dataset.financePdfjs='1';
+      document.head.appendChild(script);
+    }
+  });
+  return pdfJsLoadPromise;
+}
 async function pdfLines(file) {
-  if (!window.pdfjsLib) throw new Error('PDF parser failed to load. Use a CSV/OFX export or refresh and try again.');
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
-  const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  const pdfjsLib=await loadPdfJs();
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
   const lines = [];
   for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
     const page = await pdf.getPage(pageNo);

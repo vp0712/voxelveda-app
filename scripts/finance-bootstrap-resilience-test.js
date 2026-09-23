@@ -52,6 +52,10 @@ async function run() {
   assert(html.indexOf('/finance-bootstrap-guard.js') >= 0, 'Finance page must load the independent startup watchdog.');
   assert(html.indexOf('/finance-bootstrap-guard.js') < html.indexOf('/finance-master.js'), 'Startup watchdog must load before the main Finance bundle.');
   assert(appSource.includes("'finance-bootstrap-guard.js'"), 'Finance startup watchdog must be served no-store so hotfixes are not hidden by cache.');
+  assert(!html.includes('<script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist'), 'Third-party PDF.js must never block Finance document startup.');
+  assert.match(source, /function loadPdfJs\(\)/, 'PDF.js must be loaded lazily only when a PDF statement is parsed.');
+  assert.match(source, /script\.async=true/, 'Lazy PDF.js loading must not join the ordered deferred startup chain.');
+  assert.match(source, /PDF parser timed out/, 'Lazy PDF parser download must have its own bounded timeout.');
 
   console.log('Finance bootstrap resilience regression contract passed.');
 }
