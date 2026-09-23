@@ -21,7 +21,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Accounts | Full account cards/workspace, history coverage, lifecycle controls, protected danger zone | READY backend / integrated UI |
 | Transactions | Server pagination/filter/search, manual canonical movements, classification edit, archive/restore, source evidence | READY core / production workflow verification continues |
 | Original bank evidence | Immutable `bank_transaction_original_data` separated from current classification | READY |
-| Statement import | CSV/PDF/OFX/QFX/QIF/XLSX protected preview/review/duplicate/commit pipeline | READY core / integrated wizard |
+| Statement import | CSV/PDF/OFX/QFX/QIF/XLSX protected preview/review/duplicate/commit pipeline plus multi-file historical staging per account | READY core / integrated history centre |
 | Duplicate protection | Exact row hash plus review classification | READY |
 | Reconciliation | Master-UI integration over the existing reconciliation centre | READY |
 | Receipts | Private secure documents, malware scan, protected download, attach/unlink | PARTIAL until production user-flow verification |
@@ -40,7 +40,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Company Finance | Business-only scope, supplier/accounting command-centre data, payables/receivables surfaces | PARTIAL |
 | Personal Money | Owner-only dashboards, briefing, budgets, goals, debts, recurring, saved views and planning intelligence | PARTIAL integrated |
 | Consolidated | Selected permitted accounts with ownership separation | PARTIAL |
-| Reports | Report builder, saved definitions, protected PDF/CSV/XLSX exports, branded accountant PDF | PARTIAL catalogue |
+| Reports | Full standard report catalogue is exposed through one Report Centre with saved definitions and protected branded PDF/CSV/XLSX exports | PARTIAL pending authenticated production journey verification |
 | Notifications | User notification centre and preferences surfaced in Finance | PARTIAL |
 | User preferences | Default workspace/account/period/format/dashboard cards | PARTIAL |
 | Team access | Server-side Banking/Finance permissions | READY core |
@@ -103,7 +103,7 @@ Production currently has backup-provider metadata configured but no `BACKUP_STAT
 - Verified FX-rate storage/conversion is not implemented.
 - Receipt OCR is not configured.
 - External bank payment execution is not supported.
-- The full requested report catalogue is not yet available as equivalent branded PDFs.
+- The standard report catalogue is now exposed through the unified Report Centre and the common branded PDF/CSV/XLSX exporter; authenticated production journey verification is still required before marking reporting READY.
 - Several newly integrated UI workflows remain PARTIAL until an authenticated production user journey is exercised against real permitted records.
 - MySQL-session TLS certificate trust is unresolved; do not mislabel the WireGuard private-network layer as MySQL TLS.
 - Backup/restore provider telemetry is not yet connected to the application's assurance endpoint.

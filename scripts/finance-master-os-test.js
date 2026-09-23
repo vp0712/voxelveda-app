@@ -41,3 +41,12 @@ assert.match(js,/const MOBILE_NAV=.*\['more','☰','More'\]/,'Mobile Finance nav
 assert.match(js,/function moreView\(\)/,'Mobile More must expose the full Finance module launcher.');
 assert.match(js,/No separate Banking V3\/V4\/V5 screens/,'Unified Finance OS must explicitly keep legacy banking screens out of the active launcher.');
 assert.match(js,/financeCommandCentre\(\)/,'Overview must expose the Finance command centre.');
+
+assert.match(js,/\['history','⇩','History Import'\]/,'Finance OS must expose a historical import centre.');
+assert.match(js,/function openHistoricalImport\(/,'Historical import must support controlled multi-file staging.');
+assert.match(js,/multiple required/,'Historical statement import must accept multiple files for the selected account.');
+assert.match(js,/Nothing is committed automatically/,'Historical import must preserve explicit review before commit.');
+for(const reportType of ['INCOME_VS_EXPENSE','ACCOUNT_ACTIVITY','ACCOUNT_STATEMENT','CASH','REIMBURSEMENT','GST_SUMMARY','RECONCILIATION','DATA_QUALITY','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY']){
+  assert(js.includes(reportType),`Finance report catalogue must expose ${reportType}`);
+}
+assert.match(js,/fm-report-preset/,'Report Centre must expose one-click standard report presets.');
