@@ -24,7 +24,7 @@ const NAV_GROUPS=[
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports']]],
- ['CONTROL',[['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
+ ['CONTROL',[['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
 const MOBILE_NAV=[['overview','⌂','Home'],['accounts','▣','Accounts'],['transactions','↕','Transactions'],['statements','▤','Statements'],['more','☰','More']];
@@ -98,6 +98,7 @@ function title(v){return ({
  reconciliation:['Reconciliation','Bank transaction reconciliation inside the master Finance OS.'],
  reports:['Reports','Trusted exports and report-ready filtered transaction data.'],
  team:['Team Finance Access','Server-enforced banking and finance access controls.'],
+ setupcentre:['Finance Setup Centre','Complete the real data migration and control checks required for a reliable Finance OS.'],
  notifications:['Finance Notifications','User-specific finance alerts and notification preferences.'],
  connections:['Banking Connections','Open Banking readiness and sync status; fail-closed when not configured.'],
  settings:['Finance Settings','Capability status, safety controls and company finance configuration.'],
@@ -278,7 +279,7 @@ function financeCommandCentre(){
   ['Missing receipts',state.receiptCenter?.counts?.missing,'receipts']
  ];
  const healthButtons=health.map(([label,value,view])=>`<button class="fm-health-chip" data-viewjump="${view}"><span>${esc(label)}</span><b>${num(value)}</b></button>`).join('');
- return `<section class="fm-command-centre"><div class="fm-command-head"><div><p>FINANCE COMMAND CENTRE</p><h2>Run the whole money system from one workspace</h2><span>Company, Personal and Consolidated views share one canonical transaction ledger while ownership stays separate.</span></div><button data-viewjump="more">All modules</button></div><div class="fm-command-actions">${workflowButtons}</div><div class="fm-health-strip">${healthButtons}</div></section>`;
+ return `<section class="fm-command-centre"><div class="fm-command-head"><div><p>FINANCE COMMAND CENTRE</p><h2>Run the whole money system from one workspace</h2><span>Company, Personal and Consolidated views share one canonical transaction ledger while ownership stays separate.</span></div><div class="fm-inline-actions"><button data-viewjump="setupcentre">Setup</button><button data-viewjump="more">All modules</button></div></div><div class="fm-command-actions">${workflowButtons}</div><div class="fm-health-strip">${healthButtons}</div></section>`;
 }
 function overview(){
  const err=resourceError('dash','Finance dashboard');if(err)return err;
@@ -638,6 +639,27 @@ async function loadReceiptCenter(){
  const data=await loadResource('receiptCenter',API+'/receipts'+receiptQuery());state.receiptCenter=data||null;render();
 }
 
+function setupCentreView(){
+ const accounts=state.accounts||[],statements=state.statements||[],pending=state.reviews.filter(x=>x.status==='PENDING_REVIEW');
+ const quality=state.quality||{},receiptCounts=state.receiptCenter?.counts||{},saved=state.savedReports?.saved_reports||[];
+ const personalAccounts=accounts.filter(a=>a.ownership_scope==='PERSONAL'),businessAccounts=accounts.filter(a=>a.ownership_scope==='BUSINESS');
+ const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
+ const coveredAccounts=accounts.filter(a=>{const c=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id));return Boolean(c?.transaction_start||a.history_start_date)});
+ const steps=[
+  {key:'accounts',label:'Create every real account',done:accounts.length>0,note:accounts.length?accounts.length+' account(s) created':'Add bank, savings, card, cash and loan accounts',action:'accounts'},
+  {key:'ownership',label:'Separate Personal and Company',done:accounts.length>0&&accounts.every(a=>['PERSONAL','BUSINESS','MIXED'].includes(String(a.ownership_scope||''))),note:personalAccounts.length+' personal · '+businessAccounts.length+' company',action:'accounts'},
+  {key:'history',label:'Load historical statements',done:accounts.length>0&&coveredAccounts.length===accounts.length,note:coveredAccounts.length+' of '+accounts.length+' account(s) have history coverage',action:'history'},
+  {key:'review',label:'Commit statement reviews',done:pending.length===0&&statements.length>0,note:pending.length?pending.length+' review(s) still pending':statements.length+' statement(s) committed',action:'statements'},
+  {key:'classification',label:'Classify imported transactions',done:num(quality.unclassified_transactions??quality.unclassified)===0,note:num(quality.unclassified_transactions??quality.unclassified)+' uncategorised',action:'review'},
+  {key:'reconcile',label:'Review reconciliation',done:num(quality.unreconciled_transactions??quality.unreconciled)===0,note:num(quality.unreconciled_transactions??quality.unreconciled)+' unreconciled',action:'reconciliation'},
+  {key:'receipts',label:'Resolve receipt evidence',done:num(receiptCounts.missing)===0&&num(receiptCounts.requested)===0,note:num(receiptCounts.missing)+' missing · '+num(receiptCounts.requested)+' requested',action:'receipts'},
+  {key:'report',label:'Create a reusable report',done:saved.length>0,note:saved.length?saved.length+' saved report(s)':'Save at least one reporting definition',action:'reports'}
+ ];
+ const completed=steps.filter(s=>s.done).length,percent=Math.round((completed/steps.length)*100);
+ const stepRows=steps.map((s,i)=>`<button class="fm-setup-step ${s.done?'done':''}" data-viewjump="${s.action}"><span class="fm-setup-index">${s.done?'✓':i+1}</span><div><b>${esc(s.label)}</b><small>${esc(s.note)}</small></div><i>›</i></button>`).join('');
+ const accountRows=accounts.map(a=>{const c=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};const covered=c.transaction_start||a.history_start_date;return `<div class="fm-row"><div><h3>${esc(a.nickname||'Account')}</h3><p>${esc(a.institution||'Manual')} · ${esc(a.account_type||'Account')} · ${esc(a.currency||'AUD')}</p></div><div class="fm-row-right">${statusBadge(a.ownership_scope||'UNCLASSIFIED')}<small>${covered?'History '+date(c.transaction_start||a.history_start_date)+' → '+date(c.transaction_end||a.history_end_date):'No history loaded'}</small><button data-account-edit="${a.id}">Edit</button><button data-history-import="${a.id}">Import</button></div></div>`}).join('');
+ return `<section class="fm-setup-hero"><div><p>FINANCE DATA MIGRATION</p><h2>${percent}% setup complete</h2><span>This is the controlled path from scattered bank statements to one trusted Finance OS. No step silently fabricates balances, classifications or FX rates.</span></div><div class="fm-setup-ring" style="--progress:${percent}"><strong>${percent}%</strong><small>${completed}/${steps.length} controls</small></div></section><div class="fm-setup-grid"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Migration checklist</h2><p>Complete these in order to make reports reliable.</p></div></div><div class="fm-setup-list">${stepRows}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Account migration map</h2><p>Each bank/card/cash account remains independently traceable even when Consolidated reporting is selected.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-list">${accountRows||emptyState('No accounts yet','Create every real account before importing historical statements.')}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>What happens to your old data</h2><p>Statement rows are staged first. Duplicate or rejected rows do not enter the ledger. Committed source data stays preserved separately from editable category, ownership, receipt and reconciliation decisions.</p></div></div><div class="fm-grid four"><div class="fm-kpi"><span>Accounts</span><strong>${accounts.length}</strong><small>Real financial containers</small></div><div class="fm-kpi"><span>Committed statements</span><strong>${statements.length}</strong><small>Historical source files</small></div><div class="fm-kpi"><span>Pending reviews</span><strong>${pending.length}</strong><small>Not yet committed</small></div><div class="fm-kpi"><span>Ledger transactions</span><strong>${num(state.txMeta?.total)}</strong><small>Current filtered view count</small></div></div><div class="fm-form-actions"><button class="primary" data-viewjump="history">Continue historical import</button><button data-viewjump="review">Open data-quality review</button><button data-viewjump="reports">Open Report Centre</button></div></div></article>`;
+}
 function moreView(){
  const groups=NAV_GROUPS.map(([group,items])=>{
   const filtered=items.filter(([view])=>!['overview','accounts','transactions','statements'].includes(view));
@@ -651,6 +673,7 @@ function moreView(){
 }
 function simpleView(v){
  if(v==='more')return moreView();
+ if(v==='setupcentre')return setupCentreView();
  if(v==='history')return historyImportView();
  if(v==='budgets')return budgetsView();
  if(['savings','debt','recurring'].includes(v))return personalCard(v);
@@ -1124,6 +1147,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-viewjump]').forEach(b=>b.onclick=()=>go(b.dataset.viewjump));
  document.querySelectorAll('[data-history-import]').forEach(b=>b.onclick=()=>openHistoricalImport(b.dataset.historyImport));
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));
+ document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
  document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>openNew(b.dataset.quick));
  document.querySelectorAll('[data-personal-new]').forEach(b=>b.onclick=()=>openPersonalForm(b.dataset.personalNew));

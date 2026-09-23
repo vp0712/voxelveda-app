@@ -86,3 +86,10 @@ assert.match(js,/data-scope-view="BUSINESS"/,'Consolidated view must provide dir
 assert.match(js,/Customer Receivables/,'Company Finance must expose real customer receivables.');
 assert.match(js,/function customerInvoiceDetail\(/,'Company Finance must expose invoice/payment drill-down.');
 assert.match(js,/api\/invoice\/payment/,'Customer payments must reuse the protected invoice payment ledger.');
+
+assert.match(js,/\['setupcentre','✓','Setup Centre'\]/,'Finance OS must expose one setup and migration centre.');
+assert.match(js,/function setupCentreView\(\)/,'Setup Centre view is missing.');
+assert.match(js,/FINANCE DATA MIGRATION/,'Setup Centre must explain the historical data migration workflow.');
+assert.match(js,/Complete these in order to make reports reliable/,'Setup Centre must expose ordered data-quality controls.');
+assert.match(js,/Account migration map/,'Setup Centre must show every account separately before consolidation.');
+assert.match(js,/No step silently fabricates balances, classifications or FX rates/,'Setup Centre must preserve finance correctness boundaries.');

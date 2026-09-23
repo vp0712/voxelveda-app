@@ -21,7 +21,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Accounts | Full create/edit account workflow, account cards/workspace, history coverage, lifecycle controls, protected danger zone | READY backend / integrated UI |
 | Transactions | Server pagination/filter/search, manual canonical movements, classification edit, archive/restore, source evidence | READY core / production workflow verification continues |
 | Original bank evidence | Immutable `bank_transaction_original_data` separated from current classification | READY |
-| Statement import | CSV/PDF/OFX/QFX/QIF/XLSX protected preview/review/duplicate/commit pipeline plus multi-file historical staging per account | READY core / integrated history centre |
+| Statement import | CSV/PDF/OFX/QFX/QIF/XLSX protected preview/review/duplicate/commit pipeline plus multi-file historical staging per account and an ordered Setup Centre migration checklist | READY core / integrated history centre |
 | Duplicate protection | Exact row hash plus review classification | READY |
 | Reconciliation | Master-UI integration over the existing reconciliation centre | READY |
 | Receipts | Private secure documents, malware scan, protected download, attach/unlink | PARTIAL until production user-flow verification |
@@ -66,7 +66,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 12. Legacy premium banking UI is no longer globally injected into the unified Finance OS.
 13. Company accountant PDF repeats company identity/report metadata/header/footer on every page.
 14. Company reporting profile is editable through protected system settings.
-15. Procurement master BOM startup integrity is healthy at 236 items.
+15. Procurement master BOM startup integrity is healthy at 236 items.\n16. The unified Finance Setup Centre now gives one ordered path for account creation, ownership separation, historical import, review, classification, reconciliation, receipt evidence and reusable reporting.
 
 ## Production infrastructure evidence
 
