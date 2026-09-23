@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js && node scripts/database-runtime-verification-test.js && node scripts/finance-bulk-review-rules-v2-test.js",
+    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js && node scripts/database-runtime-verification-test.js && node scripts/finance-bulk-review-rules-v2-test.js && node scripts/finance-bootstrap-resilience-test.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
     "typecheck": "node scripts/check-syntax.js",
@@ -69,7 +69,8 @@
     "test:finance-category-manager": "node scripts/finance-category-manager-test.js",
     "test:finance-user-preferences-planning": "node scripts/finance-user-preferences-planning-test.js",
     "test:finance-global-search-company": "node scripts/finance-global-search-company-security-test.js",
-    "test:finance-bulk-review-rules": "node scripts/finance-bulk-review-rules-v2-test.js"
+    "test:finance-bulk-review-rules": "node scripts/finance-bulk-review-rules-v2-test.js",
+    "test:finance-bootstrap": "node scripts/finance-bootstrap-resilience-test.js"
   },
   "dependencies": {
     "@capacitor/android": "8.3.1",

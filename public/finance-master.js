@@ -14,6 +14,9 @@ const state={
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
 };
+let loadCycle=0;
+const FINANCE_REQUEST_TIMEOUT_MS=12000;
+const FINANCE_HYDRATION_BATCH_SIZE=5;
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
@@ -29,7 +32,23 @@ const num=v=>Number(v||0);
 const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
 const nativeMoney=(v,c)=>money(v,c||'AUD');
 const date=v=>{if(!v)return '—';const d=new Date(String(v).slice(0,10)+'T00:00:00');const fmt=state.userPreferences?.date_format||'DD/MM/YYYY';if(fmt==='YYYY-MM-DD')return String(v).slice(0,10);if(fmt==='MM/DD/YYYY')return new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)};
-async function api(path,options={}){const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...(options.headers||{})},...options});let body={};try{body=await r.json()}catch{}if(!r.ok){const e=new Error(body.message||'Request failed');e.status=r.status;e.code=body.code;throw e}return body}
+async function api(path,options={}){
+ const {timeoutMs=FINANCE_REQUEST_TIMEOUT_MS,headers={},...requestOptions}=options;
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),Math.max(1000,Number(timeoutMs)||FINANCE_REQUEST_TIMEOUT_MS));
+ try{
+  const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...headers},...requestOptions,signal:controller.signal});
+  let body={};try{body=await r.json()}catch{}
+  if(!r.ok){const e=new Error(body.message||'Request failed');e.status=r.status;e.code=body.code;throw e}
+  return body;
+ }catch(error){
+  if(error?.name==='AbortError'){
+   const timeoutError=new Error('This Finance service took too long to respond. The rest of the workspace remains available; retry this section.');
+   timeoutError.status=408;timeoutError.code='FINANCE_REQUEST_TIMEOUT';throw timeoutError;
+  }
+  throw error;
+ }finally{clearTimeout(timer)}
+}
 function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
 function navButtons(){
  $('fmNav').innerHTML=NAV_GROUPS.map(([group,items])=>`<div class="fm-nav-group"><small>${esc(group)}</small>${items.map(([v,i,l])=>`<button type="button" data-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span>${l}</button>`).join('')}</div>`).join('');
@@ -102,10 +121,18 @@ function receiptQuery(){
  return '?'+p.toString();
 }
 function setResource(name,status,data=null,error=null){state.resources[name]={status,data,error};if(data!==null)state[name]=data}
-async function loadResource(name,path){
- setResource(name,'loading');
- try{const data=await api(path);setResource(name,'loaded',data);return data}
- catch(error){setResource(name,error.status===403?'permission':'error',null,error);return null}
+async function loadResource(name,path,cycle=null){
+ if(cycle===null||cycle===loadCycle)setResource(name,'loading');
+ try{const data=await api(path);if(cycle===null||cycle===loadCycle)setResource(name,'loaded',data);return data}
+ catch(error){if(cycle===null||cycle===loadCycle)setResource(name,error.status===403?'permission':'error',null,error);return null}
+}
+function resourceData(name){return state.resources[name]?.status==='loaded'?state.resources[name].data:null}
+function syncSupplementaryState(){
+ const removed=resourceData('removedStatementPayload');if(removed)state.removedStatements=removed.removed_statements||[];
+ const reviews=resourceData('reviewPayload');if(reviews)state.reviews=reviews.sessions||[];
+}
+function canProgressivelyRender(cycle){
+ return cycle===loadCycle&&!$('fmModal')?.open&&!$('fmDrawer')?.classList.contains('open');
 }
 function resourceError(name,label){
  const r=state.resources[name];if(!r||r.status==='loaded')return '';
@@ -140,10 +167,13 @@ function dashboardCardVisible(key){
  return key==='attention'||configured.includes(key);
 }
 async function loadBase(){
- const setup=await loadResource('setup',API+'/setup');
- state.setup=setup||state.setup;
- const prefPayload=await loadResource('userPreferences',API+'/preferences');
- state.userPreferences=prefPayload?.preferences||state.userPreferences;
+  const cycle=++loadCycle;
+  const [setup,prefPayload]=await Promise.all([
+   loadResource('setup',API+'/setup',cycle),
+   loadResource('userPreferences',API+'/preferences',cycle)
+  ]);
+  state.setup=setup||state.setup;
+  state.userPreferences=prefPayload?.preferences||state.userPreferences;
  if(!state.preferencesApplied&&state.userPreferences){
   const pref=state.userPreferences;
   if(['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
@@ -153,60 +183,47 @@ async function loadBase(){
   if($('fmScope'))$('fmScope').value=state.scope;
   if($('fmPeriod'))$('fmPeriod').value=state.period;
  }
- const base=filterQuery();
- const [capabilities,dash,tx,st,removed,reviews,personal,attention,briefing,savedViews,bankingBudgets,readiness,insights,rules,quality,reconciliation,history,team,os,transferCandidates,refundCandidates,reimbursements,notifications,notificationPrefs,companySettings,receiptCenter,savedReports,archivedTransactions,cashflowCalendar,accountingPeriods,categories,smart,health,roadmaps,companySummary]=await Promise.all([
-  loadResource('capabilities',API+'/capabilities'),
-  loadResource('dash',I+'/banking-dashboard'+base),
-  loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters})),
-  loadResource('statementPayload',I+'/statements'+base),
-  loadResource('removedStatementPayload',I+'/statements-removed'),
-  loadResource('reviewPayload',I+'/statement-reviews'),
-  loadResource('personal',API+'/personal-money'),
-  loadResource('personalAttention',API+'/personal-money/attention'),
-  loadResource('briefing',API+'/personal-money/daily-briefing'),
-  loadResource('savedViews',API+'/personal-money/saved-views'),
-  loadResource('bankingBudgets',I+'/budgets'),
-  loadResource('readiness',I+'/banking-readiness'),
-  loadResource('insights',I+'/insights'+filterQuery()),
-  loadResource('rules',I+'/rules'),
-  loadResource('quality',I+'/data-quality'+base),
-  loadResource('reconciliation',I+'/reconciliation'+filterQuery()),
-  loadResource('history',I+'/history-coverage'+base),
-  loadResource('team',OS+'/team'),
-  loadResource('os',OS+'/command-center'),
-  loadResource('transferCandidates',API+'/relationship-candidates/transfers'),
-  loadResource('refundCandidates',API+'/relationship-candidates/refunds'),
-  loadResource('reimbursements',API+'/reimbursements'),
-  loadResource('notifications','/api/notifications?limit=50'),
-  loadResource('notificationPrefs','/api/notifications/preferences'),
-  loadResource('companySettings','/api/settings'),
-  loadResource('receiptCenter',API+'/receipts'+receiptQuery()),
-  loadResource('savedReports',API+'/reports/saved'),
-  loadResource('archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)),
-  loadResource('cashflowCalendar',OS+'/cashflow-calendar?days=90'),
-  loadResource('accountingPeriods',API+'/accounting-periods'),
-  loadResource('categories',API+'/categories?include_archived=true'),
-  loadResource('smart',API+'/personal-money/smart'),
-  loadResource('health',API+'/personal-money/health'),
-  loadResource('roadmaps',API+'/personal-money/roadmaps'),
-  loadResource('companySummary',API+'/company-summary')
- ]);
- state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
+  if(cycle!==loadCycle)return cycle;
+  const base=filterQuery();
+  const [capabilities,dash,tx,st]=await Promise.all([
+   loadResource('capabilities',API+'/capabilities',cycle),
+   loadResource('dash',I+'/banking-dashboard'+base,cycle),
+   loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters}),cycle),
+   loadResource('statementPayload',I+'/statements'+base,cycle)
+  ]);
+  if(cycle!==loadCycle)return cycle;
+  state.capabilities=capabilities||null;state.dash=dash||null;state.os=os||null;
  if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
  else{state.tx=[]}
- state.statements=st?.statements||[];state.removedStatements=removed?.removed_statements||[];state.reviews=reviews?.sessions||[];
- state.personal=personal||null;state.personalAttention=attention||null;state.briefing=briefing||null;state.savedViews=savedViews||null;state.bankingBudgets=bankingBudgets||null;state.readiness=readiness||null;
- state.insights=insights||null;state.rules=rules||null;state.quality=quality||null;state.reconciliation=reconciliation||null;state.history=history||null;state.team=team||null;
- state.transferCandidates=transferCandidates||null;state.refundCandidates=refundCandidates||null;state.reimbursements=reimbursements||null;state.notifications=notifications||null;state.notificationPrefs=notificationPrefs||null;state.companySettings=companySettings||null;state.receiptCenter=receiptCenter||null;state.savedReports=savedReports||null;state.archivedTransactions=archivedTransactions||null;state.cashflowCalendar=cashflowCalendar||null;state.accountingPeriods=accountingPeriods||null;state.categories=categories||null;state.smart=smart||null;state.health=health||null;state.roadmaps=roadmaps||null;state.companySummary=companySummary||null;
- state.accounts=dash?.accounts||[];
- if(!state.accounts.length){
-  const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope));
+  state.statements=st?.statements||[];
+  state.accounts=dash?.accounts||[];
+  if(dash&&!state.accounts.length){
+   const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope),cycle);
   state.accounts=accounts?.accounts||[];
  }
  if(state.account&&!state.accounts.some(a=>String(a.id)===String(state.account)))state.account='';
  const sel=$('fmAccount'),keep=state.account;
- sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
- sel.value=keep;
+  sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
+  sel.value=keep;
+  return cycle;
+}
+async function hydrateSupplementary(cycle){
+ const base=filterQuery();
+ const resources=[
+  ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],
+  ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing'],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
+  ['readiness',I+'/banking-readiness'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
+  ['os',OS+'/command-center'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
+  ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
+  ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
+  ['roadmaps',API+'/personal-money/roadmaps']
+ ];
+ for(let index=0;index<resources.length;index+=FINANCE_HYDRATION_BATCH_SIZE){
+  if(cycle!==loadCycle)return;
+  await Promise.all(resources.slice(index,index+FINANCE_HYDRATION_BATCH_SIZE).map(([name,path])=>loadResource(name,path,cycle)));
+  syncSupplementaryState();
+  if(canProgressivelyRender(cycle))render();
+ }
 }
 function hero(){
  const err=resourceError('dash','Financial overview');if(err)return err;
@@ -1036,7 +1053,11 @@ function openNew(kind='expense',presetAccount=''){
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
  $('fmEntryForm').onsubmit=async e=>{e.preventDefault();try{const x=await saveManualMovement(e.currentTarget);$('fmModal').close();notice(x.message);await refresh()}catch(error){notice(error.message,true)}};
 }
-async function refresh(){notice('');$('fmContent').innerHTML='<div class="fm-loading"><span></span><b>Refreshing finance workspace…</b></div>';await loadBase();render()}
+async function refresh(){
+ notice('');$('fmContent').innerHTML='<div class="fm-loading"><span></span><b>Refreshing finance workspace…</b></div>';
+ const cycle=await loadBase();render();
+ void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be refreshed.',true));
+}
 async function supplierBillDetail(id){
  try{
   const data=await api(API+'/supplier-bills/'+encodeURIComponent(id)),b=data.bill||{},items=data.items||[],payments=data.payments||[];
@@ -1090,5 +1111,15 @@ function bind(){
  $('fmSearch').placeholder='Search finance or type a command: add expense, upload statement, create report';
  $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){const value=e.currentTarget.value.trim();if(runFinanceCommand(value))return;globalFinanceSearch(value)}};
 }
-document.addEventListener('DOMContentLoaded',async()=>{bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h))state.view=h;navButtons();try{await loadBase();render()}catch(e){notice(e.message||'Finance workspace failed to load',true)}})
+document.addEventListener('DOMContentLoaded',async()=>{
+ bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h))state.view=h;navButtons();
+ try{
+  const cycle=await loadBase();render();
+  void hydrateSupplementary(cycle).catch(error=>notice(error.message||'Some Finance services could not be loaded.',true));
+ }catch(e){
+  notice(e.message||'Finance workspace failed to load',true);
+  $('fmContent').innerHTML='<div class="fm-state fm-state-error"><strong>Finance could not start</strong><p>The loading request ended safely. Refresh to try again.</p><button type="button" data-retry="1">Retry</button></div>';
+  bindDynamic();
+ }
+})
 })();
