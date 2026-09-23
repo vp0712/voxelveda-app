@@ -17,6 +17,7 @@ const financeReceipt = require('../controllers/financeReceiptController');
 const financeCashControl = require('../controllers/financeCashControlController');
 const financeCloseAssurance = require('../controllers/financeCloseAssuranceController');
 const financeTreasury = require('../controllers/financeTreasuryController');
+const financePerformanceRisk = require('../controllers/financePerformanceRiskController');
 const financeAccountantHandover = require('../controllers/financeAccountantHandoverController');
 const financeAudit = require('../controllers/financeAuditController');
 const financeRelationships = require('../controllers/financeRelationshipController');
@@ -269,6 +270,7 @@ router.post('/bank-accounts', requireAnyPermission('EDIT_BANK_DETAILS'), finance
 router.get('/bank-accounts/:id/transactions', requireAnyPermission('VIEW_BANKING'), financePrivacy.accountParam('id'), operations.getBankTransactions);
 router.post('/bank-accounts/:id/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), operations.importBankTransactions);
 router.get('/treasury-control', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeTreasury.getCenter);
+router.get('/performance-risk-control', requireAnyPermission('VIEW_BANKING'), financePerformanceRisk.getCenter);
 router.get('/close-assurance', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeCloseAssurance.getCenter);
 router.post('/close-assurance/:periodId/snapshot', requireAnyPermission('EDIT_FINANCE'), financeCloseAssurance.captureSnapshot);
 router.post('/close-assurance/:periodId/certify', requireAnyPermission('EDIT_FINANCE'), requireStepUp('CHANGE_ACCOUNTING_PERIOD'), financeCloseAssurance.certify);
