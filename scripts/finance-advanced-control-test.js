@@ -73,3 +73,7 @@ assert(advanced.includes('Executive Control Readiness Board'),'Executive readine
 assert(advanced.includes('CFO Daily Brief'),'CFO Daily Brief missing.');
 assert(advanced.includes('No fake composite finance score'),'Readiness board must reject misleading composite scoring.');
 assert(advanced.includes('data-fac-jump="facReadiness"'),'Readiness board must be directly navigable.');
+
+assert(advanced.includes('Job Profitability & Cost Allocation'),'Advanced Control must expose Job Profitability.');
+assert(advanced.includes('function jobProfitabilityControl()'),'Advanced Job Profitability function missing.');
+assert(advanced.includes('Job allocation evidence'),'Executive readiness must include job allocation evidence.');
