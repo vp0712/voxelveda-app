@@ -42,7 +42,9 @@ assert(routes.includes("router.delete('/reports/saved/:uid'"),'saved report dele
 assert(migration.includes('finance_saved_reports'),'saved report table migration is missing');
 assert(migration.includes('created_by'),'saved reports must be owner scoped');
 
-assert(client.includes('Report Builder 2.0'),'master Finance report builder UI is missing');
+assert(client.includes('Advanced Report Centre'),'master Finance report centre UI is missing');
+assert(client.includes('Standard Report Catalogue'),'standard Finance report catalogue is missing');
+assert(client.includes('data-report-preset'),'one-click report presets are missing');
 assert(client.includes('reportAccounts'),'multi-account report control is missing');
 assert(client.includes('generateBuiltReport'),'report generation handler is missing');
 assert(client.includes('exportBuiltReportXlsx'),'XLSX report export is missing');
