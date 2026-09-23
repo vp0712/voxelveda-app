@@ -50,3 +50,11 @@ for(const reportType of ['INCOME_VS_EXPENSE','ACCOUNT_ACTIVITY','ACCOUNT_STATEME
   assert(js.includes(reportType),`Finance report catalogue must expose ${reportType}`);
 }
 assert.match(js,/fm-report-preset/,'Report Centre must expose one-click standard report presets.');
+
+assert.match(js,/function openAccountForm\(/,'Finance OS must expose a real create/edit account workflow.');
+assert.match(js,/I\+'\/accounts'/,'Account form must save through the canonical Finance account API.');
+assert.match(js,/if\(kind==='account'\)\{openAccountForm\(\);return\}/,'Add Account must never open the transaction form.');
+assert.match(js,/data-account-edit/,'Account workspace must provide account editing.');
+assert.match(js,/data-personal-new="wallet"/,'Personal Money must expose wallet creation.');
+assert.match(js,/personal-money\/wallets/,'Personal wallet form must save to the owner-isolated wallet API.');
+assert.match(js,/fx_rate_to_wallet/,'Personal multi-currency cash entry must expose an explicit FX rate instead of inventing conversion.');

@@ -18,7 +18,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 
 | Feature | Current implementation | Classification |
 |---|---|---|
-| Accounts | Full account cards/workspace, history coverage, lifecycle controls, protected danger zone | READY backend / integrated UI |
+| Accounts | Full create/edit account workflow, account cards/workspace, history coverage, lifecycle controls, protected danger zone | READY backend / integrated UI |
 | Transactions | Server pagination/filter/search, manual canonical movements, classification edit, archive/restore, source evidence | READY core / production workflow verification continues |
 | Original bank evidence | Immutable `bank_transaction_original_data` separated from current classification | READY |
 | Statement import | CSV/PDF/OFX/QFX/QIF/XLSX protected preview/review/duplicate/commit pipeline plus multi-file historical staging per account | READY core / integrated history centre |
@@ -29,7 +29,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Internal transfers | Explicit debit/credit pair relationship, same-currency validation, excluded from income/expense | PARTIAL until production user-flow verification |
 | Refunds | Explicit refund-to-expense links, same-currency and remaining-balance validation, trusted-total netting | PARTIAL until production report/user-flow verification |
 | Reimbursements | Draft/submit/approve/reject/payment-link lifecycle | PARTIAL until production user-flow verification |
-| Cash | Canonical cash account view plus clearly separated owner-only Personal Money wallets | PARTIAL |
+| Cash | Canonical cash account creation plus owner-only Personal Money wallets, wallet creation and explicit-FX cash movements | PARTIAL pending authenticated production journey verification |
 | Budgets | Personal budgets plus banking-ledger budgets with create/archive and usage tracking | PARTIAL |
 | Savings goals | Goal management plus explicit progress contributions that do not silently move bank cash | PARTIAL |
 | Borrow & Lend | Owner-only debt lifecycle and repayment workflow | PARTIAL |
