@@ -14,7 +14,7 @@ assert(ui.includes('function moreView()')&&ui.includes('All finance modules'),'M
 for(const moduleName of ['My Money','Budgets','Savings Goals','Net Worth','Forecast','Cash Flow Calendar','Borrow & Lend','Recurring'])assert(ui.includes(moduleName),'Mobile module launcher must retain '+moduleName);
 assert(ui.includes('Personal finance is private to you'),'Personal Money privacy boundary must be visible.');
 assert(ui.includes('function dailyBriefingCard()')&&ui.includes('Daily Finance Briefing'),'Daily briefing must be integrated into My Money.');
-assert(ui.includes("['briefing',API+'/personal-money/daily-briefing?today='"),'Daily briefing must hydrate from the protected owner endpoint.');
+assert(ui.includes("['briefing',API+'/personal-money/daily-briefing?date='"),'Daily briefing must hydrate from the protected owner endpoint.');
 assert(routes.includes("router.get('/personal-money/daily-briefing', requireAnyPermission('VIEW_BANKING')"),'Daily briefing route must remain VIEW_BANKING protected and GET-only.');
 assert(briefingController.includes("ba.created_by=? AND ba.ownership_scope='PERSONAL' AND bt.ownership_scope='PERSONAL'"),'Daily briefing must restrict bank activity to the signed-in user personal data.');
 assert(briefingController.includes('bt.is_internal_transfer=0'),'Daily briefing must exclude confirmed internal transfers.');
