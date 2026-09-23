@@ -1004,6 +1004,7 @@ function advancedControlView(){
  return '<div id="financeAdvancedControlMount"><div class="fm-state"><strong>Opening Advanced Finance Control…</strong><p>Loading the advanced decision-support layer over the same canonical Finance OS.</p></div></div>';
 }
 function simpleView(v){
+ if(v==='advanced')return advancedControlView();
  if(v==='more')return moreView();
  if(v==='setupcentre')return setupCentreView();
  if(v==='history')return historyImportView();
