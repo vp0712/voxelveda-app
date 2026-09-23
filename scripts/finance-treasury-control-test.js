@@ -23,3 +23,7 @@ assert(advanced.includes("['treasury','/api/finance/treasury-control']"),'Advanc
 assert(advanced.includes('function treasuryControl()'),'Advanced Treasury section missing.');
 assert(advanced.includes('data-fac-open="treasury"'),'Advanced Control must drill into Treasury.');
 console.log('FINANCE_TREASURY_CONTROL_OK');
+
+assert(controller.includes("bt.ownership_scope='BUSINESS'"),'Treasury operating flow must exclude non-business transaction ownership.');
+
+assert(controller.includes('SELECT default_currency FROM finance_settings'),'Treasury base currency must follow Finance settings when no explicit app override exists.');
