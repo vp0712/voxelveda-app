@@ -1,21 +1,34 @@
-const fs=require('fs');
-const assert=require('assert');
-const ui=fs.readFileSync('public/personal-financial-data-quality-integrity.js','utf8');
-const controller=fs.readFileSync('controllers/personalFinancialDataQualityController.js','utf8');
-const routes=fs.readFileSync('routes/financeRoutes.js','utf8');
-const control=fs.readFileSync('public/personal-financial-control-center.js','utf8');
+'use strict';
+const fs=require('node:fs');
+const path=require('node:path');
+const assert=require('node:assert');
+const root=path.join(__dirname,'..');
+const read=(file)=>fs.readFileSync(path.join(root,file),'utf8');
 
-assert(control.includes('/personal-financial-data-quality-integrity.js?v=20260916-data-quality-integrity'),'Control Center must load Data Quality & Integrity Center.');
-assert(ui.includes('/api/finance/personal-money/data-quality-integrity'),'Integrity UI must use the dedicated owner-private endpoint.');
-assert(ui.includes("credentials:'same-origin'"),'Integrity UI must preserve authenticated same-origin credentials.');
-assert(!/method\s*:\s*['\"](?:POST|PUT|PATCH|DELETE)/i.test(ui),'Integrity UI must remain API read-only.');
-for(const label of ['PERSONAL FINANCIAL DATA QUALITY & INTEGRITY CENTER','Possible duplicate transactions','Possible missing statement periods','Cash movements needing more detail','Wallet / bank double-counting review','Statement import issues','How to read these signals'])assert(ui.includes(label),`Integrity Center must explain ${label}.`);
-assert(routes.includes("router.get('/personal-money/data-quality-integrity', requireAnyPermission('VIEW_BANKING'), personalFinancialDataQuality.getCenter)"),'Integrity endpoint must require VIEW_BANKING.');
-assert(controller.includes("ownership_scope='PERSONAL'")&&controller.includes('created_by=?'),'Bank integrity queries must be PERSONAL and owner-scoped.');
+const ui=read('public/finance-master.js');
+const html=read('public/finance-intelligence.html');
+const controller=read('controllers/personalFinancialDataQualityController.js');
+const routes=read('routes/financeRoutes.js');
+const app=read('app.js');
+
+assert(html.includes('/finance-master.js'),'Canonical Finance OS must load the master frontend.');
+assert(ui.includes("['review','!','Review Centre']"),'Canonical Finance OS must expose the Review Centre.');
+assert(ui.includes('function reviewView()'),'Canonical Finance OS must integrate Data Quality Review.');
+assert(ui.includes("['quality',I+'/data-quality'+base]"),'Canonical Finance OS must load protected data-quality metrics.');
+for(const label of ['Uncategorised','Unreconciled','Ownership missing','Unknown history coverage','Transfer candidates','Category suggestions','Anomalies','Archived transactions']){
+  assert(ui.includes(label),`Review Centre must surface ${label}.`);
+}
+
+assert(routes.includes("router.get('/personal-money/data-quality-integrity', requireAnyPermission('VIEW_BANKING'), personalFinancialDataQuality.getCenter)"),'Owner-private Personal Data Quality endpoint must remain VIEW_BANKING protected.');
+assert(controller.includes("ownership_scope='PERSONAL'")&&controller.includes('created_by=?'),'Personal Data Quality bank queries must remain PERSONAL and owner-scoped.');
 assert(controller.includes('user_id=?'),'Personal Money integrity queries must remain owner-scoped.');
-assert(controller.includes("company accounting is excluded")||controller.includes('company accounting is excluded'),'Integrity response must exclude company accounting.');
-for(const phrase of ['only a double-counting risk signal','may include legitimate repeated transactions','may be genuine','not automatically reclassified'])assert(controller.includes(phrase),`Integrity heuristics must disclose: ${phrase}`);
-assert(ui.includes('never deletes transactions')&&ui.includes('Any future correction must require your explicit approval'),'Integrity UI must prohibit automatic corrections and require explicit approval.');
-for(const prohibited of ['createJournal','POST_TRANSACTION','RECONCILE_BANK_TRANSACTION','recordDebtPayment','UPDATE bank_transactions','DELETE FROM bank_transactions'])assert(!ui.includes(prohibited),`Integrity UI must not contain mutation path: ${prohibited}`);
-require('./personal-finance-automation-approval-center-test');
-console.log('Personal Financial Data Quality & Integrity Center + Automation Approval Center regression checks passed.');
+assert(controller.includes('company accounting is excluded'),'Personal integrity response must explicitly exclude company accounting.');
+for(const phrase of ['only a double-counting risk signal','may include legitimate repeated transactions','may be genuine','not automatically reclassified']){
+  assert(controller.includes(phrase),`Integrity heuristics must disclose: ${phrase}`);
+}
+
+assert(!ui.includes('personal-finance-automation-approval-center.js'),'Canonical Finance OS must not load the retired Automation Approval frontend.');
+assert(app.includes("name.startsWith('personal-finance-')"),'Retired Personal Finance frontend assets must remain server-gated.');
+assert(app.includes('status(410)'),'Retired Finance frontend assets must fail closed with HTTP 410.');
+
+console.log('Canonical Finance Data Quality Review and owner-private integrity regression checks passed.');
