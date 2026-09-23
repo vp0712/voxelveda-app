@@ -8,7 +8,7 @@ Voxel Veda has one Finance OS frontend:
 - `public/finance-master.js`
 - `public/finance-master.css`
 
-Backend modules remain modular under `/api/finance/*`. Legacy banking UI assets are not globally injected into Finance. No Finance V6/V7 or duplicate dashboard is part of the target architecture.
+Backend modules remain modular under `/api/finance/*`. Retired Finance V3/V4 and premium Banking frontends are removed from the active production tree. `/banking` remains only as a compatibility redirect into the single Finance OS; modular backend APIs remain permission-controlled.
 
 ## Canonical financial truth
 

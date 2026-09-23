@@ -1,27 +1,27 @@
+'use strict';
 const fs=require('node:fs');
-function read(p){return fs.readFileSync(p,'utf8')}
-function assert(v,m){if(!v){console.error('FAIL:',m);process.exitCode=1}else console.log('PASS:',m)}
+const read=(p)=>fs.readFileSync(p,'utf8');
+const assert=(v,m)=>{if(!v){console.error('FAIL:',m);process.exitCode=1}else console.log('PASS:',m)};
 const app=read('app.js');
 const routes=read('routes/bankingPortalRoutes.js');
-const ui=read('public/premium-banking-app.js');
 const financeHtml=read('public/finance-intelligence.html');
+const financeUi=read('public/finance-master.js');
+const renderer=read('services/globalBrandRenderer.js');
 const staff=read('public/staff.js');
 const html=read('public/staff-dashboard.html');
 
-assert(app.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'legacy /banking entry must redirect into the unified Finance OS');
-assert(app.includes("app.use('/api/banking',auth,bankingPortalRoutes)"),'standalone banking API is mounted independently');
-assert(!routes.includes("requirePermission('VIEW_FINANCE')"),'standalone banking router does not require VIEW_FINANCE');
-assert(routes.includes("requireAnyPermission('VIEW_BANKING','VIEW_PERSONAL_BANKING','VIEW_BUSINESS_BANKING')"),'banking view permission is required');
+assert(app.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'legacy /banking URL is only a compatibility redirect to Finance OS');
+assert(app.includes("app.use('/api/banking',auth,bankingPortalRoutes)"),'Banking compatibility API remains mounted for authorised backend clients');
+assert(routes.includes("requireAnyPermission('VIEW_BANKING','VIEW_PERSONAL_BANKING','VIEW_BUSINESS_BANKING')"),'Banking view permission is required');
 assert(routes.includes("requireAnyPermission('EDIT_BANK_DETAILS','CONNECT_BANK_ACCOUNT','MANAGE_BANK_CONNECTION')"),'bank consent remains privileged');
-assert(routes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'payment approval remains explicitly permission-gated');
-assert(financeHtml.includes('/finance-master.js'),'canonical Finance route must use the unified Finance OS frontend');
-assert(financeHtml.includes('FINANCE OPERATING SYSTEM'),'standalone /banking route must not render a duplicate Banking dashboard');
-assert(!financeHtml.includes('finance-bank-app-v5'),'retired V5 frontend must not be reintroduced');
-assert(ui.includes("const STANDALONE = location.pathname === '/banking'"),'standalone API mode is explicit');
-assert(ui.includes("'/api/banking/intelligence'"),'standalone intelligence API is used');
-assert(ui.includes("'/api/banking/os'"),'standalone Banking OS API is used');
-assert(html.includes('permission-banking hidden-section'), 'staff portal contains permission-gated Banking entry');
-assert(html.includes('href="/banking"'), 'staff portal Banking entry points to standalone page');
-assert(staff.includes("hasPermission('VIEW_BANKING')"),'staff Banking visibility honours canonical banking permission');
-assert(staff.includes("setPermissionVisibility('.permission-banking', canUseBanking)"),'staff Banking UI visibility is enforced');
+assert(routes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'payment approval remains permission-gated');
+assert(financeHtml.includes('/finance-master.js')&&financeHtml.includes('FINANCE OPERATING SYSTEM'),'canonical Finance page uses the single Finance OS');
+assert(financeUi.includes('BANKING OPERATIONS')&&financeUi.includes('Payment workflow'),'Banking operations are integrated into Finance OS');
+assert(financeUi.includes('Banking Connections')&&financeUi.includes('Statement Import Wizard'),'connections and statement workflows are integrated into Finance OS');
+assert(!app.includes('premium-banking-app.js')&&!renderer.includes('premium-banking-app'),'retired premium Banking frontend is not served or injected');
+assert(html.includes('permission-banking hidden-section'),'staff portal contains permission-gated Finance OS entry');
+assert(html.includes('href="/finance-intelligence#bankops"'),'staff Banking permission entry opens Finance OS Banking Operations');
+assert(!html.includes('href="/banking"'),'staff portal no longer exposes a separate Banking page');
+assert(staff.includes("hasPermission('VIEW_BANKING')"),'staff Banking visibility honours canonical Banking permission');
+assert(staff.includes("setPermissionVisibility('.permission-banking', canUseBanking)"),'staff Banking visibility is enforced');
 if(process.exitCode)process.exit(process.exitCode);
