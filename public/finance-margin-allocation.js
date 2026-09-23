@@ -40,7 +40,7 @@ function invoiceForm(inv){
  modal('Link invoice billing context',
  '<p class="fm-helper">'+esc((inv.invoice_no||('Invoice #'+inv.id))+' · '+(inv.customer_name||'Customer'))+'</p>'+
  '<label>Dimension<select name="entity_uid">'+options()+'</select></label>'+
- '<label>Invoice currency<input name="currency" maxlength="3" pattern="[A-Za-z]{3}" value="AUD" required></label>'+
+ '<label>Invoice currency<input name="currency" maxlength="3" pattern="[A-Za-z]{3}" placeholder="AUD" value="" required></label>'+
  '<label>Note<textarea name="note"></textarea></label>',
  async fd=>{const body=Object.fromEntries(fd.entries());body.invoice_id=inv.id;const x=await api('/api/finance/margin-allocation/invoice-links',{method:'POST',body:JSON.stringify(body)});notice(x.message);await load()});
 }
@@ -66,7 +66,7 @@ function render(){
  bind();
 }
 async function load(){
- if(loading)return;loading=true;const root=document.getElementById(ROOT);if(root)root.innerHTML='<div class="fm-state">Loading Profitability & Margin Control…</div>';
+ if(loading)return;loading=true;const root=document.getElementById(ROOT);if(root)root.innerHTML='<div class="fm-state">Loading Margin Allocation Control…</div>';
  try{data=await api('/api/finance/margin-allocation');render()}catch(error){if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Margin Allocation Control could not load</strong><p>'+esc(error.message)+'</p><button id="pfcRetry">Retry</button></div>';document.getElementById('pfcRetry')?.addEventListener('click',load)}finally{loading=false}
 }
 function bind(){
@@ -81,6 +81,6 @@ function bind(){
 }
 function mount(){if(document.getElementById(ROOT))load()}
 window.__financeMarginAllocationMount=mount;
-window.addEventListener('finance:margin allocation-mount',mount);
+window.addEventListener('finance:margin-allocation-mount',mount);
 if(document.readyState!=='loading')setTimeout(mount,0);else document.addEventListener('DOMContentLoaded',()=>setTimeout(mount,0));
 })();
