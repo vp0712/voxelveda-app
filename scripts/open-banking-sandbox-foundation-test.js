@@ -44,11 +44,13 @@ expect(readiness, "production_controls_ready", 'Production banking controls stat
 expect(readiness, "BANK_DATA_WEBHOOK_SECRET", 'Webhook readiness check missing');
 expect(readiness, "liveSyncEnabled()", 'Readiness must use the explicit live-sync lock');
 
-const ui = read('public/finance-banking-readiness.js');
-expect(ui, "providerSetupPanel", 'Provider setup UI missing');
-expect(ui, "Start sandbox consent", 'Sandbox consent action missing');
-expect(ui, "Open Banking Setup", 'Guided Connect Bank label missing');
-expect(ui, "Railway", 'Credential setup guidance missing');
+const ui = read('public/finance-master.js');
+expect(ui, "Banking Setup & Safety", 'Integrated provider safety UI missing');
+expect(ui, "Fail-closed until provider and production controls are verified.", 'Fail-closed provider guidance missing');
+expect(ui, "Banking Connections", 'Integrated Banking Connections view missing');
+expect(ui, "startBankConsent", 'Guided consent action missing');
+expect(ui, "open-banking/providers", 'Provider readiness request missing');
+expect(ui, "open-banking/consent", 'Consent-start request missing');
 
 const env = read('.env.example');
 expect(env, 'BANK_DATA_ENVIRONMENT=sandbox', 'Sandbox must be the documented default');
