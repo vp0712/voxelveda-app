@@ -12,7 +12,7 @@ function assert(condition, message) {
 const migration = read('migrations/20260915_finance_statement_staging_review.sql');
 const controller = read('controllers/statementImportController.js');
 const routes = read('routes/financeRoutes.js');
-const client = read('public/finance-intelligence.js');
+const client = read('public/finance-master.js');
 const wizard = read('public/finance-import-wizard.js');
 const reviewFilter = read('public/finance-review-filter.js');
 const pdfEnhancer = read('public/finance-pdf-import-enhancer.js');

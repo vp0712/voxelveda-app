@@ -13,8 +13,6 @@ on:
       - 'routes/integrationWebhookRoutes.js'
       - 'middleware/statementPreviewSanitizer.js'
       - 'config/permissionCatalog.js'
-      - 'public/premium-banking-app.js'
-      - 'public/premium-banking-app.css'
       - 'public/admin-dashboard.html'
       - 'public/admin-dashboard.js'
       - 'public/advanced-theme.css'
@@ -34,7 +32,6 @@ on:
       - 'scripts/banking-account-scope-test.js'
       - 'routes/bankingPortalRoutes.js'
       - 'controllers/statementImportController.js'
-      - 'public/finance-intelligence.js'
       - 'public/finance-statement-report-center.js'
       - 'public/finance-master.js'\n      - 'public/finance-master.css'\n      - 'public/finance-intelligence.html'\n      - 'controllers/financeIntelligenceController.js'
       - 'routes/financeRoutes.js'
@@ -55,8 +52,6 @@ on:
       - 'routes/integrationWebhookRoutes.js'
       - 'middleware/statementPreviewSanitizer.js'
       - 'config/permissionCatalog.js'
-      - 'public/premium-banking-app.js'
-      - 'public/premium-banking-app.css'
       - 'public/admin-dashboard.html'
       - 'public/admin-dashboard.js'
       - 'public/advanced-theme.css'
@@ -93,9 +88,9 @@ jobs:
           node --check routes/advancedBankingRoutes.js
           node --check routes/integrationWebhookRoutes.js
           node --check middleware/statementPreviewSanitizer.js
-          node --check public/premium-banking-app.js
           node --check public/admin-dashboard.js
-          node --check public/finance-pdf-v3.js\n          node --check public/finance-master.js
+          node --check public/finance-pdf-v3.js
+          node --check public/finance-master.js
           node --check scripts/advanced-banking-platform-test.js
           node --check scripts/banking-os-multi-user-test.js
           node --check scripts/banking-command-center-test.js
@@ -112,10 +107,8 @@ jobs:
           node --check public/admin-dashboard.js
           node --check services/bankSyncScheduler.js
           node --check controllers/advancedBankingController.js
-          node --check public/premium-banking-app.js
           node --check controllers/statementDataManagementController.js
           node --check controllers/statementImportController.js
-          node --check public/finance-intelligence.js
           node --check public/finance-statement-report-center.js
           node --check routes/bankingPortalRoutes.js
       - name: Architecture and security contract
