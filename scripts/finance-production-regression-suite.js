@@ -15,6 +15,7 @@ const tests=[
   "finance-close-assurance-test.js",
   "finance-treasury-control-test.js",
   "finance-performance-risk-control-test.js",
+  "finance-profitability-control-test.js",
   "finance-anomaly-explain-control-test.js",
   "finance-fpa-planning-control-test.js",
   "finance-control-actions-test.js",
