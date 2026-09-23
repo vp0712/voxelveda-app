@@ -29,9 +29,9 @@ assert(routes.includes("requireStepUp('REVERSE_MARGIN_ALLOCATION')"),'Allocation
 assert(routes.includes("requireStepUp('REVERSE_MARGIN_INVOICE_LINK')"),'Invoice unlink must require step-up.');
 assert(master.includes("['marginallocation','◩','Margin Allocation']"),'Margin Allocation must be a first-class Finance module.');
 assert(master.includes('function marginAllocationView()'),'Margin Allocation canonical view loader missing.');
-assert(master.includes('/finance-margin-allocation.js?v=20260924-margin allocation-v1'),'Margin Allocation asset version missing.');
+assert(master.includes('/finance-margin-allocation.js?v=20260924-margin-allocation-v1'),'Margin Allocation asset version missing.');
 assert(asset.includes("VERSION='20260924-margin-allocation-v1'"),'Margin Allocation asset release id missing.');
 for(const marker of ['MARGIN ALLOCATION CONTROL','Dimensions & margin','Unallocated business transactions','Unlinked invoices','Cash margin comes only from explicit BUSINESS bank allocations'])
  assert(asset.includes(marker),'Margin Allocation UI missing '+marker);
 assert(app.includes("'finance-margin-allocation.js'"),'Margin Allocation asset must be canonical/allowlisted.');
-console.log('FINANCE_MARGIN_CONTROL_OK');
+console.log('FINANCE_MARGIN_ALLOCATION_OK');
