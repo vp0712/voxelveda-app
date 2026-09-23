@@ -117,3 +117,9 @@ assert.match(js,/data-wallet-active/,'Personal Money must expose recoverable wal
 assert.match(js,/data-personal-budget-delete/,'Personal Money budgets must be removable without deleting financial history.');
 assert.match(js,/data-recurring-active/,'Recurring Money must support archive and restore.');
 assert.match(js,/data-goal-status/,'Savings Goals must support pause and resume lifecycle controls.');
+
+assert.match(js,/function openTeamAccessForm\(/,'Team Finance Access must expose account-level delegation management.');
+assert.match(js,/OS\+'\/team\/'\+encodeURIComponent\(user\.id\)\+'\/access'/,'Delegated banking access must save through the canonical Banking OS access route.');
+assert.match(js,/Personal accounts are intentionally excluded/,'Team Access UI must explicitly preserve Personal Money privacy.');
+assert.match(js,/PREPARE = create payment instructions/,'Team Access must explain preparation rights.');
+assert.match(js,/APPROVE = approve another preparer/,'Team Access must explain approval separation of duties.');

@@ -618,8 +618,53 @@ function reconciliationView(){
  return `${resourceError('reconciliation','Reconciliation')}<div class="fm-grid four"><div class="fm-kpi"><span>Needs action</span><strong>${num(r.summary?.needs_action)}</strong></div><div class="fm-kpi"><span>Ready</span><strong>${num(r.summary?.ready)}</strong></div><div class="fm-kpi"><span>Partial</span><strong>${num(r.summary?.partial)}</strong></div><div class="fm-kpi"><span>Reconciled</span><strong>${num(r.summary?.reconciled)}</strong></div></div><article class="fm-card"><div class="fm-pad"><div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Date</th><th>Account</th><th>Description</th><th>Amount</th><th>Matched</th><th>Remaining</th><th>Workflow</th></tr></thead><tbody>${rows.slice(0,200).map(x=>`<tr data-tx="${x.id}"><td>${date(x.transaction_date)}</td><td>${esc(x.account_name)}</td><td>${esc(x.merchant_name||x.description)}</td><td>${nativeMoney(Math.abs(num(x.amount)),x.currency)}</td><td>${nativeMoney(x.matched_amount,x.currency)}</td><td>${nativeMoney(x.remaining_amount,x.currency)}</td><td>${statusBadge(x.workflow_status)}</td></tr>`).join('')}</tbody></table></div></div></article>`;
 }
 function teamView(){
- const users=state.team?.users||state.team?.team||[];
- return `${resourceError('team','Team Finance Access')}<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Team Finance Access</h2><p>Access is enforced on the server, not by hiding frontend controls.</p></div></div><div class="fm-list">${users.map(u=>`<div class="fm-row"><div><h3>${esc(u.name||u.email||'User')}</h3><p>${esc(u.role||'')} · ${esc(u.access_level||u.banking_access||'')}</p></div>${statusBadge(u.status||'ACTIVE')}</div>`).join('')||emptyState('No team data','No finance team access records were returned.')}</div></div></article>`;
+ const team=state.team||{},users=team.users||team.team||[],grants=team.grants||[],canManage=Boolean(team.can_manage);
+ const businessAccounts=(state.accounts||[]).filter(a=>String(a.ownership_scope||'').toUpperCase()!=='PERSONAL');
+ const grantCount=(userId)=>grants.filter(g=>String(g.user_id)===String(userId)).length;
+ const rows=users.map(u=>{
+  const userGrants=grants.filter(g=>String(g.user_id)===String(u.id));
+  const summary=userGrants.length?userGrants.slice(0,3).map(g=>esc(g.account_name||'Account')+' · '+esc(g.access_level||'VIEW')).join(' · '):'No account-specific banking grant';
+  return `<div class="fm-row"><div><h3>${esc(u.name||u.email||'User')}</h3><p>${esc(u.role||'')} · ${esc(u.department||'')} · ${summary}</p></div><div class="fm-row-right">${statusBadge(u.account_status||u.status||'ACTIVE')}<small>${grantCount(u.id)} delegated account(s)</small>${canManage?'<button data-team-access="'+u.id+'">Manage access</button>':''}</div></div>`;
+ }).join('');
+ const matrix=grants.map(g=>`<div class="fm-row"><div><h3>${esc(g.user_name||g.email||'User')} → ${esc(g.account_name||'Account')}</h3><p>${esc(g.ownership_scope||'BUSINESS')} account</p></div><div class="fm-row-right">${statusBadge(g.access_level||'VIEW')}<small>${Number(g.can_prepare_payments)?'prepare · ':''}${Number(g.can_approve_payments)?'approve · ':''}${Number(g.can_manage)?'manage':''}</small></div></div>`).join('');
+ return `${resourceError('team','Team Finance Access')}<div class="fm-control-intro"><p>FINANCE ACCESS CONTROL</p><h2>Delegate business banking without exposing Personal Money</h2><span>VIEW, PREPARE, APPROVE and MANAGE grants are enforced by the server per business account. Personal accounts cannot be delegated, and administrators cannot change their own banking access from this screen.</span></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Active team</h2><p>${canManage?'Select a user to assign or revoke account-level access.':'Your role can view Finance but cannot manage delegated banking access.'}</p></div></div><div class="fm-list">${rows||emptyState('No team data','No active users were returned.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Current account grants</h2><p>Only Company/Mixed accounts are eligible for delegation.</p></div><span class="fm-badge">${businessAccounts.length} eligible account(s)</span></div><div class="fm-list">${matrix||emptyState('No delegated access','Business accounts currently rely on role-level permissions only.')}</div></div></article></div>`;
+}
+function openTeamAccessForm(userId){
+ const team=state.team||{},user=(team.users||[]).find(u=>String(u.id)===String(userId));if(!user)return;
+ if(!team.can_manage){notice('Your role cannot manage delegated banking access.',true);return}
+ const accounts=(state.accounts||[]).filter(a=>String(a.ownership_scope||'').toUpperCase()!=='PERSONAL');
+ const grants=team.grants||[];
+ const current=Number(state.bankingOps?.current_user_id||0);
+ if(current&&Number(user.id)===current){notice('Use another authorised administrator to change your own banking access.',true);return}
+ const accessRows=accounts.map(a=>{
+  const grant=grants.find(g=>String(g.user_id)===String(user.id)&&String(g.bank_account_id)===String(a.id));
+  const level=String(grant?.access_level||'NONE').toUpperCase();
+  return `<div class="fm-team-account"><div><b>${esc(a.nickname||'Account')}</b><small>${esc(a.institution||'')} · ${esc(a.currency||'AUD')} · ${esc(a.ownership_scope||'BUSINESS')}</small></div><select data-team-account="${a.id}" data-original-level="${esc(level)}"><option value="NONE" ${level==='NONE'?'selected':''}>No access</option><option value="VIEW" ${level==='VIEW'?'selected':''}>View</option><option value="PREPARE" ${level==='PREPARE'?'selected':''}>Prepare payments</option><option value="APPROVE" ${level==='APPROVE'?'selected':''}>Approve payments</option><option value="MANAGE" ${level==='MANAGE'?'selected':''}>Manage</option></select></div>`;
+ }).join('');
+ $('fmModalEyebrow').textContent='FINANCE ACCESS';$('fmModalTitle').textContent='Banking access · '+(user.name||user.email||'User');
+ $('fmModalBody').innerHTML=`<form id="teamAccessForm" class="fm-form"><div class="fm-state"><strong>Account-level delegation</strong><p>VIEW = read only. PREPARE = create payment instructions. APPROVE = approve another preparer's payment. MANAGE = full delegated banking operations for the account. Personal accounts are intentionally excluded.</p></div><div class="fm-team-access-list">${accessRows||emptyState('No eligible business accounts','Create a Company/Mixed financial account before delegating access.')}</div><div id="teamAccessProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit" ${accounts.length?'':'disabled'}>Save changed access</button></div></form>`;
+ $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
+ $('teamAccessForm').onsubmit=async e=>{
+  e.preventDefault();
+  const selects=[...e.currentTarget.querySelectorAll('[data-team-account]')];
+  const changes=selects.filter(s=>s.value!==s.dataset.originalLevel);
+  const progress=$('teamAccessProgress');progress.hidden=false;
+  if(!changes.length){progress.innerHTML='<strong>No changes</strong><p>Every account already has the selected access level.</p>';return}
+  e.currentTarget.querySelector('button[type="submit"]').disabled=true;
+  let completed=0;
+  try{
+   for(const select of changes){
+    await api(OS+'/team/'+encodeURIComponent(user.id)+'/access',{method:'POST',body:JSON.stringify({bank_account_id:Number(select.dataset.teamAccount),access_level:select.value})});
+    completed+=1;progress.innerHTML='<strong>Saving access</strong><p>'+completed+' of '+changes.length+' account change(s) applied.</p>';
+   }
+   $('fmModal').close();notice(completed+' banking access change(s) saved with audit evidence.');
+   await loadResource('team',OS+'/team');if(state.view==='team')render();
+  }catch(error){
+   e.currentTarget.querySelector('button[type="submit"]').disabled=false;
+   progress.className='fm-state fm-state-error';progress.innerHTML='<strong>Access update stopped</strong><p>'+esc(error.message)+' · '+completed+' change(s) were already applied before this error.</p>';
+   await loadResource('team',OS+'/team');
+  }
+ };
 }
 function connectionsView(){
  const r=state.readiness||{},providers=state.openBankProviders?.providers||[],sessions=state.openBankSessions?.sessions||[],connections=state.bankConnectionData?.connections||[];
@@ -1375,6 +1420,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-payment-submit]').forEach(b=>b.onclick=()=>bankingPaymentAction(b.dataset.paymentSubmit,'submit'));
  document.querySelectorAll('[data-payment-cancel]').forEach(b=>b.onclick=()=>bankingPaymentAction(b.dataset.paymentCancel,'cancel'));
  document.querySelectorAll('[data-payment-decision]').forEach(b=>b.onclick=()=>bankingPaymentAction(b.dataset.paymentUid,'decision',b.dataset.paymentDecision));
+ document.querySelectorAll('[data-team-access]').forEach(b=>b.onclick=()=>openTeamAccessForm(b.dataset.teamAccess));
  document.querySelectorAll('[data-bank-connect]').forEach(b=>b.onclick=()=>startBankConsent(b.dataset.bankConnect));
  document.querySelectorAll('[data-bank-sync]').forEach(b=>b.onclick=()=>syncBankConnection(b.dataset.bankSync));
  document.querySelectorAll('[data-bank-reauthorize]').forEach(b=>b.onclick=()=>startBankConsent(b.dataset.bankReauthorize));

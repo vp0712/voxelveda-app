@@ -43,7 +43,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Reports | Specialized standard catalogue (cash flow, bank-style account statement with running balance, category, merchant, cash, transfers, refunds, reimbursements, GST review, reconciliation, data quality, Personal/Company monthly) with saved definitions and protected branded PDF/CSV/XLSX exports | PARTIAL pending authenticated production journey verification |
 | Notifications | User notification centre and preferences surfaced in Finance | PARTIAL |
 | User preferences | Default workspace/account/period/format/dashboard cards | PARTIAL |
-| Team access | Server-side Banking/Finance permissions | READY core |
+| Team access | Server-enforced role controls plus per-business-account VIEW/PREPARE/APPROVE/MANAGE delegation and audited revocation UI | READY core / integrated management UI |
 | Accounting period locking | Open/review/ready/locked transitions with protected lock workflow | READY core |
 | Open Banking | Unified provider readiness, consent-session launch, connected-bank sync/disconnect and sync history; still fail-closed when provider configuration/live enablement is incomplete | RUNTIME STATUS |
 | Receipt OCR | No verified OCR provider | UNAVAILABLE |
@@ -66,7 +66,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 12. Legacy premium banking UI is no longer globally injected into the unified Finance OS.
 13. Company accountant PDF repeats company identity/report metadata/header/footer on every page.
 14. Company reporting profile is editable through protected system settings.
-15. Procurement master BOM startup integrity is healthy at 236 items.\n16. The unified Finance Setup Centre now gives one ordered path for account creation, ownership separation, historical import, review, classification, reconciliation, receipt evidence and reusable reporting.
+15. Procurement master BOM startup integrity is healthy at 236 items.
+16. The unified Finance Setup Centre now gives one ordered path for account creation, ownership separation, historical import, review, classification, reconciliation, receipt evidence and reusable reporting.
 16. Multi-currency management conversion now uses explicit owner-scoped FX evidence and refuses to invent missing exchange rates.
 
 ## Production infrastructure evidence
