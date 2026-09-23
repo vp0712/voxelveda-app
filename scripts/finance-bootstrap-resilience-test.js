@@ -5,6 +5,9 @@ const fs = require('fs');
 const path = require('path');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'finance-master.js'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'finance-intelligence.html'), 'utf8');
+const guard = fs.readFileSync(path.join(__dirname, '..', 'public', 'finance-bootstrap-guard.js'), 'utf8');
+const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
 const apiStart = source.indexOf('async function api(');
 const apiEnd = source.indexOf('\nfunction notice(', apiStart);
 assert(apiStart >= 0 && apiEnd > apiStart, 'Finance API helper must remain testable.');
@@ -40,6 +43,15 @@ async function run() {
   assert.match(source, /const cycle=await loadBase\(\);render\(\);\s*void hydrateSupplementary\(cycle\)/, 'Core Finance must render before supplementary hydration.');
   assert.match(source, /cycle===loadCycle/, 'Stale Finance loads must be prevented from replacing current filter state.');
   assert.doesNotMatch(source, /Loading finance workspace[^]*await hydrateSupplementary/, 'Initial loading markup must not wait for supplementary services.');
+  assert.doesNotMatch(source, /state\.os=os\|\|null/, 'Core bootstrap must not reference the supplementary os variable before it exists.');
+  assert.match(source, /renderFinanceFatal\(error/, 'Refresh and startup paths must render a terminal failure state instead of leaving a spinner.');
+  assert.match(source, /render\(\);signalFinanceReady\(\)/, 'Successful core render must signal the independent startup watchdog.');
+  assert.match(guard, /WATCHDOG_MS=26000/, 'Independent watchdog timeout must remain bounded.');
+  assert.match(guard, /#fmContent \.fm-loading/, 'Watchdog must only replace an actually stuck Finance loader.');
+  assert.match(guard, /data-finance-hard-retry/, 'Watchdog failure state must provide a hard reload action.');
+  assert(html.indexOf('/finance-bootstrap-guard.js') >= 0, 'Finance page must load the independent startup watchdog.');
+  assert(html.indexOf('/finance-bootstrap-guard.js') < html.indexOf('/finance-master.js'), 'Startup watchdog must load before the main Finance bundle.');
+  assert(appSource.includes("'finance-bootstrap-guard.js'"), 'Finance startup watchdog must be served no-store so hotfixes are not hidden by cache.');
 
   console.log('Finance bootstrap resilience regression contract passed.');
 }
