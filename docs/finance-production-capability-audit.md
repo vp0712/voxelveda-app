@@ -32,6 +32,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Cash | Canonical cash account creation plus owner-only Personal Money wallets, explicit-FX movements, zero-balance archive and controlled restore | PARTIAL pending authenticated production journey verification |
 | Budgets | Personal budgets plus banking-ledger budgets with create/update/remove or archive controls and usage tracking | PARTIAL pending authenticated production journey verification |
 | Savings goals | Goal management, pause/resume and explicit progress contributions that do not silently move bank cash | PARTIAL pending authenticated production journey verification |
+| Net Worth | Owner-private, currency-separated bank/wallet/assets/liabilities/Borrow-Lend totals, explicit snapshots, valuation history and asset-protection reminders/document references surfaced in the unified Finance OS | PARTIAL pending authenticated production journey verification |
 | Borrow & Lend | Owner-only debt detail, due-date/note/counterparty maintenance, repayment history and repayment workflow | PARTIAL pending authenticated production journey verification |
 | Recurring money | Personal recurring create/complete/archive/restore lifecycle plus finance-intelligence suggestions; no bank execution | PARTIAL pending authenticated production journey verification |
 | Categories | Original bank category preserved separately from editable system category; category manager exposed | PARTIAL |
@@ -77,6 +78,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 20. Setup Centre now includes Finance Runtime Health: loaded/loading/restricted/failed service counts plus per-service retries, while core-ledger failures use the existing controlled full refresh. Optional service failure therefore remains visible and isolated instead of becoming a permanent application loader.
 
 21. The blocking full-screen Finance spinner has been removed from normal startup and refresh. Finance now renders an interactive shell immediately, loads core components independently, preserves the current screen during refresh, and isolates service failures behind targeted retry controls.
+
+21. Existing owner-private Net Worth and Asset Protection backends are now surfaced inside the single Finance OS instead of remaining a disconnected legacy UI: asset/liability creation, valuation/balance updates, snapshots, reminders and private HTTPS document references all use their existing protected routes.
 
 ## Production infrastructure evidence
 

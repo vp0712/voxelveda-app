@@ -1,0 +1,26 @@
+'use strict';
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const read=(file)=>fs.readFileSync(path.join(root,file),'utf8');
+const assert=(ok,message)=>{if(!ok)throw new Error(message)};
+const ui=read('public/finance-master.js');
+const routes=read('routes/financeRoutes.js');
+const controller=read('controllers/personalNetWorthController.js');
+const lifecycle=read('controllers/personalAssetLifecycleController.js');
+
+assert(ui.includes("['networth','◇','Net Worth']"),'Net Worth must be in the unified Finance navigation.');
+assert(ui.includes("['netWorth',API+'/personal-money/net-worth']"),'Unified Finance must hydrate the owner-private Net Worth backend.');
+assert(ui.includes("['assetLifecycle',API+'/personal-money/net-worth/lifecycle']"),'Unified Finance must hydrate Asset Protection.');
+assert(ui.includes('function netWorthView()'),'Unified Net Worth view missing.');
+for(const marker of ['Registered Assets','Registered Liabilities','Net Worth Snapshots','Asset Protection & Reminders','Private Document References'])assert(ui.includes(marker),'Net Worth view missing '+marker);
+for(const marker of ['openNetWorthAssetForm','openNetWorthLiabilityForm','saveNetWorthSnapshot','openAssetLifecycleForm','openAssetDocumentForm'])assert(ui.includes(marker),'Net Worth workflow missing '+marker);
+assert(ui.includes('Nothing renews or pays automatically.'),'Asset lifecycle must retain no-auto-pay boundary.');
+assert(ui.includes('currencies remain separate'),'Unified Net Worth must not imply FX conversion.');
+assert(controller.includes("ownership_scope='PERSONAL'"),'Net Worth bank balances must stay owner-personal.');
+assert(controller.includes('double_counting_warning'),'Net Worth backend must keep double-counting guidance.');
+assert(lifecycle.includes('WHERE id=? AND user_id=?'),'Lifecycle linking must remain owner scoped.');
+assert(routes.includes("router.post('/personal-money/net-worth/snapshot'"),'Snapshot route missing.');
+assert(routes.includes("router.post('/personal-money/net-worth/lifecycle/items'"),'Lifecycle reminder route missing.');
+assert(routes.includes("router.post('/personal-money/net-worth/lifecycle/documents'"),'Lifecycle document route missing.');
+console.log('FINANCE_UNIFIED_NET_WORTH_TEST_OK');
