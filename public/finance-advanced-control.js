@@ -2,7 +2,7 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v5';
+const VERSION='20260924-advanced-control-v6';
 const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
@@ -25,6 +25,7 @@ const SOURCES=[
   ['reviewInbox','/api/finance/personal-money/review-inbox'],
   ['closeAssurance','/api/finance/close-assurance'],
   ['treasury','/api/finance/treasury-control'],
+  ['performanceRisk','/api/finance/performance-risk-control'],
   ['handover','/api/finance/accountant-handover']
 ];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -281,6 +282,14 @@ function treasuryControl(){
  '<div class="fac-kpis"><div class="fac-kpi"><span>Receivables</span><b>'+money(wc.receivables||0,wc.currency||'AUD')+'</b><small>Open invoice balances</small></div><div class="fac-kpi"><span>Payables</span><b>'+money(wc.payables||0,wc.currency||'AUD')+'</b><small>Open supplier balances</small></div><div class="fac-kpi"><span>Due ≤30d</span><b>'+money(wc.supplier_obligations_due_30d||0,wc.currency||'AUD')+'</b><small>Coverage '+(wc.due_30_cash_coverage_ratio===null||wc.due_30_cash_coverage_ratio===undefined?'—':num(wc.due_30_cash_coverage_ratio).toFixed(2)+'×')+'</small></div><div class="fac-kpi"><span>Overdue payables</span><b>'+money(wc.overdue_payables||0,wc.currency||'AUD')+'</b><small>Requires review if non-zero</small></div></div>'+
  '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Business cash & runway</h4><div class="fac-list">'+(cashRows||'<div class="fac-empty">No business bank cash returned.</div>')+'</div></article><article class="fac-card"><h4>Control boundary</h4><div class="fac-note">'+esc(t.rules?.receivables||'Receivables are not assumed as forecast inflows.')+'</div><div class="fac-note" style="margin-top:8px">'+esc(t.rules?.payments||'No payment is executed from this view.')+'</div><div class="fac-toolbar"><button data-fac-open="treasury">Open Treasury</button><button data-fac-open="company">Company Finance</button><button data-fac-open="closeassurance">Close Assurance</button></div></article></div></section>';
 }
+function performanceRiskControl(){
+ const p=state.data.performanceRisk||{},sum=p.summary||{},positions=p.positions||[];
+ const rows=positions.slice(0,8).map(x=>'<div class="fac-row"><div><h4>'+esc(x.ownership_scope)+' · '+esc(x.currency)+'</h4><p>Cash '+money(x.cash_balance,x.currency)+' · base 90d '+money(x.projections?.base_90d,x.currency)+' · combined downside '+money(x.projections?.combined_downside_90d,x.currency)+'</p></div><div class="fac-right">'+statusChip(x.risk_level||'STABLE')+'</div></div>').join('');
+ return '<section id="facPerformance" class="fac-section"><header><div><h3>Performance & Stress Control</h3><p>Budget pace, operating trend and downside liquidity from the canonical bank ledger.</p></div><button data-fac-open="performance">Open full control</button></header>'+
+ '<div class="fac-kpis"><div class="fac-kpi"><span>High signals</span><b>'+num(sum.high_signal_count)+'</b><small>Calculated exceptions</small></div><div class="fac-kpi"><span>Watch signals</span><b>'+num(sum.watch_signal_count)+'</b><small>Stress / pace</small></div><div class="fac-kpi"><span>Budgets over</span><b>'+num(sum.budgets_over_limit)+'</b><small>Current periods</small></div><div class="fac-kpi"><span>Pace risk</span><b>'+num(sum.budgets_at_pace_risk)+'</b><small>Projected over limit</small></div></div>'+
+ '<div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No performance position returned.</div>')+'</div>'+
+ '<div class="fac-note" style="margin-top:10px">Stress figures use recent actual cash-flow patterns and remain separated by scope/currency. They do not predict markets, revenues or outcomes and do not execute any financial action.</div></section>';
+}
 function sourceHealth(){
  const rows=SOURCES.map(([n,u])=>{const err=state.errors[n];return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+'</div></div>'+statusChip(err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):'READY')+'</div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
@@ -288,8 +297,8 @@ function sourceHealth(){
 
 function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
- executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+treasuryControl()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ executive()+actions()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+treasuryControl()+performanceRiskControl()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }
