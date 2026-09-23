@@ -39,7 +39,7 @@ assert(!/\b(?:DROP|TRUNCATE)\b/i.test(migration),'Close Assurance migration must
 for(const marker of ['MONTH-END CLOSE & ASSURANCE','Immutable close evidence history','function closeAssuranceView()',"if(v==='closeassurance')return closeAssuranceView();","['closeassurance','✓','Close & Assurance']"])
   assert(master.includes(marker),'Close Assurance UI missing '+marker);
 assert(master.includes("['closeAssurance',API+'/close-assurance']"),'Close Assurance must hydrate inside canonical Finance OS.');
-assert(master.includes("data-viewjump="receipts"")||master.includes("action_view:'receipts'"),'Close controls must drill into evidence workflows.');
+assert(master.includes('data-viewjump="receipts"')||master.includes("action_view:'receipts'"),'Close controls must drill into evidence workflows.');
 
 assert(advanced.includes("['closeAssurance','/api/finance/close-assurance']"),'Advanced Control must surface Close Assurance evidence.');
 assert(advanced.includes('Month-end close readiness'),'Advanced Control must show close readiness.');
