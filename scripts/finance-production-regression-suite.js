@@ -14,6 +14,7 @@ const tests=[
   "finance-personal-control-surfaces-test.js",
   "finance-close-assurance-test.js",
   "finance-treasury-control-test.js",
+  "finance-governance-controls-test.js",
   "finance-accountant-handover-test.js",
   "finance-privacy-rules-test.js",
   "finance-trusted-totals-test.js",
