@@ -73,3 +73,12 @@ assert.match(js,/recurring_monthly_estimate/,'Spending intelligence must surface
 assert.match(js,/safe_to_spend_7d/,'Spending intelligence must surface short-horizon safe-to-spend evidence.');
 assert.match(js,/data-merchant-filter/,'Top merchant spending must drill into the transaction ledger.');
 assert.match(js,/does not label a legitimate expense as waste without evidence/,'Waste analysis must remain evidence-based rather than making unsupported judgments.');
+
+assert.match(js,/personalBankDash:null,businessBankDash:null/,'Finance OS must maintain independent Personal and Company bank dashboards.');
+assert.match(js,/banking-dashboard'\+scopeDashboardQuery\('PERSONAL'\)/,'Personal Banking dashboard must load independently of the top workspace selector.');
+assert.match(js,/banking-dashboard'\+scopeDashboardQuery\('BUSINESS'\)/,'Company Banking dashboard must load independently of the top workspace selector.');
+assert.match(js,/function scopedBankWorkspace\(/,'Finance OS must render real bank accounts and activity inside Personal and Company workspaces.');
+assert.match(js,/Personal planning & cash/,'Personal planning wallets must be visibly separate from imported personal bank history.');
+assert.match(js,/CONSOLIDATED — OWNERSHIP PRESERVED/,'Consolidated view must explicitly preserve Personal vs Company ownership.');
+assert.match(js,/data-scope-view="PERSONAL"/,'Consolidated view must provide direct Personal-ledger navigation.');
+assert.match(js,/data-scope-view="BUSINESS"/,'Consolidated view must provide direct Company-ledger navigation.');
