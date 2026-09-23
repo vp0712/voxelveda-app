@@ -13,7 +13,7 @@ assert(ui.includes('const MOBILE_NAV'),'Canonical Finance mobile navigation miss
 for(const marker of ["'overview','⌂','Home'","'accounts','▣','Accounts'","'transactions','↕','Transactions'","'statements','▤','Statements'","'more','☰','More'"]){
   assert(ui.includes(marker),`Canonical bottom navigation missing ${marker}`);
 }
-assert(ui.includes("fmSearch").toString?true:true);
+assert(ui.includes("$('fmSearch')"),'Canonical Finance search input binding missing.');
 assert(ui.includes("Search finance or type a command: add expense, upload statement, create report"),'Finance command/search input missing.');
 assert(ui.includes('runFinanceCommand(value)'),'Finance command router missing.');
 assert(ui.includes('globalFinanceSearch(value)'),'Global Finance search missing.');
