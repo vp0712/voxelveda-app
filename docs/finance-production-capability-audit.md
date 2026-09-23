@@ -72,6 +72,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 
 18. Original requirements acceptance is now enforced by a dedicated single-Finance-OS regression contract covering the requested account, history import, Personal/Company separation, cash, Borrow/Lend, multi-currency, reporting, recovery, mobile and security workflows.
 
+19. Banking Command Centre now surfaces permission-scoped liquidity, runway, obligations, independent approval inbox and banking attention directly inside the single Finance OS; legacy Banking test contracts now validate the canonical master frontend.
+
 ## Production infrastructure evidence
 
 ### Database transport
