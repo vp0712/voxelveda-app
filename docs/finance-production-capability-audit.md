@@ -31,7 +31,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Reimbursements | Draft/submit/approve/reject/payment-link lifecycle | PARTIAL until production user-flow verification |
 | Cash | Canonical cash account creation plus owner-only Personal Money wallets, explicit-FX movements, zero-balance archive and controlled restore | PARTIAL pending authenticated production journey verification |
 | Budgets | Personal budgets plus banking-ledger budgets with create/update/remove or archive controls and usage tracking | PARTIAL pending authenticated production journey verification |
-| Savings goals | Goal management, pause/resume and explicit progress contributions that do not silently move bank cash | PARTIAL pending authenticated production journey verification |
+| Savings goals | Goal management, pause/resume, explicit progress contributions and unified roadmap creation/checkpoints/status tracking that do not silently move bank cash | PARTIAL pending authenticated production journey verification |
 | Net Worth | Owner-private, currency-separated bank/wallet/assets/liabilities/Borrow-Lend totals, explicit snapshots, valuation history and asset-protection reminders/document references surfaced in the unified Finance OS | PARTIAL pending authenticated production journey verification |
 | Borrow & Lend | Owner-only debt detail, due-date/note/counterparty maintenance, repayment history and repayment workflow | PARTIAL pending authenticated production journey verification |
 | Recurring money | Personal recurring create/complete/archive/restore lifecycle plus finance-intelligence suggestions; no bank execution | PARTIAL pending authenticated production journey verification |
@@ -82,6 +82,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 21. Existing owner-private Net Worth and Asset Protection backends are now surfaced inside the single Finance OS instead of remaining a disconnected legacy UI: asset/liability creation, valuation/balance updates, snapshots, reminders and private HTTPS document references all use their existing protected routes.
 
 22. A production legacy Finance frontend gate now blocks any non-canonical `finance-*`, `personal-finance-*` or `advanced-banking-ui*` HTML/CSS/JS asset with HTTP 410. `/banking` and the old reconciliation page redirect into the single Finance OS, preventing old UI bundles from resurfacing even if stale files remain in repository history.
+
+22. The existing private Financial Roadmap backend is now fully actionable from Forecast: create a roadmap, inspect milestones/intelligence, record actual progress, pause/resume, complete or archive without posting money or changing real balances.
 
 ## Production infrastructure evidence
 

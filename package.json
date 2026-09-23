@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js && node scripts/database-runtime-verification-test.js && node scripts/finance-bulk-review-rules-v2-test.js && node scripts/finance-bootstrap-resilience-test.js && node scripts/finance-unified-runtime-regression-test.js && node scripts/finance-fx-rates-test.js && node scripts/personal-money-lifecycle-test.js && node scripts/finance-borrow-lend-delete-lifecycle-test.js && node scripts/finance-original-requirements-acceptance-test.js && node scripts/finance-unified-net-worth-test.js && node scripts/finance-legacy-ui-gate-test.js",
+    "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js && node scripts/database-runtime-verification-test.js && node scripts/finance-bulk-review-rules-v2-test.js && node scripts/finance-bootstrap-resilience-test.js && node scripts/finance-unified-runtime-regression-test.js && node scripts/finance-fx-rates-test.js && node scripts/personal-money-lifecycle-test.js && node scripts/finance-borrow-lend-delete-lifecycle-test.js && node scripts/finance-original-requirements-acceptance-test.js && node scripts/finance-unified-net-worth-test.js && node scripts/finance-legacy-ui-gate-test.js && node scripts/finance-unified-roadmap-test.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
     "typecheck": "node scripts/check-syntax.js",
