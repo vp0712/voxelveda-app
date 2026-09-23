@@ -1,35 +1,34 @@
-const fs = require('node:fs');
-const path = require('node:path');
+'use strict';
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.join(__dirname,'..');
+const read=(p)=>fs.readFileSync(path.join(root,p),'utf8');
+const assert=(ok,message)=>{if(!ok)throw new Error(message)};
 
-function read(file) { return fs.readFileSync(path.join(__dirname, '..', file), 'utf8'); }
-function expect(source, needle, message) { if (!source.includes(needle)) throw new Error(message || `Expected ${needle}`); }
+const client=read('public/finance-master.js');
+const css=read('public/finance-master.css');
+const html=read('public/finance-intelligence.html');
 
-const wizard = read('public/finance-import-wizard.js');
-const styles = read('public/finance-import-wizard.css');
-const financeStyles = read('public/finance-intelligence.css');
-const readiness = read('public/finance-banking-readiness.js');
+assert(html.includes('/finance-master.js'),'canonical Finance OS client must be loaded');
+assert(client.includes('function openStatementWizard()'),'single-file statement import workflow is missing');
+assert(client.includes('function openHistoricalImport('),'multi-file historical import workflow is missing');
+assert(client.includes('accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx"'),'supported statement formats must remain explicit');
+assert(client.includes('multiple required'),'historical import must allow multiple files for one selected account');
+assert(client.includes('parseOfx')&&client.includes('parseQif')&&client.includes('parsePdfLines')&&client.includes('parseXlsx'),'canonical Finance OS statement parsers are incomplete');
+assert(client.includes("crypto.subtle.digest('SHA-256'"),'statement file hashing is missing');
+assert(client.includes('/statements/preview'),'statement rows must stage through protected preview before commit');
+assert(client.includes('openStatementReview'),'staged statements must open explicit review');
+assert(client.includes("['DUPLICATE','REJECTED'].includes(row.validation_status)"),'duplicate/rejected rows must be excluded from selectable import rows');
+assert(client.includes('data-review-commit'),'review must expose explicit commit action');
+assert(client.includes('data-review-reject'),'review must expose explicit reject action');
+assert(client.includes('Nothing has been committed yet.'),'multi-file staging must clearly remain non-posting before review');
+assert(client.includes('No imported row enters the canonical ledger until you review and commit it.'),'historical import safety explanation is missing');
+assert(client.includes('checking duplicates'),'duplicate-check progress feedback is missing');
+assert(client.includes('fm-import-queue'),'multi-file import progress queue is missing');
+assert(css.includes('.fm-import-queue')&&css.includes('.fm-import-item'),'historical import progress styling is missing');
+assert(css.includes('@media(max-width:700px)'),'Finance OS must include mobile layout rules');
+assert(css.includes('.fm-table-wrap')&&css.includes('overflow:auto'),'mobile/compact review tables must remain horizontally usable');
+assert(css.includes('.fm-drawer{width:100vw}')||css.includes('.fm-drawer{width:100vw;'),'mobile statement review drawer must use available screen width');
+assert(!html.includes('finance-bank-app-v3')&&!html.includes('finance-bank-app-v4')&&!html.includes('premium-banking-app'),'canonical statement workflow must not load retired Finance/Banking apps');
 
-expect(wizard, 'Import in 5 safe steps', 'Import wizard heading is missing.');
-expect(wizard, 'Choose account', 'Import wizard account step is missing.');
-expect(wizard, 'Choose file', 'Import wizard file step is missing.');
-expect(wizard, 'Preview checks', 'Import wizard preview step is missing.');
-expect(wizard, 'Review rows', 'Import wizard review step is missing.');
-expect(wizard, 'Approve import', 'Import wizard approval step is missing.');
-expect(wizard, "new Set(['CSV','PDF','OFX','QFX','QIF','XLSX'])", 'Supported statement formats must remain explicit.');
-expect(wizard, 'Nothing touches your finance records until the final approval step.', 'Import safety explanation is missing.');
-expect(wizard, 'Duplicates stay excluded', 'Duplicate handling explanation is missing.');
-expect(wizard, 'Preview statement', 'Preview action label is missing.');
-expect(wizard, 'Checking statement…', 'Import progress state is missing.');
-expect(wizard, "document.readyState === 'loading'", 'Wizard must initialize safely when dynamically loaded.');
-expect(styles, '.import-stepper', 'Wizard progress styling is missing.');
-expect(styles, '@media(max-width:700px)', 'Wizard must include mobile-specific layout.');
-expect(readiness, '/finance-import-wizard.js?v=20260916-wizard2', 'Readiness layer must load the versioned import wizard script.');
-expect(readiness, '/finance-import-wizard.css?v=20260916-wizard2', 'Readiness layer must load the versioned import wizard styles.');
-expect(financeStyles, '.review-table thead{display:none}', 'Mobile review must hide the desktop table header.');
-expect(financeStyles, ".review-table td:nth-child(4)::before{content:'Money out'}", 'Mobile review must label outgoing money clearly.');
-expect(financeStyles, ".review-table td:nth-child(5)::before{content:'Money in'}", 'Mobile review must label incoming money clearly.');
-expect(financeStyles, ".review-table td:nth-child(7)::before{content:'Status'}", 'Mobile review must label validation status clearly.');
-expect(financeStyles, '.review-dialog .dialog-actions{position:sticky', 'Mobile review actions must stay visible while scrolling.');
-expect(financeStyles, '.review-table .row-select{width:22px;height:22px', 'Mobile review include controls must be touch friendly.');
-
-console.log('Finance import wizard and mobile review regression checks passed.');
+console.log('Unified Finance statement import and historical migration checks passed.');
