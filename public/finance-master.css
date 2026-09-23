@@ -104,3 +104,5 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 @media(max-width:700px){.fm-setup-hero{align-items:flex-start}.fm-setup-ring{width:78px;height:78px;min-width:78px}.fm-setup-hero h2{font-size:1.05rem}}
 
 .fm-inline-actions a{display:inline-flex;align-items:center;text-decoration:none;border:1px solid var(--line);background:#fff;color:#36414c;border-radius:9px;padding:7px 9px;font-size:.6rem;font-weight:850}.fm-inline-actions a:hover{background:#f5f7f8}
+
+.fm-fx-summary{border-color:#d6dfcf}.fm-fx-summary .fm-card-head>button{white-space:nowrap}

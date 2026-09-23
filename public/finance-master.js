@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -19,7 +19,7 @@ const FINANCE_REQUEST_TIMEOUT_MS=12000;
 const FINANCE_HYDRATION_BATCH_SIZE=5;
 const NAV_GROUPS=[
  ['HOME',[['overview','⌂','Overview'],['personal','◉','My Money'],['company','◆','Company Finance'],['consolidated','◎','Consolidated']]],
- ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['bankops','⌁','Banking Operations'],['cash','¤','Cash'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
+ ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['bankops','⌁','Banking Operations'],['cash','¤','Cash'],['currency','FX','Currency Centre'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar']]],
  ['INTELLIGENCE',[['insights','✦','Insights'],['rules','⌁','Rules'],['review','!','Review Centre'],['reconciliation','✓','Reconciliation']]],
@@ -84,6 +84,7 @@ function title(v){return ({
  statements:['Statement Vault','Upload, review, duplicate-check and commit statements without overwriting source evidence.'],
  receipts:['Receipts','Private receipt vault and missing-receipt review queue over visible Finance transactions.'],
  cash:['Cash','Cash wallets and cash-type financial accounts.'],
+ currency:['Currency Centre','Track explicit FX evidence and calculate management conversions without rewriting native transactions.'],
  debt:['Borrow & Lend','Owner-only debt lifecycle with repayments and remaining balances.'],
  recurring:['Recurring Money','Known and detected recurring commitments; nothing is paid automatically.'],
  transfers:['Transfers','Confirm own-account debit/credit pairs without counting them as income or expense.'],
@@ -244,7 +245,7 @@ async function hydrateSupplementary(cycle){
   ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
   ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
   ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],
-  ['roadmaps',API+'/personal-money/roadmaps'],['personalBankDash',I+'/banking-dashboard'+scopeDashboardQuery('PERSONAL')],['businessBankDash',I+'/banking-dashboard'+scopeDashboardQuery('BUSINESS')],['openBankProviders',I+'/open-banking/providers'],['openBankSessions',I+'/open-banking/sessions'],['bankConnectionData','/api/integrations/webhooks/banking/connections'],['bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs']
+  ['roadmaps',API+'/personal-money/roadmaps'],['fxRates',API+'/fx-rates'],['personalBankDash',I+'/banking-dashboard'+scopeDashboardQuery('PERSONAL')],['businessBankDash',I+'/banking-dashboard'+scopeDashboardQuery('BUSINESS')],['openBankProviders',I+'/open-banking/providers'],['openBankSessions',I+'/open-banking/sessions'],['bankConnectionData','/api/integrations/webhooks/banking/connections'],['bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs']
  ];
  for(let index=0;index<resources.length;index+=FINANCE_HYDRATION_BATCH_SIZE){
   if(cycle!==loadCycle)return;
@@ -295,7 +296,7 @@ function overview(){
  const accountCard=dashboardCardVisible('accounts')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounts</h2><p>Balances are current positions and never period-filtered.</p></div><button data-viewjump="accounts">Manage</button></div><div class="fm-list">'+(accountRows||emptyState('No accounts','Add an account or import a statement.'))+'</div></div></article>':'';
  const recentCard=dashboardCardVisible('recent')?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Recent transactions</h2><p>Drill into current classification and immutable source evidence.</p></div><button data-viewjump="transactions">View all</button></div><div class="fm-list">'+recentRows()+'</div></div></article>':'';
  const attentionCard='<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Needs your attention</h2><p>Direct queues, not decorative alerts.</p></div></div><div class="fm-attention-grid">'+attentionHtml+'</div></div></article>';
- return financeCommandCentre()+hero()+((cashflowCard||expenseCard)?'<div class="fm-grid two">'+cashflowCard+expenseCard+'</div>':'')+'<div class="fm-grid two">'+attentionCard+accountCard+'</div>'+recentCard;
+ return financeCommandCentre()+hero()+managementConversionCard()+((cashflowCard||expenseCard)?'<div class="fm-grid two">'+cashflowCard+expenseCard+'</div>':'')+'<div class="fm-grid two">'+attentionCard+accountCard+'</div>'+recentCard;
 }
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
@@ -474,6 +475,41 @@ function consolidatedView(){
  const personalRows=dashboardCurrencyRows(state.personalBankDash),businessRows=dashboardCurrencyRows(state.businessBankDash);
  const summaryCards=(label,scope,rows)=>'<article class="fm-owner-summary '+scope.toLowerCase()+'"><div class="fm-card-head"><div><small>'+scope+'</small><h2>'+label+'</h2></div><button data-scope-view="'+scope+'" data-scope-target="transactions">Open</button></div><div class="fm-owner-currencies">'+(rows.map(r=>'<div><span>'+esc(r.currency)+'</span><b>'+nativeMoney(r.balance,r.currency)+'</b><small>In '+nativeMoney(r.money_in,r.currency)+' · Out '+nativeMoney(r.money_out,r.currency)+' · Net '+nativeMoney(r.net_flow,r.currency)+'</small></div>').join('')||'<div><span>No activity</span><b>—</b><small>No visible bank account data for this ownership scope.</small></div>')+'</div></article>';
  return '<div class="fm-control-intro"><p>CONSOLIDATED — OWNERSHIP PRESERVED</p><h2>One finance system, two clearly separated ownership views</h2><span>Personal and Voxel Veda bank records are displayed together for analysis but are never silently merged or reclassified. Native currencies remain separate.</span><div class="fm-control-quick"><button data-scope-view="PERSONAL" data-scope-target="transactions">Personal transactions</button><button data-scope-view="BUSINESS" data-scope-target="transactions">Company transactions</button><button data-viewjump="reports">Build consolidated report</button></div></div><div class="fm-owner-grid">'+summaryCards('Personal Banking','PERSONAL',personalRows)+summaryCards('Voxel Veda Company Banking','BUSINESS',businessRows)+'</div>'+scopedBankWorkspace('Personal Banking','PERSONAL',state.personalBankDash,'personalBankDash')+scopedBankWorkspace('Voxel Veda Company Banking','BUSINESS',state.businessBankDash,'businessBankDash');
+}
+function latestFxRate(from,to,asOf=localIsoDay()){
+ const source=String(from||'').toUpperCase(),target=String(to||'').toUpperCase();
+ if(!source||!target)return null;if(source===target)return {rate:1,effective_date:asOf,source_note:'Same currency'};
+ const rows=(state.fxRates?.rates||[]).filter(r=>String(r.effective_date||'').slice(0,10)<=asOf);
+ const direct=rows.filter(r=>r.from_currency===source&&r.to_currency===target).sort((a,b)=>String(b.effective_date).localeCompare(String(a.effective_date)))[0];
+ if(direct)return {rate:num(direct.rate),effective_date:direct.effective_date,source_note:direct.source_note||'Manual FX evidence',rate_uid:direct.rate_uid,direction:'DIRECT'};
+ const reverse=rows.filter(r=>r.from_currency===target&&r.to_currency===source).sort((a,b)=>String(b.effective_date).localeCompare(String(a.effective_date)))[0];
+ if(reverse&&num(reverse.rate)>0)return {rate:1/num(reverse.rate),effective_date:reverse.effective_date,source_note:reverse.source_note||'Manual FX evidence',rate_uid:reverse.rate_uid,direction:'INVERSE'};
+ return null;
+}
+function managementConversionCard(){
+ const rows=currencyRows(),target=String(state.userPreferences?.reporting_currency||state.companySettings?.settings?.base_currency||'AUD').toUpperCase();
+ if(!rows.length)return '';
+ let balance=0,moneyIn=0,moneyOut=0,net=0;const missing=[],used=[];
+ for(const row of rows){
+  const fx=latestFxRate(row.currency,target);
+  if(!fx){missing.push(row.currency);continue}
+  balance+=num(row.balance)*fx.rate;moneyIn+=num(row.money_in)*fx.rate;moneyOut+=num(row.money_out)*fx.rate;net+=num(row.net_flow)*fx.rate;
+  if(row.currency!==target)used.push(row.currency+'→'+target+' '+fx.rate.toFixed(6)+' @ '+String(fx.effective_date).slice(0,10));
+ }
+ const complete=missing.length===0;
+ return `<article class="fm-card fm-fx-summary"><div class="fm-pad"><div class="fm-card-head"><div><h2>Management conversion · ${esc(target)}</h2><p>Native bank values remain authoritative. This optional view uses only your saved FX evidence.</p></div><button data-viewjump="currency">${complete?'Manage rates':'Add rates'}</button></div>${complete?`<div class="fm-grid four"><div class="fm-kpi"><span>Converted position</span><strong>${nativeMoney(balance,target)}</strong><small>Management view only</small></div><div class="fm-kpi"><span>Converted money in</span><strong class="good">${nativeMoney(moneyIn,target)}</strong></div><div class="fm-kpi"><span>Converted money out</span><strong class="bad">${nativeMoney(moneyOut,target)}</strong></div><div class="fm-kpi"><span>Converted net flow</span><strong>${nativeMoney(net,target)}</strong></div></div><p class="fm-helper">${esc(used.join(' · ')||'No conversion was required for this selection.')}</p>`:`<div class="fm-state"><strong>Conversion intentionally incomplete</strong><p>Missing ${esc(missing.join(', '))} → ${esc(target)} FX evidence. Finance will not invent an exchange rate.</p></div>`}</div></article>`;
+}
+function currencyView(){
+ const rates=state.fxRates?.rates||[],target=String(state.userPreferences?.reporting_currency||state.companySettings?.settings?.base_currency||'AUD').toUpperCase();
+ const rateRows=rates.map(r=>`<div class="fm-row"><div><h3>${esc(r.from_currency)} → ${esc(r.to_currency)}</h3><p>1 ${esc(r.from_currency)} = ${num(r.rate).toLocaleString('en-AU',{maximumFractionDigits:10})} ${esc(r.to_currency)} · effective ${date(r.effective_date)}</p><small>${esc(r.source_note||'No source note')}</small></div><div class="fm-row-right">${statusBadge('ACTIVE')}<button data-fx-archive="${esc(r.rate_uid)}">Archive</button></div></div>`).join('');
+ return resourceError('fxRates','Currency Centre')+`<div class="fm-control-intro"><p>MULTI-CURRENCY CONTROL</p><h2>Track native currencies first; convert only with explicit evidence</h2><span>Your AUD, USD, INR and other transactions remain in their original currency. Saved rates create a separate management-calculation layer and never overwrite bank evidence.</span><div class="fm-control-quick"><button data-fx-new="1">+ Add FX rate</button><button data-viewjump="reports">Reports</button><button data-viewjump="settings">Reporting currency</button></div></div>${managementConversionCard()}<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>FX evidence register</h2><p>Current reporting target: ${esc(target)}. Reverse conversion is calculated only from an explicit saved inverse rate.</p></div><button data-fx-new="1">+ Rate</button></div><div class="fm-list">${rateRows||emptyState('No FX evidence saved','Add a rate only when you have a bank/card/provider or other explicit source for that rate.')}</div></div></article>`;
+}
+function openFxRateForm(){
+ const target=String(state.userPreferences?.reporting_currency||state.companySettings?.settings?.base_currency||'AUD').toUpperCase();
+ $('fmModalEyebrow').textContent='FX EVIDENCE';$('fmModalTitle').textContent='Add exchange rate';
+ $('fmModalBody').innerHTML=`<form id="fxRateForm" class="fm-form"><div class="fm-form-grid"><label>From currency<input name="from_currency" maxlength="3" placeholder="USD" required></label><label>To currency<input name="to_currency" maxlength="3" value="${esc(target)}" required></label></div><div class="fm-form-grid"><label>Rate<input name="rate" inputmode="decimal" placeholder="1 FROM = ? TO" required></label><label>Effective date<input name="effective_date" type="date" value="${localIsoDay()}" required></label></div><label>Evidence / source note<input name="source_note" placeholder="e.g. Wise conversion receipt, bank card settlement rate"></label><p class="fm-helper">This creates management-reporting evidence only. It does not revalue or rewrite any native transaction.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary">Save rate</button></div></form>`;
+ $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
+ $('fxRateForm').onsubmit=async e=>{e.preventDefault();const body=Object.fromEntries(new FormData(e.currentTarget).entries());body.from_currency=String(body.from_currency||'').toUpperCase();body.to_currency=String(body.to_currency||'').toUpperCase();try{const x=await api(API+'/fx-rates',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await loadResource('fxRates',API+'/fx-rates');if(state.view==='currency')render()}catch(error){notice(error.message,true)}};
 }
 function cashView(){
  const p=state.personal||{}, wallets=p.wallets||[];
@@ -735,6 +771,7 @@ function simpleView(v){
  if(v==='consolidated')return consolidatedView();
  if(v==='bankops')return bankingOperationsView();
  if(v==='cash')return cashView();
+ if(v==='currency')return currencyView();
  if(v==='transfers')return transfersView();
  if(v==='refunds')return refundsView();
  if(v==='reimbursements')return reimbursementsView();
@@ -1226,6 +1263,8 @@ function bindDynamic(){
  document.querySelectorAll('[data-history-import]').forEach(b=>b.onclick=()=>openHistoricalImport(b.dataset.historyImport));
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));
  document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
+ document.querySelectorAll('[data-fx-new]').forEach(b=>b.onclick=()=>openFxRateForm());
+ document.querySelectorAll('[data-fx-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this FX rate? Historical native transactions are not changed.'))return;try{const x=await api(API+'/fx-rates/'+encodeURIComponent(b.dataset.fxArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await loadResource('fxRates',API+'/fx-rates');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
  document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>openNew(b.dataset.quick));
  document.querySelectorAll('[data-personal-new]').forEach(b=>b.onclick=()=>openPersonalForm(b.dataset.personalNew));

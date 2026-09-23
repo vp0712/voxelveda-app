@@ -47,7 +47,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Accounting period locking | Open/review/ready/locked transitions with protected lock workflow | READY core |
 | Open Banking | Unified provider readiness, consent-session launch, connected-bank sync/disconnect and sync history; still fail-closed when provider configuration/live enablement is incomplete | RUNTIME STATUS |
 | Receipt OCR | No verified OCR provider | UNAVAILABLE |
-| FX reporting | No trusted shared FX-rate service; native-currency separation is enforced | NOT SUPPORTED |
+| FX reporting | Owner-scoped explicit FX evidence register plus reversible management conversion layer; native bank values remain authoritative and missing rates fail closed | PARTIAL pending authenticated production journey verification |
 | Banking operations | Money Spaces, beneficiaries, draft/submit/independent-approval/cancel payment instructions are integrated in the unified Finance OS; external execution stays capability-gated | PARTIAL / external execution NOT SUPPORTED |
 
 ## Correctness defects already fixed
@@ -67,6 +67,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 13. Company accountant PDF repeats company identity/report metadata/header/footer on every page.
 14. Company reporting profile is editable through protected system settings.
 15. Procurement master BOM startup integrity is healthy at 236 items.\n16. The unified Finance Setup Centre now gives one ordered path for account creation, ownership separation, historical import, review, classification, reconciliation, receipt evidence and reusable reporting.
+16. Multi-currency management conversion now uses explicit owner-scoped FX evidence and refuses to invent missing exchange rates.
 
 ## Production infrastructure evidence
 
@@ -100,7 +101,7 @@ Production currently has backup-provider metadata configured but no `BACKUP_STAT
 
 ## Remaining genuine limitations
 
-- Verified FX-rate storage/conversion is not implemented.
+- FX-rate storage and management conversion are implemented using explicit user-supplied evidence; automatic market-rate ingestion and accounting revaluation are intentionally not implemented.
 - Receipt OCR is not configured.
 - External bank payment execution is not supported.
 - The standard report catalogue is now exposed through the unified Report Centre and the common branded PDF/CSV/XLSX exporter; authenticated production journey verification is still required before marking reporting READY.

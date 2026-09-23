@@ -108,3 +108,7 @@ assert.match(js,/Account Statement needs exactly one account/,'Account Statement
 assert.match(js,/GST review summary/,'Finance Report Centre must expose GST review results.');
 assert.match(js,/Reimbursement lifecycle/,'Finance Report Centre must expose reimbursement report results.');
 assert.match(js,/Data quality controls/,'Finance Report Centre must expose data-quality report results.');
+
+assert.match(js,/\['currency','FX','Currency Centre'\]/,'Finance OS must expose the Currency Centre.');
+assert.match(js,/function managementConversionCard\(\)/,'Finance OS must calculate explicit evidence-based management conversions.');
+assert.match(js,/Finance will not invent an exchange rate/,'Missing FX evidence must remain fail-closed.');

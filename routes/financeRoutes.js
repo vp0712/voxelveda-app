@@ -20,6 +20,7 @@ const financeReportBuilder = require('../controllers/financeReportBuilderControl
 const financeTransactionLifecycle = require('../controllers/financeTransactionLifecycleController');
 const financeCategories = require('../controllers/financeCategoryController');
 const financeUserPreferences = require('../controllers/financeUserPreferencesController');
+const financeFx = require('../controllers/financeFxController');
 const financeSearch = require('../controllers/financeSearchController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
@@ -66,6 +67,9 @@ router.get('/search', requireAnyPermission('VIEW_BANKING'), financeSearch.search
 router.get('/company-summary', requireAnyPermission('VIEW_BUSINESS_BANKING'), financeSearch.companySummary);
 router.get('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.get);
 router.put('/preferences', requireAnyPermission('VIEW_BANKING'), financeUserPreferences.save);
+router.get('/fx-rates', requireAnyPermission('VIEW_BANKING'), financeFx.list);
+router.post('/fx-rates', requireAnyPermission('EDIT_FINANCE'), financeFx.save);
+router.post('/fx-rates/:uid/archive', requireAnyPermission('EDIT_FINANCE'), financeFx.archive);
 router.get('/overview', controller.getOverview);
 router.get('/financial-years', controller.getFinancialYears);
 router.post('/financial-years/:id/check', requireAnyPermission('EDIT_FINANCE'), controller.runYearEndCheck);
