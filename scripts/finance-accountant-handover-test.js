@@ -46,3 +46,5 @@ assert(advanced.includes('data-fac-open="handover"'),'Advanced Control must dril
 console.log('FINANCE_ACCOUNTANT_HANDOVER_OK');
 
 assert((routes.match(/VIEW_BUSINESS_BANKING/g)||[]).length>=3,'Handover snapshot/PDF must require Company Finance visibility in addition to edit/export permissions.');
+
+assert(controller.includes("SELECT * FROM financial_years WHERE id=? LIMIT 1 FOR UPDATE"),'Snapshot versioning must serialize on the financial-year row.');
