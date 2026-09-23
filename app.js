@@ -87,7 +87,7 @@ function isRetiredFinanceUiAsset(asset){
   return name.startsWith('finance-')||name.startsWith('personal-finance-')||name.startsWith('advanced-banking-ui');
 }
 const noStorePublicAssets = new Set([
-  'login.js','admin-dashboard.js','staff.js','profile.js','procurement-ui.js','auth-lifecycle.js','mfa.js','security-page.js','step-up.js','step-up.css','style.css','advanced-theme.css','mobile-shell.js','quality.js','quality.css','shop-floor.js','shop-floor.css','service-worker.js','finance-bootstrap-guard.js','finance-master.js','finance-master.css','finance-statement-parsers.js','global-brand.css','global-brand.js',
+  'login.js','admin-dashboard.js','staff.js','profile.js','procurement-ui.js','auth-lifecycle.js','mfa.js','security-page.js','step-up.js','step-up.css','style.css','advanced-theme.css','mobile-shell.js','quality.js','quality.css','shop-floor.js','shop-floor.css','service-worker.js','finance-bootstrap-guard.js','finance-master.js','finance-master.css','finance-advanced-control.js','finance-statement-parsers.js','global-brand.css','global-brand.js',
   'recovery-assurance.css','recovery-assurance.js','recovery-drill.css','recovery-drill.js','recovery-drill-ledger.css','recovery-drill-ledger.js','recovery-drill-governance.css','recovery-drill-governance.js','recovery-remediation.css','recovery-remediation.js','recovery-executive.css','recovery-executive.js'
 ]);
 app.disable('x-powered-by');
