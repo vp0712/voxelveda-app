@@ -37,7 +37,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Categories | Original bank category preserved separately from editable system category; category manager exposed | PARTIAL |
 | Rules | Suggestion-only merchant/category rules with priority | READY core |
 | Insights | Spending-health cards, top-merchant concentration, recurring commitments, runway/safe-to-spend signals and evidence-backed transaction insights | READY core / integrated UI |
-| Company Finance | Dedicated business bank ledger workspace plus supplier/accounting command-centre data, payables and controls | PARTIAL pending authenticated production journey verification |
+| Company Finance | Dedicated business bank ledger plus real customer invoice receivables/payments, supplier payables, assets, approvals and accountant controls | PARTIAL pending authenticated production journey verification |
 | Personal Money | Dedicated personal bank-ledger workspace plus separately labelled owner-only wallets, briefing, budgets, goals, debts, recurring, saved views and planning intelligence | PARTIAL pending authenticated production journey verification |
 | Consolidated | Side-by-side Personal and Company bank dashboards with ownership-preserving drill-down and no cross-currency aggregation | PARTIAL pending authenticated production journey verification |
 | Reports | Full standard report catalogue is exposed through one Report Centre with saved definitions and protected branded PDF/CSV/XLSX exports | PARTIAL pending authenticated production journey verification |

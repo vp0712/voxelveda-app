@@ -82,3 +82,7 @@ assert.match(js,/Personal planning & cash/,'Personal planning wallets must be vi
 assert.match(js,/CONSOLIDATED — OWNERSHIP PRESERVED/,'Consolidated view must explicitly preserve Personal vs Company ownership.');
 assert.match(js,/data-scope-view="PERSONAL"/,'Consolidated view must provide direct Personal-ledger navigation.');
 assert.match(js,/data-scope-view="BUSINESS"/,'Consolidated view must provide direct Company-ledger navigation.');
+
+assert.match(js,/Customer Receivables/,'Company Finance must expose real customer receivables.');
+assert.match(js,/function customerInvoiceDetail\(/,'Company Finance must expose invoice/payment drill-down.');
+assert.match(js,/api\/invoice\/payment/,'Customer payments must reuse the protected invoice payment ledger.');

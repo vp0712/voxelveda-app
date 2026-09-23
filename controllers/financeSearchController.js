@@ -98,7 +98,7 @@ exports.companySummary=async(req,res)=>{
   try{
     await ensureFinanceSchema();
     if(!canViewBusiness(req))throw new FinanceError('Company Finance is not available to this user.',403,'BUSINESS_FINANCE_FORBIDDEN');
-    const [settingRows,bills,queries,assets]=await Promise.all([
+    const [settingRows,bills,queries,assets,customerInvoices]=await Promise.all([
       pool.query("SELECT setting_key,setting_value FROM app_settings WHERE setting_key IN ('base_currency','gst_registration')").then(([rows])=>rows),
       pool.query(
         `SELECT sb.id,sb.bill_uid,sb.supplier_invoice_no,sb.issue_date,sb.due_date,sb.status,sb.total_amount,sb.paid_amount,
@@ -113,19 +113,41 @@ exports.companySummary=async(req,res)=>{
       pool.query(
         `SELECT id,asset_number,description,category,purchase_date,purchase_cost,accounting_status
            FROM assets WHERE COALESCE(accounting_status,'ACTIVE')<>'DISPOSED' ORDER BY purchase_date DESC,id DESC LIMIT 100`
-      ).then(([rows])=>rows)
+      ).then(([rows])=>rows),
+      pool.query(
+        `SELECT i.id,i.invoice_no,i.customer_name,i.customer_email,i.total,i.status,i.created_at,
+                COALESCE(p.paid_amount,0) AS paid_amount,
+                GREATEST(COALESCE(i.total,0)-COALESCE(p.paid_amount,0),0) AS balance_due,
+                CASE WHEN COALESCE(p.paid_amount,0)<=0 THEN 'unpaid'
+                     WHEN COALESCE(p.paid_amount,0)>=COALESCE(i.total,0) THEN 'paid' ELSE 'partial' END AS payment_state
+           FROM invoices i
+           LEFT JOIN (SELECT invoice_id,SUM(amount) AS paid_amount FROM invoice_payments GROUP BY invoice_id) p ON p.invoice_id=i.id
+          WHERE COALESCE(i.deleted,0)=0 AND LOWER(COALESCE(i.status,'')) NOT IN ('rejected','void')
+          ORDER BY balance_due DESC,i.created_at DESC,i.id DESC LIMIT 100`
+      ).then(([rows])=>rows).catch((error)=>{
+        if(['ER_NO_SUCH_TABLE','ER_BAD_FIELD_ERROR'].includes(error?.code))return [];
+        throw error;
+      })
     ]);
     const settings=Object.fromEntries(settingRows.map(r=>[r.setting_key,r.setting_value]));
     const outstanding=bills.filter(b=>!['PAID','VOID'].includes(String(b.status).toUpperCase()));
     const payableCents=outstanding.reduce((sum,b)=>sum+money.toCents(b.balance||0),0n);
     const capexCents=assets.reduce((sum,a)=>sum+money.toCents(a.purchase_cost||0),0n);
+    const openReceivables=customerInvoices.filter(i=>Number(i.balance_due||0)>0.009);
+    const receivableCents=openReceivables.reduce((sum,i)=>sum+money.toCents(i.balance_due||0),0n);
+    const invoicedCents=customerInvoices.reduce((sum,i)=>sum+money.toCents(i.total||0),0n);
+    const receivedCents=customerInvoices.reduce((sum,i)=>sum+money.toCents(i.paid_amount||0),0n);
     const currency=String(settings.base_currency||'AUD').toUpperCase();
     return res.json({
       currency,supplier_payables:money.fromCents(payableCents),supplier_bill_count:outstanding.length,
       pending_supplier_approvals:bills.filter(b=>String(b.status).toUpperCase()==='PENDING_APPROVAL').length,
       open_accountant_queries:queries.length,active_asset_count:assets.length,recorded_asset_cost:money.fromCents(capexCents),
       gst_registration:settings.gst_registration||'UNKNOWN',bills:bills.slice(0,20),accountant_queries:queries.slice(0,12),assets:assets.slice(0,12),
-      receivables:{status:'NOT_CONFIGURED',note:'No dedicated customer receivables workflow is exposed here; no receivable balance is invented.'}
+      customer_receivables:money.fromCents(receivableCents),open_customer_invoice_count:openReceivables.length,
+      customer_invoiced_total:money.fromCents(invoicedCents),customer_payments_received:money.fromCents(receivedCents),
+      customer_invoices:customerInvoices.slice(0,30),
+      receivables:{status:'READY',source:'invoices + invoice_payments',balance_due:money.fromCents(receivableCents),open_invoice_count:openReceivables.length,
+        note:'Customer receivables use the existing invoice and invoice-payment ledger. They are not inferred from bank credits.'}
     });
   }catch(error){return fail(res,error,'Failed to load Company Finance summary.')}
 };
