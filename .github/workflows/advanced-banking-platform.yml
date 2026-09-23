@@ -44,30 +44,6 @@ on:
       - '.github/workflows/advanced-banking-platform.yml'
   push:
     branches: [main]
-    paths:
-      - 'migrations/20260918_advanced_au_banking_platform.sql'
-      - 'services/openBankingProviderService.js'
-      - 'services/advancedBankingSyncService.js'
-      - 'services/bankSyncScheduler.js'
-      - 'controllers/openBankingController.js'
-      - 'controllers/advancedBankingController.js'
-      - 'routes/advancedBankingRoutes.js'
-      - 'routes/integrationWebhookRoutes.js'
-      - 'middleware/statementPreviewSanitizer.js'
-      - 'config/permissionCatalog.js'
-      - 'public/admin-dashboard.html'
-      - 'public/admin-dashboard.js'
-      - 'public/advanced-theme.css'
-      - 'app.js'
-      - 'migrations/20260918_premium_banking_budgets.sql'
-      - 'migrations/20260918_banking_os_multi_user.sql'
-      - 'controllers/bankingOperatingSystemController.js'
-      - 'scripts/banking-os-multi-user-test.js'
-      - 'controllers/financeIntelligenceController.js'
-      - 'routes/financeRoutes.js'
-      - 'public/finance-pdf-v3.js'
-      - 'services/globalBrandRenderer.js'
-      - 'scripts/advanced-banking-platform-test.js'
 
 jobs:
   banking-platform:

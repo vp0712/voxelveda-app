@@ -68,7 +68,9 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 14. Company reporting profile is editable through protected system settings.
 15. Procurement master BOM startup integrity is healthy at 236 items.
 16. The unified Finance Setup Centre now gives one ordered path for account creation, ownership separation, historical import, review, classification, reconciliation, receipt evidence and reusable reporting.
-16. Multi-currency management conversion now uses explicit owner-scoped FX evidence and refuses to invent missing exchange rates.
+17. Multi-currency management conversion now uses explicit owner-scoped FX evidence and refuses to invent missing exchange rates.
+
+18. Original requirements acceptance is now enforced by a dedicated single-Finance-OS regression contract covering the requested account, history import, Personal/Company separation, cash, Borrow/Lend, multi-currency, reporting, recovery, mobile and security workflows.
 
 ## Production infrastructure evidence
 
