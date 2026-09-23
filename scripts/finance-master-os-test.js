@@ -13,7 +13,7 @@ assert.match(html,/finance-master\.js\?v=20260924-startup-hardening/,'Master fin
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');
-for(const name of ['Overview','My Money','Company Finance','Consolidated','Accounts','Transactions','Cash','Transfers','Refunds','Reimbursements','Borrow & Lend','Recurring','Statements','Budgets','Savings Goals','Insights','Rules','Review Centre','Reconciliation','Reports','Notifications','Team Access','Banking Connections','Finance Settings']){
+for(const name of ['Overview','My Money','Company Finance','Consolidated','Accounts','Transactions','Cash','Transfers','Refunds','Reimbursements','Borrow & Lend','Recurring','Statements','Budgets','Savings Goals','Advanced Control','Insights','Rules','Review Centre','Reconciliation','Reports','Notifications','Team Access','Banking Connections','Finance Settings']){
   assert(js.includes(name),`Navigation must contain ${name}`);
 }
 assert.match(js,/banking-dashboard/,'Finance OS must use real banking dashboard data.');
@@ -133,3 +133,7 @@ assert.match(js,/Current banking attention/,'Finance alerts must surface Banking
 assert.match(js,/function requestFinanceStepUp\(\)/,'Canonical Finance OS must handle step-up verification itself.');
 assert.match(js,/body\.code==='STEP_UP_REQUIRED'/,'Sensitive Finance actions must retry through the current master frontend.');
 assert.match(js,/Never enter a bank password, bank PIN or bank OTP/,'Finance step-up must separate app credentials from bank credentials.');
+
+assert.match(js,/\['advanced','⚡','Advanced Control'\]/,'Advanced Finance Control must be a first-class canonical module.');
+assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control view must be mounted inside the master Finance OS.');
+assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v1/,'Advanced Finance Control must use the canonical versioned asset.');
