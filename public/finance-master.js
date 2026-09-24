@@ -364,22 +364,22 @@ function accounts(){
  const cards=state.accounts.map(a=>{
   const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
   const accountName=esc(a.nickname||'Account');
-  return \`<article class="fm-account-card-shell">
-   <button class="fm-account-card fm-account-card-open" type="button" data-account="\${a.id}" aria-label="Open \${accountName}">
-    <span class="fm-account-type">\${esc(a.account_type||'Account')}</span>
-    <h3>\${accountName}</h3>
-    <p>\${esc(a.institution||'Manual')} · \${esc(a.account_number_masked||'number masked')}</p>
-    <strong>\${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong>
-    <small>\${esc(a.ownership_scope||'')} · \${esc(a.connection_status||'MANUAL')}</small>
-    <div class="fm-coverage"><span>Coverage</span><b>\${date(history.transaction_start||a.history_start_date)} → \${date(history.transaction_end||a.history_end_date)}</b></div>
+  return `<article class="fm-account-card-shell">
+   <button class="fm-account-card fm-account-card-open" type="button" data-account="${a.id}" aria-label="Open ${accountName}">
+    <span class="fm-account-type">${esc(a.account_type||'Account')}</span>
+    <h3>${accountName}</h3>
+    <p>${esc(a.institution||'Manual')} · ${esc(a.account_number_masked||'number masked')}</p>
+    <strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong>
+    <small>${esc(a.ownership_scope||'')} · ${esc(a.connection_status||'MANUAL')}</small>
+    <div class="fm-coverage"><span>Coverage</span><b>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)}</b></div>
    </button>
    <div class="fm-account-card-actions">
-    <button type="button" data-account-edit="\${a.id}">Edit</button>
-    <button type="button" class="bad" data-account-purge="\${a.id}">Delete</button>
+    <button type="button" data-account-edit="${a.id}">Edit</button>
+    <button type="button" class="bad" data-account-purge="${a.id}">Delete</button>
    </div>
-  </article>\`;
+  </article>`;
  }).join('');
- return \`<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial accounts</h2><p>Open an account for overview, transactions, analytics, reconciliation and lifecycle controls.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-account-grid">\${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>\`;
+ return `<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial accounts</h2><p>Open an account for overview, transactions, analytics, reconciliation and lifecycle controls.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-account-grid">${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>`;
 }
 function transactions(){
  const meta=state.txMeta||{},f=state.txFilters,saved=state.savedViews?.saved_views||[];
@@ -2215,7 +2215,7 @@ async function purgeAccount(id){
  const account=state.accounts.find(a=>String(a.id)===String(id))||{};
  const required='DELETE '+id;
  const name=account.nickname||'this account';
- const typed=prompt('Permanently delete "'+name+'" AND all data linked to this financial account?\\n\\nThis cannot be undone. Statements, imported transactions, account-linked Finance records, reconciliation/receipt links and delegated account access are removed.\\n\\nType exactly:\\n'+required);
+ const typed=prompt('Permanently delete "'+name+'" AND all data linked to this financial account?\n\nThis cannot be undone. Statements, imported transactions, account-linked Finance records, reconciliation/receipt links and delegated account access are removed.\n\nType exactly:\n'+required);
  if(typed!==required)return;
  try{
   const result=await api(I+'/accounts/'+encodeURIComponent(id)+'/purge',{method:'DELETE',body:JSON.stringify({confirmation:typed})});
