@@ -112,3 +112,159 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 .fm-runtime-health{margin-top:13px}.fm-runtime-failures{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.fm-runtime-failures .fm-row button{white-space:nowrap}
 @media(max-width:700px){.fm-runtime-failures .fm-row{align-items:flex-start}.fm-runtime-failures .fm-row button{width:100%;margin-top:7px}}
+
+
+/* ==========================================================================
+   Finance Premium UI v16 — 2026-09-24
+   Visual-only presentation layer. Existing Finance workflows and controls stay intact.
+   ========================================================================== */
+:root{
+  --bg:#f4f8fd;
+  --ink:#0d1630;
+  --muted:#6b7c96;
+  --line:#dce7f2;
+  --dark:#0b1428;
+  --accent:#0877ff;
+  --good:#0a9b74;
+  --bad:#d24352;
+  --warn:#a86a00;
+  --shadow:0 18px 48px rgba(35,77,126,.09);
+}
+html,body{background:linear-gradient(180deg,#eef6ff 0,#f7faff 240px,#f4f8fd 520px);color:var(--ink)}
+.fm-shell{background:transparent}
+.fm-sidebar{background:rgba(255,255,255,.96);border-right:1px solid #e1eaf4;box-shadow:12px 0 36px rgba(32,68,107,.045)}
+.fm-brand{border-bottom:0;padding:6px 9px 19px}.fm-brand strong{font-size:.9rem;letter-spacing:-.02em}.fm-brand span{color:#8291a7}
+#fmNav button{border-radius:13px;color:#53647b;transition:.18s ease}
+#fmNav button:hover{background:#f2f7fd}
+#fmNav button span{background:#f0f5fb;color:#47617f}
+#fmNav button.active{background:#eaf4ff;color:#086eea}
+#fmNav button.active span{background:#0877ff;color:#fff;box-shadow:0 8px 20px rgba(8,119,255,.24)}
+.fm-main{padding:24px 28px 54px;background:transparent}
+.fm-topbar{background:linear-gradient(180deg,rgba(244,249,255,.98),rgba(244,249,255,.91));backdrop-filter:blur(18px);padding:10px 0 18px;border-bottom:1px solid rgba(218,230,243,.72)}
+.fm-eyebrow{color:#7185a2;font-size:.61rem;letter-spacing:.17em}
+.fm-topbar h1{font-size:2rem;letter-spacing:-.045em;color:#0a1228}
+.fm-topbar p:last-child{font-size:.75rem;color:#6d7e96;max-width:720px;line-height:1.45}
+.fm-search{height:46px;border-radius:15px;border-color:#dbe6f1;box-shadow:0 7px 22px rgba(42,76,114,.05)}
+.fm-icon,.fm-primary{height:46px;border-radius:15px}
+.fm-icon{background:#fff;border-color:#dce6f0;color:#0877ff;font-size:1rem;box-shadow:0 7px 22px rgba(42,76,114,.05)}
+.fm-primary{background:#0877ff;color:#fff;box-shadow:0 10px 24px rgba(8,119,255,.22);padding:0 18px}
+.fm-filterbar{gap:9px;margin:13px 0 18px}
+.fm-filterbar label{min-height:46px;border-radius:15px;border-color:#dce6f0;padding:8px 12px;background:rgba(255,255,255,.94);box-shadow:0 6px 18px rgba(38,76,116,.04);font-size:.65rem}
+.fm-filterbar select,.fm-filterbar input{color:#14213c}
+.fm-card{border-radius:22px;border-color:#e0e9f3;box-shadow:0 14px 40px rgba(36,73,112,.07)}
+.fm-pad{padding:20px}
+.fm-card-head h2{font-size:1.08rem;letter-spacing:-.025em}
+.fm-card-head p{font-size:.66rem;line-height:1.45}
+.fm-card-head button{color:#0877ff;background:#edf6ff;border-radius:11px;padding:8px 11px}
+.fm-command-centre,.fm-control-intro{background:linear-gradient(135deg,#0b1630 0%,#11294b 72%,#14375f 100%);box-shadow:0 20px 52px rgba(11,32,63,.17)}
+.fm-command-action span,.fm-control-quick button:first-child{background:#0877ff!important;color:#fff!important;border-color:#0877ff!important}
+.fm-health-chip{border:1px solid rgba(255,255,255,.12)}
+.fm-account-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.fm-accounts-premium{display:grid;gap:13px}
+.fm-accounts-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.fm-account-search{height:48px;display:flex;align-items:center;gap:10px;flex:1;max-width:520px;background:#fff;border:1px solid #dce7f2;border-radius:16px;padding:0 15px;box-shadow:0 10px 26px rgba(38,79,123,.055);color:#48617f}
+.fm-account-search>span{font-size:1.35rem;line-height:1;color:#173456}
+.fm-account-search input{width:100%;border:0;outline:0;background:transparent;color:#13213b;font-weight:700}
+.fm-account-search input::placeholder{color:#8a9ab0;font-weight:600}
+.fm-account-add{border:0;border-radius:14px;height:48px;padding:0 15px;background:#0877ff;color:#fff;font-weight:900;box-shadow:0 10px 24px rgba(8,119,255,.2)}
+.fm-account-add span{font-size:1.1rem}
+.fm-accounts-panel{overflow:visible}
+.fm-accounts-head{align-items:center}
+.fm-section-kicker{display:block;color:#7890ad;font-size:.52rem;font-weight:950;letter-spacing:.14em;margin-bottom:4px}
+.fm-accounts-head>button{background:#edf6ff;color:#0877ff;border:1px solid #d7eaff;padding:9px 12px}
+.fm-account-card-shell{border:1px solid #dfe9f4;border-radius:22px;background:#fff;overflow:hidden;box-shadow:0 12px 32px rgba(38,76,116,.065);transition:transform .18s ease,box-shadow .18s ease}
+.fm-account-card-shell:hover{transform:translateY(-1px);box-shadow:0 16px 38px rgba(38,76,116,.09)}
+.fm-account-card{cursor:default;padding:18px;background:linear-gradient(180deg,#fff 0%,#fbfdff 100%)}
+.fm-account-card:hover{background:linear-gradient(180deg,#fff 0%,#fbfdff 100%)}
+.fm-account-card-top{display:grid;grid-template-columns:60px minmax(0,1fr) 38px;gap:13px;align-items:start}
+.fm-bank-mark{width:60px;height:60px;border:0;border-radius:18px;background:linear-gradient(145deg,#37a4ff,#0877ff);color:#fff;display:grid;place-items:center;cursor:pointer;box-shadow:0 12px 28px rgba(8,119,255,.22)}
+.fm-bank-mark span{font-size:1.45rem;line-height:1}
+.fm-account-tone-2 .fm-bank-mark{background:linear-gradient(145deg,#38ceb2,#09a88a);box-shadow:0 12px 28px rgba(9,168,138,.2)}
+.fm-account-tone-3 .fm-bank-mark{background:linear-gradient(145deg,#927bff,#6c52df);box-shadow:0 12px 28px rgba(108,82,223,.2)}
+.fm-account-identity{min-width:0}
+.fm-account-identity .fm-account-type{display:inline-flex;background:#eaf4ff;color:#0877ff;padding:5px 9px;font-size:.57rem}
+.fm-account-identity h3{font-size:1.02rem;margin:7px 0 4px;letter-spacing:-.025em}
+.fm-account-identity p{margin:0;color:#6e8099;font-size:.64rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.fm-account-more{width:38px;height:38px;border:0;border-radius:50%;background:#f2f6fb;color:#4d6079;font-weight:900;cursor:pointer;letter-spacing:.08em}
+.fm-account-balance-row{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-top:20px}
+.fm-account-balance>span{display:block;color:#7b8da5;font-size:.61rem;font-weight:700}
+.fm-account-balance>strong{display:block;font-size:1.65rem;letter-spacing:-.045em;margin:4px 0 4px;color:#0b1530}
+.fm-account-balance>small{display:block;color:#70829b;font-size:.56rem;font-weight:850;letter-spacing:.06em}
+.fm-account-main-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.fm-account-main-actions button{height:39px;border-radius:12px;padding:0 13px;font-weight:900;font-size:.62rem;cursor:pointer}
+.fm-account-main-actions .soft{border:1px solid #d8eaff;background:#eef7ff;color:#0877ff}
+.fm-account-main-actions .primary{border:0;background:#0877ff;color:#fff;box-shadow:0 9px 20px rgba(8,119,255,.18)}
+.fm-account-card-footer{border-top:1px solid #e8eef5;margin-top:18px;padding-top:13px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.fm-account-coverage{display:flex;align-items:center;gap:8px;min-width:0}
+.fm-account-coverage>span{width:28px;height:28px;border-radius:50%;background:#e3f8f0;color:#07906d;display:grid;place-items:center;font-size:.7rem;font-weight:950;flex:0 0 auto}
+.fm-account-coverage b,.fm-account-coverage small{display:block}.fm-account-coverage b{font-size:.61rem}.fm-account-coverage small{color:#8796aa;font-size:.5rem;margin-top:2px;white-space:nowrap}
+.fm-account-footer-actions{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap}
+.fm-account-footer-actions button{border:0;background:transparent;border-radius:9px;padding:7px 8px;font-size:.56rem;font-weight:900;color:#526780;cursor:pointer}
+.fm-account-footer-actions .details{color:#0877ff;background:#eff7ff}
+.fm-account-footer-actions .bad{color:#c33b49!important;background:#fff1f3}
+.fm-account-card-actions{display:none}
+.fm-row:hover{background:#f7fbff}
+.fm-badge{background:#eef4fa}
+.fm-badge.good{background:#e2f7ef}.fm-badge.bad{background:#fff0f2}.fm-badge.warn{background:#fff5dc}
+.fm-drawer{box-shadow:-28px 0 70px rgba(17,43,76,.18)}
+.fm-drawer header,.fm-modal header{background:#f8fbff;border-bottom-color:#e1eaf3}
+.fm-modal{border-radius:22px}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,a:focus-visible{outline-color:#0877ff}
+
+@media(max-width:900px){
+ .fm-account-grid{grid-template-columns:1fr}
+}
+@media(max-width:700px){
+ html,body{background:linear-gradient(180deg,#eef6ff 0,#f8fbff 300px,#f4f8fd 620px)}
+ .fm-sidebar{display:none!important}
+ .fm-main{padding:16px 14px calc(96px + env(safe-area-inset-bottom))}
+ .fm-topbar{position:static;padding:12px 2px 16px;border-bottom:0;background:transparent;align-items:flex-start;gap:10px}
+ .fm-topbar>div:first-child{min-width:0}
+ .fm-eyebrow{font-size:.56rem;letter-spacing:.16em}
+ .fm-topbar h1{font-size:2.05rem;line-height:1.03;margin:7px 0 7px}
+ .fm-topbar p:last-child{font-size:.68rem;line-height:1.45}
+ .fm-top-actions{gap:7px}
+ .fm-top-actions .fm-search{display:none}
+ .fm-icon{width:44px;height:44px;border-radius:14px;background:#fff}
+ .fm-primary{height:44px;border-radius:14px;padding:0 15px}
+ .fm-filterbar{overflow:visible;flex-wrap:wrap;display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:5px 0 14px}
+ .fm-filterbar label{min-width:0;width:100%;min-height:46px;border-radius:15px;justify-content:space-between;overflow:hidden}
+ .fm-filterbar select{min-width:0;max-width:100%}
+ body[data-finance-view="accounts"] .fm-filterbar label{display:none}
+ body[data-finance-view="accounts"] .fm-filterbar label:first-child,
+ body[data-finance-view="accounts"] .fm-filterbar label:last-child{display:flex}
+ .fm-pad{padding:16px}
+ .fm-card{border-radius:20px}
+ .fm-accounts-toolbar{display:block}
+ .fm-account-search{max-width:none;width:100%;height:50px;border-radius:17px}
+ .fm-account-add{display:none}
+ .fm-accounts-panel{border-radius:22px}
+ .fm-accounts-head{align-items:flex-start}
+ .fm-accounts-head>button{white-space:nowrap;padding:8px 9px}
+ .fm-accounts-head p{max-width:245px}
+ .fm-account-grid{gap:12px}
+ .fm-account-card-shell{border-radius:20px}
+ .fm-account-card{padding:14px}
+ .fm-account-card-top{grid-template-columns:54px minmax(0,1fr) 34px;gap:11px}
+ .fm-bank-mark{width:54px;height:54px;border-radius:16px}
+ .fm-account-more{width:34px;height:34px}
+ .fm-account-identity h3{font-size:1rem}
+ .fm-account-identity p{font-size:.61rem}
+ .fm-account-balance-row{display:block;margin-top:17px}
+ .fm-account-balance>strong{font-size:1.7rem}
+ .fm-account-main-actions{margin-top:14px;display:grid;grid-template-columns:.7fr 1.3fr}
+ .fm-account-main-actions button{width:100%;height:42px}
+ .fm-account-card-footer{align-items:flex-end}
+ .fm-account-coverage small{max-width:115px;overflow:hidden;text-overflow:ellipsis}
+ .fm-account-footer-actions{max-width:48%;gap:3px}
+ .fm-account-footer-actions button{padding:6px 7px}
+ .fm-account-footer-actions .details{width:100%;text-align:center}
+ .fm-mobile-nav{grid-template-columns:repeat(4,1fr);height:78px;background:rgba(255,255,255,.975);border-top:1px solid #dfe8f2;box-shadow:0 -10px 30px rgba(31,65,105,.08);padding:7px 10px calc(7px + env(safe-area-inset-bottom))}
+ .fm-mobile-nav button{position:relative;background:transparent!important;color:#53657f;border-radius:12px;gap:3px}
+ .fm-mobile-nav button span{font-size:1rem;color:#53657f}
+ .fm-mobile-nav button b{font-size:.5rem}
+ .fm-mobile-nav button.active{color:#0877ff!important}
+ .fm-mobile-nav button.active span{color:#0877ff!important}
+ .fm-mobile-nav button.active:after{content:"";position:absolute;left:28%;right:28%;bottom:1px;height:3px;border-radius:999px;background:#0877ff}
+ .fm-command-centre{border-radius:20px}
+}
