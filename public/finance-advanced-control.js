@@ -2,8 +2,8 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v13';
-const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
+const VERSION='20260924-advanced-control-v14';
+const state={loading:false,data:{},errors:{},statuses:{},progress:{resolved:0,total:0},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
   ['attention','/api/finance/personal-money/attention'],
@@ -37,6 +37,11 @@ const SOURCES=[
   ['counterparty','/api/finance/counterparty-control'],
   ['handover','/api/finance/accountant-handover']
 ];
+const ADVANCED_BATCH_SIZE=4;
+const ADVANCED_REQUEST_TIMEOUT_MS=12000;
+const ADVANCED_LOAD_BUDGET_MS=15000;
+let loadCycle=0;
+const activeControllers=new Map();
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
 const todayIso=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())};
@@ -62,6 +67,7 @@ function style(){
  .fac-bars{display:grid;gap:7px}.fac-bar{display:grid;grid-template-columns:minmax(110px,1fr) 3fr auto;gap:8px;align-items:center;font-size:.78rem}.fac-bar-track{height:8px;border-radius:999px;background:rgba(127,127,127,.12);overflow:hidden}.fac-bar-track i{display:block;height:100%;background:currentColor}
  .fac-scenario{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.fac-scenario label{display:grid;gap:5px;font-size:.78rem}.fac-scenario input,.fac-scenario select{width:100%}.fac-note{padding:12px;border:1px dashed rgba(127,127,127,.25);border-radius:13px;color:var(--muted,#687386);font-size:.8rem}
  .fac-loading{padding:24px;text-align:center;border:1px dashed rgba(127,127,127,.25);border-radius:16px}.fac-source{font-size:.73rem;color:var(--muted,#687386)}.fac-empty{padding:14px;border:1px dashed rgba(127,127,127,.22);border-radius:12px;color:var(--muted,#687386)}
+ .fac-progress{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:1px solid rgba(79,111,223,.2);border-radius:12px;background:rgba(79,111,223,.06);font-size:.8rem}.fac-progress b{white-space:nowrap}.fac-check-actions{display:flex;gap:7px;align-items:center}.fac-check-actions button{min-height:32px;padding:5px 9px}
  .fac-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fac-check{display:flex;justify-content:space-between;gap:10px;padding:10px;border:1px solid rgba(127,127,127,.14);border-radius:11px;align-items:center}
  @media(max-width:950px){.fac-grid.four,.fac-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fac-grid.three{grid-template-columns:1fr 1fr}.fac-scenario{grid-template-columns:1fr 1fr}}
  @media(max-width:650px){.fac-grid.four,.fac-grid.three,.fac-grid.two,.fac-kpis,.fac-control-grid,.fac-scenario{grid-template-columns:1fr}.fac-section>header,.fac-row{flex-direction:column}.fac-right{text-align:left;justify-items:start}.fac-toolbar>*{flex:1;min-width:130px}.fac-jumps{display:grid;grid-template-columns:1fr 1fr}.fac-bar{grid-template-columns:1fr}.fac-bar-track{order:3}}
@@ -69,24 +75,54 @@ function style(){
  document.head.appendChild(s);
 }
 
-async function get(name,url){
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+async function get(name,url,cycle=loadCycle,timeoutMs=ADVANCED_REQUEST_TIMEOUT_MS){
+ activeControllers.get(name)?.abort();
+ const controller=new AbortController();activeControllers.set(name,controller);state.statuses[name]='loading';
+ const timer=setTimeout(()=>controller.abort(),Math.max(1000,Math.min(ADVANCED_REQUEST_TIMEOUT_MS,Number(timeoutMs)||ADVANCED_REQUEST_TIMEOUT_MS)));
  try{
   const r=await fetch(url,{credentials:'same-origin',signal:controller.signal,headers:{Accept:'application/json'}});
   let body={};try{body=await r.json()}catch{}
   if(!r.ok){const e=new Error(body.message||('Request failed ('+r.status+')'));e.status=r.status;throw e}
-  state.data[name]=body;delete state.errors[name];return body;
+  if(cycle!==loadCycle)return null;
+  state.data[name]=body;state.statuses[name]='loaded';delete state.errors[name];return body;
  }catch(e){
-  state.errors[name]=e?.name==='AbortError'?'Timed out':e.message||'Unavailable';return null;
- }finally{clearTimeout(timer)}
+  if(cycle===loadCycle){state.errors[name]=e?.name==='AbortError'?'Timed out':e.message||'Unavailable';state.statuses[name]='error'}
+  return null;
+ }finally{clearTimeout(timer);if(activeControllers.get(name)===controller)activeControllers.delete(name)}
+}
+function updateProgress(){
+ state.progress={resolved:SOURCES.filter(([name])=>['loaded','error'].includes(state.statuses[name])).length,total:SOURCES.length};
+}
+function loadingMarkup(){
+ updateProgress();
+ return '<div class="fac-loading"><b>Building Advanced Finance Control…</b><p>Loaded '+state.progress.resolved+' of '+state.progress.total+' protected evidence sources. This module has a hard '+Math.round(ADVANCED_LOAD_BUDGET_MS/1000)+'-second load budget; the rest of Finance remains available.</p></div>';
 }
 async function load(){
- if(state.loading)return;state.loading=true;
+ if(state.loading)return;
  const root=document.getElementById(MOUNT_ID);if(!root){state.loading=false;return}
- root.innerHTML='<div class="fac-loading"><b>Building Advanced Finance Control…</b><p>Loading protected finance evidence in bounded batches.</p></div>';
- state.data={};state.errors={};
- for(let i=0;i<SOURCES.length;i+=4)await Promise.allSettled(SOURCES.slice(i,i+4).map(([n,u])=>get(n,u)));
- state.loading=false;render();
+ const cycle=++loadCycle,hasExistingData=Object.keys(state.data).length>0,deadline=Date.now()+ADVANCED_LOAD_BUDGET_MS;
+ state.loading=true;state.errors={};state.statuses=Object.fromEntries(SOURCES.map(([name])=>[name,'pending']));updateProgress();
+ if(hasExistingData)render();else root.innerHTML=loadingMarkup();
+ for(let i=0;i<SOURCES.length;i+=ADVANCED_BATCH_SIZE){
+  if(cycle!==loadCycle)return;
+  const remaining=deadline-Date.now();
+  if(remaining<1000)break;
+  const batch=SOURCES.slice(i,i+ADVANCED_BATCH_SIZE);
+  await Promise.allSettled(batch.map(([name,url])=>get(name,url,cycle,remaining)));
+  updateProgress();
+  if(hasExistingData)render();else if(document.getElementById(MOUNT_ID))document.getElementById(MOUNT_ID).innerHTML=loadingMarkup();
+ }
+ if(cycle!==loadCycle)return;
+ for(const [name] of SOURCES){
+  if(['pending','loading'].includes(state.statuses[name])){state.statuses[name]='error';state.errors[name]='Load budget reached'}
+ }
+ for(const controller of activeControllers.values())controller.abort();
+ updateProgress();state.loading=false;render();
+}
+async function retrySource(name){
+ const source=SOURCES.find(([sourceName])=>sourceName===name);if(!source||state.statuses[name]==='loading')return;
+ delete state.errors[name];state.statuses[name]='loading';render();
+ await get(source[0],source[1],loadCycle,ADVANCED_REQUEST_TIMEOUT_MS);updateProgress();render();
 }
 
 function currencies(){
@@ -386,19 +422,23 @@ function cashCustodyControl(){
 }
 
 function sourceHealth(){
- const rows=SOURCES.map(([n,u])=>{const err=state.errors[n];return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+'</div></div>'+statusChip(err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):'READY')+'</div>'}).join('');
+ const rows=SOURCES.map(([n,u])=>{const err=state.errors[n],status=state.statuses[n]||(Object.prototype.hasOwnProperty.call(state.data,n)?'loaded':'pending'),label=err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):(status==='loaded'?'READY':status==='loading'?'LOADING':'PENDING');return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+(err?' · '+esc(err):'')+'</div></div><div class="fac-check-actions">'+statusChip(label)+(status==='error'?'<button type="button" data-fac-retry="'+esc(n)+'">Retry</button>':'')+'</div></div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
 }
 
 function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
+ updateProgress();
+ const progress=state.loading?'<div class="fac-progress" role="status"><span>Refreshing evidence in bounded batches. The current control picture stays available while sources update.</span><b>'+state.progress.resolved+' / '+state.progress.total+'</b></div>':'';
  root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facReadiness">Readiness</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facCashCustody">Cash Custody</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facCounterparty">Counterparties</button><button data-fac-jump="facPlanning">FP&A</button><button data-fac-jump="facProfitability">Job Profitability</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facAnomaly">Explainability</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ progress+
  executive()+executiveReadinessBoard()+actions()+controlActionsSummary()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+cashCustodyControl()+treasuryControl()+counterpartyWorkingCapitalControl()+fpaPlanningControl()+jobProfitabilityControl()+performanceRiskControl()+anomalyExplainability()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }
 function bind(){
- document.getElementById('facRefresh')?.addEventListener('click',load);
+ const refresh=document.getElementById('facRefresh');if(refresh){refresh.disabled=state.loading;refresh.textContent=state.loading?'Refreshing…':'Refresh advanced control';refresh.addEventListener('click',load)}
+ document.querySelectorAll('[data-fac-retry]').forEach(button=>button.addEventListener('click',()=>retrySource(button.dataset.facRetry)));
  document.querySelectorAll('[data-fac-jump]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.facJump)?.scrollIntoView({behavior:'smooth',block:'start'})));
  document.querySelectorAll('[data-fac-open]').forEach(b=>b.addEventListener('click',()=>document.querySelector('[data-view="'+b.dataset.facOpen+'"]')?.click()));
  document.querySelectorAll('[data-fac-tx]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.facTx);if(window.__financeOpenTransaction)window.__financeOpenTransaction(id);else document.querySelector('[data-view="transactions"]')?.click()}));

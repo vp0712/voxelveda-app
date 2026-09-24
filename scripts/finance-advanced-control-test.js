@@ -35,8 +35,12 @@ for(const horizon of ['7,30,90,365','knownProjection','scenarioProjection'])
   assert(advanced.includes(horizon),`Advanced forecasting contract missing ${horizon}.`);
 
 assert(advanced.includes("credentials:'same-origin'"),'Advanced Control requests must preserve authenticated same-origin credentials.');
-assert(advanced.includes('setTimeout(()=>controller.abort(),12000)'),'Advanced Control API calls must have a bounded timeout.');
-assert(advanced.includes('for(let i=0;i<SOURCES.length;i+=4)'),'Advanced Control must hydrate protected sources in bounded batches.');
+assert(advanced.includes('ADVANCED_REQUEST_TIMEOUT_MS=12000'),'Advanced Control API calls must have a bounded per-source timeout.');
+assert(advanced.includes('ADVANCED_LOAD_BUDGET_MS=15000'),'Advanced Control must have a hard module-wide loading budget.');
+assert(advanced.includes('for(let i=0;i<SOURCES.length;i+=ADVANCED_BATCH_SIZE)'),'Advanced Control must hydrate protected sources in bounded batches.');
+assert(advanced.includes('cycle!==loadCycle'),'Advanced Control must reject stale source responses.');
+assert(advanced.includes('data-fac-retry'),'Advanced Control source failures must be independently retryable.');
+assert(advanced.includes('The current control picture stays available while sources update.'),'Advanced Control refresh must preserve the current screen.');
 assert(advanced.includes('does not create a second ledger'),'Advanced Control must explicitly preserve the one-ledger architecture.');
 assert(advanced.includes('combine currencies silently'),'Advanced Control must prohibit silent cross-currency aggregation.');
 assert(!/method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)/i.test(advanced),'Advanced Control must remain read-only against finance APIs.');

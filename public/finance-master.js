@@ -1319,7 +1319,7 @@ function ensureAdvancedControlLoaded(){
  if(window.__financeAdvancedControlMount){mount();return}
  const existing=document.querySelector('script[data-finance-advanced-control]');
  if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}
- const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v13';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
+ const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v14';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
 }
 function advancedControlView(){
  setTimeout(ensureAdvancedControlLoaded,0);
