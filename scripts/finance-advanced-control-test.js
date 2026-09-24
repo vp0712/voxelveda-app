@@ -18,7 +18,7 @@ assert(/\/finance-master\.js\?v=20260924-control-v\d+/.test(html),'Canonical Fin
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
-  'Subscription, Debt & Savings Intelligence','Risk, Integrity & Control Readiness',
+  'Commitments, Debt & Savings Reserve Intelligence','Risk, Integrity & Control Readiness',
   'Tax, Evidence & Year-End Readiness','Company CFO Control','AR / AP Counterparty Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Performance & Stress Control','CFO Anomaly & Explainability','Control Actions','Evidence Source Health'
 ]) assert(advanced.includes(label),`Advanced Finance Control must expose ${label}.`);
 
@@ -85,3 +85,6 @@ assert(advanced.includes('data-fac-open="counterparties"'),'Advanced Control mus
 assert(advanced.includes('Savings & reserves'),'Advanced Control must expose Savings & Reserve intelligence.');
 assert(advanced.includes("source:'Savings & Reserve'"),'Savings pace/emergency signals must feed the Advanced action queue.');
 assert(advanced.includes('never move money automatically'),'Advanced Savings intelligence must preserve its no-money-movement boundary.');
+
+assert(advanced.includes('Emergency reserve coverage under 3.0 months'),'Advanced Control must surface savings reserve coverage signals.');
+assert(advanced.includes('data-fac-open="savings"'),'Advanced Control must drill into canonical Savings & Reserve Control.');
