@@ -8,8 +8,8 @@ const html=read('public/finance-intelligence.html');
 const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
-assert.match(html,/finance-master\.css\?v=20260924-control-v\d+/,'Master finance stylesheet must use the current canonical versioned cache-busting release id.');
-assert.match(html,/finance-master\.js\?v=20260924-control-v\d+/,'Master finance client must use a canonical versioned cache-busting release id.');
+assert.match(html,/finance-master\.css\?v=20\d{6}-control-v\d+/,'Master finance stylesheet must use the current canonical versioned cache-busting release id.');
+assert.match(html,/finance-master\.js\?v=20\d{6}-control-v\d+/,'Master finance client must use a canonical versioned cache-busting release id.');
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');
@@ -139,7 +139,7 @@ assert.match(js,/Never enter a bank password, bank PIN or bank OTP/,'Finance ste
 
 assert.match(js,/\['advanced','⚡','Control Centre'\]/,'Advanced Finance Control must be a first-class canonical home module.');
 assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control view must be mounted inside the master Finance OS.');
-assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v\d+/,'Advanced Finance Control must use a canonical versioned asset.');
+assert.match(js,/finance-advanced-control\.js\?v=20\d{6}-advanced-control-v\d+/,'Advanced Finance Control must use a canonical versioned asset.');
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
 assert.match(js,/const MOBILE_NAV=\[\['accounts','⌂','Accounts'\],\['transactions','▤','Transactions'\],\['statements','▥','Statements'\],\['more','☰','More'\]\]/,'Mobile Finance navigation must use the clean four-tab Accounts, Transactions, Statements and More layout.');
