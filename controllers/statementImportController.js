@@ -363,6 +363,40 @@ exports.preview = async (req, res) => {
         coverage: { start: existingSession.statement_start_date || null, end: existingSession.statement_end_date || null }
       });
     }
+    if (existingSession && existingSession.status === 'REJECTED') {
+      await db.query('DELETE FROM statement_import_rows WHERE import_session_id=?', [existingSession.id]);
+      await insertReviewRows(db, existingSession.id, normalized);
+      await db.query(
+        `UPDATE statement_import_sessions SET
+           status='PENDING_REVIEW', source_format=?, original_name=?, statement_start_date=?, statement_end_date=?,
+           opening_balance=?, closing_balance=?, total_rows=?, valid_rows=?, warning_rows=?, duplicate_rows=?, rejected_rows=?,
+           parser_version=?, parser_confidence=?, reconciliation_status=?, reconciliation_difference=?, extraction_diagnostics_json=?,
+           reviewed_by=NULL, reviewed_at=NULL, committed_by=NULL, committed_at=NULL, rejection_reason=NULL, updated_at=NOW()
+         WHERE id=?`,
+        [sourceFormat, String(req.body.original_name || existingSession.original_name || `statement.${sourceFormat.toLowerCase()}`).slice(0,255),
+          dateOnly(req.body.statement_start_date) || dates[0] || null, dateOnly(req.body.statement_end_date) || dates[dates.length-1] || null,
+          req.body.opening_balance ?? null, req.body.closing_balance ?? null, normalized.length, counts.valid, counts.warning, counts.duplicate, counts.rejected,
+          parserVersion, parserConfidence, reconciliationStatus, Number.isFinite(reconciliationDifference) ? reconciliationDifference : null, diagnostics, existingSession.id]
+      );
+      await logAudit(db, audit(req, {
+        action: 'STATEMENT_REJECTED_REVIEW_RESTAGED',
+        module: 'finance_intelligence',
+        recordType: 'statement_import_session',
+        recordId: existingSession.import_uid,
+        newValue: { parser_version: parserVersion, total_rows: normalized.length, ...counts }
+      }));
+      await db.commit();
+      return res.status(200).json({
+        message: `Rejected review ${existingSession.import_uid} was safely rebuilt from the uploaded statement.`,
+        import_uid: existingSession.import_uid,
+        reused: true,
+        reparsed: true,
+        reset_from_rejected: true,
+        summary: { total: normalized.length, ...counts, selected: counts.valid + counts.warning },
+        coverage: { start: dates[0] || null, end: dates[dates.length - 1] || null },
+        rows: normalized.slice(0,250)
+      });
+    }
     if (existingSession && existingSession.status !== 'REJECTED') {
       throw new FinanceError(`This statement review is ${existingSession.status}.`, 409, 'STATEMENT_REVIEW_LOCKED');
     }
