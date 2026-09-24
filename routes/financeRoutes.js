@@ -38,6 +38,7 @@ const personalDebtPlanning = require('../controllers/personalDebtPlanningControl
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
 const personalMoneyHealth = require('../controllers/personalMoneyHealthController');
+const personalTaxEvidenceControl = require('../controllers/personalTaxEvidenceControlController');
 const personalMoneyDailyBriefing = require('../controllers/personalMoneyDailyBriefingController');
 const personalFinanceSavedViews = require('../controllers/personalFinanceSavedViewsController');
 const personalSpendingChallenges = require('../controllers/personalSpendingChallengeController');
@@ -162,6 +163,8 @@ router.post('/personal-money/smart/safety-buffer', requireAnyPermission('EDIT_FI
 router.get('/personal-money/review-inbox', requireAnyPermission('VIEW_BANKING'), personalMoneyReview.getReviewInbox);
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/confirm', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.confirmMatch);
 router.post('/personal-money/review-inbox/:recurringId/:transactionId/dismiss', requireAnyPermission('EDIT_FINANCE'), personalMoneyReview.dismissMatch);
+router.get('/personal-money/tax-control', requireAnyPermission('VIEW_BANKING'), personalTaxEvidenceControl.getCenter);
+router.put('/personal-money/tax-control/items/:entryId', requireAnyPermission('EDIT_FINANCE'), personalTaxEvidenceControl.saveReview);
 router.get('/personal-money/health', requireAnyPermission('VIEW_BANKING'), personalMoneyHealth.getHealthDashboard);
 router.get('/personal-money/daily-briefing', requireAnyPermission('VIEW_BANKING'), personalMoneyDailyBriefing.getDailyBriefing);
 router.get('/personal-money/data-quality-integrity', requireAnyPermission('VIEW_BANKING'), personalFinancialDataQuality.getCenter);
