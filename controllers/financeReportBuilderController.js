@@ -494,6 +494,23 @@ function bankStatementDate(value){
   const [y,m,d]=raw.split('-');
   return `${d}/${m}/${y}`;
 }
+function renderBankStatementPageChrome(doc,profile,report,reportId,pageNumber,pageCount){
+  const statement=report.account_statement||{};
+  const logoPath=path.join(__dirname,'..','public','Frame 1.png');
+  if(fs.existsSync(logoPath)){try{doc.image(logoPath,42,24,{fit:[56,46]})}catch{}}
+  doc.font('Helvetica-Bold').fontSize(12.5).fillColor('#111827').text(profile.tradingName||profile.legalName||'Voxel Veda',106,25,{width:250});
+  doc.font('Helvetica').fontSize(7).fillColor('#6B7280').text(profile.legalName||'Voxel Veda Pty Ltd',106,42,{width:250});
+  doc.fontSize(6.8).text([profile.abn?`ABN ${profile.abn}`:null,profile.website||null].filter(Boolean).join(' · '),106,54,{width:250});
+  doc.font('Helvetica').fontSize(20).fillColor('#0877FF').text('Your Statement',370,24,{width:183,align:'right'});
+  doc.font('Helvetica-Bold').fontSize(7.2).fillColor('#111827').text(`Statement ${statement.account_id||'—'}`,397,52,{width:156,align:'right'});
+  doc.font('Helvetica').fontSize(6.8).fillColor('#64748B').text(`Page ${pageNumber} of ${pageCount}`,397,64,{width:156,align:'right'});
+  doc.moveTo(42,88).lineTo(553,88).strokeColor('#D9E6F3').lineWidth(0.8).stroke();
+  doc.font('Helvetica').fontSize(6.5).fillColor('#64748B').text(
+    `Account ${statement.account_number_masked||'masked'} · ${bankStatementDate(statement.statement_from)} – ${bankStatementDate(statement.statement_to)} · Statement ID ${reportId}`,
+    42,96,{width:511,align:'right'}
+  );
+}
+
 function bankStatementTableHeader(doc,y){
   doc.save();
   doc.rect(42,y,511,22).fill('#0B5ED7');
@@ -510,10 +527,11 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
   const statement=report.account_statement||{};
   const currency=statement.currency||'AUD';
   const statementNo=`STMT-${statement.account_id||'A'}-${String(statement.statement_from||'ALL').replace(/-/g,'')}-${String(statement.statement_to||'NOW').replace(/-/g,'')}`;
-  doc.font('Helvetica-Bold').fontSize(23).fillColor('#0F172A').text('Account Statement',42,114,{width:320});
-  doc.font('Helvetica').fontSize(8).fillColor('#64748B').text(statementNo,390,119,{width:163,align:'right'});
+  doc.font('Helvetica-Bold').fontSize(18).fillColor('#0F172A').text(statement.account_type||'Finance Account',42,120,{width:320});
+  doc.font('Helvetica').fontSize(7.4).fillColor('#64748B').text('Secure account activity statement',42,143,{width:260});
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#334155').text(statementNo,390,124,{width:163,align:'right'});
 
-  const summaryY=151;
+  const summaryY=163;
   doc.roundedRect(42,summaryY,511,101,10).fillAndStroke('#F8FBFF','#DCE8F5');
   doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(10).text(statement.account_holder||statement.account_name||'Account holder',56,summaryY+14,{width:260});
   doc.font('Helvetica').fontSize(7.5).fillColor('#5E718A').text(`${statement.account_type||'Account'} · ${statement.account_name||''}`,56,summaryY+31,{width:260});
@@ -534,11 +552,14 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
   doc.font('Helvetica').fillColor('#0F172A').text(String(statement.transaction_count||0),446,summaryY+71,{width:94,align:'right'});
 
   doc.font('Helvetica').fontSize(7).fillColor('#64748B').text(
-    'This statement is generated from the Voxel Veda Finance ledger for the signed-in account holder. It is not a Commonwealth Bank statement and does not claim that Voxel Veda is an authorised deposit-taking institution.',
-    42,267,{width:511}
+    'This statement is generated from the Voxel Veda Finance ledger for the signed-in account holder. Source-bank transaction descriptions are preserved for audit accuracy. Voxel Veda branding identifies this generated document; it does not represent the source bank.',
+    42,279,{width:511}
   );
 
-  let y=301;
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#0F172A').text('Transaction activity',42,307,{width:220});
+  doc.font('Helvetica').fontSize(6.8).fillColor('#64748B').text('Debits are money out. Credits are money in. Balance is the recorded running balance where supplied by the source statement.',42,322,{width:511});
+
+  let y=346;
   y=bankStatementTableHeader(doc,y);
   const rows=[...(report.transactions||[])].sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||Number(a.id)-Number(b.id));
   for(const row of rows){
@@ -663,13 +684,17 @@ exports.pdf=async(req,res)=>{
     const pages=doc.bufferedPageRange();
     for(let index=0;index<pages.count;index+=1){
       doc.switchToPage(index);
-      if(fs.existsSync(logoPath)){try{doc.image(logoPath,42,28,{fit:[54,42]})}catch{}}
-      doc.fontSize(12).fillColor('#111827').text(profile.tradingName||profile.legalName||'Voxel Veda',106,27,{width:260});
-      doc.fontSize(7.2).fillColor('#6b7280').text(profile.legalName||'Voxel Veda Pty Ltd',106,43,{width:260});
-      const identity=[profile.abn?`ABN ${profile.abn}`:null,profile.website||null,profile.email||null].filter(Boolean).join(' · ');
-      doc.fontSize(7.2).fillColor('#6b7280').text(identity,106,55,{width:440});
-      doc.fontSize(7.2).text(`${title} · ${report.metadata.from||'All'} to ${report.metadata.to||'Now'} · Generated ${generatedAt.toLocaleString('en-AU')} · ${reportId}`,42,78,{width:510});
-      doc.moveTo(42,94).lineTo(553,94).strokeColor('#d1d5db').lineWidth(0.6).stroke();
+      if(report.metadata.report_type==='ACCOUNT_STATEMENT'){
+        renderBankStatementPageChrome(doc,profile,report,reportId,index+1,pages.count);
+      }else{
+        if(fs.existsSync(logoPath)){try{doc.image(logoPath,42,28,{fit:[54,42]})}catch{}}
+        doc.fontSize(12).fillColor('#111827').text(profile.tradingName||profile.legalName||'Voxel Veda',106,27,{width:260});
+        doc.fontSize(7.2).fillColor('#6b7280').text(profile.legalName||'Voxel Veda Pty Ltd',106,43,{width:260});
+        const identity=[profile.abn?`ABN ${profile.abn}`:null,profile.website||null,profile.email||null].filter(Boolean).join(' · ');
+        doc.fontSize(7.2).fillColor('#6b7280').text(identity,106,55,{width:440});
+        doc.fontSize(7.2).text(`${title} · ${report.metadata.from||'All'} to ${report.metadata.to||'Now'} · Generated ${generatedAt.toLocaleString('en-AU')} · ${reportId}`,42,78,{width:510});
+        doc.moveTo(42,94).lineTo(553,94).strokeColor('#d1d5db').lineWidth(0.6).stroke();
+      }
       doc.moveTo(42,774).lineTo(553,774).strokeColor('#d1d5db').lineWidth(0.6).stroke();
       doc.fontSize(7.2).fillColor('#6b7280').text(`${profile.footer} · Page ${index+1} of ${pages.count}`,42,782,{width:510,align:'center'});
     }
