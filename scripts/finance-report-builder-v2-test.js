@@ -70,3 +70,12 @@ assert(controller.includes("workbook.addWorksheet('Reimbursements')"),'reimburse
 assert(controller.includes("GST review summary"),'GST PDF section is missing');
 assert(controller.includes("Reconciliation summary"),'reconciliation PDF section is missing');
 assert(controller.includes("Running balance"),'bank-style Account Statement PDF must expose running balance');
+assert(controller.includes('renderBankStyleAccountStatement'),'Account Statement PDF must use the dedicated customer statement renderer');
+assert(controller.includes('bankStatementTableHeader'),'Account Statement PDF must repeat Date / Transaction / Debit / Credit / Balance columns');
+assert(controller.includes('bsb_masked')&&controller.includes('account_number_masked'),'Account Statement must include masked account routing/number fields');
+assert(controller.includes('opening_running_balance')&&controller.includes('closing_running_balance'),'Account Statement must calculate opening and closing balances');
+assert(controller.includes('Statement totals'),'Account Statement must show debit/credit/closing totals');
+assert(controller.includes('does not claim that Voxel Veda is an authorised deposit-taking institution'),'public-facing statement must not misrepresent Voxel Veda as a licensed bank');
+assert(client.includes('data-account-statement'),'Accounts UI must expose one-click statement generation');
+assert(client.includes('openAccountStatementForm'),'Accounts UI must provide a statement period modal');
+assert(client.includes('downloadFinanceFile'),'statement PDF download must use the authenticated binary download flow');
