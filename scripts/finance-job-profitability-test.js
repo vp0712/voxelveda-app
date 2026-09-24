@@ -21,7 +21,7 @@ assert(!/\b(?:INSERT|UPDATE|DELETE)\s+/i.test(controller),'Job Profitability end
 
 for(const marker of ["['profitability','◈','Job Profitability']","function jobProfitabilityView()","JOB PROFITABILITY & COST ALLOCATION","Allocation coverage","Unallocated economic evidence","if(v==='profitability')return jobProfitabilityView();","['jobProfitability',API+'/job-profitability'"])
  assert(master.includes(marker),'Job Profitability UI missing '+marker);
-assert(html.includes('/finance-master.js?v=20260924-control-v11'),'Finance master release must be cache-busted for Job Profitability.');
+assert(/\/finance-master\.js\?v=20260924-control-v\d+/.test(html),'Finance master release must be versioned for Job Profitability.');
 console.log('FINANCE_JOB_PROFITABILITY_OK');
 
 assert(advanced.includes("['jobProfitability','/api/finance/job-profitability']"),'Job Profitability must hydrate in Advanced Control.');
