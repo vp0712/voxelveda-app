@@ -66,6 +66,9 @@ function planLegacyPdfYearRepair({ originalName, minDate, maxDate, today = new D
 }
 
 async function repairOneStatement(file) {
+  if (file.parser_version && file.parser_version !== 'PDF_TABLE_V4_BALANCE_DELTA') {
+    return { repaired: false, reason: 'parser-version-not-targeted', original_name: file.original_name };
+  }
   const db = await pool.getConnection();
   try {
     await db.beginTransaction();
@@ -141,12 +144,6 @@ async function repairOneStatement(file) {
           [item.transactionDate, item.postingDate, item.newHash, repairNote, item.row.statement_row_id]
         );
       }
-      await db.query(
-        `UPDATE bank_transaction_original_data
-            SET original_transaction_date=?,original_posting_date=?
-          WHERE bank_transaction_id=? AND source_statement_uid=?`,
-        [item.transactionDate, item.postingDate, item.row.id, file.import_uid]
-      );
     }
 
     const correctedDates = updates.map((item) => item.transactionDate).sort();
@@ -197,9 +194,11 @@ async function repairKnownLegacyPdfDateRunaway() {
   const names = [...LEGACY_PDF_TARGETS.keys()];
   const placeholders = names.map(() => '?').join(',');
   const [files] = await pool.query(
-    `SELECT import_uid,bank_account_id,original_name,source_format,statement_start_date,statement_end_date,reviewed_at
-       FROM statement_import_files
-      WHERE parse_status='IMPORTED' AND UPPER(source_format)='PDF' AND original_name IN (${placeholders})`,
+    `SELECT sif.import_uid,sif.bank_account_id,sif.original_name,sif.source_format,sif.statement_start_date,sif.statement_end_date,sif.reviewed_at,
+            sis.parser_version
+       FROM statement_import_files sif
+       LEFT JOIN statement_import_sessions sis ON sis.import_uid=sif.import_uid AND sis.bank_account_id=sif.bank_account_id
+      WHERE sif.parse_status='IMPORTED' AND UPPER(sif.source_format)='PDF' AND sif.original_name IN (${placeholders})`,
     names
   );
 
