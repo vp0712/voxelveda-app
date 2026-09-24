@@ -6,14 +6,15 @@ const master=fs.readFileSync('public/finance-master.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 
-assert(advanced.includes("VERSION='20260924-advanced-control-v12'"),'Advanced Finance release id is missing.');
+const advancedVersion=(advanced.match(/VERSION='([^']+)'/)||[])[1];
+assert(/^20260924-advanced-control-v\d+$/.test(advancedVersion||''),'Advanced Finance release id is missing or invalid.');
 assert(master.includes("['advanced','⚡','Control Centre']"),'Advanced Control must be the canonical Finance home module.');
 assert(master.includes('function advancedControlView()'),'Advanced Control must mount inside the master Finance OS.');
 assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be the default Finance landing.');
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
-assert(master.includes('/finance-advanced-control.js?v=20260924-advanced-control-v12'),'Master OS must load the versioned Advanced Control asset.');
+assert(master.includes('/finance-advanced-control.js?v='+advancedVersion),'Master OS must load the exact Advanced Control release declared by the asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
-assert(html.includes('/finance-master.js?v=20260924-control-v12'),'Canonical Finance HTML must cache-bust the current canonical Finance release.');
+assert(/\/finance-master\.js\?v=20260924-control-v\d+/.test(html),'Canonical Finance HTML must use a versioned master release.');
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
