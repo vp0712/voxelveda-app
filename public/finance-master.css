@@ -364,3 +364,62 @@ body[data-finance-view="advanced"] .fm-filterbar label:focus-within{
 .fm-public-launch-gate p{margin:4px 0 0;color:#6d7f98;font-size:.61rem;line-height:1.45}
 .fm-public-launch-gate ul{grid-column:1/-1;margin:4px 0 0;padding-left:17px;color:#6f5515;font-size:.58rem;line-height:1.5}
 @media(max-width:700px){.fm-public-launch-gate{grid-template-columns:1fr auto;padding:12px}.fm-public-launch-gate ul{padding-left:16px}}
+
+
+/* Finance Statement Review UX v23 */
+.fm-statement-review-sheet{display:grid;gap:14px}
+.fm-review-bank-sheet-head{border:1px solid #dbe7f2;border-radius:20px;background:#fff;overflow:hidden;box-shadow:0 12px 34px rgba(31,65,105,.07)}
+.fm-review-bank-sheet-head:after{content:"";display:block;height:5px;background:linear-gradient(90deg,#0877ff,#0ea5a5)}
+.fm-review-brand{display:flex;align-items:center;gap:11px;padding:16px 18px 7px}
+.fm-review-brand img{width:52px;height:52px;object-fit:contain;border-radius:12px}
+.fm-review-brand b,.fm-review-brand span{display:block}
+.fm-review-brand b{font-size:.9rem;color:#0f1c32;letter-spacing:-.02em}
+.fm-review-brand span{margin-top:2px;font-size:.57rem;color:#71839a;font-weight:800;letter-spacing:.06em;text-transform:uppercase}
+.fm-review-statement-title{display:flex;align-items:end;justify-content:space-between;gap:12px;padding:2px 18px 14px}
+.fm-review-statement-title strong{font-size:1.55rem;letter-spacing:-.045em;color:#0f1a31}
+.fm-review-statement-title span{max-width:52%;color:#657892;font-size:.62rem;text-align:right;overflow-wrap:anywhere}
+.fm-review-account-meta{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #e5edf5;background:#f8fbff}
+.fm-review-account-meta span{padding:10px 12px;border-right:1px solid #e5edf5;color:#75869d;font-size:.57rem}
+.fm-review-account-meta span:last-child{border-right:0}
+.fm-review-account-meta b{display:block;margin-top:3px;color:#14213a;font-size:.7rem}
+.fm-review-status-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.fm-review-status-grid button{min-height:86px;border:1px solid #dce7f2;border-radius:16px;background:#fff;padding:11px 12px;text-align:left;cursor:pointer;box-shadow:0 7px 20px rgba(36,73,112,.045);transition:.16s ease}
+.fm-review-status-grid button:hover{border-color:#b8d8fb;transform:translateY(-1px)}
+.fm-review-status-grid button.active{border-color:#0877ff;background:#eff7ff;box-shadow:0 9px 24px rgba(8,119,255,.11)}
+.fm-review-status-grid span,.fm-review-status-grid strong,.fm-review-status-grid small{display:block}
+.fm-review-status-grid span{font-size:.57rem;font-weight:850;color:#75869c}
+.fm-review-status-grid strong{margin-top:3px;font-size:1.25rem;color:#0f1c34;letter-spacing:-.035em}
+.fm-review-status-grid small{margin-top:2px;font-size:.5rem;color:#8a99ac}
+.fm-review-filter-summary{position:sticky;top:0;z-index:3;display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px 12px;border:1px solid #dce8f3;border-radius:13px;background:rgba(248,251,255,.97);backdrop-filter:blur(10px)}
+.fm-review-filter-summary b{font-size:.66rem;color:#1a2a43}
+.fm-review-filter-summary span{font-size:.57rem;color:#75869d}
+.fm-review-table-wrap{scroll-margin-top:14px;border:1px solid #dfe8f2;border-radius:16px;background:#fff}
+.fm-bank-review-table{min-width:900px}
+.fm-bank-review-table thead th{position:sticky;top:0;z-index:2;background:#0f2a4b;color:#fff;border-bottom:0;font-size:.55rem;letter-spacing:.05em;text-transform:uppercase}
+.fm-bank-review-table td{vertical-align:middle;border-bottom-color:#e8eef5;font-size:.62rem}
+.fm-bank-review-table tbody tr:hover td{background:#f8fbff}
+.fm-statement-description{max-width:390px;line-height:1.42;color:#17243a}
+.fm-review-manual td{background:#f1fbf7}
+.fm-review-manual .fm-badge{background:#def7ec;color:#087b5f}
+.fm-edit-override,.fm-fix-include{display:inline-flex;margin-top:5px;border:1px solid #cfe0f1;border-radius:8px;background:#fff;color:#0877ff;padding:5px 7px;font-size:.52rem;font-weight:850;cursor:pointer}
+.fm-edit-override{border-color:#bfe4d7;color:#087b5f;background:#f6fffb}
+.fm-manual-select{display:inline-flex;align-items:center;gap:5px;font-size:.51rem;font-weight:850;color:#b13c49}
+.fm-review-actions{position:sticky;bottom:0;z-index:4;padding:10px 0 2px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff 25%)}
+@media(max-width:700px){
+ .fm-review-bank-sheet-head{border-radius:18px}
+ .fm-review-brand{padding:13px 14px 4px}
+ .fm-review-brand img{width:44px;height:44px}
+ .fm-review-statement-title{display:block;padding:2px 14px 12px}
+ .fm-review-statement-title strong{display:block;font-size:1.35rem}
+ .fm-review-statement-title span{display:block;max-width:none;text-align:left;margin-top:5px;font-size:.58rem}
+ .fm-review-account-meta span{padding:9px 8px;font-size:.5rem}
+ .fm-review-status-grid{display:flex;overflow-x:auto;gap:8px;padding:1px 1px 5px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+ .fm-review-status-grid::-webkit-scrollbar{display:none}
+ .fm-review-status-grid button{flex:0 0 132px;min-height:80px}
+ .fm-review-status-grid button strong{font-size:1.12rem}
+ .fm-review-table-wrap{overflow-x:auto}
+ .fm-bank-review-table{min-width:780px}
+ .fm-bank-review-table td{font-size:.59rem;padding:9px 8px}
+ .fm-statement-description{max-width:310px}
+ .fm-review-actions{display:grid;grid-template-columns:.8fr 1.2fr}
+}
