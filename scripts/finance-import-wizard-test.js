@@ -18,7 +18,8 @@ assert(client.includes('parseOfx')&&client.includes('parseQif')&&client.includes
 assert(client.includes("crypto.subtle.digest('SHA-256'"),'statement file hashing is missing');
 assert(client.includes('/statements/preview'),'statement rows must stage through protected preview before commit');
 assert(client.includes('openStatementReview'),'staged statements must open explicit review');
-assert(client.includes("['DUPLICATE','REJECTED'].includes(row.validation_status)"),'duplicate/rejected rows must be excluded from selectable import rows');
+assert(client.includes("const isDuplicate=row.validation_status==='DUPLICATE'"),'duplicate rows must remain excluded from selectable import rows');
+assert(client.includes('data-review-override'),'rejected rows must enter through the audited manual-correction flow, not normal selection');
 assert(client.includes('data-review-commit'),'review must expose explicit commit action');
 assert(client.includes('data-review-reject'),'review must expose explicit reject action');
 assert(client.includes('Nothing has been committed yet.'),'multi-file staging must clearly remain non-posting before review');
