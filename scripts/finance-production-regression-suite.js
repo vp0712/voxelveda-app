@@ -11,6 +11,7 @@ const tests=[
   "finance-control-centre-completion-test.js",
   "finance-advanced-control-test.js",
   "finance-cash-control-test.js",
+  "finance-cash-custody-control-test.js",
   "personal-debt-control-test.js",
   "personal-recurring-commitment-control-test.js",
   "personal-savings-reserve-control-test.js",
