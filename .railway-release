@@ -1,5 +1,5 @@
-finance-release: 20260925-voxel-veda-statement-branding-v22
-source-commit: 755294c7ad12dedd25a00344f6bb47b16d53505c
+finance-release: 20260925-statement-review-filter-edit-v23
+source-commit: 0151cc720be2f331b8b5109ac4cd449a89b13dbd
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
