@@ -20,8 +20,9 @@ const createApi = (fetchImpl, timeoutMs = 25) => new Function(
   'AbortController',
   'setTimeout',
   'clearTimeout',
+  'financeAuthError',
   `const FINANCE_REQUEST_TIMEOUT_MS=${timeoutMs};${apiSource};return api;`
-)(fetchImpl, AbortController, setTimeout, clearTimeout);
+)(fetchImpl, AbortController, setTimeout, clearTimeout, () => null);
 
 async function run() {
   const successfulApi = createApi(async () => ({
