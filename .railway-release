@@ -1,5 +1,5 @@
-finance-release: 20260924-finance-premium-v16
-source-commit: 83dbda18832b110ffdc9f18752fb27aa0f2716ac
+finance-release: 20260924-finance-premium-v16-r2
+source-commit: cf8d124718528529664c3bb6f9f28c1c17d0e0aa
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
