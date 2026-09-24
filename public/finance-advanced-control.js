@@ -2,13 +2,15 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v10';
+const VERSION='20260924-advanced-control-v11';
 const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
   ['attention','/api/finance/personal-money/attention'],
   ['smart','/api/finance/personal-money/smart'],
   ['health','/api/finance/personal-money/health'],
+  ['commitments','/api/finance/personal-money/commitments-control'],
+  ['personalTaxControl','/api/finance/personal-money/tax-control'],
   ['roadmaps','/api/finance/personal-money/roadmaps'],
   ['integrity','/api/finance/personal-money/data-quality-integrity'],
   ['netWorth','/api/finance/personal-money/net-worth'],
@@ -212,7 +214,7 @@ function scenario(){
 }
 
 function recurringDebt(){
- const recurring=(state.data.attention?.recurring||[]).filter(r=>String(r.item_type||'').toUpperCase()!=='INCOME');
+ const recurring=(state.data.commitments?.items||state.data.attention?.recurring||[]).filter(r=>Number(r.active??1)!==0&&String(r.item_type||'').toUpperCase()!=='INCOME');
  const debts=state.data.personal?.debts||[];
  const byCur={};
  recurring.forEach(r=>{const c=r.currency||'AUD';(byCur[c]??={monthly:0,annual:0,count:0});const f={WEEKLY:52,FORTNIGHTLY:26,MONTHLY:12,QUARTERLY:4,YEARLY:1}[String(r.frequency||'').toUpperCase()]||0;byCur[c].annual+=num(r.amount)*f;byCur[c].monthly+=num(r.amount)*f/12;byCur[c].count++});
@@ -243,8 +245,8 @@ function riskIntegrity(){
 }
 
 function taxEvidence(){
- const tax=state.data.health?.tax_readiness||{},docs=state.data.lifecycle?.documents||[],issues=state.data.integrity?.summary||{};
- const fy=tax.financial_year?.label||'Current FY',review=(tax.review_items||[]).length;
+ const tax=state.data.personalTaxControl||state.data.health?.tax_readiness||{},docs=state.data.lifecycle?.documents||[],issues=state.data.integrity?.summary||{};
+ const fy=tax.financial_year?.label||'Current FY',review=(tax.review_items||[]).length,taxCounts=tax.counts||{};
  const expiring=docs.filter(d=>d.days_until_expiry!==null&&d.days_until_expiry!==undefined&&num(d.days_until_expiry)<=30).length;
  const checklist=[
   ['Transactions classified',num(issues.unclassified_bank_transactions)===0,num(issues.unclassified_bank_transactions)+' remaining'],
@@ -256,8 +258,8 @@ function taxEvidence(){
  const cat=(tax.categories||[]).slice(0,12);
  const max=Math.max(1,...cat.map(x=>num(x.amount)));
  return '<section id="facYearEnd" class="fac-section"><header><div><h3>Tax, Evidence & Year-End Readiness</h3><p>Preparation controls only; this does not calculate tax liability or legal deductibility.</p></div><span class="fac-chip watch">'+esc(fy)+'</span></header>'+
- '<div class="fac-kpis"><div class="fac-kpi"><span>Tax review items</span><b>'+review+'</b><small>Preparation queue</small></div><div class="fac-kpi"><span>Private document refs</span><b>'+docs.length+'</b><small>Owner-only evidence references</small></div><div class="fac-kpi"><span>Evidence due/expired</span><b>'+expiring+'</b><small>Within 30 days</small></div><div class="fac-kpi"><span>Accountant questions</span><b>'+num(state.data.company?.open_accountant_queries)+'</b><small>Company finance</small></div></div>'+
- '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Year-end control checklist</h4><div class="fac-list">'+checklist.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div></article><article class="fac-card"><h4>Review categories</h4><div class="fac-bars">'+(cat.map(x=>'<div class="fac-bar"><span>'+esc(x.category||'Uncategorised')+'</span><div class="fac-bar-track"><i style="width:'+Math.min(100,num(x.amount)/max*100)+'%"></i></div><b>'+money(x.amount,x.currency||'AUD')+'</b></div>').join('')||'<div class="fac-empty">No tax-preparation category data.</div>')+'</div></article></div><div class="fac-note" style="margin-top:10px">Recorded income is not automatically taxable income. Review candidates are not deduction claims. Currencies remain separate unless verified FX evidence exists.</div></section>';
+ '<div class="fac-kpis"><div class="fac-kpi"><span>Tax review items</span><b>'+review+'</b><small>'+num(taxCounts.unreviewed)+' unreviewed · '+num(taxCounts.missing_evidence)+' missing evidence</small></div><div class="fac-kpi"><span>Private document refs</span><b>'+docs.length+'</b><small>Owner-only evidence references</small></div><div class="fac-kpi"><span>Evidence due/expired</span><b>'+expiring+'</b><small>Within 30 days</small></div><div class="fac-kpi"><span>Accountant questions</span><b>'+(num(taxCounts.ask_accountant)+num(state.data.company?.open_accountant_queries))+'</b><small>'+num(taxCounts.ask_accountant)+' personal · '+num(state.data.company?.open_accountant_queries)+' company</small></div></div>'+
+ '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Year-end control checklist</h4><div class="fac-list">'+checklist.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div></article><article class="fac-card"><h4>Review categories</h4><div class="fac-bars">'+(cat.map(x=>'<div class="fac-bar"><span>'+esc(x.category||'Uncategorised')+'</span><div class="fac-bar-track"><i style="width:'+Math.min(100,num(x.amount)/max*100)+'%"></i></div><b>'+money(x.amount,x.currency||'AUD')+'</b></div>').join('')||'<div class="fac-empty">No tax-preparation category data.</div>')+'</div></article></div><div class="fac-note" style="margin-top:10px">Recorded income is not automatically taxable income. Persistent Personal review states are preparation records, not deduction claims. Currencies remain separate unless verified FX evidence exists.</div></section>';
 }
 
 function companyCfo(){
