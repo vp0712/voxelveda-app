@@ -31,4 +31,10 @@ assert(css.includes('.fm-table-wrap')&&css.includes('overflow:auto'),'mobile/com
 assert(css.includes('.fm-drawer{width:100vw}')||css.includes('.fm-drawer{width:100vw;'),'mobile statement review drawer must use available screen width');
 assert(!html.includes('finance-bank-app-v3')&&!html.includes('finance-bank-app-v4')&&!html.includes('premium-banking-app'),'canonical statement workflow must not load retired Finance/Banking apps');
 
+assert(client.includes('function stageStatementFiles('),'multi-file statement processing must use the shared stable batch verifier');
+assert(client.includes('name="files" type="file"')&&client.includes('multiple required'),'standard Statement Import must support multiple selected files/PDFs');
+assert(client.includes('processed one-by-one for stability')||client.includes('extracted sequentially to avoid memory spikes'),'large multi-PDF selections must be processed sequentially for stability');
+assert(client.includes('duplicate(s) excluded'),'batch import must report duplicate exclusions to the user');
+assert(client.includes('showFinancePopup'),'batch extraction/verification must finish with a centred result popup');
+assert(client.includes('excluded from import, totals, screens and reports')||client.includes('blocked before they can enter Finance calculations'),'duplicate policy must be visible in the import UI');
 console.log('Unified Finance statement import and historical migration checks passed.');
