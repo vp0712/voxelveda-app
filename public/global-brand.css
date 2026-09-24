@@ -30,3 +30,6 @@ body.vv-brand-busy{overflow:hidden!important;touch-action:none}
 @media(max-height:650px){#vvGlobalBrandLoader .vv-brand-loader-scene{min-height:88vh!important}#vvGlobalBrandLoader .vv-brand-orbit{width:230px!important;height:230px!important;min-width:0!important;min-height:0!important}#vvGlobalBrandLoader .vv-brand-loader-logo-stage{width:106px!important;height:106px!important;min-width:0!important;min-height:0!important}#vvGlobalBrandLoader .vv-brand-loader-pill{margin-top:42px!important;padding:13px 22px!important}#vvGlobalBrandLoader .vv-brand-loader-context{display:none!important}}
 @media(prefers-reduced-motion:reduce){#vvGlobalBrandLoader,.vv-network-status{transition:none}.vv-brand-orbit-ring,.vv-brand-scan-line,.vv-brand-loader-dot{animation:none!important}}
 @media print{#vvGlobalBrandPresence,#vvGlobalBrandLoader,.vv-network-status{display:none!important}}
+
+/* Finance OS owns its mobile navigation; suppress the persistent global corner badge only on this workspace. */
+body.finance-os-page #vvGlobalBrandPresence{display:none!important}
