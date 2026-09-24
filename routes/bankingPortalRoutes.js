@@ -51,6 +51,7 @@ router.post('/intelligence/accounts/:id/archive', bankAdmin, financePrivacy.acco
 router.post('/intelligence/accounts/:id/inactive', bankAdmin, financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.deactivate);
 router.post('/intelligence/accounts/:id/restore', bankAdmin, financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.restore);
 router.delete('/intelligence/accounts/:id', bankAdmin, financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.remove);
+router.delete('/intelligence/accounts/:id/purge', bankAdmin, financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.purge);
 router.get('/intelligence/statements', intelligence.getStatementLibrary);
 router.get('/intelligence/statements/:uid/report', financePrivacy.statementUid('uid'), intelligence.getStatementReport);
 router.get('/intelligence/statements-removed', statementData.listRemoved);
