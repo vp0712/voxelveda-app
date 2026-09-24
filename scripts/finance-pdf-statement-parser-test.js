@@ -55,6 +55,31 @@ assert(Number(modernRows[0].debit)===100,'CR on running balance must not misclas
 assert(Number(modernRows[2].credit)===14058.5,'running-balance increase must infer credit');
 assert(modernRows[3].transaction_date==='2025-01-04','statement parser must handle year rollover');
 
-assert(client.includes("parser_version:'PDF_TABLE_V4_BALANCE_DELTA'"),'PDF parser version marker missing');
+const historical=[
+  "Here's your account information and a list of transactions from 01/07/17-31/08/24.",
+  'Date Transaction Debit Credit Balance',
+  '01 Jul OPENING BALANCE 1,000.00',
+  '31 Dec SHOP 10.00 DR',
+  '01 Jan SHOP 10.00 DR',
+  '31 Dec SHOP 10.00 DR',
+  '01 Jan SHOP 10.00 DR',
+  '31 Dec SHOP 10.00 DR',
+  '01 Jan SHOP 10.00 DR',
+  '31 Dec SHOP 10.00 DR',
+  '01 Jan SHOP 10.00 DR',
+  '31 Dec SHOP 10.00 DR',
+  '01 Jan SHOP 10.00 DR',
+  '31 Dec SHOP 10.00 DR',
+  '01 Jan SHOP 10.00 DR',
+  '31 Dec SHOP 10.00 DR',
+  '01 Jan SHOP 10.00 DR',
+  '30 Aug SHOP 10.00 DR'
+];
+const historicalRows=parsePdfLines(historical);
+assert(historicalRows[0].transaction_date==='2017-12-31','multi-year PDF must seed from the earliest explicit statement year');
+assert(historicalRows[historicalRows.length-1].transaction_date==='2024-08-30','multi-year PDF must end inside the explicit statement year bound');
+assert(!historicalRows.some(row=>String(row.transaction_date||'')>'2024-12-31'),'multi-year PDF must never run beyond its explicit statement year range');
+
+assert(client.includes("parser_version:'PDF_TABLE_V5_DATE_BOUNDS'"),'PDF parser version marker missing');
 assert(client.includes('timeoutMs:90000'),'statement preview must have an extended timeout for large multi-PDF batches');
 console.log('FINANCE_PDF_STATEMENT_PARSER_TEST_OK');
