@@ -391,7 +391,6 @@ function accounts(){
  return `<section class="fm-accounts-premium">
   <div class="fm-accounts-toolbar">
    <label class="fm-account-search"><span>⌕</span><input type="search" data-account-search placeholder="Search accounts..." autocomplete="off"></label>
-   <button type="button" class="fm-account-add" data-quick="account"><span>＋</span> Add account</button>
   </div>
   <article class="fm-card fm-accounts-panel"><div class="fm-pad"><div class="fm-card-head fm-accounts-head"><div><span class="fm-section-kicker">YOUR FINANCIAL ACCOUNTS</span><h2>Financial accounts</h2><p>Balances, history coverage, transactions and lifecycle controls in one place.</p></div><button data-quick="account">＋ Add account</button></div><div class="fm-account-grid">${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>
  </section>`;
