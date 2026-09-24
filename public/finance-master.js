@@ -434,6 +434,42 @@ function historyImportView(){
  const pendingRows=pending.map(x=>`<button class="fm-row fm-row-button" data-import-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ${num(x.total_rows)} rows · ${num(x.duplicate_rows)} duplicate(s)</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${num(x.valid_rows)} valid · ${num(x.rejected_rows)} rejected</small></div></button>`).join('');
  return `<div class="fm-control-intro"><p>HISTORICAL FINANCE SETUP</p><h2>Bring every bank account into one controlled ledger</h2><span>Create each account once, upload all of that account's statements, review duplicates/rejections, then commit. Personal and Company ownership remain separate while Consolidated reporting can show permitted accounts together.</span><div class="fm-control-quick"><button data-quick="account">+ Add account</button><button data-viewjump="statements">Statement vault</button><button data-viewjump="review">Review centre</button><button data-viewjump="reports">Reports</button></div></div><section class="fm-history-grid">${accountCards||emptyState('No financial accounts','Create the first bank, card, cash or loan account before importing history.')}</section><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Pending statement reviews</h2><p>No imported row enters the canonical ledger until you review and commit it.</p></div><span class="fm-badge">${pending.length}</span></div><div class="fm-list">${pendingRows||emptyState('No pending reviews','Imported statement previews waiting for review will appear here.')}</div></div></article>`;
 }
+async function stageStatementFiles(account,files,queue){
+ const staged=[];
+ const summary={files:Number(files.length||0),processed:0,failed:0,rows:0,ready:0,duplicates:0,rejected:0};
+ queue.innerHTML='';
+ for(let index=0;index<files.length;index++){
+  const file=files[index];
+  const item=document.createElement('div');
+  item.className='fm-import-item';
+  item.innerHTML='<div><b>'+esc(file.name)+'</b><small>Queued '+(index+1)+' of '+files.length+'</small></div><span class="fm-badge">QUEUED</span>';
+  queue.appendChild(item);
+  try{
+   item.querySelector('small').textContent='Reading and extracting transactions…';
+   item.querySelector('.fm-badge').textContent='PARSING';
+   const parsed=await parseStatement(file);
+   parsed.rows=(parsed.rows||[]).map(row=>({...row,currency:String(row.currency||account.currency||'AUD').toUpperCase()}));
+   if(!parsed.rows.length)throw new Error('No transaction rows could be safely extracted from this file.');
+   item.querySelector('small').textContent=parsed.rows.length+' row(s) extracted · verifying duplicate fingerprints…';
+   item.querySelector('.fm-badge').textContent='VERIFYING';
+   const result=await api(I+'/accounts/'+encodeURIComponent(account.id)+'/statements/preview',{method:'POST',body:JSON.stringify({source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),rows:parsed.rows})});
+   const s=result.summary||{};
+   const duplicates=num(s.duplicate),rejected=num(s.rejected),ready=num(s.selected);
+   summary.processed+=1;summary.rows+=(num(s.total)||parsed.rows.length);summary.ready+=ready;summary.duplicates+=duplicates;summary.rejected+=rejected;
+   staged.push({file:file.name,uid:result.import_uid,summary:s,reused:Boolean(result.reused)});
+   item.classList.add(duplicates||rejected?'warn':'good');
+   item.querySelector('.fm-badge').className='fm-badge '+(duplicates||rejected?'warn':'good');
+   item.querySelector('.fm-badge').textContent=duplicates?(duplicates+' DUPLICATE'+(duplicates===1?'':'S')+' EXCLUDED'):(rejected?(rejected+' REJECTED'):'VERIFIED');
+   const small=item.querySelector('small');small.textContent=ready+' ready · '+duplicates+' duplicate(s) excluded · '+rejected+' rejected · ';
+   const review=document.createElement('button');review.type='button';review.textContent='Open review';review.onclick=()=>{$('fmModal').close();openStatementReview(result.import_uid)};small.appendChild(review);
+  }catch(error){
+   summary.failed+=1;
+   item.classList.add('bad');item.querySelector('.fm-badge').className='fm-badge bad';item.querySelector('.fm-badge').textContent='ERROR';
+   item.querySelector('small').textContent=error.message;
+  }
+ }
+ return {staged,summary};
+}
 async function openHistoricalImport(accountId=''){
  const selected=state.accounts.find(a=>String(a.id)===String(accountId));
  $('fmModalEyebrow').textContent='HISTORICAL IMPORT';$('fmModalTitle').textContent='Import statement history';
