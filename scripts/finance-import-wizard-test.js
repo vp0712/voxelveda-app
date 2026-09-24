@@ -37,4 +37,9 @@ assert(client.includes('processed one-by-one for stability')||client.includes('e
 assert(client.includes('duplicate(s) excluded'),'batch import must report duplicate exclusions to the user');
 assert(client.includes('showFinancePopup'),'batch extraction/verification must finish with a centred result popup');
 assert(client.includes('excluded from import, totals, screens and reports')||client.includes('blocked before they can enter Finance calculations'),'duplicate policy must be visible in the import UI');
+assert(client.includes('function stageStatementPreview('),'statement batches must use the retry-aware preview helper');
+assert(client.includes("error?.code==='STATEMENT_PREVIEW_BUSY'")&&client.includes("error?.code==='FINANCE_REQUEST_TIMEOUT'"),'statement preview must retry transient verifier/timeout failures');
+assert(client.includes('attempt<=3'),'statement preview retry count must stay bounded');
+assert(client.includes('timeoutMs:90000'),'large PDF statement staging must have an extended request timeout');
+assert(client.includes("item.querySelector('.fm-badge').textContent='RETRYING'"),'mobile import queue must show retry progress instead of a false terminal error');
 console.log('Unified Finance statement import and historical migration checks passed.');
