@@ -19,7 +19,7 @@ assert(/\/finance-master\.js\?v=20260924-control-v\d+/.test(html),'Canonical Fin
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
   'Commitments, Debt & Savings Reserve Intelligence','Risk, Integrity & Control Readiness',
-  'Tax, Evidence & Year-End Readiness','Company CFO Control','AR / AP Counterparty Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Performance & Stress Control','CFO Anomaly & Explainability','Control Actions','Evidence Source Health'
+  'Tax, Evidence & Year-End Readiness','Company CFO Control','Cash Custody & Petty Cash Control','AR / AP Counterparty Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Performance & Stress Control','CFO Anomaly & Explainability','Control Actions','Evidence Source Health'
 ]) assert(advanced.includes(label),`Advanced Finance Control must expose ${label}.`);
 
 for(const endpoint of [
@@ -28,7 +28,7 @@ for(const endpoint of [
   '/api/finance/personal-money/data-quality-integrity','/api/finance/personal-money/net-worth',
   '/api/finance/personal-money/net-worth/lifecycle','/api/finance/company-summary','/api/finance/counterparty-control',
   '/api/finance/banking-os/command-center','/api/finance/intelligence/data-quality',
-  '/api/finance/receipts','/api/finance/reimbursements','/api/finance/accountant-handover','/api/finance/personal-money/review-inbox','/api/finance/intelligence/banking-readiness','/api/notifications','/api/finance/intelligence/rules','/api/finance/close-assurance','/api/finance/performance-risk-control','/api/finance/issues'
+  '/api/finance/receipts','/api/finance/cash-control/custody','/api/finance/reimbursements','/api/finance/accountant-handover','/api/finance/personal-money/review-inbox','/api/finance/intelligence/banking-readiness','/api/notifications','/api/finance/intelligence/rules','/api/finance/close-assurance','/api/finance/performance-risk-control','/api/finance/issues'
 ]) assert(advanced.includes(endpoint),`Advanced Control must use protected canonical source ${endpoint}.`);
 
 for(const horizon of ['7,30,90,365','knownProjection','scenarioProjection'])
@@ -88,3 +88,6 @@ assert(advanced.includes('planning calculations from recorded Personal Money evi
 
 assert(advanced.includes('Emergency reserve coverage under 3.0 months'),'Advanced Control must surface savings reserve coverage signals.');
 assert(advanced.includes('data-fac-open="savings"'),'Advanced Control must drill into canonical Savings & Reserve Control.');
+
+assert(advanced.includes('function cashCustodyControl()'),'Advanced Cash Custody section missing.');
+assert(advanced.includes('data-fac-open="cash"'),'Advanced Cash Custody must drill into canonical Cash Control.');
