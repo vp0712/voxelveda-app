@@ -84,7 +84,7 @@ assert(advanced.includes('data-fac-open="counterparties"'),'Advanced Control mus
 
 assert(advanced.includes('Savings & reserves'),'Advanced Control must expose Savings & Reserve intelligence.');
 assert(advanced.includes("source:'Savings & Reserve'"),'Savings pace/emergency signals must feed the Advanced action queue.');
-assert(advanced.includes('do not move money automatically'),'Advanced Savings intelligence must preserve its no-money-movement boundary.');
+assert(advanced.includes('planning calculations from recorded Personal Money evidence')&&/do not move money automatically/i.test(advanced),'Advanced Savings intelligence must preserve its no-money-movement boundary.');
 
 assert(advanced.includes('Emergency reserve coverage under 3.0 months'),'Advanced Control must surface savings reserve coverage signals.');
 assert(advanced.includes('data-fac-open="savings"'),'Advanced Control must drill into canonical Savings & Reserve Control.');
