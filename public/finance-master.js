@@ -1891,20 +1891,26 @@ async function saveManualMovement(form){
  return api(I+'/transactions',{method:'POST',body:JSON.stringify(body)});
 }
 async function openStatementWizard(){
- $('fmModalEyebrow').textContent='STATEMENT IMPORT';$('fmModalTitle').textContent='Import statement';
- $('fmModalBody').innerHTML=`<form id="statementWizard" class="fm-form"><label>1. Account<select name="account_id" required><option value="">Choose account</option>${state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('')}</select></label><label>2. Statement file<input name="file" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" required></label><p class="fm-helper">The file is parsed locally, SHA-256 hashed, staged on the server, duplicate-checked and reviewed before any transaction is committed.</p><div id="statementProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Extract & review</button></div></form>`;
+ const accountOptions=state.accounts.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.nickname||'Account')+' · '+esc(a.currency||'AUD')+'</option>').join('');
+ $('fmModalEyebrow').textContent='STATEMENT IMPORT';$('fmModalTitle').textContent='Import statements';
+ $('fmModalBody').innerHTML='<form id="statementWizard" class="fm-form"><label>1. Account<select name="account_id" required><option value="">Choose account</option>'+accountOptions+'</select></label><label>2. Statement files<input name="files" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" multiple required></label><p class="fm-helper">Upload one file or many PDFs/statements together. Files are extracted sequentially to avoid memory spikes. Duplicate transactions are blocked before they can enter Finance calculations, the transaction ledger or exports.</p><div id="statementProgress" class="fm-state" hidden></div><div id="statementBatchQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Extract & verify files</button></div></form>';
  $('fmModal').showModal();
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
  $('statementWizard').onsubmit=async e=>{
-   e.preventDefault();const form=e.currentTarget,fd=new FormData(form),file=fd.get('file'),accountId=fd.get('account_id'),account=state.accounts.find(a=>String(a.id)===String(accountId)),progress=$('statementProgress');
-   progress.hidden=false;progress.className='fm-state';progress.textContent='Reading statement…';
-   try{
-     const parsed=await parseStatement(file);
-     parsed.rows=(parsed.rows||[]).map(row=>({...row,currency:String(row.currency||account?.currency||'AUD').toUpperCase()}));
-     progress.textContent=`Extracted ${parsed.rows.length} row(s). Running validation and duplicate checks…`;
-     const result=await api(I+`/accounts/${accountId}/statements/preview`,{method:'POST',body:JSON.stringify({source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),rows:parsed.rows})});
-     $('fmModal').close();await openStatementReview(result.import_uid);
-   }catch(error){progress.className='fm-state fm-state-error';progress.textContent=error.message}
+  e.preventDefault();
+  const form=e.currentTarget,fd=new FormData(form),accountId=String(fd.get('account_id')||''),account=state.accounts.find(a=>String(a.id)===accountId);
+  const files=[...form.elements.files.files],progress=$('statementProgress'),queue=$('statementBatchQueue'),submit=form.querySelector('button[type="submit"]');
+  if(!account||!files.length){progress.hidden=false;progress.className='fm-state fm-state-error';progress.textContent='Choose one account and at least one statement file.';return}
+  progress.hidden=false;progress.className='fm-state';progress.textContent='Preparing '+files.length+' file(s). Duplicate verification runs continuously as each file is staged.';
+  submit.disabled=true;submit.textContent='Extracting & verifying…';
+  const batch=await stageStatementFiles(account,files,queue);
+  submit.disabled=false;submit.textContent='Extract & verify files';
+  if(!batch.staged.length){progress.className='fm-state fm-state-error';progress.textContent='No statement file could be staged. Fix the file errors shown below and retry.';return}
+  await refresh();
+  state.view='statements';history.replaceState(null,'','#statements');render();
+  $('fmModal').close();
+  const s=batch.summary;
+  showFinancePopup(s.duplicates?'Statement import verified — duplicates excluded':'Statement extraction successful',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':''),{tone:s.failed?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
  };
 }
 async function openStatementReview(uid){
