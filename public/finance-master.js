@@ -98,7 +98,7 @@ function navButtons(){
  $('fmNav').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
  const mobile=$('fmMobileNav');
  if(mobile){
-  mobile.innerHTML=MOBILE_NAV.map(([v,i,l])=>`<button type="button" data-mobile-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span><b>${l}</b></button>`).join('');
+  mobile.innerHTML=MOBILE_NAV.map(([v,i,l])=>{const isPrimary=MOBILE_NAV.some(([key])=>key===state.view),active=state.view===v||(v==='more'&&!isPrimary);return `<button type="button" data-mobile-view="${v}" class="${active?'active':''}"><span>${i}</span><b>${l}</b></button>`}).join('');
   mobile.querySelectorAll('[data-mobile-view]').forEach(b=>b.onclick=()=>go(b.dataset.mobileView));
  }
 }
