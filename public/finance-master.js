@@ -1826,46 +1826,116 @@ async function pdfLines(file) {
   return lines;
 }
 
-function parsePdfLines(lines) {
-  const datePattern = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4}\b)/;
-  const amountPattern = /(?:CR|DR)?\s*[-+]?\(?\$?\d[\d,]*\.\d{2}\)?(?:\s*(?:CR|DR))?/gi;
-  const rows = [];
-  for (const line of lines) {
-    const dateMatch = line.match(datePattern);
-    if (!dateMatch) continue;
-    const amounts = [...line.matchAll(amountPattern)].map((match) => ({ raw: match[0], index: match.index || 0 }));
-    if (!amounts.length) continue;
-    const transactionAmount = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0];
-    const balanceAmount = amounts.length >= 2 ? amounts[amounts.length - 1] : null;
-    const rawAmount = transactionAmount.raw;
-    const numeric = Math.abs(parseNumber(rawAmount.replace(/\b(?:CR|DR)\b/gi, '')));
-    const debitHint = /\bDR\b/i.test(rawAmount) || /^\s*-/.test(rawAmount) || /^\s*\(/.test(rawAmount);
-    const creditHint = /\bCR\b/i.test(rawAmount) || /^\s*\+/.test(rawAmount);
-    if (!debitHint && !creditHint) continue;
-    const description = line.slice(dateMatch.index + dateMatch[0].length, transactionAmount.index).trim();
-    rows.push({
-      transaction_date: dateMatch[0],
-      description: description || 'PDF statement transaction — verify description',
-      debit: debitHint ? numeric : 0,
-      credit: creditHint ? numeric : 0,
-      running_balance: balanceAmount ? Math.abs(parseNumber(balanceAmount.raw.replace(/\b(?:CR|DR)\b/gi, ''))) : null,
-      reference: null,
-      merchant_name: null,
-      category: null,
-      currency: null
-    });
-  }
-  if (!rows.length) throw new Error('This PDF does not expose transaction direction safely enough for automatic import. Export CSV/OFX from the bank, or use a PDF with explicit CR/DR or signed amounts. Nothing was imported.');
-  return rows;
+const PDF_MONTH_INDEX={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function pdfYearNumber(value){
+ const n=Number(value);if(!Number.isFinite(n))return null;
+ return n<100?(n>=70?1900+n:2000+n):n;
 }
-
+function pdfSeedYear(lines){
+ const text=(lines||[]).map(line=>String(line||'')).join(' ');
+ const numeric=[...text.matchAll(/\b\d{1,2}[\/-]\d{1,2}[\/-](\d{2,4})\b/g)].map(m=>pdfYearNumber(m[1])).filter(Boolean);
+ if(numeric.length)return numeric[0];
+ const named=[...text.matchAll(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+(\d{2,4})\b/g)].map(m=>pdfYearNumber(m[1])).filter(Boolean);
+ return named[0]||new Date().getFullYear();
+}
+function pdfIsoDate(raw,state){
+ const text=String(raw||'').trim().replace(/\s+/g,' ');
+ let day=null,month=null,year=null,explicitYear=false,match=text.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/);
+ if(match){day=Number(match[1]);month=Number(match[2]);if(match[3]){year=pdfYearNumber(match[3]);explicitYear=true}}
+ else{
+  match=text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})(?:\s+(\d{2,4}))?$/);
+  if(!match)return null;
+  day=Number(match[1]);month=PDF_MONTH_INDEX[match[2].slice(0,3).toLowerCase()]||null;if(match[3]){year=pdfYearNumber(match[3]);explicitYear=true}
+ }
+ if(!day||!month)return null;
+ if(!year){
+  year=Number(state.year||state.seedYear||new Date().getFullYear());
+  if(state.prevMonth&&state.prevMonth>=10&&month<=3)year+=1;
+ }
+ const value=String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+ const check=new Date(value+'T00:00:00Z');
+ if(Number.isNaN(check.getTime())||check.toISOString().slice(0,10)!==value)return null;
+ state.year=year;state.prevMonth=month;state.explicitYear=explicitYear||state.explicitYear;
+ return value;
+}
+function pdfSignedMoney(raw){
+ const text=String(raw||'').trim();
+ const numeric=Math.abs(parseNumber(text.replace(/\b(?:CR|DR)\b/gi,'')));
+ if(!numeric)return 0;
+ if(/\bDR\b/i.test(text)||/^\s*-/.test(text)||/^\s*\(/.test(text))return -numeric;
+ return numeric;
+}
+function pdfBalanceMarker(text){
+ const value=String(text||'').toUpperCase().replace(/\s+/g,' ').trim();
+ return /\b(?:OPENING|CLOSING)\s+BALANCE\b/.test(value)||/\bBALANCE\s+(?:BROUGHT|CARRIED)\s+FORWARD\b/.test(value)||/\bBALANCE\s+(?:B\/F|C\/F)\b/.test(value);
+}
+function pdfSemanticDirection(text){
+ const value=String(text||'').toUpperCase();
+ if(/\b(DIRECT CREDIT|SALARY|WAGES|PAYROLL|TRANSFER FROM|DEPOSIT|REFUND|CREDIT INTEREST|INTEREST CREDIT)\b/.test(value))return 'CREDIT';
+ if(/\b(DIRECT DEBIT|WDL\b|WITHDRAWAL|ATM\b|TRANSFER TO|BPAY|BANK FEE|ACCOUNT FEE|CARDLESS CASH)\b/.test(value))return 'DEBIT';
+ return null;
+}
+function parsePdfLines(lines) {
+ const source=(lines||[]).map(line=>String(line||'').replace(/\s+/g,' ').trim()).filter(Boolean);
+ const dateStart=/^(\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?)(?=\s|$)/i;
+ const amountPattern=/(?:\b(?:CR|DR)\s*)?[-+]?\(?\$?\s*\d[\d,]*\.\d{2}\)?(?:\s*(?:CR|DR)\b)?/gi;
+ const blocks=[];let current=null;
+ for(const line of source){
+  const dateMatch=line.match(dateStart);
+  if(dateMatch){if(current)blocks.push(current);current={date_raw:dateMatch[1],parts:[line]}}
+  else if(current)current.parts.push(line);
+ }
+ if(current)blocks.push(current);
+ const dateState={seedYear:pdfSeedYear(source),year:null,prevMonth:null};
+ const records=[];
+ for(const block of blocks){
+  const text=block.parts.join(' ').replace(/\s+/g,' ').trim();
+  const transactionDate=pdfIsoDate(block.date_raw,dateState);
+  if(!transactionDate)continue;
+  const amounts=[...text.matchAll(amountPattern)].map(match=>({raw:match[0],index:match.index||0,value:pdfSignedMoney(match[0])}));
+  if(!amounts.length)continue;
+  const afterDate=text.slice(block.date_raw.length).trim();
+  const marker=pdfBalanceMarker(afterDate);
+  if(marker){records.push({marker:true,transaction_date:transactionDate,running_balance:amounts[amounts.length-1].value,text});continue}
+  const transactionAmount=amounts.length>=2?amounts[amounts.length-2]:amounts[0];
+  const balanceAmount=amounts.length>=2?amounts[amounts.length-1]:null;
+  const amount=Math.abs(transactionAmount.value);
+  if(!amount)continue;
+  const description=text.slice(block.date_raw.length,transactionAmount.index).replace(/\s+/g,' ').trim();
+  let explicitDirection=null;
+  if(/\bDR\b/i.test(transactionAmount.raw)||/^\s*-/.test(transactionAmount.raw)||/^\s*\(/.test(transactionAmount.raw))explicitDirection='DEBIT';
+  else if(/\bCR\b/i.test(transactionAmount.raw)||/^\s*\+/.test(transactionAmount.raw))explicitDirection='CREDIT';
+  records.push({marker:false,transaction_date:transactionDate,description:description||'PDF statement transaction — verify description',amount,running_balance:balanceAmount?balanceAmount.value:null,explicit_direction:explicitDirection,text});
+ }
+ const rows=[];let previousBalance=null;
+ for(const record of records){
+  if(record.marker){if(record.running_balance!==null&&record.running_balance!==undefined)previousBalance=record.running_balance;continue}
+  let direction=record.explicit_direction,inference=null;
+  if(!direction&&record.running_balance!==null&&previousBalance!==null){
+   const delta=Math.round((record.running_balance-previousBalance)*100)/100;
+   if(Math.abs(Math.abs(delta)-record.amount)<=0.02&&Math.abs(delta)>0){direction=delta>0?'CREDIT':'DEBIT';inference='BALANCE_DELTA'}
+  }
+  if(!direction){direction=pdfSemanticDirection(record.description);if(direction)inference='DESCRIPTION'}
+  const row={
+   transaction_date:record.transaction_date,description:record.description,
+   debit:direction==='DEBIT'?record.amount:0,credit:direction==='CREDIT'?record.amount:0,
+   running_balance:record.running_balance,reference:null,merchant_name:null,category:null,currency:null
+  };
+  if(!direction)row.validation_hint='PDF transaction amount was found but debit/credit direction could not be verified automatically. Review this row before importing.';
+  else if(inference==='DESCRIPTION')row.validation_hint='PDF debit/credit direction was inferred from high-confidence transaction wording. Verify this row during review.';
+  rows.push(row);
+  if(record.running_balance!==null&&record.running_balance!==undefined)previousBalance=record.running_balance;
+ }
+ if (!rows.length) throw new Error('This PDF does not expose transaction direction safely enough for automatic import. Export CSV/OFX from the bank, or use a PDF with explicit CR/DR, debit/credit columns or running balances. Nothing was imported.');
+ return rows;
+}
 async function parseStatement(file) {
   const extension = (file.name.split('.').pop() || '').toUpperCase();
-  if (extension === 'CSV') return { format: extension, rows: parseCsv(await file.text()) };
-  if (extension === 'OFX' || extension === 'QFX') return { format: extension, rows: parseOfx(await file.text()) };
-  if (extension === 'QIF') return { format: extension, rows: parseQif(await file.text()) };
-  if (extension === 'XLSX') return { format: extension, rows: await parseXlsx(file) };
-  if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)) };
+  if (extension === 'CSV') return { format: extension, rows: parseCsv(await file.text()), parser_version:'CSV_V2' };
+  if (extension === 'OFX' || extension === 'QFX') return { format: extension, rows: parseOfx(await file.text()), parser_version:'OFX_V2' };
+  if (extension === 'QIF') return { format: extension, rows: parseQif(await file.text()), parser_version:'QIF_V2' };
+  if (extension === 'XLSX') return { format: extension, rows: await parseXlsx(file), parser_version:'XLSX_V2' };
+  if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)), parser_version:'PDF_TABLE_V4_BALANCE_DELTA', parser_confidence:0.98 };
   throw new Error('Unsupported statement file. Use CSV, PDF, OFX, QFX, QIF or XLSX.');
 }
 
