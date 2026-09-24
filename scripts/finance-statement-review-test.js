@@ -41,4 +41,11 @@ assert(client.includes('This PDF does not expose transaction direction safely en
 assert(!client.includes('opening balance is income'),'opening/closing balance markers must never be treated as income');
 assert(html.includes('/finance-master.js')&&!html.includes('finance-import-wizard.js'),'statement review must live only in canonical Finance master');
 
+assert(controller.includes("sis.status='PENDING_REVIEW'"),'preview must detect duplicate rows already staged in other pending statement files');
+assert(controller.includes('already staged in'),'cross-file duplicate reason must identify the staged source');
+assert(controller.includes('Excluded from import, totals and reports.'),'duplicate rows must be explicitly excluded from finance outputs');
+assert(controller.includes('finalDuplicateRowIds'),'commit must reclassify race-time duplicates instead of silently skipping them');
+assert(controller.includes("validation_status='DUPLICATE'"),'final commit duplicate rows must be persisted as duplicate and deselected');
+assert(client.includes('validation_message'),'statement review must display the validation reason for duplicate/rejected rows');
+assert(client.includes('showFinancePopup'),'statement import must show an in-app centred success/result message');
 console.log('Finance statement review architecture checks passed.');
