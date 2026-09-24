@@ -1,5 +1,5 @@
-finance-release: 20260925-finance-rejected-row-override-v20-r3
-source-commit: 0a48f5c1cf6be559294b8b4b03e09562ebe437d5
+finance-release: 20260925-banking-grade-statement-public-readiness-v21
+source-commit: e0f212877b68cb244c5a1c591ad3e00de3ed4c99
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
