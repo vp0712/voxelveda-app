@@ -1,5 +1,5 @@
-finance-release: 20260925-banking-grade-statement-public-readiness-v21
-source-commit: e0f212877b68cb244c5a1c591ad3e00de3ed4c99
+finance-release: 20260925-voxel-veda-statement-branding-v22
+source-commit: 755294c7ad12dedd25a00344f6bb47b16d53505c
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
