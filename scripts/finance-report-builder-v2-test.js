@@ -76,6 +76,9 @@ assert(controller.includes('bsb_masked')&&controller.includes('account_number_ma
 assert(controller.includes('opening_running_balance')&&controller.includes('closing_running_balance'),'Account Statement must calculate opening and closing balances');
 assert(controller.includes('Statement totals'),'Account Statement must show debit/credit/closing totals');
 assert(controller.includes('does not claim that Voxel Veda is an authorised deposit-taking institution'),'public-facing statement must not misrepresent Voxel Veda as a licensed bank');
+assert(controller.includes("profile.tradingName||profile.legalName||'Voxel Veda'"),'Customer statement must use Voxel Veda branding instead of source-bank branding.');
+assert(controller.includes("public','Frame 1.png"),'Customer statement must use the existing original Voxel Veda logo asset.');
+assert(!controller.includes("statement.institution||'Voxel Veda Finance Platform'"),'Customer statement masthead must not reuse the external source bank as issuer branding.');
 assert(client.includes('data-account-statement'),'Accounts UI must expose one-click statement generation');
 assert(client.includes('openAccountStatementForm'),'Accounts UI must provide a statement period modal');
 assert(client.includes('downloadFinanceFile'),'statement PDF download must use the authenticated binary download flow');
