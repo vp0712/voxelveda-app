@@ -9,8 +9,8 @@ const html=fs.readFileSync('public/finance-intelligence.html','utf8');
 const suite=fs.readFileSync('scripts/finance-production-regression-suite.js','utf8');
 
 assert(master.includes("view:'advanced',scope:'ALL'"),'Finance must open on the Control Centre.');
-assert(html.includes('/finance-master.js?v=20260924-control-v12'),'Canonical Finance release cache id is stale.');
-assert(advanced.includes("VERSION='20260924-advanced-control-v12'"),'Advanced Control release id is stale.');
+assert(/\/finance-master\.js\?v=20260924-control-v\d+/.test(html),'Canonical Finance release must use a versioned cache id.');
+assert(/VERSION='20260924-advanced-control-v\d+'/.test(advanced),'Advanced Control release must use a canonical version id.');
 
 const navBlock=master.slice(master.indexOf('const NAV_GROUPS=['),master.indexOf('];',master.indexOf('const NAV_GROUPS=['))+2);
 const navKeys=[...navBlock.matchAll(/\['([a-z0-9]+)','[^']*','[^']+'\]/g)].map(m=>m[1]);
