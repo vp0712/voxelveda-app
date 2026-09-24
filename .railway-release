@@ -1,5 +1,5 @@
-finance-release: 20260925-auth-session-recovery-v24-r2
-source-commit: 4d4d794f3e3f6b17d2daa0ab45480711d6b2d0dd
+finance-release: 20260925-statement-date-integrity-v25
+source-commit: 8b72f13f870ebdf871057a015f5966cec7766738
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build
