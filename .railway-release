@@ -1,5 +1,5 @@
-finance-release: 20260924-finance-control-v13
-source-commit: 49ea93090aac91767c09fef729f6854954e8848f
+finance-release: 20260924-finance-control-v14
+source-commit: 235c5a74a61131b0828be75711e5f0b8d468c31a
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
