@@ -48,4 +48,7 @@ assert(controller.includes('finalDuplicateRowIds'),'commit must reclassify race-
 assert(controller.includes("validation_status='DUPLICATE'"),'final commit duplicate rows must be persisted as duplicate and deselected');
 assert(client.includes('validation_message'),'statement review must display the validation reason for duplicate/rejected rows');
 assert(client.includes('showFinancePopup'),'statement import must show an in-app centred success/result message');
+assert(controller.includes("code: 'STATEMENT_PREVIEW_BUSY'"),'transient DB contention must return a retryable statement-preview code');
+assert(controller.includes("error?.code === 'ER_LOCK_WAIT_TIMEOUT'")&&controller.includes("error?.code === 'ER_LOCK_DEADLOCK'"),'lock timeout/deadlock handling must remain explicit');
+assert(!controller.includes("content_hash=? ORDER BY id DESC LIMIT 1 FOR UPDATE"),'statement preview must not hold an unnecessary session-row lock while parsing/staging');
 console.log('Finance statement review architecture checks passed.');
