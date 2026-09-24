@@ -8,7 +8,7 @@ const html=read('public/finance-intelligence.html');
 const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
-assert.match(html,/finance-master\.css\?v=20260923-control-centre/,'Master finance stylesheet must be loaded.');
+assert.match(html,/finance-master\.css\?v=20260924-control-v\d+/,'Master finance stylesheet must use the current canonical versioned cache-busting release id.');
 assert.match(html,/finance-master\.js\?v=20260924-control-v\d+/,'Master finance client must use a canonical versioned cache-busting release id.');
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
@@ -55,6 +55,8 @@ assert.match(js,/function openAccountForm\(/,'Finance OS must expose a real crea
 assert.match(js,/I\+'\/accounts'/,'Account form must save through the canonical Finance account API.');
 assert.match(js,/if\(kind==='account'\)\{openAccountForm\(\);return\}/,'Add Account must never open the transaction form.');
 assert.match(js,/data-account-edit/,'Account workspace must provide account editing.');
+assert.match(js,/data-account-purge/,'Account workspace must expose explicit permanent account-and-data deletion.');
+assert.match(js,/Type exactly:/,'Permanent account deletion must require typed confirmation.');
 assert.match(js,/data-personal-new="wallet"/,'Personal Money must expose wallet creation.');
 assert.match(js,/personal-money\/wallets/,'Personal wallet form must save to the owner-isolated wallet API.');
 assert.match(js,/fx_rate_to_wallet/,'Personal multi-currency cash entry must expose an explicit FX rate instead of inventing conversion.');
@@ -120,7 +122,7 @@ assert.match(js,/data-goal-status/,'Savings Goals must support pause and resume 
 
 assert.match(js,/function openTeamAccessForm\(/,'Team Finance Access must expose account-level delegation management.');
 assert.match(js,/OS\+'\/team\/'\+encodeURIComponent\(user\.id\)\+'\/access'/,'Delegated banking access must save through the canonical Banking OS access route.');
-assert.match(js,/Personal accounts are intentionally excluded/,'Team Access UI must explicitly preserve Personal Money privacy.');
+assert.match(js,/Personal accounts remain private/,'Team Access UI must explicitly preserve Personal Money privacy.');
 assert.match(js,/PREPARE = create payment instructions/,'Team Access must explain preparation rights.');
 assert.match(js,/APPROVE = approve another preparer/,'Team Access must explain approval separation of duties.');
 
