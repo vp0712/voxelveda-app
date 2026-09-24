@@ -1,6 +1,8 @@
-finance-release: 2026-09-24T14:15:30+10:00
-source-commit: 0de7a73db569c11b04227b2dbd508a5fd3be485b
+finance-release: 20260924-finance-control-v13
+source-commit: 49ea93090aac91767c09fef729f6854954e8848f
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
+banking-platform-ci: success
+bank-account-lifecycle-ci: success
 policy: marker-only-production-deploy
