@@ -172,25 +172,63 @@ function countRows(rows) {
   }, { valid: 0, warning: 0, duplicate: 0, rejected: 0 });
 }
 
-async function normalizeAndDedupe(db, account, inputRows) {
+async function normalizeAndDedupe(db, account, inputRows, options = {}) {
   const normalized = inputRows.map((row, index) => normalizeRow(account.id, account.currency, row, index + 1));
-  const hashes = normalized.map((row) => row.row_hash).filter(Boolean);
+  const hashes = [...new Set(normalized.map((row) => row.row_hash).filter(Boolean))];
   const duplicateHashes = new Set();
+  const duplicateSources = new Map();
+  const contentHash = String(options.contentHash || '').trim().toLowerCase();
+
   if (hashes.length) {
     const chunkSize = 500;
     for (let offset = 0; offset < hashes.length; offset += chunkSize) {
       const chunk = hashes.slice(offset, offset + chunkSize);
       const placeholders = chunk.map(() => '?').join(',');
-      const [existing] = await db.query(`SELECT row_hash FROM bank_transactions WHERE bank_account_id=? AND row_hash IN (${placeholders})`, [account.id, ...chunk]);
-      existing.forEach((row) => duplicateHashes.add(row.row_hash));
+
+      const [existingLedger] = await db.query(
+        `SELECT row_hash FROM bank_transactions WHERE bank_account_id=? AND row_hash IN (${placeholders})`,
+        [account.id, ...chunk]
+      );
+      for (const item of existingLedger) {
+        duplicateHashes.add(item.row_hash);
+        duplicateSources.set(item.row_hash, 'already exists in the committed transaction ledger');
+      }
+
+      const [pendingRows] = await db.query(
+        `SELECT sir.row_hash, sis.import_uid, sis.original_name
+           FROM statement_import_rows sir
+           JOIN statement_import_sessions sis ON sis.id=sir.import_session_id
+          WHERE sis.bank_account_id=?
+            AND sis.status='PENDING_REVIEW'
+            AND (?='' OR sis.content_hash<>?)
+            AND sir.validation_status IN ('VALID','WARNING')
+            AND sir.selected=1
+            AND sir.row_hash IN (${placeholders})`,
+        [account.id, contentHash, contentHash, ...chunk]
+      );
+      for (const item of pendingRows) {
+        duplicateHashes.add(item.row_hash);
+        if (!duplicateSources.has(item.row_hash)) {
+          duplicateSources.set(
+            item.row_hash,
+            `already staged in ${String(item.original_name || item.import_uid || 'another statement review').slice(0, 180)}`
+          );
+        }
+      }
     }
   }
+
   const seenInFile = new Set();
   for (const row of normalized) {
     if (!row.row_hash || row.validation_status === 'REJECTED') continue;
-    if (duplicateHashes.has(row.row_hash) || seenInFile.has(row.row_hash)) {
+    let duplicateReason = null;
+    if (duplicateHashes.has(row.row_hash)) duplicateReason = duplicateSources.get(row.row_hash) || 'already exists in another statement';
+    else if (seenInFile.has(row.row_hash)) duplicateReason = 'repeated inside this statement file';
+
+    if (duplicateReason) {
       row.validation_status = 'DUPLICATE';
-      row.validation_message = row.validation_message ? `${row.validation_message}; Duplicate transaction` : 'Duplicate transaction';
+      const message = `Duplicate transaction — ${duplicateReason}. Excluded from import, totals and reports.`;
+      row.validation_message = row.validation_message ? `${row.validation_message}; ${message}` : message;
       row.selected = 0;
     }
     seenInFile.add(row.row_hash);
@@ -261,7 +299,7 @@ exports.preview = async (req, res) => {
     const [[alreadyImported]] = await db.query('SELECT import_uid FROM statement_import_files WHERE bank_account_id=? AND content_hash=? LIMIT 1', [accountId, fileHash]);
     if (alreadyImported) throw new FinanceError(`This statement was already committed as ${alreadyImported.import_uid}.`, 409, 'DUPLICATE_STATEMENT_FILE');
 
-    const prepared = await normalizeAndDedupe(db, account, rows);
+    const prepared = await normalizeAndDedupe(db, account, rows, { contentHash: fileHash });
     const normalized = prepared.normalized;
     const counts = prepared.counts;
     const dates = normalized.filter((row) => row.validation_status !== 'REJECTED').map((row) => row.transaction_date).filter(Boolean).sort();
@@ -570,6 +608,7 @@ exports.commit = async (req, res) => {
     const batchUid = uid('BANK');
     let imported = 0;
     let duplicates = 0;
+    const finalDuplicateRowIds = [];
     const rows = selectedRows;
     const dates = rows.map((row) => String(row.transaction_date || '').slice(0, 10)).filter(Boolean).sort();
     const minDate = dates[0] || null;
@@ -610,7 +649,10 @@ exports.commit = async (req, res) => {
         const ledgerByHash = new Map(ledgerRows.map((item) => [item.row_hash, item.id]));
         for (const row of chunk) {
           const bankTransactionId = ledgerByHash.get(row.row_hash);
-          if (!bankTransactionId) continue;
+          if (!bankTransactionId) {
+            finalDuplicateRowIds.push(Number(row.id));
+            continue;
+          }
           await db.query(
             `INSERT IGNORE INTO bank_transaction_original_data
              (bank_transaction_id,bank_account_id,source_type,source_statement_uid,source_statement_row_id,
@@ -628,6 +670,31 @@ exports.commit = async (req, res) => {
         }
       }
     }
+
+    if (finalDuplicateRowIds.length) {
+      const ids = [...new Set(finalDuplicateRowIds.filter((id) => Number.isInteger(id) && id > 0))];
+      if (ids.length) {
+        const placeholders = ids.map(() => '?').join(',');
+        await db.query(
+          `UPDATE statement_import_rows
+              SET selected=0,
+                  validation_status='DUPLICATE',
+                  validation_message=LEFT(CONCAT_WS('; ', NULLIF(validation_message,''), 'Duplicate detected during final commit — excluded from the ledger, totals and reports.'),500)
+            WHERE id IN (${placeholders})`,
+          ids
+        );
+      }
+    }
+
+    const [finalReviewRows] = await db.query(
+      'SELECT validation_status FROM statement_import_rows WHERE import_session_id=?',
+      [session.id]
+    );
+    const finalCounts = countRows(finalReviewRows);
+    await db.query(
+      'UPDATE statement_import_sessions SET valid_rows=?, warning_rows=?, duplicate_rows=?, rejected_rows=? WHERE id=?',
+      [finalCounts.valid, finalCounts.warning, finalCounts.duplicate, finalCounts.rejected, session.id]
+    );
 
     const autoRuleResult = await applyAutoRulesToImport(db, { batchUid, userId: req.user.id });
     for (const change of autoRuleResult.changes) {
@@ -653,7 +720,7 @@ exports.commit = async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'IMPORTED', ?, ?, ?, ?, NOW(), ?)`,
       [session.import_uid, account.id, session.source_format, session.original_name, session.content_hash,
         session.statement_start_date || minDate, session.statement_end_date || maxDate, session.opening_balance, session.closing_balance,
-        imported, Number(repaired.session?.duplicate_rows || session.duplicate_rows || 0) + duplicates, Number(repaired.session?.rejected_rows || session.rejected_rows || 0), session.created_by, req.user.id]
+        imported, finalCounts.duplicate, finalCounts.rejected, session.created_by, req.user.id]
     );
     await db.query(
       'UPDATE statement_import_sessions SET status="IMPORTED", reviewed_by=?, reviewed_at=NOW(), committed_by=?, committed_at=NOW() WHERE id=?',
@@ -678,12 +745,13 @@ exports.commit = async (req, res) => {
       );
     }
     const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates: finalCounts.duplicate, duplicates_at_commit: duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
     await db.commit();
     return res.json({
-      message: `${imported} statement transactions committed after review.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
+      message: `${imported} statement transactions committed after review. ${finalCounts.duplicate} duplicate transaction(s) were excluded from the ledger, totals and reports.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
       imported,
-      duplicates,
+      duplicates: finalCounts.duplicate,
+      duplicates_at_commit: duplicates,
       manual_overrides: manualOverrides,
       excluded_balance_markers: repaired.repaired,
       auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period },
