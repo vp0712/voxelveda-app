@@ -1,0 +1,6 @@
+finance-release: 2026-09-24T14:15:30+10:00
+source-commit: 0de7a73db569c11b04227b2dbd508a5fd3be485b
+candidate-ci: success
+final-system-consolidation: success
+security-ci: success
+policy: marker-only-production-deploy
