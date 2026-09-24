@@ -235,6 +235,7 @@ function dateRange(){
  const qStart=(d)=>new Date(d.getFullYear(),Math.floor(d.getMonth()/3)*3,1);
  const fyStart=(d,offset=0)=>{const month=Math.max(1,Math.min(12,Number(state.setup?.financial_year_start_month||7)))-1;const day=Math.max(1,Math.min(28,Number(state.setup?.financial_year_start_day||1)));let year=d.getFullYear();const candidate=new Date(year,month,day);if(d<candidate)year-=1;return new Date(year+offset,month,day)};
  switch(state.period){
+  case 'all': return {from:null,to:null};
   case 'today': from=clone(); break;
   case 'yesterday': {const d=clone();d.setDate(d.getDate()-1);from=d;to=isoDay(d);break}
   case 'week': from=startOfWeek(); break;
@@ -313,7 +314,7 @@ function currencyRows(){
  });
 }
 function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — consolidated total unavailable until verified FX rates are available.':''}
-function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
+function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';const label=v.replace(/_/g,' ');return `<span class="fm-badge ${tone}">${esc(label)}</span>`}
 function emptyState(title,message,action=''){return `<div class="fm-empty"><strong>${esc(title)}</strong><span>${esc(message)}</span>${action}</div>`}
 function dashboardCardVisible(key){
  const configured=state.userPreferences?.dashboard_cards;
@@ -476,9 +477,17 @@ function transactions(){
  const meta=state.txMeta||{},f=state.txFilters,saved=state.savedViews?.saved_views||[];
  const savedBar=saved.length?'<div class="fm-saved-views"><span>Saved views</span>'+saved.map(v=>'<button data-saved-query="'+esc(v.query_text)+'">'+esc(v.name)+'</button>').join('')+'</div>':'';
  const selectedCount=state.selectedTransactions.size;
- const bulkBar='<div class="fm-bulk-bar"><label class="fm-check"><input id="txSelectAll" type="checkbox" '+(state.tx.length&&selectedCount===state.tx.length?'checked':'')+'> Select this page</label><span id="txSelectedCount">'+selectedCount+' selected</span><button id="txBulkReview" class="fm-primary" type="button" '+(selectedCount?'':'disabled')+'>Bulk review</button><small>Maximum 200 per confirmed batch</small></div>';
+ const hasRows=Array.isArray(state.tx)&&state.tx.length>0;
+ const bulkBar=hasRows?'<div class="fm-bulk-bar"><label class="fm-check"><input id="txSelectAll" type="checkbox" '+(selectedCount===state.tx.length?'checked':'')+'> Select this page</label><span id="txSelectedCount">'+selectedCount+' selected</span><button id="txBulkReview" class="fm-primary" type="button" '+(selectedCount?'':'disabled')+'>Bulk review</button><small>Maximum 200 per confirmed batch</small></div>':'';
  const rows=(state.tx||[]).map(r=>'<tr data-tx="'+r.id+'"><td class="fm-select-cell"><input type="checkbox" data-tx-select="'+r.id+'" aria-label="Select transaction '+r.id+'" '+(state.selectedTransactions.has(Number(r.id))?'checked':'')+'></td><td>'+date(r.transaction_date)+'</td><td>'+esc(r.account_name||'')+'</td><td>'+esc(r.institution||'')+'</td><td><b>'+esc(r.merchant_normalized||r.merchant_name||'')+'</b><small>'+esc(r.description||'')+'</small></td><td>'+esc(r.category||'Uncategorised')+'</td><td>'+(Number(r.is_internal_transfer)?'Transfer':num(r.debit)>0?'Expense':'Income')+'</td><td>'+esc(r.ownership_scope||'')+'</td><td>'+esc(r.currency||'')+'</td><td>'+(num(r.debit)?nativeMoney(r.debit,r.currency):'')+'</td><td>'+(num(r.credit)?nativeMoney(r.credit,r.currency):'')+'</td><td>'+esc(r.project_ref||r.source_type||'')+'</td><td>'+statusBadge(r.reviewed_at?'REVIEWED':r.reconciliation_status)+'</td></tr>').join('');
- return ('<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transaction Explorer</h2><p>'+num(meta.total)+' matching records · server-side filters and pagination.</p></div><div class="fm-hero-actions"><button id="saveCurrentView">Save view</button><button data-quick="expense">+ Financial movement</button></div></div>'+savedBar+'<div class="fm-filter-grid"><input id="txSearch" value="'+esc(f.q)+'" placeholder="Search description, merchant, reference, account"><select id="txType"><option value="">All types</option><option value="EXPENSE" '+(f.type==='EXPENSE'?'selected':'')+'>Expense</option><option value="INCOME" '+(f.type==='INCOME'?'selected':'')+'>Income</option><option value="TRANSFER" '+(f.type==='TRANSFER'?'selected':'')+'>Transfer</option></select><input id="txCategory" value="'+esc(f.category)+'" placeholder="Category"><input id="txMerchant" value="'+esc(f.merchant)+'" placeholder="Merchant"><select id="txSource"><option value="">All sources</option><option value="STATEMENT_IMPORT" '+(f.source==='STATEMENT_IMPORT'?'selected':'')+'>Statement import</option><option value="MANUAL" '+(f.source==='MANUAL'?'selected':'')+'>Manual</option><option value="OPEN_BANKING" '+(f.source==='OPEN_BANKING'?'selected':'')+'>Open Banking</option></select><select id="txRecon"><option value="">All reconciliation</option><option value="UNRECONCILED" '+(f.reconciliation_status==='UNRECONCILED'?'selected':'')+'>Unreconciled</option><option value="RECONCILED" '+(f.reconciliation_status==='RECONCILED'?'selected':'')+'>Reconciled</option></select><input id="txMin" value="'+esc(f.amount_min)+'" inputmode="decimal" placeholder="Min amount"><input id="txMax" value="'+esc(f.amount_max)+'" inputmode="decimal" placeholder="Max amount"><button id="txApply" class="fm-primary" type="button">Apply filters</button></div>'+resourceError('txPayload','Transaction ledger')+bulkBar+'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th><span class="sr-only">Select</span></th><th>Date</th><th>Account</th><th>Bank</th><th>Merchant / Description</th><th>Category</th><th>Type</th><th>Scope</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Source / Project</th><th>Status</th></tr></thead><tbody>'+(rows||'<tr><td colspan="13">'+emptyState('No matching transactions','Change filters or import financial history.')+'</td></tr>')+'</tbody></table></div><div class="fm-pagination"><button id="txPrev" '+(meta.page<=1?'disabled':'')+'>Previous</button><span>Page '+(num(meta.page)||1)+' of '+(num(meta.total_pages)||1)+'</span><button id="txNext" '+(meta.page>=meta.total_pages?'disabled':'')+'>Next</button></div></div></article>')+savedViewsCard();
+ const filtered=Object.values(f||{}).some(v=>String(v||'').trim());
+ const periodLabels={all:'All History',today:'Today',yesterday:'Yesterday',week:'This Week',last7:'Last 7 Days',month:'This Month',last_month:'Last Month',last30:'Last 30 Days',quarter:'This Quarter',previous_quarter:'Previous Quarter',fy:'Current Financial Year',previous_fy:'Previous Financial Year',year:'Calendar Year',custom:'Custom Range'};
+ const periodName=periodLabels[state.period]||'Selected period';
+ const emptyTitle=filtered?'No transactions match these filters':(state.period==='all'?'No transactions loaded':'No transactions in '+periodName);
+ const emptyMessage=filtered?'Clear or change the transaction filters to see other records.':(state.period==='all'?'Import statement history or add a financial movement to populate the ledger.':'Your imported history is preserved; this period simply has no matching activity.');
+ const emptyAction=!filtered&&state.period!=='all'?'<button type="button" class="fm-primary" data-show-all-history="1">Show all history</button>':'';
+ const ledger=hasRows?'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th><span class="sr-only">Select</span></th><th>Date</th><th>Account</th><th>Bank</th><th>Merchant / Description</th><th>Category</th><th>Type</th><th>Scope</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Source / Project</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="fm-pagination"><button id="txPrev" '+(meta.page<=1?'disabled':'')+'>Previous</button><span>Page '+(num(meta.page)||1)+' of '+(num(meta.total_pages)||1)+'</span><button id="txNext" '+(meta.page>=meta.total_pages?'disabled':'')+'>Next</button></div>':'<div class="fm-transaction-empty">'+emptyState(emptyTitle,emptyMessage,emptyAction)+'</div>';
+ return ('<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transaction Explorer</h2><p>'+num(meta.total)+' matching records · server-side filters and pagination.</p></div><div class="fm-hero-actions"><button id="saveCurrentView">Save view</button><button data-quick="expense">+ Financial movement</button></div></div>'+savedBar+'<div class="fm-filter-grid"><input id="txSearch" value="'+esc(f.q)+'" placeholder="Search description, merchant, reference, account"><select id="txType"><option value="">All types</option><option value="EXPENSE" '+(f.type==='EXPENSE'?'selected':'')+'>Expense</option><option value="INCOME" '+(f.type==='INCOME'?'selected':'')+'>Income</option><option value="TRANSFER" '+(f.type==='TRANSFER'?'selected':'')+'>Transfer</option></select><input id="txCategory" value="'+esc(f.category)+'" placeholder="Category"><input id="txMerchant" value="'+esc(f.merchant)+'" placeholder="Merchant"><select id="txSource"><option value="">All sources</option><option value="STATEMENT_IMPORT" '+(f.source==='STATEMENT_IMPORT'?'selected':'')+'>Statement import</option><option value="MANUAL" '+(f.source==='MANUAL'?'selected':'')+'>Manual</option><option value="OPEN_BANKING" '+(f.source==='OPEN_BANKING'?'selected':'')+'>Open Banking</option></select><select id="txRecon"><option value="">All reconciliation</option><option value="UNRECONCILED" '+(f.reconciliation_status==='UNRECONCILED'?'selected':'')+'>Unreconciled</option><option value="RECONCILED" '+(f.reconciliation_status==='RECONCILED'?'selected':'')+'>Reconciled</option></select><input id="txMin" value="'+esc(f.amount_min)+'" inputmode="decimal" placeholder="Min amount"><input id="txMax" value="'+esc(f.amount_max)+'" inputmode="decimal" placeholder="Max amount"><button id="txApply" class="fm-primary" type="button">Apply filters</button></div>'+resourceError('txPayload','Transaction ledger')+bulkBar+ledger+'</div></article>')+savedViewsCard();
 }
 function historyImportView(){
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
@@ -1906,12 +1915,16 @@ function pdfYearNumber(value){
  const n=Number(value);if(!Number.isFinite(n))return null;
  return n<100?(n>=70?1900+n:2000+n):n;
 }
-function pdfSeedYear(lines){
+function pdfYearBounds(lines){
  const text=(lines||[]).map(line=>String(line||'')).join(' ');
  const numeric=[...text.matchAll(/\b\d{1,2}[\/-]\d{1,2}[\/-](\d{2,4})\b/g)].map(m=>pdfYearNumber(m[1])).filter(Boolean);
- if(numeric.length)return numeric[0];
  const named=[...text.matchAll(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+(\d{2,4})\b/g)].map(m=>pdfYearNumber(m[1])).filter(Boolean);
- return named[0]||new Date().getFullYear();
+ const years=[...numeric,...named].filter(y=>y>=1900&&y<=2200);
+ return years.length?{min:Math.min(...years),max:Math.max(...years)}:{min:null,max:null};
+}
+function pdfSeedYear(lines){
+ const bounds=pdfYearBounds(lines);
+ return bounds.min||new Date().getFullYear();
 }
 function pdfIsoDate(raw,state){
  const text=String(raw||'').trim().replace(/\s+/g,' ');
@@ -1925,8 +1938,14 @@ function pdfIsoDate(raw,state){
  if(!day||!month)return null;
  if(!year){
   year=Number(state.year||state.seedYear||new Date().getFullYear());
-  if(state.prevMonth&&state.prevMonth>=10&&month<=3)year+=1;
+  if(state.prevMonth&&state.prevMonth>=10&&month<=3){
+   const rollover=year+1;
+   if(!state.maxExplicitYear||rollover<=state.maxExplicitYear)year=rollover;
+   else state.boundExceeded=true;
+  }
  }
+ if(state.minExplicitYear&&year<state.minExplicitYear)return null;
+ if(state.maxExplicitYear&&year>state.maxExplicitYear)return null;
  const value=String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
  const check=new Date(value+'T00:00:00Z');
  if(Number.isNaN(check.getTime())||check.toISOString().slice(0,10)!==value)return null;
@@ -1961,7 +1980,8 @@ function parsePdfLines(lines) {
   else if(current)current.parts.push(line);
  }
  if(current)blocks.push(current);
- const dateState={seedYear:pdfSeedYear(source),year:null,prevMonth:null};
+ const yearBounds=pdfYearBounds(source);
+ const dateState={seedYear:pdfSeedYear(source),minExplicitYear:yearBounds.min,maxExplicitYear:yearBounds.max,year:null,prevMonth:null,boundExceeded:false};
  const records=[];
  for(const block of blocks){
   const text=block.parts.join(' ').replace(/\s+/g,' ').trim();
@@ -2002,6 +2022,7 @@ function parsePdfLines(lines) {
   if(record.running_balance!==null&&record.running_balance!==undefined)previousBalance=record.running_balance;
  }
  if (!rows.length) throw new Error('This PDF does not expose transaction direction safely enough for automatic import. Export CSV/OFX from the bank, or use a PDF with explicit CR/DR, debit/credit columns or running balances. Nothing was imported.');
+ if(dateState.boundExceeded)throw new Error('The PDF date sequence runs beyond the statement year range. Finance stopped the import instead of inventing future transaction dates. Export CSV/OFX from the bank or verify the PDF statement period.');
  return rows;
 }
 async function parseStatement(file) {
@@ -2010,7 +2031,7 @@ async function parseStatement(file) {
   if (extension === 'OFX' || extension === 'QFX') return { format: extension, rows: parseOfx(await file.text()), parser_version:'OFX_V2' };
   if (extension === 'QIF') return { format: extension, rows: parseQif(await file.text()), parser_version:'QIF_V2' };
   if (extension === 'XLSX') return { format: extension, rows: await parseXlsx(file), parser_version:'XLSX_V2' };
-  if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)), parser_version:'PDF_TABLE_V4_BALANCE_DELTA', parser_confidence:0.98 };
+  if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)), parser_version:'PDF_TABLE_V5_DATE_BOUNDS', parser_confidence:0.98 };
   throw new Error('Unsupported statement file. Use CSV, PDF, OFX, QFX, QIF or XLSX.');
 }
 
@@ -2380,6 +2401,7 @@ function bindDynamic(){
  if($('txApply'))$('txApply').onclick=()=>{state.txFilters={...state.txFilters,q:$('txSearch').value.trim(),type:$('txType').value,category:$('txCategory').value.trim(),merchant:$('txMerchant').value.trim(),source:$('txSource').value,reconciliation_status:$('txRecon').value,amount_min:$('txMin').value.trim(),amount_max:$('txMax').value.trim()};state.txMeta.page=1;loadTransactions()};
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
+ document.querySelectorAll('[data-show-all-history]').forEach(b=>b.onclick=()=>{state.period='all';state.txMeta.page=1;if($('fmPeriod'))$('fmPeriod').value='all';refresh()});
  document.querySelectorAll('[data-report-preset]').forEach(b=>b.onclick=async()=>{
   const form=$('reportBuilderForm');if(!form)return;
   form.elements.report_type.value=b.dataset.reportPreset;
