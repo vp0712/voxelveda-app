@@ -452,7 +452,7 @@ async function stageStatementFiles(account,files,queue){
    if(!parsed.rows.length)throw new Error('No transaction rows could be safely extracted from this file.');
    item.querySelector('small').textContent=parsed.rows.length+' row(s) extracted · checking duplicates and verifying fingerprints…';
    item.querySelector('.fm-badge').textContent='VERIFYING';
-   const result=await api(I+'/accounts/'+encodeURIComponent(account.id)+'/statements/preview',{method:'POST',body:JSON.stringify({source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),rows:parsed.rows})});
+   const result=await api(I+'/accounts/'+encodeURIComponent(account.id)+'/statements/preview',{method:'POST',timeoutMs:90000,body:JSON.stringify({source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),parser_version:parsed.parser_version||null,parser_confidence:parsed.parser_confidence??null,extraction_diagnostics:{file_size:Number(file.size||0),extracted_rows:parsed.rows.length,batch_index:index+1,batch_files:files.length},rows:parsed.rows})});
    const s=result.summary||{};
    const duplicates=num(s.duplicate),rejected=num(s.rejected),ready=num(s.selected);
    summary.processed+=1;summary.rows+=(num(s.total)||parsed.rows.length);summary.ready+=ready;summary.duplicates+=duplicates;summary.rejected+=rejected;
