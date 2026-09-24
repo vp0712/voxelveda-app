@@ -31,7 +31,8 @@ for(const marker of ['parseOfx','parseQif','parsePdfLines','parseXlsx','openStat
 assert(client.includes('accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx"'),'supported statement file formats are incomplete');
 assert(client.includes("crypto.subtle.digest('SHA-256'"),'statement source hashing is missing');
 assert(client.includes('/statements/preview'),'statement rows must stage before commit');
-assert(client.includes("['DUPLICATE','REJECTED'].includes(row.validation_status)"),'duplicate/rejected rows must not be selectable');
+assert(client.includes("const isDuplicate=row.validation_status==='DUPLICATE'"),'duplicate rows must remain locked from normal selection');
+assert(client.includes('data-review-override'),'rejected rows must use the audited manual-correction workflow instead of normal selection');
 assert(client.includes('data-review-select'),'row-level review selection missing');
 assert(client.includes('data-review-commit'),'explicit statement commit action missing');
 assert(client.includes('data-review-reject'),'explicit statement reject action missing');
