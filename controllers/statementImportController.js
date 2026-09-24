@@ -19,6 +19,14 @@ function audit(req, values) {
 function fail(res, error, message) {
   if (error instanceof FinanceError) return res.status(error.statusCode || 400).json({ message: error.message, code: error.code, issues: error.issues });
   if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'This statement or review session already exists.', code: 'DUPLICATE_RECORD' });
+  if (error?.code === 'ER_LOCK_WAIT_TIMEOUT' || error?.code === 'ER_LOCK_DEADLOCK') {
+    console.warn(`${message}: transient database contention`, error.code);
+    return res.status(503).json({
+      message: 'Statement verification is briefly busy. The app will retry this file automatically.',
+      code: 'STATEMENT_PREVIEW_BUSY',
+      retry_after_ms: 750
+    });
+  }
   console.error(`${message}:`, error);
   return res.status(500).json({ message, code: 'STATEMENT_REVIEW_ERROR' });
 }
@@ -319,7 +327,7 @@ exports.preview = async (req, res) => {
     const reconciliationDifference = req.body.reconciliation_difference === null || req.body.reconciliation_difference === undefined || req.body.reconciliation_difference === '' ? null : Number(req.body.reconciliation_difference);
     const diagnostics = req.body.extraction_diagnostics && typeof req.body.extraction_diagnostics === 'object' ? JSON.stringify(req.body.extraction_diagnostics) : null;
 
-    const [[existingSession]] = await db.query('SELECT * FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=? ORDER BY id DESC LIMIT 1 FOR UPDATE', [accountId, fileHash]);
+    const [[existingSession]] = await db.query('SELECT * FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=? ORDER BY id DESC LIMIT 1', [accountId, fileHash]);
     if (existingSession && existingSession.status === 'PENDING_REVIEW') {
       const existingImportable = Number(existingSession.valid_rows || 0) + Number(existingSession.warning_rows || 0);
       const parserChanged = sourceFormat === 'PDF' && parserVersion && String(existingSession.parser_version || '') !== parserVersion;
