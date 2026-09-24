@@ -8,6 +8,12 @@ const { applyAutoRulesToImport } = require('../services/financeRuleEngine');
 
 const FORMATS = new Set(['CSV', 'PDF', 'OFX', 'QFX', 'QIF', 'XLSX']);
 
+function statementImportDateCeiling() {
+  // Allow for timezone differences around midnight, but never accept bank-statement
+  // transactions materially in the future.
+  return new Date(Date.now() + (36 * 60 * 60 * 1000)).toISOString().slice(0, 10);
+}
+
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
@@ -96,6 +102,10 @@ function normalizeRow(accountId, accountCurrency, input, rowNo) {
   try { debit = money.fromCents(money.toCents(row.debit || 0)); } catch { validationStatus = 'REJECTED'; messages.push('Invalid debit amount'); }
   try { credit = money.fromCents(money.toCents(row.credit || 0)); } catch { validationStatus = 'REJECTED'; messages.push('Invalid credit amount'); }
   if (!transactionDate) { validationStatus = 'REJECTED'; messages.push('Invalid or missing transaction date'); }
+  if (transactionDate && transactionDate > statementImportDateCeiling()) {
+    validationStatus = 'REJECTED';
+    messages.push('Transaction date is in the future; verify the statement year before import');
+  }
   if ((money.toCents(debit) > 0n) === (money.toCents(credit) > 0n)) { validationStatus = 'REJECTED'; messages.push('Exactly one of debit or credit must be positive'); }
   if (row.running_balance !== '' && row.running_balance !== null && row.running_balance !== undefined) {
     try { runningBalance = money.fromCents(money.toCents(row.running_balance)); } catch { if (validationStatus === 'VALID') validationStatus = 'WARNING'; messages.push('Running balance could not be parsed'); }
@@ -268,9 +278,15 @@ async function insertReviewRows(db, sessionId, normalized) {
 }
 
 async function repairPendingReview(db, session) {
-  if (!session || session.status !== 'PENDING_REVIEW') return { session, rows: null, repaired: 0 };
+  if (!session || session.status !== 'PENDING_REVIEW') return { session, rows: null, repaired: 0, future_dates_repaired: 0 };
   const [rows] = await db.query('SELECT * FROM statement_import_rows WHERE import_session_id=? ORDER BY row_no', [session.id]);
   const staleMarkers = rows.filter((row) => isBalanceMarker(row) && (Number(row.selected) || row.validation_status !== 'REJECTED'));
+  const ceiling = statementImportDateCeiling();
+  const futureDates = rows.filter((row) => {
+    const transactionDate = dateOnly(row.transaction_date);
+    return transactionDate && transactionDate > ceiling && (Number(row.selected) || row.validation_status !== 'REJECTED');
+  });
+
   if (staleMarkers.length) {
     const ids = staleMarkers.map((row) => Number(row.id)).filter(Boolean);
     const placeholders = ids.map(() => '?').join(',');
@@ -280,11 +296,24 @@ async function repairPendingReview(db, session) {
        WHERE id IN (${placeholders})`, ids
     );
   }
-  const [freshRows] = staleMarkers.length
+
+  if (futureDates.length) {
+    const ids = futureDates.map((row) => Number(row.id)).filter(Boolean);
+    const placeholders = ids.map(() => '?').join(',');
+    await db.query(
+      `UPDATE statement_import_rows
+       SET selected=0, validation_status='REJECTED',
+           validation_message=LEFT(CONCAT_WS('; ',NULLIF(validation_message,''),'Transaction date is in the future; verify the statement year before import'),500)
+       WHERE id IN (${placeholders})`, ids
+    );
+  }
+
+  const repairedAnything = staleMarkers.length || futureDates.length;
+  const [freshRows] = repairedAnything
     ? await db.query('SELECT * FROM statement_import_rows WHERE import_session_id=? ORDER BY row_no', [session.id])
     : [rows];
   const counts = countRows(freshRows);
-  if (staleMarkers.length || Number(session.valid_rows || 0) !== counts.valid || Number(session.warning_rows || 0) !== counts.warning || Number(session.duplicate_rows || 0) !== counts.duplicate || Number(session.rejected_rows || 0) !== counts.rejected) {
+  if (repairedAnything || Number(session.valid_rows || 0) !== counts.valid || Number(session.warning_rows || 0) !== counts.warning || Number(session.duplicate_rows || 0) !== counts.duplicate || Number(session.rejected_rows || 0) !== counts.rejected) {
     await db.query(
       'UPDATE statement_import_sessions SET valid_rows=?, warning_rows=?, duplicate_rows=?, rejected_rows=? WHERE id=?',
       [counts.valid, counts.warning, counts.duplicate, counts.rejected, session.id]
@@ -293,7 +322,8 @@ async function repairPendingReview(db, session) {
   return {
     session: { ...session, valid_rows: counts.valid, warning_rows: counts.warning, duplicate_rows: counts.duplicate, rejected_rows: counts.rejected },
     rows: freshRows,
-    repaired: staleMarkers.length
+    repaired: staleMarkers.length,
+    future_dates_repaired: futureDates.length
   };
 }
 
@@ -467,7 +497,7 @@ exports.get = async (req, res) => {
     const repaired = await repairPendingReview(db, session);
     const rows = repaired.rows || (await db.query('SELECT * FROM statement_import_rows WHERE import_session_id=? ORDER BY row_no', [session.id]))[0];
     await db.commit();
-    return res.json({ session: repaired.session || session, rows, repaired_rows: repaired.repaired });
+    return res.json({ session: repaired.session || session, rows, repaired_rows: repaired.repaired, future_date_rows_repaired: repaired.future_dates_repaired || 0 });
   } catch (error) {
     if (db) await db.rollback();
     return fail(res, error, 'Failed to load statement review');
@@ -644,12 +674,14 @@ exports.commit = async (req, res) => {
        WHERE import_session_id=? AND selected=1 AND validation_status IN ('VALID','WARNING') ORDER BY row_no`, [session.id]
     );
     if (!selectedRows.length) {
-      await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_NO_IMPORTABLE_ROWS', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { repaired_balance_markers: repaired.repaired, parser_version: session.parser_version || null } }));
+      await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_NO_IMPORTABLE_ROWS', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { repaired_balance_markers: repaired.repaired, repaired_future_dates: repaired.future_dates_repaired || 0, parser_version: session.parser_version || null } }));
       await db.commit();
       return res.status(422).json({
         message: repaired.repaired
           ? `This review contained ${repaired.repaired} opening/closing balance marker row(s), not transactions. They have now been safely excluded. Re-upload the same PDF once so the current parser can rebuild the review, or use CSV/OFX/QFX if no transaction rows can be verified.`
-          : 'No importable transaction rows are selected. If this is an older PDF review, re-upload the same PDF so the current parser can rebuild it. Otherwise select a valid/warning row or use CSV/OFX/QFX.',
+          : repaired.future_dates_repaired
+            ? `This review contained ${repaired.future_dates_repaired} future-dated transaction row(s). They were blocked because Finance will not import a bank transaction with an unverified future statement year. Re-upload the PDF with the current parser or use CSV/OFX/QFX.`
+            : 'No importable transaction rows are selected. If this is an older PDF review, re-upload the same PDF so the current parser can rebuild it. Otherwise select a valid/warning row or use CSV/OFX/QFX.',
         code: 'NO_IMPORTABLE_TRANSACTIONS',
         review_repaired: true,
         repaired_rows: repaired.repaired,
@@ -797,7 +829,7 @@ exports.commit = async (req, res) => {
       );
     }
     const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates: finalCounts.duplicate, duplicates_at_commit: duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates: finalCounts.duplicate, duplicates_at_commit: duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, repaired_future_dates: repaired.future_dates_repaired || 0, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
     await db.commit();
     return res.json({
       message: `${imported} statement transactions committed after review. ${finalCounts.duplicate} duplicate transaction(s) were excluded from the ledger, totals and reports.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
@@ -806,6 +838,7 @@ exports.commit = async (req, res) => {
       duplicates_at_commit: duplicates,
       manual_overrides: manualOverrides,
       excluded_balance_markers: repaired.repaired,
+      excluded_future_dates: repaired.future_dates_repaired || 0,
       auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period },
       batch_uid: batchUid,
       coverage: { start: minDate, end: maxDate }
