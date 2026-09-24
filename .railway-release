@@ -1,5 +1,5 @@
-finance-release: 20260925-auth-session-recovery-v24
-source-commit: 75e63a9c37d6b4d3f0051778145d39b0a2fd93c3
+finance-release: 20260925-auth-session-recovery-v24-r2
+source-commit: 4d4d794f3e3f6b17d2daa0ab45480711d6b2d0dd
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build
