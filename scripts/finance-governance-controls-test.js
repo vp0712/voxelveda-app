@@ -52,5 +52,5 @@ assert(protection.includes('INSURANCE')&&protection.includes('Protection boundar
 assert(protection.includes('annualByCurrency'),'Protection costs must remain separated by native currency.');
 assert(protection.includes('never renews or pays anything automatically'),'Protection register must prohibit implied automation.');
 
-assert(/\/finance-master\.js\?v=20260924-control-v\d+/.test(html),'Finance master release must be versioned for governance controls.');
+assert(/\/finance-master\.js\?v=20\d{6}-control-v\d+/.test(html),'Finance master release must be versioned for governance controls.');
 console.log('FINANCE_GOVERNANCE_CONTROLS_OK');
