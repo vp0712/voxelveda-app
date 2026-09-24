@@ -34,6 +34,7 @@ const financeSearch = require('../controllers/financeSearchController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
 const personalRecurringCommitment = require('../controllers/personalRecurringCommitmentController');
+const personalSavingsReserve = require('../controllers/personalSavingsReserveController');
 const personalDebtPlanning = require('../controllers/personalDebtPlanningController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
@@ -157,6 +158,9 @@ router.post('/personal-money/recurring/:id/active', requireAnyPermission('EDIT_F
 router.post('/personal-money/goals', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.createGoal);
 router.post('/personal-money/goals/:id/contributions', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.addGoalContribution);
 router.post('/personal-money/goals/:id/status', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.setGoalStatus);
+router.get('/personal-money/savings-control', requireAnyPermission('VIEW_BANKING'), personalSavingsReserve.getCenter);
+router.put('/personal-money/goals/:id/control', requireAnyPermission('EDIT_FINANCE'), personalSavingsReserve.saveControl);
+router.get('/personal-money/goals/:id/statement', requireAnyPermission('VIEW_BANKING'), personalSavingsReserve.getStatement);
 router.get('/personal-money/smart', requireAnyPermission('VIEW_BANKING'), personalMoneySmart.getSmartCenter);
 router.post('/personal-money/smart/recurring/:key/apply', requireAnyPermission('EDIT_FINANCE'), personalMoneySmart.applyRecurringSuggestion);
 router.post('/personal-money/smart/safety-buffer', requireAnyPermission('EDIT_FINANCE'), personalMoneySmart.saveSafetyBuffer);
