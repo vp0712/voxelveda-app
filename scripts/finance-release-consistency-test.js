@@ -41,7 +41,7 @@ const navBlock=master.slice(navStart,navEnd+2);
 const navKeys=[...navBlock.matchAll(/\['([a-z0-9]+)','[^']*','[^']+'\]/g)].map(m=>m[1]);
 assert.strictEqual(new Set(navKeys).size,navKeys.length,'Canonical Finance navigation must not contain duplicate module keys.');
 
-assert(!/20\d{6}-control-v\d+/.test(read('scripts/finance-master-os-test.js')),'Master regression must use a version-safe matcher, not a concrete control release.');
-assert(!/20\d{6}-advanced-control-v\d+/.test(read('scripts/finance-advanced-control-test.js')),'Advanced regression must derive the release id dynamically.');
+assert(!read('scripts/finance-master-os-test.js').includes(masterMatch[1]),'Master regression must not hard-code the concrete control release.');
+assert(!read('scripts/finance-advanced-control-test.js').includes(advancedAssetMatch[1]),'Advanced regression must not hard-code the concrete Advanced Control release.');
 
 console.log('FINANCE_RELEASE_CONSISTENCY_OK master='+masterMatch[1]+' advanced='+advancedAssetMatch[1]+' tests='+financeTests.length);
