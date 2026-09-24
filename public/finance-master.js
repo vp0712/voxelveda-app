@@ -2019,8 +2019,8 @@ function openRejectedRowOverride(uid,row,session,trigger){
   try{
    const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(row.id)+'/override',{method:'POST',body:JSON.stringify(payload)});
    $('fmModal').close();
-   showFinancePopup('Rejected transaction included',result.message||'The corrected transaction is selected for import.','Manual override recorded in the audit trail.',{actionLabel:'Back to review',onAction:()=>openStatementReview(uid)});
    await openStatementReview(uid);
+   showFinancePopup('Rejected transaction included',result.message||'The corrected transaction is selected for import.','Manual override recorded in the audit trail.');
   }catch(error){submit.disabled=false;submit.textContent='Include transaction';resetTrigger();notice(error.message,true)}
  };
 }
