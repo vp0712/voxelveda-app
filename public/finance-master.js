@@ -27,7 +27,7 @@ const NAV_GROUPS=[
  ['CONTROL',[['closeassurance','✓','Close & Assurance'],['protection','◇','Protection Register'],['securityprivacy','⌾','Security & Privacy'],['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
-const MOBILE_NAV=[['advanced','⚡','Control'],['accounts','▣','Accounts'],['transactions','↕','Transactions'],['statements','▤','Statements'],['more','☰','More']];
+const MOBILE_NAV=[['accounts','⌂','Accounts'],['transactions','▤','Transactions'],['statements','▥','Statements'],['more','•••','More']];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
 const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
@@ -361,25 +361,40 @@ function overview(){
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
- const cards=state.accounts.map(a=>{
+ const cards=state.accounts.map((a,index)=>{
   const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
   const accountName=esc(a.nickname||'Account');
-  return `<article class="fm-account-card-shell">
-   <button class="fm-account-card fm-account-card-open" type="button" data-account="${a.id}" aria-label="Open ${accountName}">
-    <span class="fm-account-type">${esc(a.account_type||'Account')}</span>
-    <h3>${accountName}</h3>
-    <p>${esc(a.institution||'Manual')} · ${esc(a.account_number_masked||'number masked')}</p>
-    <strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong>
-    <small>${esc(a.ownership_scope||'')} · ${esc(a.connection_status||'MANUAL')}</small>
-    <div class="fm-coverage"><span>Coverage</span><b>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)}</b></div>
-   </button>
-   <div class="fm-account-card-actions">
-    <button type="button" data-account-edit="${a.id}">Edit</button>
-    <button type="button" class="bad" data-account-purge="${a.id}">Delete</button>
+  const institution=esc(a.institution||'Manual');
+  const accountNumber=esc(a.account_number_masked||'number masked');
+  const scope=esc(a.ownership_scope||'UNCLASSIFIED');
+  const connection=esc(a.connection_status||'MANUAL');
+  const searchText=esc([a.nickname,a.institution,a.account_number_masked,a.ownership_scope,a.account_type,a.currency].filter(Boolean).join(' ').toLowerCase());
+  const tone=(index%3)+1;
+  return `<article class="fm-account-card-shell fm-account-tone-${tone}" data-account-card-shell data-search-text="${searchText}">
+   <div class="fm-account-card">
+    <div class="fm-account-card-top">
+     <button class="fm-bank-mark" type="button" data-account="${a.id}" aria-label="Open ${accountName}"><span>▥</span></button>
+     <div class="fm-account-identity"><span class="fm-account-type">${esc(a.account_type||'Account')}</span><h3>${accountName}</h3><p>${institution} · ${accountNumber}</p></div>
+     <button class="fm-account-more" type="button" data-account="${a.id}" aria-label="Open account controls">•••</button>
+    </div>
+    <div class="fm-account-balance-row">
+     <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>${scope} · ${connection}</small></div>
+     <div class="fm-account-main-actions"><button type="button" class="soft" data-account="${a.id}">View</button><button type="button" class="primary" data-account-transactions="${a.id}">Transactions</button></div>
+    </div>
+    <div class="fm-account-card-footer">
+     <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)}</small></div></div>
+     <div class="fm-account-footer-actions"><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
+    </div>
    </div>
   </article>`;
  }).join('');
- return `<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial accounts</h2><p>Open an account for overview, transactions, analytics, reconciliation and lifecycle controls.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-account-grid">${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>`;
+ return `<section class="fm-accounts-premium">
+  <div class="fm-accounts-toolbar">
+   <label class="fm-account-search"><span>⌕</span><input type="search" data-account-search placeholder="Search accounts..." autocomplete="off"></label>
+   <button type="button" class="fm-account-add" data-quick="account"><span>＋</span> Add account</button>
+  </div>
+  <article class="fm-card fm-accounts-panel"><div class="fm-pad"><div class="fm-card-head fm-accounts-head"><div><span class="fm-section-kicker">YOUR FINANCIAL ACCOUNTS</span><h2>Financial accounts</h2><p>Balances, history coverage, transactions and lifecycle controls in one place.</p></div><button data-quick="account">＋ Add account</button></div><div class="fm-account-grid">${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>
+ </section>`;
 }
 function transactions(){
  const meta=state.txMeta||{},f=state.txFilters,saved=state.savedViews?.saved_views||[];
@@ -1943,6 +1958,7 @@ async function reimbursementDetail(id){
  }catch(error){notice(error.message,true)}
 }
 function render(){
+ document.body.dataset.financeView=state.view;
  const [t,sub]=title(state.view);$('fmTitle').textContent=t;$('fmSubtitle').textContent=sub;navButtons();
  $('fmContent').innerHTML=state.view==='overview'?overview():state.view==='accounts'?accounts():state.view==='transactions'?transactions():state.view==='statements'?statements():simpleView(state.view);
  bindDynamic();
@@ -1959,6 +1975,9 @@ function bindDynamic(){
  document.querySelectorAll('[data-history-import]').forEach(b=>b.onclick=()=>openHistoricalImport(b.dataset.historyImport));
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));
  document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
+ document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');if($('fmAccount'))$('fmAccount').value=state.account;state.txMeta.page=1;go('transactions');loadTransactions()});
+ const accountSearch=document.querySelector('[data-account-search]');
+ if(accountSearch)accountSearch.oninput=e=>{const q=String(e.currentTarget.value||'').trim().toLowerCase();document.querySelectorAll('[data-account-card-shell]').forEach(card=>{card.hidden=Boolean(q)&&!String(card.dataset.searchText||'').includes(q)})};
  document.querySelectorAll('[data-fx-new]').forEach(b=>b.onclick=()=>openFxRateForm());
  document.querySelectorAll('[data-fx-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this FX rate? Historical native transactions are not changed.'))return;try{const x=await api(API+'/fx-rates/'+encodeURIComponent(b.dataset.fxArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await loadResource('fxRates',API+'/fx-rates');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
