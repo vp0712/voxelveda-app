@@ -44,6 +44,7 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 | Reports | Specialized standard catalogue (cash flow, bank-style account statement with running balance, category, merchant, cash, transfers, refunds, reimbursements, GST review, reconciliation, data quality, Personal/Company monthly) with saved definitions and protected branded PDF/CSV/XLSX exports | PARTIAL pending authenticated production journey verification |
 | Notifications | Unified notification centre, delivery preferences, Banking command-centre attention, and per-user low-balance/large-transaction/budget/payment/sync/unusual-activity alert controls | PARTIAL pending authenticated production journey verification |
 | User preferences | Default workspace/account/period/format/dashboard cards | PARTIAL |
+| Loading and recovery | Interactive shell, bounded core requests, progressive supplementary hydration, a 15-second Advanced Control load budget, stale-response rejection, non-destructive refresh and per-source retry | READY core / production journey verification continues |
 | Team access | Server-enforced role controls plus per-business-account VIEW/PREPARE/APPROVE/MANAGE delegation and audited revocation UI | READY core / integrated management UI |
 | Accounting period locking | Open/review/ready/locked transitions with protected lock workflow | READY core |
 | Open Banking | Unified provider readiness, consent-session launch, connected-bank sync/disconnect and sync history; still fail-closed when provider configuration/live enablement is incomplete | RUNTIME STATUS |
@@ -84,6 +85,8 @@ The canonical banking cash ledger is `bank_transactions`, with linked source/imp
 22. A production legacy Finance frontend gate now blocks any non-canonical `finance-*`, `personal-finance-*` or `advanced-banking-ui*` HTML/CSS/JS asset with HTTP 410. `/banking` and the old reconciliation page redirect into the single Finance OS, preventing old UI bundles from resurfacing even if stale files remain in repository history.
 
 22. The existing private Financial Roadmap backend is now fully actionable from Forecast: create a roadmap, inspect milestones/intelligence, record actual progress, pause/resume, complete or archive without posting money or changing real balances.
+
+23. Advanced Control no longer has an eight-batch worst-case loading chain. Its 30 read-only evidence sources now run inside one hard 15-second module budget, retain the last usable control picture during refresh, reject stale responses, expose live progress and allow each failed source to be retried independently.
 
 ## Production infrastructure evidence
 

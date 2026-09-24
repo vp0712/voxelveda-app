@@ -10,6 +10,7 @@ const tests=[
   "finance-master-os-test.js",
   "finance-control-centre-completion-test.js",
   "finance-advanced-control-test.js",
+  "finance-advanced-loading-resilience-test.js",
   "finance-cash-control-test.js",
   "finance-cash-custody-control-test.js",
   "personal-debt-control-test.js",
