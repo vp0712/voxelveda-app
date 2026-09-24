@@ -130,18 +130,49 @@ async function repairOneStatement(file) {
     }
 
     const repairNote = 'Legacy PDF year-seed parser error repaired automatically; original staged payload remains preserved for audit.';
-    for (const item of updates) {
+    const updateChunkSize = 120;
+    for (let offset = 0; offset < updates.length; offset += updateChunkSize) {
+      const chunk = updates.slice(offset, offset + updateChunkSize);
+      const bankIds = chunk.map((item) => Number(item.row.id));
+      const transactionCases = chunk.map(() => 'WHEN ? THEN ?').join(' ');
+      const postingCases = chunk.map(() => 'WHEN ? THEN ?').join(' ');
+      const hashCases = chunk.map(() => 'WHEN ? THEN ?').join(' ');
+      const idPlaceholders = bankIds.map(() => '?').join(',');
       await db.query(
-        'UPDATE bank_transactions SET transaction_date=?,posting_date=?,row_hash=? WHERE id=?',
-        [item.transactionDate, item.postingDate, item.newHash, item.row.id]
+        `UPDATE bank_transactions
+            SET transaction_date=CASE id ${transactionCases} ELSE transaction_date END,
+                posting_date=CASE id ${postingCases} ELSE posting_date END,
+                row_hash=CASE id ${hashCases} ELSE row_hash END
+          WHERE id IN (${idPlaceholders})`,
+        [
+          ...chunk.flatMap((item) => [item.row.id, item.transactionDate]),
+          ...chunk.flatMap((item) => [item.row.id, item.postingDate]),
+          ...chunk.flatMap((item) => [item.row.id, item.newHash]),
+          ...bankIds
+        ]
       );
-      if (item.row.statement_row_id) {
+
+      const staged = chunk.filter((item) => Number(item.row.statement_row_id) > 0);
+      if (staged.length) {
+        const stagedIds = staged.map((item) => Number(item.row.statement_row_id));
+        const stagedTransactionCases = staged.map(() => 'WHEN ? THEN ?').join(' ');
+        const stagedPostingCases = staged.map(() => 'WHEN ? THEN ?').join(' ');
+        const stagedHashCases = staged.map(() => 'WHEN ? THEN ?').join(' ');
+        const stagedPlaceholders = stagedIds.map(() => '?').join(',');
         await db.query(
           `UPDATE statement_import_rows
-              SET transaction_date=?,posting_date=?,row_hash=?,
+              SET transaction_date=CASE id ${stagedTransactionCases} ELSE transaction_date END,
+                  posting_date=CASE id ${stagedPostingCases} ELSE posting_date END,
+                  row_hash=CASE id ${stagedHashCases} ELSE row_hash END,
                   validation_message=LEFT(CONCAT_WS('; ',NULLIF(validation_message,''),?),500)
-            WHERE id=?`,
-          [item.transactionDate, item.postingDate, item.newHash, repairNote, item.row.statement_row_id]
+            WHERE id IN (${stagedPlaceholders})`,
+          [
+            ...staged.flatMap((item) => [item.row.statement_row_id, item.transactionDate]),
+            ...staged.flatMap((item) => [item.row.statement_row_id, item.postingDate]),
+            ...staged.flatMap((item) => [item.row.statement_row_id, item.newHash]),
+            repairNote,
+            ...stagedIds
+          ]
         );
       }
     }
