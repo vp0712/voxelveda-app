@@ -23,6 +23,7 @@ const { selfTestWebhookVerifier } = require('./services/webhookSecurityService')
 const { verifyBackupRestoreProvider } = require('./config/backupRestoreAssurance');
 const { backgroundJobService } = require('./services/backgroundJobService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
+const { repairKnownLegacyPdfDateRunaway } = require('./services/financeDateIntegrityRepair');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
 const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
@@ -280,6 +281,19 @@ async function bootstrap() {
 
     setPhase('INITIALIZING_CRITICAL_SCHEMAS');
     await initializeCriticalSchemas();
+
+    // Repair only the two previously identified V4 PDF imports whose year seed
+    // ran forward by seven years. This is exact-match, idempotent and non-fatal.
+    try {
+      const dateRepair = await repairKnownLegacyPdfDateRunaway();
+      if (dateRepair.repaired) {
+        console.log(`Finance date-integrity repair completed: ${dateRepair.repaired}/${dateRepair.checked} targeted statement(s) corrected.`);
+      }
+    } catch (error) {
+      addWarning(`Finance legacy PDF date-integrity repair did not complete: ${error.code || error.message}`);
+      console.error('Finance date-integrity repair failed safely:', error.code || error.message);
+    }
+
     await refreshDatabaseAttestation(pool);
 
     setPhase('INITIALIZING_SERVICES');
