@@ -82,3 +82,7 @@ assert(!controller.includes("statement.institution||'Voxel Veda Finance Platform
 assert(client.includes('data-account-statement'),'Accounts UI must expose one-click statement generation');
 assert(client.includes('openAccountStatementForm'),'Accounts UI must provide a statement period modal');
 assert(client.includes('downloadFinanceFile'),'statement PDF download must use the authenticated binary download flow');
+assert(controller.includes('renderBankStatementPageChrome'),'Account Statement must have dedicated bank-document page chrome.');
+assert(controller.includes("text('Your Statement'")||controller.includes("text('Your Statement',"),'Account Statement header must present a customer-facing Your Statement title.');
+assert(controller.includes('Transaction activity'),'Account Statement must include a bank-style transaction activity section.');
+assert(controller.includes('Source-bank transaction descriptions are preserved for audit accuracy'),'Account Statement must distinguish Voxel Veda document branding from source-bank transaction provenance.');
