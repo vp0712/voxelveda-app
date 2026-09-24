@@ -1,0 +1,58 @@
+name: Finance Release Candidate CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/finance-**'
+      - 'controllers/finance**'
+      - 'controllers/personal**'
+      - 'services/finance**'
+      - 'middleware/finance**'
+      - 'routes/financeRoutes.js'
+      - 'migrations/**'
+      - 'scripts/finance-**'
+      - 'scripts/personal-**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/finance-release-ci.yml'
+  push:
+    branches:
+      - 'finance-release-*'
+
+concurrency:
+  group: finance-release-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  finance-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Production Finance build gate
+        run: npm run build
+
+      - name: Verify no production release marker changed in candidate work
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" | grep -qx '.railway-release'; then
+            echo "::error::.railway-release must only be changed after the candidate has passed CI and merged."
+            exit 1
+          fi
+          echo "Finance candidate passed without prematurely triggering Railway production."
