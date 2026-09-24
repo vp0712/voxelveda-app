@@ -33,6 +33,7 @@ const financeFx = require('../controllers/financeFxController');
 const financeSearch = require('../controllers/financeSearchController');
 const personalMoney = require('../controllers/personalMoneyController');
 const personalMoneyAttention = require('../controllers/personalMoneyAttentionController');
+const personalRecurringCommitment = require('../controllers/personalRecurringCommitmentController');
 const personalDebtPlanning = require('../controllers/personalDebtPlanningController');
 const personalMoneySmart = require('../controllers/personalMoneySmartController');
 const personalMoneyReview = require('../controllers/personalMoneyReviewController');
@@ -146,6 +147,8 @@ router.put('/personal-money/debts/:id', requireAnyPermission('EDIT_FINANCE'), pe
 router.post('/personal-money/debts/:id/payments', requireAnyPermission('EDIT_FINANCE'), personalMoney.recordDebtPayment);
 router.post('/personal-money/budgets', requireAnyPermission('EDIT_FINANCE'), personalMoney.saveBudget);
 router.delete('/personal-money/budgets/:id', requireAnyPermission('EDIT_FINANCE'), personalMoney.deleteBudget);
+router.get('/personal-money/commitments-control', requireAnyPermission('VIEW_BANKING'), personalRecurringCommitment.getCenter);
+router.put('/personal-money/recurring/:id/control', requireAnyPermission('EDIT_FINANCE'), personalRecurringCommitment.saveControl);
 router.get('/personal-money/attention', requireAnyPermission('VIEW_BANKING'), personalMoneyAttention.getAttentionCenter);
 router.post('/personal-money/recurring', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.createRecurring);
 router.post('/personal-money/recurring/:id/complete', requireAnyPermission('EDIT_FINANCE'), personalMoneyAttention.completeRecurring);
