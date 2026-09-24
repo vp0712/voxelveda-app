@@ -517,8 +517,9 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
   doc.roundedRect(42,summaryY,511,101,10).fillAndStroke('#F8FBFF','#DCE8F5');
   doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(10).text(statement.account_holder||statement.account_name||'Account holder',56,summaryY+14,{width:260});
   doc.font('Helvetica').fontSize(7.5).fillColor('#5E718A').text(`${statement.account_type||'Account'} · ${statement.account_name||''}`,56,summaryY+31,{width:260});
+  const brandedIssuer=profile.tradingName||profile.legalName||'Voxel Veda';
   const leftDetails=[
-    statement.institution||'Voxel Veda Finance Platform',
+    brandedIssuer,
     statement.bsb_masked?`BSB ${statement.bsb_masked}`:null,
     statement.account_number_masked?`Account ${statement.account_number_masked}`:null
   ].filter(Boolean).join(' · ');
@@ -576,7 +577,7 @@ exports.pdf=async(req,res)=>{
     const report=await buildReport(req),profile=await reportCompanyProfile(),title=reportTitle(report.metadata.report_type);
     const reportId=`FIN-${Date.now()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
     const generatedAt=new Date();
-    const doc=new PDFDocument({size:'A4',margins:{top:112,left:42,right:42,bottom:66},bufferPages:true,info:{Title:`${profile.legalName} - ${title}`,Author:profile.legalName}});
+    const doc=new PDFDocument({size:'A4',margins:{top:112,left:42,right:42,bottom:66},bufferPages:true,info:{Title:`${profile.tradingName||profile.legalName} - ${title}`,Author:profile.legalName}});
     const safeName=title.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'');
     res.setHeader('Content-Type','application/pdf');
     res.setHeader('Content-Disposition',`attachment; filename="Voxel-Veda-${safeName}.pdf"`);
@@ -663,9 +664,10 @@ exports.pdf=async(req,res)=>{
     for(let index=0;index<pages.count;index+=1){
       doc.switchToPage(index);
       if(fs.existsSync(logoPath)){try{doc.image(logoPath,42,28,{fit:[54,42]})}catch{}}
-      doc.fontSize(10.5).fillColor('#111827').text(profile.legalName,106,28,{width:260});
+      doc.fontSize(12).fillColor('#111827').text(profile.tradingName||profile.legalName||'Voxel Veda',106,27,{width:260});
+      doc.fontSize(7.2).fillColor('#6b7280').text(profile.legalName||'Voxel Veda Pty Ltd',106,43,{width:260});
       const identity=[profile.abn?`ABN ${profile.abn}`:null,profile.website||null,profile.email||null].filter(Boolean).join(' · ');
-      doc.fontSize(7.2).fillColor('#6b7280').text(identity,106,44,{width:440});
+      doc.fontSize(7.2).fillColor('#6b7280').text(identity,106,55,{width:440});
       doc.fontSize(7.2).text(`${title} · ${report.metadata.from||'All'} to ${report.metadata.to||'Now'} · Generated ${generatedAt.toLocaleString('en-AU')} · ${reportId}`,42,78,{width:510});
       doc.moveTo(42,94).lineTo(553,94).strokeColor('#d1d5db').lineWidth(0.6).stroke();
       doc.moveTo(42,774).lineTo(553,774).strokeColor('#d1d5db').lineWidth(0.6).stroke();
