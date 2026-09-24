@@ -1,5 +1,5 @@
-finance-release: 20260925-statement-review-filter-edit-v23
-source-commit: 0151cc720be2f331b8b5109ac4cd449a89b13dbd
+finance-release: 20260925-statement-review-filter-edit-v23-r2
+source-commit: e04a7184d40141579d5b697a04d96453cf0b1fe0
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
