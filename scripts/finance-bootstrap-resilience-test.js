@@ -8,6 +8,8 @@ const source = fs.readFileSync(path.join(__dirname, '..', 'public', 'finance-mas
 const html = fs.readFileSync(path.join(__dirname, '..', 'public', 'finance-intelligence.html'), 'utf8');
 const guard = fs.readFileSync(path.join(__dirname, '..', 'public', 'finance-bootstrap-guard.js'), 'utf8');
 const appSource = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
+const authMiddleware = fs.readFileSync(path.join(__dirname, '..', 'middleware', 'auth.js'), 'utf8');
+const pageAuth = fs.readFileSync(path.join(__dirname, '..', 'middleware', 'pageAuth.js'), 'utf8');
 const apiStart = source.indexOf('async function api(');
 const apiEnd = source.indexOf('\nfunction notice(', apiStart);
 assert(apiStart >= 0 && apiEnd > apiStart, 'Finance API helper must remain testable.');
@@ -55,6 +57,15 @@ async function run() {
   assert(!html.includes('<script defer src="https://cdn.jsdelivr.net/npm/pdfjs-dist'), 'Third-party PDF.js must never block Finance document startup.');
   assert.match(source, /function loadPdfJs\(\)/, 'PDF.js must be loaded lazily only when a PDF statement is parsed.');
   assert.match(source, /script\.async=true/, 'Lazy PDF.js loading must not join the ordered deferred startup chain.');
+  assert.match(source, /function handleFinanceSessionExpired\(\)/, 'Finance must centrally handle expired authenticated sessions.');
+  assert.match(source, /const authError=financeAuthError\(r,body\)/, 'Canonical Finance API requests must intercept HTTP 401 before UI error rendering.');
+  assert.match(source, /if\(financeAuthExpiryHandled&&bad\)return/, 'Expired-session redirects must suppress the raw red error banner.');
+  assert.match(source, /\/api\/auth\/logout/, 'Expired Finance sessions must clear the stale secure cookie before redirect.');
+  assert.match(authMiddleware, /code: 'AUTH_SESSION_EXPIRED'/, 'Auth middleware must return a machine-readable expired-session code.');
+  assert.doesNotMatch(authMiddleware, /message: 'Invalid or expired token'/, 'Auth middleware must not expose the raw token-expiry banner text.');
+  assert.match(authMiddleware, /AUTH_SERVICE_UNAVAILABLE/, 'Unexpected auth infrastructure failures must not masquerade as expired tokens.');
+  assert.match(pageAuth, /clearSessionCookie\(req, res\)/, 'Protected page redirects must clear stale session cookies.');
+
   assert.match(source, /PDF parser timed out/, 'Lazy PDF parser download must have its own bounded timeout.');
 
   console.log('Finance bootstrap resilience regression contract passed.');
