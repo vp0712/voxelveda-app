@@ -2000,19 +2000,55 @@ async function openStatementWizard(){
   showFinancePopup(s.duplicates?'Statement import verified — duplicates excluded':'Statement extraction successful',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':''),{tone:s.failed?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
  };
 }
+function openRejectedRowOverride(uid,row,session,trigger){
+ const debit=num(row.debit),credit=num(row.credit);
+ const direction=debit>0?'DEBIT':credit>0?'CREDIT':'';
+ const amount=debit>0?debit:credit>0?credit:'';
+ $('fmModalEyebrow').textContent='MANUAL STATEMENT CORRECTION';
+ $('fmModalTitle').textContent='Fix & include rejected transaction';
+ $('fmModalBody').innerHTML='<form id="rejectedRowOverrideForm" class="fm-form"><div class="fm-state fm-state-warning"><strong>Manual override</strong><p>This row was rejected by automatic validation. Confirm the genuine transaction details before including it. Duplicate transactions and opening/closing balance markers remain permanently blocked.</p></div><label>Transaction date<input name="transaction_date" type="date" value="'+esc(String(row.transaction_date||'').slice(0,10))+'" required></label><label>Description<textarea name="description" rows="3" required>'+esc(row.description||'')+'</textarea></label><div class="fm-form-grid two"><label>Money direction<select name="direction" required><option value="">Choose</option><option value="DEBIT" '+(direction==='DEBIT'?'selected':'')+'>Money out / Debit</option><option value="CREDIT" '+(direction==='CREDIT'?'selected':'')+'>Money in / Credit</option></select></label><label>Amount<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+esc(amount||'')+'" required></label></div><label>Why is this a genuine transaction?<textarea name="reason" rows="2" placeholder="Example: Verified against the original bank statement" required></textarea></label><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Include transaction</button></div></form>';
+ if(!$('fmModal').open)$('fmModal').showModal();
+ const resetTrigger=()=>{if(trigger)trigger.checked=false};
+ document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>{$('fmModal').close();resetTrigger()},{once:true});
+ $('rejectedRowOverrideForm').onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.currentTarget,fd=new FormData(form),submit=form.querySelector('button[type="submit"]');
+  const payload={transaction_date:String(fd.get('transaction_date')||''),description:String(fd.get('description')||'').trim(),direction:String(fd.get('direction')||''),amount:String(fd.get('amount')||''),reason:String(fd.get('reason')||'').trim()};
+  if(!payload.transaction_date||!payload.description||!payload.direction||!payload.amount||payload.reason.length<3){notice('Complete the date, description, direction, amount and override reason.',true);return}
+  submit.disabled=true;submit.textContent='Checking & including…';
+  try{
+   const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(row.id)+'/override',{method:'POST',body:JSON.stringify(payload)});
+   $('fmModal').close();
+   showFinancePopup('Rejected transaction included',result.message||'The corrected transaction is selected for import.','Manual override recorded in the audit trail.',{actionLabel:'Back to review',onAction:()=>openStatementReview(uid)});
+   await openStatementReview(uid);
+  }catch(error){submit.disabled=false;submit.textContent='Include transaction';resetTrigger();notice(error.message,true)}
+ };
+}
 async function openStatementReview(uid){
  try{
   const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)),session=result.session,rows=result.rows||[];
   const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked. They will not be committed, calculated, shown in the transaction ledger or included in Finance exports.</p></div>':'';
   const tableRows=rows.map(row=>{
-   const blocked=['DUPLICATE','REJECTED'].includes(row.validation_status);
-   const rowClass=row.validation_status==='DUPLICATE'?'fm-review-duplicate':row.validation_status==='REJECTED'?'fm-review-rejected':'';
-   return '<tr class="'+rowClass+'"><td><input type="checkbox" data-review-select="'+esc(row.id)+'" '+(Number(row.selected)?'checked ':'')+(blocked?'disabled':'')+'></td><td>'+date(row.transaction_date)+'</td><td>'+esc(row.description)+'</td><td>'+(num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):'')+'</td><td>'+(num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):'')+'</td><td>'+statusBadge(row.validation_status)+'</td><td><small>'+esc(row.validation_message||'Verified')+'</small></td></tr>';
+   const isDuplicate=row.validation_status==='DUPLICATE';
+   const isRejected=row.validation_status==='REJECTED';
+   const balanceLocked=isRejected&&(/balance.*marker|opening\/closing balance|not a transaction/i.test(String(row.validation_message||''))||/^(opening|closing) balance\b/i.test(String(row.description||'')));
+   const rowClass=isDuplicate?'fm-review-duplicate':isRejected?'fm-review-rejected':'';
+   const useControl=isDuplicate||balanceLocked
+    ? '<input type="checkbox" disabled aria-label="Locked row">'
+    : isRejected
+      ? '<label class="fm-manual-select"><input type="checkbox" data-review-override="'+esc(row.id)+'"><span>Include</span></label>'
+      : '<input type="checkbox" data-review-select="'+esc(row.id)+'" '+(Number(row.selected)?'checked ':'')+'>';
+   const validation=isRejected&&!balanceLocked
+    ? '<small>'+esc(row.validation_message||'Rejected by automatic validation')+'</small><button type="button" class="fm-fix-include" data-review-fix="'+esc(row.id)+'">Fix & include</button>'
+    : '<small>'+esc(row.validation_message||'Verified')+'</small>';
+   return '<tr class="'+rowClass+'"><td>'+useControl+'</td><td>'+date(row.transaction_date)+'</td><td>'+esc(row.description)+'</td><td>'+(num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):'')+'</td><td>'+(num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):'')+'</td><td>'+statusBadge(row.validation_status)+'</td><td>'+validation+'</td></tr>';
   }).join('');
   const body='<div class="fm-grid four"><div class="fm-kpi"><span>Total</span><strong>'+num(session.total_rows)+'</strong></div><div class="fm-kpi"><span>Valid</span><strong class="good">'+num(session.valid_rows)+'</strong></div><div class="fm-kpi"><span>Duplicates excluded</span><strong class="warn">'+num(session.duplicate_rows)+'</strong></div><div class="fm-kpi"><span>Rejected</span><strong class="bad">'+num(session.rejected_rows)+'</strong></div></div>'+duplicateWarning+'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Commit selected rows</button></div>';
   openDrawer('Review '+(session.original_name||'statement'),body,'STATEMENT REVIEW');
   setTimeout(()=>{
    document.querySelectorAll('[data-review-select]').forEach(box=>box.onchange=async()=>{try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(box.dataset.reviewSelect)+'/select',{method:'POST',body:JSON.stringify({selected:box.checked})})}catch(error){box.checked=!box.checked;notice(error.message,true)}});
+   document.querySelectorAll('[data-review-override]').forEach(box=>box.onchange=()=>{if(!box.checked)return;const row=rows.find(item=>String(item.id)===String(box.dataset.reviewOverride));if(row)openRejectedRowOverride(uid,row,session,box)});
+   document.querySelectorAll('[data-review-fix]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewFix));if(row)openRejectedRowOverride(uid,row,session,null)});
    document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{
     try{
      const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:'{}'});
