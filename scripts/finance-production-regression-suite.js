@@ -35,6 +35,7 @@ const tests=[
   "finance-original-bank-data-test.js",
   "finance-statement-review-test.js",
   "finance-pdf-statement-parser-test.js",
+  "finance-date-integrity-repair-test.js",
   "finance-import-wizard-test.js",
   "finance-reconciliation-center-test.js",
   "finance-action-reliability-test.js",
