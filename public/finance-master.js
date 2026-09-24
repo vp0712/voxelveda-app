@@ -100,6 +100,42 @@ function showFinancePopup(title,message,detail='',options={}){
  document.body.appendChild(overlay);requestAnimationFrame(()=>overlay.classList.add('show'));
  return overlay;
 }
+async function downloadFinanceFile(url,filename,successTitle='Download ready'){
+ let response;
+ for(let attempt=0;attempt<2;attempt++){
+  response=await fetch(url,{credentials:'same-origin'});
+  if(response.ok)break;
+  let payload={};try{payload=await response.clone().json()}catch{}
+  if(payload.code==='STEP_UP_REQUIRED'&&attempt===0){await requestFinanceStepUp();continue}
+  const error=new Error(payload.message||('Download failed ('+response.status+')'));error.status=response.status;error.code=payload.code;throw error;
+ }
+ const blob=await response.blob();
+ const objectUrl=URL.createObjectURL(blob),link=document.createElement('a');
+ link.href=objectUrl;link.download=filename||'finance-document.pdf';document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
+ showFinancePopup(successTitle,'Your PDF was generated successfully and is ready to save.','The document was produced from the permission-scoped Finance ledger.');
+}
+function openAccountStatementForm(accountId){
+ const account=state.accounts.find(a=>String(a.id)===String(accountId));
+ if(!account){notice('Financial account not found.',true);return}
+ $('fmModalEyebrow').textContent='ACCOUNT STATEMENT';$('fmModalTitle').textContent='Generate account statement';
+ $('fmModalBody').innerHTML='<form id="accountStatementForm" class="fm-form"><div class="fm-state"><strong>'+esc(account.nickname||'Account')+'</strong><p>'+esc(account.institution||'Finance account')+' · '+esc(account.account_number_masked||'number masked')+' · '+esc(account.currency||'AUD')+'</p></div><div class="fm-form-grid two"><label>From<input name="from" type="date"></label><label>To<input name="to" type="date"></label></div><p class="fm-helper">Leave the dates blank to include all available history. The PDF uses a customer statement layout with statement period, masked account details, opening/closing balance and debit/credit/balance columns.</p><div class="fm-state fm-state-warning"><strong>Branding rule</strong><p>The document is issued under Voxel Veda Finance branding. It does not copy Commonwealth Bank branding or claim Voxel Veda is a licensed bank.</p></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Generate PDF statement</button></div></form>';
+ $('fmModal').showModal();
+ document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close(),{once:true});
+ $('accountStatementForm').onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.currentTarget,fd=new FormData(form),from=String(fd.get('from')||''),to=String(fd.get('to')||'');
+  if(from&&to&&from>to){notice('Statement From date cannot be after To date.',true);return}
+  const params=new URLSearchParams({report_type:'ACCOUNT_STATEMENT',scope:String(account.ownership_scope||'ALL').toUpperCase(),account_ids:String(account.id)});
+  if(from)params.set('from',from);if(to)params.set('to',to);
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;button.textContent='Generating…';
+  try{
+   await downloadFinanceFile(API+'/reports/builder.pdf?'+params.toString(),'Voxel-Veda-Account-Statement-'+String(account.id)+'.pdf','Account statement ready');
+   $('fmModal').close();
+  }catch(error){button.disabled=false;button.textContent='Generate PDF statement';notice(error.message,true)}
+ };
+}
+
 function signalFinanceReady(){
  try{window.dispatchEvent(new CustomEvent('finance:ready',{detail:{view:state.view,cycle:loadCycle}}))}catch{}
 }
@@ -402,7 +438,7 @@ function accounts(){
     </div>
     <div class="fm-account-card-footer">
      <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)}</small></div></div>
-     <div class="fm-account-footer-actions"><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
+     <div class="fm-account-footer-actions"><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
     </div>
    </div>
   </article>`;
@@ -2154,6 +2190,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-viewjump]').forEach(b=>b.onclick=()=>go(b.dataset.viewjump));
  document.querySelectorAll('[data-history-import]').forEach(b=>b.onclick=()=>openHistoricalImport(b.dataset.historyImport));
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));
+ document.querySelectorAll('[data-account-statement]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountStatementForm(b.dataset.accountStatement)});
  document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
  document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');if($('fmAccount'))$('fmAccount').value=state.account;state.txMeta.page=1;go('transactions');loadTransactions()});
  const accountSearch=document.querySelector('[data-account-search]');
