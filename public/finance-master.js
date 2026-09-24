@@ -34,6 +34,25 @@ const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences
 const nativeMoney=(v,c)=>money(v,c||'AUD');
 const date=v=>{if(!v)return '—';const d=new Date(String(v).slice(0,10)+'T00:00:00');const fmt=state.userPreferences?.date_format||'DD/MM/YYYY';if(fmt==='YYYY-MM-DD')return String(v).slice(0,10);if(fmt==='MM/DD/YYYY')return new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)};
 let financeStepUpPromise=null;
+let financeAuthExpiryHandled=false;
+function handleFinanceSessionExpired(){
+ if(financeAuthExpiryHandled)return;
+ financeAuthExpiryHandled=true;
+ try{localStorage.removeItem('token');localStorage.removeItem('user');localStorage.removeItem('role')}catch{}
+ const returnTo=location.pathname+location.search+location.hash;
+ const login='/login?returnTo='+encodeURIComponent(returnTo)+'&message='+encodeURIComponent('Your secure session ended. Please sign in again to continue.');
+ try{fetch('/api/auth/logout',{method:'POST',credentials:'same-origin',keepalive:true}).catch(()=>{})}catch{}
+ setTimeout(()=>location.replace(login),0);
+}
+function financeAuthError(response,payload={}){
+ if(Number(response?.status)!==401)return null;
+ handleFinanceSessionExpired();
+ const error=new Error('Secure session ended');
+ error.status=401;
+ error.code=payload?.code||'AUTH_SESSION_EXPIRED';
+ error.authHandled=true;
+ return error;
+}
 function requestFinanceStepUp(){
  if(financeStepUpPromise)return financeStepUpPromise;
  financeStepUpPromise=new Promise((resolve,reject)=>{
@@ -51,9 +70,10 @@ function requestFinanceStepUp(){
    try{
     const response=await fetch('/api/auth/step-up',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:fd.get('password'),code:String(fd.get('code')||'').replace(/\s/g,'')})});
     let payload={};try{payload=await response.json()}catch{}
+    const authError=financeAuthError(response,payload);if(authError)throw authError;
     if(!response.ok)throw new Error(payload.message||'Security verification failed.');
     settled=true;financeStepUpPromise=null;modal.close();resolve(payload);
-   }catch(error){status.className='fm-state fm-state-error';status.textContent=error.message;button.disabled=false}
+   }catch(error){if(financeAuthExpiryHandled)return;status.className='fm-state fm-state-error';status.textContent=error.message;button.disabled=false}
   };
  });
  return financeStepUpPromise;
@@ -65,6 +85,7 @@ async function api(path,options={}){
  try{
   const r=await fetch(path,{credentials:'same-origin',headers:{'Content-Type':'application/json',...headers},...requestOptions,signal:controller.signal});
   let body={};try{body=await r.json()}catch{}
+  const authError=financeAuthError(r,body);if(authError)throw authError;
   if(!r.ok&&body.code==='STEP_UP_REQUIRED'&&!_stepUpRetry&&path!=='/api/auth/step-up'){
    clearTimeout(timer);
    await requestFinanceStepUp();
@@ -80,7 +101,7 @@ async function api(path,options={}){
   throw error;
  }finally{clearTimeout(timer)}
 }
-function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
+function notice(m,bad=false){if(financeAuthExpiryHandled&&bad)return;const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
 function showFinancePopup(title,message,detail='',options={}){
  document.querySelector('.fm-centre-popup')?.remove();
  const overlay=document.createElement('div');
@@ -106,6 +127,7 @@ async function downloadFinanceFile(url,filename,successTitle='Download ready'){
   response=await fetch(url,{credentials:'same-origin'});
   if(response.ok)break;
   let payload={};try{payload=await response.clone().json()}catch{}
+  const authError=financeAuthError(response,payload);if(authError)throw authError;
   if(payload.code==='STEP_UP_REQUIRED'&&attempt===0){await requestFinanceStepUp();continue}
   const error=new Error(payload.message||('Download failed ('+response.status+')'));error.status=response.status;error.code=payload.code;throw error;
  }
@@ -2459,7 +2481,7 @@ async function transactionDetail(id){
   openDrawer(r.merchant_normalized||r.merchant_name||r.description||'Transaction',`<div class="fm-grid two"><div class="fm-kpi"><span>Amount</span><strong>${nativeMoney(Math.abs(num(r.credit||0)-num(r.debit||0)),r.currency||'AUD')}</strong><small>${Number(r.is_internal_transfer)?'Internal transfer':num(r.debit)>0?'Expense':'Income'} · ${esc(r.currency||'')}</small></div><div class="fm-kpi"><span>Review</span><strong>${r.reviewed_at?'Reviewed':'Needs review'}</strong><small>${esc(r.reconciliation_status||'')} · ${esc(r.source_type||'')}</small></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>CURRENT CLASSIFICATION</h3><p>Editable classification never overwrites original bank evidence.</p></div></div><form id="txEditForm" class="fm-form"><div class="fm-form-grid"><label>Category<input name="category" value="${esc(r.category||'')}"></label><label>Ownership<select name="ownership_scope"><option ${r.ownership_scope==='PERSONAL'?'selected':''}>PERSONAL</option><option ${r.ownership_scope==='BUSINESS'?'selected':''}>BUSINESS</option><option ${r.ownership_scope==='MIXED'?'selected':''}>MIXED</option><option ${r.ownership_scope==='UNCLASSIFIED'?'selected':''}>UNCLASSIFIED</option></select></label></div><div class="fm-form-grid"><label>Normalised merchant<input name="merchant_normalized" value="${esc(r.merchant_normalized||'')}"></label><label>Project / cost centre<input name="project_ref" value="${esc(r.project_ref||'')}"></label></div><div class="fm-form-grid"><label>Tags<input name="tags" value="${esc(txTags.join(', '))}"></label><label>GST treatment<select name="gst_treatment"><option value="">Not set</option>${['REVIEW','GST_ON_EXPENSES','GST_ON_INCOME','GST_FREE','INPUT_TAXED','NO_GST','OUT_OF_SCOPE'].map(v=>`<option ${r.gst_treatment===v?'selected':''}>${v}</option>`).join('')}</select></label></div><div class="fm-detail-grid"><span>Date<b>${date(r.transaction_date)}</b></span><span>Posting date<b>${date(r.posting_date)}</b></span><span>Account<b>${esc(r.account_name||'')}</b></span><span>Bank<b>${esc(r.institution||'')}</b></span><span>Description<b>${esc(r.description||'')}</b></span><span>Reference<b>${esc(r.reference||'—')}</b></span><span>Source<b>${esc(r.source_type||'')}</b></span><span>Statement<b>${esc(r.statement_import_uid||'—')}</b></span></div><label class="fm-check"><input name="reviewed" type="checkbox" ${r.reviewed_at?'checked':''}> Classification reviewed</label><label class="fm-check"><input name="remember_rule" type="checkbox"> Remember as Suggest Only rule</label><div class="fm-form-actions"><button class="primary" type="submit">Save classification</button></div></form><div class="fm-workflow-actions"><button type="button" data-split-open="1">Split transaction</button>${num(r.debit)>0?'<button type="button" data-reimbursement-open="1">Create reimbursement</button>':''}${num(r.credit)>0?'<button type="button" data-refund-link="'+r.id+'" data-refund-currency="'+esc(r.currency)+'">Link as refund</button>':''}<button type="button" data-viewjump="transfers">Transfer matching</button>${r.archived_at?'<button type="button" data-transaction-restore="'+r.id+'">Restore transaction</button>':r.source_type==='MANUAL'?'<button type="button" class="bad" data-transaction-archive="'+r.id+'" data-manual-delete="1">Delete wrong entry</button>':'<button type="button" class="bad" data-transaction-archive="'+r.id+'">Archive from active ledger</button>'}</div><div class="fm-relation-summary"><span>Split lines <b>${splits.length}</b></span><span>Refund links <b>${refundLinks.length}</b></span><span>Transfer pairs <b>${transferLinks.length}</b></span></div></div></div>${sourceBlock}${receiptBlock}${auditBlock}`,'TRANSACTION');
   setTimeout(()=>{
    $('txEditForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(I+'/transactions/'+id,{method:'POST',body:JSON.stringify({category:fd.get('category'),ownership_scope:fd.get('ownership_scope'),merchant_normalized:fd.get('merchant_normalized')||null,project_ref:fd.get('project_ref')||null,tags:String(fd.get('tags')||'').split(',').map(x=>x.trim()).filter(Boolean),gst_treatment:fd.get('gst_treatment')||null,reviewed:fd.get('reviewed')==='on',remember_rule:fd.get('remember_rule')==='on'})});notice(x.message);closeDrawer();await refresh()}catch(error){notice(error.message,true)}};
-   if($('receiptUploadForm'))$('receiptUploadForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const response=await fetch(API+'/bank-transactions/'+id+'/receipts',{method:'POST',credentials:'same-origin',body:fd});let payload={};try{payload=await response.json()}catch{}if(!response.ok)throw new Error(payload.message||'Receipt upload failed');notice(payload.message||'Receipt attached.');await transactionDetail(id)}catch(error){notice(error.message,true)}};
+   if($('receiptUploadForm'))$('receiptUploadForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const response=await fetch(API+'/bank-transactions/'+id+'/receipts',{method:'POST',credentials:'same-origin',body:fd});let payload={};try{payload=await response.json()}catch{}const authError=financeAuthError(response,payload);if(authError)throw authError;if(!response.ok)throw new Error(payload.message||'Receipt upload failed');notice(payload.message||'Receipt attached.');await transactionDetail(id)}catch(error){notice(error.message,true)}};
    document.querySelectorAll('[data-detail-receipt-status]').forEach(b=>b.onclick=async()=>{let reason='';if(b.dataset.detailReceiptStatus==='NOT_REQUIRED'){reason=prompt('Why is a receipt not required?')||'';if(!reason.trim())return}try{const x=await api(API+'/bank-transactions/'+id+'/receipt-status',{method:'PATCH',body:JSON.stringify({status:b.dataset.detailReceiptStatus,reason})});notice(x.message);await transactionDetail(id)}catch(error){notice(error.message,true)}});
    document.querySelectorAll('[data-receipt-unlink]').forEach(b=>b.onclick=async()=>{if(!confirm('Unlink this receipt from the transaction?'))return;try{const x=await api(API+'/bank-transactions/'+id+'/receipts/'+encodeURIComponent(b.dataset.receiptUnlink),{method:'DELETE'});notice(x.message);await transactionDetail(id)}catch(error){notice(error.message,true)}});
    document.querySelector('[data-split-open]')?.addEventListener('click',()=>openSplitEditor(id,Math.abs(num(r.credit||0)-num(r.debit||0)),r.currency||'AUD'));
