@@ -361,7 +361,25 @@ function overview(){
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
- return `<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial accounts</h2><p>Open an account for overview, transactions, analytics, reconciliation and lifecycle controls.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-account-grid">${state.accounts.map(a=>{const c=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};return `<button class="fm-account-card" data-account="${a.id}"><span class="fm-account-type">${esc(a.account_type||'Account')}</span><h3>${esc(a.nickname||'Account')}</h3><p>${esc(a.institution||'Manual')} · ${esc(a.account_number_masked||'number masked')}</p><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>${esc(a.ownership_scope||'')} · ${esc(a.connection_status||'MANUAL')}</small><div class="fm-coverage"><span>Coverage</span><b>${date(c.transaction_start||a.history_start_date)} → ${date(c.transaction_end||a.history_end_date)}</b></div></button>`}).join('')||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>`;
+ const cards=state.accounts.map(a=>{
+  const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
+  const accountName=esc(a.nickname||'Account');
+  return \`<article class="fm-account-card-shell">
+   <button class="fm-account-card fm-account-card-open" type="button" data-account="\${a.id}" aria-label="Open \${accountName}">
+    <span class="fm-account-type">\${esc(a.account_type||'Account')}</span>
+    <h3>\${accountName}</h3>
+    <p>\${esc(a.institution||'Manual')} · \${esc(a.account_number_masked||'number masked')}</p>
+    <strong>\${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong>
+    <small>\${esc(a.ownership_scope||'')} · \${esc(a.connection_status||'MANUAL')}</small>
+    <div class="fm-coverage"><span>Coverage</span><b>\${date(history.transaction_start||a.history_start_date)} → \${date(history.transaction_end||a.history_end_date)}</b></div>
+   </button>
+   <div class="fm-account-card-actions">
+    <button type="button" data-account-edit="\${a.id}">Edit</button>
+    <button type="button" class="bad" data-account-purge="\${a.id}">Delete</button>
+   </div>
+  </article>\`;
+ }).join('');
+ return \`<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial accounts</h2><p>Open an account for overview, transactions, analytics, reconciliation and lifecycle controls.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-account-grid">\${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>\`;
 }
 function transactions(){
  const meta=state.txMeta||{},f=state.txFilters,saved=state.savedViews?.saved_views||[];
@@ -1108,7 +1126,8 @@ function teamView(){
 function openTeamAccessForm(userId){
  const team=state.team||{},user=(team.users||[]).find(u=>String(u.id)===String(userId));if(!user)return;
  if(!team.can_manage){notice('Your role cannot manage delegated banking access.',true);return}
- const accounts=(state.accounts||[]).filter(a=>String(a.ownership_scope||'').toUpperCase()!=='PERSONAL');
+ const accounts=(state.accounts||[]).filter(a=>['BUSINESS','MIXED'].includes(String(a.ownership_scope||'').toUpperCase()));
+ const nonDelegatable=(state.accounts||[]).filter(a=>!['BUSINESS','MIXED'].includes(String(a.ownership_scope||'').toUpperCase()));
  const grants=team.grants||[];
  const current=Number(state.bankingOps?.current_user_id||0);
  if(current&&Number(user.id)===current){notice('Use another authorised administrator to change your own banking access.',true);return}
@@ -1117,9 +1136,11 @@ function openTeamAccessForm(userId){
   const level=String(grant?.access_level||'NONE').toUpperCase();
   return `<div class="fm-team-account"><div><b>${esc(a.nickname||'Account')}</b><small>${esc(a.institution||'')} · ${esc(a.currency||'AUD')} · ${esc(a.ownership_scope||'BUSINESS')}</small></div><select data-team-account="${a.id}" data-original-level="${esc(level)}"><option value="NONE" ${level==='NONE'?'selected':''}>No access</option><option value="VIEW" ${level==='VIEW'?'selected':''}>View</option><option value="PREPARE" ${level==='PREPARE'?'selected':''}>Prepare payments</option><option value="APPROVE" ${level==='APPROVE'?'selected':''}>Approve payments</option><option value="MANAGE" ${level==='MANAGE'?'selected':''}>Manage</option></select></div>`;
  }).join('');
+ const nonDelegatableRows=nonDelegatable.map(a=>`<div class="fm-team-account fm-team-account-blocked"><div><b>${esc(a.nickname||'Account')}</b><small>${esc(a.institution||'')} · ${esc(a.currency||'AUD')} · ${esc(a.ownership_scope||'PERSONAL')} · not delegatable</small></div><button type="button" data-team-account-edit="${a.id}">Change ownership</button></div>`).join('');
  $('fmModalEyebrow').textContent='FINANCE ACCESS';$('fmModalTitle').textContent='Banking access · '+(user.name||user.email||'User');
- $('fmModalBody').innerHTML=`<form id="teamAccessForm" class="fm-form"><div class="fm-state"><strong>Account-level delegation</strong><p>VIEW = read only. PREPARE = create payment instructions. APPROVE = approve another preparer's payment. MANAGE = full delegated banking operations for the account. Personal accounts are intentionally excluded.</p></div><div class="fm-team-access-list">${accessRows||emptyState('No eligible business accounts','Create a Company/Mixed financial account before delegating access.')}</div><div id="teamAccessProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit" ${accounts.length?'':'disabled'}>Save changed access</button></div></form>`;
+ $('fmModalBody').innerHTML=`<form id="teamAccessForm" class="fm-form"><div class="fm-state"><strong>Account-level delegation</strong><p>VIEW = read only. PREPARE = create payment instructions. APPROVE = approve another preparer's payment. MANAGE = full delegated banking operations for the account. Only Company and Mixed accounts can be delegated; Personal accounts remain private.</p></div><div class="fm-team-access-list">${accessRows||(emptyState('No Company/Mixed accounts yet','Your existing accounts are private. Change the ownership of the account you want to share to Company or Mixed.')+nonDelegatableRows)}</div><div id="teamAccessProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit" ${accounts.length?'':'disabled'}>Save changed access</button></div></form>`;
  $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
+ document.querySelectorAll('[data-team-account-edit]').forEach(button=>button.addEventListener('click',()=>{$('fmModal').close();openAccountForm('',button.dataset.teamAccountEdit)}));
  $('teamAccessForm').onsubmit=async e=>{
   e.preventDefault();
   const selects=[...e.currentTarget.querySelectorAll('[data-team-account]')];
@@ -2024,6 +2045,7 @@ function bindDynamic(){
  if($('txBulkReview'))$('txBulkReview').onclick=openBulkReview;
  document.querySelectorAll('[data-reconciliation]').forEach(r=>{r.onclick=()=>openReconciliationDetail(r.dataset.reconciliation);r.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openReconciliationDetail(r.dataset.reconciliation)}}});
  document.querySelectorAll('[data-account]').forEach(r=>r.onclick=()=>accountDetail(r.dataset.account));
+ document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=e=>{e.stopPropagation();purgeAccount(b.dataset.accountPurge)});
  document.querySelectorAll('[data-customer-statement-name]').forEach(b=>b.onclick=()=>{const q=new URLSearchParams();if(b.dataset.customerStatementEmail)q.set('customer_email',b.dataset.customerStatementEmail);else if(b.dataset.customerStatementName)q.set('customer_name',b.dataset.customerStatementName);window.open('/api/invoice/statement/pdf?'+q.toString(),'_blank','noopener')});
  document.querySelectorAll('[data-company-bill]').forEach(b=>b.onclick=()=>supplierBillDetail(b.dataset.companyBill));
  document.querySelectorAll('[data-customer-invoice]').forEach(b=>b.onclick=()=>customerInvoiceDetail(b.dataset.customerInvoice));
@@ -2175,10 +2197,11 @@ async function accountDetail(id){
   const chart=monthly.length?monthly.map(x=>`<div class="fm-chart-row"><span>${esc(x.month)}</span><div class="fm-bars"><i class="in" style="width:${Math.max(2,num(x.money_in)/max*100)}%"></i><i class="out" style="width:${Math.max(2,num(x.money_out)/max*100)}%"></i></div><b>${nativeMoney(num(x.money_in)-num(x.money_out),a.currency||'AUD')}</b></div>`).join(''):emptyState('No account trend','No recent monthly activity.');
   const categories=(d.categories||[]).map(x=>`<div class="fm-row"><span>${esc(x.category)}</span><b>${nativeMoney(x.spent,a.currency||'AUD')}</b></div>`).join('')||emptyState('No categories','No recent account expense categories.');
   const tx=(d.transactions||[]).slice(0,20).map(x=>`<div class="fm-row" data-tx="${x.id}"><div><h3>${esc(x.merchant_name||x.description)}</h3><p>${date(x.transaction_date)} · ${esc(x.category||'Uncategorised')}</p></div><b>${nativeMoney(Math.abs(num(x.credit)-num(x.debit)),x.currency||a.currency||'AUD')}</b></div>`).join('');
-  const deleteButton=life?.deletion_check?.eligible?`<button class="bad" data-account-action="delete" data-id="${a.id}">Permanently delete eligible empty account</button>`:'';
-  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad"><h3>Category distribution</h3><div class="fm-list">${categories}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive or inactive is preferred. Permanent deletion is shown only when the server dependency scan says the account is eligible and still requires privileged step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${deleteButton}</div></details>`,'ACCOUNT WORKSPACE');
+  const purgeButton=`<button class="bad" data-account-purge="${a.id}">Delete account & all data</button>`;
+  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad"><h3>Category distribution</h3><div class="fm-list">${categories}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
   setTimeout(()=>{
    document.querySelectorAll('[data-account-action]').forEach(b=>b.onclick=()=>accountLifecycle(b.dataset.id,b.dataset.accountAction));
+   document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=()=>purgeAccount(b.dataset.accountPurge));
    document.querySelector('[data-account-edit]')?.addEventListener('click',()=>{closeDrawer();openAccountForm('',a.id)});
    document.querySelectorAll('[data-tx]').forEach(x=>x.onclick=()=>transactionDetail(x.dataset.tx));
    document.querySelector('[data-account-tx]')?.addEventListener('click',()=>{state.account=String(a.id);$('fmAccount').value=state.account;closeDrawer();go('transactions');loadTransactions()});
@@ -2188,6 +2211,20 @@ async function accountDetail(id){
  }catch(error){notice(error.message,true)}
 }
 async function accountLifecycle(id,action){const map={inactive:['POST',I+'/accounts/'+id+'/inactive'],archive:['POST',I+'/accounts/'+id+'/archive'],restore:['POST',I+'/accounts/'+id+'/restore'],delete:['DELETE',I+'/accounts/'+id]};const cfg=map[action];if(!cfg)return;if(action==='delete'&&!confirm('Permanently delete this empty account? This action is blocked if dependencies exist.'))return;try{await api(cfg[1],{method:cfg[0],body:cfg[0]==='POST'?'{}':undefined});notice('Account updated.');closeDrawer();await refresh()}catch(e){notice(e.message,true)}}
+async function purgeAccount(id){
+ const account=state.accounts.find(a=>String(a.id)===String(id))||{};
+ const required='DELETE '+id;
+ const name=account.nickname||'this account';
+ const typed=prompt('Permanently delete "'+name+'" AND all data linked to this financial account?\\n\\nThis cannot be undone. Statements, imported transactions, account-linked Finance records, reconciliation/receipt links and delegated account access are removed.\\n\\nType exactly:\\n'+required);
+ if(typed!==required)return;
+ try{
+  const result=await api(I+'/accounts/'+encodeURIComponent(id)+'/purge',{method:'DELETE',body:JSON.stringify({confirmation:typed})});
+  if(String(state.account)===String(id)){state.account='';if($('fmAccount'))$('fmAccount').value=''}
+  closeDrawer();
+  notice(result.message||'Account and linked Finance data deleted.');
+  await refresh();
+ }catch(error){notice(error.message,true)}
+}
 function openAccountForm(presetType='',accountId=''){
  const existing=state.accounts.find(a=>String(a.id)===String(accountId))||{};
  $('fmModalEyebrow').textContent='FINANCIAL ACCOUNT';$('fmModalTitle').textContent=accountId?'Edit financial account':'Add financial account';
