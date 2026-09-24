@@ -2,7 +2,7 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v12';
+const VERSION='20260924-advanced-control-v13';
 const state={loading:false,data:{},errors:{},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
@@ -21,6 +21,7 @@ const SOURCES=[
   ['quality','/api/finance/intelligence/data-quality'],
   ['issues','/api/finance/issues'],
   ['receipts','/api/finance/receipts'],
+  ['cashCustody','/api/finance/cash-control/custody'],
   ['reimbursements','/api/finance/reimbursements'],
   ['rules','/api/finance/intelligence/rules'],
   ['notifications','/api/notifications'],
@@ -374,6 +375,16 @@ function anomalyExplainability(){
  '<article class="fac-card"><h4>Large source transactions</h4><div class="fac-list">'+(outlierRows||'<div class="fac-empty">No current large transaction outlier.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="anomaly">Open full Explainability</button><button data-fac-open="transactions">Transaction Explorer</button></div></article>'+
  '<div class="fac-note">'+esc(data.rules?.anomaly||'Signals are deterministic review prompts.')+' '+esc(data.rules?.currency||'Currencies remain separate.')+'</div></section>';
 }
+
+function cashCustodyControl(){
+ const data=state.data.cashCustody||{},rows=data.cases||[],by=data.by_currency||{};
+ const open=rows.filter(x=>!['CLOSED','CANCELLED'].includes(String(x.display_status||x.status||'').toUpperCase())&&num(x.outstanding_amount)>0.0001);
+ const overdue=open.filter(x=>String(x.display_status||'').toUpperCase()==='OVERDUE');
+ const currency=Object.entries(by).map(([c,x])=>'<div class="fac-kpi"><span>'+esc(c)+' custody outstanding</span><b>'+money(x.outstanding_total,c)+'</b><small>'+num(x.open_cases)+' open · '+num(x.overdue_cases)+' overdue</small></div>').join('');
+ const list=open.slice(0,12).map(x=>'<div class="fac-row"><div><h4>'+esc(x.custodian||'Custodian')+'</h4><p>'+esc(x.account_name||x.wallet_name||'Cash source')+' · '+esc(x.purpose||'Cash custody')+' · due '+date(x.due_at)+'</p></div><div class="fac-right"><b>'+money(x.outstanding_amount,x.currency)+'</b>'+statusChip(x.display_status||x.status||'OPEN')+'</div></div>').join('');
+ return '<section id="facCashCustody" class="fac-section"><header><div><h3>Cash Custody & Petty Cash Control</h3><p>Explains where physical cash is held without treating handover itself as spending.</p></div>'+statusChip(overdue.length?'HIGH':'CONTROLLED')+'</header><div class="fac-kpis">'+(currency||'<div class="fac-kpi"><span>Open custody</span><b>0</b><small>No cash currently held in custody.</small></div>')+'</div><div class="fac-card" style="margin-top:10px"><div class="fac-list">'+(list||'<div class="fac-empty">No active Cash Custody record.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="cash">Open Cash Control</button></div></div><div class="fac-note" style="margin-top:10px">'+esc(data.rule||'Cash custody is a control/location record and does not silently alter the ledger.')+'</div></section>';
+}
+
 function sourceHealth(){
  const rows=SOURCES.map(([n,u])=>{const err=state.errors[n];return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+'</div></div>'+statusChip(err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):'READY')+'</div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
@@ -381,8 +392,8 @@ function sourceHealth(){
 
 function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facReadiness">Readiness</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facCounterparty">Counterparties</button><button data-fac-jump="facPlanning">FP&A</button><button data-fac-jump="facProfitability">Job Profitability</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facAnomaly">Explainability</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
- executive()+executiveReadinessBoard()+actions()+controlActionsSummary()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+treasuryControl()+counterpartyWorkingCapitalControl()+fpaPlanningControl()+jobProfitabilityControl()+performanceRiskControl()+anomalyExplainability()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facReadiness">Readiness</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facCashCustody">Cash Custody</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facCounterparty">Counterparties</button><button data-fac-jump="facPlanning">FP&A</button><button data-fac-jump="facProfitability">Job Profitability</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facAnomaly">Explainability</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ executive()+executiveReadinessBoard()+actions()+controlActionsSummary()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+cashCustodyControl()+treasuryControl()+counterpartyWorkingCapitalControl()+fpaPlanningControl()+jobProfitabilityControl()+performanceRiskControl()+anomalyExplainability()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }
