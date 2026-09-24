@@ -270,3 +270,65 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .fm-mobile-nav button.active:after{content:"";position:absolute;left:28%;right:28%;bottom:1px;height:3px;border-radius:999px;background:#0877ff}
  .fm-command-centre{border-radius:20px}
 }
+
+
+/* ==========================================================================
+   Finance Premium UI v17 — command-centre refinement
+   ========================================================================== */
+.fm-filterbar [hidden]{display:none!important}
+.fm-filterbar label{position:relative;overflow:hidden}
+.fm-filterbar label select{max-width:100%;text-overflow:ellipsis}
+body[data-finance-view="advanced"] .fm-content{gap:18px}
+body[data-finance-view="advanced"] .fm-topbar{padding-bottom:16px}
+body[data-finance-view="advanced"] .fm-filterbar{margin-top:12px}
+body[data-finance-view="advanced"] .fm-filterbar label{
+  background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);
+  border-color:#d9e5f1;
+}
+body[data-finance-view="advanced"] .fm-filterbar label:focus-within{
+  border-color:#9ac8ff;
+  box-shadow:0 0 0 3px rgba(8,119,255,.08);
+}
+.fm-top-actions .fm-primary{letter-spacing:-.01em}
+.fm-top-actions .fm-icon{font-size:1.15rem}
+.fm-notice{box-shadow:0 8px 24px rgba(45,75,112,.06)}
+.fm-card,.fm-account-card-shell,.fm-command-centre{transition:box-shadow .18s ease,transform .18s ease}
+.fm-module-card{border-color:#dfe8f2;box-shadow:0 8px 24px rgba(32,69,110,.05)}
+.fm-module-card:hover{transform:translateY(-1px);box-shadow:0 12px 30px rgba(32,69,110,.08)}
+
+@media(max-width:700px){
+ body[data-finance-view="advanced"] .fm-main{padding-top:12px}
+ body[data-finance-view="advanced"] .fm-topbar{padding:12px 2px 13px}
+ body[data-finance-view="advanced"] .fm-topbar h1{font-size:1.92rem;max-width:285px}
+ body[data-finance-view="advanced"] .fm-topbar p:last-child{max-width:330px}
+ body[data-finance-view="advanced"] .fm-filterbar{
+   display:grid;
+   grid-template-columns:1fr 1fr;
+   gap:9px;
+   margin:4px 0 15px;
+   overflow:visible;
+ }
+ body[data-finance-view="advanced"] .fm-filterbar label{
+   min-height:54px;
+   display:grid;
+   grid-template-columns:auto minmax(0,1fr);
+   gap:8px;
+   align-items:center;
+   padding:9px 11px;
+   border-radius:17px;
+   box-shadow:0 7px 22px rgba(37,76,119,.045);
+ }
+ body[data-finance-view="advanced"] .fm-filterbar label[hidden]{display:none!important}
+ body[data-finance-view="advanced"] .fm-filterbar select{
+   width:100%;
+   min-width:0;
+   text-align:right;
+   text-overflow:ellipsis;
+ }
+ .fm-mobile-nav{
+   border-radius:0;
+   min-height:78px;
+ }
+ .fm-mobile-nav button b{font-size:.52rem;font-weight:800}
+ .fm-mobile-nav button span{font-weight:900}
+}
