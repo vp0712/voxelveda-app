@@ -38,7 +38,7 @@ console.log('Finance Master OS regression contract passed.');
 
 assert.match(html,/id="fmMobileNav"/,'Finance OS must provide a dedicated mobile navigation surface.');
 assert.doesNotMatch(html,/Frame 1\.png/,'Finance mobile shell must not render the old corner logo image.');
-assert.match(js,/const MOBILE_NAV=.*\['more','☰','More'\]/,'Mobile Finance navigation must include a More control.');
+assert.match(js,/const MOBILE_NAV=.*\['more','•••','More'\]/,'Mobile Finance navigation must include a More control.');
 assert.match(js,/function moreView\(\)/,'Mobile More must expose the full Finance module launcher.');
 assert.match(js,/No separate Banking V3\/V4\/V5 screens/,'Unified Finance OS must explicitly keep legacy banking screens out of the active launcher.');
 assert.match(js,/financeCommandCentre\(\)/,'Overview must expose the Finance command centre.');
