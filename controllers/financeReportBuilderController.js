@@ -208,12 +208,42 @@ async function buildReport(req,definition=null){
   if(f.report_type==='ACCOUNT_STATEMENT'){
     const ordered=[...transactions].sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||Number(a.id)-Number(b.id));
     const first=ordered[0]||null,last=ordered[ordered.length-1]||null;
+    const accountId=f.account_ids[0];
+    const [[accountMeta]]=await pool.query(
+      `SELECT ba.id,ba.nickname,ba.institution,ba.bsb_masked,ba.account_number_masked,ba.currency,
+              ba.account_type,ba.ownership_scope,ba.entity_name,ba.opening_balance,ba.current_ledger_balance,
+              ba.available_balance,ba.created_by,u.name AS created_by_name
+         FROM bank_accounts ba
+         LEFT JOIN users u ON u.id=ba.created_by
+        WHERE ba.id=? AND ${privacy.visibilitySql('ba',req)}
+        LIMIT 1`,
+      [accountId,...privacy.visibilityParams(req)]
+    );
+    if(!accountMeta) throw new FinanceError('Account Statement account is unavailable.',404,'ACCOUNT_STATEMENT_ACCOUNT_NOT_FOUND');
+    const openingFromFirst=first?.running_balance===null||first?.running_balance===undefined
+      ? null
+      : Number(first.running_balance||0)+Number(first.debit||0)-Number(first.credit||0);
+    const movementNet=ordered.reduce((sum,row)=>sum+Number(row.credit||0)-Number(row.debit||0),0);
+    const opening=openingFromFirst!==null?openingFromFirst:Number(accountMeta.opening_balance||0);
+    const closing=last?.running_balance===null||last?.running_balance===undefined
+      ? opening+movementNet
+      : Number(last.running_balance||0);
     accountStatement={
-      account_id:f.account_ids[0],
-      account_name:first?.account_name||last?.account_name||coverage.accounts[0]?.account_name||null,
-      currency:first?.currency||last?.currency||coverage.accounts[0]?.currency||null,
-      opening_running_balance:first?.running_balance??null,
-      closing_running_balance:last?.running_balance??null,
+      account_id:accountId,
+      account_name:accountMeta.nickname||first?.account_name||last?.account_name||coverage.accounts[0]?.account_name||null,
+      account_holder:accountMeta.entity_name||accountMeta.created_by_name||accountMeta.nickname||'Account holder',
+      institution:accountMeta.institution||'Voxel Veda Finance Platform',
+      bsb_masked:accountMeta.bsb_masked||null,
+      account_number_masked:accountMeta.account_number_masked||null,
+      account_type:accountMeta.account_type||'Account',
+      ownership_scope:accountMeta.ownership_scope||null,
+      currency:accountMeta.currency||first?.currency||last?.currency||coverage.accounts[0]?.currency||'AUD',
+      statement_from:f.from||first?.transaction_date||coverage.accounts[0]?.history_start||null,
+      statement_to:f.to||last?.transaction_date||coverage.accounts[0]?.history_end||null,
+      opening_running_balance:opening,
+      closing_running_balance:closing,
+      total_debits:ordered.reduce((sum,row)=>sum+Number(row.debit||0),0),
+      total_credits:ordered.reduce((sum,row)=>sum+Number(row.credit||0),0),
       transaction_count:ordered.length
     };
   }
@@ -453,6 +483,94 @@ function printableAmount(value,currency) {
   return `${String(currency||'').toUpperCase()} ${money.fromCents(money.toCents(value||0))}`.trim();
 }
 
+function bankStatementMoney(value,currency){
+  const amount=Number(value||0);
+  try{return new Intl.NumberFormat('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}).format(amount)+(currency?' '+String(currency).toUpperCase():'')}
+  catch{return amount.toFixed(2)+(currency?' '+String(currency).toUpperCase():'')}
+}
+function bankStatementDate(value){
+  const raw=String(value||'').slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(raw))return '—';
+  const [y,m,d]=raw.split('-');
+  return `${d}/${m}/${y}`;
+}
+function bankStatementTableHeader(doc,y){
+  doc.save();
+  doc.rect(42,y,511,22).fill('#0B5ED7');
+  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(7.2);
+  doc.text('Date',48,y+7,{width:50});
+  doc.text('Transaction',98,y+7,{width:250});
+  doc.text('Debit',356,y+7,{width:58,align:'right'});
+  doc.text('Credit',420,y+7,{width:58,align:'right'});
+  doc.text('Balance',484,y+7,{width:63,align:'right'});
+  doc.restore();
+  return y+22;
+}
+function renderBankStyleAccountStatement(doc,report,profile,reportId){
+  const statement=report.account_statement||{};
+  const currency=statement.currency||'AUD';
+  const statementNo=`STMT-${statement.account_id||'A'}-${String(statement.statement_from||'ALL').replace(/-/g,'')}-${String(statement.statement_to||'NOW').replace(/-/g,'')}`;
+  doc.font('Helvetica-Bold').fontSize(23).fillColor('#0F172A').text('Account Statement',42,114,{width:320});
+  doc.font('Helvetica').fontSize(8).fillColor('#64748B').text(statementNo,390,119,{width:163,align:'right'});
+
+  const summaryY=151;
+  doc.roundedRect(42,summaryY,511,101,10).fillAndStroke('#F8FBFF','#DCE8F5');
+  doc.fillColor('#0F172A').font('Helvetica-Bold').fontSize(10).text(statement.account_holder||statement.account_name||'Account holder',56,summaryY+14,{width:260});
+  doc.font('Helvetica').fontSize(7.5).fillColor('#5E718A').text(`${statement.account_type||'Account'} · ${statement.account_name||''}`,56,summaryY+31,{width:260});
+  const leftDetails=[
+    statement.institution||'Voxel Veda Finance Platform',
+    statement.bsb_masked?`BSB ${statement.bsb_masked}`:null,
+    statement.account_number_masked?`Account ${statement.account_number_masked}`:null
+  ].filter(Boolean).join(' · ');
+  doc.text(leftDetails,56,summaryY+46,{width:280});
+  doc.fillColor('#334155').font('Helvetica-Bold').text('Statement period',354,summaryY+14,{width:90});
+  doc.font('Helvetica').fillColor('#475569').text(`${bankStatementDate(statement.statement_from)} – ${bankStatementDate(statement.statement_to)}`,446,summaryY+14,{width:94,align:'right'});
+  doc.font('Helvetica-Bold').fillColor('#334155').text('Opening balance',354,summaryY+33,{width:90});
+  doc.font('Helvetica').fillColor('#0F172A').text(bankStatementMoney(statement.opening_running_balance,currency),446,summaryY+33,{width:94,align:'right'});
+  doc.font('Helvetica-Bold').fillColor('#334155').text('Closing balance',354,summaryY+52,{width:90});
+  doc.font('Helvetica-Bold').fillColor('#0B5ED7').text(bankStatementMoney(statement.closing_running_balance,currency),446,summaryY+52,{width:94,align:'right'});
+  doc.font('Helvetica-Bold').fillColor('#334155').text('Transactions',354,summaryY+71,{width:90});
+  doc.font('Helvetica').fillColor('#0F172A').text(String(statement.transaction_count||0),446,summaryY+71,{width:94,align:'right'});
+
+  doc.font('Helvetica').fontSize(7).fillColor('#64748B').text(
+    'This statement is generated from the Voxel Veda Finance ledger for the signed-in account holder. It is not a Commonwealth Bank statement and does not claim that Voxel Veda is an authorised deposit-taking institution.',
+    42,267,{width:511}
+  );
+
+  let y=301;
+  y=bankStatementTableHeader(doc,y);
+  const rows=[...(report.transactions||[])].sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||Number(a.id)-Number(b.id));
+  for(const row of rows){
+    const description=String(row.merchant_name||row.description||'Transaction').replace(/\s+/g,' ').trim();
+    const ref=row.reference?String(row.reference).trim():'';
+    const detail=ref&&ref!==description?`${description}\nRef: ${ref}`:description;
+    const textHeight=Math.min(24,doc.heightOfString(detail,{width:246,lineGap:1}));
+    const rowH=Math.max(28,textHeight+10);
+    if(y+rowH>746){
+      doc.addPage();
+      y=118;
+      y=bankStatementTableHeader(doc,y);
+    }
+    if(Math.floor((y-323)/28)%2===1)doc.rect(42,y,511,rowH).fill('#FAFCFF');
+    doc.moveTo(42,y+rowH).lineTo(553,y+rowH).strokeColor('#E5EDF6').lineWidth(0.45).stroke();
+    doc.fillColor('#334155').font('Helvetica').fontSize(7.1);
+    doc.text(bankStatementDate(row.transaction_date),48,y+8,{width:47});
+    doc.fillColor('#172033').text(detail,98,y+7,{width:250,height:rowH-8,ellipsis:true,lineGap:1});
+    doc.fillColor('#334155');
+    doc.text(Number(row.debit||0)>0?bankStatementMoney(row.debit,''): '',356,y+8,{width:58,align:'right'});
+    doc.text(Number(row.credit||0)>0?bankStatementMoney(row.credit,''): '',420,y+8,{width:58,align:'right'});
+    doc.font('Helvetica-Bold').fillColor('#172033').text(row.running_balance===null||row.running_balance===undefined?'—':bankStatementMoney(row.running_balance,''),484,y+8,{width:63,align:'right'});
+    y+=rowH;
+  }
+  if(y+78>746){doc.addPage();y=118}
+  doc.roundedRect(42,y+14,511,58,8).fillAndStroke('#F8FBFF','#DCE8F5');
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#334155').text('Statement totals',56,y+27,{width:150});
+  doc.font('Helvetica').fontSize(7.3).fillColor('#475569').text(`Debits ${bankStatementMoney(statement.total_debits,currency)}`,245,y+27,{width:130,align:'right'});
+  doc.text(`Credits ${bankStatementMoney(statement.total_credits,currency)}`,380,y+27,{width:159,align:'right'});
+  doc.font('Helvetica-Bold').fillColor('#0B5ED7').text(`Closing ${bankStatementMoney(statement.closing_running_balance,currency)}`,380,y+45,{width:159,align:'right'});
+  doc.font('Helvetica').fontSize(6.5).fillColor('#64748B').text(`Statement ID ${reportId} · Generated from permission-scoped ledger data`,56,y+46,{width:300});
+}
+
 exports.pdf=async(req,res)=>{
   try{
     const report=await buildReport(req),profile=await reportCompanyProfile(),title=reportTitle(report.metadata.report_type);
@@ -464,22 +582,25 @@ exports.pdf=async(req,res)=>{
     res.setHeader('Content-Disposition',`attachment; filename="Voxel-Veda-${safeName}.pdf"`);
     doc.pipe(res);
 
-    doc.fontSize(20).fillColor('#111827').text(title);
-    doc.moveDown(0.25).fontSize(9).fillColor('#4b5563').text(
-      `Workspace: ${report.metadata.scope} · Period: ${report.metadata.from||'All'} to ${report.metadata.to||'Now'} · Transactions: ${report.metadata.source_transaction_count}`
-    );
-    doc.text(`Currency treatment: ${report.metadata.currency_treatment}`);
-    doc.moveDown(0.7).fontSize(13).fillColor('#111827').text('Financial summary');
-    for(const row of report.summary_by_currency||[]){
-      doc.fontSize(9).text(
-        `${row.currency}: Money In ${printableAmount(row.money_in,row.currency)} · Money Out ${printableAmount(row.money_out,row.currency)} · Net ${printableAmount(row.net_cash_flow,row.currency)}`
+    if(report.metadata.report_type==='ACCOUNT_STATEMENT'){
+      renderBankStyleAccountStatement(doc,report,profile,reportId);
+    }else{
+      doc.fontSize(20).fillColor('#111827').text(title);
+      doc.moveDown(0.25).fontSize(9).fillColor('#4b5563').text(
+        `Workspace: ${report.metadata.scope} · Period: ${report.metadata.from||'All'} to ${report.metadata.to||'Now'} · Transactions: ${report.metadata.source_transaction_count}`
       );
-      doc.fontSize(8).fillColor('#6b7280').text(
-        `Ordinary inflow ${printableAmount(row.ordinary_money_in,row.currency)} · Linked refunds ${printableAmount(row.linked_refund_inflow,row.currency)} · Net economic expense ${printableAmount(row.net_economic_expense,row.currency)}`
-      ).fillColor('#111827');
-    }
+      doc.text(`Currency treatment: ${report.metadata.currency_treatment}`);
+      doc.moveDown(0.7).fontSize(13).fillColor('#111827').text('Financial summary');
+      for(const row of report.summary_by_currency||[]){
+        doc.fontSize(9).text(
+          `${row.currency}: Money In ${printableAmount(row.money_in,row.currency)} · Money Out ${printableAmount(row.money_out,row.currency)} · Net ${printableAmount(row.net_cash_flow,row.currency)}`
+        );
+        doc.fontSize(8).fillColor('#6b7280').text(
+          `Ordinary inflow ${printableAmount(row.ordinary_money_in,row.currency)} · Linked refunds ${printableAmount(row.linked_refund_inflow,row.currency)} · Net economic expense ${printableAmount(row.net_economic_expense,row.currency)}`
+        ).fillColor('#111827');
+      }
 
-    if(report.metadata.report_type==='CATEGORY'){
+      if(report.metadata.report_type==='CATEGORY'){
       doc.moveDown().fontSize(13).text('Category analysis');
       for(const row of (report.categories||[]).slice(0,500)){
         if(doc.y>724)doc.addPage();
@@ -533,6 +654,8 @@ exports.pdf=async(req,res)=>{
           doc.fontSize(7).fillColor('#6b7280').text(`${row.category||'Uncategorised'} · ${row.reconciliation_status||''} · ${row.source_type||''}`);
         }
       }
+    }
+
     }
 
     const logoPath=path.join(__dirname,'..','public','Frame 1.png');
