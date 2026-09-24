@@ -23,7 +23,7 @@ for(const label of [
 
 for(const endpoint of [
   '/api/finance/personal-money','/api/finance/personal-money/attention','/api/finance/personal-money/smart',
-  '/api/finance/personal-money/health','/api/finance/personal-money/commitments-control','/api/finance/personal-money/tax-control','/api/finance/personal-money/roadmaps',
+  '/api/finance/personal-money/health','/api/finance/personal-money/commitments-control','/api/finance/personal-money/savings-control','/api/finance/personal-money/tax-control','/api/finance/personal-money/roadmaps',
   '/api/finance/personal-money/data-quality-integrity','/api/finance/personal-money/net-worth',
   '/api/finance/personal-money/net-worth/lifecycle','/api/finance/company-summary','/api/finance/counterparty-control',
   '/api/finance/banking-os/command-center','/api/finance/intelligence/data-quality',
@@ -80,3 +80,7 @@ assert(advanced.includes('Job allocation evidence'),'Executive readiness must in
 
 assert(advanced.includes('function counterpartyWorkingCapitalControl()'),'Advanced Counterparty Control section missing.');
 assert(advanced.includes('data-fac-open="counterparties"'),'Advanced Control must drill into Customers & Suppliers.');
+
+assert(advanced.includes('Savings & reserves'),'Advanced Control must expose Savings & Reserve intelligence.');
+assert(advanced.includes("source:'Savings & Reserve'"),'Savings pace/emergency signals must feed the Advanced action queue.');
+assert(advanced.includes('never move money automatically'),'Advanced Savings intelligence must preserve its no-money-movement boundary.');
