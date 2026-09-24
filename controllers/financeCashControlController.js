@@ -6,6 +6,7 @@ const { FinanceError }=require('../services/financeDomain');
 const { ensureFinanceSchema }=require('../services/financeSchema');
 const privacy=require('../services/financePrivacyService');
 const { logAudit }=require('../services/auditService');
+const cashCustody=require('../services/financeCashCustodyService');
 
 function uid(req){return privacy.userId(req)}
 function clean(value,max=500){const text=String(value??'').trim();return text?text.slice(0,max):null}
@@ -125,6 +126,8 @@ exports.recordCount=async(req,res)=>{
     }else{
       const row=await wallet(db,sourceId,owner,{forUpdate:true});expected=Number(row.balance||0);currency=String(row.currency||'AUD').toUpperCase();walletId=row.id;sourceName=row.name||'Cash wallet';
     }
+    const custodyHeld=await cashCustody.outstandingForSource(db,{sourceType:source,bankAccountId,walletId});
+    expected=Math.round((expected-custodyHeld)*10000)/10000;
     const actual=money(req.body.actual_amount,'Actual cash count'),variance=Math.round((actual-expected)*10000)/10000;
     const status=Math.abs(variance)<=0.005?'BALANCED':'REVIEW_REQUIRED',countUid=crypto.randomUUID();
     await db.query(`INSERT INTO finance_cash_counts
@@ -133,7 +136,7 @@ exports.recordCount=async(req,res)=>{
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [countUid,source,bankAccountId,walletId,scope,currency,expected,actual,variance,status,clean(req.body.custodian,160),dateTime(req.body.counted_at),clean(req.body.note,700),owner]);
     await logAudit(db,audit(req,'FINANCE_CASH_COUNT_RECORDED','finance_cash_count',countUid,null,
-      {source_type:source,source_id:sourceId,source_name:sourceName,currency,expected_amount:expected,actual_amount:actual,variance_amount:variance,status}));
+      {source_type:source,source_id:sourceId,source_name:sourceName,currency,custody_outstanding:custodyHeld,expected_amount:expected,actual_amount:actual,variance_amount:variance,status}));
     await db.commit();
     return res.status(201).json({message:status==='BALANCED'?'Cash count balanced with the recorded balance.':'Cash variance recorded for review. No ledger balance was changed.',count_uid:countUid,status,expected_amount:expected,actual_amount:actual,variance_amount:variance,currency});
   }catch(error){await db.rollback().catch(()=>{});return fail(res,error,'Failed to record cash count.');}finally{db.release()}
