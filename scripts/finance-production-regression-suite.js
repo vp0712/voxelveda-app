@@ -43,6 +43,7 @@ const tests=[
   "finance-reimbursement-settlement-test.js",
   "finance-receipt-audit-center-test.js",
   "finance-report-builder-v2-test.js",
+  "finance-banking-readiness-test.js",
   "finance-xlsx-export-test.js",
   "finance-transaction-lifecycle-test.js",
   "finance-planning-controls-test.js",
