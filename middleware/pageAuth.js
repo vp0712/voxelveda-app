@@ -1,7 +1,7 @@
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
-const { getRequestToken, safeReturnTo } = require('../utils/session');
+const { getRequestToken, safeReturnTo, clearSessionCookie } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { validateSession } = require('../services/sessionService');
@@ -20,6 +20,7 @@ function parsePermissions(value) {
 }
 
 function redirectToLogin(req, res) {
+  clearSessionCookie(req, res);
   const returnTo = safeReturnTo(req.originalUrl, '/');
   return res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo)}`);
 }
