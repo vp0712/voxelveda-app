@@ -1,8 +1,8 @@
-finance-release: 20260925-statement-review-filter-edit-v23-r2
-source-commit: e04a7184d40141579d5b697a04d96453cf0b1fe0
-candidate-ci: success
-final-system-consolidation: success
-security-ci: success
-banking-platform-ci: success
-bank-account-lifecycle-ci: success
+finance-release: 20260925-auth-session-recovery-v24
+source-commit: 75e63a9c37d6b4d3f0051778145d39b0a2fd93c3
+candidate-ci: pending-railway-build
+final-system-consolidation: pending-railway-build
+security-ci: pending-railway-build
+banking-platform-ci: pending-railway-build
+bank-account-lifecycle-ci: pending-railway-build
 policy: marker-only-production-deploy
