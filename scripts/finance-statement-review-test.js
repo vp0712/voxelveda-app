@@ -59,4 +59,10 @@ assert(controller.includes("validation_status='WARNING'")&&controller.includes('
 assert(client.includes('function openRejectedRowOverride('),'statement review must expose the manual rejected-row correction form');
 assert(client.includes('data-review-override')&&client.includes('data-review-fix'),'rejected rows must be manually includable from the review table');
 assert(client.includes('Fix & include rejected transaction'),'manual correction UI must clearly state the action');
+assert(client.includes('data-review-filter="rejected"')&&client.includes('data-review-filter="valid"'),'statement review status cards must be clickable filters for rejected and valid rows');
+assert(client.includes('function reviewStatusFilter('),'statement review must filter rows without searching through the full statement manually');
+assert(client.includes('data-review-filter-title')&&client.includes('data-review-filter-count'),'statement review must show the active filtered list and result count');
+assert(client.includes('data-review-edit'),'manually corrected rows must expose an edit action before commit');
+assert(client.includes("editing?'Edit corrected transaction'"),'manual override workflow must support editing a prior correction');
+assert(client.includes('fm-review-bank-sheet-head'),'statement review must use the bank-style Voxel Veda statement presentation');
 console.log('Finance statement review architecture checks passed.');
