@@ -2037,12 +2037,13 @@ async function openStatementWizard(){
  };
 }
 function openRejectedRowOverride(uid,row,session,trigger){
+ const editing=Boolean(Number(row.manual_override||0));
  const debit=num(row.debit),credit=num(row.credit);
  const direction=debit>0?'DEBIT':credit>0?'CREDIT':'';
  const amount=debit>0?debit:credit>0?credit:'';
- $('fmModalEyebrow').textContent='MANUAL STATEMENT CORRECTION';
- $('fmModalTitle').textContent='Fix & include rejected transaction';
- $('fmModalBody').innerHTML='<form id="rejectedRowOverrideForm" class="fm-form"><div class="fm-state fm-state-warning"><strong>Manual override</strong><p>This row was rejected by automatic validation. Confirm the genuine transaction details before including it. Duplicate transactions and opening/closing balance markers remain permanently blocked.</p></div><label>Transaction date<input name="transaction_date" type="date" value="'+esc(String(row.transaction_date||'').slice(0,10))+'" required></label><label>Description<textarea name="description" rows="3" required>'+esc(row.description||'')+'</textarea></label><div class="fm-form-grid two"><label>Money direction<select name="direction" required><option value="">Choose</option><option value="DEBIT" '+(direction==='DEBIT'?'selected':'')+'>Money out / Debit</option><option value="CREDIT" '+(direction==='CREDIT'?'selected':'')+'>Money in / Credit</option></select></label><label>Amount<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+esc(amount||'')+'" required></label></div><label>Why is this a genuine transaction?<textarea name="reason" rows="2" placeholder="Example: Verified against the original bank statement" required></textarea></label><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Include transaction</button></div></form>';
+ $('fmModalEyebrow').textContent=editing?'MANUAL STATEMENT EDIT':'MANUAL STATEMENT CORRECTION';
+ $('fmModalTitle').textContent=editing?'Edit corrected transaction':'Fix & include rejected transaction';
+ $('fmModalBody').innerHTML='<form id="rejectedRowOverrideForm" class="fm-form"><div class="fm-state fm-state-warning"><strong>'+(editing?'Manual override edit':'Manual override')+'</strong><p>'+(editing?'This row was previously corrected manually. You can edit it again before the statement is committed. Duplicate transactions and opening/closing balance markers remain locked.':'This row was rejected by automatic validation. Confirm the genuine transaction details before including it. Duplicate transactions and opening/closing balance markers remain permanently blocked.')+'</p></div><label>Transaction date<input name="transaction_date" type="date" value="'+esc(String(row.transaction_date||'').slice(0,10))+'" required></label><label>Description<textarea name="description" rows="3" required>'+esc(row.description||'')+'</textarea></label><div class="fm-form-grid two"><label>Money direction<select name="direction" required><option value="">Choose</option><option value="DEBIT" '+(direction==='DEBIT'?'selected':'')+'>Money out / Debit</option><option value="CREDIT" '+(direction==='CREDIT'?'selected':'')+'>Money in / Credit</option></select></label><label>Amount<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+esc(amount||'')+'" required></label></div><label>Reason / verification note<textarea name="reason" rows="2" placeholder="Example: Verified against the original bank statement" required>'+esc(row.override_reason||'')+'</textarea></label><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">'+(editing?'Save changes':'Include transaction')+'</button></div></form>';
  if(!$('fmModal').open)$('fmModal').showModal();
  const resetTrigger=()=>{if(trigger)trigger.checked=false};
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>{$('fmModal').close();resetTrigger()},{once:true});
@@ -2050,41 +2051,86 @@ function openRejectedRowOverride(uid,row,session,trigger){
   e.preventDefault();
   const form=e.currentTarget,fd=new FormData(form),submit=form.querySelector('button[type="submit"]');
   const payload={transaction_date:String(fd.get('transaction_date')||''),description:String(fd.get('description')||'').trim(),direction:String(fd.get('direction')||''),amount:String(fd.get('amount')||''),reason:String(fd.get('reason')||'').trim()};
-  if(!payload.transaction_date||!payload.description||!payload.direction||!payload.amount||payload.reason.length<3){notice('Complete the date, description, direction, amount and override reason.',true);return}
-  submit.disabled=true;submit.textContent='Checking & including…';
+  if(!payload.transaction_date||!payload.description||!payload.direction||!payload.amount||payload.reason.length<3){notice('Complete the date, description, direction, amount and verification note.',true);return}
+  submit.disabled=true;submit.textContent=editing?'Saving…':'Checking & including…';
   try{
    const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(row.id)+'/override',{method:'POST',body:JSON.stringify(payload)});
    $('fmModal').close();
-   await openStatementReview(uid);
-   showFinancePopup('Rejected transaction included',result.message||'The corrected transaction is selected for import.','Manual override recorded in the audit trail.');
-  }catch(error){submit.disabled=false;submit.textContent='Include transaction';resetTrigger();notice(error.message,true)}
+   await openStatementReview(uid,editing?'manual':'rejected');
+   showFinancePopup(editing?'Corrected transaction updated':'Rejected transaction included',result.message||(editing?'The corrected transaction was updated.':'The corrected transaction is selected for import.'),'Manual override recorded in the audit trail.');
+  }catch(error){submit.disabled=false;submit.textContent=editing?'Save changes':'Include transaction';resetTrigger();notice(error.message,true)}
  };
 }
-async function openStatementReview(uid){
+
+function reviewStatusFilter(row,filter){
+ const status=String(row.validation_status||'').toUpperCase();
+ if(filter==='total')return true;
+ if(filter==='valid')return status==='VALID';
+ if(filter==='warning')return status==='WARNING';
+ if(filter==='duplicate')return status==='DUPLICATE';
+ if(filter==='rejected')return status==='REJECTED';
+ if(filter==='manual')return Boolean(Number(row.manual_override||0));
+ return true;
+}
+
+function statementReviewRowMarkup(row,session){
+ const isDuplicate=row.validation_status==='DUPLICATE';
+ const isRejected=row.validation_status==='REJECTED';
+ const isManual=Boolean(Number(row.manual_override||0));
+ const balanceLocked=isRejected&&(/balance.*marker|opening\/closing balance|not a transaction/i.test(String(row.validation_message||''))||/^(opening|closing) balance\b/i.test(String(row.description||'')));
+ const rowClass=isDuplicate?'fm-review-duplicate':isRejected?'fm-review-rejected':isManual?'fm-review-manual':'';
+ const useControl=isDuplicate||balanceLocked
+  ? '<input type="checkbox" disabled aria-label="Locked row">'
+  : isRejected
+    ? '<label class="fm-manual-select"><input type="checkbox" data-review-override="'+esc(row.id)+'"><span>Include</span></label>'
+    : '<input type="checkbox" data-review-select="'+esc(row.id)+'" '+(Number(row.selected)?'checked ':'')+'>';
+ let validation='<small>'+esc(row.validation_message||'Verified')+'</small>';
+ if(isRejected&&!balanceLocked)validation+='<button type="button" class="fm-fix-include" data-review-fix="'+esc(row.id)+'">Fix & include</button>';
+ if(isManual)validation+='<button type="button" class="fm-edit-override" data-review-edit="'+esc(row.id)+'">Edit correction</button>';
+ return '<tr class="'+rowClass+'" data-review-row data-status="'+esc(String(row.validation_status||'').toLowerCase())+'" data-manual="'+(isManual?'1':'0')+'"><td>'+useControl+'</td><td>'+date(row.transaction_date)+'</td><td><div class="fm-statement-description">'+esc(row.description)+'</div></td><td>'+(num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):'')+'</td><td>'+(num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):'')+'</td><td>'+statusBadge(row.validation_status)+'</td><td>'+validation+'</td></tr>';
+}
+
+async function openStatementReview(uid,initialFilter='total'){
  try{
   const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)),session=result.session,rows=result.rows||[];
-  const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked. They will not be committed, calculated, shown in the transaction ledger or included in Finance exports.</p></div>':'';
-  const tableRows=rows.map(row=>{
-   const isDuplicate=row.validation_status==='DUPLICATE';
-   const isRejected=row.validation_status==='REJECTED';
-   const balanceLocked=isRejected&&(/balance.*marker|opening\/closing balance|not a transaction/i.test(String(row.validation_message||''))||/^(opening|closing) balance\b/i.test(String(row.description||'')));
-   const rowClass=isDuplicate?'fm-review-duplicate':isRejected?'fm-review-rejected':'';
-   const useControl=isDuplicate||balanceLocked
-    ? '<input type="checkbox" disabled aria-label="Locked row">'
-    : isRejected
-      ? '<label class="fm-manual-select"><input type="checkbox" data-review-override="'+esc(row.id)+'"><span>Include</span></label>'
-      : '<input type="checkbox" data-review-select="'+esc(row.id)+'" '+(Number(row.selected)?'checked ':'')+'>';
-   const validation=isRejected&&!balanceLocked
-    ? '<small>'+esc(row.validation_message||'Rejected by automatic validation')+'</small><button type="button" class="fm-fix-include" data-review-fix="'+esc(row.id)+'">Fix & include</button>'
-    : '<small>'+esc(row.validation_message||'Verified')+'</small>';
-   return '<tr class="'+rowClass+'"><td>'+useControl+'</td><td>'+date(row.transaction_date)+'</td><td>'+esc(row.description)+'</td><td>'+(num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):'')+'</td><td>'+(num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):'')+'</td><td>'+statusBadge(row.validation_status)+'</td><td>'+validation+'</td></tr>';
-  }).join('');
-  const body='<div class="fm-grid four"><div class="fm-kpi"><span>Total</span><strong>'+num(session.total_rows)+'</strong></div><div class="fm-kpi"><span>Valid</span><strong class="good">'+num(session.valid_rows)+'</strong></div><div class="fm-kpi"><span>Duplicates excluded</span><strong class="warn">'+num(session.duplicate_rows)+'</strong></div><div class="fm-kpi"><span>Rejected</span><strong class="bad">'+num(session.rejected_rows)+'</strong></div></div>'+duplicateWarning+'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Commit selected rows</button></div>';
+  const warnings=rows.filter(row=>String(row.validation_status||'').toUpperCase()==='WARNING').length;
+  const manualFixes=rows.filter(row=>Number(row.manual_override||0)).length;
+  const selectedCount=rows.filter(row=>Number(row.selected||0)&&['VALID','WARNING'].includes(String(row.validation_status||'').toUpperCase())).length;
+  const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked and excluded from the ledger, totals and exports.</p></div>':'';
+  const tableRows=rows.map(row=>statementReviewRowMarkup(row,session)).join('');
+  const brandHeader='<section class="fm-review-bank-sheet-head"><div class="fm-review-brand"><img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda"><div><b>Voxel Veda</b><span>Finance Statement Review</span></div></div><div class="fm-review-statement-title"><strong>Your Statement</strong><span>'+esc(session.original_name||'Statement review')+'</span></div><div class="fm-review-account-meta"><span>Statement rows <b>'+num(session.total_rows)+'</b></span><span>Selected <b>'+selectedCount+'</b></span><span>Currency <b>'+esc(session.account_currency||'AUD')+'</b></span></div></section>';
+  const statusCards='<div class="fm-review-status-grid" role="tablist" aria-label="Statement row filters">'+
+    '<button type="button" data-review-filter="total" class="active"><span>Total</span><strong>'+num(session.total_rows)+'</strong><small>All rows</small></button>'+
+    '<button type="button" data-review-filter="valid"><span>Valid</span><strong class="good">'+num(session.valid_rows)+'</strong><small>Verified rows</small></button>'+
+    '<button type="button" data-review-filter="warning"><span>Warnings / fixed</span><strong>'+warnings+'</strong><small>'+manualFixes+' manual fix'+(manualFixes===1?'':'es')+'</small></button>'+
+    '<button type="button" data-review-filter="duplicate"><span>Duplicates</span><strong class="warn">'+num(session.duplicate_rows)+'</strong><small>Excluded</small></button>'+
+    '<button type="button" data-review-filter="rejected"><span>Rejected</span><strong class="bad">'+num(session.rejected_rows)+'</strong><small>Needs attention</small></button>'+
+  '</div>';
+  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Commit selected rows</button></div></div>';
   openDrawer('Review '+(session.original_name||'statement'),body,'STATEMENT REVIEW');
+
   setTimeout(()=>{
+   const applyFilter=filter=>{
+    const allowed=['total','valid','warning','duplicate','rejected','manual'];
+    const next=allowed.includes(filter)?filter:'total';
+    let shown=0;
+    document.querySelectorAll('[data-review-row]').forEach((tr,index)=>{
+     const row=rows[index],show=reviewStatusFilter(row,next);
+     tr.hidden=!show;if(show)shown+=1;
+    });
+    document.querySelectorAll('[data-review-filter]').forEach(button=>button.classList.toggle('active',button.dataset.reviewFilter===next));
+    const labels={total:'All statement rows',valid:'Valid transactions',warning:'Warnings / corrected transactions',duplicate:'Duplicate transactions — excluded',rejected:'Rejected transactions — fix before import',manual:'Manually corrected transactions'};
+    const title=document.querySelector('[data-review-filter-title]'),count=document.querySelector('[data-review-filter-count]');
+    if(title)title.textContent=labels[next]||labels.total;
+    if(count)count.textContent=shown+' shown';
+    const table=document.querySelector('.fm-review-table-wrap');if(table)table.scrollIntoView({behavior:'smooth',block:'start'});
+   };
+
+   document.querySelectorAll('[data-review-filter]').forEach(button=>button.onclick=()=>applyFilter(button.dataset.reviewFilter));
    document.querySelectorAll('[data-review-select]').forEach(box=>box.onchange=async()=>{try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(box.dataset.reviewSelect)+'/select',{method:'POST',body:JSON.stringify({selected:box.checked})})}catch(error){box.checked=!box.checked;notice(error.message,true)}});
    document.querySelectorAll('[data-review-override]').forEach(box=>box.onchange=()=>{if(!box.checked)return;const row=rows.find(item=>String(item.id)===String(box.dataset.reviewOverride));if(row)openRejectedRowOverride(uid,row,session,box)});
    document.querySelectorAll('[data-review-fix]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewFix));if(row)openRejectedRowOverride(uid,row,session,null)});
+   document.querySelectorAll('[data-review-edit]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewEdit));if(row)openRejectedRowOverride(uid,row,session,null)});
    document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{
     try{
      const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:'{}'});
@@ -2093,6 +2139,7 @@ async function openStatementReview(uid){
     }catch(error){notice(error.message,true)}
    });
    document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/reject',{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
+   applyFilter(initialFilter);
   },0);
  }catch(error){notice(error.message,true)}
 }
