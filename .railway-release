@@ -1,5 +1,5 @@
-finance-release: 20260925-finance-statement-pdf-v19
-source-commit: 9e5b02e2f1ea5fe5e75759b036ae11b6c4b3e438
+finance-release: 20260925-finance-pdf-import-v19-r1
+source-commit: dd8de3a168a14cbf8059ba579e72244e51df2f85
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
