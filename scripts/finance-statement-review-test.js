@@ -51,4 +51,11 @@ assert(client.includes('showFinancePopup'),'statement import must show an in-app
 assert(controller.includes("code: 'STATEMENT_PREVIEW_BUSY'"),'transient DB contention must return a retryable statement-preview code');
 assert(controller.includes("error?.code === 'ER_LOCK_WAIT_TIMEOUT'")&&controller.includes("error?.code === 'ER_LOCK_DEADLOCK'"),'lock timeout/deadlock handling must remain explicit');
 assert(!controller.includes("content_hash=? ORDER BY id DESC LIMIT 1 FOR UPDATE"),'statement preview must not hold an unnecessary session-row lock while parsing/staging');
+assert(controller.includes('exports.overrideRejectedRow = async'),'rejected statement rows must support an explicit correction workflow');
+assert(controller.includes("Duplicate rows stay locked"),'manual correction must never unlock duplicate rows');
+assert(controller.includes("Balance markers cannot be converted into transactions"),'manual correction must never convert statement balance markers into ledger transactions');
+assert(controller.includes("validation_status='WARNING'")&&controller.includes('manual_override=1'),'approved rejected rows must become auditable warnings with manual-override evidence');
+assert(client.includes('function openRejectedRowOverride('),'statement review must expose the manual rejected-row correction form');
+assert(client.includes('data-review-override')&&client.includes('data-review-fix'),'rejected rows must be manually includable from the review table');
+assert(client.includes('Fix & include rejected transaction'),'manual correction UI must clearly state the action');
 console.log('Finance statement review architecture checks passed.');
