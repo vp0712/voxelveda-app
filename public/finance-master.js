@@ -434,6 +434,23 @@ function historyImportView(){
  const pendingRows=pending.map(x=>`<button class="fm-row fm-row-button" data-import-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ${num(x.total_rows)} rows · ${num(x.duplicate_rows)} duplicate(s)</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${num(x.valid_rows)} valid · ${num(x.rejected_rows)} rejected</small></div></button>`).join('');
  return `<div class="fm-control-intro"><p>HISTORICAL FINANCE SETUP</p><h2>Bring every bank account into one controlled ledger</h2><span>Create each account once, upload all of that account's statements, review duplicates/rejections, then commit. Personal and Company ownership remain separate while Consolidated reporting can show permitted accounts together.</span><div class="fm-control-quick"><button data-quick="account">+ Add account</button><button data-viewjump="statements">Statement vault</button><button data-viewjump="review">Review centre</button><button data-viewjump="reports">Reports</button></div></div><section class="fm-history-grid">${accountCards||emptyState('No financial accounts','Create the first bank, card, cash or loan account before importing history.')}</section><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Pending statement reviews</h2><p>No imported row enters the canonical ledger until you review and commit it.</p></div><span class="fm-badge">${pending.length}</span></div><div class="fm-list">${pendingRows||emptyState('No pending reviews','Imported statement previews waiting for review will appear here.')}</div></div></article>`;
 }
+function waitFinance(ms){return new Promise(resolve=>setTimeout(resolve,Math.max(0,Number(ms)||0)))}
+async function stageStatementPreview(account,file,parsed,index,totalFiles,onRetry){
+ const payload={source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),parser_version:parsed.parser_version||null,parser_confidence:parsed.parser_confidence??null,extraction_diagnostics:{file_size:Number(file.size||0),extracted_rows:parsed.rows.length,batch_index:index+1,batch_files:totalFiles},rows:parsed.rows};
+ let lastError=null;
+ for(let attempt=1;attempt<=3;attempt++){
+  try{return await api(I+'/accounts/'+encodeURIComponent(account.id)+'/statements/preview',{method:'POST',timeoutMs:90000,body:JSON.stringify(payload)})}
+  catch(error){
+   lastError=error;
+   const retryable=error?.code==='STATEMENT_PREVIEW_BUSY'||error?.code==='FINANCE_REQUEST_TIMEOUT'||error?.code==='DUPLICATE_RECORD'||error?.status===503||error?.status===408;
+   if(!retryable||attempt===3)throw error;
+   const delay=Math.min(2500,700*attempt);
+   if(typeof onRetry==='function')onRetry(attempt,delay,error);
+   await waitFinance(delay);
+  }
+ }
+ throw lastError||new Error('Statement verification failed.');
+}
 async function stageStatementFiles(account,files,queue){
  const staged=[];
  const summary={files:Number(files.length||0),processed:0,failed:0,rows:0,ready:0,duplicates:0,rejected:0};
@@ -452,7 +469,7 @@ async function stageStatementFiles(account,files,queue){
    if(!parsed.rows.length)throw new Error('No transaction rows could be safely extracted from this file.');
    item.querySelector('small').textContent=parsed.rows.length+' row(s) extracted · checking duplicates and verifying fingerprints…';
    item.querySelector('.fm-badge').textContent='VERIFYING';
-   const result=await api(I+'/accounts/'+encodeURIComponent(account.id)+'/statements/preview',{method:'POST',timeoutMs:90000,body:JSON.stringify({source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),parser_version:parsed.parser_version||null,parser_confidence:parsed.parser_confidence??null,extraction_diagnostics:{file_size:Number(file.size||0),extracted_rows:parsed.rows.length,batch_index:index+1,batch_files:files.length},rows:parsed.rows})});
+   const result=await stageStatementPreview(account,file,parsed,index,files.length,(attempt,delay)=>{item.querySelector('.fm-badge').textContent='RETRYING';item.querySelector('small').textContent='Finance verifier was busy · retry '+attempt+' in '+Math.round(delay/100)/10+'s…'});
    const s=result.summary||{};
    const duplicates=num(s.duplicate),rejected=num(s.rejected),ready=num(s.selected);
    summary.processed+=1;summary.rows+=(num(s.total)||parsed.rows.length);summary.ready+=ready;summary.duplicates+=duplicates;summary.rejected+=rejected;
