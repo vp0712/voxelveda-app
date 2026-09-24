@@ -56,6 +56,8 @@ assert(controller.includes('exports.overrideRejectedRow = async'),'rejected stat
 assert(controller.includes("Duplicate rows stay locked"),'manual correction must never unlock duplicate rows');
 assert(controller.includes("Balance markers cannot be converted into transactions"),'manual correction must never convert statement balance markers into ledger transactions');
 assert(controller.includes("validation_status='WARNING'")&&controller.includes('manual_override=1'),'approved rejected rows must become auditable warnings with manual-override evidence');
+assert(controller.includes('Transaction date is in the future; verify the statement year before import'),'future-dated statement rows must fail closed before ledger commit');
+assert(controller.includes('future_dates_repaired'),'older pending reviews with future-dated rows must be repaired and deselected before commit');
 assert(client.includes('function openRejectedRowOverride('),'statement review must expose the manual rejected-row correction form');
 assert(client.includes('data-review-override')&&client.includes('data-review-fix'),'rejected rows must be manually includable from the review table');
 assert(client.includes('Fix & include rejected transaction'),'manual correction UI must clearly state the action');
