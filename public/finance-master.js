@@ -81,6 +81,25 @@ async function api(path,options={}){
  }finally{clearTimeout(timer)}
 }
 function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
+function showFinancePopup(title,message,detail='',options={}){
+ document.querySelector('.fm-centre-popup')?.remove();
+ const overlay=document.createElement('div');
+ overlay.className='fm-centre-popup '+(options.tone==='warning'?'warning':'success');
+ overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
+ const card=document.createElement('div');card.className='fm-centre-popup-card';
+ const icon=document.createElement('div');icon.className='fm-centre-popup-icon';icon.textContent=options.tone==='warning'?'!':'✓';
+ const heading=document.createElement('h3');heading.textContent=String(title||'Success');
+ const body=document.createElement('p');body.textContent=String(message||'');
+ card.append(icon,heading,body);
+ if(detail){const small=document.createElement('small');small.textContent=String(detail);card.appendChild(small)}
+ const actions=document.createElement('div');actions.className='fm-centre-popup-actions';
+ if(options.actionLabel){const action=document.createElement('button');action.type='button';action.textContent=String(options.actionLabel);action.onclick=()=>{overlay.remove();if(typeof options.onAction==='function')options.onAction()};actions.appendChild(action)}
+ const done=document.createElement('button');done.type='button';done.className='primary';done.textContent='Done';done.onclick=()=>overlay.remove();actions.appendChild(done);
+ card.appendChild(actions);overlay.appendChild(card);
+ overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});
+ document.body.appendChild(overlay);requestAnimationFrame(()=>overlay.classList.add('show'));
+ return overlay;
+}
 function signalFinanceReady(){
  try{window.dispatchEvent(new CustomEvent('finance:ready',{detail:{view:state.view,cycle:loadCycle}}))}catch{}
 }
