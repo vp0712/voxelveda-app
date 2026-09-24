@@ -471,41 +471,25 @@ async function stageStatementFiles(account,files,queue){
  return {staged,summary};
 }
 async function openHistoricalImport(accountId=''){
- const selected=state.accounts.find(a=>String(a.id)===String(accountId));
+ const accountOptions=state.accounts.map(a=>'<option value="'+esc(a.id)+'" '+(String(a.id)===String(accountId)?'selected':'')+'>'+esc(a.nickname||'Account')+' · '+esc(a.institution||'')+' · '+esc(a.currency||'AUD')+'</option>').join('');
  $('fmModalEyebrow').textContent='HISTORICAL IMPORT';$('fmModalTitle').textContent='Import statement history';
- $('fmModalBody').innerHTML=`<form id="historicalImportForm" class="fm-form"><label>Account<select name="account_id" required><option value="">Choose account</option>${state.accounts.map(a=>`<option value="${a.id}" ${String(a.id)===String(accountId)?'selected':''}>${esc(a.nickname||'Account')} · ${esc(a.institution||'')} · ${esc(a.currency||'AUD')}</option>`).join('')}</select></label><label>Statement files<input name="files" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" multiple required></label><p class="fm-helper">Select multiple statement files for the same account. Each file is parsed, SHA-256 hashed, duplicate-checked and staged independently. Nothing is committed automatically.</p><div id="historyImportQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Stage all files for review</button></div></form>`;
+ $('fmModalBody').innerHTML='<form id="historicalImportForm" class="fm-form"><label>Account<select name="account_id" required><option value="">Choose account</option>'+accountOptions+'</select></label><label>Statement files<input name="files" type="file" accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx" multiple required></label><p class="fm-helper">Select as many statement files as needed for this account. Files are processed one-by-one for stability. Every transaction is checked against the committed ledger, earlier staged files and repeated rows inside the same file. Duplicates are excluded from import, totals, screens and reports.</p><div id="historyImportQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Extract & verify all files</button></div></form>';
  $('fmModal').showModal();
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
  $('historicalImportForm').onsubmit=async e=>{
   e.preventDefault();
   const form=e.currentTarget,fd=new FormData(form),selectedId=String(fd.get('account_id')||''),account=state.accounts.find(a=>String(a.id)===selectedId);
-  const files=[...form.elements.files.files],queue=$('historyImportQueue');
+  const files=[...form.elements.files.files],queue=$('historyImportQueue'),submit=form.querySelector('button[type="submit"]');
   if(!account||!files.length){notice('Choose one account and at least one statement file.',true);return}
-  const rows=[];queue.innerHTML='';
-  form.querySelector('button[type="submit"]').disabled=true;
-  for(const file of files){
-   const item=document.createElement('div');item.className='fm-import-item';item.innerHTML=`<div><b>${esc(file.name)}</b><small>Waiting</small></div><span class="fm-badge">QUEUED</span>`;queue.appendChild(item);
-   try{
-    item.querySelector('small').textContent='Reading and validating…';item.querySelector('.fm-badge').textContent='PARSING';
-    const parsed=await parseStatement(file);
-    parsed.rows=(parsed.rows||[]).map(row=>({...row,currency:String(row.currency||account.currency||'AUD').toUpperCase()}));
-    item.querySelector('small').textContent=`${parsed.rows.length} rows · checking duplicates…`;
-    const result=await api(I+`/accounts/${selectedId}/statements/preview`,{method:'POST',body:JSON.stringify({source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),rows:parsed.rows})});
-    rows.push({file:file.name,uid:result.import_uid});
-    item.classList.add('good');item.querySelector('.fm-badge').className='fm-badge good';item.querySelector('.fm-badge').textContent='STAGED';
-    item.querySelector('small').innerHTML=`${parsed.rows.length} rows · <button type="button" data-import-review="${esc(result.import_uid)}">Open review</button>`;
-    item.querySelector('[data-import-review]').onclick=()=>{$('fmModal').close();openStatementReview(result.import_uid)};
-   }catch(error){
-    item.classList.add('bad');item.querySelector('.fm-badge').className='fm-badge bad';item.querySelector('.fm-badge').textContent='FAILED';
-    item.querySelector('small').textContent=error.message;
-   }
-  }
-  form.querySelector('button[type="submit"]').disabled=false;
-  if(rows.length){
-   notice(rows.length+' statement file(s) staged for review. Nothing has been committed yet.');
-   await refresh();
-   state.view='history';history.replaceState(null,'','#history');render();
-  }
+  submit.disabled=true;submit.textContent='Extracting & verifying…';
+  const batch=await stageStatementFiles(account,files,queue);
+  submit.disabled=false;submit.textContent='Extract & verify all files';
+  if(!batch.staged.length){notice('No statement file could be staged. Review the file errors shown above.',true);return}
+  await refresh();
+  state.view='history';history.replaceState(null,'','#history');render();
+  $('fmModal').close();
+  const s=batch.summary;
+  showFinancePopup(s.duplicates?'Statements verified — duplicates excluded':'Statements extracted successfully',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':''),{tone:s.failed?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
  };
 }
 function statements(){
