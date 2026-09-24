@@ -1915,12 +1915,25 @@ async function openStatementWizard(){
 }
 async function openStatementReview(uid){
  try{
-  const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)),session=result.session;
-  openDrawer('Review '+(session.original_name||'statement'),`<div class="fm-grid four"><div class="fm-kpi"><span>Total</span><strong>${num(session.total_rows)}</strong></div><div class="fm-kpi"><span>Valid</span><strong class="good">${num(session.valid_rows)}</strong></div><div class="fm-kpi"><span>Duplicates</span><strong class="warn">${num(session.duplicate_rows)}</strong></div><div class="fm-kpi"><span>Rejected</span><strong class="bad">${num(session.rejected_rows)}</strong></div></div><div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th></tr></thead><tbody>${(result.rows||[]).map(row=>`<tr><td><input type="checkbox" data-review-select="${row.id}" ${Number(row.selected)?'checked':''} ${['DUPLICATE','REJECTED'].includes(row.validation_status)?'disabled':''}></td><td>${date(row.transaction_date)}</td><td>${esc(row.description)}</td><td>${num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):''}</td><td>${num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):''}</td><td>${statusBadge(row.validation_status)}</td></tr>`).join('')}</tbody></table></div><div class="fm-form-actions"><button type="button" data-review-reject="${esc(uid)}">Reject review</button><button class="primary" type="button" data-review-commit="${esc(uid)}">Commit selected rows</button></div>`,'STATEMENT REVIEW');
+  const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)),session=result.session,rows=result.rows||[];
+  const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked. They will not be committed, calculated, shown in the transaction ledger or included in Finance exports.</p></div>':'';
+  const tableRows=rows.map(row=>{
+   const blocked=['DUPLICATE','REJECTED'].includes(row.validation_status);
+   const rowClass=row.validation_status==='DUPLICATE'?'fm-review-duplicate':row.validation_status==='REJECTED'?'fm-review-rejected':'';
+   return '<tr class="'+rowClass+'"><td><input type="checkbox" data-review-select="'+esc(row.id)+'" '+(Number(row.selected)?'checked ':'')+(blocked?'disabled':'')+'></td><td>'+date(row.transaction_date)+'</td><td>'+esc(row.description)+'</td><td>'+(num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):'')+'</td><td>'+(num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):'')+'</td><td>'+statusBadge(row.validation_status)+'</td><td><small>'+esc(row.validation_message||'Verified')+'</small></td></tr>';
+  }).join('');
+  const body='<div class="fm-grid four"><div class="fm-kpi"><span>Total</span><strong>'+num(session.total_rows)+'</strong></div><div class="fm-kpi"><span>Valid</span><strong class="good">'+num(session.valid_rows)+'</strong></div><div class="fm-kpi"><span>Duplicates excluded</span><strong class="warn">'+num(session.duplicate_rows)+'</strong></div><div class="fm-kpi"><span>Rejected</span><strong class="bad">'+num(session.rejected_rows)+'</strong></div></div>'+duplicateWarning+'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Use</th><th>Date</th><th>Description</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Commit selected rows</button></div>';
+  openDrawer('Review '+(session.original_name||'statement'),body,'STATEMENT REVIEW');
   setTimeout(()=>{
-   document.querySelectorAll('[data-review-select]').forEach(c=>c.onchange=async()=>{try{await api(I+`/statement-reviews/${encodeURIComponent(uid)}/rows/${c.dataset.reviewSelect}/select`,{method:'POST',body:JSON.stringify({selected:c.checked})})}catch(error){c.checked=!c.checked;notice(error.message,true)}});
-   document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{try{const x=await api(I+`/statement-reviews/${encodeURIComponent(uid)}/commit`,{method:'POST',body:'{}'});closeDrawer();notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
-   document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+`/statement-reviews/${encodeURIComponent(uid)}/reject`,{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
+   document.querySelectorAll('[data-review-select]').forEach(box=>box.onchange=async()=>{try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(box.dataset.reviewSelect)+'/select',{method:'POST',body:JSON.stringify({selected:box.checked})})}catch(error){box.checked=!box.checked;notice(error.message,true)}});
+   document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{
+    try{
+     const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:'{}'});
+     closeDrawer();await refresh();
+     showFinancePopup('Statement imported successfully',x.message,num(x.imported)+' imported · '+num(x.duplicates)+' duplicate(s) excluded · '+num(x.excluded_balance_markers)+' balance marker(s) excluded');
+    }catch(error){notice(error.message,true)}
+   });
+   document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/reject',{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
   },0);
  }catch(error){notice(error.message,true)}
 }
