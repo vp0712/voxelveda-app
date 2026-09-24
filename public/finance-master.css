@@ -265,6 +265,8 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
  .fm-mobile-nav button b{font-size:.5rem}
  .fm-mobile-nav button.active{color:#0877ff!important}
  .fm-mobile-nav button.active span{color:#0877ff!important}
+ .fm-mobile-nav button[data-mobile-view="more"] span{font-size:0}
+ .fm-mobile-nav button[data-mobile-view="more"] span:before{content:"•••";font-size:1rem;letter-spacing:.08em}
  .fm-mobile-nav button.active:after{content:"";position:absolute;left:28%;right:28%;bottom:1px;height:3px;border-radius:999px;background:#0877ff}
  .fm-command-centre{border-radius:20px}
 }
