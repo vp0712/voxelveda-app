@@ -34,8 +34,10 @@ function normalizeStatementDate(value) {
 }
 
 function isBalanceOnlyRow(row) {
-  const text = `${row?.description || ''} ${row?.merchant_name || ''}`.trim().toUpperCase();
-  return /\b(OPENING|CLOSING|CURRENT|AVAILABLE|BROUGHT\s+FORWARD|CARRIED\s+FORWARD|BALANCE\s+B\/F|BALANCE\s+C\/F)\b/.test(text) && /BALANCE|OPENING|CLOSING/.test(text);
+  const text = `${row?.description || ''} ${row?.merchant_name || ''}`.trim().toUpperCase().replace(/\s+/g, ' ');
+  return /^(?:OPENING|CLOSING|CURRENT|AVAILABLE)\s+BALANCE\b/.test(text)
+    || /^BALANCE\s+(?:BROUGHT|CARRIED)\s+FORWARD\b/.test(text)
+    || /^BALANCE\s+(?:B\/F|C\/F)\b/.test(text);
 }
 
 module.exports = function statementPreviewSanitizer(req, res, next) {
@@ -69,7 +71,7 @@ module.exports = function statementPreviewSanitizer(req, res, next) {
   if (!kept.length) {
     return res.status(400).json({
       code: 'NO_TRANSACTION_CANDIDATES',
-      message: 'No transaction candidates were found after statement-only balance markers were removed. No data was imported.'
+      message: 'Only statement balance markers were detected. No transaction rows were found, so nothing was imported. Retry after the PDF parser finishes extracting the transaction table.'
     });
   }
 
