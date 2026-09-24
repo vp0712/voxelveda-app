@@ -1,5 +1,5 @@
-finance-release: 20260925-finance-rejected-override-v20-r2
-source-commit: 6cba9c23add788a29bdeb3397a46dbda0f206498
+finance-release: 20260925-finance-rejected-row-override-v20-r2
+source-commit: b62c8248e5be926c12a79fc95967e130c8247c60
 candidate-ci: success
 final-system-consolidation: success
 security-ci: success
