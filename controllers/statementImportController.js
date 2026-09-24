@@ -237,14 +237,24 @@ async function normalizeAndDedupe(db, account, inputRows, options = {}) {
 }
 
 async function insertReviewRows(db, sessionId, normalized) {
-  for (const row of normalized) {
+  const rows = Array.isArray(normalized) ? normalized : [];
+  const chunkSize = 250;
+  for (let offset = 0; offset < rows.length; offset += chunkSize) {
+    const chunk = rows.slice(offset, offset + chunkSize);
+    const placeholders = chunk.map(() => '(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').join(',');
+    const params = [];
+    for (const row of chunk) {
+      params.push(
+        sessionId, row.row_no, row.transaction_date, row.posting_date, row.description, row.reference, row.debit, row.credit,
+        row.running_balance, row.merchant_name, row.category, row.currency, row.row_hash, row.validation_status, row.validation_message, row.selected, row.raw_payload_json
+      );
+    }
     await db.query(
       `INSERT INTO statement_import_rows
        (import_session_id, row_no, transaction_date, posting_date, description, reference, debit, credit, running_balance,
         merchant_name, category, currency, row_hash, validation_status, validation_message, selected, raw_payload_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [sessionId, row.row_no, row.transaction_date, row.posting_date, row.description, row.reference, row.debit, row.credit,
-        row.running_balance, row.merchant_name, row.category, row.currency, row.row_hash, row.validation_status, row.validation_message, row.selected, row.raw_payload_json]
+       VALUES ${placeholders}`,
+      params
     );
   }
 }
@@ -294,7 +304,7 @@ exports.preview = async (req, res) => {
 
     db = await pool.getConnection();
     await db.beginTransaction();
-    const [[account]] = await db.query('SELECT * FROM bank_accounts WHERE id=? AND status="ACTIVE" FOR UPDATE', [accountId]);
+    const [[account]] = await db.query('SELECT * FROM bank_accounts WHERE id=? AND status="ACTIVE"', [accountId]);
     if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
     const [[alreadyImported]] = await db.query('SELECT import_uid FROM statement_import_files WHERE bank_account_id=? AND content_hash=? LIMIT 1', [accountId, fileHash]);
     if (alreadyImported) throw new FinanceError(`This statement was already committed as ${alreadyImported.import_uid}.`, 409, 'DUPLICATE_STATEMENT_FILE');
