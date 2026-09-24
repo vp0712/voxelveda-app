@@ -74,7 +74,7 @@ async function dependencyScan(accountId) {
 
 async function baseTablesWithColumn(db, columnName, excluded = []) {
   const [rows] = await db.query(
-    \`SELECT DISTINCT c.TABLE_NAME AS table_name
+    `SELECT DISTINCT c.TABLE_NAME AS table_name
        FROM INFORMATION_SCHEMA.COLUMNS c
        JOIN INFORMATION_SCHEMA.TABLES t
          ON t.TABLE_SCHEMA = c.TABLE_SCHEMA
@@ -82,7 +82,7 @@ async function baseTablesWithColumn(db, columnName, excluded = []) {
       WHERE c.TABLE_SCHEMA = DATABASE()
         AND c.COLUMN_NAME = ?
         AND t.TABLE_TYPE = 'BASE TABLE'
-      ORDER BY c.TABLE_NAME\`,
+      ORDER BY c.TABLE_NAME`,
     [String(columnName)]
   );
   const blocked = new Set(excluded.map((value) => String(value)));
@@ -94,7 +94,7 @@ async function deleteByIds(db, table, column, ids) {
   if (!values.length) return 0;
   const placeholders = values.map(() => '?').join(',');
   const [result] = await db.query(
-    \`DELETE FROM \${quoteIdentifier(table)} WHERE \${quoteIdentifier(column)} IN (\${placeholders})\`,
+    `DELETE FROM ${quoteIdentifier(table)} WHERE ${quoteIdentifier(column)} IN (${placeholders})`,
     values
   );
   return Number(result?.affectedRows || 0);
@@ -131,17 +131,17 @@ async function purgeAccountData(db, accountId) {
   if (financeTransactionIds.length) {
     const journalPlaceholders = financeTransactionIds.map(() => '?').join(',');
     const [journalRows] = await db.query(
-      \`SELECT id FROM journal_entries WHERE source_transaction_id IN (\${journalPlaceholders}) FOR UPDATE\`,
+      `SELECT id FROM journal_entries WHERE source_transaction_id IN (${journalPlaceholders}) FOR UPDATE`,
       financeTransactionIds
     );
     const journalIds = journalRows.map((row) => Number(row.id)).filter(Boolean);
     add('journal_lines', await deleteByIds(db, 'journal_lines', 'journal_entry_id', journalIds));
     add('journal_entries', await deleteByIds(db, 'journal_entries', 'source_transaction_id', financeTransactionIds));
     const [unlink] = await db.query(
-      \`UPDATE finance_transactions
+      `UPDATE finance_transactions
           SET reversal_transaction_id=NULL
-        WHERE reversal_transaction_id IN (\${journalPlaceholders})
-          AND bank_account_id<>?\`,
+        WHERE reversal_transaction_id IN (${journalPlaceholders})
+          AND bank_account_id<>?`,
       [...financeTransactionIds, accountId]
     );
     if (Number(unlink?.affectedRows || 0) > 0) deleted.finance_transaction_reversal_links_cleared = Number(unlink.affectedRows);
@@ -150,13 +150,13 @@ async function purgeAccountData(db, accountId) {
   if (importUids.length) {
     const placeholders = importUids.map(() => '?').join(',');
     const [sessionRows] = await db.query(
-      \`SELECT id FROM statement_import_sessions WHERE import_uid IN (\${placeholders}) FOR UPDATE\`,
+      `SELECT id FROM statement_import_sessions WHERE import_uid IN (${placeholders}) FOR UPDATE`,
       importUids
     );
     const sessionIds = sessionRows.map((row) => Number(row.id)).filter(Boolean);
     add('statement_import_rows', await deleteByIds(db, 'statement_import_rows', 'import_session_id', sessionIds));
     const [sessions] = await db.query(
-      \`DELETE FROM statement_import_sessions WHERE import_uid IN (\${placeholders})\`,
+      `DELETE FROM statement_import_sessions WHERE import_uid IN (${placeholders})`,
       importUids
     );
     add('statement_import_sessions', sessions?.affectedRows);
@@ -168,7 +168,7 @@ async function purgeAccountData(db, accountId) {
     ...directTables.filter((table) => ['finance_transactions', 'bank_transactions'].includes(table))
   ];
   for (const table of orderedTables) {
-    const [result] = await db.query(\`DELETE FROM \${quoteIdentifier(table)} WHERE bank_account_id=?\`, [accountId]);
+    const [result] = await db.query(`DELETE FROM ${quoteIdentifier(table)} WHERE bank_account_id=?`, [accountId]);
     add(table, result?.affectedRows);
   }
 
@@ -308,9 +308,9 @@ exports.purge = async (req, res) => {
     const accountId = Number(req.params.id || 0);
     if (!accountId) throw new FinanceError('Financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
     const confirmation = String(req.body?.confirmation || '').trim();
-    if (confirmation !== \`DELETE \${accountId}\`) {
+    if (confirmation !== `DELETE ${accountId}`) {
       throw new FinanceError(
-        \`Type DELETE \${accountId} to permanently delete this account and all of its linked Finance data.\`,
+        `Type DELETE ${accountId} to permanently delete this account and all of its linked Finance data.`,
         400,
         'BANK_ACCOUNT_PURGE_CONFIRMATION_REQUIRED'
       );
