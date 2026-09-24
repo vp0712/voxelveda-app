@@ -37,6 +37,7 @@ assert.match(css,/fm-drawer/,'Transaction/account detail drawer must be styled.'
 console.log('Finance Master OS regression contract passed.');
 
 assert.match(html,/id="fmMobileNav"/,'Finance OS must provide a dedicated mobile navigation surface.');
+assert.doesNotMatch(html,/Frame 1\.png/,'Finance mobile shell must not render the old corner logo image.');
 assert.match(js,/const MOBILE_NAV=.*\['more','☰','More'\]/,'Mobile Finance navigation must include a More control.');
 assert.match(js,/function moreView\(\)/,'Mobile More must expose the full Finance module launcher.');
 assert.match(js,/No separate Banking V3\/V4\/V5 screens/,'Unified Finance OS must explicitly keep legacy banking screens out of the active launcher.');
@@ -141,7 +142,7 @@ assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control vie
 assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v\d+/,'Advanced Finance Control must use a canonical versioned asset.');
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
-assert.match(js,/const MOBILE_NAV=\[\['advanced','⚡','Control'\]/,'Mobile Finance Home must open Advanced Control.');
+assert.match(js,/const MOBILE_NAV=\[\['accounts','⌂','Accounts'\],\['transactions','▤','Transactions'\],\['statements','▥','Statements'\],\['more','•••','More'\]\]/,'Mobile Finance navigation must use the clean four-tab Accounts, Transactions, Statements and More layout.');
 
 assert.match(js,/MONTH-END CLOSE & ASSURANCE/,'Finance OS must expose the period Close & Assurance centre.');
 assert.match(js,/close-assurance/,'Finance OS must use the canonical Close Assurance API.');
