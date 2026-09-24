@@ -552,7 +552,7 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
   doc.font('Helvetica').fillColor('#0F172A').text(String(statement.transaction_count||0),446,summaryY+71,{width:94,align:'right'});
 
   doc.font('Helvetica').fontSize(7).fillColor('#64748B').text(
-    'This statement is generated from the Voxel Veda Finance ledger for the signed-in account holder. Source-bank transaction descriptions are preserved for audit accuracy. Voxel Veda branding identifies this generated document; it does not represent the source bank.',
+    'This statement is generated from the Voxel Veda Finance ledger for the signed-in account holder. Source-bank transaction descriptions are preserved for audit accuracy. Voxel Veda branding identifies this generated document; it does not represent the source bank and does not claim that Voxel Veda is an authorised deposit-taking institution.',
     42,279,{width:511}
   );
 
