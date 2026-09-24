@@ -255,6 +255,20 @@ function listenApplication() {
       });
       markReady();
       console.log(`Server ready on ${HOST}:${PORT}`);
+
+      // Never hold application readiness behind a historical data repair.
+      // The repair is exact-match + idempotent and runs after the server is usable.
+      setImmediate(() => {
+        repairKnownLegacyPdfDateRunaway()
+          .then((dateRepair) => {
+            console.log(`Finance date-integrity repair check completed: ${dateRepair.repaired}/${dateRepair.checked} targeted statement(s) corrected.`);
+          })
+          .catch((error) => {
+            addWarning(`Finance legacy PDF date-integrity repair did not complete: ${error.code || error.message}`);
+            console.error('Finance date-integrity repair failed safely:', error.code || error.message);
+          });
+      });
+
       resolve(server);
     });
   });
@@ -281,19 +295,6 @@ async function bootstrap() {
 
     setPhase('INITIALIZING_CRITICAL_SCHEMAS');
     await initializeCriticalSchemas();
-
-    // Repair only the two previously identified V4 PDF imports whose year seed
-    // ran forward by seven years. This is exact-match, idempotent and non-fatal.
-    try {
-      const dateRepair = await repairKnownLegacyPdfDateRunaway();
-      if (dateRepair.repaired) {
-        console.log(`Finance date-integrity repair completed: ${dateRepair.repaired}/${dateRepair.checked} targeted statement(s) corrected.`);
-      }
-    } catch (error) {
-      addWarning(`Finance legacy PDF date-integrity repair did not complete: ${error.code || error.message}`);
-      console.error('Finance date-integrity repair failed safely:', error.code || error.message);
-    }
-
     await refreshDatabaseAttestation(pool);
 
     setPhase('INITIALIZING_SERVICES');
