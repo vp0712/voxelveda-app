@@ -42,7 +42,7 @@ for(const key of navKeys){
 
 
 for(const source of [
- "['cashControl',API+'/cash-control']","['debtPlanner',API+'/personal-money/debt-planner']","['commitments',API+'/personal-money/commitments-control']",
+ "['cashControl',API+'/cash-control']","['debtPlanner',API+'/personal-money/debt-planner']","['commitments',API+'/personal-money/commitments-control']","['savingsReserve',API+'/personal-money/savings-control']",
  "['closeAssurance',API+'/close-assurance']","['treasuryControl',API+'/treasury-control']",
  "['performanceRisk',API+'/performance-risk-control']","['anomalyExplain',API+'/anomaly-explain-control']",
  "['planningControl',API+'/planning-control']","['jobProfitability',API+'/job-profitability'","['counterpartyControl',API+'/counterparty-control']",
@@ -50,7 +50,7 @@ for(const source of [
 ]) assert(master.includes(source),`Finance hydration source missing ${source}`);
 
 for(const route of [
- "router.get('/job-profitability'","router.get('/counterparty-control'","router.get('/cash-control'","router.get('/personal-money/debt-planner'","router.get('/personal-money/commitments-control'",
+ "router.get('/job-profitability'","router.get('/counterparty-control'","router.get('/cash-control'","router.get('/personal-money/debt-planner'","router.get('/personal-money/commitments-control'","router.get('/personal-money/savings-control'",
  "router.get('/close-assurance'","router.get('/treasury-control'","router.get('/performance-risk-control'",
  "router.get('/anomaly-explain-control'","router.get('/planning-control'","router.get('/accountant-handover'",
  "router.get('/reports/builder'","router.get('/personal-money/data-quality-integrity'","router.get('/personal-money/tax-control'"
@@ -64,6 +64,7 @@ assert(master.includes('FINANCE_HYDRATION_BATCH_SIZE=5'),'Finance hydration must
 assert(suite.includes('"finance-job-profitability-test.js"'),'Job Profitability must remain in the production regression suite.');
 assert(suite.includes('"finance-counterparty-control-test.js"'),'Counterparty Control must remain in the production regression suite.');
 assert(suite.includes('"personal-recurring-commitment-control-test.js"'),'Recurring Commitment Control must remain in the production regression suite.');
+assert(suite.includes('"personal-savings-reserve-control-test.js"'),'Savings & Reserve Control must remain in the production regression suite.');
 assert(suite.includes('"personal-tax-evidence-control-test.js"'),'Personal Tax Evidence Control must remain in the production regression suite.');
 assert(suite.includes('"finance-full-surface-acceptance-test.js"'),'Full-surface acceptance must gate production.');
 console.log('FINANCE_FULL_SURFACE_ACCEPTANCE_OK '+navKeys.length+' modules');
