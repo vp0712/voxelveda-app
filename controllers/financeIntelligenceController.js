@@ -473,8 +473,17 @@ exports.updateTransaction = async (req, res) => {
     const row = await visibleBankTransaction(id, req, db, true);
     await assertClassificationPeriodsOpen(db, [row]);
 
-    const category = String(req.body.category || '').trim().slice(0,120) || null;
-    if (category !== (row.category || null)) await assertCategoryVisible(db, req, category);
+    const category = await resolveTransactionCategory(db, req, row, req.body);
+    const categoryChanged = category !== (row.category || null);
+    let replacedSplits = [];
+    if (categoryChanged && req.body.move_whole_transaction === true) {
+      const [splitRows] = await db.query(
+        'SELECT * FROM bank_transaction_splits WHERE parent_bank_transaction_id=? ORDER BY id FOR UPDATE',
+        [id]
+      );
+      replacedSplits = splitRows || [];
+      if (replacedSplits.length) await db.query('DELETE FROM bank_transaction_splits WHERE parent_bank_transaction_id=?',[id]);
+    }
     const requestedScope = String(req.body.ownership_scope || row.ownership_scope || '').trim().toUpperCase();
     const allowedScopes = new Set(['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
     if (!allowedScopes.has(requestedScope)) throw new FinanceError('Choose Personal, Business, Mixed or Needs owner.', 400, 'INVALID_TRANSACTION_SCOPE');
@@ -493,6 +502,7 @@ exports.updateTransaction = async (req, res) => {
     if (hasOwn(req.body, 'ignored') && ignored && ignoredReason.length < 3) throw new FinanceError('Add a short reason before excluding a transaction from reports.', 400, 'IGNORE_REASON_REQUIRED');
     const reconciliationStatus = ignored ? 'IGNORED' : (hasOwn(req.body, 'ignored') && row.reconciliation_status === 'IGNORED' ? 'UNRECONCILED' : row.reconciliation_status);
     const rememberRule = req.body.remember_rule === true;
+    const learnMerchant = req.body.learn_merchant === true;
     const merchantNormalized = hasOwn(req.body, 'merchant_normalized') ? cleanMerchant(req.body.merchant_normalized) || null : row.merchant_normalized;
     const projectRef = hasOwn(req.body, 'project_ref') ? String(req.body.project_ref || '').trim().slice(0, 120) || null : row.project_ref;
     const tags = hasOwn(req.body, 'tags') ? normalizeTags(req.body.tags) : bulkValue(row, 'tags');
