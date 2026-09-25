@@ -19,6 +19,10 @@ for(const name of ['Overview','My Money','Company Finance','Consolidated','Accou
 assert.match(js,/banking-dashboard/,'Finance OS must use real banking dashboard data.');
 assert.match(js,/I\+'\/transactions'/,'Finance OS must use the real transaction explorer endpoint.');
 assert.match(js,/I\+'\/statements'/,'Finance OS must use the real statement vault endpoint.');
+assert.match(js,/data-statement-edit/,'Committed Statement Vault rows must expose an edit action after Pending Review.');
+assert.match(js,/function openStatementVaultEditor\(/,'Statement Vault edit action must open the committed statement transaction editor.');
+assert.match(js,/data-statement-edit-tx/,'Committed statement editor must drill into editable linked transactions.');
+assert.match(js,/method:'DELETE',body:JSON\.stringify\(\{confirmation:typed\}\)/,'Permanent statement purge must call the DELETE route.');
 assert.match(js,/bank-transactions\/'\+id\+'\/original/,'Transaction detail must surface immutable original bank data.');
 assert.match(js,/I\+'\/transactions'/,'Manual transaction workflow must write to the canonical bank transaction ledger API.');
 assert.match(js,/relationship-candidates\/transfers/,'Transfer review must use the canonical relationship candidate API.');
