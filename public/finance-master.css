@@ -459,3 +459,33 @@ body[data-finance-view="advanced"] .fm-filterbar label:focus-within{
  .fm-category-drilldown-totals{display:grid;grid-template-columns:1fr 1fr;justify-content:stretch}
  .fm-category-drilldown-totals>span{min-width:0;text-align:left}
 }
+
+
+/* Per-account category charts */
+.fm-account-category-chart{margin-top:12px;padding:13px;border:1px solid #dfe9f4;border-radius:16px;background:linear-gradient(180deg,#fbfdff,#f6faff)}
+.fm-account-category-chart.compact{margin:2px 0 12px;padding:11px 12px}
+.fm-account-category-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end}
+.fm-account-category-head h4{margin:2px 0 0;font-size:.82rem}
+.fm-account-category-head small{display:block;color:var(--muted);font-size:.52rem}
+.fm-account-category-head>div:last-child{text-align:right;white-space:nowrap}
+.fm-account-category-head>div:last-child b{display:block;font-size:.78rem}
+.fm-account-category-scroll{display:flex;align-items:flex-end;gap:8px;overflow-x:auto;padding:12px 1px 3px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.fm-account-category-column{flex:0 0 82px;display:grid;grid-template-rows:auto 112px auto auto;align-items:end;gap:4px;border:0;background:transparent;color:inherit;padding:0;cursor:pointer;text-align:center;touch-action:manipulation}
+.fm-account-category-chart.compact .fm-account-category-column{flex-basis:72px;grid-template-rows:auto 82px auto auto}
+.fm-account-category-value{font-size:.56rem;font-weight:900;white-space:nowrap}
+.fm-account-category-barbox{height:112px;display:flex;align-items:flex-end;justify-content:center}
+.fm-account-category-chart.compact .fm-account-category-barbox{height:82px}
+.fm-account-category-barbox i{display:block;width:36px;min-height:3px;border-radius:9px 9px 4px 4px;background:linear-gradient(180deg,#1f8fff,#0b62d5);box-shadow:0 7px 16px rgba(8,119,255,.14)}
+.fm-account-category-chart.compact .fm-account-category-barbox i{width:30px}
+.fm-account-category-name{font-size:.55rem;font-weight:850;line-height:1.15;overflow-wrap:anywhere}
+.fm-account-category-column small{font-size:.48rem;color:var(--muted)}
+.fm-account-category-column:active .fm-account-category-barbox i,.fm-account-category-column:focus-visible .fm-account-category-barbox i{filter:brightness(.9)}
+@media(max-width:700px){
+ .fm-account-category-head{align-items:flex-start}
+ .fm-account-category-head>div:last-child{font-size:.9rem}
+ .fm-account-category-scroll{margin-right:-4px}
+ .fm-account-category-column{flex-basis:76px;grid-template-rows:auto 98px auto auto}
+ .fm-account-category-barbox{height:98px}
+ .fm-account-category-chart.compact .fm-account-category-column{flex-basis:68px;grid-template-rows:auto 76px auto auto}
+ .fm-account-category-chart.compact .fm-account-category-barbox{height:76px}
+}
