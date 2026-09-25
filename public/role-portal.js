@@ -175,5 +175,9 @@
     }, 250);
   }
 
-  document.addEventListener('DOMContentLoaded', applyRoleExperience);
+  document.addEventListener('DOMContentLoaded', () => {
+    applyRoleExperience();
+    window.setTimeout(applyRoleExperience, 300);
+    window.setTimeout(applyRoleExperience, 900);
+  });
 })();
