@@ -228,6 +228,7 @@ router.post('/intelligence/transactions/bulk/review', requireAnyPermission('EDIT
 router.post('/intelligence/transactions/bulk/category', requireAnyPermission('EDIT_FINANCE'), intelligence.bulkCategorizeTransactions);
 router.get('/intelligence/statements', requireAnyPermission('VIEW_BANKING'), intelligence.getStatementLibrary);
 router.get('/intelligence/statements/:uid/report', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), intelligence.getStatementReport);
+router.post('/intelligence/statements/:uid/transactions/:transactionId/correct', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementData.correctPostedTransaction);
 router.get('/intelligence/statements-removed', requireAnyPermission('VIEW_BANKING'), statementData.listRemoved);
 router.post('/intelligence/statements/:uid/remove', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('DELETE_BANK_STATEMENT'), statementData.remove);
 router.post('/intelligence/statements/:uid/restore', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('RESTORE_BANK_STATEMENT'), statementData.restore);
