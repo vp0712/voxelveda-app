@@ -443,3 +443,19 @@ body[data-finance-view="advanced"] .fm-filterbar label:focus-within{
  .fm-vault-editor-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:none;margin-top:0}
  .fm-vault-editor-actions button{width:100%;min-width:0;min-height:42px;white-space:normal}
 }
+
+
+/* Category chart drill-down context */
+.fm-category-drilldown-summary{display:flex;justify-content:space-between;gap:14px;align-items:center;margin:12px 0;padding:14px;border:1px solid #dce8f5;border-radius:16px;background:linear-gradient(135deg,#f7fbff,#eef7ff)}
+.fm-category-drilldown-summary>div:first-child{min-width:0;display:grid;gap:3px}
+.fm-category-drilldown-summary>div:first-child>strong{font-size:1.05rem;overflow-wrap:anywhere}
+.fm-category-drilldown-summary>div:first-child>small{color:var(--muted);font-size:.6rem}
+.fm-category-drilldown-totals{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.fm-category-drilldown-totals>span{min-width:105px;padding:9px 11px;border:1px solid #dbe7f3;border-radius:12px;background:#fff;text-align:right}
+.fm-category-drilldown-totals b,.fm-category-drilldown-totals small{display:block}
+.fm-category-drilldown-totals b{font-size:.8rem}.fm-category-drilldown-totals small{margin-top:2px;color:var(--muted);font-size:.52rem}
+@media(max-width:700px){
+ .fm-category-drilldown-summary{display:grid;grid-template-columns:1fr;align-items:start}
+ .fm-category-drilldown-totals{display:grid;grid-template-columns:1fr 1fr;justify-content:stretch}
+ .fm-category-drilldown-totals>span{min-width:0;text-align:left}
+}
