@@ -612,7 +612,7 @@ exports.updateTransaction = async (req, res) => {
     await db.commit();
     const updated = await visibleBankTransaction(id, req);
     return res.json({
-      message: learnMerchant && category
+      message: learnedRule?.saved && category
         ? 'Transaction moved and this exact merchant was learned for future automatic categorisation.'
         : rememberRule && category
           ? 'Transaction updated and merchant suggestion rule saved.'
