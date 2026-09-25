@@ -542,7 +542,7 @@ exports.updateTransaction = async (req, res) => {
       learnedRule = await upsertExactAutoCategoryRule(db, {
         userId: req.user.id,
         category,
-        ownershipScope: canOverrideScope ? nextScope : null,
+        ownershipScope: nextScope,
         merchant_normalized: merchantNormalized,
         merchant_name: row.merchant_name,
         description: row.description,
