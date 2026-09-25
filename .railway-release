@@ -1,5 +1,5 @@
 finance-release: 20260925-secure-statement-ingestion-v26
-source-commit: a10ce31e8ccbf1c6e9d0d55a323b4dc3fa6dcda4
+source-commit: 7c16cca17c9cb93b3eef97a2f9224da7867b8e76
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build
