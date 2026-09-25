@@ -747,6 +747,7 @@ exports.getStatementReport = async (req, res) => {
       merchants: merchantRows,
       monthly: monthlyRows,
       transactions: transactionRows,
+      transactions_included: includeTransactions,
       split_policy: 'Split child categories replace the parent category allocation for reporting; the source bank transaction stays immutable.',
       refund_policy: 'Linked refund cash inflow is separated and reduces net economic expense.',
       legacy_linkage: Number(statement.imported_rows || 0) > 0 && transactionRows.length === 0
@@ -757,6 +758,7 @@ exports.getSpendingReport = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const filters = spendingWhere(req);
+    const includeTransactions=String(req.query.include_transactions??'1')!=='0';
     const [summaryByCurrency, categories, merchantRows, accountRows, accountCategoryRows, monthlyRows, weekdayRows, transactionRows, manualRows] = await Promise.all([
       trustedTotals.cashTotalsByCurrency(pool, filters.where, filters.params),
       trustedTotals.categorySpendByCurrency(pool, filters.where, filters.params, 200),
@@ -810,7 +812,7 @@ exports.getSpendingReport = async (req, res) => {
           GROUP BY bt.currency,DAYNAME(bt.transaction_date),WEEKDAY(bt.transaction_date)
           ORDER BY bt.currency,weekday_index`, filters.params
       ).then(([rows]) => rows),
-      pool.query(
+      includeTransactions ? pool.query(
         `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,
                 bt.currency,bt.ownership_scope,bt.reconciliation_status,bt.source_type,bt.statement_import_uid,
                 bt.manual_override,bt.is_internal_transfer,ba.nickname AS account_name,sif.original_name AS statement_name
@@ -818,7 +820,7 @@ exports.getSpendingReport = async (req, res) => {
            LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
           WHERE ${filters.where}
           ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 5000`, filters.params
-      ).then(([rows]) => rows),
+      ).then(([rows]) => rows) : Promise.resolve([]),
       pool.query(
         `SELECT bt.currency,SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
