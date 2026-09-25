@@ -281,6 +281,7 @@ router.post('/intelligence/insights/:id/apply', requireAnyPermission('EDIT_FINAN
 router.post('/intelligence/insights/:id/dismiss', requireAnyPermission('EDIT_FINANCE'), financePrivacy.insightParam('id'), transactionIntelligence.dismissInsight);
 router.get('/intelligence/rules', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getRules);
 router.post('/intelligence/rules/:id', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.updateRule);
+router.post('/intelligence/rules/:id/apply-history', requireAnyPermission('EDIT_FINANCE'), requireStepUp('APPLY_FINANCE_INTELLIGENCE'), transactionIntelligence.applyRuleHistory);
 router.delete('/intelligence/rules/:id', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.deleteRule);
 router.get('/intelligence/reconciliation', requireAnyPermission('VIEW_BANKING'), reconciliationCenter.getCenter);
 router.get('/intelligence/reconciliation/:id/candidates', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), reconciliationCenter.getCandidates);
