@@ -1,5 +1,5 @@
-finance-release: 20260926-smart-category-intelligence-v34
-source-commit: 4439321795bfd9acef98b75ad70eadb13b6495bc
+finance-release: 20260926-smart-category-intelligence-v34-r1
+source-commit: 4877e564b324e6d35fecd0024558c850296f8675
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build
