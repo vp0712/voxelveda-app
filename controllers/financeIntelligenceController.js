@@ -348,10 +348,10 @@ function bulkRowChanges(row, changes) {
   return delta;
 }
 
-async function assertCategoryVisible(db, req, category) {
-  if (!category) return;
+async function assertCategoryVisible(db, req, category, accountScope = null) {
+  if (!category) return null;
   const [[row]] = await db.query(
-    `SELECT id FROM finance_system_categories c
+    `SELECT id,name,scope FROM finance_system_categories c
       WHERE c.name=? AND c.active=1 AND c.archived_at IS NULL
         AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL)
           OR (c.scope='PERSONAL' AND c.owner_user_id=?))
@@ -359,13 +359,22 @@ async function assertCategoryVisible(db, req, category) {
     [category, privacy.userId(req)]
   );
   if (!row) throw new FinanceError('Choose an active Finance category available to this user.', 400, 'FINANCE_CATEGORY_NOT_AVAILABLE');
+  const account = String(accountScope || '').toUpperCase();
+  const categoryScope = String(row.scope || 'BOTH').toUpperCase();
+  if (account === 'PERSONAL' && !['PERSONAL','BOTH'].includes(categoryScope)) {
+    throw new FinanceError('Choose a Personal or Both category for this Personal account.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+  }
+  if (account === 'BUSINESS' && !['BUSINESS','BOTH'].includes(categoryScope)) {
+    throw new FinanceError('Choose a Business or Both category for this Company account.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+  }
+  return row;
 }
 
 async function resolveTransactionCategory(db, req, row, body = {}) {
   const createName = String(body.create_category_name || '').trim().slice(0, 120);
   let targetCategory = String(body.category || '').trim().slice(0, 120) || null;
   if (!createName) {
-    if (targetCategory !== (row.category || null)) await assertCategoryVisible(db, req, targetCategory);
+    if (targetCategory !== (row.category || null)) await assertCategoryVisible(db, req, targetCategory, row.account_scope);
     return targetCategory;
   }
   if (createName.length < 2) throw new FinanceError('New category name must be at least 2 characters.', 400, 'CATEGORY_NAME_REQUIRED');
