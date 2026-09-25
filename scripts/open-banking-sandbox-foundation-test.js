@@ -16,6 +16,14 @@ expect(service,'BANK_DATA_LIVE_SYNC_ENABLED','Explicit production live-sync lock
 expect(service,'https://consent.basiq.io/home','Basiq consent UI endpoint missing');
 expect(service,'BANK_DATA_API_KEY','Basiq API key configuration missing');
 
+const sync=read('services/advancedBankingSyncService.js');
+const bankCategory=read('services/financeBankCategoryService.js');
+expect(sync,"suggestConnectedBankCategory",'Connected-bank sync must normalise provider categories before posting them.');
+expect(sync,"bankCategory.category ? 'CLASSIFIED' : 'UNCLASSIFIED'",'Connected-bank sync must classify only mapped categories and leave uncertain items unclassified.');
+expect(bankCategory,'BANK_PROVIDER_CATEGORY_MAPPED','Bank category normaliser must distinguish mapped provider evidence.');
+expect(bankCategory,'UNCLASSIFIED','Unknown connected-bank categories must fail safely to Unclassified.');
+expect(bankCategory,'Fuel & Vehicle','Bank category normaliser must support the canonical fuel category.');
+
 const controller=read('controllers/openBankingController.js');
 expect(controller,"environment() === 'PRODUCTION' && !liveSyncEnabled()",'Production Open Banking must fail closed');
 expect(controller,'PROVIDER_ADAPTER_NOT_READY','Unimplemented provider adapters must fail closed');
