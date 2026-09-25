@@ -19,7 +19,8 @@ const SOURCES=[
   ['company','/api/finance/company-summary'],
   ['command','/api/finance/banking-os/command-center'],
   ['quality','/api/finance/intelligence/data-quality'],
-  ['spending',()=>'/api/finance/intelligence/reports/spending'+advancedFilterQuery()],
+  ['spending',()=>'/api/finance/intelligence/reports/spending'+advancedFilterQuery()+'&include_transactions=0'],
+  ['categories','/api/finance/categories?include_archived=false'],
   ['issues','/api/finance/issues'],
   ['receipts','/api/finance/receipts'],
   ['cashCustody','/api/finance/cash-control/custody'],
@@ -464,16 +465,22 @@ function executive(){
 }
 
 function categorySpendingControl(){
- const data=state.data.spending||{},accounts=Array.isArray(data.accounts)?data.accounts:[],allCategories=Array.isArray(data.categories)?data.categories:[],accountCategories=Array.isArray(data.account_categories)?data.account_categories:[];
+ const data=state.data.spending||{},accounts=Array.isArray(data.accounts)?data.accounts:[],allCategories=Array.isArray(data.categories)?data.categories:[],accountCategories=Array.isArray(data.account_categories)?data.account_categories:[],categoryDefinitions=(state.data.categories?.categories||[]).filter(item=>Number(item.active??1)!==0&&!item.archived_at);
+ const categoryNames=[...new Set(categoryDefinitions.map(item=>String(item.name||'').trim()).filter(Boolean))];
  const visibleIds=new Set(accounts.map(a=>String(a.bank_account_id)));
  if(state.categoryChartAccount!=='ALL'&&!visibleIds.has(String(state.categoryChartAccount)))state.categoryChartAccount='ALL';
  const selected=state.categoryChartAccount;
  const rows=(selected==='ALL'?allCategories:accountCategories.filter(row=>String(row.bank_account_id)===String(selected))).map(row=>({...row,spent:num(row.spent),source_transaction_count:num(row.source_transaction_count||row.transaction_count)}));
- const currencies=[...new Set(rows.map(row=>String(row.currency||'AUD').toUpperCase()))];
+ const selectedAccounts=selected==='ALL'?accounts:accounts.filter(a=>String(a.bank_account_id)===String(selected));
+ const currencies=[...new Set([...rows.map(row=>String(row.currency||'AUD').toUpperCase()),...selectedAccounts.map(a=>String(a.currency||'AUD').toUpperCase())])];
  const tabs='<div class="fac-category-account-tabs"><button type="button" data-fac-category-account="ALL" class="'+(selected==='ALL'?'active':'')+'">All visible accounts</button>'+accounts.map(a=>'<button type="button" data-fac-category-account="'+esc(a.bank_account_id)+'" class="'+(String(selected)===String(a.bank_account_id)?'active':'')+'">'+esc(a.account_name||'Account')+'</button>').join('')+'</div>';
  const charts=currencies.map(cur=>{
-  const cats=rows.filter(row=>String(row.currency||'AUD').toUpperCase()===cur).sort((a,b)=>num(b.spent)-num(a.spent));
-  const max=Math.max(1,...cats.map(x=>num(x.spent))),total=cats.reduce((sum,x)=>sum+num(x.spent),0),count=cats.reduce((sum,x)=>sum+num(x.source_transaction_count),0);
+  const actual=rows.filter(row=>String(row.currency||'AUD').toUpperCase()===cur);
+  const byCategory=new Map(actual.map(row=>[String(row.category||'Unclassified'),row]));
+  for(const name of categoryNames)if(!byCategory.has(name))byCategory.set(name,{category:name,currency:cur,spent:0,source_transaction_count:0});
+  if(!byCategory.has('Unclassified'))byCategory.set('Unclassified',{category:'Unclassified',currency:cur,spent:0,source_transaction_count:0});
+  const cats=[...byCategory.values()].sort((a,b)=>num(b.spent)-num(a.spent)||String(a.category).localeCompare(String(b.category)));
+  const max=Math.max(1,...cats.map(x=>num(x.spent))),total=actual.reduce((sum,x)=>sum+num(x.spent),0),count=actual.reduce((sum,x)=>sum+num(x.source_transaction_count),0);
   const columns=cats.map(x=>{
    const height=Math.max(3,Math.min(100,(num(x.spent)/max)*100));
    const effectiveAccount=selected==='ALL'?(data.filters?.account_id||''):selected;
@@ -482,7 +489,7 @@ function categorySpendingControl(){
   return '<article class="fac-category-currency"><div class="fac-category-currency-head"><div><h4>'+esc(cur)+' spending by category</h4><span>'+num(count)+' category-linked transaction(s)</span></div><strong>'+money(total,cur)+'</strong></div><div class="fac-category-scroll">'+(columns||'<div class="fac-empty">No category spending for this selection.</div>')+'</div></article>';
  }).join('');
  const period=data.filters?.from||data.filters?.to?(' · '+esc(data.filters?.from||'start')+' to '+esc(data.filters?.to||'today')):' · all available history';
- return '<section id="facCategories" class="fac-section"><header><div><h3>Category Spending Chart</h3><p>Every category is calculated from the canonical ledger'+period+'. Select an account, then tap any column to open every matching transaction and its total.</p></div><span class="fac-source">'+num(rows.length)+' category bucket(s)</span></header>'+tabs+'<div class="fac-grid">'+(charts||'<div class="fac-empty">No expense categories are available for the selected filters.</div>')+'</div><div class="fac-note" style="margin-top:10px">Manual transaction/category changes are reflected from the same ledger. Connected-bank categories are only normalised when the bank/provider evidence maps cleanly to a canonical Finance category; uncertain items stay Unclassified instead of being forced into the wrong category.</div></section>';
+ return '<section id="facCategories" class="fac-section"><header><div><h3>Category Spending Chart</h3><p>Every category is calculated from the canonical ledger'+period+'. Select an account, then tap any column to open every matching transaction and its total.</p></div><span class="fac-source">'+num(categoryNames.length||rows.length)+' configured categories</span></header>'+tabs+'<div class="fac-grid">'+(charts||'<div class="fac-empty">No expense categories are available for the selected filters.</div>')+'</div><div class="fac-note" style="margin-top:10px">Manual transaction/category changes are reflected from the same ledger. Connected-bank categories are only normalised when the bank/provider evidence maps cleanly to a canonical Finance category; uncertain items stay Unclassified instead of being forced into the wrong category.</div></section>';
 }
 
 function executiveReadinessBoard(){
