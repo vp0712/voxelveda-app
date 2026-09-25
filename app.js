@@ -125,11 +125,11 @@ function portalPathForRequestUser(user){
   return '/portal/staff';
 }
 function serveRolePortal(req,res){
-  const role=String(req.user?.role||'staff').trim().toLowerCase();
   const requested=String(req.params?.role||'').trim().toLowerCase();
   const expected=portalPathForRequestUser(req.user);
   if(expected==='/admin'||expected==='/client')return res.redirect(302,expected);
-  if(requested!==role)return res.redirect(302,expected);
+  const expectedRole=expected.split('/').filter(Boolean).pop()||'staff';
+  if(requested!==expectedRole)return res.redirect(302,expected);
   res.type('html');return res.send(brandedPage('staff-dashboard.html'));
 }
 app.get('/',sendPage('index.html'));app.get('/login',noIndex,sendPage('login.html'));app.get('/register',noIndex,sendPage('register.html'));app.get('/request-quote',sendPage('customer.html'));app.get('/privacy',sendPage('privacy-policy.html'));app.get('/terms',sendPage('terms.html'));app.get('/support',sendPage('support.html'));app.get('/careers',sendPage('careers.html'));app.get('/employee/verify/:token',noIndex,sendPage('employee-verify.html'));app.get('/careers-admin',noIndex,pageAuth(),sendPage('careers-admin.html'));app.get('/forgot-password',noIndex,sendPage('forgot-password.html'));app.get('/reset-password',noIndex,sendPage('reset-password.html'));app.get('/accept-invite',noIndex,sendPage('accept-invite.html'));app.get('/mfa',noIndex,sendPage('mfa.html'));app.get('/security',noIndex,pageAuth({allowMfaSetup:true}),sendPage('security.html'));app.get('/attendance-terminal',noIndex,sendPage('shift-qr.html'));app.get('/401',noIndex,sendPage('401.html',401));app.get('/403',noIndex,sendPage('403.html',403));app.get('/404',noIndex,sendPage('404.html',404));app.get('/429',noIndex,sendPage('429.html',429));app.get('/500',noIndex,sendPage('500.html',500));app.get('/maintenance',noIndex,sendPage('maintenance.html',503));
