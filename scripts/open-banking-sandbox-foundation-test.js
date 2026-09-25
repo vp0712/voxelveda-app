@@ -23,7 +23,11 @@ expect(sync,"findExactAutoCategoryRule",'Connected-bank sync must consult learne
 expect(sync,"const resolvedCategory = learnedRule?.category || bankCategory.category || null",'Learned merchant categories must outrank provider category guesses.');
 expect(sync,"resolvedCategory ? 'CLASSIFIED' : 'UNCLASSIFIED'",'Connected-bank sync must classify only resolved categories and leave uncertain items unclassified.');
 expect(sync,"manual_override=0",'Connected-bank learning must never overwrite a manual category move.');
-expect(sync,"'OPEN_BANKING',?,?,?,?,currency,ownership_scope,?, ?,0,NOW(),NOW(),?,?,?,?,?,?",'Connected-bank INSERT must keep provider fields aligned with canonical transaction columns.');
+expect(sync,"c.scope AS category_scope",'Connected-bank learned rules must carry managed category scope.');
+expect(sync,"account_scope: localAccountScope",'Connected-bank learned rules must be checked against the destination account scope.');
+expect(sync,"const resolvedScope =", 'Connected-bank sync must resolve transaction ownership from a compatible learned rule.');
+expect(sync,"ownership_scope=IF(?=1,?,ownership_scope)",'A learned rule may update ownership only when the rule safely overrides the provider guess.');
+expect(sync,"currency,?, ?, ?,0,NOW(),NOW()",'Connected-bank INSERT must write the resolved ownership scope and category into canonical transaction columns.');
 expect(bankCategory,'BANK_PROVIDER_CATEGORY_MAPPED','Bank category normaliser must distinguish mapped provider evidence.');
 expect(bankCategory,'UNCLASSIFIED','Unknown connected-bank categories must fail safely to Unclassified.');
 expect(bankCategory,'Fuel & Vehicle','Bank category normaliser must support the canonical fuel category.');
