@@ -2658,14 +2658,15 @@ async function openTransactionCategoryMove(id,transaction){
   if(!categories.length){const payload=await api(API+'/categories?include_archived=false');categories=payload?.categories||[];}
   const current=String(transaction.category||'');
   const accountScope=String(transaction.account_scope||transaction.ownership_scope||'').toUpperCase();
+  categories=categories.filter(cat=>{const scope=String(cat.scope||'BOTH').toUpperCase();return accountScope==='PERSONAL'?['PERSONAL','BOTH'].includes(scope):accountScope==='BUSINESS'?['BUSINESS','BOTH'].includes(scope):true});
   const defaultScope=accountScope==='PERSONAL'?'PERSONAL':accountScope==='BUSINESS'?'BUSINESS':'BOTH';
   $('fmModalEyebrow').textContent='SMART CATEGORY MOVE';
   $('fmModalTitle').textContent='Move transaction to category';
   $('fmModalBody').innerHTML=`<form id="transactionCategoryMoveForm" class="fm-form">
    <div class="fm-state"><strong>Current category: ${esc(current||'Unclassified')}</strong><p>This is a whole-transaction move. After saving, the transaction will no longer count in the old category. Existing split-category allocations, if any, are replaced.</p></div>
-   <label>Move to existing category<select name="category"><option value="">Choose category</option>${categories.map(cat=>`<option value="${esc(cat.name)}" ${cat.name===current?'selected':''}>${esc(cat.name)} · ${esc(cat.scope||'BOTH')}</option>`).join('')}</select></label>
+   <label>Move to existing category<select name="category"><option value="">Choose category</option><option value="__UNCLASSIFIED__">Unclassified / needs review</option>${categories.map(cat=>`<option value="${esc(cat.name)}" ${cat.name===current?'selected':''}>${esc(cat.name)} · ${esc(cat.scope||'BOTH')}</option>`).join('')}</select></label>
    <div class="fm-or-divider"><span>or create a new category</span></div>
-   <div class="fm-form-grid"><label>New category name<input name="create_category_name" maxlength="120" placeholder="e.g. Vehicle Repairs"></label><label>New category scope<select name="create_category_scope"><option value="PERSONAL" ${defaultScope==='PERSONAL'?'selected':''}>PERSONAL</option><option value="BUSINESS" ${defaultScope==='BUSINESS'?'selected':''}>BUSINESS</option><option value="BOTH" ${defaultScope==='BOTH'?'selected':''}>BOTH</option></select></label></div>
+   <div class="fm-form-grid"><label>New category name<input name="create_category_name" maxlength="120" placeholder="e.g. Vehicle Repairs"></label><label>New category scope<select name="create_category_scope">${accountScope!=='BUSINESS'?`<option value="PERSONAL" ${defaultScope==='PERSONAL'?'selected':''}>PERSONAL</option>`:''}${accountScope!=='PERSONAL'?`<option value="BUSINESS" ${defaultScope==='BUSINESS'?'selected':''}>BUSINESS</option>`:''}<option value="BOTH" ${defaultScope==='BOTH'?'selected':''}>BOTH</option></select></label></div>
    <label class="fm-check"><input name="learn_merchant" type="checkbox" checked> Learn this exact merchant for future transactions</label>
    <p class="fm-helper">Learning uses an exact normalised merchant match. Future statement imports and connected-bank transactions can use this category automatically. Manual moves remain authoritative and are not overwritten by bank sync.</p>
    <div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Move transaction</button></div>
@@ -2673,8 +2674,8 @@ async function openTransactionCategoryMove(id,transaction){
   $('fmModal').showModal();
   document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close(),{once:true});
   $('transactionCategoryMoveForm').onsubmit=async e=>{
-   e.preventDefault();const form=e.currentTarget,fd=new FormData(form),newName=String(fd.get('create_category_name')||'').trim(),selected=String(fd.get('category')||'').trim();
-   if(!newName&&!selected){notice('Choose an existing category or enter a new category name.',true);return}
+   e.preventDefault();const form=e.currentTarget,fd=new FormData(form),newName=String(fd.get('create_category_name')||'').trim(),selectedRaw=String(fd.get('category')||'').trim(),selected=selectedRaw==='__UNCLASSIFIED__'?'':selectedRaw;
+   if(!newName&&!selectedRaw){notice('Choose an existing category or enter a new category name.',true);return}
    const submit=form.querySelector('button[type="submit"]');submit.disabled=true;submit.textContent='Moving…';
    try{
     const result=await api(I+'/transactions/'+encodeURIComponent(id),{method:'POST',body:JSON.stringify({
