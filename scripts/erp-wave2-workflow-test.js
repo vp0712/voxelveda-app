@@ -51,7 +51,7 @@ assert(sla.includes('WORKFLOW_SLA_${eventType}'), 'automated SLA events must be 
 assert(server.includes('startWorkflowSlaScheduler'), 'workflow SLA scheduler must start with the server');
 assert(app.includes("app.use('/api/workflows'"), 'workflow API must be mounted');
 assert(app.includes("app.get('/approvals'"), 'the universal approvals route must be available');
-assert(app.includes("['admin','super_admin'].includes"), 'the approvals route must keep non-admin reviewers in the staff portal');
+assert(app.includes('const portal=portalPathForRequestUser(req.user)'), 'the approvals route must preserve role-aware portal routing');
 
 assert(adminHtml.includes('data-workflow-portal="admin"'), 'admin My Approvals view must exist');
 assert(staffHtml.includes('data-workflow-portal="staff"'), 'staff My Approvals view must exist');

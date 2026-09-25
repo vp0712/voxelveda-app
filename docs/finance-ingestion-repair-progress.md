@@ -5,7 +5,8 @@ Last updated: 2026-09-26 (Australia/Sydney)
 ## Current Git release
 
 - Original baseline commit: `2a636bb856318aa9202da31ba47abce372a1f815` (`Release Finance Control v14 to Railway`).
-- Production release commit: `5fa7461ad50a24860591e7477522e9123a99a0e4` (`Release Finance v26 migration retry hotfix`).
+- Current live production commit: `d609cad2bebe4e557b89ce2e9d60a3215f5857b0` (`Release scope-safe smart categorisation v35`), which includes the Finance v26 ingestion release.
+- Finance v26 rollout commit: `5fa7461ad50a24860591e7477522e9123a99a0e4` (`Release Finance v26 migration retry hotfix`).
 - Primary release PR: #254; production migration recovery PRs: #255, #256, #257 and #258.
 - Finance v25 baseline incorporated before the v26 release: `d7b8c694bf85598137baf0f21380f4120387fb3a` (`Release Finance statement date integrity v25 r2`).
 - Ingestion implementation commit: `e07fd9b`; v25 integration commit: `9d96bab`.
@@ -113,7 +114,7 @@ Last updated: 2026-09-26 (Australia/Sydney)
 
 ## Deployment status
 
-- Finance statement ingestion v26 is live in Railway production at deployment `dee1cf41-3eee-4bb3-b213-1506685c7977` from main SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
+- Finance statement ingestion v26 remains live in Railway production within deployment `0f25b30e-3bca-42cf-ba8a-77488390c90e` from main SHA `d609cad2bebe4e557b89ce2e9d60a3215f5857b0`; its original successful rollout was deployment `dee1cf41-3eee-4bb3-b213-1506685c7977` from SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
 - The first rollout correctly failed closed on MySQL-incompatible `ADD COLUMN IF NOT EXISTS`. The hotfix replaced it with guarded dynamic DDL and added a compatibility regression.
 - The next rollout exposed a failed-migration checksum retry deadlock. The runner now permits corrected checksum replacement only for incomplete `FAILED`/`RUNNING` entries; `APPLIED`/`BASELINED` migrations remain immutable.
 - The corrected migration applied in 6745 ms and the ledger reports schema `20260925_finance_ingestion_pipeline` with 77 migrations verified.
@@ -121,7 +122,7 @@ Last updated: 2026-09-26 (Australia/Sydney)
 ## Current local verification
 
 - `npm run lint`: PASS (189 JavaScript files).
-- `npm run build`: PASS after the v25 merge (53 Finance production checks, including generated real-file OCR/parser cases).
+- `npm run build`: PASS on current main (54 Finance production checks, including generated real-file OCR/parser cases).
 - `npm test`: PASS (complete application, security, ERP and Finance suite).
 - `npm audit --omit=dev --audit-level=high`: PASS (0 vulnerabilities).
 - Real formats proven: CSV, XLSX, OFX, QFX, QIF, selectable-text PDF, PNG OCR, scanned-PDF OCR and password-protected PDF.
@@ -130,7 +131,7 @@ Last updated: 2026-09-26 (Australia/Sydney)
 ## Production verification evidence
 
 - `/api/health`: HTTP 200 after the backend became ready.
-- `/api/ready`: HTTP 200, `ready: true`, schema `20260925_finance_ingestion_pipeline`, deployment SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
+- `/api/ready`: HTTP 200, `ready: true`, schema `20260925_finance_ingestion_pipeline`, deployment SHA `d609cad2bebe4e557b89ce2e9d60a3215f5857b0`.
 - `finance_ingestion_worker`, background workers, migrations, Finance schema, database and all other critical services report `OPERATIONAL`.
 - Runtime evidence verifies Redis rate limiting, ClamAV malware scanning, Railway S3 private object storage and the least-privileged `voxelveda_app` database identity.
 - The deployed Finance client contains multipart durable upload, job polling, password/mapping recovery, protected review and original-statement evidence paths. Both ingestion paths reject unauthenticated calls with HTTP 401.
