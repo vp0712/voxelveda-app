@@ -125,10 +125,9 @@
     config.cards.forEach(([kicker,title,desc,sectionId,permissionClass]) => {
       const button = document.createElement('button');
       button.type='button';
-      button.className = `role-command-card permission-${permissionClass}`;
+      button.className = `role-command-card permission-${permissionClass} hidden-section`;
       button.innerHTML = `<span>${kicker}</span><strong>${title}</strong><small>${desc}</small>`;
       button.addEventListener('click',()=>openSection(sectionId));
-      if (!hasVisibleTarget(sectionId)) button.hidden = true;
       grid.appendChild(button);
     });
   }
@@ -169,9 +168,6 @@
     buildRolePanel(config);
     window.setTimeout(() => {
       if (typeof window.applyPermissionUI === 'function') window.applyPermissionUI();
-      document.querySelectorAll('#roleCommandGrid .role-command-card').forEach((card)=>{
-        if (card.classList.contains('hidden-section')) card.hidden=true;
-      });
     }, 250);
   }
 
