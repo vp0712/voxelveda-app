@@ -7,6 +7,7 @@ const operations = require('../controllers/financeOperationsController');
 const intelligence = require('../controllers/financeIntelligenceController');
 const bankAccountLifecycle = require('../controllers/bankAccountLifecycleController');
 const statementReview = require('../controllers/statementImportController');
+const statementIngestion = require('../controllers/financeStatementIngestionController');
 const statementData = require('../controllers/statementDataManagementController');
 const transactionIntelligence = require('../controllers/financeTransactionIntelligenceController');
 const reconciliationCenter = require('../controllers/financeReconciliationCenterController');
@@ -59,9 +60,9 @@ const { requireAnyPermission } = require('../middleware/authorizationMiddleware'
 const requireStepUp = require('../middleware/stepUpMiddleware');
 const requireSensitiveExportApproval = require('../middleware/sensitiveExportMiddleware');
 const highRiskPaymentGuard = require('../middleware/highRiskPaymentMiddleware');
-const statementPreviewSanitizer = require('../middleware/statementPreviewSanitizer');
 const financePrivacy = require('../middleware/financePrivacyMiddleware');
 const { sanitizeUploadName, secureMulterOptions, validateUploadedFile } = require('../middleware/uploadSecurity');
+const financeStatementUpload = require('../middleware/financeStatementUpload');
 const { financeCapabilities } = require('../services/financeCapabilityRegistry');
 
 const router = express.Router();
@@ -72,8 +73,6 @@ const financeReceiptStorage = multer.diskStorage({
   filename(req, file, cb) { cb(null, `receipt_${req.params.id}_${Date.now()}_${sanitizeUploadName(file.originalname)}`); }
 });
 const financeReceiptUpload = multer(secureMulterOptions(financeReceiptStorage, 12));
-
-
 router.use(financePrivacy.resolveBankingAccessScope);
 
 router.get('/capabilities', requireAnyPermission('VIEW_BANKING'), (req, res) => res.json(financeCapabilities()));
@@ -248,8 +247,17 @@ router.post('/intelligence/accounts/:id/archive', requireAnyPermission('EDIT_BAN
 router.post('/intelligence/accounts/:id/inactive', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.deactivate);
 router.post('/intelligence/accounts/:id/restore', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.restore);
 router.delete('/intelligence/accounts/:id', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.remove);
-router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), intelligence.importStatementRows);
-router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementPreviewSanitizer, statementReview.preview);
+router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.legacyDisabled);
+router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.legacyDisabled);
+router.post('/intelligence/accounts/:id/statement-imports', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), ...financeStatementUpload, statementIngestion.upload);
+router.get('/intelligence/statement-imports/metrics', requireAnyPermission('VIEW_BANKING'), statementIngestion.metrics);
+router.get('/intelligence/statement-imports/mappings', requireAnyPermission('VIEW_BANKING'), statementIngestion.listMappings);
+router.post('/intelligence/statement-imports/mappings', requireAnyPermission('EDIT_FINANCE'), statementIngestion.saveMapping);
+router.get('/intelligence/statement-imports/:uid/status', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), statementIngestion.status);
+router.post('/intelligence/statement-imports/:uid/password', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.password);
+router.post('/intelligence/statement-imports/:uid/mapping', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.mapping);
+router.post('/intelligence/statement-imports/:uid/retry', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), statementIngestion.retry);
+router.post('/intelligence/statement-imports/:uid/cancel', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.cancel);
 router.get('/intelligence/statement-reviews', requireAnyPermission('VIEW_BANKING'), financePrivacy.filterStatementList, statementReview.list);
 router.get('/intelligence/statement-reviews/:uid', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), statementReview.get);
 router.post('/intelligence/statement-reviews/:uid/rows/:rowId/select', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), statementReview.updateRowSelection);

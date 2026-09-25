@@ -33,6 +33,8 @@ const tests=[
   "finance-trusted-totals-test.js",
   "finance-filter-consistency-test.js",
   "finance-original-bank-data-test.js",
+  "finance-statement-ingestion-architecture-test.js",
+  "finance-statement-ingestion-real-files-test.js",
   "finance-statement-review-test.js",
   "finance-import-wizard-test.js",
   "finance-reconciliation-center-test.js",

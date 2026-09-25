@@ -24,8 +24,8 @@ assert(importController.includes("String(maxDate) >= String(account.history_end_
 
 assert(ui.includes('function openHistoricalImport('),'canonical Finance OS includes historical statement import');
 assert(ui.includes('multiple required'),'historical import supports multiple files for one selected account');
-assert(ui.includes("currency:String(row.currency||account.currency||'AUD').toUpperCase()"),'missing statement row currency falls back to the selected account currency');
-assert(ui.includes('accept=".csv,.pdf,.ofx,.qfx,.qif,.xlsx"'),'historical import supports the required statement formats');
+assert(ui.includes('uploadStatementFile(selectedId,file)'),'historical statements upload original bytes to the server');
+assert(ui.includes('accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx"'),'historical import supports the required statement formats');
 assert(ui.includes('Nothing is committed automatically.'),'historical imports remain review-before-commit');
 assert(app.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'there is no separate Banking UI');
 
@@ -36,7 +36,7 @@ assert(ui.includes('Standard Report Catalogue'),'the unified Finance OS exposes 
 assert(ui.includes('id="reportPdf"')&&ui.includes('id="reportCsv"')&&ui.includes('id="reportXlsx"'),'report PDF/CSV/XLSX actions remain available');
 
 assert(financeRoutes.includes("'/intelligence/reports/portfolio-history'"),'finance route exposes portfolio history');
-assert(financeRoutes.includes("'/intelligence/accounts/:id/statements/preview'"),'Finance OS supports protected statement preview');
+assert(financeRoutes.includes("'/intelligence/accounts/:id/statement-imports'"),'Finance OS supports secure original-file ingestion');
 assert(financeRoutes.includes("'/intelligence/statement-reviews/:uid/commit'"),'Finance OS supports reviewed statement commit');
 
 if(process.exitCode)process.exit(process.exitCode);

@@ -8,8 +8,8 @@ const html=read('public/finance-intelligence.html');
 const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
-assert.match(html,/finance-master\.css\?v=20260923-control-centre/,'Master finance stylesheet must be loaded.');
-assert.match(html,/finance-master\.js\?v=20260924-control-v\d+/,'Master finance client must use a canonical versioned cache-busting release id.');
+assert.match(html,/finance-master\.css\?v=\d{8}-[a-z0-9-]+-v\d+/,'Master finance stylesheet must be loaded.');
+assert.match(html,/finance-master\.js\?v=\d{8}-[a-z0-9-]+-v\d+/,'Master finance client must use a canonical versioned cache-busting release id.');
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');

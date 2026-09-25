@@ -105,6 +105,41 @@ async function getAuthorisedDocument(user, id) {
   return { status: 200, document, storage: 'LOCAL_LEGACY', path: resolved };
 }
 
+async function readDocumentBodyInternal(id) {
+  await ensureSecurityOperationsSchema();
+  const [[document]] = await pool.query('SELECT * FROM secure_documents WHERE id=? AND deleted_at IS NULL LIMIT 1', [id]);
+  if (!document) throw Object.assign(new Error('Stored document was not found.'), { code: 'STORED_DOCUMENT_NOT_FOUND', status: 404 });
+  if (['QUARANTINED', 'PENDING_SCAN'].includes(String(document.scan_status || '').toUpperCase())) {
+    throw Object.assign(new Error('Stored document is not available while security scanning is pending.'), { code: 'STORED_DOCUMENT_SECURITY_PENDING', status: 423 });
+  }
+  const objectKey = keyFromStorageUri(document.storage_path);
+  let body;
+  if (objectKey) body = await getObject(objectKey);
+  else {
+    const resolved = safeStoredPath(document.storage_path);
+    if (!resolved || !fs.existsSync(resolved)) throw Object.assign(new Error('Stored document bytes were not found.'), { code: 'STORED_DOCUMENT_BYTES_NOT_FOUND', status: 404 });
+    body = await fs.promises.readFile(resolved);
+  }
+  const actualSha256 = crypto.createHash('sha256').update(body).digest('hex');
+  if (document.content_sha256 && actualSha256 !== document.content_sha256) {
+    throw Object.assign(new Error('Stored document integrity verification failed.'), { code: 'DOCUMENT_INTEGRITY_MISMATCH', status: 409 });
+  }
+  return { document, body, contentSha256: actualSha256, storage: objectKey ? 'OBJECT_STORAGE' : 'LOCAL_LEGACY' };
+}
+
+async function removeDocumentInternal(id) {
+  const [[document]] = await pool.query('SELECT * FROM secure_documents WHERE id=? LIMIT 1', [id]);
+  if (!document) return false;
+  const objectKey = keyFromStorageUri(document.storage_path);
+  if (objectKey) await deleteObject(objectKey).catch(() => {});
+  else {
+    const resolved = safeStoredPath(document.storage_path);
+    if (resolved) await fs.promises.unlink(resolved).catch(() => {});
+  }
+  await pool.query('UPDATE secure_documents SET deleted_at=NOW() WHERE id=? AND deleted_at IS NULL', [id]);
+  return true;
+}
+
 function safeDispositionName(value) {
   return String(value || 'document').replace(/[\r\n"\\]/g, '_').slice(0, 180);
 }
@@ -194,6 +229,8 @@ module.exports = {
   documentObjectKey,
   getAuthorisedDocument,
   objectStorageDocumentsEnabled,
+  readDocumentBodyInternal,
+  removeDocumentInternal,
   registerDocument,
   safeDispositionName,
   safeStoredPath,

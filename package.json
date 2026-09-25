@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
+    "start:finance-worker": "node scripts/start-finance-ingestion-worker.js",
     "pretest": "node scripts/wave-b-pr1-platform-guards-test.js && node scripts/wave-b-pr2-worker-safety-test.js && node scripts/wave-b-pr3-qms-fail-closed-test.js && node scripts/database-runtime-verification-test.js && node scripts/finance-bulk-review-rules-v2-test.js && node scripts/finance-bootstrap-resilience-test.js && node scripts/finance-unified-runtime-regression-test.js && node scripts/finance-fx-rates-test.js && node scripts/personal-money-lifecycle-test.js && node scripts/finance-borrow-lend-delete-lifecycle-test.js && node scripts/finance-original-requirements-acceptance-test.js && node scripts/finance-unified-net-worth-test.js && node scripts/finance-advanced-control-test.js && node scripts/finance-cash-control-test.js && node scripts/personal-debt-control-test.js && node scripts/finance-close-assurance-test.js && node scripts/finance-treasury-control-test.js && node scripts/finance-performance-risk-control-test.js && node scripts/finance-anomaly-explain-control-test.js && node scripts/finance-control-actions-test.js && node scripts/finance-accountant-handover-test.js && node scripts/finance-legacy-ui-gate-test.js && node scripts/finance-unified-roadmap-test.js",
     "check": "node scripts/check-syntax.js",
     "lint": "node scripts/check-syntax.js",
@@ -88,6 +89,8 @@
     "@capacitor/android": "8.3.1",
     "@capacitor/core": "8.3.1",
     "@capacitor/ios": "8.3.1",
+    "@napi-rs/canvas": "1.0.9",
+    "@tesseract.js-data/eng": "1.0.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
@@ -97,9 +100,12 @@
     "multer": "^2.3.0",
     "mysql2": "^3.24.3",
     "nodemailer": "^10.0.0",
+    "pdfjs-dist": "6.3.289",
     "pdfkit": "^0.18.0",
     "qrcode": "^1.5.4",
-    "redis": "^6.2.1"
+    "redis": "^6.2.1",
+    "sharp": "0.35.4",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@capacitor/cli": "8.3.1",

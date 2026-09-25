@@ -12,6 +12,7 @@ assert(sanitizer.isBalanceOnlyRow({ description: 'OPENING BALANCE' }) === true, 
 assert(sanitizer.isBalanceOnlyRow({ description: 'COLES SUPERMARKET' }) === false, 'Normal transactions must not be filtered as balance rows.');
 
 const routeSource = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'routes', 'financeRoutes.js'), 'utf8');
-assert(routeSource.includes('statementPreviewSanitizer, statementReview.preview'), 'Statement preview sanitizer must run before staging controller.');
+assert(routeSource.includes('statementIngestion.legacyDisabled'), 'Legacy client-row staging must fail closed.');
+assert(routeSource.includes('...financeStatementUpload, statementIngestion.upload'), 'Original statement bytes must pass through secure multipart validation.');
 
 console.log('Statement preview sanitizer regression checks passed.');

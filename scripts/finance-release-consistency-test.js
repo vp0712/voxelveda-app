@@ -11,7 +11,7 @@ const advanced=read('public/finance-advanced-control.js');
 const pkg=JSON.parse(read('package.json'));
 const suite=read('scripts/finance-production-regression-suite.js');
 
-const masterMatch=html.match(/\/finance-master\.js\?v=(20260924-control-v\d+)/);
+const masterMatch=html.match(/\/finance-master\.js\?v=(\d{8}-[a-z0-9-]+-v\d+)/);
 const advancedAssetMatch=advanced.match(/VERSION='(20260924-advanced-control-v\d+)'/);
 const advancedLoaderMatch=master.match(/\/finance-advanced-control\.js\?v=(20260924-advanced-control-v\d+)/);
 

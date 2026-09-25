@@ -14,7 +14,7 @@ assert(master.includes("view:'advanced',scope:'ALL'"),'Advanced Control must be 
 assert(master.includes("if(v==='advanced')return advancedControlView();"),'Advanced Control navigation must render the Advanced Control view instead of falling through to Finance Settings.');
 assert(master.includes('/finance-advanced-control.js?v='+advancedVersion),'Master OS must load the exact Advanced Control release declared by the asset.');
 assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be allowlisted as a canonical Finance asset.');
-assert(/\/finance-master\.js\?v=20260924-control-v\d+/.test(html),'Canonical Finance HTML must use a versioned master release.');
+assert(/\/finance-master\.js\?v=\d{8}-[a-z0-9-]+-v\d+/.test(html),'Canonical Finance HTML must use a versioned master release.');
 
 for(const label of [
   'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
