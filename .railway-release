@@ -1,5 +1,5 @@
-finance-release: 20260925-secure-statement-ingestion-v26
-source-commit: 7c16cca17c9cb93b3eef97a2f9224da7867b8e76
+finance-release: 20260925-secure-statement-ingestion-v26-hotfix
+source-commit: b7e93f1c0c0a0aa1167e88f6c4c352ea34ba277c
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build
