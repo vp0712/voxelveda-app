@@ -142,6 +142,13 @@ async function findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credi
 
 async function ingestTransactions(db, connection, transactionsPayload, provider) {
   const rows = list(transactionsPayload);
+  const [learnedRules] = connection.app_user_id ? await db.query(
+    `SELECT id,merchant_pattern,category,ownership_scope,priority,application_mode,enabled
+       FROM finance_category_rules
+      WHERE created_by=? AND enabled=1 AND application_mode='AUTO_APPLY' AND category IS NOT NULL AND category<>''
+      ORDER BY priority DESC,updated_at DESC,id DESC`,
+    [connection.app_user_id]
+  ) : [[]];
   let inserted = 0; let updated = 0; let duplicates = 0; let linkedExisting = 0;
   for (const tx of rows) {
     const remoteAccountId = transactionAccountId(tx);
@@ -167,7 +174,7 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
       merchant_name: tx?.merchant?.name || tx?.merchantName,
       description: transactionDescription(tx),
       reference: tx?.reference || tx?.referenceNo
-    });
+    }, learnedRules);
     const resolvedCategory = learnedRule?.category || bankCategory.category || null;
     let existing = null;
     if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type,category,classification_status,manual_override FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
