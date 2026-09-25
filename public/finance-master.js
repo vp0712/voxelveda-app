@@ -582,13 +582,42 @@ function removedStatementsSection(){
  const rows=(state.removedStatements||[]).map(x=>'<div class="fm-row"><div><h3>'+esc(x.original_name||'Removed statement')+'</h3><p>'+esc(x.account_name||'')+' · '+date(x.statement_start_date)+' – '+date(x.statement_end_date)+' · '+esc(x.source_format||'')+'</p></div><div class="fm-row-right">'+statusBadge('REMOVED')+'<small>Excluded from active reports and analysis</small><div class="fm-inline-actions"><button type="button" data-statement-restore="'+esc(x.import_uid)+'">Restore</button><button type="button" class="bad" data-statement-purge="'+esc(x.import_uid)+'">Danger Zone purge</button></div></div></div>').join('')||emptyState('No removed statements','Soft-removed statements will appear here for controlled recovery.');
  return '<details class="fm-card fm-removed-statements"><summary class="fm-pad"><strong>Removed Statements</strong><span>'+(state.removedStatements||[]).length+' recoverable</span></summary><div class="fm-pad"><p class="fm-helper">Restore returns the statement to active history. Permanent deletion is hidden in this controlled recovery area, requires step-up authentication, and cannot be undone.</p><div class="fm-list">'+rows+'</div></div></details>';
 }
+function openCommittedStatementTransactionEditor(uid,tx){
+ const debit=num(tx.debit),credit=num(tx.credit),direction=debit>0?'DEBIT':credit>0?'CREDIT':'',amount=debit>0?debit:credit>0?credit:'';
+ $('fmModalEyebrow').textContent='POSTED STATEMENT CORRECTION';
+ $('fmModalTitle').textContent='Edit committed transaction';
+ $('fmModalBody').innerHTML='<form id="postedStatementCorrectionForm" class="fm-form"><div class="fm-state fm-state-warning"><strong>Audited correction</strong><p>This changes the active ledger transaction after Pending Review. The original bank/source evidence is preserved and the correction is recorded in audit history.</p></div><label>Transaction date<input name="transaction_date" type="date" value="'+esc(String(tx.transaction_date||'').slice(0,10))+'" required></label><label>Posting date<input name="posting_date" type="date" value="'+esc(String(tx.posting_date||'').slice(0,10))+'"></label><label>Description<textarea name="description" rows="3" required>'+esc(tx.description||'')+'</textarea></label><div class="fm-form-grid two"><label>Money direction<select name="direction" required><option value="">Choose</option><option value="DEBIT" '+(direction==='DEBIT'?'selected':'')+'>Money out / Debit</option><option value="CREDIT" '+(direction==='CREDIT'?'selected':'')+'>Money in / Credit</option></select></label><label>Amount<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+esc(amount||'')+'" required></label></div><div class="fm-form-grid two"><label>Reference<input name="reference" value="'+esc(tx.reference||'')+'"></label><label>Merchant<input name="merchant_name" value="'+esc(tx.merchant_name||'')+'"></label></div><label>Running balance<input name="running_balance" type="number" inputmode="decimal" step="0.01" value="'+esc(tx.running_balance===null||tx.running_balance===undefined?'':tx.running_balance)+'"></label><label>Correction reason<textarea name="reason" rows="2" placeholder="Example: Verified against original PDF; OCR read amount incorrectly" required></textarea></label><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Save audited correction</button></div></form>';
+ if(!$('fmModal').open)$('fmModal').showModal();
+ document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close(),{once:true});
+ $('postedStatementCorrectionForm').onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.currentTarget,fd=new FormData(form),submit=form.querySelector('button[type="submit"]');
+  const payload={
+   transaction_date:String(fd.get('transaction_date')||''),posting_date:String(fd.get('posting_date')||''),
+   description:String(fd.get('description')||'').trim(),reference:String(fd.get('reference')||'').trim(),
+   merchant_name:String(fd.get('merchant_name')||'').trim(),direction:String(fd.get('direction')||''),
+   amount:String(fd.get('amount')||''),running_balance:String(fd.get('running_balance')||'').trim(),
+   reason:String(fd.get('reason')||'').trim()
+  };
+  if(!payload.transaction_date||!payload.description||!payload.direction||!payload.amount||payload.reason.length<3){notice('Complete the date, description, direction, amount and correction reason.',true);return}
+  submit.disabled=true;submit.textContent='Saving correction…';
+  try{
+   const result=await api(I+'/statements/'+encodeURIComponent(uid)+'/transactions/'+encodeURIComponent(tx.id)+'/correct',{method:'POST',body:JSON.stringify(payload)});
+   $('fmModal').close();
+   notice(result.message||'Statement transaction corrected.');
+   await refresh();
+   await openStatementVaultEditor(uid);
+  }catch(error){submit.disabled=false;submit.textContent='Save audited correction';notice(error.message,true)}
+ };
+}
 async function openStatementVaultEditor(uid){
  try{
   const payload=await api(I+'/statements/'+encodeURIComponent(uid)+'/report');
   const statement=payload.statement||{},transactions=payload.transactions||[];
-  const rows=transactions.map(tx=>`<button type="button" class="fm-row fm-row-button" data-statement-edit-tx="${esc(tx.id)}"><div><h3>${esc(tx.merchant_name||tx.description||'Transaction')}</h3><p>${date(tx.transaction_date)} · ${esc(tx.category||'Uncategorised')} · ${esc(tx.reconciliation_status||'')}</p></div><div class="fm-row-right"><b>${nativeMoney(Math.abs(num(tx.credit)-num(tx.debit)),tx.currency||statement.currency||'AUD')}</b><small>Edit classification ›</small></div></button>`).join('');
-  openDrawer(statement.original_name||'Statement',`<div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>Statement Vault editor</h3><p>Committed statement history stays linked to its original source evidence. Edit the current transaction classification without overwriting the bank statement.</p></div></div><div class="fm-detail-grid"><span>Account<b>${esc(statement.account_name||'—')}</b></span><span>Format<b>${esc(statement.source_format||'—')}</b></span><span>Period<b>${date(statement.statement_start_date)} – ${date(statement.statement_end_date)}</b></span><span>Imported<b>${num(statement.imported_rows)}</b></span></div><div class="fm-list">${rows||emptyState('No linked transactions','This statement has no currently linked ledger rows to edit.')}</div></div></div>`,'STATEMENT');
-  document.querySelectorAll('[data-statement-edit-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.statementEditTx));
+  const rows=transactions.map(tx=>`<div class="fm-row"><div><h3>${esc(tx.merchant_name||tx.description||'Transaction')}</h3><p>${date(tx.transaction_date)} · ${esc(tx.category||'Uncategorised')} · ${esc(tx.reconciliation_status||'')}</p></div><div class="fm-row-right"><b>${nativeMoney(Math.abs(num(tx.credit)-num(tx.debit)),tx.currency||statement.currency||'AUD')}</b><div class="fm-inline-actions"><button type="button" data-statement-correct-tx="${esc(tx.id)}">Edit transaction</button><button type="button" data-statement-classify-tx="${esc(tx.id)}">Classification</button></div></div></div>`).join('');
+  openDrawer(statement.original_name||'Statement',`<div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>Statement Vault editor</h3><p>Pending Review is not the end of correction access. Posted rows can still be corrected here with an audit trail; immutable bank/source evidence is never overwritten.</p></div></div><div class="fm-detail-grid"><span>Account<b>${esc(statement.account_name||'—')}</b></span><span>Format<b>${esc(statement.source_format||'—')}</b></span><span>Period<b>${date(statement.statement_start_date)} – ${date(statement.statement_end_date)}</b></span><span>Imported<b>${num(statement.imported_rows)}</b></span></div><div class="fm-list">${rows||emptyState('No linked transactions','This statement has no currently linked ledger rows to edit.')}</div></div></div>`,'STATEMENT');
+  document.querySelectorAll('[data-statement-correct-tx]').forEach(b=>b.onclick=()=>{const tx=transactions.find(item=>String(item.id)===String(b.dataset.statementCorrectTx));if(tx)openCommittedStatementTransactionEditor(uid,tx)});
+  document.querySelectorAll('[data-statement-classify-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.statementClassifyTx));
  }catch(error){notice(error.message,true)}
 }
 function personalCard(kind){
