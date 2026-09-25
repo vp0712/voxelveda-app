@@ -54,18 +54,21 @@ function exactRuleMatch(transaction, rule) {
   return Boolean(transactionMerchant && ruleMerchant && transactionMerchant === ruleMerchant);
 }
 
-async function findExactAutoCategoryRule(db, userId, transaction = {}) {
+async function findExactAutoCategoryRule(db, userId, transaction = {}, preloadedRules = null) {
   const actorId = Number(userId || 0);
   if (!actorId) return null;
   const merchant = cleanMerchant(transaction.merchant_normalized || transaction.merchant_name || transaction.description || transaction.reference || '');
   if (!merchant) return null;
-  const [rules] = await db.query(
-    `SELECT id,merchant_pattern,category,ownership_scope,priority,application_mode,enabled
-       FROM finance_category_rules
-      WHERE created_by=? AND enabled=1 AND application_mode='AUTO_APPLY' AND category IS NOT NULL AND category<>''
-      ORDER BY priority DESC,updated_at DESC,id DESC`,
-    [actorId]
-  );
+  let rules = Array.isArray(preloadedRules) ? preloadedRules : null;
+  if (!rules) {
+    [rules] = await db.query(
+      `SELECT id,merchant_pattern,category,ownership_scope,priority,application_mode,enabled
+         FROM finance_category_rules
+        WHERE created_by=? AND enabled=1 AND application_mode='AUTO_APPLY' AND category IS NOT NULL AND category<>''
+        ORDER BY priority DESC,updated_at DESC,id DESC`,
+      [actorId]
+    );
+  }
   return rules.find((rule) => cleanMerchant(rule.merchant_pattern) === merchant) || null;
 }
 
