@@ -40,6 +40,10 @@ assert.match(js,/companySettingsForm/,'Finance Settings must expose editable com
 assert.match(js,/runFinanceCommand/,'Finance OS must expose command search actions.');
 assert.match(css,/@media\(max-width:700px\)/,'Finance OS must have a dedicated mobile layout.');
 assert.match(css,/fm-drawer/,'Transaction/account detail drawer must be styled.');
+assert.match(js,/fm-vault-editor-row/,'Statement Vault editor must use a mobile-safe committed transaction row.');
+assert.match(css,/\.fm-vault-editor-row\{display:grid;grid-template-columns:minmax\(0,1fr\) auto/,'Statement Vault desktop row must reserve visible amount/action space.');
+assert.match(css,/@media\(max-width:700px\)\{[\s\S]*\.fm-vault-editor-row\{grid-template-columns:1fr/,'Statement Vault editor must stack transaction details on phone screens.');
+assert.match(css,/\.fm-vault-editor-actions\{display:grid;grid-template-columns:1fr 1fr/,'Statement Vault mobile actions must fit within the viewport.');
 console.log('Finance Master OS regression contract passed.');
 
 assert.match(html,/id="fmMobileNav"/,'Finance OS must provide a dedicated mobile navigation surface.');
