@@ -112,6 +112,7 @@ exports.getOverview = async (req, res) => {
       },
       summary_by_currency: summaryByCurrency,
       accounts: accountRows,
+      account_categories: accountCategories,
       spending_by_category: categoryRows,
       monthly_cash_flow: monthRows,
       split_policy: 'Split child category amounts replace the parent category amount and are never double counted.'
@@ -757,7 +758,7 @@ exports.getSpendingReport = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const filters = spendingWhere(req);
-    const [summaryByCurrency, categories, merchantRows, accountRows, monthlyRows, weekdayRows, transactionRows, manualRows] = await Promise.all([
+    const [summaryByCurrency, categories, merchantRows, accountRows, accountCategoryRows, monthlyRows, weekdayRows, transactionRows, manualRows] = await Promise.all([
       trustedTotals.cashTotalsByCurrency(pool, filters.where, filters.params),
       trustedTotals.categorySpendByCurrency(pool, filters.where, filters.params, 200),
       pool.query(
@@ -777,6 +778,20 @@ exports.getSpendingReport = async (req, res) => {
                 COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE ${filters.where} GROUP BY ba.id ORDER BY spent DESC`, filters.params
+      ).then(([rows]) => rows),
+      pool.query(
+        `SELECT ba.id AS bank_account_id,ba.nickname AS account_name,ba.institution,bt.currency,
+                COALESCE(NULLIF(s.category,''),NULLIF(bt.category,''),'Unclassified') AS category,
+                COUNT(DISTINCT bt.id) AS source_transaction_count,
+                COUNT(s.id) AS split_line_count,
+                COALESCE(SUM(CASE WHEN s.id IS NOT NULL THEN s.amount ELSE bt.debit END),0) AS spent
+           FROM bank_transactions bt
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           LEFT JOIN bank_transaction_splits s ON s.parent_bank_transaction_id=bt.id
+          WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${filters.where}
+          GROUP BY ba.id,ba.nickname,ba.institution,bt.currency,
+                   COALESCE(NULLIF(s.category,''),NULLIF(bt.category,''),'Unclassified')
+          ORDER BY ba.nickname,bt.currency,spent DESC`, filters.params
       ).then(([rows]) => rows),
       pool.query(
         `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,COUNT(*) AS transaction_count,
@@ -837,6 +852,17 @@ exports.getSpendingReport = async (req, res) => {
         percentage_of_spend: gross > 0 ? Number(((Number(row.spent || 0) / gross) * 100).toFixed(2)) : 0
       };
     });
+
+    const accountCategories = accountCategoryRows.map((row) => ({
+      bank_account_id: Number(row.bank_account_id),
+      account_name: row.account_name,
+      institution: row.institution,
+      currency: String(row.currency || 'AUD').toUpperCase(),
+      category: row.category || 'Unclassified',
+      source_transaction_count: Number(row.source_transaction_count || 0),
+      split_line_count: Number(row.split_line_count || 0),
+      spent: money.fromCents(money.toCents(row.spent || 0))
+    }));
 
     return res.json({
       filters: { scope: filters.scope, account_id: filters.accountId || null, statement_uid: filters.statementUid || null, from: filters.from, to: filters.to },
