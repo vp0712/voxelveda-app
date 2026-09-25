@@ -629,7 +629,8 @@ exports.updateTransaction = async (req, res) => {
         from: row.category || null,
         to: category,
         replaced_split_count: replacedSplits.length,
-        learned_exact_merchant: Boolean(learnedRule?.saved)
+        learned_exact_merchant: Boolean(learnedRule?.saved),
+        learned_rule_id: learnedRule?.rule?.id || null
       }
     });
   } catch (error) {
