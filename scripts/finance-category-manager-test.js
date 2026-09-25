@@ -19,6 +19,8 @@ assert(controller.includes("scope='PERSONAL' AND \\${alias}.owner_user_id=?") ||
 assert(controller.includes('FINANCE_CATEGORY_CREATED'),'category create audit missing');
 assert(controller.includes('FINANCE_CATEGORY_ARCHIVED'),'category archive audit missing');
 assert(controller.includes('CATEGORY_HAS_ACTIVE_CHILDREN'),'parent/child archive guard missing');
+assert(controller.includes('CATEGORY_NAME_ALREADY_EXISTS'),'duplicate visible category-name guard missing');
+assert(controller.includes('CATEGORY_NAME_ARCHIVED'),'archived duplicate category guard missing');
 
 assert(routes.includes("router.get('/categories'"),'category list route missing');
 assert(routes.includes("router.post('/categories', requireAnyPermission('EDIT_FINANCE')"),'category write permission missing');
