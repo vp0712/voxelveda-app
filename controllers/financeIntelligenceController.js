@@ -7,7 +7,7 @@ const { FinanceError, dateOnly } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
 const trustedTotals = require('../services/financeTrustedTotals');
 const { buildCoreBankTransactionFilter } = require('../services/financeFilterContract');
-const { cleanMerchant, normalizeTags, normalizeGstTreatment } = require('../services/financeRuleEngine');
+const { cleanMerchant, normalizeTags, normalizeGstTreatment, upsertExactAutoCategoryRule } = require('../services/financeRuleEngine');
 
 const VALID_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const DASHBOARD_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'ALL']);
@@ -348,10 +348,10 @@ function bulkRowChanges(row, changes) {
   return delta;
 }
 
-async function assertCategoryVisible(db, req, category) {
-  if (!category) return;
+async function assertCategoryVisible(db, req, category, accountScope = null) {
+  if (!category) return null;
   const [[row]] = await db.query(
-    `SELECT id FROM finance_system_categories c
+    `SELECT id,name,scope FROM finance_system_categories c
       WHERE c.name=? AND c.active=1 AND c.archived_at IS NULL
         AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL)
           OR (c.scope='PERSONAL' AND c.owner_user_id=?))
@@ -359,8 +359,69 @@ async function assertCategoryVisible(db, req, category) {
     [category, privacy.userId(req)]
   );
   if (!row) throw new FinanceError('Choose an active Finance category available to this user.', 400, 'FINANCE_CATEGORY_NOT_AVAILABLE');
+  const account = String(accountScope || '').toUpperCase();
+  const categoryScope = String(row.scope || 'BOTH').toUpperCase();
+  if (account === 'PERSONAL' && !['PERSONAL','BOTH'].includes(categoryScope)) {
+    throw new FinanceError('Choose a Personal or Both category for this Personal account.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+  }
+  if (account === 'BUSINESS' && !['BUSINESS','BOTH'].includes(categoryScope)) {
+    throw new FinanceError('Choose a Business or Both category for this Company account.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+  }
+  return row;
 }
 
+async function resolveTransactionCategory(db, req, row, body = {}) {
+  const createName = String(body.create_category_name || '').trim().slice(0, 120);
+  let targetCategory = String(body.category || '').trim().slice(0, 120) || null;
+  if (!createName) {
+    if (targetCategory !== (row.category || null)) await assertCategoryVisible(db, req, targetCategory, row.account_scope);
+    return targetCategory;
+  }
+  if (createName.length < 2) throw new FinanceError('New category name must be at least 2 characters.', 400, 'CATEGORY_NAME_REQUIRED');
+  const actorId = privacy.userId(req);
+  const [[existing]] = await db.query(
+    `SELECT c.* FROM finance_system_categories c
+      WHERE LOWER(c.name)=LOWER(?)
+        AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL) OR (c.scope='PERSONAL' AND c.owner_user_id=?))
+      ORDER BY c.active DESC,c.id DESC LIMIT 1 FOR UPDATE`,
+    [createName, actorId]
+  );
+  if (existing) {
+    const existingScope=String(existing.scope||'BOTH').toUpperCase();
+    const existingAccountScope=String(row.account_scope||'').toUpperCase();
+    if(existingAccountScope==='PERSONAL'&&!['PERSONAL','BOTH'].includes(existingScope)) throw new FinanceError('A Personal account cannot use this Business-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+    if(existingAccountScope==='BUSINESS'&&!['BUSINESS','BOTH'].includes(existingScope)) throw new FinanceError('A Company account cannot use this Personal-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+    if (!Number(existing.active) || existing.archived_at) {
+      await db.query('UPDATE finance_system_categories SET active=1,archived_at=NULL,archived_by=NULL,updated_by=? WHERE id=?',[actorId, existing.id]);
+      await logAudit(db, audit(req, {
+        action:'FINANCE_CATEGORY_RESTORED_FROM_TRANSACTION_MOVE',module:'finance_categories',recordType:'finance_system_category',recordId:existing.id,
+        oldValue:{active:existing.active,archived_at:existing.archived_at},newValue:{active:1,name:existing.name}
+      }));
+    }
+    return existing.name;
+  }
+  const requestedScope = String(body.create_category_scope || '').trim().toUpperCase();
+  const accountScope = String(row.account_scope || '').toUpperCase();
+  const rowScope = String(row.ownership_scope || '').toUpperCase();
+  const inferredScope = accountScope === 'PERSONAL' ? 'PERSONAL' : accountScope === 'BUSINESS' ? 'BUSINESS' : ['PERSONAL','BUSINESS'].includes(rowScope) ? rowScope : 'BOTH';
+  const scope = requestedScope || inferredScope;
+  if (!['PERSONAL','BUSINESS','BOTH'].includes(scope)) throw new FinanceError('New category scope must be Personal, Business or Both.',400,'INVALID_CATEGORY_SCOPE');
+  if (accountScope === 'PERSONAL' && !['PERSONAL','BOTH'].includes(scope)) throw new FinanceError('A Personal account cannot create or use a Business-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+  if (accountScope === 'BUSINESS' && !['BUSINESS','BOTH'].includes(scope)) throw new FinanceError('A Company account cannot create or use a Personal-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+  const ownerUserId = scope === 'PERSONAL' ? actorId : null;
+  const categoryUid = uid('CAT');
+  const [insert] = await db.query(
+    `INSERT INTO finance_system_categories
+     (category_uid,name,parent_id,scope,owner_user_id,icon,color,gst_default,active,created_by,updated_by)
+     VALUES (?,?,NULL,?,?,NULL,NULL,'REVIEW',1,?,?)`,
+    [categoryUid, createName, scope, ownerUserId, actorId, actorId]
+  );
+  await logAudit(db, audit(req, {
+    action:'FINANCE_CATEGORY_CREATED_FROM_TRANSACTION_MOVE',module:'finance_categories',recordType:'finance_system_category',recordId:insert.insertId,
+    newValue:{category_uid:categoryUid,name:createName,scope,owner_user_id:ownerUserId}
+  }));
+  return createName;
+}
 async function assertClassificationPeriodsOpen(db, rows) {
   const dates = [...new Set(rows.map((row) => dateOnly(row.transaction_date)).filter(Boolean))];
   for (const effectiveDate of dates) {
@@ -427,8 +488,17 @@ exports.updateTransaction = async (req, res) => {
     const row = await visibleBankTransaction(id, req, db, true);
     await assertClassificationPeriodsOpen(db, [row]);
 
-    const category = String(req.body.category || '').trim().slice(0,120) || null;
-    if (category !== (row.category || null)) await assertCategoryVisible(db, req, category);
+    const category = await resolveTransactionCategory(db, req, row, req.body);
+    const categoryChanged = category !== (row.category || null);
+    let replacedSplits = [];
+    if (categoryChanged && req.body.move_whole_transaction === true) {
+      const [splitRows] = await db.query(
+        'SELECT * FROM bank_transaction_splits WHERE parent_bank_transaction_id=? ORDER BY id FOR UPDATE',
+        [id]
+      );
+      replacedSplits = splitRows || [];
+      if (replacedSplits.length) await db.query('DELETE FROM bank_transaction_splits WHERE parent_bank_transaction_id=?',[id]);
+    }
     const requestedScope = String(req.body.ownership_scope || row.ownership_scope || '').trim().toUpperCase();
     const allowedScopes = new Set(['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
     if (!allowedScopes.has(requestedScope)) throw new FinanceError('Choose Personal, Business, Mixed or Needs owner.', 400, 'INVALID_TRANSACTION_SCOPE');
@@ -447,6 +517,7 @@ exports.updateTransaction = async (req, res) => {
     if (hasOwn(req.body, 'ignored') && ignored && ignoredReason.length < 3) throw new FinanceError('Add a short reason before excluding a transaction from reports.', 400, 'IGNORE_REASON_REQUIRED');
     const reconciliationStatus = ignored ? 'IGNORED' : (hasOwn(req.body, 'ignored') && row.reconciliation_status === 'IGNORED' ? 'UNRECONCILED' : row.reconciliation_status);
     const rememberRule = req.body.remember_rule === true;
+    const learnMerchant = req.body.learn_merchant === true;
     const merchantNormalized = hasOwn(req.body, 'merchant_normalized') ? cleanMerchant(req.body.merchant_normalized) || null : row.merchant_normalized;
     const projectRef = hasOwn(req.body, 'project_ref') ? String(req.body.project_ref || '').trim().slice(0, 120) || null : row.project_ref;
     const tags = hasOwn(req.body, 'tags') ? normalizeTags(req.body.tags) : bulkValue(row, 'tags');
@@ -457,14 +528,36 @@ exports.updateTransaction = async (req, res) => {
       `UPDATE bank_transactions
           SET category=?, classification_status=?, ownership_scope=?, is_internal_transfer=?,
               reconciliation_status=?, ignored_reason=?, merchant_normalized=?,project_ref=?,tags_json=?,gst_treatment=?,
-              reviewed_at=IF(?,COALESCE(reviewed_at,NOW()),NULL),reviewed_by=IF(?,COALESCE(reviewed_by,?),NULL)
+              reviewed_at=IF(?,COALESCE(reviewed_at,NOW()),NULL),reviewed_by=IF(?,COALESCE(reviewed_by,?),NULL),
+              manual_override=IF(?,1,manual_override),
+              review_source_status=IF(?,'MANUAL_CATEGORY_MOVE',review_source_status)
         WHERE id=?`,
       [category, category ? 'CLASSIFIED' : 'UNCLASSIFIED', nextScope, internalTransfer, reconciliationStatus, ignoredReason,
         merchantNormalized, projectRef, tags.length ? JSON.stringify(tags) : null, gstTreatment,
-        reviewed, reviewed, req.user.id, id]
+        reviewed, reviewed, req.user.id, categoryChanged, categoryChanged, id]
     );
 
-    if (rememberRule && category) {
+    let learnedRule = null;
+    if (learnMerchant && category) {
+      learnedRule = await upsertExactAutoCategoryRule(db, {
+        userId: req.user.id,
+        category,
+        ownershipScope: nextScope,
+        merchant_normalized: merchantNormalized,
+        merchant_name: row.merchant_name,
+        description: row.description,
+        reference: row.reference
+      });
+      if (learnedRule.saved) {
+        await logAudit(db, audit(req, {
+          action:'FINANCE_EXACT_MERCHANT_CATEGORY_LEARNED',
+          module:'finance_intelligence',
+          recordType:'finance_category_rule',
+          recordId:learnedRule.rule?.id || id,
+          newValue:{merchant_pattern:learnedRule.merchant,category,application_mode:'AUTO_APPLY',source_transaction_id:id}
+        }));
+      }
+    } else if (rememberRule && category) {
       const pattern = String(merchantNormalized || row.merchant_name || row.description || '').trim().slice(0,255);
       if (pattern) {
         const [[existing]] = await db.query(
@@ -473,19 +566,19 @@ exports.updateTransaction = async (req, res) => {
         );
         if (existing) {
           await db.query(
-            'UPDATE finance_category_rules SET category=?, ownership_scope=?, enabled=1, priority=250 WHERE id=?',
-            [category, canOverrideScope ? nextScope : null, existing.id]
+            "UPDATE finance_category_rules SET category=?, ownership_scope=?, enabled=1, priority=250, application_mode='SUGGEST_ONLY', updated_by=? WHERE id=?",
+            [category, canOverrideScope ? nextScope : null, req.user.id, existing.id]
           );
         } else {
           await db.query(
-            `INSERT INTO finance_category_rules (rule_uid, merchant_pattern, category, ownership_scope, priority, enabled, created_by)
-             VALUES (?, ?, ?, ?, 250, 1, ?)`,
-            [uid('RULE'), pattern, category, canOverrideScope ? nextScope : null, req.user.id]
+            `INSERT INTO finance_category_rules
+             (rule_uid,merchant_pattern,category,ownership_scope,priority,enabled,application_mode,created_by,updated_by)
+             VALUES (?,?,?,?,250,1,'SUGGEST_ONLY',?,?)`,
+            [uid('RULE'), pattern, category, canOverrideScope ? nextScope : null, req.user.id, req.user.id]
           );
         }
       }
     }
-
     await logAudit(db, audit(req, {
       action: 'BANK_TRANSACTION_UPDATED',
       module: 'finance_intelligence',
@@ -514,15 +607,31 @@ exports.updateTransaction = async (req, res) => {
         tags,
         gst_treatment: gstTreatment,
         reviewed,
-        remembered_rule: rememberRule
+        remembered_rule: rememberRule,
+        learned_merchant_auto_rule: Boolean(learnedRule?.saved),
+        moved_whole_transaction: req.body.move_whole_transaction === true,
+        replaced_split_count: replacedSplits.length
       }
     }));
     await db.commit();
     const updated = await visibleBankTransaction(id, req);
     return res.json({
-      message: rememberRule && category ? 'Transaction updated and merchant rule saved for future imports.' : 'Transaction updated.',
+      message: learnedRule?.saved && category
+        ? 'Transaction moved and this exact merchant was learned for future automatic categorisation.'
+        : rememberRule && category
+          ? 'Transaction updated and merchant suggestion rule saved.'
+          : categoryChanged
+            ? 'Transaction moved to the selected category.'
+            : 'Transaction updated.',
       transaction: updated,
-      scope_locked_to_account: !canOverrideScope
+      scope_locked_to_account: !canOverrideScope,
+      category_move: {
+        from: row.category || null,
+        to: category,
+        replaced_split_count: replacedSplits.length,
+        learned_exact_merchant: Boolean(learnedRule?.saved),
+        learned_rule_id: learnedRule?.rule?.id || null
+      }
     });
   } catch (error) {
     if (db) await db.rollback();
@@ -579,7 +688,7 @@ exports.bulkReviewTransactions = async (req, res) => {
       const fields = [];
       const params = [];
       if (hasOwn(changes, 'category')) {
-        fields.push("category=?", "classification_status=?");
+        fields.push("category=?", "classification_status=?", "manual_override=1", "review_source_status='MANUAL_BULK_CATEGORY'");
         params.push(changes.category, changes.category ? 'CLASSIFIED' : 'UNCLASSIFIED');
       }
       if (hasOwn(changes, 'ownership_scope')) { fields.push('ownership_scope=?'); params.push(changes.ownership_scope); }
@@ -625,7 +734,7 @@ exports.getStatementLibrary = async (req, res) => {
     await ensureFinanceSchema();
     const scope = reportScope(req.query.scope);
     const accountId = Number(req.query.account_id || 0);
-    const clauses = [privacy.visibilitySql('ba', req)];
+    const clauses = ["sif.parse_status='IMPORTED'", privacy.visibilitySql('ba', req)];
     const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { clauses.push('ba.ownership_scope=?'); params.push(scope); }
     if (accountId) { clauses.push('sif.bank_account_id=?'); params.push(accountId); }
@@ -701,8 +810,8 @@ exports.getStatementReport = async (req, res) => {
           ORDER BY bt.currency,month`, filters.params
       ).then(([rows]) => rows),
       pool.query(
-        `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,
-                bt.running_balance,bt.currency,bt.reconciliation_status,bt.manual_override,bt.source_type,
+        `SELECT bt.id,bt.transaction_date,bt.posting_date,bt.description,bt.reference,bt.merchant_name,bt.category,bt.debit,bt.credit,
+                bt.running_balance,bt.currency,bt.reconciliation_status,bt.manual_override,bt.source_type,bt.statement_row_id,
                 bt.is_internal_transfer,ba.nickname AS account_name
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE ${filters.where}
@@ -757,7 +866,8 @@ exports.getSpendingReport = async (req, res) => {
   try {
     await ensureFinanceSchema();
     const filters = spendingWhere(req);
-    const [summaryByCurrency, categories, merchantRows, accountRows, monthlyRows, weekdayRows, transactionRows, manualRows] = await Promise.all([
+    const includeTransactions=String(req.query.include_transactions??'1')!=='0';
+    const [summaryByCurrency, categories, merchantRows, accountRows, accountCategoryRows, monthlyRows, weekdayRows, transactionRows, manualRows] = await Promise.all([
       trustedTotals.cashTotalsByCurrency(pool, filters.where, filters.params),
       trustedTotals.categorySpendByCurrency(pool, filters.where, filters.params, 200),
       pool.query(
@@ -779,6 +889,20 @@ exports.getSpendingReport = async (req, res) => {
           WHERE ${filters.where} GROUP BY ba.id ORDER BY spent DESC`, filters.params
       ).then(([rows]) => rows),
       pool.query(
+        `SELECT ba.id AS bank_account_id,ba.nickname AS account_name,ba.institution,bt.currency,
+                COALESCE(NULLIF(s.category,''),NULLIF(bt.category,''),'Unclassified') AS category,
+                COUNT(DISTINCT bt.id) AS source_transaction_count,
+                COUNT(s.id) AS split_line_count,
+                COALESCE(SUM(CASE WHEN s.id IS NOT NULL THEN s.amount ELSE bt.debit END),0) AS spent
+           FROM bank_transactions bt
+           JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+           LEFT JOIN bank_transaction_splits s ON s.parent_bank_transaction_id=bt.id
+          WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${filters.where}
+          GROUP BY ba.id,ba.nickname,ba.institution,bt.currency,
+                   COALESCE(NULLIF(s.category,''),NULLIF(bt.category,''),'Unclassified')
+          ORDER BY ba.nickname,bt.currency,spent DESC`, filters.params
+      ).then(([rows]) => rows),
+      pool.query(
         `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,COUNT(*) AS transaction_count,
                 COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
                 COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS received
@@ -796,7 +920,7 @@ exports.getSpendingReport = async (req, res) => {
           GROUP BY bt.currency,DAYNAME(bt.transaction_date),WEEKDAY(bt.transaction_date)
           ORDER BY bt.currency,weekday_index`, filters.params
       ).then(([rows]) => rows),
-      pool.query(
+      includeTransactions ? pool.query(
         `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,
                 bt.currency,bt.ownership_scope,bt.reconciliation_status,bt.source_type,bt.statement_import_uid,
                 bt.manual_override,bt.is_internal_transfer,ba.nickname AS account_name,sif.original_name AS statement_name
@@ -804,7 +928,7 @@ exports.getSpendingReport = async (req, res) => {
            LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
           WHERE ${filters.where}
           ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 5000`, filters.params
-      ).then(([rows]) => rows),
+      ).then(([rows]) => rows) : Promise.resolve([]),
       pool.query(
         `SELECT bt.currency,SUM(CASE WHEN bt.manual_override=1 THEN 1 ELSE 0 END) AS manual_overrides
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
@@ -838,6 +962,17 @@ exports.getSpendingReport = async (req, res) => {
       };
     });
 
+    const accountCategories = accountCategoryRows.map((row) => ({
+      bank_account_id: Number(row.bank_account_id),
+      account_name: row.account_name,
+      institution: row.institution,
+      currency: String(row.currency || 'AUD').toUpperCase(),
+      category: row.category || 'Unclassified',
+      source_transaction_count: Number(row.source_transaction_count || 0),
+      split_line_count: Number(row.split_line_count || 0),
+      spent: money.fromCents(money.toCents(row.spent || 0))
+    }));
+
     return res.json({
       filters: { scope: filters.scope, account_id: filters.accountId || null, statement_uid: filters.statementUid || null, from: filters.from, to: filters.to },
       currency_rule: 'Currencies are never combined without verified FX evidence. Linked refunds are separated from ordinary money-in.',
@@ -846,9 +981,11 @@ exports.getSpendingReport = async (req, res) => {
       categories: categoriesWithPercent,
       merchants: merchantRows,
       accounts: accountRows,
+      account_categories: accountCategories,
       monthly: monthlyRows,
       weekdays: weekdayRows,
       transactions: transactionRows,
+      transactions_included: includeTransactions,
       split_policy: 'Split parents contribute child category amounts instead of parent + child amounts, preventing double counting.',
       refund_policy: 'Linked refunds remain cash inflow but are excluded from ordinary_money_in and reduce net_economic_expense.',
       generated_at: new Date().toISOString()

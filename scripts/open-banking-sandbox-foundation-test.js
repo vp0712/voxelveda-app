@@ -16,6 +16,22 @@ expect(service,'BANK_DATA_LIVE_SYNC_ENABLED','Explicit production live-sync lock
 expect(service,'https://consent.basiq.io/home','Basiq consent UI endpoint missing');
 expect(service,'BANK_DATA_API_KEY','Basiq API key configuration missing');
 
+const sync=read('services/advancedBankingSyncService.js');
+const bankCategory=read('services/financeBankCategoryService.js');
+expect(sync,"suggestConnectedBankCategory",'Connected-bank sync must normalise provider categories before posting them.');
+expect(sync,"findExactAutoCategoryRule",'Connected-bank sync must consult learned exact merchant rules before provider category fallbacks.');
+expect(sync,"const resolvedCategory = learnedRule?.category || bankCategory.category || null",'Learned merchant categories must outrank provider category guesses.');
+expect(sync,"resolvedCategory ? 'CLASSIFIED' : 'UNCLASSIFIED'",'Connected-bank sync must classify only resolved categories and leave uncertain items unclassified.');
+expect(sync,"manual_override=0",'Connected-bank learning must never overwrite a manual category move.');
+expect(sync,"c.scope AS category_scope",'Connected-bank learned rules must carry managed category scope.');
+expect(sync,"account_scope: localAccountScope",'Connected-bank learned rules must be checked against the destination account scope.');
+expect(sync,"const resolvedScope =", 'Connected-bank sync must resolve transaction ownership from a compatible learned rule.');
+expect(sync,"ownership_scope=IF(?=1,?,ownership_scope)",'A learned rule may update ownership only when the rule safely overrides the provider guess.');
+expect(sync,"currency,?, ?, ?,0,NOW(),NOW()",'Connected-bank INSERT must write the resolved ownership scope and category into canonical transaction columns.');
+expect(bankCategory,'BANK_PROVIDER_CATEGORY_MAPPED','Bank category normaliser must distinguish mapped provider evidence.');
+expect(bankCategory,'UNCLASSIFIED','Unknown connected-bank categories must fail safely to Unclassified.');
+expect(bankCategory,'Fuel & Vehicle','Bank category normaliser must support the canonical fuel category.');
+
 const controller=read('controllers/openBankingController.js');
 expect(controller,"environment() === 'PRODUCTION' && !liveSyncEnabled()",'Production Open Banking must fail closed');
 expect(controller,'PROVIDER_ADAPTER_NOT_READY','Unimplemented provider adapters must fail closed');

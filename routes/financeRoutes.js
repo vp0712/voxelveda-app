@@ -228,6 +228,7 @@ router.post('/intelligence/transactions/bulk/review', requireAnyPermission('EDIT
 router.post('/intelligence/transactions/bulk/category', requireAnyPermission('EDIT_FINANCE'), intelligence.bulkCategorizeTransactions);
 router.get('/intelligence/statements', requireAnyPermission('VIEW_BANKING'), intelligence.getStatementLibrary);
 router.get('/intelligence/statements/:uid/report', requireAnyPermission('VIEW_BANKING'), financePrivacy.statementUid('uid'), intelligence.getStatementReport);
+router.post('/intelligence/statements/:uid/transactions/:transactionId/correct', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementData.correctPostedTransaction);
 router.get('/intelligence/statements-removed', requireAnyPermission('VIEW_BANKING'), statementData.listRemoved);
 router.post('/intelligence/statements/:uid/remove', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('DELETE_BANK_STATEMENT'), statementData.remove);
 router.post('/intelligence/statements/:uid/restore', requireAnyPermission('EDIT_FINANCE'), financePrivacy.statementUid('uid'), requireStepUp('RESTORE_BANK_STATEMENT'), statementData.restore);
@@ -280,6 +281,7 @@ router.post('/intelligence/insights/:id/apply', requireAnyPermission('EDIT_FINAN
 router.post('/intelligence/insights/:id/dismiss', requireAnyPermission('EDIT_FINANCE'), financePrivacy.insightParam('id'), transactionIntelligence.dismissInsight);
 router.get('/intelligence/rules', requireAnyPermission('VIEW_BANKING'), transactionIntelligence.getRules);
 router.post('/intelligence/rules/:id', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.updateRule);
+router.post('/intelligence/rules/:id/apply-history', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.applyRuleHistory);
 router.delete('/intelligence/rules/:id', requireAnyPermission('EDIT_FINANCE'), transactionIntelligence.deleteRule);
 router.get('/intelligence/reconciliation', requireAnyPermission('VIEW_BANKING'), reconciliationCenter.getCenter);
 router.get('/intelligence/reconciliation/:id/candidates', requireAnyPermission('VIEW_BANKING'), financePrivacy.bankTransactionParam('id'), reconciliationCenter.getCandidates);

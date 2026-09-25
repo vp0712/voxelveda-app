@@ -54,6 +54,100 @@ function exactRuleMatch(transaction, rule) {
   return Boolean(transactionMerchant && ruleMerchant && transactionMerchant === ruleMerchant);
 }
 
+function ruleCompatibleWithAccount(rule, accountScope) {
+  const account = String(accountScope || '').trim().toUpperCase();
+  const ruleScope = String(rule?.ownership_scope || '').trim().toUpperCase();
+  const categoryScope = String(rule?.category_scope || '').trim().toUpperCase();
+  if (account === 'PERSONAL') {
+    if (ruleScope && ruleScope !== 'PERSONAL') return false;
+    if (categoryScope && !['PERSONAL','BOTH'].includes(categoryScope)) return false;
+  }
+  if (account === 'BUSINESS') {
+    if (ruleScope && ruleScope !== 'BUSINESS') return false;
+    if (categoryScope && !['BUSINESS','BOTH'].includes(categoryScope)) return false;
+  }
+  if (['MIXED','UNCLASSIFIED'].includes(account) && categoryScope === 'PERSONAL' && ruleScope && ruleScope !== 'PERSONAL') return false;
+  if (['MIXED','UNCLASSIFIED'].includes(account) && categoryScope === 'BUSINESS' && ruleScope && ruleScope !== 'BUSINESS') return false;
+  return true;
+}
+
+async function findExactAutoCategoryRule(db, userId, transaction = {}, preloadedRules = null) {
+  const actorId = Number(userId || 0);
+  if (!actorId) return null;
+  const merchant = cleanMerchant(transaction.merchant_normalized || transaction.merchant_name || transaction.description || transaction.reference || '');
+  if (!merchant) return null;
+  let rules = Array.isArray(preloadedRules) ? preloadedRules : null;
+  if (!rules) {
+    [rules] = await db.query(
+      `SELECT r.id,r.merchant_pattern,r.category,r.ownership_scope,r.priority,r.application_mode,r.enabled,
+              c.scope AS category_scope
+         FROM finance_category_rules r
+         LEFT JOIN finance_system_categories c
+           ON c.name=r.category AND c.active=1 AND c.archived_at IS NULL
+          AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL)
+            OR (c.scope='PERSONAL' AND c.owner_user_id=r.created_by))
+        WHERE r.created_by=? AND r.enabled=1 AND r.application_mode='AUTO_APPLY'
+          AND r.category IS NOT NULL AND r.category<>''
+        ORDER BY r.priority DESC,r.updated_at DESC,r.id DESC`,
+      [actorId]
+    );
+  }
+  return rules.find((rule) => cleanMerchant(rule.merchant_pattern) === merchant
+    && ruleCompatibleWithAccount(rule, transaction.account_scope)) || null;
+}
+
+async function upsertExactAutoCategoryRule(db, options = {}) {
+  const actorId = Number(options.userId || 0);
+  const category = String(options.category || '').trim().slice(0, 120);
+  const merchant = cleanMerchant(
+    options.merchant_normalized || options.merchant_name || options.description || options.reference || ''
+  );
+  if (!actorId || !category || !merchant) return { saved: false, rule: null, merchant: merchant || null };
+
+  const ownershipScope = String(options.ownershipScope || '').trim().toUpperCase();
+  const scope = ['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(ownershipScope) ? ownershipScope : null;
+  const [ownedRules] = await db.query(
+    `SELECT id,rule_uid,merchant_pattern,category,ownership_scope,application_mode,priority,enabled
+       FROM finance_category_rules
+      WHERE created_by=?
+      ORDER BY priority DESC,updated_at DESC,id DESC FOR UPDATE`,
+    [actorId]
+  );
+  const normalizedMatches = ownedRules.filter((rule) => cleanMerchant(rule.merchant_pattern) === merchant);
+  const existing = normalizedMatches[0] || null;
+  if (existing) {
+    await db.query(
+      `UPDATE finance_category_rules
+          SET merchant_pattern=?,category=?,ownership_scope=?,priority=500,enabled=1,application_mode='AUTO_APPLY',
+              updated_by=?,last_used_at=NOW()
+        WHERE id=?`,
+      [merchant, category, scope, actorId, existing.id]
+    );
+    const duplicateIds = normalizedMatches.slice(1).map((rule) => Number(rule.id)).filter(Boolean);
+    if (duplicateIds.length) {
+      await db.query(
+        `UPDATE finance_category_rules SET enabled=0,updated_by=? WHERE id IN (${duplicateIds.map(() => '?').join(',')})`,
+        [actorId, ...duplicateIds]
+      );
+    }
+    return {
+      saved: true,
+      rule: { ...existing, id: existing.id, merchant_pattern: merchant, category, ownership_scope: scope, application_mode: 'AUTO_APPLY' },
+      merchant,
+      deduplicated_rules: duplicateIds.length
+    };
+  }
+
+  const ruleUid = `RULE-${Date.now().toString(36).toUpperCase()}-${require('node:crypto').randomBytes(4).toString('hex').toUpperCase()}`;
+  const [insert] = await db.query(
+    `INSERT INTO finance_category_rules
+       (rule_uid,merchant_pattern,category,ownership_scope,priority,enabled,application_mode,created_by,updated_by,last_used_at)
+     VALUES (?,?,?,?,500,1,'AUTO_APPLY',?,?,NOW())`,
+    [ruleUid, merchant, category, scope, actorId, actorId]
+  );
+  return { saved: true, rule: { id: insert.insertId, rule_uid: ruleUid, merchant_pattern: merchant, category, ownership_scope: scope, application_mode: 'AUTO_APPLY' }, merchant };
+}
+
 async function periodAllowsClassification(db, transactionDate) {
   const effectiveDate = dateOnly(transactionDate);
   if (!effectiveDate) return false;
@@ -114,7 +208,7 @@ async function applyAutoRulesToImport(db, options = {}) {
     const ruleScope = String(rule.ownership_scope || '').toUpperCase();
     const accountCompatible = !ruleScope || ['MIXED', 'UNCLASSIFIED'].includes(accountScope) || accountScope === ruleScope;
     if (accountCompatible) {
-      if (!next.category && rule.category) next.category = rule.category;
+      if (rule.category) next.category = rule.category;
       if (ruleScope && ['MIXED', 'UNCLASSIFIED'].includes(accountScope)
         && ['MIXED', 'UNCLASSIFIED'].includes(String(next.ownership_scope || '').toUpperCase())) next.ownership_scope = ruleScope;
       if (!next.merchant_normalized) next.merchant_normalized = cleanMerchant(transaction.merchant_name || transaction.description || transaction.reference || '');
@@ -160,5 +254,8 @@ module.exports = {
   normalizeRuleMode,
   normalizeGstTreatment,
   exactRuleMatch,
+  ruleCompatibleWithAccount,
+  findExactAutoCategoryRule,
+  upsertExactAutoCategoryRule,
   applyAutoRulesToImport
 };

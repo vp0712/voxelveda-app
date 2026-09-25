@@ -59,6 +59,85 @@ function matchingUserRule(merchant, rules) {
   }) || null;
 }
 
+async function ownedRule(db, req, id, forUpdate = false) {
+  const suffix = forUpdate ? ' FOR UPDATE' : '';
+  const [[rule]] = await db.query(
+    `SELECT r.*,c.scope AS category_scope
+       FROM finance_category_rules r
+       LEFT JOIN finance_system_categories c
+         ON c.name=r.category AND c.active=1 AND c.archived_at IS NULL
+        AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL)
+          OR (c.scope='PERSONAL' AND c.owner_user_id=r.created_by))
+      WHERE r.id=? AND r.created_by=?${suffix}`,
+    [id, privacy.userId(req)]
+  );
+  if (!rule) throw new FinanceError('Smart rule not found.',404,'FINANCE_RULE_NOT_FOUND');
+  return rule;
+}
+
+function historicalRuleTargetScope(rule, row) {
+  const accountScope = String(row.account_scope || '').toUpperCase();
+  const currentScope = String(row.ownership_scope || accountScope || 'UNCLASSIFIED').toUpperCase();
+  const ruleScope = String(rule.ownership_scope || '').toUpperCase();
+  const categoryScope = String(rule.category_scope || '').toUpperCase();
+  if (accountScope === 'PERSONAL') {
+    if (ruleScope && ruleScope !== 'PERSONAL') return null;
+    if (categoryScope && !['PERSONAL','BOTH'].includes(categoryScope)) return null;
+    return 'PERSONAL';
+  }
+  if (accountScope === 'BUSINESS') {
+    if (ruleScope && ruleScope !== 'BUSINESS') return null;
+    if (categoryScope && !['BUSINESS','BOTH'].includes(categoryScope)) return null;
+    return 'BUSINESS';
+  }
+  const target = ['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(ruleScope) ? ruleScope : currentScope;
+  if (categoryScope === 'PERSONAL' && target !== 'PERSONAL') return null;
+  if (categoryScope === 'BUSINESS' && target !== 'BUSINESS') return null;
+  return target;
+}
+
+async function ruleHistoryCandidates(db, req, rule, forUpdate = false) {
+  const suffix = forUpdate ? ' FOR UPDATE' : '';
+  const [rows] = await db.query(
+    `SELECT bt.id,bt.transaction_date,bt.description,bt.reference,bt.merchant_name,bt.merchant_normalized,
+            bt.category,bt.ownership_scope,bt.manual_override,bt.source_type,bt.review_source_status,
+            ba.ownership_scope AS account_scope,ba.nickname AS account_name,
+            EXISTS(SELECT 1 FROM bank_transaction_splits s WHERE s.parent_bank_transaction_id=bt.id) AS has_splits,
+            ap.status AS period_status,fy.status AS financial_year_status
+       FROM bank_transactions bt
+       JOIN bank_accounts ba ON ba.id=bt.bank_account_id
+       LEFT JOIN accounting_periods ap ON bt.transaction_date BETWEEN ap.start_date AND ap.end_date
+       LEFT JOIN financial_years fy ON fy.id=ap.financial_year_id
+      WHERE bt.archived_at IS NULL AND bt.is_internal_transfer=0 AND ${privacy.visibilitySql('ba', req)}
+      ORDER BY bt.transaction_date ASC,bt.id ASC LIMIT 5000${suffix}`,
+    privacy.visibilityParams(req)
+  );
+  const pattern = cleanMerchant(rule.merchant_pattern);
+  const summary = { exact_matches:0,eligible_count:0,skipped_manual:0,skipped_splits:0,skipped_locked_or_unconfigured:0,skipped_scope:0,already_correct:0,remaining_count:0,capped:false };
+  const eligible = [];
+  for (const row of rows) {
+    const merchant = cleanMerchant(row.merchant_normalized || row.merchant_name || row.description || row.reference || '');
+    if (!pattern || merchant !== pattern) continue;
+    summary.exact_matches += 1;
+    if (Number(row.manual_override || 0)) { summary.skipped_manual += 1; continue; }
+    if (Number(row.has_splits || 0)) { summary.skipped_splits += 1; continue; }
+    const periodOpen = String(row.period_status || '').toUpperCase() === 'OPEN'
+      && !['LOCKED','ARCHIVED'].includes(String(row.financial_year_status || '').toUpperCase());
+    if (!periodOpen) { summary.skipped_locked_or_unconfigured += 1; continue; }
+    const targetScope = historicalRuleTargetScope(rule, row);
+    if (!targetScope) { summary.skipped_scope += 1; continue; }
+    const sameCategory = String(row.category || '') === String(rule.category || '');
+    const sameScope = String(row.ownership_scope || '').toUpperCase() === String(targetScope || '').toUpperCase();
+    if (sameCategory && sameScope) { summary.already_correct += 1; continue; }
+    eligible.push({ ...row, target_scope: targetScope });
+  }
+  const capped = eligible.length > 1000;
+  const candidates = eligible.slice(0,1000);
+  summary.eligible_count = candidates.length;
+  summary.remaining_count = Math.max(0, eligible.length - candidates.length);
+  summary.capped = capped;
+  return { candidates, summary };
+}
 function median(values) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   if (!sorted.length) return 0;
@@ -404,6 +483,64 @@ exports.updateRule = async (req, res) => {
   } catch (error) { return fail(res, error, 'Failed to update smart finance rule'); }
 };
 
+exports.applyRuleHistory = async (req, res) => {
+  let db;
+  try {
+    const id = Number(req.params.id || 0);
+    const preview = req.body.preview === true;
+    db = await pool.getConnection();
+    if (!preview) await db.beginTransaction();
+    const rule = await ownedRule(db, req, id, !preview);
+    if (!rule.enabled || String(rule.application_mode || '').toUpperCase() !== 'AUTO_APPLY') {
+      throw new FinanceError('Enable this rule in Auto Apply mode before applying it to history.',409,'FINANCE_RULE_HISTORY_MODE_REQUIRED');
+    }
+    if (!rule.category || !rule.category_scope) {
+      throw new FinanceError('Historical application requires an active managed Finance category.',409,'FINANCE_RULE_HISTORY_CATEGORY_REQUIRED');
+    }
+    const { candidates, summary } = await ruleHistoryCandidates(db, req, rule, !preview);
+    const response = {
+      rule_id:id,merchant_pattern:rule.merchant_pattern,category:rule.category,ownership_scope:rule.ownership_scope || null,
+      ...summary,
+      note:'Manual classifications, split transactions, locked periods and incompatible account scopes are never overwritten.'
+    };
+    if (preview) return res.json({ message:`${summary.eligible_count} existing exact merchant transaction(s) are eligible for this category rule.`,preview:true,...response });
+
+    const expectedCount = Number(req.body.expected_count);
+    if (!Number.isInteger(expectedCount) || expectedCount < 0) throw new FinanceError('Preview historical matches before applying the rule.',409,'FINANCE_RULE_HISTORY_PREVIEW_REQUIRED');
+    if (expectedCount !== candidates.length) throw new FinanceError('Historical match count changed after preview. Review again before applying.',409,'FINANCE_RULE_HISTORY_PREVIEW_STALE');
+
+    for (const row of candidates) {
+      await db.query(
+        `UPDATE bank_transactions
+            SET category=?,classification_status='CLASSIFIED',ownership_scope=?,review_source_status='AUTO_RULE_HISTORY'
+          WHERE id=? AND manual_override=0 AND archived_at IS NULL`,
+        [rule.category,row.target_scope,row.id]
+      );
+      await db.query(
+        `INSERT INTO finance_transaction_rule_matches
+         (finance_category_rule_id,bank_transaction_id,match_kind,status,matched_at,applied_at,applied_by)
+         VALUES (?,?,'EXACT','APPLIED',NOW(),NOW(),?)
+         ON DUPLICATE KEY UPDATE match_kind='EXACT',status='APPLIED',matched_at=NOW(),applied_at=NOW(),applied_by=VALUES(applied_by)`,
+        [rule.id,row.id,privacy.userId(req)]
+      );
+      await logAudit(db, audit(req, {
+        action:'FINANCE_RULE_HISTORY_APPLIED',module:'finance_intelligence',recordType:'bank_transaction',recordId:row.id,
+        oldValue:{category:row.category,ownership_scope:row.ownership_scope,review_source_status:row.review_source_status},
+        newValue:{category:rule.category,ownership_scope:row.target_scope,review_source_status:'AUTO_RULE_HISTORY',finance_category_rule_id:rule.id}
+      }));
+    }
+    await db.query('UPDATE finance_category_rules SET last_used_at=NOW(),updated_by=? WHERE id=?',[privacy.userId(req),rule.id]);
+    await logAudit(db, audit(req, {
+      action:'FINANCE_RULE_HISTORY_BATCH_APPLIED',module:'finance_intelligence',recordType:'finance_category_rule',recordId:rule.id,
+      newValue:{merchant_pattern:rule.merchant_pattern,category:rule.category,applied_count:candidates.length,remaining_count:summary.remaining_count}
+    }));
+    await db.commit();
+    return res.json({ message:`Applied ${candidates.length} existing exact merchant transaction(s) to ${rule.category}.`,preview:false,applied_count:candidates.length,...response });
+  } catch (error) {
+    if (db && !req.body?.preview) await db.rollback().catch(()=>{});
+    return fail(res,error,'Failed to apply smart rule to historical transactions');
+  } finally { if (db) db.release(); }
+};
 exports.deleteRule = async (req, res) => {
   try {
     const id = Number(req.params.id || 0);

@@ -4,10 +4,17 @@
   const status = document.getElementById('status');
   const setStatus = (message, ok = false) => { status.textContent = message; status.style.color = ok ? '#22c55e' : '#f87171'; };
   function destination(user) {
+    const role = String(user?.role || '').trim().toLowerCase();
+    let home = '/portal/staff';
+    if (['viewer', 'view_only', 'client', 'customer'].includes(role)) home = '/client';
+    else if (['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(role) || user?.permissions?.includes('finance')) home = '/admin';
+    else if (['staff', 'hr', 'production', 'supervisor', 'manager', 'sales'].includes(role)) home = `/portal/${role}`;
+
     const requested = sessionStorage.getItem('vv_mfa_return_to') || '';
-    if (requested.startsWith('/') && !requested.startsWith('//') && !requested.includes('\\')) return requested;
-    const role = String(user?.role || '').toLowerCase();
-    return ['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(role) || user?.permissions?.includes('finance') ? '/admin' : '/dashboard';
+    if (!requested.startsWith('/') || requested.startsWith('//') || requested.includes('\\')) return home;
+    if (requested === '/dashboard' || requested.startsWith('/portal/') || requested === '/client') return home;
+    if (requested.startsWith('/admin') && home !== '/admin') return home;
+    return requested;
   }
   function clearChallenge() {
     sessionStorage.removeItem('vv_mfa_challenge');

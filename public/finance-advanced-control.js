@@ -2,10 +2,12 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260924-advanced-control-v15';
-const state={loading:false,data:{},errors:{},statuses:{},progress:{resolved:0,total:0},scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
+const VERSION='20260925-advanced-control-v17';
+const state={loading:false,data:{},errors:{},statuses:{},progress:{resolved:0,total:0},categoryChartAccount:'ALL',filterSignature:'',dataRevision:0,lastLoadedAt:0,scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
+  ['spending',()=>'/api/finance/intelligence/reports/spending'+advancedFilterQuery()+'&include_transactions=0'],
+  ['categories','/api/finance/categories?include_archived=false'],
   ['attention','/api/finance/personal-money/attention'],
   ['smart','/api/finance/personal-money/smart'],
   ['health','/api/finance/personal-money/health'],
@@ -49,6 +51,9 @@ const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'curre
 const date=v=>{if(!v)return '—';try{return new Intl.DateTimeFormat('en-AU',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(String(v).slice(0,10)+'T00:00:00'))}catch{return String(v)}};
 const tone=s=>{s=String(s||'').toUpperCase();if(['URGENT','CRITICAL','HIGH','FAILED','OVERDUE'].includes(s))return 'high';if(['MEDIUM','WATCH','WARNING','ACTION_SOON','REVIEW'].includes(s))return 'watch';return 'ok'};
 const statusChip=(label)=>'<span class="fac-chip '+tone(label)+'">'+esc(String(label||'INFO').replaceAll('_',' '))+'</span>';
+const advancedFilterQuery=()=>typeof window!=='undefined'&&typeof window.__financeFilterQuery==='function'?window.__financeFilterQuery():'?scope=ALL';
+const currentFilterSignature=()=>advancedFilterQuery();
+const sourceUrl=source=>typeof source==='function'?source():source;
 
 function style(){
  if(document.querySelector('style[data-finance-advanced-control]'))return;
@@ -69,8 +74,12 @@ function style(){
  .fac-loading{padding:24px;text-align:center;border:1px dashed rgba(127,127,127,.25);border-radius:16px}.fac-source{font-size:.73rem;color:var(--muted,#687386)}.fac-empty{padding:14px;border:1px dashed rgba(127,127,127,.22);border-radius:12px;color:var(--muted,#687386)}
  .fac-progress{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:1px solid rgba(79,111,223,.2);border-radius:12px;background:rgba(79,111,223,.06);font-size:.8rem}.fac-progress b{white-space:nowrap}.fac-check-actions{display:flex;gap:7px;align-items:center}.fac-check-actions button{min-height:32px;padding:5px 9px}
  .fac-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fac-check{display:flex;justify-content:space-between;gap:10px;padding:10px;border:1px solid rgba(127,127,127,.14);border-radius:11px;align-items:center}
+ .fac-category-account-tabs{display:flex;gap:7px;overflow:auto;padding:2px 0 8px;scrollbar-width:none}.fac-category-account-tabs::-webkit-scrollbar{display:none}.fac-category-account-tabs button{flex:0 0 auto;border:1px solid rgba(127,127,127,.2);background:var(--panel,#fff);border-radius:999px;padding:7px 10px;font-size:.68rem;font-weight:850;cursor:pointer}.fac-category-account-tabs button.active{border-color:#0877ff;background:#eef7ff;color:#0877ff}
+ .fac-category-currency{padding:14px;border:1px solid rgba(127,127,127,.16);border-radius:15px;background:var(--panel,#fff)}.fac-category-currency-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end}.fac-category-currency-head h4{margin:0}.fac-category-currency-head span{font-size:.7rem;color:var(--muted,#687386)}
+ .fac-category-scroll{display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding:14px 2px 4px;scrollbar-width:thin}.fac-category-column{flex:0 0 92px;display:grid;grid-template-rows:auto 174px auto auto;gap:5px;align-items:end;border:0;background:transparent;color:inherit;padding:0;cursor:pointer;text-align:center}.fac-category-column:hover .fac-category-bar,.fac-category-column:focus-visible .fac-category-bar{filter:brightness(.93)}.fac-category-value{font-size:.61rem;font-weight:900;white-space:nowrap}.fac-category-bar-area{height:174px;display:flex;align-items:flex-end;justify-content:center}.fac-category-bar{display:block;width:48px;min-height:4px;border-radius:12px 12px 5px 5px;background:linear-gradient(180deg,#1f8fff,#0b62d5);box-shadow:0 8px 20px rgba(8,119,255,.16)}.fac-category-label{font-size:.61rem;font-weight:850;line-height:1.2;overflow-wrap:anywhere}.fac-category-count{font-size:.54rem;color:var(--muted,#687386)}
+
  @media(max-width:950px){.fac-grid.four,.fac-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fac-grid.three{grid-template-columns:1fr 1fr}.fac-scenario{grid-template-columns:1fr 1fr}}
- @media(max-width:650px){.fac-grid.four,.fac-grid.three,.fac-grid.two,.fac-kpis,.fac-control-grid,.fac-scenario{grid-template-columns:1fr}.fac-section>header,.fac-row{flex-direction:column}.fac-right{text-align:left;justify-items:start}.fac-toolbar>*{flex:1;min-width:130px}.fac-jumps{display:grid;grid-template-columns:1fr 1fr}.fac-bar{grid-template-columns:1fr}.fac-bar-track{order:3}}
+ @media(max-width:650px){.fac-grid.four,.fac-grid.three,.fac-grid.two,.fac-kpis,.fac-control-grid,.fac-scenario{grid-template-columns:1fr}.fac-section>header,.fac-row{flex-direction:column}.fac-right{text-align:left;justify-items:start}.fac-toolbar>*{flex:1;min-width:130px}.fac-jumps{display:grid;grid-template-columns:1fr 1fr}.fac-bar{grid-template-columns:1fr}.fac-bar-track{order:3}.fac-category-column{flex-basis:84px;grid-template-rows:auto 148px auto auto}.fac-category-bar-area{height:148px}.fac-category-bar{width:42px}.fac-category-currency{padding:12px}}
 
 
  /* Premium command-centre visual layer v15 */
@@ -342,6 +351,8 @@ async function load(){
  if(state.loading)return;
  const root=document.getElementById(MOUNT_ID);if(!root){state.loading=false;return}
  const cycle=++loadCycle,hasExistingData=Object.keys(state.data).length>0,deadline=Date.now()+ADVANCED_LOAD_BUDGET_MS;
+ state.filterSignature=currentFilterSignature();
+ state.dataRevision=Number(typeof window!=='undefined'?window.__financeDataRevision||0:0);
  state.loading=true;state.errors={};state.statuses=Object.fromEntries(SOURCES.map(([name])=>[name,'pending']));updateProgress();
  if(hasExistingData)render();else root.innerHTML=loadingMarkup();
  for(let i=0;i<SOURCES.length;i+=ADVANCED_BATCH_SIZE){
@@ -349,7 +360,7 @@ async function load(){
   const remaining=deadline-Date.now();
   if(remaining<1000)break;
   const batch=SOURCES.slice(i,i+ADVANCED_BATCH_SIZE);
-  await Promise.allSettled(batch.map(([name,url])=>get(name,url,cycle,remaining)));
+  await Promise.allSettled(batch.map(([name,url])=>get(name,sourceUrl(url),cycle,remaining)));
   updateProgress();
   if(hasExistingData)render();else if(document.getElementById(MOUNT_ID))document.getElementById(MOUNT_ID).innerHTML=loadingMarkup();
  }
@@ -358,12 +369,12 @@ async function load(){
   if(['pending','loading'].includes(state.statuses[name])){state.statuses[name]='error';state.errors[name]='Load budget reached'}
  }
  for(const controller of activeControllers.values())controller.abort();
- updateProgress();state.loading=false;render();
+ updateProgress();state.loading=false;state.lastLoadedAt=Date.now();render();
 }
 async function retrySource(name){
  const source=SOURCES.find(([sourceName])=>sourceName===name);if(!source||state.statuses[name]==='loading')return;
  delete state.errors[name];state.statuses[name]='loading';render();
- await get(source[0],source[1],loadCycle,ADVANCED_REQUEST_TIMEOUT_MS);updateProgress();render();
+ await get(source[0],sourceUrl(source[1]),loadCycle,ADVANCED_REQUEST_TIMEOUT_MS);updateProgress();render();
 }
 
 function currencies(){
@@ -451,6 +462,34 @@ function executive(){
  return '<section id="facExecutive" class="fac-section"><header><div><h3>Executive Cockpit</h3><p>Personal, banking, company and evidence controls without collapsing currencies.</p></div>'+statusChip(critical?'HIGH ATTENTION':'CONTROLLED')+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>High-priority actions</span><b>'+critical+'</b><small>From current protected sources</small></div><div class="fac-kpi"><span>Unclassified transactions</span><b>'+num(integrity.unclassified_bank_transactions)+'</b><small>Personal integrity</small></div><div class="fac-kpi"><span>Unreconciled transactions</span><b>'+num(integrity.unreconciled_bank_transactions)+'</b><small>Personal integrity</small></div><div class="fac-kpi"><span>Receipt exceptions</span><b>'+(num(rc.missing)+num(rc.requested))+'</b><small>Missing + requested</small></div></div>'+
  '<div class="fac-grid '+(cs.length>1?'two':'')+'" style="margin-top:10px">'+rows+'</div></section>';
+}
+
+function categorySpendingControl(){
+ const data=state.data.spending||{},accounts=Array.isArray(data.accounts)?data.accounts:[],allCategories=Array.isArray(data.categories)?data.categories:[],accountCategories=Array.isArray(data.account_categories)?data.account_categories:[],categoryDefinitions=(state.data.categories?.categories||[]).filter(item=>Number(item.active??1)!==0&&!item.archived_at);
+ const categoryNames=[...new Set(categoryDefinitions.map(item=>String(item.name||'').trim()).filter(Boolean))];
+ const visibleIds=new Set(accounts.map(a=>String(a.bank_account_id)));
+ if(state.categoryChartAccount!=='ALL'&&!visibleIds.has(String(state.categoryChartAccount)))state.categoryChartAccount='ALL';
+ const selected=state.categoryChartAccount;
+ const rows=(selected==='ALL'?allCategories:accountCategories.filter(row=>String(row.bank_account_id)===String(selected))).map(row=>({...row,spent:num(row.spent),source_transaction_count:num(row.source_transaction_count||row.transaction_count)}));
+ const selectedAccounts=selected==='ALL'?accounts:accounts.filter(a=>String(a.bank_account_id)===String(selected));
+ const currencies=[...new Set([...rows.map(row=>String(row.currency||'AUD').toUpperCase()),...selectedAccounts.map(a=>String(a.currency||'AUD').toUpperCase())])];
+ const tabs='<div class="fac-category-account-tabs"><button type="button" data-fac-category-account="ALL" class="'+(selected==='ALL'?'active':'')+'">All visible accounts</button>'+accounts.map(a=>'<button type="button" data-fac-category-account="'+esc(a.bank_account_id)+'" class="'+(String(selected)===String(a.bank_account_id)?'active':'')+'">'+esc(a.account_name||'Account')+'</button>').join('')+'</div>';
+ const charts=currencies.map(cur=>{
+  const actual=rows.filter(row=>String(row.currency||'AUD').toUpperCase()===cur);
+  const byCategory=new Map(actual.map(row=>[String(row.category||'Unclassified'),row]));
+  for(const name of categoryNames)if(!byCategory.has(name))byCategory.set(name,{category:name,currency:cur,spent:0,source_transaction_count:0});
+  if(!byCategory.has('Unclassified'))byCategory.set('Unclassified',{category:'Unclassified',currency:cur,spent:0,source_transaction_count:0});
+  const cats=[...byCategory.values()].sort((a,b)=>num(b.spent)-num(a.spent)||String(a.category).localeCompare(String(b.category)));
+  const max=Math.max(1,...cats.map(x=>num(x.spent))),total=actual.reduce((sum,x)=>sum+num(x.spent),0),count=actual.reduce((sum,x)=>sum+num(x.source_transaction_count),0);
+  const columns=cats.map(x=>{
+   const height=Math.max(3,Math.min(100,(num(x.spent)/max)*100));
+   const effectiveAccount=selected==='ALL'?(data.filters?.account_id||''):selected;
+   return '<button type="button" class="fac-category-column" data-fac-category-open="'+esc(x.category||'Unclassified')+'" data-fac-category-currency="'+esc(cur)+'" data-fac-category-account-id="'+esc(effectiveAccount)+'" title="Open '+esc(x.category||'Unclassified')+' transactions"><span class="fac-category-value">'+money(x.spent,cur)+'</span><span class="fac-category-bar-area"><i class="fac-category-bar" style="height:'+height.toFixed(2)+'%"></i></span><span class="fac-category-label">'+esc(x.category||'Unclassified')+'</span><span class="fac-category-count">'+num(x.source_transaction_count)+' tx</span></button>';
+  }).join('');
+  return '<article class="fac-category-currency"><div class="fac-category-currency-head"><div><h4>'+esc(cur)+' spending by category</h4><span>'+num(count)+' category-linked transaction(s)</span></div><strong>'+money(total,cur)+'</strong></div><div class="fac-category-scroll">'+(columns||'<div class="fac-empty">No category spending for this selection.</div>')+'</div></article>';
+ }).join('');
+ const period=data.filters?.from||data.filters?.to?(' · '+esc(data.filters?.from||'start')+' to '+esc(data.filters?.to||'today')):' · all available history';
+ return '<section id="facCategories" class="fac-section"><header><div><h3>Category Spending Chart</h3><p>Every category is calculated from the canonical ledger'+period+'. Select an account, then tap any column to open every matching transaction and its total.</p></div><span class="fac-source">'+num(categoryNames.length||rows.length)+' configured categories</span></header>'+tabs+'<div class="fac-grid">'+(charts||'<div class="fac-empty">No expense categories are available for the selected filters.</div>')+'</div><div class="fac-note" style="margin-top:10px">Manual transaction/category changes are reflected from the same ledger. Connected-bank categories are only normalised when the bank/provider evidence maps cleanly to a canonical Finance category; uncertain items stay Unclassified instead of being forced into the wrong category.</div></section>';
 }
 
 function executiveReadinessBoard(){
@@ -663,7 +702,7 @@ function cashCustodyControl(){
 }
 
 function sourceHealth(){
- const rows=SOURCES.map(([n,u])=>{const err=state.errors[n],status=state.statuses[n]||(Object.prototype.hasOwnProperty.call(state.data,n)?'loaded':'pending'),label=err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):(status==='loaded'?'READY':status==='loading'?'LOADING':'PENDING');return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+(err?' · '+esc(err):'')+'</div></div><div class="fac-check-actions">'+statusChip(label)+(status==='error'?'<button type="button" data-fac-retry="'+esc(n)+'">Retry</button>':'')+'</div></div>'}).join('');
+ const rows=SOURCES.map(([n,u])=>{const err=state.errors[n],status=state.statuses[n]||(Object.prototype.hasOwnProperty.call(state.data,n)?'loaded':'pending'),label=err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):(status==='loaded'?'READY':status==='loading'?'LOADING':'PENDING'),resolved=(()=>{try{return sourceUrl(u)}catch{return 'dynamic Finance source'}})();return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(resolved)+(err?' · '+esc(err):'')+'</div></div><div class="fac-check-actions">'+statusChip(label)+(status==='error'?'<button type="button" data-fac-retry="'+esc(n)+'">Retry</button>':'')+'</div></div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
 }
 
@@ -671,9 +710,9 @@ function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
  updateProgress();
  const progress=state.loading?'<div class="fac-progress" role="status"><span>Refreshing evidence in bounded batches. The current control picture stays available while sources update.</span><b>'+state.progress.resolved+' / '+state.progress.total+'</b></div>':'';
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facReadiness">Readiness</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facCashCustody">Cash Custody</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facCounterparty">Counterparties</button><button data-fac-jump="facPlanning">FP&A</button><button data-fac-jump="facProfitability">Job Profitability</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facAnomaly">Explainability</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facCategories">Categories</button><button data-fac-jump="facReadiness">Readiness</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facCashCustody">Cash Custody</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facCounterparty">Counterparties</button><button data-fac-jump="facPlanning">FP&A</button><button data-fac-jump="facProfitability">Job Profitability</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facAnomaly">Explainability</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
  progress+
- executive()+executiveReadinessBoard()+actions()+controlActionsSummary()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+cashCustodyControl()+treasuryControl()+counterpartyWorkingCapitalControl()+fpaPlanningControl()+jobProfitabilityControl()+performanceRiskControl()+anomalyExplainability()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
+ executive()+categorySpendingControl()+executiveReadinessBoard()+actions()+controlActionsSummary()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+cashCustodyControl()+treasuryControl()+counterpartyWorkingCapitalControl()+fpaPlanningControl()+jobProfitabilityControl()+performanceRiskControl()+anomalyExplainability()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
  bind();
 }
@@ -683,6 +722,8 @@ function bind(){
  document.querySelectorAll('[data-fac-jump]').forEach(b=>b.addEventListener('click',()=>document.getElementById(b.dataset.facJump)?.scrollIntoView({behavior:'smooth',block:'start'})));
  document.querySelectorAll('[data-fac-open]').forEach(b=>b.addEventListener('click',()=>document.querySelector('[data-view="'+b.dataset.facOpen+'"]')?.click()));
  document.querySelectorAll('[data-fac-tx]').forEach(b=>b.addEventListener('click',()=>{const id=Number(b.dataset.facTx);if(window.__financeOpenTransaction)window.__financeOpenTransaction(id);else document.querySelector('[data-view="transactions"]')?.click()}));
+ document.querySelectorAll('[data-fac-category-account]').forEach(b=>b.addEventListener('click',()=>{state.categoryChartAccount=b.dataset.facCategoryAccount||'ALL';render()}));
+ document.querySelectorAll('[data-fac-category-open]').forEach(b=>b.addEventListener('click',()=>{const payload={category:b.dataset.facCategoryOpen||'',currency:b.dataset.facCategoryCurrency||'',accountId:b.dataset.facCategoryAccountId||''};if(window.__financeOpenCategory)window.__financeOpenCategory(payload);else document.querySelector('[data-view="transactions"]')?.click()}));
  const ids=[['facScenarioCurrency','currency'],['facIncomeDelta','monthlyIncomeDelta'],['facSpendDelta','monthlySpendingDelta'],['facOneTime','oneTimeCost'],['facSavingTarget','monthlySavingTarget']];
  for(const [id,key] of ids)document.getElementById(id)?.addEventListener(id==='facScenarioCurrency'?'change':'input',e=>{state.scenario[key]=id==='facScenarioCurrency'?e.target.value:num(e.target.value);render()});
  document.getElementById('facCompareCurrency')?.addEventListener('change',e=>{state.scenario.currency=e.target.value;render()});
@@ -692,9 +733,13 @@ function bind(){
 function mount(){
  style();
  const root=document.getElementById(MOUNT_ID);if(!root)return;
- if(Object.keys(state.data).length&&!state.loading)render();else load();
+ const filterChanged=state.filterSignature!==currentFilterSignature();
+ const dataChanged=state.dataRevision!==Number(typeof window!=='undefined'?window.__financeDataRevision||0:0);
+ const stale=Date.now()-num(state.lastLoadedAt)>15000;
+ if(!state.loading&&(filterChanged||dataChanged||stale||!Object.keys(state.data).length))load();else render();
 }
 window.__financeAdvancedControlMount=mount;
 window.addEventListener('finance:advanced-mount',mount);
+window.addEventListener('finance:data-changed',()=>{if(document.getElementById(MOUNT_ID)&&!state.loading)load()});
 if(document.readyState!=='loading')setTimeout(mount,0);else document.addEventListener('DOMContentLoaded',()=>setTimeout(mount,0));
 })();

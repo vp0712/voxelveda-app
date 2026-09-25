@@ -19,6 +19,8 @@ assert(controller.includes("scope='PERSONAL' AND \\${alias}.owner_user_id=?") ||
 assert(controller.includes('FINANCE_CATEGORY_CREATED'),'category create audit missing');
 assert(controller.includes('FINANCE_CATEGORY_ARCHIVED'),'category archive audit missing');
 assert(controller.includes('CATEGORY_HAS_ACTIVE_CHILDREN'),'parent/child archive guard missing');
+assert(controller.includes('CATEGORY_NAME_ALREADY_EXISTS'),'duplicate visible category-name guard missing');
+assert(controller.includes('CATEGORY_NAME_ARCHIVED'),'archived duplicate category guard missing');
 
 assert(routes.includes("router.get('/categories'"),'category list route missing');
 assert(routes.includes("router.post('/categories', requireAnyPermission('EDIT_FINANCE')"),'category write permission missing');
@@ -31,6 +33,10 @@ assert(client.includes('openFinanceCategoryForm'),'category create/edit UI missi
 assert(client.includes('openFinanceRuleForm'),'merchant rule edit UI missing');
 assert(client.includes('data-category-archive'),'category archive action missing');
 assert(client.includes('data-category-restore'),'category restore action missing');
+assert(client.includes('openTransactionCategoryMove'),'transaction category move workflow missing');
+assert(client.includes('create_category_name'),'inline new-category creation from a transaction is missing');
+assert(client.includes('Learn this exact merchant for future transactions'),'merchant-learning control missing');
+
 
 assert(!archiveMigration.includes('CREATE INDEX IF NOT EXISTS'),'MySQL-incompatible CREATE INDEX IF NOT EXISTS must not remain');
 assert(!archiveMigration.includes('ADD COLUMN IF NOT EXISTS'),'MySQL-incompatible ADD COLUMN IF NOT EXISTS must not remain');

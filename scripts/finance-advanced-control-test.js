@@ -5,6 +5,7 @@ const advanced=fs.readFileSync('public/finance-advanced-control.js','utf8');
 const master=fs.readFileSync('public/finance-master.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
+const intelligence=fs.readFileSync('controllers/financeIntelligenceController.js','utf8');
 
 const advancedVersion=(advanced.match(/VERSION='([^']+)'/)||[])[1];
 assert(/^20\d{6}-advanced-control-v\d+$/.test(advancedVersion||''),'Advanced Finance release id is missing or invalid.');
@@ -17,7 +18,7 @@ assert(app.includes("'finance-advanced-control.js'"),'Advanced Control must be a
 assert(/\/finance-master\.js\?v=20\d{6}-control-v\d+/.test(html),'Canonical Finance HTML must use a versioned master release.');
 
 for(const label of [
-  'Executive Cockpit','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
+  'Executive Cockpit','Category Spending Chart','Action Queue','7 / 30 / 90 / 365-day Forecast','Scenario Lab',
   'Commitments, Debt & Savings Reserve Intelligence','Risk, Integrity & Control Readiness',
   'Tax, Evidence & Year-End Readiness','Company CFO Control','Cash Custody & Petty Cash Control','AR / AP Counterparty Control','Accountant Handover Readiness','Automation & Approval Control','Decision Intelligence — Plan A vs Plan B','Performance & Stress Control','CFO Anomaly & Explainability','Control Actions','Evidence Source Health'
 ]) assert(advanced.includes(label),`Advanced Finance Control must expose ${label}.`);
@@ -27,7 +28,7 @@ for(const endpoint of [
   '/api/finance/personal-money/health','/api/finance/personal-money/commitments-control','/api/finance/personal-money/savings-control','/api/finance/personal-money/tax-control','/api/finance/personal-money/roadmaps',
   '/api/finance/personal-money/data-quality-integrity','/api/finance/personal-money/net-worth',
   '/api/finance/personal-money/net-worth/lifecycle','/api/finance/company-summary','/api/finance/counterparty-control',
-  '/api/finance/banking-os/command-center','/api/finance/intelligence/data-quality',
+  '/api/finance/banking-os/command-center','/api/finance/intelligence/data-quality','/api/finance/intelligence/reports/spending',
   '/api/finance/receipts','/api/finance/cash-control/custody','/api/finance/reimbursements','/api/finance/accountant-handover','/api/finance/personal-money/review-inbox','/api/finance/intelligence/banking-readiness','/api/notifications','/api/finance/intelligence/rules','/api/finance/close-assurance','/api/finance/performance-risk-control','/api/finance/issues'
 ]) assert(advanced.includes(endpoint),`Advanced Control must use protected canonical source ${endpoint}.`);
 
@@ -72,6 +73,12 @@ assert(advanced.includes('/api/finance/anomaly-explain-control'),'Advanced Contr
 assert(advanced.includes('function anomalyExplainability()'),'Advanced anomaly/explainability section missing.');
 assert(advanced.includes('data-fac-open="anomaly"'),'Advanced Control must drill into full anomaly/explainability workspace.');
 assert(advanced.includes('data-fac-tx'),'Advanced Control must expose source transaction drill-down for explainability.');
+assert(advanced.includes('function categorySpendingControl()'),'Advanced Control must expose the live category spending chart.');
+assert(advanced.includes('data-fac-category-account'),'Category chart must support account-level switching.');
+assert(advanced.includes('data-fac-category-open'),'Category columns must drill into matching transactions.');
+assert(master.includes('window.__financeOpenCategory'),'Master Finance OS must expose the category-to-ledger drilldown bridge.');
+assert(master.includes('fm-category-drilldown-summary'),'Transaction Explorer must show category totals after chart drilldown.');
+
 
 assert(advanced.includes('function executiveReadinessBoard()'),'Executive readiness board function missing.');
 assert(advanced.includes('Executive Control Readiness Board'),'Executive readiness board UI missing.');
@@ -95,3 +102,9 @@ assert(advanced.includes('data-fac-open="savings"'),'Advanced Control must drill
 
 assert(advanced.includes('function cashCustodyControl()'),'Advanced Cash Custody section missing.');
 assert(advanced.includes('data-fac-open="cash"'),'Advanced Cash Custody must drill into canonical Cash Control.');
+assert(advanced.includes('include_transactions=0'),'Advanced category analytics must use the lightweight spending endpoint mode.');
+assert(advanced.includes("['categories','/api/finance/categories?include_archived=false']"),'Category chart must hydrate configured Finance categories, including zero-spend buckets.');
+assert(intelligence.includes('account_categories: accountCategories'),'Spending report must return per-account category totals.');
+assert(intelligence.includes("const includeTransactions=String(req.query.include_transactions??'1')!=='0'"),'Spending report must support lightweight category analytics without the 5,000-row transaction payload.');
+assert(intelligence.includes('transactions_included: includeTransactions'),'Spending report must identify whether transaction rows were included.');
+

@@ -19,6 +19,12 @@ for(const name of ['Overview','My Money','Company Finance','Consolidated','Accou
 assert.match(js,/banking-dashboard/,'Finance OS must use real banking dashboard data.');
 assert.match(js,/I\+'\/transactions'/,'Finance OS must use the real transaction explorer endpoint.');
 assert.match(js,/I\+'\/statements'/,'Finance OS must use the real statement vault endpoint.');
+assert.match(js,/data-statement-edit/,'Committed Statement Vault rows must expose an edit action after Pending Review.');
+assert.match(js,/function openStatementVaultEditor\(/,'Statement Vault edit action must open the committed statement transaction editor.');
+assert.match(js,/data-statement-correct-tx/,'Committed statement editor must expose audited post-review transaction corrections.');
+assert.match(js,/function openCommittedStatementTransactionEditor\(/,'Posted statement correction form must exist after Pending Review.');
+assert.match(js,/\/transactions\/'\+encodeURIComponent\(tx\.id\)\+'\/correct/,'Posted statement corrections must use the protected Statement Vault API.');
+assert.match(js,/method:'DELETE',body:JSON\.stringify\(\{confirmation:typed\}\)/,'Permanent statement purge must call the DELETE route.');
 assert.match(js,/bank-transactions\/'\+id\+'\/original/,'Transaction detail must surface immutable original bank data.');
 assert.match(js,/I\+'\/transactions'/,'Manual transaction workflow must write to the canonical bank transaction ledger API.');
 assert.match(js,/relationship-candidates\/transfers/,'Transfer review must use the canonical relationship candidate API.');
@@ -34,6 +40,10 @@ assert.match(js,/companySettingsForm/,'Finance Settings must expose editable com
 assert.match(js,/runFinanceCommand/,'Finance OS must expose command search actions.');
 assert.match(css,/@media\(max-width:700px\)/,'Finance OS must have a dedicated mobile layout.');
 assert.match(css,/fm-drawer/,'Transaction/account detail drawer must be styled.');
+assert.match(js,/fm-vault-editor-row/,'Statement Vault editor must use a mobile-safe committed transaction row.');
+assert.match(css,/\.fm-vault-editor-row\{display:grid;grid-template-columns:minmax\(0,1fr\) auto/,'Statement Vault desktop row must reserve visible amount/action space.');
+assert.match(css,/@media\(max-width:700px\)\{[\s\S]*\.fm-vault-editor-row\{grid-template-columns:1fr/,'Statement Vault editor must stack transaction details on phone screens.');
+assert.match(css,/\.fm-vault-editor-actions\{display:grid;grid-template-columns:1fr 1fr/,'Statement Vault mobile actions must fit within the viewport.');
 console.log('Finance Master OS regression contract passed.');
 
 assert.match(html,/id="fmMobileNav"/,'Finance OS must provide a dedicated mobile navigation surface.');
@@ -51,11 +61,27 @@ for(const reportType of ['INCOME_VS_EXPENSE','ACCOUNT_ACTIVITY','ACCOUNT_STATEME
   assert(js.includes(reportType),`Finance report catalogue must expose ${reportType}`);
 }
 assert.match(js,/fm-report-preset/,'Report Centre must expose one-click standard report presets.');
+assert.match(js,/function openTransactionCategoryMove\(/,'Transaction detail must expose a dedicated category move workflow.');
+assert.match(js,/data-category-move-open/,'Transaction detail must expose the Move Category action.');
+assert.match(js,/move_whole_transaction:true/,'Category move must explicitly replace split allocations so a moved transaction cannot remain in the old category.');
+assert.match(js,/learn_merchant:fd\.get\('learn_merchant'\)==='on'/,'Category move must let the user teach the exact merchant for future categorisation.');
+assert.match(js,/create_category_name:newName\|\|null/,'Category move must support inline category creation.');
+assert.match(js,/function applyLearnedRuleToHistory\(/,'Learned merchant rules must offer safe historical exact-match propagation.');
+assert.match(js,/rules\/'\+encodeURIComponent\(ruleId\)\+'\/apply-history/,'Historical learned-category propagation must use the protected rule endpoint.');
+assert.match(js,/Only safe non-manual, non-split transactions in open accounting periods will change/,'Historical merchant learning must disclose protected exclusions before applying.');
+
+
 
 assert.match(js,/function openAccountForm\(/,'Finance OS must expose a real create/edit account workflow.');
 assert.match(js,/I\+'\/accounts'/,'Account form must save through the canonical Finance account API.');
 assert.match(js,/if\(kind==='account'\)\{openAccountForm\(\);return\}/,'Add Account must never open the transaction form.');
 assert.match(js,/data-account-edit/,'Account workspace must provide account editing.');
+assert.match(js,/function renderAccountCategoryChart\(/,'Every Finance account must have a reusable category spending chart.');
+assert.match(js,/data-account-category=/,'Account category chart columns must be clickable.');
+assert.match(js,/openAccountCategory\(/,'Account category columns must drill into filtered transactions.');
+assert.match(js,/accountCategorySpending/,'Accounts page must hydrate per-account category totals for the selected period.');
+assert.match(css,/\.fm-account-category-chart/,'Per-account category chart must be styled.');
+
 assert.match(js,/data-account-purge/,'Account workspace must expose explicit permanent account-and-data deletion.');
 assert.match(js,/Type exactly:/,'Permanent account deletion must require typed confirmation.');
 assert.match(js,/data-personal-new="wallet"/,'Personal Money must expose wallet creation.');

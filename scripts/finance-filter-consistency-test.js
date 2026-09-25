@@ -23,6 +23,7 @@ const controller=fs.readFileSync(path.join(__dirname,'..','controllers','finance
 const reportController=fs.readFileSync(path.join(__dirname,'..','controllers','financeReportBuilderController.js'),'utf8');
 assert.match(controller,/const filters = spendingWhere\(req\);[\s\S]{0,500}const txWhere = filters\.where/,'dashboard must consume the canonical core filter');
 assert.match(controller,/const core = spendingWhere\(req\);/,'transaction explorer must consume the canonical core filter');
+assert.match(controller,/exports\.getStatementLibrary[\s\S]{0,900}sif\.parse_status='IMPORTED'/,'Statement Vault must return only active imported statements so soft-removed statements stay out after refresh.');
 assert.match(reportController,/buildCoreBankTransactionFilter\(req/,'report builder must consume the canonical core filter');
 
 console.log('FINANCE_FILTER_CONSISTENCY_TEST_OK');

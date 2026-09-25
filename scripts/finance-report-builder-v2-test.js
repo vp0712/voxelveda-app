@@ -47,6 +47,11 @@ assert(client.includes('Standard Report Catalogue'),'standard Finance report cat
 assert(client.includes('data-report-preset'),'one-click report presets are missing');
 assert(client.includes('reportAccounts'),'multi-account report control is missing');
 assert(client.includes('generateBuiltReport'),'report generation handler is missing');
+assert(client.includes('ensureReportPresetDelegation'),'report catalogue must use resilient delegated tap handling.');
+assert(client.includes('runReportPreset'),'report catalogue must route every preset through one handler.');
+assert(client.includes('type="button" class="fm-report-preset"'),'report preset cards must be explicit non-submit buttons.');
+assert(client.includes('reportResultAnchor'),'generated report must expose a deterministic mobile scroll target.');
+
 assert(client.includes('exportBuiltReportXlsx'),'XLSX report export is missing');
 assert(client.includes("API+'/reports/builder.xlsx?'"),'XLSX action must use the protected server export route');
 assert(client.includes("API+'/reports/builder.csv?'"),'CSV report export is missing');

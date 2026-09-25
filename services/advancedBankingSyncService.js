@@ -2,6 +2,8 @@ const crypto = require('node:crypto');
 const pool = require('../config/db');
 const { adapter, environment, liveSyncEnabled, selectedProvider } = require('./openBankingProviderService');
 const { logAudit } = require('./auditService');
+const { suggestConnectedBankCategory } = require('./financeBankCategoryService');
+const { findExactAutoCategoryRule } = require('./financeRuleEngine');
 
 function uid(prefix) { return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(5).toString('hex').toUpperCase()}`; }
 function list(payload) { return Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []; }
@@ -140,6 +142,20 @@ async function findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credi
 
 async function ingestTransactions(db, connection, transactionsPayload, provider) {
   const rows = list(transactionsPayload);
+  const [learnedRules] = connection.app_user_id ? await db.query(
+    `SELECT r.id,r.merchant_pattern,r.category,r.ownership_scope,r.priority,r.application_mode,r.enabled,
+            c.scope AS category_scope
+       FROM finance_category_rules r
+       LEFT JOIN finance_system_categories c
+         ON c.name=r.category AND c.active=1 AND c.archived_at IS NULL
+        AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL)
+          OR (c.scope='PERSONAL' AND c.owner_user_id=r.created_by))
+      WHERE r.created_by=? AND r.enabled=1 AND r.application_mode='AUTO_APPLY'
+        AND r.category IS NOT NULL AND r.category<>''
+      ORDER BY r.priority DESC,r.updated_at DESC,r.id DESC`,
+    [connection.app_user_id]
+  ) : [[]];
+  const accountScopeCache = new Map();
   let inserted = 0; let updated = 0; let duplicates = 0; let linkedExisting = 0;
   for (const tx of rows) {
     const remoteAccountId = transactionAccountId(tx);
@@ -160,23 +176,58 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
     const rawHash = hash(JSON.stringify(tx));
     const txDate = dateOnly(tx?.transactionDate || tx?.postDate || tx?.date);
     if (!txDate) continue;
+    const bankCategory = suggestConnectedBankCategory(tx, direction);
+    if (!accountScopeCache.has(localAccountId)) {
+      const [[accountMeta]] = await db.query('SELECT ownership_scope FROM bank_accounts WHERE id=? LIMIT 1', [localAccountId]);
+      accountScopeCache.set(localAccountId, String(accountMeta?.ownership_scope || 'UNCLASSIFIED').toUpperCase());
+    }
+    const localAccountScope = accountScopeCache.get(localAccountId);
+    const learnedRule = await findExactAutoCategoryRule(db, connection.app_user_id, {
+      merchant_name: tx?.merchant?.name || tx?.merchantName,
+      description: transactionDescription(tx),
+      reference: tx?.reference || tx?.referenceNo,
+      account_scope: localAccountScope
+    }, learnedRules);
+    const learnedScope = String(learnedRule?.ownership_scope || '').toUpperCase();
+    const resolvedScope = ['MIXED','UNCLASSIFIED'].includes(localAccountScope) && ['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(learnedScope)
+      ? learnedScope
+      : localAccountScope;
+    const resolvedCategory = learnedRule?.category || bankCategory.category || null;
     let existing = null;
-    if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
+    if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type,category,classification_status,manual_override FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
     if (!existing) existing = await findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credit, fingerprint);
     if (existing) {
       if (externalId) await db.query(`UPDATE bank_transactions SET source_provider=?,provider_transaction_id=?,provider_account_id=?,provider_status=?,provider_raw_hash=?,canonical_fingerprint=?,last_seen_at=NOW(),provider_updated_at=? WHERE id=?`, [provider, externalId, remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.lastUpdated || tx?.updatedAt), existing.id]);
+      let categoryUpdated=false;
+      if (resolvedCategory && existing.source_type === 'OPEN_BANKING' && !Number(existing.manual_override || 0)) {
+        const learnedOverride = Boolean(learnedRule?.category);
+        const [categoryUpdate] = await db.query(
+          `UPDATE bank_transactions
+              SET category=?,classification_status='CLASSIFIED',
+                  ownership_scope=IF(?=1,?,ownership_scope),
+                  review_source_status=IF(?=1,'AUTO_RULE',COALESCE(review_source_status,'BANK_PROVIDER'))
+            WHERE id=? AND source_type='OPEN_BANKING' AND manual_override=0
+              AND (?=1 OR category IS NULL OR category='' OR classification_status='UNCLASSIFIED')`,
+          [resolvedCategory, learnedOverride ? 1 : 0, resolvedScope, learnedOverride ? 1 : 0, existing.id, learnedOverride ? 1 : 0]
+        );
+        categoryUpdated=Number(categoryUpdate.affectedRows||0)>0;
+        if (categoryUpdated && learnedRule?.id) await db.query('UPDATE finance_category_rules SET last_used_at=NOW() WHERE id=?',[learnedRule.id]);
+      }
       if (existing.source_type && existing.source_type !== 'OPEN_BANKING') linkedExisting += 1;
-      if (existing.provider_raw_hash && existing.provider_raw_hash !== rawHash) updated += 1; else duplicates += 1;
+      if (categoryUpdated || (existing.provider_raw_hash && existing.provider_raw_hash !== rawHash)) updated += 1; else duplicates += 1;
       continue;
     }
     const [result] = await db.query(
       `INSERT IGNORE INTO bank_transactions
        (bank_account_id,import_batch_uid,row_hash,transaction_date,description,reference,debit,credit,running_balance,reconciliation_status,imported_by,source_type,source_provider,provider_transaction_id,merchant_name,posting_date,currency,ownership_scope,category,classification_status,is_internal_transfer,first_seen_at,last_seen_at,provider_account_id,provider_status,provider_raw_hash,canonical_fingerprint,transaction_timestamp,provider_updated_at)
-       SELECT ?,?,?,?,?,?,?,?,?, 'UNRECONCILED',?, 'OPEN_BANKING',?,?,?,?,?,currency,ownership_scope,?, 'UNCLASSIFIED',0,NOW(),NOW(),?,?,?,?,?
+       SELECT ?,?,?,?,?,?,?,?,?, 'UNRECONCILED',?, 'OPEN_BANKING',?,?,?,?,currency,?, ?, ?,0,NOW(),NOW(),?,?,?,?,?,?
        FROM bank_accounts WHERE id=?`,
-      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo, 180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName, 255) || null, dateOnly(tx?.postDate) || null, clean(tx?.category || tx?.class?.title, 120) || null, remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
+      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo, 180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName, 255) || null, dateOnly(tx?.postDate) || null, resolvedScope, resolvedCategory, resolvedCategory ? 'CLASSIFIED' : 'UNCLASSIFIED', remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
     );
-    if (result.affectedRows) inserted += 1; else duplicates += 1;
+    if (result.affectedRows) {
+      inserted += 1;
+      if (learnedRule?.id) await db.query('UPDATE finance_category_rules SET last_used_at=NOW() WHERE id=?',[learnedRule.id]);
+    } else duplicates += 1;
   }
   return { seen: rows.length, inserted, updated, duplicates, linked_existing: linkedExisting };
 }

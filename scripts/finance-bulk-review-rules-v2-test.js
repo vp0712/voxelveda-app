@@ -77,6 +77,29 @@ async function main() {
   assert.match(bulkController, /assertClassificationPeriodsOpen/);
   assert.match(rulesController, /application_mode/);
   assert.match(statementController, /applyAutoRulesToImport/);
+  assert.match(bulkController, /resolveTransactionCategory/);
+  assert.match(bulkController, /move_whole_transaction/);
+  assert.match(bulkController, /DELETE FROM bank_transaction_splits WHERE parent_bank_transaction_id/);
+  assert.match(bulkController, /upsertExactAutoCategoryRule/);
+  assert.match(bulkController, /MANUAL_CATEGORY_MOVE/);
+  assert.equal(typeof ruleEngine.findExactAutoCategoryRule, 'function');
+  assert.equal(typeof ruleEngine.upsertExactAutoCategoryRule, 'function');
+  assert.equal(typeof ruleEngine.ruleCompatibleWithAccount, 'function');
+  assert.equal(ruleEngine.ruleCompatibleWithAccount({ ownership_scope:'BUSINESS', category_scope:'BUSINESS' }, 'BUSINESS'), true);
+  assert.equal(ruleEngine.ruleCompatibleWithAccount({ ownership_scope:'BUSINESS', category_scope:'BUSINESS' }, 'PERSONAL'), false);
+  assert.match(read('services/financeRuleEngine.js'), /normalizedMatches/);
+  assert.match(read('services/financeRuleEngine.js'), /deduplicated_rules/);
+  assert.match(rulesController, /applyRuleHistory/);
+  assert.match(rulesController, /AUTO_RULE_HISTORY/);
+  assert.match(rulesController, /skipped_manual/);
+  assert.match(rulesController, /skipped_splits/);
+  assert.match(rulesController, /skipped_locked_or_unconfigured/);
+  assert.match(rulesController, /FINANCE_RULE_HISTORY_PREVIEW_STALE/);
+  assert.match(routes, /rules\/:id\/apply-history/);
+  assert.match(client, /function applyLearnedRuleToHistory\(/);
+  assert.match(client, /historical exact-merchant match/);
+
+
   assert.match(client, /Preview changes/);
   assert.match(client, /Confirm & apply/);
   assert.match(client, /Auto Apply exact matches/);
