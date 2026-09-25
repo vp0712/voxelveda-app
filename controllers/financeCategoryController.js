@@ -67,6 +67,15 @@ exports.save=async(req,res)=>{
  try{
   await ensureFinanceSchema();const values=normalize(req.body),id=Number(req.body.id||0);
   await db.beginTransaction();
+  const [[nameConflict]]=await db.query(
+   `SELECT c.id,c.active,c.archived_at,c.scope FROM finance_system_categories c
+      WHERE LOWER(c.name)=LOWER(?) AND c.id<>? AND ${visibilitySql(req,'c')}
+      ORDER BY c.active DESC,c.id DESC LIMIT 1 FOR UPDATE`,
+   [values.name,id||0,...visibilityParams(req)]);
+  if(nameConflict){
+   if(Number(nameConflict.active)&&!nameConflict.archived_at)throw new FinanceError('A Finance category with this name already exists.',409,'CATEGORY_NAME_ALREADY_EXISTS');
+   throw new FinanceError('An archived Finance category with this name already exists. Restore it instead of creating a duplicate.',409,'CATEGORY_NAME_ARCHIVED');
+  }
   if(values.parent_id){
    const [[parent]]=await db.query(`SELECT id,scope,owner_user_id FROM finance_system_categories WHERE id=? AND ${visibilitySql(req,'finance_system_categories')} AND active=1 FOR UPDATE`,[values.parent_id,...visibilityParams(req)]);
    if(!parent)throw new FinanceError('Parent category is not available to this user.',404,'PARENT_CATEGORY_NOT_FOUND');
