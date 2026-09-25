@@ -701,8 +701,8 @@ exports.getStatementReport = async (req, res) => {
           ORDER BY bt.currency,month`, filters.params
       ).then(([rows]) => rows),
       pool.query(
-        `SELECT bt.id,bt.transaction_date,bt.description,bt.merchant_name,bt.category,bt.debit,bt.credit,
-                bt.running_balance,bt.currency,bt.reconciliation_status,bt.manual_override,bt.source_type,
+        `SELECT bt.id,bt.transaction_date,bt.posting_date,bt.description,bt.reference,bt.merchant_name,bt.category,bt.debit,bt.credit,
+                bt.running_balance,bt.currency,bt.reconciliation_status,bt.manual_override,bt.source_type,bt.statement_row_id,
                 bt.is_internal_transfer,ba.nickname AS account_name
            FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
           WHERE ${filters.where}
