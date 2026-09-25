@@ -106,22 +106,36 @@ async function upsertExactAutoCategoryRule(db, options = {}) {
 
   const ownershipScope = String(options.ownershipScope || '').trim().toUpperCase();
   const scope = ['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(ownershipScope) ? ownershipScope : null;
-  const [[existing]] = await db.query(
-    `SELECT id,rule_uid,merchant_pattern,category,ownership_scope,application_mode
+  const [ownedRules] = await db.query(
+    `SELECT id,rule_uid,merchant_pattern,category,ownership_scope,application_mode,priority,enabled
        FROM finance_category_rules
-      WHERE created_by=? AND merchant_pattern=?
-      ORDER BY priority DESC,updated_at DESC,id DESC LIMIT 1 FOR UPDATE`,
-    [actorId, merchant]
+      WHERE created_by=?
+      ORDER BY priority DESC,updated_at DESC,id DESC FOR UPDATE`,
+    [actorId]
   );
+  const normalizedMatches = ownedRules.filter((rule) => cleanMerchant(rule.merchant_pattern) === merchant);
+  const existing = normalizedMatches[0] || null;
   if (existing) {
     await db.query(
       `UPDATE finance_category_rules
-          SET category=?,ownership_scope=?,priority=500,enabled=1,application_mode='AUTO_APPLY',
+          SET merchant_pattern=?,category=?,ownership_scope=?,priority=500,enabled=1,application_mode='AUTO_APPLY',
               updated_by=?,last_used_at=NOW()
         WHERE id=?`,
-      [category, scope, actorId, existing.id]
+      [merchant, category, scope, actorId, existing.id]
     );
-    return { saved: true, rule: { ...existing, id: existing.id, merchant_pattern: merchant, category, ownership_scope: scope, application_mode: 'AUTO_APPLY' }, merchant };
+    const duplicateIds = normalizedMatches.slice(1).map((rule) => Number(rule.id)).filter(Boolean);
+    if (duplicateIds.length) {
+      await db.query(
+        `UPDATE finance_category_rules SET enabled=0,updated_by=? WHERE id IN (${duplicateIds.map(() => '?').join(',')})`,
+        [actorId, ...duplicateIds]
+      );
+    }
+    return {
+      saved: true,
+      rule: { ...existing, id: existing.id, merchant_pattern: merchant, category, ownership_scope: scope, application_mode: 'AUTO_APPLY' },
+      merchant,
+      deduplicated_rules: duplicateIds.length
+    };
   }
 
   const ruleUid = `RULE-${Date.now().toString(36).toUpperCase()}-${require('node:crypto').randomBytes(4).toString('hex').toUpperCase()}`;
