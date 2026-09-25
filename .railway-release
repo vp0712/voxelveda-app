@@ -1,5 +1,5 @@
-finance-release: 20260925-statement-vault-mobile-v29
-source-commit: 045d54c72f0c11af27b4a5b4e53bdffbf06f7f44
+finance-release: 20260925-category-spending-v31
+source-commit: 1476fc466965ffc5b20bad0f9378dbb274b490d8
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build
