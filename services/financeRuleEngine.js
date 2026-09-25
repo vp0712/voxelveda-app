@@ -54,6 +54,23 @@ function exactRuleMatch(transaction, rule) {
   return Boolean(transactionMerchant && ruleMerchant && transactionMerchant === ruleMerchant);
 }
 
+function ruleCompatibleWithAccount(rule, accountScope) {
+  const account = String(accountScope || '').trim().toUpperCase();
+  const ruleScope = String(rule?.ownership_scope || '').trim().toUpperCase();
+  const categoryScope = String(rule?.category_scope || '').trim().toUpperCase();
+  if (account === 'PERSONAL') {
+    if (ruleScope && ruleScope !== 'PERSONAL') return false;
+    if (categoryScope && !['PERSONAL','BOTH'].includes(categoryScope)) return false;
+  }
+  if (account === 'BUSINESS') {
+    if (ruleScope && ruleScope !== 'BUSINESS') return false;
+    if (categoryScope && !['BUSINESS','BOTH'].includes(categoryScope)) return false;
+  }
+  if (['MIXED','UNCLASSIFIED'].includes(account) && categoryScope === 'PERSONAL' && ruleScope && ruleScope !== 'PERSONAL') return false;
+  if (['MIXED','UNCLASSIFIED'].includes(account) && categoryScope === 'BUSINESS' && ruleScope && ruleScope !== 'BUSINESS') return false;
+  return true;
+}
+
 async function findExactAutoCategoryRule(db, userId, transaction = {}, preloadedRules = null) {
   const actorId = Number(userId || 0);
   if (!actorId) return null;
@@ -62,14 +79,21 @@ async function findExactAutoCategoryRule(db, userId, transaction = {}, preloaded
   let rules = Array.isArray(preloadedRules) ? preloadedRules : null;
   if (!rules) {
     [rules] = await db.query(
-      `SELECT id,merchant_pattern,category,ownership_scope,priority,application_mode,enabled
-         FROM finance_category_rules
-        WHERE created_by=? AND enabled=1 AND application_mode='AUTO_APPLY' AND category IS NOT NULL AND category<>''
-        ORDER BY priority DESC,updated_at DESC,id DESC`,
+      `SELECT r.id,r.merchant_pattern,r.category,r.ownership_scope,r.priority,r.application_mode,r.enabled,
+              c.scope AS category_scope
+         FROM finance_category_rules r
+         LEFT JOIN finance_system_categories c
+           ON c.name=r.category AND c.active=1 AND c.archived_at IS NULL
+          AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL)
+            OR (c.scope='PERSONAL' AND c.owner_user_id=r.created_by))
+        WHERE r.created_by=? AND r.enabled=1 AND r.application_mode='AUTO_APPLY'
+          AND r.category IS NOT NULL AND r.category<>''
+        ORDER BY r.priority DESC,r.updated_at DESC,r.id DESC`,
       [actorId]
     );
   }
-  return rules.find((rule) => cleanMerchant(rule.merchant_pattern) === merchant) || null;
+  return rules.find((rule) => cleanMerchant(rule.merchant_pattern) === merchant
+    && ruleCompatibleWithAccount(rule, transaction.account_scope)) || null;
 }
 
 async function upsertExactAutoCategoryRule(db, options = {}) {
@@ -216,6 +240,7 @@ module.exports = {
   normalizeRuleMode,
   normalizeGstTreatment,
   exactRuleMatch,
+  ruleCompatibleWithAccount,
   findExactAutoCategoryRule,
   upsertExactAutoCategoryRule,
   applyAutoRulesToImport
