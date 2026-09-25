@@ -5,9 +5,9 @@ Last updated: 2026-09-26 (Australia/Sydney)
 ## Current Git release
 
 - Original baseline commit: `2a636bb856318aa9202da31ba47abce372a1f815` (`Release Finance Control v14 to Railway`).
-- Current live production commit: `d609cad2bebe4e557b89ce2e9d60a3215f5857b0` (`Release scope-safe smart categorisation v35`), which includes the Finance v26 ingestion release.
+- Current live production commit: `5a1f857ea075b9610d2f1879308a45d78901b2b4` (`Release Finance document compatibility repair`), which includes the Finance v26 ingestion release and its downstream receipt/report compatibility repair.
 - Finance v26 rollout commit: `5fa7461ad50a24860591e7477522e9123a99a0e4` (`Release Finance v26 migration retry hotfix`).
-- Primary release PR: #254; production migration recovery PRs: #255, #256, #257 and #258.
+- Primary release PR: #254; production migration recovery PRs: #255, #256, #257 and #258; downstream production compatibility/release PRs: #260 and #261.
 - Finance v25 baseline incorporated before the v26 release: `d7b8c694bf85598137baf0f21380f4120387fb3a` (`Release Finance statement date integrity v25 r2`).
 - Ingestion implementation commit: `e07fd9b`; v25 integration commit: `9d96bab`.
 
@@ -114,15 +114,16 @@ Last updated: 2026-09-26 (Australia/Sydney)
 - [x] Add actual-byte format, OCR, encrypted/corrupt/oversize, validation and duplicate tests.
 - [x] Run local lint, full application test suite, 50-check Finance release build and dependency audit.
 - [x] Verify Railway variables and migration plan; deploy and verify production readiness.
-- [ ] Deploy the additive secure-document compatibility migration and verify receipt/accountant report errors are cleared.
+- [x] Deploy the additive secure-document compatibility migration and verify receipt/accountant report errors are cleared.
 - [ ] Complete one authenticated production statement upload/review/post smoke test with an owner-provided MFA session.
 
 ## Deployment status
 
-- Finance statement ingestion v26 remains live in Railway production within deployment `0f25b30e-3bca-42cf-ba8a-77488390c90e` from main SHA `d609cad2bebe4e557b89ce2e9d60a3215f5857b0`; its original successful rollout was deployment `dee1cf41-3eee-4bb3-b213-1506685c7977` from SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
+- Finance statement ingestion v26 remains live in Railway production within deployment `27d7b6d3-a95f-4362-9396-1270e038c42c` from main SHA `5a1f857ea075b9610d2f1879308a45d78901b2b4`; its original successful rollout was deployment `dee1cf41-3eee-4bb3-b213-1506685c7977` from SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
 - The first rollout correctly failed closed on MySQL-incompatible `ADD COLUMN IF NOT EXISTS`. The hotfix replaced it with guarded dynamic DDL and added a compatibility regression.
 - The next rollout exposed a failed-migration checksum retry deadlock. The runner now permits corrected checksum replacement only for incomplete `FAILED`/`RUNNING` entries; `APPLIED`/`BASELINED` migrations remain immutable.
 - The corrected migration applied in 6745 ms and the ledger reports schema `20260925_finance_ingestion_pipeline` with 77 migrations verified.
+- The additive downstream compatibility migration applied in 644 ms; production now reports schema `20260926_finance_document_compatibility` with 78 migrations verified.
 
 ## Current local verification
 
@@ -136,10 +137,11 @@ Last updated: 2026-09-26 (Australia/Sydney)
 ## Production verification evidence
 
 - `/api/health`: HTTP 200 after the backend became ready.
-- `/api/ready`: HTTP 200, `ready: true`, schema `20260925_finance_ingestion_pipeline`, deployment SHA `d609cad2bebe4e557b89ce2e9d60a3215f5857b0`.
+- `/api/ready`: HTTP 200, `ready: true`, schema `20260926_finance_document_compatibility`, deployment SHA `5a1f857ea075b9610d2f1879308a45d78901b2b4`.
 - `finance_ingestion_worker`, background workers, migrations, Finance schema, database and all other critical services report `OPERATIONAL`.
 - Runtime evidence verifies Redis rate limiting, ClamAV malware scanning, Railway S3 private object storage and the least-privileged `voxelveda_app` database identity.
 - The deployed Finance client contains multipart durable upload, job polling, password/mapping recovery, protected review and original-statement evidence paths. Both ingestion paths reject unauthenticated calls with HTTP 401.
+- Post-release logs contain zero `secure_documents.deleted_by` missing-column errors, zero mixed-collation errors and zero unexpected runtime errors for the new deployment.
 - Authenticated upload/review/post verification remains pending an authorised MFA code; the production test account correctly requires MFA and no code was fabricated or bypassed.
 
 ## Remaining blockers and assumptions
