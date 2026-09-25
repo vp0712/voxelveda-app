@@ -402,6 +402,8 @@ async function resolveTransactionCategory(db, req, row, body = {}) {
   const inferredScope = accountScope === 'PERSONAL' ? 'PERSONAL' : accountScope === 'BUSINESS' ? 'BUSINESS' : ['PERSONAL','BUSINESS'].includes(rowScope) ? rowScope : 'BOTH';
   const scope = requestedScope || inferredScope;
   if (!['PERSONAL','BUSINESS','BOTH'].includes(scope)) throw new FinanceError('New category scope must be Personal, Business or Both.',400,'INVALID_CATEGORY_SCOPE');
+  if (accountScope === 'PERSONAL' && !['PERSONAL','BOTH'].includes(scope)) throw new FinanceError('A Personal account cannot create or use a Business-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+  if (accountScope === 'BUSINESS' && !['BUSINESS','BOTH'].includes(scope)) throw new FinanceError('A Company account cannot create or use a Personal-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
   const ownerUserId = scope === 'PERSONAL' ? actorId : null;
   const categoryUid = uid('CAT');
   const [insert] = await db.query(
