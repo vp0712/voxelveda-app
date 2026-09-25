@@ -625,7 +625,7 @@ exports.getStatementLibrary = async (req, res) => {
     await ensureFinanceSchema();
     const scope = reportScope(req.query.scope);
     const accountId = Number(req.query.account_id || 0);
-    const clauses = [privacy.visibilitySql('ba', req)];
+    const clauses = ["sif.parse_status='IMPORTED'", privacy.visibilitySql('ba', req)];
     const params = [...privacy.visibilityParams(req)];
     if (scope !== 'ALL') { clauses.push('ba.ownership_scope=?'); params.push(scope); }
     if (accountId) { clauses.push('sif.bank_account_id=?'); params.push(accountId); }
