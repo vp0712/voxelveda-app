@@ -361,6 +361,52 @@ async function assertCategoryVisible(db, req, category) {
   if (!row) throw new FinanceError('Choose an active Finance category available to this user.', 400, 'FINANCE_CATEGORY_NOT_AVAILABLE');
 }
 
+async function resolveTransactionCategory(db, req, row, body = {}) {
+  const createName = String(body.create_category_name || '').trim().slice(0, 120);
+  let targetCategory = String(body.category || '').trim().slice(0, 120) || null;
+  if (!createName) {
+    if (targetCategory !== (row.category || null)) await assertCategoryVisible(db, req, targetCategory);
+    return targetCategory;
+  }
+  if (createName.length < 2) throw new FinanceError('New category name must be at least 2 characters.', 400, 'CATEGORY_NAME_REQUIRED');
+  const actorId = privacy.userId(req);
+  const [[existing]] = await db.query(
+    `SELECT c.* FROM finance_system_categories c
+      WHERE LOWER(c.name)=LOWER(?)
+        AND ((c.scope IN ('BUSINESS','BOTH') AND c.owner_user_id IS NULL) OR (c.scope='PERSONAL' AND c.owner_user_id=?))
+      ORDER BY c.active DESC,c.id DESC LIMIT 1 FOR UPDATE`,
+    [createName, actorId]
+  );
+  if (existing) {
+    if (!Number(existing.active) || existing.archived_at) {
+      await db.query('UPDATE finance_system_categories SET active=1,archived_at=NULL,archived_by=NULL,updated_by=? WHERE id=?',[actorId, existing.id]);
+      await logAudit(db, audit(req, {
+        action:'FINANCE_CATEGORY_RESTORED_FROM_TRANSACTION_MOVE',module:'finance_categories',recordType:'finance_system_category',recordId:existing.id,
+        oldValue:{active:existing.active,archived_at:existing.archived_at},newValue:{active:1,name:existing.name}
+      }));
+    }
+    return existing.name;
+  }
+  const requestedScope = String(body.create_category_scope || '').trim().toUpperCase();
+  const accountScope = String(row.account_scope || '').toUpperCase();
+  const rowScope = String(row.ownership_scope || '').toUpperCase();
+  const inferredScope = accountScope === 'PERSONAL' ? 'PERSONAL' : accountScope === 'BUSINESS' ? 'BUSINESS' : ['PERSONAL','BUSINESS'].includes(rowScope) ? rowScope : 'BOTH';
+  const scope = requestedScope || inferredScope;
+  if (!['PERSONAL','BUSINESS','BOTH'].includes(scope)) throw new FinanceError('New category scope must be Personal, Business or Both.',400,'INVALID_CATEGORY_SCOPE');
+  const ownerUserId = scope === 'PERSONAL' ? actorId : null;
+  const categoryUid = uid('CAT');
+  const [insert] = await db.query(
+    `INSERT INTO finance_system_categories
+     (category_uid,name,parent_id,scope,owner_user_id,icon,color,gst_default,active,created_by,updated_by)
+     VALUES (?,?,NULL,?,?,NULL,NULL,'REVIEW',1,?,?)`,
+    [categoryUid, createName, scope, ownerUserId, actorId, actorId]
+  );
+  await logAudit(db, audit(req, {
+    action:'FINANCE_CATEGORY_CREATED_FROM_TRANSACTION_MOVE',module:'finance_categories',recordType:'finance_system_category',recordId:insert.insertId,
+    newValue:{category_uid:categoryUid,name:createName,scope,owner_user_id:ownerUserId}
+  }));
+  return createName;
+}
 async function assertClassificationPeriodsOpen(db, rows) {
   const dates = [...new Set(rows.map((row) => dateOnly(row.transaction_date)).filter(Boolean))];
   for (const effectiveDate of dates) {
