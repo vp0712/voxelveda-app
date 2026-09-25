@@ -3,6 +3,7 @@ const pool = require('../config/db');
 const { adapter, environment, liveSyncEnabled, selectedProvider } = require('./openBankingProviderService');
 const { logAudit } = require('./auditService');
 const { suggestConnectedBankCategory } = require('./financeBankCategoryService');
+const { findExactAutoCategoryRule } = require('./financeRuleEngine');
 
 function uid(prefix) { return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(5).toString('hex').toUpperCase()}`; }
 function list(payload) { return Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []; }
@@ -162,22 +163,30 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
     const txDate = dateOnly(tx?.transactionDate || tx?.postDate || tx?.date);
     if (!txDate) continue;
     const bankCategory = suggestConnectedBankCategory(tx, direction);
+    const learnedRule = await findExactAutoCategoryRule(db, connection.app_user_id, {
+      merchant_name: tx?.merchant?.name || tx?.merchantName,
+      description: transactionDescription(tx),
+      reference: tx?.reference || tx?.referenceNo
+    });
+    const resolvedCategory = learnedRule?.category || bankCategory.category || null;
     let existing = null;
     if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type,category,classification_status,manual_override FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
     if (!existing) existing = await findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credit, fingerprint);
     if (existing) {
       if (externalId) await db.query(`UPDATE bank_transactions SET source_provider=?,provider_transaction_id=?,provider_account_id=?,provider_status=?,provider_raw_hash=?,canonical_fingerprint=?,last_seen_at=NOW(),provider_updated_at=? WHERE id=?`, [provider, externalId, remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.lastUpdated || tx?.updatedAt), existing.id]);
       let categoryUpdated=false;
-      if (bankCategory.category && existing.source_type === 'OPEN_BANKING' && !Number(existing.manual_override || 0)
-        && (!String(existing.category || '').trim() || String(existing.classification_status || '').toUpperCase() === 'UNCLASSIFIED')) {
+      if (resolvedCategory && existing.source_type === 'OPEN_BANKING' && !Number(existing.manual_override || 0)) {
+        const learnedOverride = Boolean(learnedRule?.category);
         const [categoryUpdate] = await db.query(
           `UPDATE bank_transactions
-              SET category=?,classification_status='CLASSIFIED'
+              SET category=?,classification_status='CLASSIFIED',
+                  review_source_status=IF(?,'AUTO_RULE',review_source_status)
             WHERE id=? AND source_type='OPEN_BANKING' AND manual_override=0
-              AND (category IS NULL OR category='' OR classification_status='UNCLASSIFIED')`,
-          [bankCategory.category, existing.id]
+              AND (?=1 OR category IS NULL OR category='' OR classification_status='UNCLASSIFIED')`,
+          [resolvedCategory, learnedOverride ? 1 : 0, existing.id, learnedOverride ? 1 : 0]
         );
         categoryUpdated=Number(categoryUpdate.affectedRows||0)>0;
+        if (categoryUpdated && learnedRule?.id) await db.query('UPDATE finance_category_rules SET last_used_at=NOW() WHERE id=?',[learnedRule.id]);
       }
       if (existing.source_type && existing.source_type !== 'OPEN_BANKING') linkedExisting += 1;
       if (categoryUpdated || (existing.provider_raw_hash && existing.provider_raw_hash !== rawHash)) updated += 1; else duplicates += 1;
@@ -188,9 +197,12 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
        (bank_account_id,import_batch_uid,row_hash,transaction_date,description,reference,debit,credit,running_balance,reconciliation_status,imported_by,source_type,source_provider,provider_transaction_id,merchant_name,posting_date,currency,ownership_scope,category,classification_status,is_internal_transfer,first_seen_at,last_seen_at,provider_account_id,provider_status,provider_raw_hash,canonical_fingerprint,transaction_timestamp,provider_updated_at)
        SELECT ?,?,?,?,?,?,?,?,?, 'UNRECONCILED',?, 'OPEN_BANKING',?,?,?,?,currency,ownership_scope,?, ?,0,NOW(),NOW(),?,?,?,?,?,?
        FROM bank_accounts WHERE id=?`,
-      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo, 180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName, 255) || null, dateOnly(tx?.postDate) || null, bankCategory.category, bankCategory.category ? 'CLASSIFIED' : 'UNCLASSIFIED', remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
+      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo, 180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName, 255) || null, dateOnly(tx?.postDate) || null, resolvedCategory, resolvedCategory ? 'CLASSIFIED' : 'UNCLASSIFIED', remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
     );
-    if (result.affectedRows) inserted += 1; else duplicates += 1;
+    if (result.affectedRows) {
+      inserted += 1;
+      if (learnedRule?.id) await db.query('UPDATE finance_category_rules SET last_used_at=NOW() WHERE id=?',[learnedRule.id]);
+    } else duplicates += 1;
   }
   return { seen: rows.length, inserted, updated, duplicates, linked_existing: linkedExisting };
 }
