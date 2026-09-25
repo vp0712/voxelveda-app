@@ -592,15 +592,30 @@ exports.updateTransaction = async (req, res) => {
         tags,
         gst_treatment: gstTreatment,
         reviewed,
-        remembered_rule: rememberRule
+        remembered_rule: rememberRule,
+        learned_merchant_auto_rule: Boolean(learnedRule?.saved),
+        moved_whole_transaction: req.body.move_whole_transaction === true,
+        replaced_split_count: replacedSplits.length
       }
     }));
     await db.commit();
     const updated = await visibleBankTransaction(id, req);
     return res.json({
-      message: rememberRule && category ? 'Transaction updated and merchant rule saved for future imports.' : 'Transaction updated.',
+      message: learnMerchant && category
+        ? 'Transaction moved and this exact merchant was learned for future automatic categorisation.'
+        : rememberRule && category
+          ? 'Transaction updated and merchant suggestion rule saved.'
+          : categoryChanged
+            ? 'Transaction moved to the selected category.'
+            : 'Transaction updated.',
       transaction: updated,
-      scope_locked_to_account: !canOverrideScope
+      scope_locked_to_account: !canOverrideScope,
+      category_move: {
+        from: row.category || null,
+        to: category,
+        replaced_split_count: replacedSplits.length,
+        learned_exact_merchant: Boolean(learnedRule?.saved)
+      }
     });
   } catch (error) {
     if (db) await db.rollback();
