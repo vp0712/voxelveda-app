@@ -56,7 +56,11 @@ function migrationPool({ legacy = false } = {}) {
         ledger.set(id, { ...ledger.get(id), status: 'APPLIED' });
         return [{ affectedRows: 1 }, []];
       }
-      if (normalized.startsWith("UPDATE schema_migrations SET status = 'FAILED'")) return [{ affectedRows: 1 }, []];
+      if (normalized.startsWith("UPDATE schema_migrations SET status = 'FAILED'")) {
+        const id = params[3];
+        ledger.set(id, { ...ledger.get(id), status: 'FAILED' });
+        return [{ affectedRows: 1 }, []];
+      }
       if (normalized.startsWith('SELECT migration_id FROM schema_migrations')) {
         const latest = [...ledger.values()].filter((row) => ['APPLIED', 'BASELINED'].includes(row.status)).sort((a, b) => b.migration_id.localeCompare(a.migration_id))[0];
         return [latest ? [{ migration_id: latest.migration_id }] : [], []];
@@ -95,6 +99,30 @@ async function testMigrationRunner() {
       () => runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } }),
       (error) => error.code === 'MIGRATION_CHECKSUM_MISMATCH'
     );
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+async function testFailedMigrationCorrection() {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'voxelveda-wave-a-corrected-'));
+  try {
+    const migrationId = '20260101_corrected';
+    const filename = path.join(directory, `${migrationId}.sql`);
+    fs.writeFileSync(filename, 'CREATE TABLE corrected_table (id BIGINT);\n');
+    const mock = migrationPool();
+    mock.ledger.set(migrationId, {
+      migration_id: migrationId,
+      checksum_sha256: 'checksum-from-failed-attempt',
+      status: 'FAILED'
+    });
+
+    const result = await runMigrations({ pool: mock.pool, migrationsDir: directory, logger: { info() {} } });
+    const [corrected] = discoverMigrations(directory);
+    assert.equal(result.applied, 1);
+    assert.equal(mock.ledger.get(migrationId).status, 'APPLIED');
+    assert.equal(mock.ledger.get(migrationId).checksum_sha256, corrected.checksum_sha256);
+    assert.equal(mock.executed.some((sql) => sql.includes('corrected_table')), true);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
@@ -256,6 +284,7 @@ async function run() {
   testWiring();
   testDatabaseFailurePreventsListen();
   await testMigrationRunner();
+  await testFailedMigrationCorrection();
   await testLegacyMigrationBaseline();
   console.log('Enterprise Wave A bootstrap tests passed.');
 }

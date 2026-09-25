@@ -178,7 +178,8 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
         'SELECT migration_id, checksum_sha256, status FROM schema_migrations WHERE migration_id = ? LIMIT 1',
         [migration.migration_id]
       );
-      if (existing?.checksum_sha256 && existing.checksum_sha256 !== migration.checksum_sha256) {
+      const retryableChecksumState = ['FAILED', 'RUNNING'].includes(existing?.status);
+      if (existing?.checksum_sha256 && existing.checksum_sha256 !== migration.checksum_sha256 && !retryableChecksumState) {
         throw new MigrationError(
           `Checksum mismatch for migration ${migration.migration_id}`,
           'MIGRATION_CHECKSUM_MISMATCH',
