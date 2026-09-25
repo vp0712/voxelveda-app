@@ -66,6 +66,10 @@ assert.match(js,/data-category-move-open/,'Transaction detail must expose the Mo
 assert.match(js,/move_whole_transaction:true/,'Category move must explicitly replace split allocations so a moved transaction cannot remain in the old category.');
 assert.match(js,/learn_merchant:fd\.get\('learn_merchant'\)==='on'/,'Category move must let the user teach the exact merchant for future categorisation.');
 assert.match(js,/create_category_name:newName\|\|null/,'Category move must support inline category creation.');
+assert.match(js,/function applyLearnedRuleToHistory\(/,'Learned merchant rules must offer safe historical exact-match propagation.');
+assert.match(js,/rules\/'\+encodeURIComponent\(ruleId\)\+'\/apply-history/,'Historical learned-category propagation must use the protected rule endpoint.');
+assert.match(js,/Only safe non-manual, non-split transactions in open accounting periods will change/,'Historical merchant learning must disclose protected exclusions before applying.');
+
 
 
 assert.match(js,/function openAccountForm\(/,'Finance OS must expose a real create/edit account workflow.');
