@@ -8,7 +8,7 @@ async function redirectSavedSession() {
     localStorage.removeItem('token');
     localStorage.setItem('user', JSON.stringify(savedUser));
     localStorage.setItem('role', role);
-    window.location.replace(hasOperationsWorkspaceAccess(role, savedUser) ? '/admin' : '/dashboard');
+    window.location.replace(portalPathForUser(role, savedUser));
     return true;
   } catch {
     localStorage.removeItem('token');
@@ -59,21 +59,28 @@ async function resolveAuthenticatedUser(loginData) {
   return data?.user?.role ? data.user : null;
 }
 
-function hasOperationsWorkspaceAccess(role, user = {}) {
+function portalPathForUser(role, user = {}) {
   const normalizedRole = String(role || '').trim().toLowerCase();
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
-  return ['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(normalizedRole)
-    || permissions.includes('finance')
-    || permissions.includes('tasks');
+  if (['viewer', 'view_only', 'client', 'customer'].includes(normalizedRole)) return '/client';
+  if (['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(normalizedRole)
+    || permissions.includes('finance')) return '/admin';
+  const internalRoles = new Set(['staff', 'hr', 'production', 'supervisor', 'manager', 'sales']);
+  return internalRoles.has(normalizedRole) ? `/portal/${normalizedRole}` : '/portal/staff';
+}
+
+function hasOperationsWorkspaceAccess(role, user = {}) {
+  return portalPathForUser(role, user) === '/admin';
 }
 
 function safeReturnTo(role, user = {}) {
-  const operationsAccess = hasOperationsWorkspaceAccess(role, user);
+  const home = portalPathForUser(role, user);
   const value = new URLSearchParams(window.location.search).get('returnTo');
-  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) {
-    return operationsAccess ? '/admin' : '/dashboard';
-  }
-  if (!operationsAccess && value.startsWith('/admin')) return '/dashboard';
+  if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return home;
+  if (value.startsWith('/admin') && home !== '/admin') return home;
+  if (value.startsWith('/portal/')) return home;
+  if (value === '/dashboard') return home;
+  if (value === '/client' && home !== '/client') return home;
   return value;
 }
 
