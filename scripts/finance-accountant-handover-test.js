@@ -18,6 +18,8 @@ assert(routes.includes("requireSensitiveExportApproval('ACCOUNTANT_PACK')"),'Han
 
 assert(controller.includes("bt.ownership_scope='BUSINESS'"),'Handover bank evidence must be BUSINESS-only.');
 assert(controller.includes("ba.ownership_scope IN ('BUSINESS','MIXED')"),'Handover may inspect business/mixed account containers only.');
+assert(controller.includes('CAST(sd.record_id AS UNSIGNED)=bt.id'),'Handover receipt evidence must use a collation-independent numeric document link.');
+assert(!controller.includes('sd.record_id=CAST(bt.id AS CHAR)'),'Handover must not compare differently collated text identifiers.');
 assert(!controller.includes('personal_money_'),'Business handover controller must not query Personal Money tables.');
 assert(controller.includes('accountant_exports'),'Handover must use the versioned accountant export ledger.');
 assert(controller.includes("crypto.createHash('sha256')"),'Handover snapshot must create a SHA-256 manifest checksum.');

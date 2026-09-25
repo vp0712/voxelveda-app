@@ -17,6 +17,8 @@ assert(controller.includes("privacy.visibilitySql('ba',req)"),'report builder mu
 assert(filterContract.includes("bt.bank_account_id IN"),'multi-account filter is missing');
 assert(controller.includes("finance_refund_links"),'refund report semantics are missing');
 assert(controller.includes("secure_documents"),'receipt status filter is missing');
+assert(controller.includes('CAST(sd.record_id AS UNSIGNED)=bt.id'),'receipt report filters must use a collation-independent numeric document link');
+assert(!controller.includes('sd.record_id=CAST(bt.id AS CHAR)'),'receipt report filters must not compare differently collated text identifiers');
 assert(controller.includes("Mixed currencies") || controller.includes("Currency"),'currency handling contract is missing');
 assert(controller.includes("LIMIT 20000"),'filtered report must use a bounded server query');
 assert(controller.includes("csvCell"),'CSV escaping is missing');

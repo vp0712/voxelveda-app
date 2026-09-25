@@ -86,8 +86,8 @@ function buildFilters(req,definition=null){
   if(merchant){clauses.push('(bt.merchant_name LIKE ? OR bt.description LIKE ?)');params.push(`%${merchant}%`,`%${merchant}%`)}
   if(source){clauses.push('bt.source_type=?');params.push(source)}
   if(recon){clauses.push('bt.reconciliation_status=?');params.push(recon)}
-  if(receipt==='ATTACHED') clauses.push("EXISTS (SELECT 1 FROM secure_documents sd WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND sd.record_id=CAST(bt.id AS CHAR) AND sd.deleted_at IS NULL)");
-  if(receipt==='MISSING') clauses.push("NOT EXISTS (SELECT 1 FROM secure_documents sd WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND sd.record_id=CAST(bt.id AS CHAR) AND sd.deleted_at IS NULL)");
+  if(receipt==='ATTACHED') clauses.push("EXISTS (SELECT 1 FROM secure_documents sd WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND CAST(sd.record_id AS UNSIGNED)=bt.id AND sd.deleted_at IS NULL)");
+  if(receipt==='MISSING') clauses.push("NOT EXISTS (SELECT 1 FROM secure_documents sd WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND CAST(sd.record_id AS UNSIGNED)=bt.id AND sd.deleted_at IS NULL)");
   if(transactionType==='TRANSFER') clauses.push('bt.is_internal_transfer=1');
   if(transactionType==='EXPENSE') clauses.push('bt.debit>0 AND bt.is_internal_transfer=0');
   if(transactionType==='INCOME') clauses.push("bt.credit>0 AND bt.is_internal_transfer=0 AND NOT EXISTS (SELECT 1 FROM finance_refund_links fr WHERE fr.refund_bank_transaction_id=bt.id AND fr.status='ACTIVE')");
