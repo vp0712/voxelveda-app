@@ -5,6 +5,7 @@ const advanced=fs.readFileSync('public/finance-advanced-control.js','utf8');
 const master=fs.readFileSync('public/finance-master.js','utf8');
 const app=fs.readFileSync('app.js','utf8');
 const html=fs.readFileSync('public/finance-intelligence.html','utf8');
+const intelligence=fs.readFileSync('controllers/financeIntelligenceController.js','utf8');
 
 const advancedVersion=(advanced.match(/VERSION='([^']+)'/)||[])[1];
 assert(/^20\d{6}-advanced-control-v\d+$/.test(advancedVersion||''),'Advanced Finance release id is missing or invalid.');
@@ -101,3 +102,9 @@ assert(advanced.includes('data-fac-open="savings"'),'Advanced Control must drill
 
 assert(advanced.includes('function cashCustodyControl()'),'Advanced Cash Custody section missing.');
 assert(advanced.includes('data-fac-open="cash"'),'Advanced Cash Custody must drill into canonical Cash Control.');
+assert(advanced.includes('include_transactions=0'),'Advanced category analytics must use the lightweight spending endpoint mode.');
+assert(advanced.includes("['categories','/api/finance/categories?include_archived=false']"),'Category chart must hydrate configured Finance categories, including zero-spend buckets.');
+assert(intelligence.includes('account_categories: accountCategories'),'Spending report must return per-account category totals.');
+assert(intelligence.includes("const includeTransactions=String(req.query.include_transactions??'1')!=='0'"),'Spending report must support lightweight category analytics without the 5,000-row transaction payload.');
+assert(intelligence.includes('transactions_included: includeTransactions'),'Spending report must identify whether transaction rows were included.');
+
