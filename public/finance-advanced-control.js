@@ -6,6 +6,8 @@ const VERSION='20260925-advanced-control-v17';
 const state={loading:false,data:{},errors:{},statuses:{},progress:{resolved:0,total:0},categoryChartAccount:'ALL',filterSignature:'',dataRevision:0,lastLoadedAt:0,scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
+  ['spending',()=>'/api/finance/intelligence/reports/spending'+advancedFilterQuery()+'&include_transactions=0'],
+  ['categories','/api/finance/categories?include_archived=false'],
   ['attention','/api/finance/personal-money/attention'],
   ['smart','/api/finance/personal-money/smart'],
   ['health','/api/finance/personal-money/health'],
@@ -19,8 +21,6 @@ const SOURCES=[
   ['company','/api/finance/company-summary'],
   ['command','/api/finance/banking-os/command-center'],
   ['quality','/api/finance/intelligence/data-quality'],
-  ['spending',()=>'/api/finance/intelligence/reports/spending'+advancedFilterQuery()+'&include_transactions=0'],
-  ['categories','/api/finance/categories?include_archived=false'],
   ['issues','/api/finance/issues'],
   ['receipts','/api/finance/receipts'],
   ['cashCustody','/api/finance/cash-control/custody'],
