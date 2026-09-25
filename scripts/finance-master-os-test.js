@@ -21,7 +21,9 @@ assert.match(js,/I\+'\/transactions'/,'Finance OS must use the real transaction 
 assert.match(js,/I\+'\/statements'/,'Finance OS must use the real statement vault endpoint.');
 assert.match(js,/data-statement-edit/,'Committed Statement Vault rows must expose an edit action after Pending Review.');
 assert.match(js,/function openStatementVaultEditor\(/,'Statement Vault edit action must open the committed statement transaction editor.');
-assert.match(js,/data-statement-edit-tx/,'Committed statement editor must drill into editable linked transactions.');
+assert.match(js,/data-statement-correct-tx/,'Committed statement editor must expose audited post-review transaction corrections.');
+assert.match(js,/function openCommittedStatementTransactionEditor\(/,'Posted statement correction form must exist after Pending Review.');
+assert.match(js,/\/transactions\/'\+encodeURIComponent\(tx\.id\)\+'\/correct/,'Posted statement corrections must use the protected Statement Vault API.');
 assert.match(js,/method:'DELETE',body:JSON\.stringify\(\{confirmation:typed\}\)/,'Permanent statement purge must call the DELETE route.');
 assert.match(js,/bank-transactions\/'\+id\+'\/original/,'Transaction detail must surface immutable original bank data.');
 assert.match(js,/I\+'\/transactions'/,'Manual transaction workflow must write to the canonical bank transaction ledger API.');
