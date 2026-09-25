@@ -61,6 +61,12 @@ for(const reportType of ['INCOME_VS_EXPENSE','ACCOUNT_ACTIVITY','ACCOUNT_STATEME
   assert(js.includes(reportType),`Finance report catalogue must expose ${reportType}`);
 }
 assert.match(js,/fm-report-preset/,'Report Centre must expose one-click standard report presets.');
+assert.match(js,/function openTransactionCategoryMove\(/,'Transaction detail must expose a dedicated category move workflow.');
+assert.match(js,/data-category-move-open/,'Transaction detail must expose the Move Category action.');
+assert.match(js,/move_whole_transaction:true/,'Category move must explicitly replace split allocations so a moved transaction cannot remain in the old category.');
+assert.match(js,/learn_merchant:fd\.get\('learn_merchant'\)==='on'/,'Category move must let the user teach the exact merchant for future categorisation.');
+assert.match(js,/create_category_name:newName\|\|null/,'Category move must support inline category creation.');
+
 
 assert.match(js,/function openAccountForm\(/,'Finance OS must expose a real create/edit account workflow.');
 assert.match(js,/I\+'\/accounts'/,'Account form must save through the canonical Finance account API.');
