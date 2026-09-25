@@ -27,13 +27,32 @@ const NAV_GROUPS=[
  ['CONTROL',[['closeassurance','✓','Close & Assurance'],['protection','◇','Protection Register'],['securityprivacy','⌾','Security & Privacy'],['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
-const MOBILE_NAV=[['advanced','⚡','Control'],['accounts','▣','Accounts'],['transactions','↕','Transactions'],['statements','▤','Statements'],['more','☰','More']];
+const MOBILE_NAV=[['accounts','⌂','Accounts'],['transactions','▤','Transactions'],['statements','▥','Statements'],['more','☰','More']];
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
 const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
 const nativeMoney=(v,c)=>money(v,c||'AUD');
 const date=v=>{if(!v)return '—';const d=new Date(String(v).slice(0,10)+'T00:00:00');const fmt=state.userPreferences?.date_format||'DD/MM/YYYY';if(fmt==='YYYY-MM-DD')return String(v).slice(0,10);if(fmt==='MM/DD/YYYY')return new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)};
 let financeStepUpPromise=null;
+let financeAuthExpiryHandled=false;
+function handleFinanceSessionExpired(){
+ if(financeAuthExpiryHandled)return;
+ financeAuthExpiryHandled=true;
+ try{localStorage.removeItem('token');localStorage.removeItem('user');localStorage.removeItem('role')}catch{}
+ const returnTo=location.pathname+location.search+location.hash;
+ const login='/login?returnTo='+encodeURIComponent(returnTo)+'&message='+encodeURIComponent('Your secure session ended. Please sign in again to continue.');
+ try{fetch('/api/auth/logout',{method:'POST',credentials:'same-origin',keepalive:true}).catch(()=>{})}catch{}
+ setTimeout(()=>location.replace(login),0);
+}
+function financeAuthError(response,payload={}){
+ if(Number(response?.status)!==401)return null;
+ handleFinanceSessionExpired();
+ const error=new Error('Secure session ended');
+ error.status=401;
+ error.code=payload?.code||'AUTH_SESSION_EXPIRED';
+ error.authHandled=true;
+ return error;
+}
 function requestFinanceStepUp(){
  if(financeStepUpPromise)return financeStepUpPromise;
  financeStepUpPromise=new Promise((resolve,reject)=>{
@@ -51,9 +70,10 @@ function requestFinanceStepUp(){
    try{
     const response=await fetch('/api/auth/step-up',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:fd.get('password'),code:String(fd.get('code')||'').replace(/\s/g,'')})});
     let payload={};try{payload=await response.json()}catch{}
+    const authError=financeAuthError(response,payload);if(authError)throw authError;
     if(!response.ok)throw new Error(payload.message||'Security verification failed.');
     settled=true;financeStepUpPromise=null;modal.close();resolve(payload);
-   }catch(error){status.className='fm-state fm-state-error';status.textContent=error.message;button.disabled=false}
+   }catch(error){if(financeAuthExpiryHandled)return;status.className='fm-state fm-state-error';status.textContent=error.message;button.disabled=false}
   };
  });
  return financeStepUpPromise;
@@ -67,6 +87,7 @@ async function api(path,options={}){
   const defaultHeaders=multipart?{}:{'Content-Type':'application/json'};
   const r=await fetch(path,{credentials:'same-origin',headers:{...defaultHeaders,...headers},...requestOptions,signal:controller.signal});
   let body={};try{body=await r.json()}catch{}
+  const authError=financeAuthError(r,body);if(authError)throw authError;
   if(!r.ok&&body.code==='STEP_UP_REQUIRED'&&!_stepUpRetry&&path!=='/api/auth/step-up'){
    clearTimeout(timer);
    await requestFinanceStepUp();
@@ -82,7 +103,63 @@ async function api(path,options={}){
   throw error;
  }finally{clearTimeout(timer)}
 }
-function notice(m,bad=false){const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
+function notice(m,bad=false){if(financeAuthExpiryHandled&&bad)return;const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
+function showFinancePopup(title,message,detail='',options={}){
+ document.querySelector('.fm-centre-popup')?.remove();
+ const overlay=document.createElement('div');
+ overlay.className='fm-centre-popup '+(options.tone==='warning'?'warning':'success');
+ overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');
+ const card=document.createElement('div');card.className='fm-centre-popup-card';
+ const icon=document.createElement('div');icon.className='fm-centre-popup-icon';icon.textContent=options.tone==='warning'?'!':'✓';
+ const heading=document.createElement('h3');heading.textContent=String(title||'Success');
+ const body=document.createElement('p');body.textContent=String(message||'');
+ card.append(icon,heading,body);
+ if(detail){const small=document.createElement('small');small.textContent=String(detail);card.appendChild(small)}
+ const actions=document.createElement('div');actions.className='fm-centre-popup-actions';
+ if(options.actionLabel){const action=document.createElement('button');action.type='button';action.textContent=String(options.actionLabel);action.onclick=()=>{overlay.remove();if(typeof options.onAction==='function')options.onAction()};actions.appendChild(action)}
+ const done=document.createElement('button');done.type='button';done.className='primary';done.textContent='Done';done.onclick=()=>overlay.remove();actions.appendChild(done);
+ card.appendChild(actions);overlay.appendChild(card);
+ overlay.addEventListener('click',e=>{if(e.target===overlay)overlay.remove()});
+ document.body.appendChild(overlay);requestAnimationFrame(()=>overlay.classList.add('show'));
+ return overlay;
+}
+async function downloadFinanceFile(url,filename,successTitle='Download ready'){
+ let response;
+ for(let attempt=0;attempt<2;attempt++){
+  response=await fetch(url,{credentials:'same-origin'});
+  if(response.ok)break;
+  let payload={};try{payload=await response.clone().json()}catch{}
+  const authError=financeAuthError(response,payload);if(authError)throw authError;
+  if(payload.code==='STEP_UP_REQUIRED'&&attempt===0){await requestFinanceStepUp();continue}
+  const error=new Error(payload.message||('Download failed ('+response.status+')'));error.status=response.status;error.code=payload.code;throw error;
+ }
+ const blob=await response.blob();
+ const objectUrl=URL.createObjectURL(blob),link=document.createElement('a');
+ link.href=objectUrl;link.download=filename||'finance-document.pdf';document.body.appendChild(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
+ showFinancePopup(successTitle,'Your PDF was generated successfully and is ready to save.','The document was produced from the permission-scoped Finance ledger.');
+}
+function openAccountStatementForm(accountId){
+ const account=state.accounts.find(a=>String(a.id)===String(accountId));
+ if(!account){notice('Financial account not found.',true);return}
+ $('fmModalEyebrow').textContent='ACCOUNT STATEMENT';$('fmModalTitle').textContent='Generate account statement';
+ $('fmModalBody').innerHTML='<form id="accountStatementForm" class="fm-form"><div class="fm-state"><strong>'+esc(account.nickname||'Account')+'</strong><p>'+esc(account.institution||'Finance account')+' · '+esc(account.account_number_masked||'number masked')+' · '+esc(account.currency||'AUD')+'</p></div><div class="fm-form-grid two"><label>From<input name="from" type="date"></label><label>To<input name="to" type="date"></label></div><p class="fm-helper">Leave the dates blank to include all available history. The PDF uses a customer statement layout with statement period, masked account details, opening/closing balance and debit/credit/balance columns.</p><div class="fm-state fm-state-warning"><strong>Branding rule</strong><p>The document is issued under Voxel Veda Finance branding. It does not copy Commonwealth Bank branding or claim Voxel Veda is a licensed bank.</p></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Generate PDF statement</button></div></form>';
+ $('fmModal').showModal();
+ document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close(),{once:true});
+ $('accountStatementForm').onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.currentTarget,fd=new FormData(form),from=String(fd.get('from')||''),to=String(fd.get('to')||'');
+  if(from&&to&&from>to){notice('Statement From date cannot be after To date.',true);return}
+  const params=new URLSearchParams({report_type:'ACCOUNT_STATEMENT',scope:String(account.ownership_scope||'ALL').toUpperCase(),account_ids:String(account.id)});
+  if(from)params.set('from',from);if(to)params.set('to',to);
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;button.textContent='Generating…';
+  try{
+   await downloadFinanceFile(API+'/reports/builder.pdf?'+params.toString(),'Voxel-Veda-Account-Statement-'+String(account.id)+'.pdf','Account statement ready');
+   $('fmModal').close();
+  }catch(error){button.disabled=false;button.textContent='Generate PDF statement';notice(error.message,true)}
+ };
+}
+
 function signalFinanceReady(){
  try{window.dispatchEvent(new CustomEvent('finance:ready',{detail:{view:state.view,cycle:loadCycle}}))}catch{}
 }
@@ -100,7 +177,7 @@ function navButtons(){
  $('fmNav').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
  const mobile=$('fmMobileNav');
  if(mobile){
-  mobile.innerHTML=MOBILE_NAV.map(([v,i,l])=>`<button type="button" data-mobile-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span><b>${l}</b></button>`).join('');
+  mobile.innerHTML=MOBILE_NAV.map(([v,i,l])=>{const isPrimary=MOBILE_NAV.some(([key])=>key===state.view),active=state.view===v||(v==='more'&&!isPrimary);return `<button type="button" data-mobile-view="${v}" class="${active?'active':''}"><span>${i}</span><b>${l}</b></button>`}).join('');
   mobile.querySelectorAll('[data-mobile-view]').forEach(b=>b.onclick=()=>go(b.dataset.mobileView));
  }
 }
@@ -160,6 +237,7 @@ function dateRange(){
  const qStart=(d)=>new Date(d.getFullYear(),Math.floor(d.getMonth()/3)*3,1);
  const fyStart=(d,offset=0)=>{const month=Math.max(1,Math.min(12,Number(state.setup?.financial_year_start_month||7)))-1;const day=Math.max(1,Math.min(28,Number(state.setup?.financial_year_start_day||1)));let year=d.getFullYear();const candidate=new Date(year,month,day);if(d<candidate)year-=1;return new Date(year+offset,month,day)};
  switch(state.period){
+  case 'all': return {from:null,to:null};
   case 'today': from=clone(); break;
   case 'yesterday': {const d=clone();d.setDate(d.getDate()-1);from=d;to=isoDay(d);break}
   case 'week': from=startOfWeek(); break;
@@ -238,7 +316,7 @@ function currencyRows(){
  });
 }
 function mixedCurrencyMessage(rows){return rows.length>1?'Mixed currencies — consolidated total unavailable until verified FX rates are available.':''}
-function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';return `<span class="fm-badge ${tone}">${esc(v)}</span>`}
+function statusBadge(status){const v=String(status||'UNKNOWN').toUpperCase();const tone=['READY','ACTIVE','RECONCILED','BALANCED','SUCCESS','COMPLETED'].includes(v)?'good':['BLOCKED','ERROR','FAILED','MISMATCH','OVERDUE'].includes(v)?'bad':'warn';const label=v.replace(/_/g,' ');return `<span class="fm-badge ${tone}">${esc(label)}</span>`}
 function emptyState(title,message,action=''){return `<div class="fm-empty"><strong>${esc(title)}</strong><span>${esc(message)}</span>${action}</div>`}
 function dashboardCardVisible(key){
  const configured=state.userPreferences?.dashboard_cards;
@@ -363,15 +441,55 @@ function overview(){
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
- return `<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial accounts</h2><p>Open an account for overview, transactions, analytics, reconciliation and lifecycle controls.</p></div><button data-quick="account">+ Add account</button></div><div class="fm-account-grid">${state.accounts.map(a=>{const c=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};return `<button class="fm-account-card" data-account="${a.id}"><span class="fm-account-type">${esc(a.account_type||'Account')}</span><h3>${esc(a.nickname||'Account')}</h3><p>${esc(a.institution||'Manual')} · ${esc(a.account_number_masked||'number masked')}</p><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>${esc(a.ownership_scope||'')} · ${esc(a.connection_status||'MANUAL')}</small><div class="fm-coverage"><span>Coverage</span><b>${date(c.transaction_start||a.history_start_date)} → ${date(c.transaction_end||a.history_end_date)}</b></div></button>`}).join('')||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>`;
+ const cards=state.accounts.map((a,index)=>{
+  const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
+  const accountName=esc(a.nickname||'Account');
+  const institution=esc(a.institution||'Manual');
+  const accountNumber=esc(a.account_number_masked||'number masked');
+  const scope=esc(a.ownership_scope||'UNCLASSIFIED');
+  const connection=esc(a.connection_status||'MANUAL');
+  const searchText=esc([a.nickname,a.institution,a.account_number_masked,a.ownership_scope,a.account_type,a.currency].filter(Boolean).join(' ').toLowerCase());
+  const tone=(index%3)+1;
+  return `<article class="fm-account-card-shell fm-account-tone-${tone}" data-account-card-shell data-search-text="${searchText}">
+   <div class="fm-account-card">
+    <div class="fm-account-card-top">
+     <button class="fm-bank-mark" type="button" data-account="${a.id}" aria-label="Open ${accountName}"><span>▥</span></button>
+     <div class="fm-account-identity"><span class="fm-account-type">${esc(a.account_type||'Account')}</span><h3>${accountName}</h3><p>${institution} · ${accountNumber}</p></div>
+     <button class="fm-account-more" type="button" data-account="${a.id}" aria-label="Open account controls">•••</button>
+    </div>
+    <div class="fm-account-balance-row">
+     <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>${scope} · ${connection}</small></div>
+     <div class="fm-account-main-actions"><button type="button" class="soft" data-account="${a.id}">View</button><button type="button" class="primary" data-account-transactions="${a.id}">Transactions</button></div>
+    </div>
+    <div class="fm-account-card-footer">
+     <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)}</small></div></div>
+     <div class="fm-account-footer-actions"><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
+    </div>
+   </div>
+  </article>`;
+ }).join('');
+ return `<section class="fm-accounts-premium">
+  <div class="fm-accounts-toolbar">
+   <label class="fm-account-search"><span>⌕</span><input type="search" data-account-search placeholder="Search accounts..." autocomplete="off"></label>
+  </div>
+  <article class="fm-card fm-accounts-panel"><div class="fm-pad"><div class="fm-card-head fm-accounts-head"><div><span class="fm-section-kicker">YOUR FINANCIAL ACCOUNTS</span><h2>Financial accounts</h2><p>Balances, history coverage, transactions and lifecycle controls in one place.</p></div><button data-quick="account">＋ Add account</button></div><div class="fm-account-grid">${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>
+ </section>`;
 }
 function transactions(){
  const meta=state.txMeta||{},f=state.txFilters,saved=state.savedViews?.saved_views||[];
  const savedBar=saved.length?'<div class="fm-saved-views"><span>Saved views</span>'+saved.map(v=>'<button data-saved-query="'+esc(v.query_text)+'">'+esc(v.name)+'</button>').join('')+'</div>':'';
  const selectedCount=state.selectedTransactions.size;
- const bulkBar='<div class="fm-bulk-bar"><label class="fm-check"><input id="txSelectAll" type="checkbox" '+(state.tx.length&&selectedCount===state.tx.length?'checked':'')+'> Select this page</label><span id="txSelectedCount">'+selectedCount+' selected</span><button id="txBulkReview" class="fm-primary" type="button" '+(selectedCount?'':'disabled')+'>Bulk review</button><small>Maximum 200 per confirmed batch</small></div>';
+ const hasRows=Array.isArray(state.tx)&&state.tx.length>0;
+ const bulkBar=hasRows?'<div class="fm-bulk-bar"><label class="fm-check"><input id="txSelectAll" type="checkbox" '+(selectedCount===state.tx.length?'checked':'')+'> Select this page</label><span id="txSelectedCount">'+selectedCount+' selected</span><button id="txBulkReview" class="fm-primary" type="button" '+(selectedCount?'':'disabled')+'>Bulk review</button><small>Maximum 200 per confirmed batch</small></div>':'';
  const rows=(state.tx||[]).map(r=>'<tr data-tx="'+r.id+'"><td class="fm-select-cell"><input type="checkbox" data-tx-select="'+r.id+'" aria-label="Select transaction '+r.id+'" '+(state.selectedTransactions.has(Number(r.id))?'checked':'')+'></td><td>'+date(r.transaction_date)+'</td><td>'+esc(r.account_name||'')+'</td><td>'+esc(r.institution||'')+'</td><td><b>'+esc(r.merchant_normalized||r.merchant_name||'')+'</b><small>'+esc(r.description||'')+'</small></td><td>'+esc(r.category||'Uncategorised')+'</td><td>'+(Number(r.is_internal_transfer)?'Transfer':num(r.debit)>0?'Expense':'Income')+'</td><td>'+esc(r.ownership_scope||'')+'</td><td>'+esc(r.currency||'')+'</td><td>'+(num(r.debit)?nativeMoney(r.debit,r.currency):'')+'</td><td>'+(num(r.credit)?nativeMoney(r.credit,r.currency):'')+'</td><td>'+esc(r.project_ref||r.source_type||'')+'</td><td>'+statusBadge(r.reviewed_at?'REVIEWED':r.reconciliation_status)+'</td></tr>').join('');
- return ('<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transaction Explorer</h2><p>'+num(meta.total)+' matching records · server-side filters and pagination.</p></div><div class="fm-hero-actions"><button id="saveCurrentView">Save view</button><button data-quick="expense">+ Financial movement</button></div></div>'+savedBar+'<div class="fm-filter-grid"><input id="txSearch" value="'+esc(f.q)+'" placeholder="Search description, merchant, reference, account"><select id="txType"><option value="">All types</option><option value="EXPENSE" '+(f.type==='EXPENSE'?'selected':'')+'>Expense</option><option value="INCOME" '+(f.type==='INCOME'?'selected':'')+'>Income</option><option value="TRANSFER" '+(f.type==='TRANSFER'?'selected':'')+'>Transfer</option></select><input id="txCategory" value="'+esc(f.category)+'" placeholder="Category"><input id="txMerchant" value="'+esc(f.merchant)+'" placeholder="Merchant"><select id="txSource"><option value="">All sources</option><option value="STATEMENT_IMPORT" '+(f.source==='STATEMENT_IMPORT'?'selected':'')+'>Statement import</option><option value="MANUAL" '+(f.source==='MANUAL'?'selected':'')+'>Manual</option><option value="OPEN_BANKING" '+(f.source==='OPEN_BANKING'?'selected':'')+'>Open Banking</option></select><select id="txRecon"><option value="">All reconciliation</option><option value="UNRECONCILED" '+(f.reconciliation_status==='UNRECONCILED'?'selected':'')+'>Unreconciled</option><option value="RECONCILED" '+(f.reconciliation_status==='RECONCILED'?'selected':'')+'>Reconciled</option></select><input id="txMin" value="'+esc(f.amount_min)+'" inputmode="decimal" placeholder="Min amount"><input id="txMax" value="'+esc(f.amount_max)+'" inputmode="decimal" placeholder="Max amount"><button id="txApply" class="fm-primary" type="button">Apply filters</button></div>'+resourceError('txPayload','Transaction ledger')+bulkBar+'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th><span class="sr-only">Select</span></th><th>Date</th><th>Account</th><th>Bank</th><th>Merchant / Description</th><th>Category</th><th>Type</th><th>Scope</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Source / Project</th><th>Status</th></tr></thead><tbody>'+(rows||'<tr><td colspan="13">'+emptyState('No matching transactions','Change filters or import financial history.')+'</td></tr>')+'</tbody></table></div><div class="fm-pagination"><button id="txPrev" '+(meta.page<=1?'disabled':'')+'>Previous</button><span>Page '+(num(meta.page)||1)+' of '+(num(meta.total_pages)||1)+'</span><button id="txNext" '+(meta.page>=meta.total_pages?'disabled':'')+'>Next</button></div></div></article>')+savedViewsCard();
+ const filtered=Object.values(f||{}).some(v=>String(v||'').trim());
+ const periodLabels={all:'All History',today:'Today',yesterday:'Yesterday',week:'This Week',last7:'Last 7 Days',month:'This Month',last_month:'Last Month',last30:'Last 30 Days',quarter:'This Quarter',previous_quarter:'Previous Quarter',fy:'Current Financial Year',previous_fy:'Previous Financial Year',year:'Calendar Year',custom:'Custom Range'};
+ const periodName=periodLabels[state.period]||'Selected period';
+ const emptyTitle=filtered?'No transactions match these filters':(state.period==='all'?'No transactions loaded':'No transactions in '+periodName);
+ const emptyMessage=filtered?'Clear or change the transaction filters to see other records.':(state.period==='all'?'Import statement history or add a financial movement to populate the ledger.':'Your imported history is preserved; this period simply has no matching activity.');
+ const emptyAction=!filtered&&state.period!=='all'?'<button type="button" class="fm-primary" data-show-all-history="1">Show all history</button>':'';
+ const ledger=hasRows?'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th><span class="sr-only">Select</span></th><th>Date</th><th>Account</th><th>Bank</th><th>Merchant / Description</th><th>Category</th><th>Type</th><th>Scope</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Source / Project</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="fm-pagination"><button id="txPrev" '+(meta.page<=1?'disabled':'')+'>Previous</button><span>Page '+(num(meta.page)||1)+' of '+(num(meta.total_pages)||1)+'</span><button id="txNext" '+(meta.page>=meta.total_pages?'disabled':'')+'>Next</button></div>':'<div class="fm-transaction-empty">'+emptyState(emptyTitle,emptyMessage,emptyAction)+'</div>';
+ return ('<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transaction Explorer</h2><p>'+num(meta.total)+' matching records · server-side filters and pagination.</p></div><div class="fm-hero-actions"><button id="saveCurrentView">Save view</button><button data-quick="expense">+ Financial movement</button></div></div>'+savedBar+'<div class="fm-filter-grid"><input id="txSearch" value="'+esc(f.q)+'" placeholder="Search description, merchant, reference, account"><select id="txType"><option value="">All types</option><option value="EXPENSE" '+(f.type==='EXPENSE'?'selected':'')+'>Expense</option><option value="INCOME" '+(f.type==='INCOME'?'selected':'')+'>Income</option><option value="TRANSFER" '+(f.type==='TRANSFER'?'selected':'')+'>Transfer</option></select><input id="txCategory" value="'+esc(f.category)+'" placeholder="Category"><input id="txMerchant" value="'+esc(f.merchant)+'" placeholder="Merchant"><select id="txSource"><option value="">All sources</option><option value="STATEMENT_IMPORT" '+(f.source==='STATEMENT_IMPORT'?'selected':'')+'>Statement import</option><option value="MANUAL" '+(f.source==='MANUAL'?'selected':'')+'>Manual</option><option value="OPEN_BANKING" '+(f.source==='OPEN_BANKING'?'selected':'')+'>Open Banking</option></select><select id="txRecon"><option value="">All reconciliation</option><option value="UNRECONCILED" '+(f.reconciliation_status==='UNRECONCILED'?'selected':'')+'>Unreconciled</option><option value="RECONCILED" '+(f.reconciliation_status==='RECONCILED'?'selected':'')+'>Reconciled</option></select><input id="txMin" value="'+esc(f.amount_min)+'" inputmode="decimal" placeholder="Min amount"><input id="txMax" value="'+esc(f.amount_max)+'" inputmode="decimal" placeholder="Max amount"><button id="txApply" class="fm-primary" type="button">Apply filters</button></div>'+resourceError('txPayload','Transaction ledger')+bulkBar+ledger+'</div></article>')+savedViewsCard();
 }
 function historyImportView(){
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
@@ -385,39 +503,74 @@ function historyImportView(){
  const pendingRows=pending.map(x=>`<button class="fm-row fm-row-button" data-import-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ${num(x.total_rows)} rows · ${num(x.duplicate_rows)} duplicate(s)</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${num(x.valid_rows)} valid · ${num(x.rejected_rows)} rejected</small></div></button>`).join('');
  return `<div class="fm-control-intro"><p>HISTORICAL FINANCE SETUP</p><h2>Bring every bank account into one controlled ledger</h2><span>Create each account once, upload all of that account's statements, review duplicates/rejections, then commit. Personal and Company ownership remain separate while Consolidated reporting can show permitted accounts together.</span><div class="fm-control-quick"><button data-quick="account">+ Add account</button><button data-viewjump="statements">Statement vault</button><button data-viewjump="review">Review centre</button><button data-viewjump="reports">Reports</button></div></div><section class="fm-history-grid">${accountCards||emptyState('No financial accounts','Create the first bank, card, cash or loan account before importing history.')}</section><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Pending statement reviews</h2><p>No imported row enters the canonical ledger until you review and commit it.</p></div><span class="fm-badge">${pending.length}</span></div><div class="fm-list">${pendingRows||emptyState('No pending reviews','Imported statement previews waiting for review will appear here.')}</div></div></article>`;
 }
+function waitFinance(ms){return new Promise(resolve=>setTimeout(resolve,Math.max(0,Number(ms)||0)))}
+async function stageStatementPreview(account,file,parsed,index,totalFiles,onRetry){
+ const payload={source_format:parsed.format,original_name:file.name,content_hash:await sha256(file),parser_version:parsed.parser_version||null,parser_confidence:parsed.parser_confidence??null,extraction_diagnostics:{file_size:Number(file.size||0),extracted_rows:parsed.rows.length,batch_index:index+1,batch_files:totalFiles},rows:parsed.rows};
+ let lastError=null;
+ for(let attempt=1;attempt<=3;attempt++){
+  try{return await api(I+'/accounts/'+encodeURIComponent(account.id)+'/statements/preview',{method:'POST',timeoutMs:90000,body:JSON.stringify(payload)})}
+  catch(error){
+   lastError=error;
+   const retryable=error?.code==='STATEMENT_PREVIEW_BUSY'||error?.code==='FINANCE_REQUEST_TIMEOUT'||error?.code==='DUPLICATE_RECORD'||error?.status===503||error?.status===408;
+   if(!retryable||attempt===3)throw error;
+   const delay=Math.min(2500,700*attempt);
+   if(typeof onRetry==='function')onRetry(attempt,delay,error);
+   await waitFinance(delay);
+  }
+ }
+ throw lastError||new Error('Statement verification failed.');
+}
+async function stageStatementFiles(account,files,queue,mapping=null){
+ const staged=[];
+ const summary={files:Number(files.length||0),processed:0,failed:0,attention:0,rows:0,ready:0,duplicates:0,rejected:0};
+ queue.innerHTML='';
+ for(let index=0;index<files.length;index++){
+  const file=files[index];
+  const item=document.createElement('div');
+  item.className='fm-import-item';
+  item.innerHTML='<div class="fm-import-item-main"><b>'+esc(file.name)+'</b><div class="fm-import-status">Queued '+(index+1)+' of '+files.length+'</div></div><span class="fm-badge">QUEUED</span>';
+  queue.appendChild(item);
+  const holder=item.querySelector('.fm-import-status'),badge=item.querySelector('.fm-badge');
+  try{
+   holder.textContent='Uploading original bytes to private statement storage…';badge.textContent='UPLOAD';
+   const uploaded=await uploadStatementFile(account.id,file,mapping);
+   const outcome=await waitForStatementImport(uploaded.import_uid,holder,{openReview:false});
+   const record=outcome.record||{},status=String(outcome.status||'').toUpperCase();
+   if(status==='PENDING_REVIEW'){
+    const duplicates=num(record.duplicate_rows),rejected=num(record.rejected_rows),ready=num(record.valid_rows)+num(record.warning_rows);
+    summary.processed+=1;summary.rows+=num(record.total_rows);summary.ready+=ready;summary.duplicates+=duplicates;summary.rejected+=rejected;
+    staged.push({file:file.name,uid:uploaded.import_uid,summary:record,reused:Boolean(uploaded.reused)});
+    item.classList.add(duplicates||rejected?'warn':'good');badge.className='fm-badge '+(duplicates||rejected?'warn':'good');badge.textContent=duplicates?(duplicates+' DUPLICATE'+(duplicates===1?'':'S')+' EXCLUDED'):(rejected?(rejected+' REJECTED'):'READY');
+   }else if(['NEEDS_PASSWORD','NEEDS_MAPPING'].includes(status)){
+    summary.attention+=1;item.classList.add('warn');badge.className='fm-badge warn';badge.textContent='ACTION';
+   }else{
+    summary.failed+=1;item.classList.add('bad');badge.className='fm-badge bad';badge.textContent=status||'FAILED';
+   }
+  }catch(error){
+   summary.failed+=1;item.classList.add('bad');badge.className='fm-badge bad';badge.textContent='ERROR';holder.textContent=error.message;
+  }
+ }
+ return {staged,summary};
+}
 async function openHistoricalImport(accountId=''){
  $('fmModalEyebrow').textContent='HISTORICAL IMPORT';$('fmModalTitle').textContent='Import statement history';
- $('fmModalBody').innerHTML=`<form id="historicalImportForm" class="fm-form"><label>Account<select name="account_id" required><option value="">Choose account</option>${state.accounts.map(a=>`<option value="${a.id}" ${String(a.id)===String(accountId)?'selected':''}>${esc(a.nickname||'Account')} · ${esc(a.institution||'')} · ${esc(a.currency||'AUD')}</option>`).join('')}</select></label><label>Statement files<input name="files" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" multiple required></label><p class="fm-helper">Each original file is privately retained and processed as its own resumable server job. Nothing is committed automatically. Posting requires explicit review and approval.</p><div id="historyImportQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload all securely</button></div></form>`;
+ $('fmModalBody').innerHTML=`<form id="historicalImportForm" class="fm-form"><label>Account<select name="account_id" required><option value="">Choose account</option>${state.accounts.map(a=>`<option value="${a.id}" ${String(a.id)===String(accountId)?'selected':''}>${esc(a.nickname||'Account')} · ${esc(a.institution||'')} · ${esc(a.currency||'AUD')}</option>`).join('')}</select></label><label>Statement files<input name="files" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" multiple required></label><p class="fm-helper">Each original file is privately retained and processed one-by-one for stability as its own resumable server job. Duplicates are excluded from import, totals, screens and reports. Nothing is committed automatically. Posting requires explicit review and approval.</p><div id="historyImportQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload all securely</button></div></form>`;
  $('fmModal').showModal();
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
  $('historicalImportForm').onsubmit=async e=>{
   e.preventDefault();
   const form=e.currentTarget,fd=new FormData(form),selectedId=String(fd.get('account_id')||''),account=state.accounts.find(a=>String(a.id)===selectedId);
-  const files=[...form.elements.files.files],queue=$('historyImportQueue');
+  const files=[...form.elements.files.files],queue=$('historyImportQueue'),submit=form.querySelector('button[type="submit"]');
   if(!account||!files.length){notice('Choose one account and at least one statement file.',true);return}
-  const rows=[];queue.innerHTML='';
-  form.querySelector('button[type="submit"]').disabled=true;
-  for(const file of files){
-   const item=document.createElement('div');item.className='fm-import-item';item.innerHTML=`<div class="fm-import-item-main"><b>${esc(file.name)}</b><div class="fm-import-status">Waiting</div></div><span class="fm-badge">QUEUED</span>`;queue.appendChild(item);
-   const itemStatus=item.querySelector('.fm-import-status');
-   try{
-    itemStatus.textContent='Uploading privately…';item.querySelector('.fm-badge').textContent='UPLOAD';
-    const result=await uploadStatementFile(selectedId,file);
-    rows.push({file:file.name,uid:result.import_uid});
-    const outcome=await waitForStatementImport(result.import_uid,itemStatus,{openReview:false});
-    if(outcome.status==='PENDING_REVIEW'){item.classList.add('good');item.querySelector('.fm-badge').className='fm-badge good';item.querySelector('.fm-badge').textContent='REVIEW'}
-    else item.querySelector('.fm-badge').textContent=outcome.status;
-   }catch(error){
-    item.classList.add('bad');item.querySelector('.fm-badge').className='fm-badge bad';item.querySelector('.fm-badge').textContent='FAILED';
-    itemStatus.textContent=error.message;
-   }
-  }
-  form.querySelector('button[type="submit"]').disabled=false;
-  if(rows.length){
-   notice(rows.length+' statement file(s) staged for review. Nothing has been committed yet.');
-   await refresh();
-   state.view='history';history.replaceState(null,'','#history');render();
-  }
+  submit.disabled=true;submit.textContent='Uploading & verifying…';
+  const batch=await stageStatementFiles(account,files,queue);
+  submit.disabled=false;submit.textContent='Upload all securely';
+  if(!batch.staged.length){notice(batch.summary.attention?'Some files need your action before review.':'No statement file could be staged. Review the file errors shown above.',true);return}
+  await refresh();
+  state.view='history';history.replaceState(null,'','#history');render();
+  $('fmModal').close();
+  const s=batch.summary;
+  showFinancePopup(s.duplicates?'Statements verified — duplicates excluded':'Statements processed securely',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':'')+(s.attention?' · '+s.attention+' need action':''),{tone:s.failed||s.attention?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
  };
 }
 function statements(){
@@ -1108,7 +1261,8 @@ function teamView(){
 function openTeamAccessForm(userId){
  const team=state.team||{},user=(team.users||[]).find(u=>String(u.id)===String(userId));if(!user)return;
  if(!team.can_manage){notice('Your role cannot manage delegated banking access.',true);return}
- const accounts=(state.accounts||[]).filter(a=>String(a.ownership_scope||'').toUpperCase()!=='PERSONAL');
+ const accounts=(state.accounts||[]).filter(a=>['BUSINESS','MIXED'].includes(String(a.ownership_scope||'').toUpperCase()));
+ const nonDelegatable=(state.accounts||[]).filter(a=>!['BUSINESS','MIXED'].includes(String(a.ownership_scope||'').toUpperCase()));
  const grants=team.grants||[];
  const current=Number(state.bankingOps?.current_user_id||0);
  if(current&&Number(user.id)===current){notice('Use another authorised administrator to change your own banking access.',true);return}
@@ -1117,9 +1271,11 @@ function openTeamAccessForm(userId){
   const level=String(grant?.access_level||'NONE').toUpperCase();
   return `<div class="fm-team-account"><div><b>${esc(a.nickname||'Account')}</b><small>${esc(a.institution||'')} · ${esc(a.currency||'AUD')} · ${esc(a.ownership_scope||'BUSINESS')}</small></div><select data-team-account="${a.id}" data-original-level="${esc(level)}"><option value="NONE" ${level==='NONE'?'selected':''}>No access</option><option value="VIEW" ${level==='VIEW'?'selected':''}>View</option><option value="PREPARE" ${level==='PREPARE'?'selected':''}>Prepare payments</option><option value="APPROVE" ${level==='APPROVE'?'selected':''}>Approve payments</option><option value="MANAGE" ${level==='MANAGE'?'selected':''}>Manage</option></select></div>`;
  }).join('');
+ const nonDelegatableRows=nonDelegatable.map(a=>`<div class="fm-team-account fm-team-account-blocked"><div><b>${esc(a.nickname||'Account')}</b><small>${esc(a.institution||'')} · ${esc(a.currency||'AUD')} · ${esc(a.ownership_scope||'PERSONAL')} · not delegatable</small></div><button type="button" data-team-account-edit="${a.id}">Change ownership</button></div>`).join('');
  $('fmModalEyebrow').textContent='FINANCE ACCESS';$('fmModalTitle').textContent='Banking access · '+(user.name||user.email||'User');
- $('fmModalBody').innerHTML=`<form id="teamAccessForm" class="fm-form"><div class="fm-state"><strong>Account-level delegation</strong><p>VIEW = read only. PREPARE = create payment instructions. APPROVE = approve another preparer's payment. MANAGE = full delegated banking operations for the account. Personal accounts are intentionally excluded.</p></div><div class="fm-team-access-list">${accessRows||emptyState('No eligible business accounts','Create a Company/Mixed financial account before delegating access.')}</div><div id="teamAccessProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit" ${accounts.length?'':'disabled'}>Save changed access</button></div></form>`;
+ $('fmModalBody').innerHTML=`<form id="teamAccessForm" class="fm-form"><div class="fm-state"><strong>Account-level delegation</strong><p>VIEW = read only. PREPARE = create payment instructions. APPROVE = approve another preparer's payment. MANAGE = full delegated banking operations for the account. Only Company and Mixed accounts can be delegated; Personal accounts remain private.</p></div><div class="fm-team-access-list">${accessRows||(emptyState('No Company/Mixed accounts yet','Your existing accounts are private. Change the ownership of the account you want to share to Company or Mixed.')+nonDelegatableRows)}</div><div id="teamAccessProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit" ${accounts.length?'':'disabled'}>Save changed access</button></div></form>`;
  $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
+ document.querySelectorAll('[data-team-account-edit]').forEach(button=>button.addEventListener('click',()=>{$('fmModal').close();openAccountForm('',button.dataset.teamAccountEdit)}));
  $('teamAccessForm').onsubmit=async e=>{
   e.preventDefault();
   const selects=[...e.currentTarget.querySelectorAll('[data-team-account]')];
@@ -1148,7 +1304,7 @@ function connectionsView(){
  const connectionRows=connections.map(c=>`<div class="fm-row"><div><h3>${esc(c.institution||c.provider||'Bank connection')}</h3><p>${esc(c.provider||'')} · consent ${esc(c.consent_status||'')} · last sync ${c.last_sync_completed_at?new Date(c.last_sync_completed_at).toLocaleString('en-AU'):'never'}</p><small>${(c.accounts||[]).map(a=>esc(a.account_name||'Account')+' · '+esc(a.currency||'')).join(' · ')}</small></div><div class="fm-row-right">${statusBadge(c.status||c.last_sync_status||c.consent_status)}<div class="fm-inline-actions"><button data-bank-sync="${esc(c.connection_uid)}">Sync now</button><button data-bank-reauthorize="${esc(c.provider||'BASIQ')}">Renew consent</button><button class="bad" data-bank-disconnect="${esc(c.connection_uid)}">Disconnect</button></div></div></div>`).join('');
  const sessionRows=sessions.slice(0,20).map(s=>`<div class="fm-row"><div><h3>${esc(s.provider)} consent</h3><p>${esc(s.environment||'')} · created ${s.created_at?new Date(s.created_at).toLocaleString('en-AU'):'—'} · expires ${s.expires_at?new Date(s.expires_at).toLocaleString('en-AU'):'—'}</p></div><div class="fm-row-right">${statusBadge(s.status)}${['CREATED','AWAITING_USER'].includes(String(s.status||''))?`<button data-consent-cancel="${esc(s.session_uid)}">Cancel</button>`:''}</div></div>`).join('');
  const syncRows=(state.bankSyncJobs?.runs||state.bankSyncJobs?.sync_runs||[]).slice(0,12).map(s=>`<div class="fm-row"><div><h3>${esc(s.provider||'Bank sync')} · ${esc(s.trigger_type||'')}</h3><p>${s.started_at?new Date(s.started_at).toLocaleString('en-AU'):'—'} · ${num(s.transactions_seen)} seen · ${num(s.transactions_inserted)} inserted · ${num(s.duplicates_skipped)} duplicates skipped</p></div>${statusBadge(s.status)}</div>`).join('');
- return `${resourceError('readiness','Banking Connections')}<div class="fm-control-intro"><p>OPEN BANKING & MANUAL IMPORT</p><h2>Connect where available; statements always remain the fallback</h2><span>Voxel Veda never asks for or stores your bank password, PIN or OTP. Consent happens on the provider/bank-controlled page. Imported and synced transactions land in the same canonical Finance ledger.</span><div class="fm-control-quick"><button data-viewjump="history">Import statements</button><button data-viewjump="accounts">Manage accounts</button><button data-viewjump="review">Review data</button></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Banking Setup & Safety</h2><p>${esc(r.headline||state.openBankProviders?.recommendation?.reason||'Open Banking readiness')} · Fail-closed until provider and production controls are verified.</p></div>${statusBadge(r.overall||'RUNTIME STATUS')}</div><div class="fm-connection-grid">${providerCards||emptyState('No provider configured','Use statement import until an Australian Open Banking provider is configured.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Connected banks</h2><p>Sync controls operate on existing provider consents and preserve historical data when disconnected.</p></div></div>${resourceError('bankConnectionData','Connected banks')}<div class="fm-list">${connectionRows||emptyState('No bank connected','Connect a configured provider or use History Import for complete statement history.')}</div></div></article></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Consent sessions</h2><p>Provider-controlled authorization sessions for the signed-in user.</p></div></div>${resourceError('openBankSessions','Consent sessions')}<div class="fm-list">${sessionRows||emptyState('No consent sessions','Starting a bank connection creates a short-lived consent session.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Sync history</h2><p>Evidence of provider syncs, inserted transactions and duplicate suppression.</p></div></div>${resourceError('bankSyncJobs','Bank sync history')}<div class="fm-list">${syncRows||emptyState('No sync history','No provider sync has run for this user.')}</div></div></article></div>`;
+ return `${resourceError('readiness','Banking Connections')}<div class="fm-control-intro"><p>OPEN BANKING & MANUAL IMPORT</p><h2>Connect where available; statements always remain the fallback</h2><span>Voxel Veda never asks for or stores your bank password, PIN or OTP. Consent happens on the provider/bank-controlled page. Imported and synced transactions land in the same canonical Finance ledger.</span><div class="fm-control-quick"><button data-viewjump="history">Import statements</button><button data-viewjump="accounts">Manage accounts</button><button data-viewjump="review">Review data</button></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Banking Setup & Safety</h2><p>${esc(r.headline||state.openBankProviders?.recommendation?.reason||'Open Banking readiness')} · Fail-closed until provider and production controls are verified.</p></div>${statusBadge(r.overall||'RUNTIME STATUS')}</div><div class="fm-connection-grid">${providerCards||emptyState('No provider configured','Use statement import until an Australian Open Banking provider is configured.')}</div>${r.public_launch?'<div class="fm-public-launch-gate"><div><span>PUBLIC SERVICE LAUNCH GATE</span><b>'+esc(r.public_launch.public_platform_ready?'Platform controls ready for final legal launch review':'Platform launch blocked')+'</b><p>'+esc(r.public_launch.wording_rule||'Finance platform wording only.')+'</p></div>'+statusBadge(r.public_launch.public_platform_ready?'READY':'BLOCKED')+'<ul>'+(r.public_launch.blockers||[]).slice(0,6).map(item=>'<li>'+esc(item)+'</li>').join('')+'</ul></div>':''}</div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Connected banks</h2><p>Sync controls operate on existing provider consents and preserve historical data when disconnected.</p></div></div>${resourceError('bankConnectionData','Connected banks')}<div class="fm-list">${connectionRows||emptyState('No bank connected','Connect a configured provider or use History Import for complete statement history.')}</div></div></article></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Consent sessions</h2><p>Provider-controlled authorization sessions for the signed-in user.</p></div></div>${resourceError('openBankSessions','Consent sessions')}<div class="fm-list">${sessionRows||emptyState('No consent sessions','Starting a bank connection creates a short-lived consent session.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Sync history</h2><p>Evidence of provider syncs, inserted transactions and duplicate suppression.</p></div></div>${resourceError('bankSyncJobs','Bank sync history')}<div class="fm-list">${syncRows||emptyState('No sync history','No provider sync has run for this user.')}</div></div></article></div>`;
 }
 async function startBankConsent(provider){
  try{
@@ -1319,7 +1475,7 @@ function ensureAdvancedControlLoaded(){
  if(window.__financeAdvancedControlMount){mount();return}
  const existing=document.querySelector('script[data-finance-advanced-control]');
  if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}
- const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v14';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
+ const script=document.createElement('script');script.src='/finance-advanced-control.js?v=20260924-advanced-control-v15';script.defer=true;script.dataset.financeAdvancedControl='1';script.onload=mount;script.onerror=()=>{const root=$('financeAdvancedControlMount');if(root)root.innerHTML='<div class="fm-state fm-state-error"><strong>Advanced Finance Control failed to load</strong><p>The core Finance OS remains available. Reload this module or refresh the page.</p></div>'};document.head.appendChild(script);
 }
 function advancedControlView(){
  setTimeout(ensureAdvancedControlLoaded,0);
@@ -1752,46 +1908,128 @@ async function pdfLines(file) {
   return lines;
 }
 
-function parsePdfLines(lines) {
-  const datePattern = /(\b\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}\b|\b\d{1,2}\s+[A-Za-z]{3}\s+\d{2,4}\b)/;
-  const amountPattern = /(?:CR|DR)?\s*[-+]?\(?\$?\d[\d,]*\.\d{2}\)?(?:\s*(?:CR|DR))?/gi;
-  const rows = [];
-  for (const line of lines) {
-    const dateMatch = line.match(datePattern);
-    if (!dateMatch) continue;
-    const amounts = [...line.matchAll(amountPattern)].map((match) => ({ raw: match[0], index: match.index || 0 }));
-    if (!amounts.length) continue;
-    const transactionAmount = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0];
-    const balanceAmount = amounts.length >= 2 ? amounts[amounts.length - 1] : null;
-    const rawAmount = transactionAmount.raw;
-    const numeric = Math.abs(parseNumber(rawAmount.replace(/\b(?:CR|DR)\b/gi, '')));
-    const debitHint = /\bDR\b/i.test(rawAmount) || /^\s*-/.test(rawAmount) || /^\s*\(/.test(rawAmount);
-    const creditHint = /\bCR\b/i.test(rawAmount) || /^\s*\+/.test(rawAmount);
-    if (!debitHint && !creditHint) continue;
-    const description = line.slice(dateMatch.index + dateMatch[0].length, transactionAmount.index).trim();
-    rows.push({
-      transaction_date: dateMatch[0],
-      description: description || 'PDF statement transaction — verify description',
-      debit: debitHint ? numeric : 0,
-      credit: creditHint ? numeric : 0,
-      running_balance: balanceAmount ? Math.abs(parseNumber(balanceAmount.raw.replace(/\b(?:CR|DR)\b/gi, ''))) : null,
-      reference: null,
-      merchant_name: null,
-      category: null,
-      currency: null
-    });
-  }
-  if (!rows.length) throw new Error('This PDF does not expose transaction direction safely enough for automatic import. Export CSV/OFX from the bank, or use a PDF with explicit CR/DR or signed amounts. Nothing was imported.');
-  return rows;
+const PDF_MONTH_INDEX={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function pdfYearNumber(value){
+ const n=Number(value);if(!Number.isFinite(n))return null;
+ return n<100?(n>=70?1900+n:2000+n):n;
 }
-
+function pdfYearBounds(lines){
+ const text=(lines||[]).map(line=>String(line||'')).join(' ');
+ const numeric=[...text.matchAll(/\b\d{1,2}[\/-]\d{1,2}[\/-](\d{2,4})\b/g)].map(m=>pdfYearNumber(m[1])).filter(Boolean);
+ const named=[...text.matchAll(/\b\d{1,2}\s+[A-Za-z]{3,9}\s+(\d{2,4})\b/g)].map(m=>pdfYearNumber(m[1])).filter(Boolean);
+ const years=[...numeric,...named].filter(y=>y>=1900&&y<=2200);
+ return years.length?{min:Math.min(...years),max:Math.max(...years)}:{min:null,max:null};
+}
+function pdfSeedYear(lines){
+ const bounds=pdfYearBounds(lines);
+ return bounds.min||new Date().getFullYear();
+}
+function pdfIsoDate(raw,state){
+ const text=String(raw||'').trim().replace(/\s+/g,' ');
+ let day=null,month=null,year=null,explicitYear=false,match=text.match(/^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/);
+ if(match){day=Number(match[1]);month=Number(match[2]);if(match[3]){year=pdfYearNumber(match[3]);explicitYear=true}}
+ else{
+  match=text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})(?:\s+(\d{2,4}))?$/);
+  if(!match)return null;
+  day=Number(match[1]);month=PDF_MONTH_INDEX[match[2].slice(0,3).toLowerCase()]||null;if(match[3]){year=pdfYearNumber(match[3]);explicitYear=true}
+ }
+ if(!day||!month)return null;
+ if(!year){
+  year=Number(state.year||state.seedYear||new Date().getFullYear());
+  if(state.prevMonth&&state.prevMonth>=10&&month<=3){
+   const rollover=year+1;
+   if(!state.maxExplicitYear||rollover<=state.maxExplicitYear)year=rollover;
+   else state.boundExceeded=true;
+  }
+ }
+ if(state.minExplicitYear&&year<state.minExplicitYear)return null;
+ if(state.maxExplicitYear&&year>state.maxExplicitYear)return null;
+ const value=String(year).padStart(4,'0')+'-'+String(month).padStart(2,'0')+'-'+String(day).padStart(2,'0');
+ const check=new Date(value+'T00:00:00Z');
+ if(Number.isNaN(check.getTime())||check.toISOString().slice(0,10)!==value)return null;
+ state.year=year;state.prevMonth=month;state.explicitYear=explicitYear||state.explicitYear;
+ return value;
+}
+function pdfSignedMoney(raw){
+ const text=String(raw||'').trim();
+ const numeric=Math.abs(parseNumber(text.replace(/\b(?:CR|DR)\b/gi,'')));
+ if(!numeric)return 0;
+ if(/\bDR\b/i.test(text)||/^\s*-/.test(text)||/^\s*\(/.test(text))return -numeric;
+ return numeric;
+}
+function pdfBalanceMarker(text){
+ const value=String(text||'').toUpperCase().replace(/\s+/g,' ').trim();
+ return /\b(?:OPENING|CLOSING)\s+BALANCE\b/.test(value)||/\bBALANCE\s+(?:BROUGHT|CARRIED)\s+FORWARD\b/.test(value)||/\bBALANCE\s+(?:B\/F|C\/F)\b/.test(value);
+}
+function pdfSemanticDirection(text){
+ const value=String(text||'').toUpperCase();
+ if(/\b(DIRECT CREDIT|SALARY|WAGES|PAYROLL|TRANSFER FROM|DEPOSIT|REFUND|CREDIT INTEREST|INTEREST CREDIT)\b/.test(value))return 'CREDIT';
+ if(/\b(DIRECT DEBIT|WDL\b|WITHDRAWAL|ATM\b|TRANSFER TO|BPAY|BANK FEE|ACCOUNT FEE|CARDLESS CASH)\b/.test(value))return 'DEBIT';
+ return null;
+}
+function parsePdfLines(lines) {
+ const source=(lines||[]).map(line=>String(line||'').replace(/\s+/g,' ').trim()).filter(Boolean);
+ const dateStart=/^(\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?)(?=\s|$)/i;
+ const amountPattern=/(?:\b(?:CR|DR)\s*)?[-+]?\(?\$?\s*\d[\d,]*\.\d{2}\)?(?:\s*(?:CR|DR)\b)?/gi;
+ const blocks=[];let current=null;
+ for(const line of source){
+  const dateMatch=line.match(dateStart);
+  if(dateMatch){if(current)blocks.push(current);current={date_raw:dateMatch[1],parts:[line]}}
+  else if(current)current.parts.push(line);
+ }
+ if(current)blocks.push(current);
+ const yearBounds=pdfYearBounds(source);
+ const dateState={seedYear:pdfSeedYear(source),minExplicitYear:yearBounds.min,maxExplicitYear:yearBounds.max,year:null,prevMonth:null,boundExceeded:false};
+ const records=[];
+ for(const block of blocks){
+  const text=block.parts.join(' ').replace(/\s+/g,' ').trim();
+  const transactionDate=pdfIsoDate(block.date_raw,dateState);
+  if(!transactionDate)continue;
+  const amounts=[...text.matchAll(amountPattern)].map(match=>({raw:match[0],index:match.index||0,value:pdfSignedMoney(match[0])}));
+  if(!amounts.length)continue;
+  const afterDate=text.slice(block.date_raw.length).trim();
+  const marker=pdfBalanceMarker(afterDate);
+  if(marker){records.push({marker:true,transaction_date:transactionDate,running_balance:amounts[amounts.length-1].value,text});continue}
+  const transactionAmount=amounts.length>=2?amounts[amounts.length-2]:amounts[0];
+  const balanceAmount=amounts.length>=2?amounts[amounts.length-1]:null;
+  const amount=Math.abs(transactionAmount.value);
+  if(!amount)continue;
+  const description=text.slice(block.date_raw.length,transactionAmount.index).replace(/\s+/g,' ').trim();
+  let explicitDirection=null;
+  if(/\bDR\b/i.test(transactionAmount.raw)||/^\s*-/.test(transactionAmount.raw)||/^\s*\(/.test(transactionAmount.raw))explicitDirection='DEBIT';
+  else if(/\bCR\b/i.test(transactionAmount.raw)||/^\s*\+/.test(transactionAmount.raw))explicitDirection='CREDIT';
+  records.push({marker:false,transaction_date:transactionDate,description:description||'PDF statement transaction — verify description',amount,running_balance:balanceAmount?balanceAmount.value:null,explicit_direction:explicitDirection,text});
+ }
+ const rows=[];let previousBalance=null;
+ for(const record of records){
+  if(record.marker){if(record.running_balance!==null&&record.running_balance!==undefined)previousBalance=record.running_balance;continue}
+  let direction=record.explicit_direction,inference=null;
+  if(!direction&&record.running_balance!==null&&previousBalance!==null){
+   const delta=Math.round((record.running_balance-previousBalance)*100)/100;
+   if(Math.abs(Math.abs(delta)-record.amount)<=0.02&&Math.abs(delta)>0){direction=delta>0?'CREDIT':'DEBIT';inference='BALANCE_DELTA'}
+  }
+  if(!direction){direction=pdfSemanticDirection(record.description);if(direction)inference='DESCRIPTION'}
+  const row={
+   transaction_date:record.transaction_date,description:record.description,
+   debit:direction==='DEBIT'?record.amount:0,credit:direction==='CREDIT'?record.amount:0,
+   running_balance:record.running_balance,reference:null,merchant_name:null,category:null,currency:null
+  };
+  if(!direction)row.validation_hint='PDF transaction amount was found but debit/credit direction could not be verified automatically. Review this row before importing.';
+  else if(inference==='DESCRIPTION')row.validation_hint='PDF debit/credit direction was inferred from high-confidence transaction wording. Verify this row during review.';
+  rows.push(row);
+  if(record.running_balance!==null&&record.running_balance!==undefined)previousBalance=record.running_balance;
+ }
+ if (!rows.length) throw new Error('This PDF does not expose transaction direction safely enough for automatic import. Export CSV/OFX from the bank, or use a PDF with explicit CR/DR, debit/credit columns or running balances. Nothing was imported.');
+ if(dateState.boundExceeded)throw new Error('The PDF date sequence runs beyond the statement year range. Finance stopped the import instead of inventing future transaction dates. Export CSV/OFX from the bank or verify the PDF statement period.');
+ return rows;
+}
 async function parseStatement(file) {
   const extension = (file.name.split('.').pop() || '').toUpperCase();
-  if (extension === 'CSV') return { format: extension, rows: parseCsv(await file.text()) };
-  if (extension === 'OFX' || extension === 'QFX') return { format: extension, rows: parseOfx(await file.text()) };
-  if (extension === 'QIF') return { format: extension, rows: parseQif(await file.text()) };
-  if (extension === 'XLSX') return { format: extension, rows: await parseXlsx(file) };
-  if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)) };
+  if (extension === 'CSV') return { format: extension, rows: parseCsv(await file.text()), parser_version:'CSV_V2' };
+  if (extension === 'OFX' || extension === 'QFX') return { format: extension, rows: parseOfx(await file.text()), parser_version:'OFX_V2' };
+  if (extension === 'QIF') return { format: extension, rows: parseQif(await file.text()), parser_version:'QIF_V2' };
+  if (extension === 'XLSX') return { format: extension, rows: await parseXlsx(file), parser_version:'XLSX_V2' };
+  if (extension === 'PDF') return { format: extension, rows: parsePdfLines(await pdfLines(file)), parser_version:'PDF_TABLE_V5_DATE_BOUNDS', parser_confidence:0.98 };
   throw new Error('Unsupported statement file. Use CSV, PDF, OFX, QFX, QIF or XLSX.');
 }
 
@@ -1859,17 +2097,29 @@ async function waitForStatementImport(uid,holder,{openReview=true}={}){
 }
 async function openStatementWizard(){
  let templates=[];try{templates=(await api(I+'/statement-imports/mappings')).mapping_templates||[]}catch{}
- $('fmModalEyebrow').textContent='STATEMENT IMPORT';$('fmModalTitle').textContent='Import statement';
- $('fmModalBody').innerHTML=`<form id="statementWizard" class="fm-form"><label>1. Account<select name="account_id" required><option value="">Choose account</option>${state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('')}</select></label><label>2. Statement file<input name="file" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" required></label>${templates.length?`<label>Saved mapping (optional)<select name="mapping_template"><option value="">Detect columns automatically</option>${templates.map(template=>`<option value="${esc(template.template_uid)}">${esc(template.template_name)} · ${esc(template.institution)} · ${esc(template.source_format)}</option>`).join('')}</select></label>`:''}<p class="fm-helper">The original file is uploaded privately, content-verified, hashed, malware-checked, classified and parsed on the server. No transaction reaches the ledger until review and approval.</p><div id="statementProgress" class="fm-state" hidden></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload securely</button></div></form>`;
+ const accountOptions=state.accounts.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.nickname||'Account')+' · '+esc(a.currency||'AUD')+'</option>').join('');
+ $('fmModalEyebrow').textContent='STATEMENT IMPORT';$('fmModalTitle').textContent='Import statements';
+ const templateOptions=templates.length?'<label>Saved mapping (optional)<select name="mapping_template"><option value="">Detect columns automatically</option>'+templates.map(template=>'<option value="'+esc(template.template_uid)+'">'+esc(template.template_name)+' · '+esc(template.institution)+' · '+esc(template.source_format)+'</option>').join('')+'</select></label>':'';
+ $('fmModalBody').innerHTML='<form id="statementWizard" class="fm-form"><label>1. Account<select name="account_id" required><option value="">Choose account</option>'+accountOptions+'</select></label><label>2. Statement files<input name="files" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" multiple required></label>'+templateOptions+'<p class="fm-helper">Upload one or many statements. Original bytes are retained privately and processed one-by-one for stability by resumable server jobs. Duplicate transactions are blocked before they can enter Finance calculations, the ledger or exports. Nothing is committed automatically. No transaction reaches the ledger until review and approval.</p><div id="statementProgress" class="fm-state" hidden></div><div id="statementBatchQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload & verify files</button></div></form>';
  $('fmModal').showModal();
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
  $('statementWizard').onsubmit=async e=>{
-   e.preventDefault();const form=e.currentTarget,fd=new FormData(form),file=fd.get('file'),accountId=fd.get('account_id'),progress=$('statementProgress'),submit=form.querySelector('button[type="submit"]');
-   progress.hidden=false;progress.className='fm-state';progress.textContent='Uploading to private statement storage…';submit.disabled=true;
-   try{
-     const selectedTemplate=templates.find(template=>template.template_uid===fd.get('mapping_template')),mapping=selectedTemplate?statementJson(selectedTemplate.mapping_json):null;
-     const result=await uploadStatementFile(accountId,file,mapping);await waitForStatementImport(result.import_uid,progress);
-   }catch(error){progress.className='fm-state fm-state-error';progress.textContent=error.message;submit.disabled=false}
+  e.preventDefault();
+  const form=e.currentTarget,fd=new FormData(form),accountId=String(fd.get('account_id')||''),account=state.accounts.find(a=>String(a.id)===accountId);
+  const files=[...form.elements.files.files],progress=$('statementProgress'),queue=$('statementBatchQueue'),submit=form.querySelector('button[type="submit"]');
+  if(!account||!files.length){progress.hidden=false;progress.className='fm-state fm-state-error';progress.textContent='Choose one account and at least one statement file.';return}
+  const selectedTemplate=templates.find(template=>template.template_uid===fd.get('mapping_template')),mapping=selectedTemplate?statementJson(selectedTemplate.mapping_json):null;
+  progress.hidden=false;progress.className='fm-state';progress.textContent='Uploading '+files.length+' original file(s) to private storage. Server-side classification, extraction and duplicate verification follow.';
+  submit.disabled=true;submit.textContent='Uploading & verifying…';
+  const batch=await stageStatementFiles(account,files,queue,mapping);
+  submit.disabled=false;submit.textContent='Upload & verify files';
+  if(!batch.staged.length){progress.className='fm-state fm-state-error';progress.textContent=batch.summary.attention?'Complete the requested password or mapping action shown below.':'No statement file could be staged. Fix the file errors shown below and retry.';return}
+  await refresh();
+  state.view='statements';history.replaceState(null,'','#statements');render();
+  if(batch.summary.attention){progress.className='fm-state fm-state-warn';progress.textContent='Some files are ready for review and others still need the action shown below.';return}
+  $('fmModal').close();
+  const s=batch.summary;
+  showFinancePopup(s.duplicates?'Statement import verified — duplicates excluded':'Statement processing completed',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':''),{tone:s.failed?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
  };
 }
 async function openStatementImportStatus(uid){
@@ -1877,27 +2127,112 @@ async function openStatementImportStatus(uid){
  $('fmModalBody').innerHTML='<div id="statementProgress" class="fm-state">Loading secure job status…</div>';$('fmModal').showModal();
  try{await waitForStatementImport(uid,$('statementProgress'))}catch(error){const holder=$('statementProgress');holder.className='fm-state fm-state-error';holder.textContent=error.message}
 }
-function openStatementRowCorrection(uid,row){
+function openRejectedRowOverride(uid,row,session,trigger){
+ const editing=Boolean(Number(row.manual_override||0));
  const debit=num(row.debit),credit=num(row.credit);
- $('fmModalEyebrow').textContent='SOURCE-CONTROLLED CORRECTION';$('fmModalTitle').textContent='Correct rejected row';
- $('fmModalBody').innerHTML=`<form id="statementCorrectionForm" class="fm-form"><p class="fm-helper">Original source: page ${esc(row.source_page||'—')}, row ${esc(row.source_row_number||row.row_no||'—')} · ${esc(row.source_snippet||'No text snippet available')}</p><label>Date<input name="transaction_date" type="date" value="${esc(String(row.transaction_date||'').slice(0,10))}" required></label><label>Description<input name="description" value="${esc(row.description||'')}" required></label><div class="fm-form-grid"><label>Direction<select name="direction"><option value="DEBIT" ${debit?'selected':''}>Money out / debit</option><option value="CREDIT" ${credit?'selected':''}>Money in / credit</option></select></label><label>Amount<input name="amount" inputmode="decimal" value="${esc(debit||credit||'')}" required></label></div><label>Currency<input name="currency" maxlength="3" value="${esc(row.currency||'AUD')}" required></label><label>Correction reason<textarea name="reason" required placeholder="Explain why the extracted value is being overridden"></textarea></label><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Save audited correction</button></div></form>`;
- $('fmModal').showModal();document.querySelector('[data-modal-cancel]').onclick=()=> $('fmModal').close();
- $('statementCorrectionForm').onsubmit=async event=>{event.preventDefault();const body=Object.fromEntries(new FormData(event.currentTarget).entries());try{await api(I+`/statement-reviews/${encodeURIComponent(uid)}/rows/${row.id}/override`,{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice('Correction saved with original evidence retained.');await openStatementReview(uid,'UNCERTAIN')}catch(error){notice(error.message,true)}};
+ const direction=debit>0?'DEBIT':credit>0?'CREDIT':'';
+ const amount=debit>0?debit:credit>0?credit:'';
+ $('fmModalEyebrow').textContent=editing?'MANUAL STATEMENT EDIT':'MANUAL STATEMENT CORRECTION';
+ $('fmModalTitle').textContent=editing?'Edit corrected transaction':'Fix & include rejected transaction';
+ const source='Page '+esc(row.source_page||'—')+' · source row '+esc(row.source_row_number||row.row_no||'—')+' · confidence '+(row.confidence_score===null||row.confidence_score===undefined?'—':Math.round(num(row.confidence_score)*100)+'%')+'<br>'+esc(row.source_snippet||row.validation_message||'No source snippet available');
+ $('fmModalBody').innerHTML='<form id="rejectedRowOverrideForm" class="fm-form"><div class="fm-state fm-state-warning"><strong>'+(editing?'Manual override edit':'Manual override')+'</strong><p>'+(editing?'This row was previously corrected manually. You can edit it again before the statement is committed. Duplicate transactions and opening/closing balance markers remain locked.':'This row was rejected by automatic validation. Confirm the genuine transaction details before including it. Duplicate transactions and opening/closing balance markers remain permanently blocked.')+'</p></div><p class="fm-helper">Original extraction: '+source+'</p><label>Transaction date<input name="transaction_date" type="date" value="'+esc(String(row.transaction_date||'').slice(0,10))+'" required></label><label>Description<textarea name="description" rows="3" required>'+esc(row.description||'')+'</textarea></label><div class="fm-form-grid two"><label>Money direction<select name="direction" required><option value="">Choose</option><option value="DEBIT" '+(direction==='DEBIT'?'selected':'')+'>Money out / Debit</option><option value="CREDIT" '+(direction==='CREDIT'?'selected':'')+'>Money in / Credit</option></select></label><label>Amount<input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" value="'+esc(amount||'')+'" required></label></div><label>Reason / verification note<textarea name="reason" rows="2" placeholder="Example: Verified against the original bank statement" required>'+esc(row.override_reason||'')+'</textarea></label><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">'+(editing?'Save changes':'Include transaction')+'</button></div></form>';
+ if(!$('fmModal').open)$('fmModal').showModal();
+ const resetTrigger=()=>{if(trigger)trigger.checked=false};
+ document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>{$('fmModal').close();resetTrigger()},{once:true});
+ $('rejectedRowOverrideForm').onsubmit=async e=>{
+  e.preventDefault();
+  const form=e.currentTarget,fd=new FormData(form),submit=form.querySelector('button[type="submit"]');
+  const payload={transaction_date:String(fd.get('transaction_date')||''),description:String(fd.get('description')||'').trim(),direction:String(fd.get('direction')||''),amount:String(fd.get('amount')||''),reason:String(fd.get('reason')||'').trim()};
+  if(!payload.transaction_date||!payload.description||!payload.direction||!payload.amount||payload.reason.length<3){notice('Complete the date, description, direction, amount and verification note.',true);return}
+  submit.disabled=true;submit.textContent=editing?'Saving…':'Checking & including…';
+  try{
+   const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(row.id)+'/override',{method:'POST',body:JSON.stringify(payload)});
+   $('fmModal').close();
+   await openStatementReview(uid,editing?'manual':'rejected');
+   showFinancePopup(editing?'Corrected transaction updated':'Rejected transaction included',result.message||(editing?'The corrected transaction was updated.':'The corrected transaction is selected for import.'),'Manual override recorded in the audit trail.');
+  }catch(error){submit.disabled=false;submit.textContent=editing?'Save changes':'Include transaction';resetTrigger();notice(error.message,true)}
+ };
 }
-async function openStatementReview(uid,filter='ALL'){
+
+function reviewStatusFilter(row,filter){
+ const status=String(row.validation_status||'').toUpperCase();
+ const normalized=String(filter||'ALL').toUpperCase();
+ if(normalized==='ALL'||normalized==='TOTAL')return true;
+ if(normalized==='VALID')return status==='VALID';
+ if(normalized==='WARNING'||normalized==='UNCERTAIN')return status==='WARNING';
+ if(normalized==='DUPLICATE')return status==='DUPLICATE';
+ if(normalized==='REJECTED')return status==='REJECTED';
+ if(normalized==='MANUAL')return Boolean(Number(row.manual_override||0));
+ return true;
+}
+
+function statementReviewRowMarkup(row,session){
+ const isDuplicate=row.validation_status==='DUPLICATE';
+ const isRejected=row.validation_status==='REJECTED';
+ const isManual=Boolean(Number(row.manual_override||0));
+ const balanceLocked=isRejected&&(/balance.*marker|opening\/closing balance|not a transaction/i.test(String(row.validation_message||''))||/^(opening|closing) balance\b/i.test(String(row.description||'')));
+ const rowClass=isDuplicate?'fm-review-duplicate':isRejected?'fm-review-rejected':isManual?'fm-review-manual':'';
+ const useControl=isDuplicate||balanceLocked
+  ? '<input type="checkbox" disabled aria-label="Locked row">'
+  : isRejected
+    ? '<label class="fm-manual-select"><input type="checkbox" data-review-override="'+esc(row.id)+'"><span>Include</span></label>'
+    : '<input type="checkbox" data-review-select="'+esc(row.id)+'" '+(Number(row.selected)?'checked ':'')+'>';
+ const source='<small class="fm-source-detail">Page '+esc(row.source_page||'—')+' · source row '+esc(row.source_row_number||row.row_no||'—')+' · confidence '+(row.confidence_score===null||row.confidence_score===undefined?'—':Math.round(num(row.confidence_score)*100)+'%')+'<br>'+esc(row.source_snippet||'')+'</small>';
+ let validation='<small>'+esc(row.validation_message||'Verified')+'</small>';
+ if(isRejected&&!balanceLocked)validation+='<button type="button" class="fm-fix-include" data-review-fix="'+esc(row.id)+'">Fix & include</button>';
+ if(isManual)validation+='<button type="button" class="fm-edit-override" data-review-edit="'+esc(row.id)+'">Edit correction</button>';
+ return '<tr class="'+rowClass+'" data-review-row data-status="'+esc(String(row.validation_status||'').toLowerCase())+'" data-manual="'+(isManual?'1':'0')+'"><td>'+useControl+'</td><td>'+date(row.transaction_date)+'</td><td><div class="fm-statement-description">'+esc(row.description)+'</div>'+source+'</td><td>'+(num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):'')+'</td><td>'+(num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):'')+'</td><td>'+statusBadge(row.validation_status)+'</td><td>'+validation+'</td></tr>';
+}
+
+async function openStatementReview(uid,initialFilter='ALL'){
  try{
-  const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'?filter='+encodeURIComponent(filter)),session=result.session,validations=result.validation_results||[];
-  const filters=[['ALL','All',session.total_rows],['VALID','Valid',session.valid_rows],['UNCERTAIN','Uncertain',session.warning_rows],['DUPLICATE','Duplicates',session.duplicate_rows],['REJECTED','Rejected',session.rejected_rows]];
-  const evidence=session.secure_document_id?`<a class="fm-evidence-link" href="/api/documents/${encodeURIComponent(session.secure_document_id)}/download" target="_blank" rel="noopener">Open original statement</a>`:'';
-  const validationHtml=validations.map(item=>`<div class="fm-validation-row"><span>${esc(String(item.validation_key||'').replace(/_/g,' '))}</span>${statusBadge(item.status)}<small>${esc(item.detail||item.actual_value||'')}</small></div>`).join('');
-  const rowHtml=(result.rows||[]).map(row=>`<tr><td><input type="checkbox" data-review-select="${row.id}" ${Number(row.selected)?'checked':''} ${['DUPLICATE','REJECTED'].includes(row.validation_status)?'disabled':''}></td><td>${date(row.transaction_date)}</td><td><b>${esc(row.description||'—')}</b><small class="fm-source-detail">Page ${esc(row.source_page||'—')} · source row ${esc(row.source_row_number||row.row_no||'—')} · confidence ${row.confidence_score===null||row.confidence_score===undefined?'—':Math.round(num(row.confidence_score)*100)+'%'}<br>${esc(row.source_snippet||row.validation_message||'')}</small>${row.validation_status==='REJECTED'?`<button type="button" class="fm-row-edit" data-review-edit="${row.id}">Correct row</button>`:''}</td><td>${num(row.debit)?nativeMoney(row.debit,row.currency||session.account_currency):''}</td><td>${num(row.credit)?nativeMoney(row.credit,row.currency||session.account_currency):''}</td><td>${statusBadge(row.validation_status)}${row.manual_override?'<small class="fm-source-detail">Manual override</small>':''}</td></tr>`).join('');
-  openDrawer('Review '+(session.original_name||'statement'),`<div class="fm-review-toolbar"><div class="fm-review-filters">${filters.map(([key,label,count])=>`<button type="button" data-review-filter="${key}" class="fm-kpi ${filter===key?'active':''}"><span>${label}</span><strong>${num(count)}</strong></button>`).join('')}</div>${evidence}</div><div class="fm-statement-meta"><span>Account<b>${esc(session.account_name||'—')}</b></span><span>Format<b>${esc(session.source_format||'—')}</b></span><span>Parser<b>${esc(session.parser_version||'—')}</b></span><span>Reconciliation<b>${esc(session.reconciliation_status||'INCOMPLETE')} ${session.reconciliation_difference!==null&&session.reconciliation_difference!==undefined?'· '+nativeMoney(session.reconciliation_difference,session.statement_currency||session.account_currency):''}</b></span></div>${validationHtml?`<details class="fm-validation"><summary>Validation and reconciliation evidence</summary>${validationHtml}</details>`:''}<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Use</th><th>Date</th><th>Description & source</th><th>Debit</th><th>Credit</th><th>Status</th></tr></thead><tbody>${rowHtml||'<tr><td colspan="6">No rows match this filter.</td></tr>'}</tbody></table></div><div class="fm-form-actions"><button type="button" data-review-reject="${esc(uid)}">Reject review</button><button class="primary" type="button" data-review-commit="${esc(uid)}">Approve & post selected rows</button></div>`,'STATEMENT REVIEW');
+  const result=await api(I+'/statement-reviews/'+encodeURIComponent(uid)),session=result.session,rows=result.rows||[],validations=result.validation_results||[];
+  const warnings=rows.filter(row=>String(row.validation_status||'').toUpperCase()==='WARNING').length;
+  const manualFixes=rows.filter(row=>Number(row.manual_override||0)).length;
+  const selectedCount=rows.filter(row=>Number(row.selected||0)&&['VALID','WARNING'].includes(String(row.validation_status||'').toUpperCase())).length;
+  const filters=[['ALL','All',session.total_rows],['VALID','Valid',session.valid_rows],['UNCERTAIN','Uncertain',warnings],['DUPLICATE','Duplicates',session.duplicate_rows],['REJECTED','Rejected',session.rejected_rows]];
+  const evidence=session.secure_document_id?'<a class="fm-evidence-link" href="/api/documents/'+encodeURIComponent(session.secure_document_id)+'/download" target="_blank" rel="noopener">Open original statement</a>':'';
+  const validationHtml=validations.map(item=>'<div class="fm-validation-row"><span>'+esc(String(item.validation_key||'').replace(/_/g,' '))+'</span>'+statusBadge(item.status)+'<small>'+esc(item.detail||item.actual_value||'')+'</small></div>').join('');
+  const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked and excluded from the ledger, totals and exports.</p></div>':'';
+  const tableRows=rows.map(row=>statementReviewRowMarkup(row,session)).join('');
+  const brandHeader='<section class="fm-review-bank-sheet-head"><div class="fm-review-brand"><img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda"><div><b>Voxel Veda</b><span>Finance Statement Review</span></div></div><div class="fm-review-statement-title"><strong>Your Statement</strong><span>'+esc(session.original_name||'Statement review')+'</span></div><div class="fm-review-account-meta"><span>Statement rows <b>'+num(session.total_rows)+'</b></span><span>Selected <b>'+selectedCount+'</b></span><span>Currency <b>'+esc(session.account_currency||'AUD')+'</b></span></div></section>';
+  const statusCards='<div class="fm-review-toolbar"><div class="fm-review-status-grid" role="tablist" aria-label="Statement row filters">'+filters.map(([key,label,count])=>'<button type="button" data-review-filter="'+key+'"><span>'+label+'</span><strong>'+num(count)+'</strong><small>'+({ALL:'All rows',VALID:'Verified rows',UNCERTAIN:manualFixes+' manual fix'+(manualFixes===1?'':'es'),DUPLICATE:'Excluded',REJECTED:'Needs attention'}[key])+'</small></button>').join('')+'</div>'+evidence+'</div>';
+  const metadata='<div class="fm-statement-meta"><span>Account<b>'+esc(session.account_name||'—')+'</b></span><span>Format<b>'+esc(session.source_format||'—')+'</b></span><span>Parser<b>'+esc(session.parser_version||'—')+'</b></span><span>Reconciliation<b>'+esc(session.reconciliation_status||'INCOMPLETE')+(session.reconciliation_difference!==null&&session.reconciliation_difference!==undefined?' · '+nativeMoney(session.reconciliation_difference,session.statement_currency||session.account_currency):'')+'</b></span></div>';
+  const validationPanel=validationHtml?'<details class="fm-validation"><summary>Validation and reconciliation evidence</summary>'+validationHtml+'</details>':'';
+  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+metadata+validationPanel+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction & source</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Approve & post selected rows</button></div></div>';
+  openDrawer('Review '+(session.original_name||'statement'),body,'STATEMENT REVIEW');
+
   setTimeout(()=>{
-   document.querySelectorAll('[data-review-filter]').forEach(button=>button.onclick=()=>openStatementReview(uid,button.dataset.reviewFilter));
-   document.querySelectorAll('[data-review-edit]').forEach(button=>{button.onclick=()=>{const row=(result.rows||[]).find(item=>String(item.id)===String(button.dataset.reviewEdit));if(row)openStatementRowCorrection(uid,row)}});
-   document.querySelectorAll('[data-review-select]').forEach(c=>c.onchange=async()=>{try{await api(I+`/statement-reviews/${encodeURIComponent(uid)}/rows/${c.dataset.reviewSelect}/select`,{method:'POST',body:JSON.stringify({selected:c.checked})})}catch(error){c.checked=!c.checked;notice(error.message,true)}});
-   document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{try{const x=await api(I+`/statement-reviews/${encodeURIComponent(uid)}/commit`,{method:'POST',body:'{}'});closeDrawer();notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
-   document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+`/statement-reviews/${encodeURIComponent(uid)}/reject`,{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
+   const applyFilter=filter=>{
+    const allowed=['ALL','VALID','UNCERTAIN','DUPLICATE','REJECTED','MANUAL'];
+    const requested=String(filter||'ALL').toUpperCase(),next=allowed.includes(requested)?requested:'ALL';
+    let shown=0;
+    document.querySelectorAll('[data-review-row]').forEach((tr,index)=>{
+     const row=rows[index],show=reviewStatusFilter(row,next);
+     tr.hidden=!show;if(show)shown+=1;
+    });
+    document.querySelectorAll('[data-review-filter]').forEach(button=>button.classList.toggle('active',button.dataset.reviewFilter===next));
+    const labels={ALL:'All statement rows',VALID:'Valid transactions',UNCERTAIN:'Uncertain / corrected transactions',DUPLICATE:'Duplicate transactions — excluded',REJECTED:'Rejected transactions — fix before import',MANUAL:'Manually corrected transactions'};
+    const title=document.querySelector('[data-review-filter-title]'),count=document.querySelector('[data-review-filter-count]');
+    if(title)title.textContent=labels[next]||labels.ALL;
+    if(count)count.textContent=shown+' shown';
+    const table=document.querySelector('.fm-review-table-wrap');if(table)table.scrollIntoView({behavior:'smooth',block:'start'});
+   };
+
+   document.querySelectorAll('[data-review-filter]').forEach(button=>button.onclick=()=>applyFilter(button.dataset.reviewFilter));
+   document.querySelectorAll('[data-review-select]').forEach(box=>box.onchange=async()=>{try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(box.dataset.reviewSelect)+'/select',{method:'POST',body:JSON.stringify({selected:box.checked})})}catch(error){box.checked=!box.checked;notice(error.message,true)}});
+   document.querySelectorAll('[data-review-override]').forEach(box=>box.onchange=()=>{if(!box.checked)return;const row=rows.find(item=>String(item.id)===String(box.dataset.reviewOverride));if(row)openRejectedRowOverride(uid,row,session,box)});
+   document.querySelectorAll('[data-review-fix]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewFix));if(row)openRejectedRowOverride(uid,row,session,null)});
+   document.querySelectorAll('[data-review-edit]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewEdit));if(row)openRejectedRowOverride(uid,row,session,null)});
+   document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{
+    try{
+     const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:'{}'});
+     closeDrawer();await refresh();
+     showFinancePopup('Statement imported successfully',x.message,num(x.imported)+' imported · '+num(x.duplicates)+' duplicate(s) excluded · '+num(x.excluded_balance_markers)+' balance marker(s) excluded');
+    }catch(error){notice(error.message,true)}
+   });
+   document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/reject',{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
+   applyFilter(initialFilter);
   },0);
  }catch(error){notice(error.message,true)}
 }
@@ -1979,6 +2314,7 @@ async function reimbursementDetail(id){
  }catch(error){notice(error.message,true)}
 }
 function render(){
+ document.body.dataset.financeView=state.view;
  const [t,sub]=title(state.view);$('fmTitle').textContent=t;$('fmSubtitle').textContent=sub;navButtons();
  $('fmContent').innerHTML=state.view==='overview'?overview():state.view==='accounts'?accounts():state.view==='transactions'?transactions():state.view==='statements'?statements():simpleView(state.view);
  bindDynamic();
@@ -1994,7 +2330,11 @@ function bindDynamic(){
  document.querySelectorAll('[data-viewjump]').forEach(b=>b.onclick=()=>go(b.dataset.viewjump));
  document.querySelectorAll('[data-history-import]').forEach(b=>b.onclick=()=>openHistoricalImport(b.dataset.historyImport));
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));
+ document.querySelectorAll('[data-account-statement]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountStatementForm(b.dataset.accountStatement)});
  document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
+ document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');if($('fmAccount'))$('fmAccount').value=state.account;state.txMeta.page=1;go('transactions');loadTransactions()});
+ const accountSearch=document.querySelector('[data-account-search]');
+ if(accountSearch)accountSearch.oninput=e=>{const q=String(e.currentTarget.value||'').trim().toLowerCase();document.querySelectorAll('[data-account-card-shell]').forEach(card=>{card.hidden=Boolean(q)&&!String(card.dataset.searchText||'').includes(q)})};
  document.querySelectorAll('[data-fx-new]').forEach(b=>b.onclick=()=>openFxRateForm());
  document.querySelectorAll('[data-fx-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this FX rate? Historical native transactions are not changed.'))return;try{const x=await api(API+'/fx-rates/'+encodeURIComponent(b.dataset.fxArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await loadResource('fxRates',API+'/fx-rates');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
@@ -2082,6 +2422,7 @@ function bindDynamic(){
  if($('txBulkReview'))$('txBulkReview').onclick=openBulkReview;
  document.querySelectorAll('[data-reconciliation]').forEach(r=>{r.onclick=()=>openReconciliationDetail(r.dataset.reconciliation);r.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openReconciliationDetail(r.dataset.reconciliation)}}});
  document.querySelectorAll('[data-account]').forEach(r=>r.onclick=()=>accountDetail(r.dataset.account));
+ document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=e=>{e.stopPropagation();purgeAccount(b.dataset.accountPurge)});
  document.querySelectorAll('[data-customer-statement-name]').forEach(b=>b.onclick=()=>{const q=new URLSearchParams();if(b.dataset.customerStatementEmail)q.set('customer_email',b.dataset.customerStatementEmail);else if(b.dataset.customerStatementName)q.set('customer_name',b.dataset.customerStatementName);window.open('/api/invoice/statement/pdf?'+q.toString(),'_blank','noopener')});
  document.querySelectorAll('[data-company-bill]').forEach(b=>b.onclick=()=>supplierBillDetail(b.dataset.companyBill));
  document.querySelectorAll('[data-customer-invoice]').forEach(b=>b.onclick=()=>customerInvoiceDetail(b.dataset.customerInvoice));
@@ -2111,6 +2452,7 @@ function bindDynamic(){
  if($('txApply'))$('txApply').onclick=()=>{state.txFilters={...state.txFilters,q:$('txSearch').value.trim(),type:$('txType').value,category:$('txCategory').value.trim(),merchant:$('txMerchant').value.trim(),source:$('txSource').value,reconciliation_status:$('txRecon').value,amount_min:$('txMin').value.trim(),amount_max:$('txMax').value.trim()};state.txMeta.page=1;loadTransactions()};
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
+ document.querySelectorAll('[data-show-all-history]').forEach(b=>b.onclick=()=>{state.period='all';state.txMeta.page=1;if($('fmPeriod'))$('fmPeriod').value='all';refresh()});
  document.querySelectorAll('[data-report-preset]').forEach(b=>b.onclick=async()=>{
   const form=$('reportBuilderForm');if(!form)return;
   form.elements.report_type.value=b.dataset.reportPreset;
@@ -2212,7 +2554,7 @@ async function transactionDetail(id){
   openDrawer(r.merchant_normalized||r.merchant_name||r.description||'Transaction',`<div class="fm-grid two"><div class="fm-kpi"><span>Amount</span><strong>${nativeMoney(Math.abs(num(r.credit||0)-num(r.debit||0)),r.currency||'AUD')}</strong><small>${Number(r.is_internal_transfer)?'Internal transfer':num(r.debit)>0?'Expense':'Income'} · ${esc(r.currency||'')}</small></div><div class="fm-kpi"><span>Review</span><strong>${r.reviewed_at?'Reviewed':'Needs review'}</strong><small>${esc(r.reconciliation_status||'')} · ${esc(r.source_type||'')}</small></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>CURRENT CLASSIFICATION</h3><p>Editable classification never overwrites original bank evidence.</p></div></div><form id="txEditForm" class="fm-form"><div class="fm-form-grid"><label>Category<input name="category" value="${esc(r.category||'')}"></label><label>Ownership<select name="ownership_scope"><option ${r.ownership_scope==='PERSONAL'?'selected':''}>PERSONAL</option><option ${r.ownership_scope==='BUSINESS'?'selected':''}>BUSINESS</option><option ${r.ownership_scope==='MIXED'?'selected':''}>MIXED</option><option ${r.ownership_scope==='UNCLASSIFIED'?'selected':''}>UNCLASSIFIED</option></select></label></div><div class="fm-form-grid"><label>Normalised merchant<input name="merchant_normalized" value="${esc(r.merchant_normalized||'')}"></label><label>Project / cost centre<input name="project_ref" value="${esc(r.project_ref||'')}"></label></div><div class="fm-form-grid"><label>Tags<input name="tags" value="${esc(txTags.join(', '))}"></label><label>GST treatment<select name="gst_treatment"><option value="">Not set</option>${['REVIEW','GST_ON_EXPENSES','GST_ON_INCOME','GST_FREE','INPUT_TAXED','NO_GST','OUT_OF_SCOPE'].map(v=>`<option ${r.gst_treatment===v?'selected':''}>${v}</option>`).join('')}</select></label></div><div class="fm-detail-grid"><span>Date<b>${date(r.transaction_date)}</b></span><span>Posting date<b>${date(r.posting_date)}</b></span><span>Account<b>${esc(r.account_name||'')}</b></span><span>Bank<b>${esc(r.institution||'')}</b></span><span>Description<b>${esc(r.description||'')}</b></span><span>Reference<b>${esc(r.reference||'—')}</b></span><span>Source<b>${esc(r.source_type||'')}</b></span><span>Statement<b>${esc(r.statement_import_uid||'—')}</b></span></div><label class="fm-check"><input name="reviewed" type="checkbox" ${r.reviewed_at?'checked':''}> Classification reviewed</label><label class="fm-check"><input name="remember_rule" type="checkbox"> Remember as Suggest Only rule</label><div class="fm-form-actions"><button class="primary" type="submit">Save classification</button></div></form><div class="fm-workflow-actions"><button type="button" data-split-open="1">Split transaction</button>${num(r.debit)>0?'<button type="button" data-reimbursement-open="1">Create reimbursement</button>':''}${num(r.credit)>0?'<button type="button" data-refund-link="'+r.id+'" data-refund-currency="'+esc(r.currency)+'">Link as refund</button>':''}<button type="button" data-viewjump="transfers">Transfer matching</button>${r.archived_at?'<button type="button" data-transaction-restore="'+r.id+'">Restore transaction</button>':r.source_type==='MANUAL'?'<button type="button" class="bad" data-transaction-archive="'+r.id+'" data-manual-delete="1">Delete wrong entry</button>':'<button type="button" class="bad" data-transaction-archive="'+r.id+'">Archive from active ledger</button>'}</div><div class="fm-relation-summary"><span>Split lines <b>${splits.length}</b></span><span>Refund links <b>${refundLinks.length}</b></span><span>Transfer pairs <b>${transferLinks.length}</b></span></div></div></div>${sourceBlock}${receiptBlock}${auditBlock}`,'TRANSACTION');
   setTimeout(()=>{
    $('txEditForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const x=await api(I+'/transactions/'+id,{method:'POST',body:JSON.stringify({category:fd.get('category'),ownership_scope:fd.get('ownership_scope'),merchant_normalized:fd.get('merchant_normalized')||null,project_ref:fd.get('project_ref')||null,tags:String(fd.get('tags')||'').split(',').map(x=>x.trim()).filter(Boolean),gst_treatment:fd.get('gst_treatment')||null,reviewed:fd.get('reviewed')==='on',remember_rule:fd.get('remember_rule')==='on'})});notice(x.message);closeDrawer();await refresh()}catch(error){notice(error.message,true)}};
-   if($('receiptUploadForm'))$('receiptUploadForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const response=await fetch(API+'/bank-transactions/'+id+'/receipts',{method:'POST',credentials:'same-origin',body:fd});let payload={};try{payload=await response.json()}catch{}if(!response.ok)throw new Error(payload.message||'Receipt upload failed');notice(payload.message||'Receipt attached.');await transactionDetail(id)}catch(error){notice(error.message,true)}};
+   if($('receiptUploadForm'))$('receiptUploadForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);try{const response=await fetch(API+'/bank-transactions/'+id+'/receipts',{method:'POST',credentials:'same-origin',body:fd});let payload={};try{payload=await response.json()}catch{}const authError=financeAuthError(response,payload);if(authError)throw authError;if(!response.ok)throw new Error(payload.message||'Receipt upload failed');notice(payload.message||'Receipt attached.');await transactionDetail(id)}catch(error){notice(error.message,true)}};
    document.querySelectorAll('[data-detail-receipt-status]').forEach(b=>b.onclick=async()=>{let reason='';if(b.dataset.detailReceiptStatus==='NOT_REQUIRED'){reason=prompt('Why is a receipt not required?')||'';if(!reason.trim())return}try{const x=await api(API+'/bank-transactions/'+id+'/receipt-status',{method:'PATCH',body:JSON.stringify({status:b.dataset.detailReceiptStatus,reason})});notice(x.message);await transactionDetail(id)}catch(error){notice(error.message,true)}});
    document.querySelectorAll('[data-receipt-unlink]').forEach(b=>b.onclick=async()=>{if(!confirm('Unlink this receipt from the transaction?'))return;try{const x=await api(API+'/bank-transactions/'+id+'/receipts/'+encodeURIComponent(b.dataset.receiptUnlink),{method:'DELETE'});notice(x.message);await transactionDetail(id)}catch(error){notice(error.message,true)}});
    document.querySelector('[data-split-open]')?.addEventListener('click',()=>openSplitEditor(id,Math.abs(num(r.credit||0)-num(r.debit||0)),r.currency||'AUD'));
@@ -2233,10 +2575,11 @@ async function accountDetail(id){
   const chart=monthly.length?monthly.map(x=>`<div class="fm-chart-row"><span>${esc(x.month)}</span><div class="fm-bars"><i class="in" style="width:${Math.max(2,num(x.money_in)/max*100)}%"></i><i class="out" style="width:${Math.max(2,num(x.money_out)/max*100)}%"></i></div><b>${nativeMoney(num(x.money_in)-num(x.money_out),a.currency||'AUD')}</b></div>`).join(''):emptyState('No account trend','No recent monthly activity.');
   const categories=(d.categories||[]).map(x=>`<div class="fm-row"><span>${esc(x.category)}</span><b>${nativeMoney(x.spent,a.currency||'AUD')}</b></div>`).join('')||emptyState('No categories','No recent account expense categories.');
   const tx=(d.transactions||[]).slice(0,20).map(x=>`<div class="fm-row" data-tx="${x.id}"><div><h3>${esc(x.merchant_name||x.description)}</h3><p>${date(x.transaction_date)} · ${esc(x.category||'Uncategorised')}</p></div><b>${nativeMoney(Math.abs(num(x.credit)-num(x.debit)),x.currency||a.currency||'AUD')}</b></div>`).join('');
-  const deleteButton=life?.deletion_check?.eligible?`<button class="bad" data-account-action="delete" data-id="${a.id}">Permanently delete eligible empty account</button>`:'';
-  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad"><h3>Category distribution</h3><div class="fm-list">${categories}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive or inactive is preferred. Permanent deletion is shown only when the server dependency scan says the account is eligible and still requires privileged step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${deleteButton}</div></details>`,'ACCOUNT WORKSPACE');
+  const purgeButton=`<button class="bad" data-account-purge="${a.id}">Delete account & all data</button>`;
+  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad"><h3>Category distribution</h3><div class="fm-list">${categories}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
   setTimeout(()=>{
    document.querySelectorAll('[data-account-action]').forEach(b=>b.onclick=()=>accountLifecycle(b.dataset.id,b.dataset.accountAction));
+   document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=()=>purgeAccount(b.dataset.accountPurge));
    document.querySelector('[data-account-edit]')?.addEventListener('click',()=>{closeDrawer();openAccountForm('',a.id)});
    document.querySelectorAll('[data-tx]').forEach(x=>x.onclick=()=>transactionDetail(x.dataset.tx));
    document.querySelector('[data-account-tx]')?.addEventListener('click',()=>{state.account=String(a.id);$('fmAccount').value=state.account;closeDrawer();go('transactions');loadTransactions()});
@@ -2246,6 +2589,20 @@ async function accountDetail(id){
  }catch(error){notice(error.message,true)}
 }
 async function accountLifecycle(id,action){const map={inactive:['POST',I+'/accounts/'+id+'/inactive'],archive:['POST',I+'/accounts/'+id+'/archive'],restore:['POST',I+'/accounts/'+id+'/restore'],delete:['DELETE',I+'/accounts/'+id]};const cfg=map[action];if(!cfg)return;if(action==='delete'&&!confirm('Permanently delete this empty account? This action is blocked if dependencies exist.'))return;try{await api(cfg[1],{method:cfg[0],body:cfg[0]==='POST'?'{}':undefined});notice('Account updated.');closeDrawer();await refresh()}catch(e){notice(e.message,true)}}
+async function purgeAccount(id){
+ const account=state.accounts.find(a=>String(a.id)===String(id))||{};
+ const required='DELETE '+id;
+ const name=account.nickname||'this account';
+ const typed=prompt('Permanently delete "'+name+'" AND all data linked to this financial account?\n\nThis cannot be undone. Statements, imported transactions, account-linked Finance records, reconciliation/receipt links and delegated account access are removed.\n\nType exactly:\n'+required);
+ if(typed!==required)return;
+ try{
+  const result=await api(I+'/accounts/'+encodeURIComponent(id)+'/purge',{method:'DELETE',body:JSON.stringify({confirmation:typed})});
+  if(String(state.account)===String(id)){state.account='';if($('fmAccount'))$('fmAccount').value=''}
+  closeDrawer();
+  notice(result.message||'Account and linked Finance data deleted.');
+  await refresh();
+ }catch(error){notice(error.message,true)}
+}
 function openAccountForm(presetType='',accountId=''){
  const existing=state.accounts.find(a=>String(a.id)===String(accountId))||{};
  $('fmModalEyebrow').textContent='FINANCIAL ACCOUNT';$('fmModalTitle').textContent=accountId?'Edit financial account':'Add financial account';

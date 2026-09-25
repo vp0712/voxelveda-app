@@ -25,5 +25,5 @@ for(const marker of ['Control Actions','function controlActionsView()','Every Fi
 assert(advanced.includes("['issues','/api/finance/issues']"),'Advanced Control must hydrate Finance issue actions.');
 assert(advanced.includes('function controlActionsSummary()'),'Advanced Control Actions summary missing.');
 assert(advanced.includes('data-fac-open="controlactions"'),'Advanced Control must drill into Control Actions.');
-assert(/VERSION='20260924-advanced-control-v\d+'/.test(advanced),'Advanced Control release must be versioned.');
+assert(/VERSION='20\d{6}-advanced-control-v\d+'/.test(advanced),'Advanced Control release must be versioned.');
 console.log('FINANCE_CONTROL_ACTIONS_OK');

@@ -28,6 +28,7 @@ const {
 } = require('./services/financeStatementIngestionWorker');
 const { objectStorageDocumentsEnabled } = require('./services/documentSecurityService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
+const { repairKnownLegacyPdfDateRunaway } = require('./services/financeDateIntegrityRepair');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
 const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
@@ -276,6 +277,20 @@ function listenApplication() {
       });
       markReady();
       console.log(`Server ready on ${HOST}:${PORT}`);
+
+      // Never hold application readiness behind a historical data repair.
+      // The repair is exact-match + idempotent and runs after the server is usable.
+      setImmediate(() => {
+        repairKnownLegacyPdfDateRunaway()
+          .then((dateRepair) => {
+            console.log(`Finance date-integrity repair check completed: ${dateRepair.repaired}/${dateRepair.checked} targeted statement(s) corrected.`);
+          })
+          .catch((error) => {
+            addWarning(`Finance legacy PDF date-integrity repair did not complete: ${error.code || error.message}`);
+            console.error('Finance date-integrity repair failed safely:', error.code || error.message);
+          });
+      });
+
       resolve(server);
     });
   });

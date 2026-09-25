@@ -1,8 +1,8 @@
-finance-release: 20260924-finance-control-v14
-source-commit: 235c5a74a61131b0828be75711e5f0b8d468c31a
-candidate-ci: success
-final-system-consolidation: success
-security-ci: success
-banking-platform-ci: success
-bank-account-lifecycle-ci: success
+finance-release: 20260925-statement-date-integrity-v25-r2
+source-commit: c6e9fd44509f18d58cab6516b3454a153c874a9b
+candidate-ci: pending-railway-build
+final-system-consolidation: pending-railway-build
+security-ci: pending-railway-build
+banking-platform-ci: pending-railway-build
+bank-account-lifecycle-ci: pending-railway-build
 policy: marker-only-production-deploy

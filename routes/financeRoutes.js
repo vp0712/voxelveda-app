@@ -247,6 +247,7 @@ router.post('/intelligence/accounts/:id/archive', requireAnyPermission('EDIT_BAN
 router.post('/intelligence/accounts/:id/inactive', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.deactivate);
 router.post('/intelligence/accounts/:id/restore', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.restore);
 router.delete('/intelligence/accounts/:id', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.remove);
+router.delete('/intelligence/accounts/:id/purge', requireAnyPermission('EDIT_BANK_DETAILS'), financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.purge);
 router.post('/intelligence/accounts/:id/statements/import', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.legacyDisabled);
 router.post('/intelligence/accounts/:id/statements/preview', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.legacyDisabled);
 router.post('/intelligence/accounts/:id/statement-imports', requireAnyPermission('EDIT_FINANCE'), financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), ...financeStatementUpload, statementIngestion.upload);

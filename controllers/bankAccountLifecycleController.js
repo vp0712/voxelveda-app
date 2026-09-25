@@ -71,6 +71,116 @@ async function dependencyScan(accountId) {
   }
 }
 
+
+async function baseTablesWithColumn(db, columnName, excluded = []) {
+  const [rows] = await db.query(
+    `SELECT DISTINCT c.TABLE_NAME AS table_name
+       FROM INFORMATION_SCHEMA.COLUMNS c
+       JOIN INFORMATION_SCHEMA.TABLES t
+         ON t.TABLE_SCHEMA = c.TABLE_SCHEMA
+        AND t.TABLE_NAME = c.TABLE_NAME
+      WHERE c.TABLE_SCHEMA = DATABASE()
+        AND c.COLUMN_NAME = ?
+        AND t.TABLE_TYPE = 'BASE TABLE'
+      ORDER BY c.TABLE_NAME`,
+    [String(columnName)]
+  );
+  const blocked = new Set(excluded.map((value) => String(value)));
+  return rows.map((row) => String(row.table_name || '')).filter((table) => table && !blocked.has(table));
+}
+
+async function deleteByIds(db, table, column, ids) {
+  const values = [...new Set((ids || []).map(Number).filter((id) => Number.isInteger(id) && id > 0))];
+  if (!values.length) return 0;
+  const placeholders = values.map(() => '?').join(',');
+  const [result] = await db.query(
+    `DELETE FROM ${quoteIdentifier(table)} WHERE ${quoteIdentifier(column)} IN (${placeholders})`,
+    values
+  );
+  return Number(result?.affectedRows || 0);
+}
+
+async function purgeAccountData(db, accountId) {
+  const deleted = {};
+  const add = (table, count) => {
+    const value = Number(count || 0);
+    if (value > 0) deleted[table] = Number(deleted[table] || 0) + value;
+  };
+
+  const [bankRows] = await db.query('SELECT id FROM bank_transactions WHERE bank_account_id=? FOR UPDATE', [accountId]);
+  const bankTransactionIds = bankRows.map((row) => Number(row.id)).filter(Boolean);
+
+  const [financeRows] = await db.query('SELECT id FROM finance_transactions WHERE bank_account_id=? FOR UPDATE', [accountId]);
+  const financeTransactionIds = financeRows.map((row) => Number(row.id)).filter(Boolean);
+
+  const [custodyRows] = await db.query('SELECT id FROM finance_cash_custody_cases WHERE bank_account_id=? FOR UPDATE', [accountId]);
+  const custodyIds = custodyRows.map((row) => Number(row.id)).filter(Boolean);
+
+  const [statementRows] = await db.query('SELECT import_uid FROM statement_import_files WHERE bank_account_id=? FOR UPDATE', [accountId]);
+  const importUids = [...new Set(statementRows.map((row) => String(row.import_uid || '')).filter(Boolean))];
+
+  if (bankTransactionIds.length) {
+    const childTables = await baseTablesWithColumn(db, 'bank_transaction_id');
+    for (const table of childTables) add(table, await deleteByIds(db, table, 'bank_transaction_id', bankTransactionIds));
+  }
+
+  if (custodyIds.length) {
+    add('finance_cash_custody_events', await deleteByIds(db, 'finance_cash_custody_events', 'custody_id', custodyIds));
+  }
+
+  if (financeTransactionIds.length) {
+    const journalPlaceholders = financeTransactionIds.map(() => '?').join(',');
+    const [journalRows] = await db.query(
+      `SELECT id FROM journal_entries WHERE source_transaction_id IN (${journalPlaceholders}) FOR UPDATE`,
+      financeTransactionIds
+    );
+    const journalIds = journalRows.map((row) => Number(row.id)).filter(Boolean);
+    add('journal_lines', await deleteByIds(db, 'journal_lines', 'journal_entry_id', journalIds));
+    add('journal_entries', await deleteByIds(db, 'journal_entries', 'source_transaction_id', financeTransactionIds));
+    const [unlink] = await db.query(
+      `UPDATE finance_transactions
+          SET reversal_transaction_id=NULL
+        WHERE reversal_transaction_id IN (${journalPlaceholders})
+          AND bank_account_id<>?`,
+      [...financeTransactionIds, accountId]
+    );
+    if (Number(unlink?.affectedRows || 0) > 0) deleted.finance_transaction_reversal_links_cleared = Number(unlink.affectedRows);
+  }
+
+  if (importUids.length) {
+    const placeholders = importUids.map(() => '?').join(',');
+    const [sessionRows] = await db.query(
+      `SELECT id FROM statement_import_sessions WHERE import_uid IN (${placeholders}) FOR UPDATE`,
+      importUids
+    );
+    const sessionIds = sessionRows.map((row) => Number(row.id)).filter(Boolean);
+    add('statement_import_rows', await deleteByIds(db, 'statement_import_rows', 'import_session_id', sessionIds));
+    const [sessions] = await db.query(
+      `DELETE FROM statement_import_sessions WHERE import_uid IN (${placeholders})`,
+      importUids
+    );
+    add('statement_import_sessions', sessions?.affectedRows);
+  }
+
+  const directTables = await baseTablesWithColumn(db, 'bank_account_id', ['bank_accounts']);
+  const orderedTables = [
+    ...directTables.filter((table) => !['bank_transactions', 'finance_transactions'].includes(table)),
+    ...directTables.filter((table) => ['finance_transactions', 'bank_transactions'].includes(table))
+  ];
+  for (const table of orderedTables) {
+    const [result] = await db.query(`DELETE FROM ${quoteIdentifier(table)} WHERE bank_account_id=?`, [accountId]);
+    add(table, result?.affectedRows);
+  }
+
+  return {
+    deleted,
+    total_rows_deleted: Object.values(deleted).reduce((sum, value) => sum + Number(value || 0), 0),
+    bank_transactions: bankTransactionIds.length,
+    finance_transactions: financeTransactionIds.length,
+    statements: importUids.length
+  };
+}
+
 async function setStatus(req, res, targetStatus, actionName, message) {
   try {
     const accountId = Number(req.params.id || 0);
@@ -190,6 +300,66 @@ exports.remove = async (req, res) => {
   }
 };
 
+
+exports.purge = async (req, res) => {
+  let db;
+  try {
+    await ensureFinanceSchema();
+    const accountId = Number(req.params.id || 0);
+    if (!accountId) throw new FinanceError('Financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
+    const confirmation = String(req.body?.confirmation || '').trim();
+    if (confirmation !== `DELETE ${accountId}`) {
+      throw new FinanceError(
+        `Type DELETE ${accountId} to permanently delete this account and all of its linked Finance data.`,
+        400,
+        'BANK_ACCOUNT_PURGE_CONFIRMATION_REQUIRED'
+      );
+    }
+
+    db = await pool.getConnection();
+    await db.beginTransaction();
+    const account = await privacy.assertAccountAccess(db, accountId, req, { forUpdate: true });
+    const summary = await purgeAccountData(db, accountId);
+
+    await logAudit(db, audit(req, {
+      action: 'PURGED_WITH_DATA',
+      module: 'finance_intelligence',
+      recordType: 'bank_account',
+      recordId: accountId,
+      oldValue: {
+        nickname: account.nickname,
+        institution: account.institution,
+        ownership_scope: account.ownership_scope,
+        status: account.status,
+        currency: account.currency
+      },
+      newValue: null,
+      metadata: {
+        permanent: true,
+        confirmation_verified: true,
+        total_rows_deleted: summary.total_rows_deleted,
+        deleted_by_table: summary.deleted
+      }
+    }));
+
+    await db.query('DELETE FROM bank_accounts WHERE id=?', [accountId]);
+    await db.commit();
+    return res.json({
+      message: 'Account and all linked Finance data permanently deleted.',
+      bank_account_id: accountId,
+      deleted: true,
+      ...summary
+    });
+  } catch (error) {
+    if (db) {
+      try { await db.rollback(); } catch {}
+    }
+    return fail(res, error, 'Failed to permanently delete financial account and linked data.');
+  } finally {
+    if (db) db.release();
+  }
+};
+
 exports.getActiveOverview = async (req, res) => {
   try {
     await ensureFinanceSchema();
@@ -251,4 +421,4 @@ exports.getActiveOverview = async (req, res) => {
   }
 };
 
-exports._test = { dependencyScan, quoteIdentifier };
+exports._test = { dependencyScan, quoteIdentifier, baseTablesWithColumn, deleteByIds, purgeAccountData };

@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const pool = require('../config/db');
-const { getRequestToken } = require('../utils/session');
+const { getRequestToken, clearSessionCookie } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { logSecurityEvent, validateSession } = require('../services/sessionService');
@@ -25,8 +25,10 @@ module.exports = async (req, res, next) => {
     const token = getRequestToken(req);
 
     if (!token) {
+      clearSessionCookie(req, res);
       return res.status(401).json({
-        message: 'Authorization token missing'
+        message: 'Authentication required',
+        code: 'AUTH_REQUIRED'
       });
     }
 
@@ -38,7 +40,7 @@ module.exports = async (req, res, next) => {
 
     if (isApiToken(token)) {
       const integration = await authenticateApiToken(token, req);
-      if (!integration) return res.status(401).json({ message: 'Invalid, expired or revoked API token' });
+      if (!integration) return res.status(401).json({ message: 'API token is invalid, expired or revoked', code: 'API_TOKEN_INVALID' });
       req.user = integration.user;
       req.authType = 'api_token';
       req.apiTokenId = integration.tokenId;
@@ -51,7 +53,10 @@ module.exports = async (req, res, next) => {
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
     const session = await validateSession(token, decoded);
-    if (!session) return res.status(401).json({ message: 'Session has ended. Please sign in again.' });
+    if (!session) {
+      clearSessionCookie(req, res);
+      return res.status(401).json({ message: 'Your session has ended. Please sign in again.', code: 'AUTH_SESSION_EXPIRED' });
+    }
 
     const [[freshUser]] = await pool.query(
       `SELECT id, email, username, role, permissions, active, account_status, session_version, mfa_enabled
@@ -63,8 +68,10 @@ module.exports = async (req, res, next) => {
 
     const blocked = ['LOCKED', 'SUSPENDED', 'DISABLED', 'TERMINATED'];
     if (!freshUser || Number(freshUser.active) === 0 || blocked.includes(String(freshUser.account_status).toUpperCase()) || Number(freshUser.session_version) !== Number(session.session_version)) {
+      clearSessionCookie(req, res);
       return res.status(401).json({
-        message: 'Account disabled or no longer available'
+        message: 'Your session is no longer valid. Please sign in again.',
+        code: 'AUTH_SESSION_REVOKED'
       });
     }
 
@@ -155,8 +162,17 @@ module.exports = async (req, res, next) => {
     if (err?.statusCode === 403) {
       return res.status(403).json({ message: err.message, code: err.code || 'SECURITY_CONTEXT_REJECTED' });
     }
-    return res.status(401).json({
-      message: 'Invalid or expired token'
+    if (['TokenExpiredError', 'JsonWebTokenError', 'NotBeforeError'].includes(String(err?.name || ''))) {
+      clearSessionCookie(req, res);
+      return res.status(401).json({
+        message: 'Your session has ended. Please sign in again.',
+        code: 'AUTH_SESSION_EXPIRED'
+      });
+    }
+    console.error('AUTH MIDDLEWARE ERROR:', err?.code || err?.message || err);
+    return res.status(503).json({
+      message: 'Authentication service is temporarily unavailable',
+      code: 'AUTH_SERVICE_UNAVAILABLE'
     });
   }
 };

@@ -8,8 +8,8 @@ const html=read('public/finance-intelligence.html');
 const css=read('public/finance-master.css');
 const js=read('public/finance-master.js');
 
-assert.match(html,/finance-master\.css\?v=\d{8}-[a-z0-9-]+-v\d+/,'Master finance stylesheet must be loaded.');
-assert.match(html,/finance-master\.js\?v=\d{8}-[a-z0-9-]+-v\d+/,'Master finance client must use a canonical versioned cache-busting release id.');
+assert.match(html,/finance-master\.css\?v=20\d{6}-control-v\d+/,'Master finance stylesheet must use the current canonical versioned cache-busting release id.');
+assert.match(html,/finance-master\.js\?v=20\d{6}-control-v\d+/,'Master finance client must use a canonical versioned cache-busting release id.');
 assert.match(html,/finance-bootstrap-guard\.js\?v=20260924-startup-hardening/,'Finance startup watchdog must load with the current release id.');
 assert.doesNotMatch(html,/finance-bank-app-v5/,'Legacy V5 assets must not be referenced.');
 assert.match(html,/FINANCE OPERATING SYSTEM/,'Finance OS shell is required.');
@@ -37,6 +37,7 @@ assert.match(css,/fm-drawer/,'Transaction/account detail drawer must be styled.'
 console.log('Finance Master OS regression contract passed.');
 
 assert.match(html,/id="fmMobileNav"/,'Finance OS must provide a dedicated mobile navigation surface.');
+assert.doesNotMatch(html,/Frame 1\.png/,'Finance mobile shell must not render the old corner logo image.');
 assert.match(js,/const MOBILE_NAV=.*\['more','☰','More'\]/,'Mobile Finance navigation must include a More control.');
 assert.match(js,/function moreView\(\)/,'Mobile More must expose the full Finance module launcher.');
 assert.match(js,/No separate Banking V3\/V4\/V5 screens/,'Unified Finance OS must explicitly keep legacy banking screens out of the active launcher.');
@@ -55,6 +56,8 @@ assert.match(js,/function openAccountForm\(/,'Finance OS must expose a real crea
 assert.match(js,/I\+'\/accounts'/,'Account form must save through the canonical Finance account API.');
 assert.match(js,/if\(kind==='account'\)\{openAccountForm\(\);return\}/,'Add Account must never open the transaction form.');
 assert.match(js,/data-account-edit/,'Account workspace must provide account editing.');
+assert.match(js,/data-account-purge/,'Account workspace must expose explicit permanent account-and-data deletion.');
+assert.match(js,/Type exactly:/,'Permanent account deletion must require typed confirmation.');
 assert.match(js,/data-personal-new="wallet"/,'Personal Money must expose wallet creation.');
 assert.match(js,/personal-money\/wallets/,'Personal wallet form must save to the owner-isolated wallet API.');
 assert.match(js,/fx_rate_to_wallet/,'Personal multi-currency cash entry must expose an explicit FX rate instead of inventing conversion.');
@@ -120,7 +123,7 @@ assert.match(js,/data-goal-status/,'Savings Goals must support pause and resume 
 
 assert.match(js,/function openTeamAccessForm\(/,'Team Finance Access must expose account-level delegation management.');
 assert.match(js,/OS\+'\/team\/'\+encodeURIComponent\(user\.id\)\+'\/access'/,'Delegated banking access must save through the canonical Banking OS access route.');
-assert.match(js,/Personal accounts are intentionally excluded/,'Team Access UI must explicitly preserve Personal Money privacy.');
+assert.match(js,/Personal accounts remain private/,'Team Access UI must explicitly preserve Personal Money privacy.');
 assert.match(js,/PREPARE = create payment instructions/,'Team Access must explain preparation rights.');
 assert.match(js,/APPROVE = approve another preparer/,'Team Access must explain approval separation of duties.');
 
@@ -136,10 +139,10 @@ assert.match(js,/Never enter a bank password, bank PIN or bank OTP/,'Finance ste
 
 assert.match(js,/\['advanced','⚡','Control Centre'\]/,'Advanced Finance Control must be a first-class canonical home module.');
 assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control view must be mounted inside the master Finance OS.');
-assert.match(js,/finance-advanced-control\.js\?v=20260924-advanced-control-v\d+/,'Advanced Finance Control must use a canonical versioned asset.');
+assert.match(js,/finance-advanced-control\.js\?v=20\d{6}-advanced-control-v\d+/,'Advanced Finance Control must use a canonical versioned asset.');
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
-assert.match(js,/const MOBILE_NAV=\[\['advanced','⚡','Control'\]/,'Mobile Finance Home must open Advanced Control.');
+assert.match(js,/const MOBILE_NAV=\[\['accounts','⌂','Accounts'\],\['transactions','▤','Transactions'\],\['statements','▥','Statements'\],\['more','☰','More'\]\]/,'Mobile Finance navigation must use the clean four-tab Accounts, Transactions, Statements and More layout.');
 
 assert.match(js,/MONTH-END CLOSE & ASSURANCE/,'Finance OS must expose the period Close & Assurance centre.');
 assert.match(js,/close-assurance/,'Finance OS must use the canonical Close Assurance API.');

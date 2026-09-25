@@ -150,6 +150,33 @@ exports.getReadiness = async (req, res) => {
     const partial = requiredControls.filter((item) => item.status === 'PARTIAL');
     const productionControlsReady = hardBlockers.length === 0 && partial.length === 0;
     const productionBankFeedReady = Boolean(providerConfigured && providerRecognised && productionControlsReady && bankEnvironment === 'PRODUCTION' && liveEnabled);
+
+    // Public launch is deliberately separate from technical readiness. Environment flags here
+    // record evidence references/approvals; they never create a licence or regulatory authority.
+    const adiAuthorityReference = String(process.env.AU_ADI_AUTHORITY_REFERENCE || '').trim();
+    const restrictedBankWordConsentReference = String(process.env.AU_RESTRICTED_BANK_WORD_CONSENT_REFERENCE || '').trim();
+    const afsLicenceReference = String(process.env.AU_AFS_LICENCE_REFERENCE || '').trim();
+    const amlCtfProgramApproved = String(process.env.AML_CTF_PROGRAM_APPROVED || '').toLowerCase() === 'true';
+    const customerTermsApproved = String(process.env.PUBLIC_CUSTOMER_TERMS_APPROVED || '').toLowerCase() === 'true';
+    const complaintsProcessApproved = String(process.env.PUBLIC_COMPLAINTS_PROCESS_APPROVED || '').toLowerCase() === 'true';
+    const privacyReviewApproved = String(process.env.PUBLIC_PRIVACY_REVIEW_APPROVED || '').toLowerCase() === 'true';
+    const publicPlatformLaunchApproved = String(process.env.PUBLIC_FINANCIAL_PLATFORM_LAUNCH_APPROVED || '').toLowerCase() === 'true';
+    const publicBankBrandingReady = Boolean(adiAuthorityReference && restrictedBankWordConsentReference);
+    const publicPlatformReady = Boolean(
+      productionControlsReady &&
+      customerTermsApproved &&
+      complaintsProcessApproved &&
+      privacyReviewApproved &&
+      publicPlatformLaunchApproved
+    );
+    const publicLaunchBlockers = [
+      !productionControlsReady ? 'Production security/recovery controls are not fully verified.' : null,
+      !customerTermsApproved ? 'Public customer terms are not approved.' : null,
+      !complaintsProcessApproved ? 'Public complaints/dispute process is not approved.' : null,
+      !privacyReviewApproved ? 'Public privacy review is not approved.' : null,
+      !publicPlatformLaunchApproved ? 'Public financial-platform launch approval is not recorded.' : null,
+      !amlCtfProgramApproved ? 'AML/CTF program approval is not recorded for any designated service.' : null
+    ].filter(Boolean);
     const weightedProgress = requiredControls.length
       ? Math.round(((readyRequired.length + (partial.length * 0.5)) / requiredControls.length) * 100)
       : 100;
@@ -190,6 +217,27 @@ exports.getReadiness = async (req, res) => {
         blocked_or_missing: hardBlockers.length,
         owner_actions: requiredControls.filter((item) => item.user_action_required && item.status !== 'READY').length,
         explanation: `${readyRequired.length} of ${requiredControls.length} required production controls are fully ready.`
+      },
+      public_launch: {
+        mode: publicBankBrandingReady ? 'BANK_BRANDING_EVIDENCE_PRESENT' : 'FINANCE_PLATFORM_ONLY',
+        public_platform_ready: publicPlatformReady,
+        bank_branding_ready: publicBankBrandingReady,
+        bank_branding_allowed_by_app: publicBankBrandingReady,
+        production_bank_feed_ready: productionBankFeedReady,
+        evidence: {
+          adi_authority_reference_present: Boolean(adiAuthorityReference),
+          restricted_bank_word_consent_reference_present: Boolean(restrictedBankWordConsentReference),
+          afs_licence_reference_present: Boolean(afsLicenceReference),
+          aml_ctf_program_approved: amlCtfProgramApproved,
+          customer_terms_approved: customerTermsApproved,
+          complaints_process_approved: complaintsProcessApproved,
+          privacy_review_approved: privacyReviewApproved,
+          launch_approval_recorded: publicPlatformLaunchApproved
+        },
+        blockers: publicLaunchBlockers,
+        wording_rule: publicBankBrandingReady
+          ? 'Technical gate sees authority/consent references. Independent legal verification is still required before public bank claims.'
+          : 'Use Voxel Veda Finance / financial platform wording. Do not present the service as a bank or copy another bank brand.'
       },
       open_banking: {
         enabled: productionBankFeedReady,
