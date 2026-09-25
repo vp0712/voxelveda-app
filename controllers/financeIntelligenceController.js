@@ -513,14 +513,36 @@ exports.updateTransaction = async (req, res) => {
       `UPDATE bank_transactions
           SET category=?, classification_status=?, ownership_scope=?, is_internal_transfer=?,
               reconciliation_status=?, ignored_reason=?, merchant_normalized=?,project_ref=?,tags_json=?,gst_treatment=?,
-              reviewed_at=IF(?,COALESCE(reviewed_at,NOW()),NULL),reviewed_by=IF(?,COALESCE(reviewed_by,?),NULL)
+              reviewed_at=IF(?,COALESCE(reviewed_at,NOW()),NULL),reviewed_by=IF(?,COALESCE(reviewed_by,?),NULL),
+              manual_override=IF(?,1,manual_override),
+              review_source_status=IF(?,'MANUAL_CATEGORY_MOVE',review_source_status)
         WHERE id=?`,
       [category, category ? 'CLASSIFIED' : 'UNCLASSIFIED', nextScope, internalTransfer, reconciliationStatus, ignoredReason,
         merchantNormalized, projectRef, tags.length ? JSON.stringify(tags) : null, gstTreatment,
-        reviewed, reviewed, req.user.id, id]
+        reviewed, reviewed, req.user.id, categoryChanged, categoryChanged, id]
     );
 
-    if (rememberRule && category) {
+    let learnedRule = null;
+    if (learnMerchant && category) {
+      learnedRule = await upsertExactAutoCategoryRule(db, {
+        userId: req.user.id,
+        category,
+        ownershipScope: canOverrideScope ? nextScope : null,
+        merchant_normalized: merchantNormalized,
+        merchant_name: row.merchant_name,
+        description: row.description,
+        reference: row.reference
+      });
+      if (learnedRule.saved) {
+        await logAudit(db, audit(req, {
+          action:'FINANCE_EXACT_MERCHANT_CATEGORY_LEARNED',
+          module:'finance_intelligence',
+          recordType:'finance_category_rule',
+          recordId:learnedRule.rule?.id || id,
+          newValue:{merchant_pattern:learnedRule.merchant,category,application_mode:'AUTO_APPLY',source_transaction_id:id}
+        }));
+      }
+    } else if (rememberRule && category) {
       const pattern = String(merchantNormalized || row.merchant_name || row.description || '').trim().slice(0,255);
       if (pattern) {
         const [[existing]] = await db.query(
@@ -529,19 +551,19 @@ exports.updateTransaction = async (req, res) => {
         );
         if (existing) {
           await db.query(
-            'UPDATE finance_category_rules SET category=?, ownership_scope=?, enabled=1, priority=250 WHERE id=?',
-            [category, canOverrideScope ? nextScope : null, existing.id]
+            "UPDATE finance_category_rules SET category=?, ownership_scope=?, enabled=1, priority=250, application_mode='SUGGEST_ONLY', updated_by=? WHERE id=?",
+            [category, canOverrideScope ? nextScope : null, req.user.id, existing.id]
           );
         } else {
           await db.query(
-            `INSERT INTO finance_category_rules (rule_uid, merchant_pattern, category, ownership_scope, priority, enabled, created_by)
-             VALUES (?, ?, ?, ?, 250, 1, ?)`,
-            [uid('RULE'), pattern, category, canOverrideScope ? nextScope : null, req.user.id]
+            `INSERT INTO finance_category_rules
+             (rule_uid,merchant_pattern,category,ownership_scope,priority,enabled,application_mode,created_by,updated_by)
+             VALUES (?,?,?,?,250,1,'SUGGEST_ONLY',?,?)`,
+            [uid('RULE'), pattern, category, canOverrideScope ? nextScope : null, req.user.id, req.user.id]
           );
         }
       }
     }
-
     await logAudit(db, audit(req, {
       action: 'BANK_TRANSACTION_UPDATED',
       module: 'finance_intelligence',
