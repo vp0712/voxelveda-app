@@ -4,9 +4,10 @@ Last updated: 2026-09-25 (Australia/Sydney)
 
 ## Current Git commit
 
-- Baseline branch: `main`
-- Baseline commit: `2a636bb856318aa9202da31ba47abce372a1f815` (`Release Finance Control v14 to Railway`)
-- Working tree was clean before this repair began.
+- Original baseline commit: `2a636bb856318aa9202da31ba47abce372a1f815` (`Release Finance Control v14 to Railway`).
+- Current release branch: `codex/finance-ingestion-v26`.
+- Current production baseline merged into the release branch: `d7b8c694bf85598137baf0f21380f4120387fb3a` (`Release Finance statement date integrity v25 r2`).
+- Ingestion implementation commit: `e07fd9b`; v25 integration commit: `9d96bab`.
 
 ## Existing architecture
 
@@ -72,12 +73,12 @@ Last updated: 2026-09-25 (Australia/Sydney)
 
 ## Production configuration gaps
 
-- The Finance ingestion worker, readiness signal, MySQL queue, stale recovery, bounded retry and dead-letter telemetry are implemented locally; Railway runtime configuration still needs verification.
+- The Finance ingestion worker, readiness signal, MySQL queue, stale recovery, bounded retry and dead-letter telemetry are implemented locally. The release still needs explicit worker variables applied and live worker readiness verified after deploy.
 - Pinned PDF, OCR, English OCR data, image and canvas dependencies are installed and exercised by real-file tests.
-- Finance uploads now use restricted `secure_documents` records and private object storage; Railway credentials and the `OBJECT_STORAGE_DOCUMENTS_ENABLED` flag still need pre-deploy verification.
-- Malware scanning is optional unless Railway sets the required scanner variables; Finance ingestion must expose this state and fail closed according to policy.
+- Finance uploads use restricted `secure_documents` records and private object storage. Railway currently exposes object-storage provider, bucket, endpoint/region and credential variables, including `OBJECT_STORAGE_DOCUMENTS_ENABLED`.
+- Railway currently exposes required ClamAV provider/host/port/fail-closed variables, and the separate malware-scanner service is healthy. Values remain secret and were not copied into this record.
 - Redis is used only as an optional distributed rate limiter. The application already has a durable MySQL lease/job framework, so ingestion will reuse that authority rather than create a second queue without need.
-- Existing operational gaps remain: live backup telemetry and verified database certificate trust are not configured. No risky production migration will be applied without backup evidence or an explicitly safe additive migration decision.
+- Existing operational gaps remain: live backup telemetry is not externally verified, and database readiness reports encryption without verified certificate trust. The v26 migration is additive, uses restart-safe `IF NOT EXISTS`/conditional-index DDL, and does not delete or rewrite existing finance data.
 
 ## Baseline test and startup results
 
@@ -85,7 +86,8 @@ Last updated: 2026-09-25 (Australia/Sydney)
 - `npm run build`: PASS, all 48 Finance production regression checks passed.
 - `npm test`: PASS, complete application/security/Finance suite passed.
 - `npm start`: expected local fail-closed result; missing local `.env` caused `JWT_SECRET must be a unique value of at least 32 characters` before database/migrations were contacted.
-- Production baseline before this repair: Railway health/readiness returned healthy at deployment `2a636bb856318aa9202da31ba47abce372a1f815`; schema version `20260924_personal_tax_evidence_control` with all critical schemas operational.
+- Original production baseline before this repair: Railway health/readiness returned healthy at deployment `2a636bb856318aa9202da31ba47abce372a1f815`.
+- Current production baseline before v26 deployment: `d7b8c694bf85598137baf0f21380f4120387fb3a`; schema version `20260924_personal_tax_evidence_control` with critical services operational.
 
 ## Test plan
 
@@ -109,13 +111,13 @@ Last updated: 2026-09-25 (Australia/Sydney)
 
 ## Deployment status
 
-- Current production remains Finance Control v14 at deployment SHA `2a636bb856318aa9202da31ba47abce372a1f815`.
+- Current production remains Finance statement date integrity v25 r2 at deployment SHA `d7b8c694bf85598137baf0f21380f4120387fb3a`.
 - This ingestion repair has not yet been deployed.
 
 ## Current local verification
 
 - `npm run lint`: PASS (189 JavaScript files).
-- `npm run build`: PASS (50 Finance production checks, including generated real-file OCR/parser cases).
+- `npm run build`: PASS after the v25 merge (53 Finance production checks, including generated real-file OCR/parser cases).
 - `npm test`: PASS (complete application, security, ERP and Finance suite).
 - `npm audit --omit=dev --audit-level=high`: PASS (0 vulnerabilities).
 - Real formats proven: CSV, XLSX, OFX, QFX, QIF, selectable-text PDF, PNG OCR, scanned-PDF OCR and password-protected PDF.
@@ -124,8 +126,8 @@ Last updated: 2026-09-25 (Australia/Sydney)
 ## Production verification evidence
 
 - Baseline `/api/health`: `ok`.
-- Baseline `/api/ready`: `ready: true`, all critical services operational, schema `20260924_personal_tax_evidence_control`.
-- Deployed `finance-advanced-control.js` contains the v14 15-second budget and abort-controller recovery logic.
+- Baseline `/api/ready`: `ready: true`, all critical services operational, schema `20260924_personal_tax_evidence_control`, deployment `d7b8c694bf85598137baf0f21380f4120387fb3a`.
+- Railway malware-scanner and Redis services report successful deployments; application object-storage and malware configuration names are present.
 - Authenticated upload verification is pending the repaired ingestion path and an authorised MFA session.
 
 ## Remaining blockers and assumptions

@@ -1,53 +1,71 @@
 ALTER TABLE statement_import_sessions
-  ADD COLUMN secure_document_id CHAR(36) NULL,
-  ADD COLUMN detected_mime VARCHAR(120) NULL,
-  ADD COLUMN file_size_bytes BIGINT NULL,
-  ADD COLUMN document_type VARCHAR(60) NULL,
-  ADD COLUMN institution VARCHAR(180) NULL,
-  ADD COLUMN masked_account_identifier VARCHAR(80) NULL,
-  ADD COLUMN statement_currency CHAR(3) NULL,
-  ADD COLUMN page_count INT NULL,
-  ADD COLUMN selectable_text TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN ocr_required TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN multiple_accounts TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN multiple_currencies TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN appears_incomplete TINYINT(1) NOT NULL DEFAULT 0,
-  ADD COLUMN current_stage VARCHAR(40) NULL,
-  ADD COLUMN progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,
-  ADD COLUMN correlation_id CHAR(36) NULL,
-  ADD COLUMN processing_started_at DATETIME NULL,
-  ADD COLUMN processing_completed_at DATETIME NULL,
-  ADD COLUMN last_error_code VARCHAR(100) NULL,
-  ADD COLUMN last_error_summary VARCHAR(1000) NULL,
-  ADD COLUMN approved_by BIGINT NULL,
-  ADD COLUMN approved_at DATETIME NULL,
-  ADD COLUMN posting_started_at DATETIME NULL,
-  ADD COLUMN posted_at DATETIME NULL;
+  ADD COLUMN IF NOT EXISTS secure_document_id CHAR(36) NULL,
+  ADD COLUMN IF NOT EXISTS detected_mime VARCHAR(120) NULL,
+  ADD COLUMN IF NOT EXISTS file_size_bytes BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS document_type VARCHAR(60) NULL,
+  ADD COLUMN IF NOT EXISTS institution VARCHAR(180) NULL,
+  ADD COLUMN IF NOT EXISTS masked_account_identifier VARCHAR(80) NULL,
+  ADD COLUMN IF NOT EXISTS statement_currency CHAR(3) NULL,
+  ADD COLUMN IF NOT EXISTS page_count INT NULL,
+  ADD COLUMN IF NOT EXISTS selectable_text TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS ocr_required TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS multiple_accounts TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS multiple_currencies TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS appears_incomplete TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS current_stage VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS progress_percent TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS correlation_id CHAR(36) NULL,
+  ADD COLUMN IF NOT EXISTS processing_started_at DATETIME NULL,
+  ADD COLUMN IF NOT EXISTS processing_completed_at DATETIME NULL,
+  ADD COLUMN IF NOT EXISTS last_error_code VARCHAR(100) NULL,
+  ADD COLUMN IF NOT EXISTS last_error_summary VARCHAR(1000) NULL,
+  ADD COLUMN IF NOT EXISTS approved_by BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS approved_at DATETIME NULL,
+  ADD COLUMN IF NOT EXISTS posting_started_at DATETIME NULL,
+  ADD COLUMN IF NOT EXISTS posted_at DATETIME NULL;
 
-CREATE INDEX idx_statement_session_document ON statement_import_sessions (secure_document_id);
-CREATE INDEX idx_statement_session_processing ON statement_import_sessions (status, current_stage, updated_at);
+SET @vv_idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='statement_import_sessions' AND index_name='idx_statement_session_document');
+SET @vv_idx_sql = IF(@vv_idx_exists=0, 'CREATE INDEX idx_statement_session_document ON statement_import_sessions (secure_document_id)', 'SELECT 1');
+PREPARE vv_idx_stmt FROM @vv_idx_sql;
+EXECUTE vv_idx_stmt;
+DEALLOCATE PREPARE vv_idx_stmt;
+
+SET @vv_idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='statement_import_sessions' AND index_name='idx_statement_session_processing');
+SET @vv_idx_sql = IF(@vv_idx_exists=0, 'CREATE INDEX idx_statement_session_processing ON statement_import_sessions (status, current_stage, updated_at)', 'SELECT 1');
+PREPARE vv_idx_stmt FROM @vv_idx_sql;
+EXECUTE vv_idx_stmt;
+DEALLOCATE PREPARE vv_idx_stmt;
 
 ALTER TABLE statement_import_rows
-  ADD COLUMN source_file_id CHAR(36) NULL,
-  ADD COLUMN source_page INT NULL,
-  ADD COLUMN source_row_number INT NULL,
-  ADD COLUMN source_bbox_json JSON NULL,
-  ADD COLUMN source_snippet VARCHAR(1000) NULL,
-  ADD COLUMN parser_name VARCHAR(80) NULL,
-  ADD COLUMN parser_version VARCHAR(40) NULL,
-  ADD COLUMN confidence_score DECIMAL(6,5) NULL,
-  ADD COLUMN duplicate_status VARCHAR(30) NOT NULL DEFAULT 'NOT_DUPLICATE',
-  ADD COLUMN review_status VARCHAR(30) NOT NULL DEFAULT 'UNREVIEWED',
-  ADD COLUMN rejection_reasons_json JSON NULL,
-  ADD COLUMN original_extracted_json JSON NULL,
-  ADD COLUMN corrected_values_json JSON NULL,
-  ADD COLUMN final_posted_transaction_id BIGINT NULL,
-  ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
+  ADD COLUMN IF NOT EXISTS source_file_id CHAR(36) NULL,
+  ADD COLUMN IF NOT EXISTS source_page INT NULL,
+  ADD COLUMN IF NOT EXISTS source_row_number INT NULL,
+  ADD COLUMN IF NOT EXISTS source_bbox_json JSON NULL,
+  ADD COLUMN IF NOT EXISTS source_snippet VARCHAR(1000) NULL,
+  ADD COLUMN IF NOT EXISTS parser_name VARCHAR(80) NULL,
+  ADD COLUMN IF NOT EXISTS parser_version VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS confidence_score DECIMAL(6,5) NULL,
+  ADD COLUMN IF NOT EXISTS duplicate_status VARCHAR(30) NOT NULL DEFAULT 'NOT_DUPLICATE',
+  ADD COLUMN IF NOT EXISTS review_status VARCHAR(30) NOT NULL DEFAULT 'UNREVIEWED',
+  ADD COLUMN IF NOT EXISTS rejection_reasons_json JSON NULL,
+  ADD COLUMN IF NOT EXISTS original_extracted_json JSON NULL,
+  ADD COLUMN IF NOT EXISTS corrected_values_json JSON NULL,
+  ADD COLUMN IF NOT EXISTS final_posted_transaction_id BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 
-CREATE INDEX idx_statement_rows_source ON statement_import_rows (source_file_id, source_page, source_row_number);
-CREATE INDEX idx_statement_rows_review_status ON statement_import_rows (import_session_id, review_status, validation_status, duplicate_status);
+SET @vv_idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='statement_import_rows' AND index_name='idx_statement_rows_source');
+SET @vv_idx_sql = IF(@vv_idx_exists=0, 'CREATE INDEX idx_statement_rows_source ON statement_import_rows (source_file_id, source_page, source_row_number)', 'SELECT 1');
+PREPARE vv_idx_stmt FROM @vv_idx_sql;
+EXECUTE vv_idx_stmt;
+DEALLOCATE PREPARE vv_idx_stmt;
 
-CREATE TABLE finance_statement_import_jobs (
+SET @vv_idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='statement_import_rows' AND index_name='idx_statement_rows_review_status');
+SET @vv_idx_sql = IF(@vv_idx_exists=0, 'CREATE INDEX idx_statement_rows_review_status ON statement_import_rows (import_session_id, review_status, validation_status, duplicate_status)', 'SELECT 1');
+PREPARE vv_idx_stmt FROM @vv_idx_sql;
+EXECUTE vv_idx_stmt;
+DEALLOCATE PREPARE vv_idx_stmt;
+
+CREATE TABLE IF NOT EXISTS finance_statement_import_jobs (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   job_uuid CHAR(36) NOT NULL,
   import_session_id BIGINT NOT NULL,
@@ -77,7 +95,7 @@ CREATE TABLE finance_statement_import_jobs (
   KEY idx_finance_statement_job_heartbeat (status, heartbeat_at)
 ) ENGINE=InnoDB;
 
-CREATE TABLE statement_import_pages (
+CREATE TABLE IF NOT EXISTS statement_import_pages (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   import_session_id BIGINT NOT NULL,
   secure_document_id CHAR(36) NOT NULL,
@@ -93,7 +111,7 @@ CREATE TABLE statement_import_pages (
   KEY idx_statement_page_document (secure_document_id, page_number)
 ) ENGINE=InnoDB;
 
-CREATE TABLE finance_statement_mapping_templates (
+CREATE TABLE IF NOT EXISTS finance_statement_mapping_templates (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   template_uid CHAR(36) NOT NULL,
   owner_user_id BIGINT NOT NULL,
@@ -110,7 +128,7 @@ CREATE TABLE finance_statement_mapping_templates (
   KEY idx_statement_mapping_match (owner_user_id, institution, source_format, active)
 ) ENGINE=InnoDB;
 
-CREATE TABLE finance_statement_parser_templates (
+CREATE TABLE IF NOT EXISTS finance_statement_parser_templates (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   parser_name VARCHAR(80) NOT NULL,
   parser_version VARCHAR(40) NOT NULL,
@@ -121,12 +139,12 @@ CREATE TABLE finance_statement_parser_templates (
   UNIQUE KEY uq_statement_parser_version (parser_name, parser_version)
 ) ENGINE=InnoDB;
 
-INSERT INTO finance_statement_parser_templates (parser_name, parser_version, institution_pattern, configuration_json)
+INSERT IGNORE INTO finance_statement_parser_templates (parser_name, parser_version, institution_pattern, configuration_json)
 VALUES
   ('australian-crdr', 'australian-crdr-v1', 'Australian institution plus CR/DR layout', JSON_OBJECT('date_format','DMY','requires_direction',true)),
   ('generic-statement', 'generic-statement-v1', 'Generic positional financial statement', JSON_OBJECT('requires_direction',true));
 
-CREATE TABLE statement_validation_results (
+CREATE TABLE IF NOT EXISTS statement_validation_results (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   import_session_id BIGINT NOT NULL,
   validation_key VARCHAR(80) NOT NULL,
@@ -140,7 +158,7 @@ CREATE TABLE statement_validation_results (
   KEY idx_statement_validation_status (import_session_id, status)
 ) ENGINE=InnoDB;
 
-CREATE TABLE statement_duplicate_candidates (
+CREATE TABLE IF NOT EXISTS statement_duplicate_candidates (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   import_session_id BIGINT NOT NULL,
   statement_row_id BIGINT NOT NULL,
@@ -156,7 +174,7 @@ CREATE TABLE statement_duplicate_candidates (
   KEY idx_statement_duplicate_review (import_session_id, match_class, resolved_status)
 ) ENGINE=InnoDB;
 
-CREATE TABLE processing_errors (
+CREATE TABLE IF NOT EXISTS processing_errors (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   correlation_id CHAR(36) NOT NULL,
   scope_type VARCHAR(60) NOT NULL,
@@ -173,12 +191,16 @@ CREATE TABLE processing_errors (
 ) ENGINE=InnoDB;
 
 ALTER TABLE statement_import_files
-  ADD COLUMN secure_document_id CHAR(36) NULL,
-  ADD COLUMN detected_mime VARCHAR(120) NULL,
-  ADD COLUMN file_size_bytes BIGINT NULL,
-  ADD COLUMN parser_name VARCHAR(80) NULL,
-  ADD COLUMN parser_version VARCHAR(40) NULL,
-  ADD COLUMN reconciliation_status VARCHAR(30) NULL,
-  ADD COLUMN reconciliation_difference DECIMAL(18,2) NULL;
+  ADD COLUMN IF NOT EXISTS secure_document_id CHAR(36) NULL,
+  ADD COLUMN IF NOT EXISTS detected_mime VARCHAR(120) NULL,
+  ADD COLUMN IF NOT EXISTS file_size_bytes BIGINT NULL,
+  ADD COLUMN IF NOT EXISTS parser_name VARCHAR(80) NULL,
+  ADD COLUMN IF NOT EXISTS parser_version VARCHAR(40) NULL,
+  ADD COLUMN IF NOT EXISTS reconciliation_status VARCHAR(30) NULL,
+  ADD COLUMN IF NOT EXISTS reconciliation_difference DECIMAL(18,2) NULL;
 
-CREATE INDEX idx_statement_import_document ON statement_import_files (secure_document_id);
+SET @vv_idx_exists = (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='statement_import_files' AND index_name='idx_statement_import_document');
+SET @vv_idx_sql = IF(@vv_idx_exists=0, 'CREATE INDEX idx_statement_import_document ON statement_import_files (secure_document_id)', 'SELECT 1');
+PREPARE vv_idx_stmt FROM @vv_idx_sql;
+EXECUTE vv_idx_stmt;
+DEALLOCATE PREPARE vv_idx_stmt;

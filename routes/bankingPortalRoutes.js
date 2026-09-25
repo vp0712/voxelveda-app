@@ -60,8 +60,12 @@ router.post('/intelligence/statements/:uid/remove', edit, financePrivacy.stateme
 router.post('/intelligence/statements/:uid/restore', edit, financePrivacy.statementUid('uid'), requireStepUp('RESTORE_BANK_STATEMENT'), statementData.restore);
 router.delete('/intelligence/statements/:uid/purge', bankAdmin, financePrivacy.statementUid('uid'), requireStepUp('PURGE_BANK_STATEMENT'), statementData.purge);
 router.post('/intelligence/accounts/:id/clear-statements', edit, financePrivacy.accountParam('id'), requireStepUp('CLEAR_BANK_STATEMENT_HISTORY'), statementData.clearAccountStatements);
+router.post('/intelligence/accounts/:id/statements/import', edit, financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.legacyDisabled);
 router.post('/intelligence/accounts/:id/statements/preview', edit, financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.legacyDisabled);
 router.post('/intelligence/accounts/:id/statement-imports', edit, financePrivacy.accountParam('id'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), ...financeStatementUpload, statementIngestion.upload);
+router.get('/intelligence/statement-imports/metrics', statementIngestion.metrics);
+router.get('/intelligence/statement-imports/mappings', statementIngestion.listMappings);
+router.post('/intelligence/statement-imports/mappings', edit, statementIngestion.saveMapping);
 router.get('/intelligence/statement-imports/:uid/status', financePrivacy.statementUid('uid'), statementIngestion.status);
 router.post('/intelligence/statement-imports/:uid/password', edit, financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.password);
 router.post('/intelligence/statement-imports/:uid/mapping', edit, financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementIngestion.mapping);

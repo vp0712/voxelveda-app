@@ -17,13 +17,15 @@ const client = read('public/finance-master.js');
 const server = read('server.js');
 
 for (const table of ['finance_statement_import_jobs','statement_import_pages','statement_validation_results','statement_duplicate_candidates','processing_errors']) {
-  assert(migration.includes(`CREATE TABLE ${table}`), `durable ingestion table missing: ${table}`);
+  assert(new RegExp(`CREATE TABLE(?: IF NOT EXISTS)? ${table}`).test(migration), `durable ingestion table missing: ${table}`);
 }
+assert(migration.includes('ADD COLUMN IF NOT EXISTS') && migration.includes('information_schema.statistics'), 'additive ingestion migration must be restart-safe after partial DDL');
 for (const field of ['secure_document_id','source_bbox_json','source_snippet','confidence_score','final_posted_transaction_id']) {
   assert(migration.includes(field), `source lineage field missing: ${field}`);
 }
 assert(routes.includes("'/intelligence/accounts/:id/statement-imports'"), 'multipart ingestion endpoint missing');
 assert(bankingRoutes.includes("'/intelligence/accounts/:id/statement-imports'"), 'standalone banking ingestion endpoint missing');
+assert(bankingRoutes.includes("'/intelligence/statement-imports/mappings'"), 'standalone banking mapping-template endpoints missing');
 assert(routes.includes('...financeStatementUpload'), 'ingestion endpoint must use bounded secure multipart middleware');
 assert(ingestion.includes('detectStatementFile(body'), 'server must inspect file content');
 assert(ingestion.includes("classification: 'RESTRICTED'"), 'original statement must be stored as restricted evidence');
