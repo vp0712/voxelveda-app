@@ -7,7 +7,7 @@ const { FinanceError, dateOnly } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
 const trustedTotals = require('../services/financeTrustedTotals');
 const { buildCoreBankTransactionFilter } = require('../services/financeFilterContract');
-const { cleanMerchant, normalizeTags, normalizeGstTreatment } = require('../services/financeRuleEngine');
+const { cleanMerchant, normalizeTags, normalizeGstTreatment, upsertExactAutoCategoryRule } = require('../services/financeRuleEngine');
 
 const VALID_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const DASHBOARD_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'ALL']);
