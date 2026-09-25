@@ -54,6 +54,59 @@ function exactRuleMatch(transaction, rule) {
   return Boolean(transactionMerchant && ruleMerchant && transactionMerchant === ruleMerchant);
 }
 
+async function findExactAutoCategoryRule(db, userId, transaction = {}) {
+  const actorId = Number(userId || 0);
+  if (!actorId) return null;
+  const merchant = cleanMerchant(transaction.merchant_normalized || transaction.merchant_name || transaction.description || transaction.reference || '');
+  if (!merchant) return null;
+  const [rules] = await db.query(
+    `SELECT id,merchant_pattern,category,ownership_scope,priority,application_mode,enabled
+       FROM finance_category_rules
+      WHERE created_by=? AND enabled=1 AND application_mode='AUTO_APPLY' AND category IS NOT NULL AND category<>''
+      ORDER BY priority DESC,updated_at DESC,id DESC`,
+    [actorId]
+  );
+  return rules.find((rule) => cleanMerchant(rule.merchant_pattern) === merchant) || null;
+}
+
+async function upsertExactAutoCategoryRule(db, options = {}) {
+  const actorId = Number(options.userId || 0);
+  const category = String(options.category || '').trim().slice(0, 120);
+  const merchant = cleanMerchant(
+    options.merchant_normalized || options.merchant_name || options.description || options.reference || ''
+  );
+  if (!actorId || !category || !merchant) return { saved: false, rule: null, merchant: merchant || null };
+
+  const ownershipScope = String(options.ownershipScope || '').trim().toUpperCase();
+  const scope = ['PERSONAL','BUSINESS','MIXED','UNCLASSIFIED'].includes(ownershipScope) ? ownershipScope : null;
+  const [[existing]] = await db.query(
+    `SELECT id,rule_uid,merchant_pattern,category,ownership_scope,application_mode
+       FROM finance_category_rules
+      WHERE created_by=? AND merchant_pattern=?
+      ORDER BY priority DESC,updated_at DESC,id DESC LIMIT 1 FOR UPDATE`,
+    [actorId, merchant]
+  );
+  if (existing) {
+    await db.query(
+      `UPDATE finance_category_rules
+          SET category=?,ownership_scope=?,priority=500,enabled=1,application_mode='AUTO_APPLY',
+              updated_by=?,last_used_at=NOW()
+        WHERE id=?`,
+      [category, scope, actorId, existing.id]
+    );
+    return { saved: true, rule: { ...existing, id: existing.id, merchant_pattern: merchant, category, ownership_scope: scope, application_mode: 'AUTO_APPLY' }, merchant };
+  }
+
+  const ruleUid = `RULE-${Date.now().toString(36).toUpperCase()}-${require('node:crypto').randomBytes(4).toString('hex').toUpperCase()}`;
+  const [insert] = await db.query(
+    `INSERT INTO finance_category_rules
+       (rule_uid,merchant_pattern,category,ownership_scope,priority,enabled,application_mode,created_by,updated_by,last_used_at)
+     VALUES (?,?,?,?,500,1,'AUTO_APPLY',?,?,NOW())`,
+    [ruleUid, merchant, category, scope, actorId, actorId]
+  );
+  return { saved: true, rule: { id: insert.insertId, rule_uid: ruleUid, merchant_pattern: merchant, category, ownership_scope: scope, application_mode: 'AUTO_APPLY' }, merchant };
+}
+
 async function periodAllowsClassification(db, transactionDate) {
   const effectiveDate = dateOnly(transactionDate);
   if (!effectiveDate) return false;
@@ -160,5 +213,7 @@ module.exports = {
   normalizeRuleMode,
   normalizeGstTreatment,
   exactRuleMatch,
+  findExactAutoCategoryRule,
+  upsertExactAutoCategoryRule,
   applyAutoRulesToImport
 };
