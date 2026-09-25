@@ -9,7 +9,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,cashCustody:null,debtPlanner:null,commitments:null,savingsReserve:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,anomalyExplain:null,controlActions:null,jobProfitability:null,counterpartyControl:null,handover:null,personalIntegrity:null,personalTaxControl:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,accountCategorySpending:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,cashCustody:null,debtPlanner:null,commitments:null,savingsReserve:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,anomalyExplain:null,controlActions:null,jobProfitability:null,counterpartyControl:null,handover:null,personalIntegrity:null,personalTaxControl:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
   resources:{},txFilters:{q:'',type:'',category:'',merchant:'',currency:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -390,7 +390,7 @@ async function loadBase(){
 async function hydrateSupplementary(cycle){
  const base=filterQuery();
  const resources=[
-  ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],
+  ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],['accountCategorySpending',I+'/reports/spending'+base+'&include_transactions=0'],
   ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing?date='+encodeURIComponent(localIsoDay())],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
   ['readiness',I+'/banking-readiness'],['controlActions',API+'/issues'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
   ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
@@ -449,9 +449,47 @@ function overview(){
  const attentionCard='<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Needs your attention</h2><p>Direct queues, not decorative alerts.</p></div></div><div class="fm-attention-grid">'+attentionHtml+'</div></div></article>';
  return financeCommandCentre()+hero()+managementConversionCard()+((cashflowCard||expenseCard)?'<div class="fm-grid two">'+cashflowCard+expenseCard+'</div>':'')+'<div class="fm-grid two">'+attentionCard+accountCard+'</div>'+recentCard;
 }
+function accountCategoryDefinitions(account,definitions=null){
+ const scope=String(account?.ownership_scope||'').toUpperCase();
+ const rows=(definitions||state.categories?.categories||[]).filter(item=>Number(item.active??1)!==0&&!item.archived_at);
+ const filtered=rows.filter(item=>{
+  const catScope=String(item.scope||'BOTH').toUpperCase();
+  if(scope==='PERSONAL')return catScope==='PERSONAL'||catScope==='BOTH';
+  if(scope==='BUSINESS')return catScope==='BUSINESS'||catScope==='BOTH';
+  return true;
+ });
+ return [...new Set([...filtered.map(item=>String(item.name||'').trim()).filter(Boolean),'Unclassified'])];
+}
+function renderAccountCategoryChart(account,rows=[],definitions=null,{compact=false,label='Selected period'}={}){
+ const currency=String(account?.currency||'AUD').toUpperCase();
+ const source=(Array.isArray(rows)?rows:[]).filter(row=>String(row.currency||currency).toUpperCase()===currency);
+ const byCategory=new Map(source.map(row=>[String(row.category||'Unclassified'),{...row,spent:num(row.spent),source_transaction_count:num(row.source_transaction_count||row.transaction_count)}]));
+ for(const name of accountCategoryDefinitions(account,definitions))if(!byCategory.has(name))byCategory.set(name,{category:name,currency,spent:0,source_transaction_count:0});
+ const items=[...byCategory.values()].sort((a,b)=>num(b.spent)-num(a.spent)||String(a.category).localeCompare(String(b.category)));
+ const max=Math.max(1,...items.map(item=>num(item.spent))),total=items.reduce((sum,item)=>sum+num(item.spent),0);
+ const bars=items.map(item=>{
+  const height=num(item.spent)>0?Math.max(5,Math.min(100,(num(item.spent)/max)*100)):2;
+  return `<button type="button" class="fm-account-category-column" data-account-category="${esc(item.category||'Unclassified')}" data-account-category-account="${esc(account.id)}" data-account-category-currency="${esc(currency)}" title="Open ${esc(item.category||'Unclassified')} transactions"><span class="fm-account-category-value">${nativeMoney(item.spent,currency)}</span><span class="fm-account-category-barbox"><i style="height:${height.toFixed(2)}%"></i></span><span class="fm-account-category-name">${esc(item.category||'Unclassified')}</span><small>${num(item.source_transaction_count)} tx</small></button>`;
+ }).join('');
+ return `<section class="fm-account-category-chart ${compact?'compact':''}"><div class="fm-account-category-head"><div><span class="fm-section-kicker">SPENDING BY CATEGORY</span><h4>Category chart</h4><small>${esc(label)} · tap a column to open its transactions</small></div><div><b>${nativeMoney(total,currency)}</b><small>Total spend</small></div></div><div class="fm-account-category-scroll">${bars||emptyState('No categories','No category activity is available for this account.')}</div></section>`;
+}
+async function openAccountCategory(accountId,category,currency){
+ state.account=String(accountId||'');
+ if($('fmAccount'))$('fmAccount').value=state.account;
+ state.txFilters={...state.txFilters,q:'',type:'',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
+ state.txMeta.page=1;
+ closeDrawer();
+ state.view='transactions';
+ history.replaceState(null,'','#transactions');
+ await loadTransactions();
+}
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
+ const spending=state.accountCategorySpending||{};
+ const accountCategoryRows=Array.isArray(spending.account_categories)?spending.account_categories:[];
+ const periodLabels={all:'All history',today:'Today',yesterday:'Yesterday',week:'This week',last7:'Last 7 days',month:'This month',last_month:'Last month',last30:'Last 30 days',quarter:'This quarter',previous_quarter:'Previous quarter',fy:'Current financial year',previous_fy:'Previous financial year',year:'Calendar year',custom:'Custom range'};
+ const chartPeriod=periodLabels[state.period]||'Selected period';
  const cards=state.accounts.map((a,index)=>{
   const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
   const accountName=esc(a.nickname||'Account');
@@ -472,6 +510,7 @@ function accounts(){
      <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>${scope} · ${connection}</small></div>
      <div class="fm-account-main-actions"><button type="button" class="soft" data-account="${a.id}">View</button><button type="button" class="primary" data-account-transactions="${a.id}">Transactions</button></div>
     </div>
+    ${renderAccountCategoryChart(a,accountCategoryRows.filter(row=>String(row.bank_account_id)===String(a.id)),null,{compact:true,label:chartPeriod})}
     <div class="fm-account-card-footer">
      <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)}</small></div></div>
      <div class="fm-account-footer-actions"><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
@@ -2425,6 +2464,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-account-statement]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountStatementForm(b.dataset.accountStatement)});
  document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
  document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');if($('fmAccount'))$('fmAccount').value=state.account;state.txMeta.page=1;go('transactions');loadTransactions()});
+ document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
  const accountSearch=document.querySelector('[data-account-search]');
  if(accountSearch)accountSearch.oninput=e=>{const q=String(e.currentTarget.value||'').trim().toLowerCase();document.querySelectorAll('[data-account-card-shell]').forEach(card=>{card.hidden=Boolean(q)&&!String(card.dataset.searchText||'').includes(q)})};
  document.querySelectorAll('[data-fx-new]').forEach(b=>b.onclick=()=>openFxRateForm());
@@ -2653,20 +2693,25 @@ async function transactionDetail(id){
 }
 async function accountDetail(id){
  try{
-  const [detailResult,lifecycleResult]=await Promise.allSettled([api(OS+'/accounts/'+id),api(I+'/accounts/'+id+'/lifecycle')]);
+  const [detailResult,lifecycleResult,spendingResult,categoryResult]=await Promise.allSettled([api(OS+'/accounts/'+id),api(I+'/accounts/'+id+'/lifecycle'),api(I+'/reports/spending'+filterQuery({account_id:id,include_transactions:0})),api(API+'/categories?include_archived=false')]);
   if(detailResult.status==='rejected')throw detailResult.reason;
   const d=detailResult.value,a=d.account||state.accounts.find(x=>String(x.id)===String(id))||{},life=lifecycleResult.status==='fulfilled'?lifecycleResult.value?.lifecycle:null;
+  const spending=spendingResult.status==='fulfilled'?spendingResult.value:null;
+  const categoryDefs=categoryResult.status==='fulfilled'?(categoryResult.value?.categories||[]):(state.categories?.categories||[]);
+  const periodLabels={all:'All history',today:'Today',yesterday:'Yesterday',week:'This week',last7:'Last 7 days',month:'This month',last_month:'Last month',last30:'Last 30 days',quarter:'This quarter',previous_quarter:'Previous quarter',fy:'Current financial year',previous_fy:'Previous financial year',year:'Calendar year',custom:'Custom range'};
+  const categoryChart=renderAccountCategoryChart(a,spending?.categories||[],categoryDefs,{compact:false,label:periodLabels[state.period]||'Selected period'});
   const monthly=d.monthly||[],max=Math.max(1,...monthly.flatMap(x=>[num(x.money_in),num(x.money_out)]));
   const chart=monthly.length?monthly.map(x=>`<div class="fm-chart-row"><span>${esc(x.month)}</span><div class="fm-bars"><i class="in" style="width:${Math.max(2,num(x.money_in)/max*100)}%"></i><i class="out" style="width:${Math.max(2,num(x.money_out)/max*100)}%"></i></div><b>${nativeMoney(num(x.money_in)-num(x.money_out),a.currency||'AUD')}</b></div>`).join(''):emptyState('No account trend','No recent monthly activity.');
-  const categories=(d.categories||[]).map(x=>`<div class="fm-row"><span>${esc(x.category)}</span><b>${nativeMoney(x.spent,a.currency||'AUD')}</b></div>`).join('')||emptyState('No categories','No recent account expense categories.');
+
   const tx=(d.transactions||[]).slice(0,20).map(x=>`<div class="fm-row" data-tx="${x.id}"><div><h3>${esc(x.merchant_name||x.description)}</h3><p>${date(x.transaction_date)} · ${esc(x.category||'Uncategorised')}</p></div><b>${nativeMoney(Math.abs(num(x.credit)-num(x.debit)),x.currency||a.currency||'AUD')}</b></div>`).join('');
   const purgeButton=`<button class="bad" data-account-purge="${a.id}">Delete account & all data</button>`;
-  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad"><h3>Category distribution</h3><div class="fm-list">${categories}</div></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
+  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad">${categoryChart}</div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
   setTimeout(()=>{
    document.querySelectorAll('[data-account-action]').forEach(b=>b.onclick=()=>accountLifecycle(b.dataset.id,b.dataset.accountAction));
    document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=()=>purgeAccount(b.dataset.accountPurge));
    document.querySelector('[data-account-edit]')?.addEventListener('click',()=>{closeDrawer();openAccountForm('',a.id)});
    document.querySelectorAll('[data-tx]').forEach(x=>x.onclick=()=>transactionDetail(x.dataset.tx));
+   document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
    document.querySelector('[data-account-tx]')?.addEventListener('click',()=>{state.account=String(a.id);$('fmAccount').value=state.account;closeDrawer();go('transactions');loadTransactions()});
    document.querySelector('[data-quick-account]')?.addEventListener('click',()=>openNew('expense',a.id));
    document.querySelectorAll('[data-viewjump]').forEach(x=>x.onclick=()=>{closeDrawer();go(x.dataset.viewjump)});
