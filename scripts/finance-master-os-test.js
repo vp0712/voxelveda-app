@@ -66,6 +66,12 @@ assert.match(js,/function openAccountForm\(/,'Finance OS must expose a real crea
 assert.match(js,/I\+'\/accounts'/,'Account form must save through the canonical Finance account API.');
 assert.match(js,/if\(kind==='account'\)\{openAccountForm\(\);return\}/,'Add Account must never open the transaction form.');
 assert.match(js,/data-account-edit/,'Account workspace must provide account editing.');
+assert.match(js,/function renderAccountCategoryChart\(/,'Every Finance account must have a reusable category spending chart.');
+assert.match(js,/data-account-category=/,'Account category chart columns must be clickable.');
+assert.match(js,/openAccountCategory\(/,'Account category columns must drill into filtered transactions.');
+assert.match(js,/accountCategorySpending/,'Accounts page must hydrate per-account category totals for the selected period.');
+assert.match(css,/\.fm-account-category-chart/,'Per-account category chart must be styled.');
+
 assert.match(js,/data-account-purge/,'Account workspace must expose explicit permanent account-and-data deletion.');
 assert.match(js,/Type exactly:/,'Permanent account deletion must require typed confirmation.');
 assert.match(js,/data-personal-new="wallet"/,'Personal Money must expose wallet creation.');
