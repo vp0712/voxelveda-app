@@ -51,7 +51,7 @@ const money=(v,c='AUD')=>{try{return new Intl.NumberFormat('en-AU',{style:'curre
 const date=v=>{if(!v)return '—';try{return new Intl.DateTimeFormat('en-AU',{day:'2-digit',month:'short',year:'numeric'}).format(new Date(String(v).slice(0,10)+'T00:00:00'))}catch{return String(v)}};
 const tone=s=>{s=String(s||'').toUpperCase();if(['URGENT','CRITICAL','HIGH','FAILED','OVERDUE'].includes(s))return 'high';if(['MEDIUM','WATCH','WARNING','ACTION_SOON','REVIEW'].includes(s))return 'watch';return 'ok'};
 const statusChip=(label)=>'<span class="fac-chip '+tone(label)+'">'+esc(String(label||'INFO').replaceAll('_',' '))+'</span>';
-const advancedFilterQuery=()=>typeof window.__financeFilterQuery==='function'?window.__financeFilterQuery():'?scope=ALL';
+const advancedFilterQuery=()=>typeof window!=='undefined'&&typeof window.__financeFilterQuery==='function'?window.__financeFilterQuery():'?scope=ALL';
 const currentFilterSignature=()=>advancedFilterQuery();
 const sourceUrl=source=>typeof source==='function'?source():source;
 
@@ -352,7 +352,7 @@ async function load(){
  const root=document.getElementById(MOUNT_ID);if(!root){state.loading=false;return}
  const cycle=++loadCycle,hasExistingData=Object.keys(state.data).length>0,deadline=Date.now()+ADVANCED_LOAD_BUDGET_MS;
  state.filterSignature=currentFilterSignature();
- state.dataRevision=Number(window.__financeDataRevision||0);
+ state.dataRevision=Number(typeof window!=='undefined'?window.__financeDataRevision||0:0);
  state.loading=true;state.errors={};state.statuses=Object.fromEntries(SOURCES.map(([name])=>[name,'pending']));updateProgress();
  if(hasExistingData)render();else root.innerHTML=loadingMarkup();
  for(let i=0;i<SOURCES.length;i+=ADVANCED_BATCH_SIZE){
@@ -734,7 +734,7 @@ function mount(){
  style();
  const root=document.getElementById(MOUNT_ID);if(!root)return;
  const filterChanged=state.filterSignature!==currentFilterSignature();
- const dataChanged=state.dataRevision!==Number(window.__financeDataRevision||0);
+ const dataChanged=state.dataRevision!==Number(typeof window!=='undefined'?window.__financeDataRevision||0:0);
  const stale=Date.now()-num(state.lastLoadedAt)>15000;
  if(!state.loading&&(filterChanged||dataChanged||stale||!Object.keys(state.data).length))load();else render();
 }
