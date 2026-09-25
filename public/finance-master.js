@@ -10,7 +10,7 @@ const state={
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
   transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,cashCustody:null,debtPlanner:null,commitments:null,savingsReserve:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,anomalyExplain:null,controlActions:null,jobProfitability:null,counterpartyControl:null,handover:null,personalIntegrity:null,personalTaxControl:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
-  resources:{},txFilters:{q:'',type:'',category:'',merchant:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
+  resources:{},txFilters:{q:'',type:'',category:'',merchant:'',currency:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
 };
@@ -261,6 +261,16 @@ function filterQuery(extra={}){
  Object.entries(extra).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')p.set(k,v)});
  return '?'+p.toString();
 }
+window.__financeFilterQuery=(extra={})=>filterQuery(extra);
+window.__financeOpenCategory=async({category='',accountId='',currency=''}={})=>{
+ state.account=accountId?String(accountId):'';
+ if($('fmAccount'))$('fmAccount').value=state.account;
+ state.txFilters={...state.txFilters,q:'',type:'',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
+ state.txMeta.page=1;
+ state.view='transactions';
+ history.replaceState(null,'','#transactions');
+ await loadTransactions();
+};
 function scopeDashboardQuery(scope){
  const range=dateRange(),p=new URLSearchParams({scope});
  if(range.from)p.set('from',range.from);if(range.to)p.set('to',range.to);
@@ -362,7 +372,7 @@ async function loadBase(){
   ]);
   if(cycle!==loadCycle)return cycle;
   state.capabilities=capabilities||null;state.dash=dash||null;
- if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
+ if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{},summary_by_currency:tx.summary_by_currency||[],filters:tx.filters||{}}}
  else{state.tx=[]}
   state.statements=st?.statements||[];
   state.accounts=dash?.accounts||[];
@@ -485,11 +495,16 @@ function transactions(){
  const filtered=Object.values(f||{}).some(v=>String(v||'').trim());
  const periodLabels={all:'All History',today:'Today',yesterday:'Yesterday',week:'This Week',last7:'Last 7 Days',month:'This Month',last_month:'Last Month',last30:'Last 30 Days',quarter:'This Quarter',previous_quarter:'Previous Quarter',fy:'Current Financial Year',previous_fy:'Previous Financial Year',year:'Calendar Year',custom:'Custom Range'};
  const periodName=periodLabels[state.period]||'Selected period';
+ const categoryContext=f.category?(()=>{
+  const sums=Array.isArray(meta.summary_by_currency)?meta.summary_by_currency:[];
+  const totals=sums.length?sums.map(row=>'<span><b>'+nativeMoney(row.money_out||0,row.currency||f.currency||'AUD')+'</b><small>'+esc(row.currency||'')+' spend</small></span>').join(''):'<span><b>'+num(meta.total)+'</b><small>matching transactions</small></span>';
+  return '<div class="fm-category-drilldown-summary"><div><span class="fm-section-kicker">CATEGORY DRILLDOWN</span><strong>'+esc(f.category)+'</strong><small>'+(state.account?esc(state.accounts.find(a=>String(a.id)===String(state.account))?.nickname||'Selected account'):'All permitted accounts')+(f.currency?' · '+esc(f.currency):'')+'</small></div><div class="fm-category-drilldown-totals"><span><b>'+num(meta.total)+'</b><small>transactions</small></span>'+totals+'</div></div>';
+ })():'';
  const emptyTitle=filtered?'No transactions match these filters':(state.period==='all'?'No transactions loaded':'No transactions in '+periodName);
  const emptyMessage=filtered?'Clear or change the transaction filters to see other records.':(state.period==='all'?'Import statement history or add a financial movement to populate the ledger.':'Your imported history is preserved; this period simply has no matching activity.');
  const emptyAction=!filtered&&state.period!=='all'?'<button type="button" class="fm-primary" data-show-all-history="1">Show all history</button>':'';
  const ledger=hasRows?'<div class="fm-table-wrap"><table class="fm-table"><thead><tr><th><span class="sr-only">Select</span></th><th>Date</th><th>Account</th><th>Bank</th><th>Merchant / Description</th><th>Category</th><th>Type</th><th>Scope</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Source / Project</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div><div class="fm-pagination"><button id="txPrev" '+(meta.page<=1?'disabled':'')+'>Previous</button><span>Page '+(num(meta.page)||1)+' of '+(num(meta.total_pages)||1)+'</span><button id="txNext" '+(meta.page>=meta.total_pages?'disabled':'')+'>Next</button></div>':'<div class="fm-transaction-empty">'+emptyState(emptyTitle,emptyMessage,emptyAction)+'</div>';
- return ('<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transaction Explorer</h2><p>'+num(meta.total)+' matching records · server-side filters and pagination.</p></div><div class="fm-hero-actions"><button id="saveCurrentView">Save view</button><button data-quick="expense">+ Financial movement</button></div></div>'+savedBar+'<div class="fm-filter-grid"><input id="txSearch" value="'+esc(f.q)+'" placeholder="Search description, merchant, reference, account"><select id="txType"><option value="">All types</option><option value="EXPENSE" '+(f.type==='EXPENSE'?'selected':'')+'>Expense</option><option value="INCOME" '+(f.type==='INCOME'?'selected':'')+'>Income</option><option value="TRANSFER" '+(f.type==='TRANSFER'?'selected':'')+'>Transfer</option></select><input id="txCategory" value="'+esc(f.category)+'" placeholder="Category"><input id="txMerchant" value="'+esc(f.merchant)+'" placeholder="Merchant"><select id="txSource"><option value="">All sources</option><option value="STATEMENT_IMPORT" '+(f.source==='STATEMENT_IMPORT'?'selected':'')+'>Statement import</option><option value="MANUAL" '+(f.source==='MANUAL'?'selected':'')+'>Manual</option><option value="OPEN_BANKING" '+(f.source==='OPEN_BANKING'?'selected':'')+'>Open Banking</option></select><select id="txRecon"><option value="">All reconciliation</option><option value="UNRECONCILED" '+(f.reconciliation_status==='UNRECONCILED'?'selected':'')+'>Unreconciled</option><option value="RECONCILED" '+(f.reconciliation_status==='RECONCILED'?'selected':'')+'>Reconciled</option></select><input id="txMin" value="'+esc(f.amount_min)+'" inputmode="decimal" placeholder="Min amount"><input id="txMax" value="'+esc(f.amount_max)+'" inputmode="decimal" placeholder="Max amount"><button id="txApply" class="fm-primary" type="button">Apply filters</button></div>'+resourceError('txPayload','Transaction ledger')+bulkBar+ledger+'</div></article>')+savedViewsCard();
+ return ('<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Transaction Explorer</h2><p>'+num(meta.total)+' matching records · server-side filters and pagination.</p></div><div class="fm-hero-actions"><button id="saveCurrentView">Save view</button><button data-quick="expense">+ Financial movement</button></div></div>'+savedBar+categoryContext+'<div class="fm-filter-grid"><input id="txSearch" value="'+esc(f.q)+'" placeholder="Search description, merchant, reference, account"><select id="txType"><option value="">All types</option><option value="EXPENSE" '+(f.type==='EXPENSE'?'selected':'')+'>Expense</option><option value="INCOME" '+(f.type==='INCOME'?'selected':'')+'>Income</option><option value="TRANSFER" '+(f.type==='TRANSFER'?'selected':'')+'>Transfer</option></select><input id="txCategory" value="'+esc(f.category)+'" placeholder="Category"><input id="txMerchant" value="'+esc(f.merchant)+'" placeholder="Merchant"><input id="txCurrency" value="'+esc(f.currency||'')+'" maxlength="3" placeholder="Currency e.g. AUD"><select id="txSource"><option value="">All sources</option><option value="STATEMENT_IMPORT" '+(f.source==='STATEMENT_IMPORT'?'selected':'')+'>Statement import</option><option value="MANUAL" '+(f.source==='MANUAL'?'selected':'')+'>Manual</option><option value="OPEN_BANKING" '+(f.source==='OPEN_BANKING'?'selected':'')+'>Open Banking</option></select><select id="txRecon"><option value="">All reconciliation</option><option value="UNRECONCILED" '+(f.reconciliation_status==='UNRECONCILED'?'selected':'')+'>Unreconciled</option><option value="RECONCILED" '+(f.reconciliation_status==='RECONCILED'?'selected':'')+'>Reconciled</option></select><input id="txMin" value="'+esc(f.amount_min)+'" inputmode="decimal" placeholder="Min amount"><input id="txMax" value="'+esc(f.amount_max)+'" inputmode="decimal" placeholder="Max amount"><button id="txApply" class="fm-primary" type="button">Apply filters</button></div>'+resourceError('txPayload','Transaction ledger')+bulkBar+ledger+'</div></article>')+savedViewsCard();
 }
 function historyImportView(){
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
@@ -2083,7 +2098,7 @@ async function loadTransactions(){
  state.selectedTransactions.clear();
  await loadResource('txPayload',I+'/transactions'+filterQuery({page:state.txMeta.page,limit:state.txMeta.limit,...state.txFilters}));
  const tx=state.resources.txPayload?.data;
- if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{}}}
+ if(tx){state.tx=tx.transactions||[];state.txMeta={page:num(tx.page)||1,limit:num(tx.limit)||50,total:num(tx.total),total_pages:num(tx.total_pages)||1,summary:tx.summary||{},summary_by_currency:tx.summary_by_currency||[],filters:tx.filters||{}}}
  else state.tx=[];
  if(state.view==='transactions')render();
 }
@@ -2488,7 +2503,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-receipt-restore]').forEach(b=>b.onclick=async()=>{if(!confirm('Restore this protected receipt to the transaction?'))return;try{const x=await api(API+'/bank-transactions/'+b.dataset.receiptId+'/receipts/'+encodeURIComponent(b.dataset.receiptRestore)+'/restore',{method:'POST',body:'{}'});notice(x.message);await loadReceiptCenter()}catch(error){notice(error.message,true)}});
  if($('receiptFilterForm'))$('receiptFilterForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);state.receiptFilters={q:String(fd.get('q')||'').trim(),account_id:String(fd.get('account_id')||''),merchant:String(fd.get('merchant')||'').trim(),category:String(fd.get('category')||'').trim(),from:String(fd.get('from')||''),to:String(fd.get('to')||''),amount_min:String(fd.get('amount_min')||'').trim(),receipt_status:String(fd.get('receipt_status')||'ALL'),tax_relevant:fd.get('tax_relevant')==='on'};await loadReceiptCenter()};
  if($('financePreferencesForm'))$('financePreferencesForm').onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget);const body=Object.fromEntries(fd.entries());body.dashboard_cards=fd.getAll('dashboard_cards');body.default_account_id=body.default_account_id?Number(body.default_account_id):null;body.reporting_currency=String(body.reporting_currency||'').toUpperCase()||null;try{const x=await api(API+'/preferences',{method:'PUT',body:JSON.stringify(body)});state.userPreferences=x.preferences;notice(x.message);render()}catch(error){notice(error.message,true)}};
- if($('txApply'))$('txApply').onclick=()=>{state.txFilters={...state.txFilters,q:$('txSearch').value.trim(),type:$('txType').value,category:$('txCategory').value.trim(),merchant:$('txMerchant').value.trim(),source:$('txSource').value,reconciliation_status:$('txRecon').value,amount_min:$('txMin').value.trim(),amount_max:$('txMax').value.trim()};state.txMeta.page=1;loadTransactions()};
+ if($('txApply'))$('txApply').onclick=()=>{state.txFilters={...state.txFilters,q:$('txSearch').value.trim(),type:$('txType').value,category:$('txCategory').value.trim(),merchant:$('txMerchant').value.trim(),currency:$('txCurrency').value.trim().toUpperCase(),source:$('txSource').value,reconciliation_status:$('txRecon').value,amount_min:$('txMin').value.trim(),amount_max:$('txMax').value.trim()};state.txMeta.page=1;loadTransactions()};
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
  document.querySelectorAll('[data-show-all-history]').forEach(b=>b.onclick=()=>{state.period='all';state.txMeta.page=1;if($('fmPeriod'))$('fmPeriod').value='all';refresh()});
