@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Client Portal</title>
+  <link rel="stylesheet" href="/style.css?v=20260926-role-portals" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260926-role-portals" />
+  <link rel="stylesheet" href="/role-portal.css?v=20260926-role-portals" />
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
+  <meta name="robots" content="noindex,nofollow,noarchive" />
+  <style>
+    .client-shell{max-width:1240px;margin:0 auto;padding:22px}
+    .client-top{display:flex;justify-content:space-between;gap:18px;align-items:center;margin-bottom:18px}
+    .client-brand{display:flex;align-items:center;gap:14px}.client-brand img{width:58px;height:58px;object-fit:contain}
+    .client-brand h1{margin:0;font-size:22px}.client-brand p{margin:3px 0 0;color:#94a3b8}
+    .client-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:18px}.client-card{padding:22px;border:1px solid rgba(148,163,184,.16);border-radius:22px;background:rgba(8,12,20,.88)}
+    .client-hero{padding:28px;border-radius:26px;border:1px solid rgba(56,189,248,.2);background:radial-gradient(circle at 90% 10%,rgba(56,189,248,.18),transparent 35%),linear-gradient(145deg,#0a0f18,#0d1521)}
+    .client-hero .eyebrow{color:#38bdf8}.client-hero h2{font-size:clamp(28px,4vw,44px);margin:8px 0}.client-hero p{max-width:760px;color:#a7b2c3}
+    .client-actions{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}.client-action{padding:16px;border:1px solid rgba(148,163,184,.16);border-radius:16px;background:rgba(15,23,42,.7);text-decoration:none;color:#e5eef8}
+    .client-action strong{display:block;margin-bottom:5px}.client-action span{font-size:13px;color:#94a3b8}
+    .client-form{display:grid;grid-template-columns:1fr 1fr;gap:12px}.client-form textarea{grid-column:1/-1;min-height:120px}
+    .client-form input,.client-form textarea{width:100%}.client-status{min-height:22px;color:#94a3b8}.client-profile-row{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid rgba(148,163,184,.1)}
+    @media(max-width:850px){.client-grid{grid-template-columns:1fr}.client-actions{grid-template-columns:1fr}.client-form{grid-template-columns:1fr}.client-form textarea{grid-column:auto}.client-top{align-items:flex-start}}
+  </style>
+</head>
+<body data-vv-role="viewer">
+  <main class="client-shell">
+    <header class="client-top">
+      <div class="client-brand">
+        <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda Logo" />
+        <div><h1>Voxel Veda Client Portal</h1><p id="clientWelcome">Secure project and RFQ workspace</p></div>
+      </div>
+      <button type="button" class="logout-btn" onclick="clientLogout()">Logout</button>
+    </header>
+
+    <section class="client-hero">
+      <p class="eyebrow">Client Workspace</p>
+      <h2>Projects start with a clean engineering brief.</h2>
+      <p>Submit a new RFQ, prepare the technical information our engineering team needs, or contact the team about an existing enquiry.</p>
+      <div class="client-actions">
+        <a class="client-action" href="#new-rfq"><strong>New RFQ</strong><span>Submit scope, material, quantity and requirements.</span></a>
+        <a class="client-action" href="mailto:info@voxelveda.com"><strong>Contact Team</strong><span>Discuss an existing enquiry or commercial question.</span></a>
+        <a class="client-action" href="/support"><strong>Support</strong><span>Open Voxel Veda support and company contact options.</span></a>
+      </div>
+    </section>
+
+    <div class="client-grid" style="margin-top:18px">
+      <section id="new-rfq" class="client-card">
+        <p class="eyebrow">Engineering Intake</p>
+        <h2>Submit a request for quote</h2>
+        <p class="client-status" id="clientRfqStatus">Provide enough detail for feasibility and pricing review.</p>
+        <div class="client-form">
+          <input id="clientName" placeholder="Customer / company name" />
+          <input id="clientEmail" type="email" placeholder="Email" />
+          <input id="clientPhone" placeholder="Phone" />
+          <input id="clientMaterial" placeholder="Material / process" />
+          <input id="clientQuantity" type="number" min="1" value="1" placeholder="Quantity" />
+          <input id="clientDeadline" placeholder="Target date / urgency" />
+          <textarea id="clientApplication" placeholder="Part description, use case, tolerances, finish, file types, NDA needs or other requirements"></textarea>
+        </div>
+        <label class="privacy-check" style="margin-top:12px"><input id="clientPrivacy" type="checkbox" /> <span>I accept the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+        <button type="button" class="primary-btn" style="margin-top:12px" onclick="submitClientRfq()">Submit RFQ</button>
+      </section>
+
+      <aside class="client-card">
+        <p class="eyebrow">Account</p>
+        <h2>Your client profile</h2>
+        <div class="client-profile-row"><span>Name</span><strong id="clientProfileName">Loading...</strong></div>
+        <div class="client-profile-row"><span>Email</span><strong id="clientProfileEmail">-</strong></div>
+        <div class="client-profile-row"><span>Portal</span><strong>Client</strong></div>
+        <div class="client-profile-row"><span>Access</span><strong>Client-safe functions only</strong></div>
+        <div style="margin-top:18px">
+          <p class="eyebrow">RFQ checklist</p>
+          <ul>
+            <li>STEP/STP or STL/3MF files when available</li>
+            <li>Critical dimensions and tolerance requirements</li>
+            <li>Material or performance requirements</li>
+            <li>Quantity and target delivery window</li>
+            <li>NDA/confidentiality requirement if applicable</li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </main>
+  <script src="/client-portal.js?v=20260926-role-portals"></script>
+</body>
+</html>
