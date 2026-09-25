@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voxel Veda Visitor Portal</title>
+  <link rel="stylesheet" href="/style.css?v=20260926-role-portals" />
+  <link rel="stylesheet" href="/advanced-theme.css?v=20260926-role-portals" />
+  <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
+  <style>
+    .visitor-shell{max-width:1180px;margin:0 auto;padding:28px}.visitor-hero{padding:34px;border:1px solid rgba(148,163,184,.16);border-radius:28px;background:radial-gradient(circle at 80% 0,rgba(45,212,191,.16),transparent 40%),linear-gradient(145deg,#080d14,#101722)}
+    .visitor-logo{width:72px;height:72px;object-fit:contain}.visitor-hero h1{font-size:clamp(34px,6vw,64px);max-width:850px;margin:14px 0}.visitor-hero p{max-width:760px;color:#a7b2c3;font-size:16px}
+    .visitor-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}.visitor-card{padding:22px;border:1px solid rgba(148,163,184,.15);border-radius:20px;background:rgba(9,14,22,.88);text-decoration:none;color:#e5eef8}.visitor-card span{color:#2dd4bf;font-size:12px;text-transform:uppercase;letter-spacing:.1em}.visitor-card h2{margin:8px 0}.visitor-card p{color:#94a3b8;line-height:1.5}
+    @media(max-width:800px){.visitor-grid{grid-template-columns:1fr}.visitor-shell{padding:18px}.visitor-hero{padding:24px}}
+  </style>
+</head>
+<body>
+  <main class="visitor-shell">
+    <section class="visitor-hero">
+      <img class="visitor-logo" src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda Logo" />
+      <p class="eyebrow">Visitor Portal</p>
+      <h1>Choose the right entry point before you continue.</h1>
+      <p>Visitors, clients, applicants and authorised team members use different workflows. This portal keeps public access separate from internal operational systems.</p>
+    </section>
+    <section class="visitor-grid">
+      <a class="visitor-card" href="/request-quote"><span>Client / Enquiry</span><h2>Request a Quote</h2><p>Submit a manufacturing or engineering RFQ with project details.</p></a>
+      <a class="visitor-card" href="/careers"><span>Applicant</span><h2>Careers</h2><p>View current opportunities and recruitment information.</p></a>
+      <a class="visitor-card" href="/support"><span>Visitor</span><h2>Company Support</h2><p>Find contact and support information for Voxel Veda.</p></a>
+      <a class="visitor-card" href="/employee/verify/demo" onclick="event.preventDefault();document.getElementById('verifyHelp').scrollIntoView({behavior:'smooth'})"><span>Verification</span><h2>Employee Verification</h2><p>Use the verification link or QR supplied on an authorised employee ID.</p></a>
+      <a class="visitor-card" href="/privacy"><span>Privacy</span><h2>Privacy & Data</h2><p>Read how information submitted through public forms is handled.</p></a>
+      <a class="visitor-card" href="/login"><span>Authorised Access</span><h2>Staff Login</h2><p>Secure sign-in for staff, HR, production, supervisors, managers and administrators.</p></a>
+    </section>
+    <section id="verifyHelp" class="card" style="margin-top:18px"><h2>Employee verification</h2><p>For security, verification uses the unique QR/link on the employee ID card. Do not enter or guess an employee token manually.</p></section>
+  </main>
+</body>
+</html>
