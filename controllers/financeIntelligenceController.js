@@ -683,7 +683,7 @@ exports.bulkReviewTransactions = async (req, res) => {
       const fields = [];
       const params = [];
       if (hasOwn(changes, 'category')) {
-        fields.push("category=?", "classification_status=?");
+        fields.push("category=?", "classification_status=?", "manual_override=1", "review_source_status='MANUAL_BULK_CATEGORY'");
         params.push(changes.category, changes.category ? 'CLASSIFIED' : 'UNCLASSIFIED');
       }
       if (hasOwn(changes, 'ownership_scope')) { fields.push('ownership_scope=?'); params.push(changes.ownership_scope); }
