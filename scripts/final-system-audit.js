@@ -149,7 +149,9 @@ const statementContracts = [
   [statementController, "session.status === 'IMPORTED'", 'statement commit must be idempotent'],
   [statementController, 'isBalanceMarker', 'balance markers must be identified'],
   [statementController, "validation_status IN ('VALID','WARNING')", 'commit must only import valid/warning rows'],
-  [financeUi, "['DUPLICATE','REJECTED'].includes(row.validation_status)", 'duplicate/rejected rows must be disabled in the canonical review UI'],
+  [financeUi, "row.validation_status==='DUPLICATE'", 'duplicate rows must be locked in the canonical review UI'],
+  [financeUi, 'data-review-override', 'rejected rows must require an explicit manual correction workflow'],
+  [financeUi, 'balanceLocked', 'opening and closing balance markers must remain locked'],
   [financeUi, 'data-review-commit', 'statement review commit action must exist in the canonical Finance OS'],
   [financeUi, 'openStatementReview', 'statement review errors must remain inside the canonical Finance OS']
 ];

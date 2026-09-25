@@ -24,7 +24,7 @@ assert(importController.includes("String(maxDate) >= String(account.history_end_
 
 assert(ui.includes('function openHistoricalImport('),'canonical Finance OS includes historical statement import');
 assert(ui.includes('multiple required'),'historical import supports multiple files for one selected account');
-assert(ui.includes('uploadStatementFile(selectedId,file)'),'historical statements upload original bytes to the server');
+assert(ui.includes('uploadStatementFile(account.id,file,mapping)'),'historical statements upload original bytes and optional mappings to the server');
 assert(ui.includes('accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx"'),'historical import supports the required statement formats');
 assert(ui.includes('Nothing is committed automatically.'),'historical imports remain review-before-commit');
 assert(app.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'there is no separate Banking UI');

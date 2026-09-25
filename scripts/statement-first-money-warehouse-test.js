@@ -28,7 +28,7 @@ assert(js.includes('Statement Import Wizard'),'master Finance OS contains the st
 assert(js.includes('Statement Vault'),'master Finance OS contains statement history');
 assert(js.includes('openStatementWizard'),'statement upload opens a real in-context wizard');
 assert(js.includes("accept=\".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx\""),'wizard advertises only supported formats');
-assert(js.includes('uploadStatementFile(accountId,file)'),'wizard uploads the selected original statement');
+assert(js.includes('async function uploadStatementFile(accountId,file,mapping=null)'),'wizard uploads the selected original statement with optional mapping metadata');
 assert(js.includes('/statement-imports`'),'wizard uses the durable secure ingestion endpoint');
 assert(js.includes('openStatementReview'),'wizard opens protected row review before commit');
 assert(js.includes('/statement-reviews/'),'row selection and commit use the protected review API');
