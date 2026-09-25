@@ -426,3 +426,20 @@ body[data-finance-view="advanced"] .fm-filterbar label:focus-within{
  .fm-statement-description{max-width:310px}
  .fm-review-actions{display:grid;grid-template-columns:.8fr 1.2fr}
 }
+
+
+/* Statement Vault committed editor — mobile-safe amount/actions */
+.fm-vault-editor-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:start;gap:14px;cursor:default}
+.fm-vault-editor-main{min-width:0}
+.fm-vault-editor-main h3,.fm-vault-editor-main p{overflow-wrap:anywhere;word-break:break-word}
+.fm-vault-editor-side{min-width:max-content;text-align:right}
+.fm-vault-editor-amount{display:block;white-space:nowrap;font-variant-numeric:tabular-nums}
+.fm-vault-editor-actions{flex-wrap:wrap;max-width:210px}
+.fm-drawer-body{overflow-x:hidden}
+@media(max-width:700px){
+ .fm-vault-editor-row{grid-template-columns:1fr;gap:9px;padding:14px 0}
+ .fm-vault-editor-side{width:100%;min-width:0;display:grid;grid-template-columns:1fr;gap:8px;text-align:left}
+ .fm-vault-editor-amount{font-size:.9rem!important;line-height:1.2;white-space:normal;overflow-wrap:anywhere}
+ .fm-vault-editor-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;max-width:none;margin-top:0}
+ .fm-vault-editor-actions button{width:100%;min-width:0;min-height:42px;white-space:normal}
+}
