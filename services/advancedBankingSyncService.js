@@ -163,12 +163,24 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
     if (!txDate) continue;
     const bankCategory = suggestConnectedBankCategory(tx, direction);
     let existing = null;
-    if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
+    if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type,category,classification_status,manual_override FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
     if (!existing) existing = await findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credit, fingerprint);
     if (existing) {
       if (externalId) await db.query(`UPDATE bank_transactions SET source_provider=?,provider_transaction_id=?,provider_account_id=?,provider_status=?,provider_raw_hash=?,canonical_fingerprint=?,last_seen_at=NOW(),provider_updated_at=? WHERE id=?`, [provider, externalId, remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.lastUpdated || tx?.updatedAt), existing.id]);
+      let categoryUpdated=false;
+      if (bankCategory.category && existing.source_type === 'OPEN_BANKING' && !Number(existing.manual_override || 0)
+        && (!String(existing.category || '').trim() || String(existing.classification_status || '').toUpperCase() === 'UNCLASSIFIED')) {
+        const [categoryUpdate] = await db.query(
+          `UPDATE bank_transactions
+              SET category=?,classification_status='CLASSIFIED'
+            WHERE id=? AND source_type='OPEN_BANKING' AND manual_override=0
+              AND (category IS NULL OR category='' OR classification_status='UNCLASSIFIED')`,
+          [bankCategory.category, existing.id]
+        );
+        categoryUpdated=Number(categoryUpdate.affectedRows||0)>0;
+      }
       if (existing.source_type && existing.source_type !== 'OPEN_BANKING') linkedExisting += 1;
-      if (existing.provider_raw_hash && existing.provider_raw_hash !== rawHash) updated += 1; else duplicates += 1;
+      if (categoryUpdated || (existing.provider_raw_hash && existing.provider_raw_hash !== rawHash)) updated += 1; else duplicates += 1;
       continue;
     }
     const [result] = await db.query(
