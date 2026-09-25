@@ -262,6 +262,12 @@ function filterQuery(extra={}){
  Object.entries(extra).forEach(([k,v])=>{if(v!==undefined&&v!==null&&v!=='')p.set(k,v)});
  return '?'+p.toString();
 }
+function accountChartsQuery(){
+ const range=dateRange(),p=new URLSearchParams({scope:state.scope});
+ if(range.from)p.set('from',range.from);if(range.to)p.set('to',range.to);
+ p.set('include_transactions','0');
+ return '?'+p.toString();
+}
 window.__financeFilterQuery=(extra={})=>filterQuery(extra);
 window.__financeOpenCategory=async({category='',accountId='',currency=''}={})=>{
  state.account=accountId?String(accountId):'';
@@ -390,7 +396,7 @@ async function loadBase(){
 async function hydrateSupplementary(cycle){
  const base=filterQuery();
  const resources=[
-  ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],['accountCategorySpending',I+'/reports/spending'+base+'&include_transactions=0'],
+  ['personal',API+'/personal-money'],['personalAttention',API+'/personal-money/attention'],['companySummary',API+'/company-summary'],['insights',I+'/insights'+filterQuery()],['quality',I+'/data-quality'+base],['accountCategorySpending',I+'/reports/spending'+accountChartsQuery()],
   ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing?date='+encodeURIComponent(localIsoDay())],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
   ['readiness',I+'/banking-readiness'],['controlActions',API+'/issues'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
   ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
