@@ -489,3 +489,8 @@ body[data-finance-view="advanced"] .fm-filterbar label:focus-within{
  .fm-account-category-chart.compact .fm-account-category-column{flex-basis:68px;grid-template-rows:auto 76px auto auto}
  .fm-account-category-chart.compact .fm-account-category-barbox{height:76px}
 }
+
+
+/* Smart category move */
+.fm-or-divider{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.56rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em}
+.fm-or-divider:before,.fm-or-divider:after{content:"";height:1px;background:var(--line);flex:1}
