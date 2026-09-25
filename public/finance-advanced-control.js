@@ -2,7 +2,7 @@
 'use strict';
 
 const MOUNT_ID='financeAdvancedControlMount';
-const VERSION='20260925-advanced-control-v16';
+const VERSION='20260925-advanced-control-v17';
 const state={loading:false,data:{},errors:{},statuses:{},progress:{resolved:0,total:0},categoryChartAccount:'ALL',filterSignature:'',dataRevision:0,lastLoadedAt:0,scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
