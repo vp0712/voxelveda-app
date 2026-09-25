@@ -1,12 +1,13 @@
 # Finance ingestion repair progress
 
-Last updated: 2026-09-25 (Australia/Sydney)
+Last updated: 2026-09-26 (Australia/Sydney)
 
-## Current Git commit
+## Current Git release
 
 - Original baseline commit: `2a636bb856318aa9202da31ba47abce372a1f815` (`Release Finance Control v14 to Railway`).
-- Current release branch: `codex/finance-ingestion-v26`.
-- Current production baseline merged into the release branch: `d7b8c694bf85598137baf0f21380f4120387fb3a` (`Release Finance statement date integrity v25 r2`).
+- Production release commit: `5fa7461ad50a24860591e7477522e9123a99a0e4` (`Release Finance v26 migration retry hotfix`).
+- Primary release PR: #254; production migration recovery PRs: #255, #256, #257 and #258.
+- Finance v25 baseline incorporated before the v26 release: `d7b8c694bf85598137baf0f21380f4120387fb3a` (`Release Finance statement date integrity v25 r2`).
 - Ingestion implementation commit: `e07fd9b`; v25 integration commit: `9d96bab`.
 
 ## Existing architecture
@@ -73,12 +74,12 @@ Last updated: 2026-09-25 (Australia/Sydney)
 
 ## Production configuration gaps
 
-- The Finance ingestion worker, readiness signal, MySQL queue, stale recovery, bounded retry and dead-letter telemetry are implemented locally. The release still needs explicit worker variables applied and live worker readiness verified after deploy.
+- The Finance ingestion worker, readiness signal, MySQL queue, stale recovery, bounded retry and dead-letter telemetry are deployed. `FINANCE_INGESTION_WORKER_ENABLED`, `FINANCE_INGESTION_WORKER_REQUIRED` and `FINANCE_STATEMENT_DURABLE_STORAGE_REQUIRED` are explicitly enabled in Railway production.
 - Pinned PDF, OCR, English OCR data, image and canvas dependencies are installed and exercised by real-file tests.
 - Finance uploads use restricted `secure_documents` records and private object storage. Railway currently exposes object-storage provider, bucket, endpoint/region and credential variables, including `OBJECT_STORAGE_DOCUMENTS_ENABLED`.
 - Railway currently exposes required ClamAV provider/host/port/fail-closed variables, and the separate malware-scanner service is healthy. Values remain secret and were not copied into this record.
 - Redis is used only as an optional distributed rate limiter. The application already has a durable MySQL lease/job framework, so ingestion will reuse that authority rather than create a second queue without need.
-- Existing operational gaps remain: live backup telemetry is not externally verified, and database readiness reports encryption without verified certificate trust. The v26 migration is additive, uses restart-safe `IF NOT EXISTS`/conditional-index DDL, and does not delete or rewrite existing finance data.
+- Existing operational gaps remain: live backup telemetry is not externally verified, and database readiness reports encryption capability without active verified certificate trust. The v26 migration is additive, uses `information_schema`-guarded dynamic column/index DDL for MySQL-compatible restart safety, and does not delete or rewrite existing finance data.
 
 ## Baseline test and startup results
 
@@ -107,12 +108,15 @@ Last updated: 2026-09-25 (Australia/Sydney)
 - [x] Wire database-backed progress, filtering, correction and retry UI.
 - [x] Add actual-byte format, OCR, encrypted/corrupt/oversize, validation and duplicate tests.
 - [x] Run local lint, full application test suite, 50-check Finance release build and dependency audit.
-- [ ] Verify Railway variables, backup state and migration plan; deploy and verify production.
+- [x] Verify Railway variables and migration plan; deploy and verify production readiness.
+- [ ] Complete one authenticated production statement upload/review/post smoke test with an owner-provided MFA session.
 
 ## Deployment status
 
-- Current production remains Finance statement date integrity v25 r2 at deployment SHA `d7b8c694bf85598137baf0f21380f4120387fb3a`.
-- This ingestion repair has not yet been deployed.
+- Finance statement ingestion v26 is live in Railway production at deployment `dee1cf41-3eee-4bb3-b213-1506685c7977` from main SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
+- The first rollout correctly failed closed on MySQL-incompatible `ADD COLUMN IF NOT EXISTS`. The hotfix replaced it with guarded dynamic DDL and added a compatibility regression.
+- The next rollout exposed a failed-migration checksum retry deadlock. The runner now permits corrected checksum replacement only for incomplete `FAILED`/`RUNNING` entries; `APPLIED`/`BASELINED` migrations remain immutable.
+- The corrected migration applied in 6745 ms and the ledger reports schema `20260925_finance_ingestion_pipeline` with 77 migrations verified.
 
 ## Current local verification
 
@@ -125,15 +129,17 @@ Last updated: 2026-09-25 (Australia/Sydney)
 
 ## Production verification evidence
 
-- Baseline `/api/health`: `ok`.
-- Baseline `/api/ready`: `ready: true`, all critical services operational, schema `20260924_personal_tax_evidence_control`, deployment `d7b8c694bf85598137baf0f21380f4120387fb3a`.
-- Railway malware-scanner and Redis services report successful deployments; application object-storage and malware configuration names are present.
-- Authenticated upload verification is pending the repaired ingestion path and an authorised MFA session.
+- `/api/health`: HTTP 200 after the backend became ready.
+- `/api/ready`: HTTP 200, `ready: true`, schema `20260925_finance_ingestion_pipeline`, deployment SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
+- `finance_ingestion_worker`, background workers, migrations, Finance schema, database and all other critical services report `OPERATIONAL`.
+- Runtime evidence verifies Redis rate limiting, ClamAV malware scanning, Railway S3 private object storage and the least-privileged `voxelveda_app` database identity.
+- The deployed Finance client contains multipart durable upload, job polling, password/mapping recovery, protected review and original-statement evidence paths. Both ingestion paths reject unauthenticated calls with HTTP 401.
+- Authenticated upload/review/post verification remains pending an authorised MFA code; the production test account correctly requires MFA and no code was fabricated or bypassed.
 
 ## Remaining blockers and assumptions
 
-- No destructive migration is currently planned. All schema work must be additive and backward-compatible.
+- No destructive migration was used. All v26 schema work is additive and backward-compatible.
 - A production database backup is not yet externally verified. This blocks destructive/high-risk migrations, not safe local implementation or additive migration preparation.
-- Final authenticated live testing requires the owner MFA session.
+- Final authenticated upload/review/post testing requires the owner MFA session.
 - HEIC and legacy XLS will be shown as unsupported unless the selected production parser stack proves them with real files and bounded resource controls.
 - Any third-party paid OCR provider would require owner selection. The implementation will first use a local, deterministic OCR engine so work can continue without transmitting financial documents to a third party.
