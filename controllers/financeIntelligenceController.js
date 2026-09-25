@@ -112,7 +112,6 @@ exports.getOverview = async (req, res) => {
       },
       summary_by_currency: summaryByCurrency,
       accounts: accountRows,
-      account_categories: accountCategories,
       spending_by_category: categoryRows,
       monthly_cash_flow: monthRows,
       split_policy: 'Split child category amounts replace the parent category amount and are never double counted.'
@@ -872,6 +871,7 @@ exports.getSpendingReport = async (req, res) => {
       categories: categoriesWithPercent,
       merchants: merchantRows,
       accounts: accountRows,
+      account_categories: accountCategories,
       monthly: monthlyRows,
       weekdays: weekdayRows,
       transactions: transactionRows,
