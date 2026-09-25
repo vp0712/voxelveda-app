@@ -16,6 +16,9 @@ const ALLOWED_UPLOADS = new Map([
   ['.docx', ['application/vnd.openxmlformats-officedocument.wordprocessingml.document']],
   ['.xls', ['application/vnd.ms-excel']],
   ['.xlsx', ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']]
+  ,['.ofx', ['application/x-ofx', 'application/vnd.intu.qfx', 'text/plain', 'application/octet-stream']]
+  ,['.qfx', ['application/x-qfx', 'application/vnd.intu.qfx', 'text/plain', 'application/octet-stream']]
+  ,['.qif', ['application/x-qif', 'text/qif', 'text/plain', 'application/octet-stream']]
 ]);
 
 function sanitizeUploadName(filename) {
@@ -61,6 +64,8 @@ function matchesSignature(ext, bytes) {
   if (['.docx', '.xlsx'].includes(ext)) return hex.startsWith('504b0304');
   if (['.doc', '.xls'].includes(ext)) return hex.startsWith('d0cf11e0a1b11ae1');
   if (['.csv', '.txt'].includes(ext)) return !bytes.includes(0);
+  if (['.ofx', '.qfx'].includes(ext)) return !bytes.includes(0) && /<(?:OFX|STMTTRN|CCSTMTTRN)>/i.test(bytes.toString('utf8'));
+  if (ext === '.qif') return !bytes.includes(0) && /^!Type:(?:Bank|CCard|Cash|Oth)/i.test(bytes.toString('utf8'));
   return false;
 }
 
@@ -72,7 +77,10 @@ async function validateUploadedFile(req, res, next) {
   if (!req.file?.path) return next();
   try {
     const handle = await fs.promises.open(req.file.path, 'r');
-    const bytes = Buffer.alloc(32);
+    // Text statement signatures (particularly OFX/QFX) may follow a header block,
+    // so inspect enough of the file to identify the actual payload rather than
+    // trusting the extension or MIME type.
+    const bytes = Buffer.alloc(4096);
     const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
     await handle.close();
     const ext = path.extname(req.file.originalname || '').toLowerCase();
@@ -112,5 +120,6 @@ module.exports = {
   sanitizeUploadName,
   secureFileFilter,
   secureMulterOptions,
-  validateUploadedFile
+  validateUploadedFile,
+  matchesSignature
 };

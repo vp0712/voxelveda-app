@@ -33,7 +33,8 @@ assert(routes.includes("requireStepUp('CHANGE_BANKING_USER_ACCESS')"),'team acce
 for(const marker of ['BANKING OPERATIONS','Money Spaces','Beneficiaries','Payment workflow','Team Access','data-team-access','data-payment-decision'])assert(ui.includes(marker),'unified Finance OS contains '+marker);
 assert(ui.includes('External bank payment execution is not enabled'),'Finance OS exposes real provider capability state');
 assert(ui.includes('Draft → submit → independent approval → ready-for-execution'),'UI exposes workflow-only payment lifecycle');
-assert(ui.includes('Personal accounts are intentionally excluded'),'delegated access must not expose Personal Money');
+assert(ui.includes('Personal accounts cannot be delegated'),'delegated access must not expose Personal Money');
+assert(ui.includes("['BUSINESS','MIXED'].includes"),'delegated banking access must be limited to non-personal accounts in the UI');
 assert(app.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'there is no separate Banking frontend');
 
 if(process.exitCode)process.exit(process.exitCode);

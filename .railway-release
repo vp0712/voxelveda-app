@@ -1,5 +1,5 @@
-finance-release: 20260925-statement-date-integrity-v25-r2
-source-commit: c6e9fd44509f18d58cab6516b3454a153c874a9b
+finance-release: 20260925-secure-statement-ingestion-v26
+source-commit: 7c16cca17c9cb93b3eef97a2f9224da7867b8e76
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build

@@ -22,6 +22,11 @@ const { healthProbe: objectStorageHealthProbe } = require('./services/objectStor
 const { selfTestWebhookVerifier } = require('./services/webhookSecurityService');
 const { verifyBackupRestoreProvider } = require('./config/backupRestoreAssurance');
 const { backgroundJobService } = require('./services/backgroundJobService');
+const {
+  startFinanceStatementIngestionWorker,
+  stopFinanceStatementIngestionWorker
+} = require('./services/financeStatementIngestionWorker');
+const { objectStorageDocumentsEnabled } = require('./services/documentSecurityService');
 const { ensureFinanceSchema } = require('./services/financeSchema');
 const { repairKnownLegacyPdfDateRunaway } = require('./services/financeDateIntegrityRepair');
 const { ensureSecuritySchema } = require('./services/securitySchema');
@@ -229,13 +234,30 @@ async function initializeServices() {
 
 async function initializeWorkers() {
   setCriticalService('background_workers', CONTROL_STATES.INITIALIZING);
+  setCriticalService('finance_ingestion_worker', CONTROL_STATES.INITIALIZING);
   const framework = await backgroundJobService.initialize();
+  const financeWorkerStarted = startFinanceStatementIngestionWorker();
   const started = [
     startWeeklyTimesheetScheduler(),
     startTrashPurgeScheduler(),
     startWorkflowSlaScheduler(),
-    startEmailQueueWorker()
+    startEmailQueueWorker(),
+    financeWorkerStarted
   ].filter(Boolean).length;
+  const financeWorkerRequired = process.env.NODE_ENV === 'production'
+    && String(process.env.FINANCE_INGESTION_WORKER_REQUIRED || 'true').toLowerCase() !== 'false';
+  const durableStorageRequired = process.env.NODE_ENV === 'production'
+    && String(process.env.FINANCE_STATEMENT_DURABLE_STORAGE_REQUIRED || 'true').toLowerCase() !== 'false';
+  if (!financeWorkerStarted && financeWorkerRequired) {
+    setCriticalService('finance_ingestion_worker', CONTROL_STATES.FAILED, 'Finance statement worker is required but disabled');
+    throw Object.assign(new Error('Finance statement worker is required but disabled.'), { code: 'FINANCE_INGESTION_WORKER_REQUIRED' });
+  }
+  if (durableStorageRequired && !objectStorageDocumentsEnabled()) {
+    setCriticalService('finance_ingestion_worker', CONTROL_STATES.FAILED, 'Private durable statement storage is required but unavailable');
+    throw Object.assign(new Error('Private durable statement storage is required but unavailable.'), { code: 'FINANCE_DURABLE_STORAGE_REQUIRED' });
+  }
+  setCriticalService('finance_ingestion_worker', financeWorkerStarted ? CONTROL_STATES.OPERATIONAL : CONTROL_STATES.NOT_CONFIGURED,
+    financeWorkerStarted ? 'Durable statement queue worker registered with heartbeat, bounded retries and stale-job recovery' : 'Finance statement ingestion worker disabled');
   setCriticalService('background_workers', CONTROL_STATES.OPERATIONAL,
     `${framework.registered_jobs} jobs registered with durable MySQL leases; ${started} schedulers enabled`);
   console.log(`Background worker framework ready: ${framework.registered_jobs} jobs registered, ${started} schedulers enabled with durable MySQL leases.`);
@@ -316,6 +338,7 @@ async function bootstrap() {
     stopWeeklyTimesheetScheduler();
     stopTrashPurgeScheduler();
     stopWorkflowSlaScheduler();
+    await stopFinanceStatementIngestionWorker().catch(() => {});
     await getRateLimitService().close().catch(() => {});
     await pool.end().catch(() => {});
     const migrationContext = error?.details?.migration_id
@@ -334,6 +357,7 @@ async function shutdown(signal = 'shutdown', exitCode = 0) {
   stopWeeklyTimesheetScheduler();
   stopTrashPurgeScheduler();
   stopWorkflowSlaScheduler();
+  await stopFinanceStatementIngestionWorker().catch(() => {});
   await getRateLimitService().close().catch(() => {});
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
   await pool.end().catch(() => {});
