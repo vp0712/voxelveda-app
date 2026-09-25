@@ -747,7 +747,6 @@ exports.getStatementReport = async (req, res) => {
       merchants: merchantRows,
       monthly: monthlyRows,
       transactions: transactionRows,
-      transactions_included: includeTransactions,
       split_policy: 'Split child categories replace the parent category allocation for reporting; the source bank transaction stays immutable.',
       refund_policy: 'Linked refund cash inflow is separated and reduces net economic expense.',
       legacy_linkage: Number(statement.imported_rows || 0) > 0 && transactionRows.length === 0
@@ -877,6 +876,7 @@ exports.getSpendingReport = async (req, res) => {
       monthly: monthlyRows,
       weekdays: weekdayRows,
       transactions: transactionRows,
+      transactions_included: includeTransactions,
       split_policy: 'Split parents contribute child category amounts instead of parent + child amounts, preventing double counting.',
       refund_policy: 'Linked refunds remain cash inflow but are excluded from ordinary_money_in and reduce net_economic_expense.',
       generated_at: new Date().toISOString()
