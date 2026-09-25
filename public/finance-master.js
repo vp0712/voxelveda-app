@@ -1699,14 +1699,14 @@ function reportView(){
   ['PERSONAL_MONTHLY_SUMMARY','Personal Monthly','Owner-only personal summary'],
   ['COMPANY_MONTHLY_SUMMARY','Company Monthly','Voxel Veda business summary']
  ];
- const presetCards='<div class="fm-report-catalogue">'+presets.map(([type,label,note])=>'<button class="fm-report-preset" data-report-preset="'+type+'"><b>'+label+'</b><small>'+note+'</small><span>›</span></button>').join('')+'</div>';
+ const presetCards='<div class="fm-report-catalogue" data-report-catalogue="1">'+presets.map(([type,label,note])=>'<button type="button" class="fm-report-preset" data-report-preset="'+type+'" aria-label="Generate '+esc(label)+' report"><b>'+label+'</b><small>'+note+'</small><span>›</span></button>').join('')+'</div><div id="reportPresetStatus" class="fm-report-preset-status" hidden role="status"></div>';
 
  const currencies=[...new Set(state.accounts.map(a=>String(a.currency||'AUD').toUpperCase()))].sort();
  const accountOptions=state.accounts.map(a=>'<option value="'+a.id+'" '+(String(a.id)===String(state.account)?'selected':'')+'>'+esc(a.nickname||'Account')+' · '+esc(a.currency||'AUD')+' · '+esc(a.ownership_scope||'')+'</option>').join('');
  const savedRows=saved.map(r=>'<div class="fm-row"><div><h3>'+esc(r.name)+'</h3><p>'+esc(r.report_type)+' · updated '+date(r.updated_at)+'</p></div><div class="fm-row-right"><button data-report-run="'+esc(r.report_uid)+'">Run</button><button data-report-delete="'+esc(r.report_uid)+'">Delete</button></div></div>').join('');
  const summaryRows=(result?.summary_by_currency||[]).map(x=>'<div class="fm-kpi"><span>'+esc(x.currency)+' · Money in</span><strong>'+nativeMoney(x.money_in,x.currency)+'</strong><small>Ordinary '+nativeMoney(x.ordinary_money_in,x.currency)+' · refunds '+nativeMoney(x.linked_refund_inflow,x.currency)+'</small></div><div class="fm-kpi"><span>'+esc(x.currency)+' · Money out</span><strong>'+nativeMoney(x.money_out,x.currency)+'</strong><small>Net cash flow '+nativeMoney(x.net_cash_flow,x.currency)+'</small></div>').join('');
  const txRows=(result?.transactions||[]).slice(0,100).map(t=>'<tr><td>'+date(t.transaction_date)+'</td><td>'+esc(t.account_name||'')+'</td><td>'+esc(t.merchant_name||t.description||'')+'</td><td>'+esc(t.category||'Uncategorised')+'</td><td>'+esc(t.currency||'')+'</td><td>'+(num(t.debit)?nativeMoney(t.debit,t.currency):'')+'</td><td>'+(num(t.credit)?nativeMoney(t.credit,t.currency):'')+'</td><td>'+esc(t.reconciliation_status||'')+'</td><td>'+(Number(t.has_receipt)?'Attached':'Missing')+'</td></tr>').join('');
- const results=result?'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Generated Report</h2><p>'+num(result.metadata?.source_transaction_count)+' source transaction(s) · '+esc(result.metadata?.currency_treatment||'Native currencies')+'</p></div></div><div class="fm-grid four">'+(summaryRows||'<div class="fm-kpi"><span>Result</span><strong>—</strong><small>No financial activity for these filters.</small></div>')+'</div><div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Date</th><th>Account</th><th>Merchant / Description</th><th>Category</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Reconciliation</th><th>Receipt</th></tr></thead><tbody>'+txRows+'</tbody></table></div><p class="fm-helper">Preview shows up to 100 rows. CSV/XLSX exports use the complete permission-scoped result returned by the report endpoint.</p></div></article>':'';
+ const results=result?'<article id="reportResultAnchor" class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Generated Report</h2><p>'+num(result.metadata?.source_transaction_count)+' source transaction(s) · '+esc(result.metadata?.currency_treatment||'Native currencies')+'</p></div></div><div class="fm-grid four">'+(summaryRows||'<div class="fm-kpi"><span>Result</span><strong>—</strong><small>No financial activity for these filters.</small></div>')+'</div><div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Date</th><th>Account</th><th>Merchant / Description</th><th>Category</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Reconciliation</th><th>Receipt</th></tr></thead><tbody>'+txRows+'</tbody></table></div><p class="fm-helper">Preview shows up to 100 rows. CSV/XLSX exports use the complete permission-scoped result returned by the report endpoint.</p></div></article>':'';
  return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Standard Report Catalogue</h2><p>One-click starting points. Every report can still be narrowed by workspace, account, period, category, merchant and evidence status.</p></div></div>'+presetCards+'</div></article><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Advanced Report Centre</h2><p>Uses the same Trusted Totals and permission-scoped bank ledger as the dashboard.</p></div></div><form id="reportBuilderForm" class="fm-form"><div class="fm-form-grid"><label>Workspace<select name="scope"><option value="ALL" '+(state.scope==='ALL'?'selected':'')+'>Consolidated</option><option value="PERSONAL" '+(state.scope==='PERSONAL'?'selected':'')+'>Personal</option><option value="BUSINESS" '+(state.scope==='BUSINESS'?'selected':'')+'>Company</option></select></label><label>Report type<select name="report_type"><option>TRANSACTION_REGISTER</option><option>INCOME</option><option>EXPENSE</option><option>INCOME_VS_EXPENSE</option><option>CASH_FLOW</option><option>ACCOUNT_ACTIVITY</option><option>ACCOUNT_STATEMENT</option><option>CATEGORY</option><option>MERCHANT</option><option>CASH</option><option>TRANSFER</option><option>REFUND</option><option>REIMBURSEMENT</option><option>GST_SUMMARY</option><option>RECONCILIATION</option><option>DATA_QUALITY</option><option>PERSONAL_MONTHLY_SUMMARY</option><option>COMPANY_MONTHLY_SUMMARY</option></select></label></div><label>Accounts<select id="reportAccounts" name="account_ids" multiple size="5">'+accountOptions+'</select><small>Select none for all permitted accounts. Use Ctrl/Cmd to select multiple.</small></label><div class="fm-form-grid"><label>From<input name="from" type="date" value="'+esc(range.from||'')+'"></label><label>To<input name="to" type="date" value="'+esc(range.to||'')+'"></label></div><div class="fm-form-grid"><label>Native currency filter<select name="currency"><option value="">All native currencies</option>'+currencies.map(c=>'<option>'+esc(c)+'</option>').join('')+'</select></label><label>Transaction type<select name="transaction_type"><option value="">All</option><option>INCOME</option><option>EXPENSE</option><option>TRANSFER</option><option>REFUND</option></select></label></div><div class="fm-form-grid"><label>Category<input name="category" placeholder="e.g. Office Supplies"></label><label>Merchant<input name="merchant" placeholder="e.g. Officeworks"></label></div><div class="fm-form-grid"><label>Source<select name="source"><option value="">All</option><option>STATEMENT_IMPORT</option><option>MANUAL</option><option>OPEN_BANKING</option><option>API_IMPORT</option></select></label><label>Reconciliation<select name="reconciliation_status"><option value="">All active</option><option>UNRECONCILED</option><option>RECONCILED</option><option>IGNORED</option></select></label></div><div class="fm-form-grid"><label>Receipt status<select name="receipt_status"><option value="">All</option><option>ATTACHED</option><option>MISSING</option></select></label><label>Search<input name="q" placeholder="Description, reference, account"></label></div><div class="fm-form-actions"><button class="primary" type="submit">Generate</button><button type="button" id="reportPdf">PDF</button><button type="button" id="reportCsv">CSV</button><button type="button" id="reportXlsx">XLSX</button><button type="button" id="reportSave">Save report</button></div></form><p class="fm-helper">Currencies are never converted or relabelled. Selecting a currency filters to that native currency; mixed currencies remain separate.</p></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Saved Reports</h2><p>Definitions are private to the signed-in user and can be rerun against current data.</p></div></div><div class="fm-list">'+(savedRows||emptyState('No saved reports','Build a report and save its filter definition for later.'))+'</div><hr><div class="fm-card-head"><div><h2>Company Accounting Exports</h2><p>Accounting-period outputs remain separate from filtered bank-ledger reports.</p></div></div><div class="fm-quick-grid"><button class="fm-quick" data-export="/api/finance/exports/accountant-review.pdf"><span>PDF</span><b>Accountant Review</b><small>Branded every page</small></button><button class="fm-quick" data-export="/api/finance/exports/trial-balance.csv"><span>CSV</span><b>Trial Balance</b><small>Canonical accounting ledger</small></button></div></div></article></div>'+reportSpecificPreview(result)+results;
 }
 function reportDefinitionFromUi(){
@@ -1728,6 +1728,42 @@ function reportQuery(def){
 async function generateBuiltReport(){
  const def=reportDefinitionFromUi();if(!def)return null;
  const result=await api(API+'/reports/builder?'+reportQuery(def));state.reportResult=result;render();return result;
+}
+async function runReportPreset(type,button){
+ const form=$('reportBuilderForm');if(!form)return;
+ const reportType=String(type||'').toUpperCase();
+ const status=$('reportPresetStatus');
+ if(button){button.disabled=true;button.setAttribute('aria-busy','true')}
+ if(status){status.hidden=false;status.textContent='Generating '+reportType.replaceAll('_',' ').toLowerCase()+' report…'}
+ try{
+  form.elements.report_type.value=reportType;
+  const implied=['INCOME','EXPENSE','TRANSFER','REFUND'].includes(reportType)?reportType:'';
+  form.elements.transaction_type.value=implied;
+  if(reportType==='ACCOUNT_STATEMENT'&&form.elements.account_ids.selectedOptions.length!==1){
+   notice('Account Statement needs exactly one account. Select one account below, then tap Generate.',true);
+   form.scrollIntoView({behavior:'smooth',block:'start'});
+   form.elements.account_ids.focus();
+   return;
+  }
+  await generateBuiltReport();
+  requestAnimationFrame(()=>$('reportResultAnchor')?.scrollIntoView({behavior:'smooth',block:'start'}));
+ }catch(error){
+  notice(error.message,true);
+  const live=$('reportPresetStatus');if(live){live.hidden=false;live.textContent='Report could not be generated: '+error.message}
+ }finally{
+  if(button&&document.body.contains(button)){button.disabled=false;button.removeAttribute('aria-busy')}
+ }
+}
+function ensureReportPresetDelegation(){
+ const host=$('fmContent');if(!host||host.dataset.reportPresetDelegated==='1')return;
+ host.dataset.reportPresetDelegated='1';
+ host.addEventListener('click',event=>{
+  const button=event.target.closest?.('[data-report-preset]');
+  if(!button||!host.contains(button))return;
+  event.preventDefault();
+  event.stopPropagation();
+  runReportPreset(button.dataset.reportPreset,button);
+ });
 }
 async function saveBuiltReport(){
  const def=reportDefinitionFromUi();if(!def)return;
@@ -2372,6 +2408,7 @@ function render(){
  document.body.dataset.financeView=state.view;
  const [t,sub]=title(state.view);$('fmTitle').textContent=t;$('fmSubtitle').textContent=sub;navButtons();
  $('fmContent').innerHTML=state.view==='overview'?overview():state.view==='accounts'?accounts():state.view==='transactions'?transactions():state.view==='statements'?statements():simpleView(state.view);
+ ensureReportPresetDelegation();
  bindDynamic();
 }
 async function go(v){state.view=v;history.replaceState(null,'','#'+v);render()}
@@ -2509,14 +2546,6 @@ function bindDynamic(){
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
  document.querySelectorAll('[data-show-all-history]').forEach(b=>b.onclick=()=>{state.period='all';state.txMeta.page=1;if($('fmPeriod'))$('fmPeriod').value='all';refresh()});
- document.querySelectorAll('[data-report-preset]').forEach(b=>b.onclick=async()=>{
-  const form=$('reportBuilderForm');if(!form)return;
-  form.elements.report_type.value=b.dataset.reportPreset;
-  const implied=['INCOME','EXPENSE','TRANSFER','REFUND'].includes(b.dataset.reportPreset)?b.dataset.reportPreset:'';
-  form.elements.transaction_type.value=implied;
-  if(b.dataset.reportPreset==='ACCOUNT_STATEMENT'&&form.elements.account_ids.selectedOptions.length!==1){notice('Account Statement needs exactly one account. Select one account in Advanced Report Centre, then generate it.',true);form.elements.account_ids.focus();return}
-  try{await generateBuiltReport()}catch(error){notice(error.message,true)}
- });
  if($('reportBuilderForm'))$('reportBuilderForm').onsubmit=async e=>{e.preventDefault();try{await generateBuiltReport()}catch(error){notice(error.message,true)}};
  if($('reportPdf'))$('reportPdf').onclick=()=>{const def=reportDefinitionFromUi();if(def)location.href=API+'/reports/builder.pdf?'+reportQuery(def)};
  if($('reportCsv'))$('reportCsv').onclick=()=>{const def=reportDefinitionFromUi();if(def)location.href=API+'/reports/builder.csv?'+reportQuery(def)};
