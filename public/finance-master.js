@@ -2652,6 +2652,23 @@ function bindDynamic(){
 }
 function openDrawer(title,body,eyebrow='DETAIL'){$('fmDrawerEyebrow').textContent=eyebrow;$('fmDrawerTitle').textContent=title;$('fmDrawerBody').innerHTML=body;$('fmDrawer').classList.add('open');$('fmDrawer').setAttribute('aria-hidden','false');$('fmBackdrop').hidden=false}
 function closeDrawer(){$('fmDrawer').classList.remove('open');$('fmDrawer').setAttribute('aria-hidden','true');$('fmBackdrop').hidden=true}
+async function applyLearnedRuleToHistory(moveResult){
+ const ruleId=moveResult?.category_move?.learned_rule_id;
+ if(!ruleId)return {message:'',applied:0};
+ try{
+  const preview=await api(I+'/rules/'+encodeURIComponent(ruleId)+'/apply-history',{method:'POST',body:JSON.stringify({preview:true})});
+  const count=num(preview.eligible_count);
+  if(!count)return {message:'No other safe historical exact-merchant matches needed changing.',applied:0};
+  const skipped=[];
+  if(num(preview.skipped_manual))skipped.push(num(preview.skipped_manual)+' manual');
+  if(num(preview.skipped_splits))skipped.push(num(preview.skipped_splits)+' split');
+  if(num(preview.skipped_locked_or_unconfigured))skipped.push(num(preview.skipped_locked_or_unconfigured)+' locked/unconfigured');
+  const note=skipped.length?'\n\nProtected/unchanged: '+skipped.join(', ')+'.':'';
+  if(!confirm('Apply this learned category to '+count+' other existing exact merchant transaction'+(count===1?'':'s')+'?\n\nOnly safe non-manual, non-split transactions in open accounting periods will change.'+note))return {message:count+' historical exact-merchant match'+(count===1?' was':'es were')+' left unchanged.',applied:0};
+  const applied=await api(I+'/rules/'+encodeURIComponent(ruleId)+'/apply-history',{method:'POST',body:JSON.stringify({preview:false,expected_count:count})});
+  return {message:applied.message||('Applied '+count+' historical match(es).'),applied:num(applied.applied_count)};
+ }catch(error){return {message:'Current transaction was moved, but historical exact-match propagation did not run: '+error.message,applied:0,error:true}}
+}
 async function openTransactionCategoryMove(id,transaction){
  try{
   let categories=(state.categories?.categories||[]).filter(c=>Number(c.active)&&!c.archived_at);
@@ -2682,7 +2699,7 @@ async function openTransactionCategoryMove(id,transaction){
       category:newName?null:selected,create_category_name:newName||null,create_category_scope:newName?String(fd.get('create_category_scope')||defaultScope):null,
       ownership_scope:transaction.ownership_scope||accountScope||'UNCLASSIFIED',reviewed:true,move_whole_transaction:true,learn_merchant:fd.get('learn_merchant')==='on'
     })});
-    $('fmModal').close();closeDrawer();notice(result.message||'Transaction moved.');financeDataChanged();await refresh();
+    $('fmModal').close();closeDrawer();let historyResult={message:'',applied:0};if(result?.category_move?.learned_exact_merchant)historyResult=await applyLearnedRuleToHistory(result);const finalMessage=[result.message||'Transaction moved.',historyResult.message].filter(Boolean).join(' ');notice(finalMessage,Boolean(historyResult.error));financeDataChanged();await refresh();
    }catch(error){submit.disabled=false;submit.textContent='Move transaction';notice(error.message,true)}
   };
  }catch(error){notice(error.message,true)}
