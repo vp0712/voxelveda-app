@@ -77,6 +77,14 @@ async function main() {
   assert.match(bulkController, /assertClassificationPeriodsOpen/);
   assert.match(rulesController, /application_mode/);
   assert.match(statementController, /applyAutoRulesToImport/);
+  assert.match(bulkController, /resolveTransactionCategory/);
+  assert.match(bulkController, /move_whole_transaction/);
+  assert.match(bulkController, /DELETE FROM bank_transaction_splits WHERE parent_bank_transaction_id/);
+  assert.match(bulkController, /upsertExactAutoCategoryRule/);
+  assert.match(bulkController, /MANUAL_CATEGORY_MOVE/);
+  assert.equal(typeof ruleEngine.findExactAutoCategoryRule, 'function');
+  assert.equal(typeof ruleEngine.upsertExactAutoCategoryRule, 'function');
+
   assert.match(client, /Preview changes/);
   assert.match(client, /Confirm & apply/);
   assert.match(client, /Auto Apply exact matches/);
