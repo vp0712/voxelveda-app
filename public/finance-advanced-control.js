@@ -3,7 +3,7 @@
 
 const MOUNT_ID='financeAdvancedControlMount';
 const VERSION='20260925-advanced-control-v16';
-const state={loading:false,data:{},errors:{},statuses:{},progress:{resolved:0,total:0},categoryChartAccount:'ALL',filterSignature:'',lastLoadedAt:0,scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
+const state={loading:false,data:{},errors:{},statuses:{},progress:{resolved:0,total:0},categoryChartAccount:'ALL',filterSignature:'',dataRevision:0,lastLoadedAt:0,scenario:{currency:'AUD',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},compare:{horizon:365,a:{label:'Plan A',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0},b:{label:'Plan B',monthlyIncomeDelta:0,monthlySpendingDelta:0,oneTimeCost:0,monthlySavingTarget:0}}};
 const SOURCES=[
   ['personal','/api/finance/personal-money'],
   ['attention','/api/finance/personal-money/attention'],
@@ -351,6 +351,7 @@ async function load(){
  const root=document.getElementById(MOUNT_ID);if(!root){state.loading=false;return}
  const cycle=++loadCycle,hasExistingData=Object.keys(state.data).length>0,deadline=Date.now()+ADVANCED_LOAD_BUDGET_MS;
  state.filterSignature=currentFilterSignature();
+ state.dataRevision=Number(window.__financeDataRevision||0);
  state.loading=true;state.errors={};state.statuses=Object.fromEntries(SOURCES.map(([name])=>[name,'pending']));updateProgress();
  if(hasExistingData)render();else root.innerHTML=loadingMarkup();
  for(let i=0;i<SOURCES.length;i+=ADVANCED_BATCH_SIZE){
@@ -694,7 +695,7 @@ function cashCustodyControl(){
 }
 
 function sourceHealth(){
- const rows=SOURCES.map(([n,u])=>{const err=state.errors[n],status=state.statuses[n]||(Object.prototype.hasOwnProperty.call(state.data,n)?'loaded':'pending'),label=err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):(status==='loaded'?'READY':status==='loading'?'LOADING':'PENDING');return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(u)+(err?' · '+esc(err):'')+'</div></div><div class="fac-check-actions">'+statusChip(label)+(status==='error'?'<button type="button" data-fac-retry="'+esc(n)+'">Retry</button>':'')+'</div></div>'}).join('');
+ const rows=SOURCES.map(([n,u])=>{const err=state.errors[n],status=state.statuses[n]||(Object.prototype.hasOwnProperty.call(state.data,n)?'loaded':'pending'),label=err?(err==='Timed out'?'TIMEOUT':'UNAVAILABLE'):(status==='loaded'?'READY':status==='loading'?'LOADING':'PENDING'),resolved=(()=>{try{return sourceUrl(u)}catch{return 'dynamic Finance source'}})();return '<div class="fac-check"><div><b>'+esc(n.replaceAll('_',' '))+'</b><div class="fac-source">'+esc(resolved)+(err?' · '+esc(err):'')+'</div></div><div class="fac-check-actions">'+statusChip(label)+(status==='error'?'<button type="button" data-fac-retry="'+esc(n)+'">Retry</button>':'')+'</div></div>'}).join('');
  return '<section id="facSources" class="fac-section"><header><div><h3>Evidence Source Health</h3><p>Advanced Control degrades per source; one failed optional endpoint never blocks the whole Finance OS.</p></div></header><div class="fac-control-grid">'+rows+'</div></section>';
 }
 
@@ -702,7 +703,7 @@ function render(){
  const root=document.getElementById(MOUNT_ID);if(!root)return;
  updateProgress();
  const progress=state.loading?'<div class="fac-progress" role="status"><span>Refreshing evidence in bounded batches. The current control picture stays available while sources update.</span><b>'+state.progress.resolved+' / '+state.progress.total+'</b></div>':'';
- root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facReadiness">Readiness</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facCashCustody">Cash Custody</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facCounterparty">Counterparties</button><button data-fac-jump="facPlanning">FP&A</button><button data-fac-jump="facProfitability">Job Profitability</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facAnomaly">Explainability</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
+ root.innerHTML='<div class="fac"><section class="fac-hero"><div class="fac-eyebrow">ADVANCED FINANCE CONTROL</div><h2>One operating picture. Real evidence. No duplicate finance system.</h2><p>Executive control across Personal Money, Company Finance, banking, forecasting, risk, evidence and year-end readiness. Every figure stays tied to the canonical Finance APIs.</p><div class="fac-toolbar"><button id="facRefresh" class="primary">Refresh advanced control</button><span class="fac-source">Release '+VERSION+'</span></div><div class="fac-jumps"><button data-fac-jump="facExecutive">Executive</button><button data-fac-jump="facCategories">Categories</button><button data-fac-jump="facReadiness">Readiness</button><button data-fac-jump="facActions">Actions</button><button data-fac-jump="facControlActions">Control Actions</button><button data-fac-jump="facForecast">Forecast</button><button data-fac-jump="facScenario">Scenario Lab</button><button data-fac-jump="facPersonal">Personal Intelligence</button><button data-fac-jump="facRisk">Risk & Integrity</button><button data-fac-jump="facYearEnd">Tax & Year-end</button><button data-fac-jump="facCompany">Company CFO</button><button data-fac-jump="facCashCustody">Cash Custody</button><button data-fac-jump="facTreasury">Treasury</button><button data-fac-jump="facCounterparty">Counterparties</button><button data-fac-jump="facPlanning">FP&A</button><button data-fac-jump="facProfitability">Job Profitability</button><button data-fac-jump="facPerformance">Performance</button><button data-fac-jump="facAnomaly">Explainability</button><button data-fac-jump="facHandover">Handover</button><button data-fac-jump="facAutomation">Automation</button><button data-fac-jump="facDecision">Decision Lab</button></div></section>'+
  progress+
  executive()+categorySpendingControl()+executiveReadinessBoard()+actions()+controlActionsSummary()+forecast()+scenario()+decisionIntelligence()+recurringDebt()+riskIntegrity()+taxEvidence()+companyCfo()+cashCustodyControl()+treasuryControl()+counterpartyWorkingCapitalControl()+fpaPlanningControl()+jobProfitabilityControl()+performanceRiskControl()+anomalyExplainability()+accountantHandoverStatus()+automationApprovalControl()+sourceHealth()+
  '<div class="fac-note"><b>Control boundary:</b> Advanced Control is a decision-support layer over the same Finance OS. It does not create a second ledger, invent FX rates, combine currencies silently, execute bank transfers, auto-reconcile, auto-delete, lodge tax, or make accounting changes without the existing protected workflows.</div></div>';
@@ -726,8 +727,9 @@ function mount(){
  style();
  const root=document.getElementById(MOUNT_ID);if(!root)return;
  const filterChanged=state.filterSignature!==currentFilterSignature();
+ const dataChanged=state.dataRevision!==Number(window.__financeDataRevision||0);
  const stale=Date.now()-num(state.lastLoadedAt)>15000;
- if(!state.loading&&(filterChanged||stale||!Object.keys(state.data).length))load();else render();
+ if(!state.loading&&(filterChanged||dataChanged||stale||!Object.keys(state.data).length))load();else render();
 }
 window.__financeAdvancedControlMount=mount;
 window.addEventListener('finance:advanced-mount',mount);
