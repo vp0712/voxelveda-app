@@ -1,5 +1,5 @@
-finance-release: 20260925-category-spending-v31-r1
-source-commit: f186ff6777c6650e06dc649ed99e26db33743e80
+finance-release: 20260926-report-buttons-v32
+source-commit: 5aee55bab3e3cf504ade0dcd7aa9a6b5cc164d2c
 candidate-ci: pending-railway-build
 final-system-consolidation: pending-railway-build
 security-ci: pending-railway-build
