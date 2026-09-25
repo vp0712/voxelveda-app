@@ -2,6 +2,7 @@ const crypto = require('node:crypto');
 const pool = require('../config/db');
 const { adapter, environment, liveSyncEnabled, selectedProvider } = require('./openBankingProviderService');
 const { logAudit } = require('./auditService');
+const { suggestConnectedBankCategory } = require('./financeBankCategoryService');
 
 function uid(prefix) { return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(5).toString('hex').toUpperCase()}`; }
 function list(payload) { return Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : []; }
@@ -160,6 +161,7 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
     const rawHash = hash(JSON.stringify(tx));
     const txDate = dateOnly(tx?.transactionDate || tx?.postDate || tx?.date);
     if (!txDate) continue;
+    const bankCategory = suggestConnectedBankCategory(tx, direction);
     let existing = null;
     if (externalId) [[existing]] = await db.query('SELECT id,provider_raw_hash,source_type FROM bank_transactions WHERE bank_account_id=? AND source_provider=? AND provider_transaction_id=? LIMIT 1', [localAccountId, provider, externalId]);
     if (!existing) existing = await findCrossSourceMatch(db, localAccountId, txDate, tx, debit, credit, fingerprint);
@@ -172,9 +174,9 @@ async function ingestTransactions(db, connection, transactionsPayload, provider)
     const [result] = await db.query(
       `INSERT IGNORE INTO bank_transactions
        (bank_account_id,import_batch_uid,row_hash,transaction_date,description,reference,debit,credit,running_balance,reconciliation_status,imported_by,source_type,source_provider,provider_transaction_id,merchant_name,posting_date,currency,ownership_scope,category,classification_status,is_internal_transfer,first_seen_at,last_seen_at,provider_account_id,provider_status,provider_raw_hash,canonical_fingerprint,transaction_timestamp,provider_updated_at)
-       SELECT ?,?,?,?,?,?,?,?,?, 'UNRECONCILED',?, 'OPEN_BANKING',?,?,?,?,?,currency,ownership_scope,?, 'UNCLASSIFIED',0,NOW(),NOW(),?,?,?,?,?
+       SELECT ?,?,?,?,?,?,?,?,?, 'UNRECONCILED',?, 'OPEN_BANKING',?,?,?,?,?,currency,ownership_scope,?, ?,0,NOW(),NOW(),?,?,?,?,?
        FROM bank_accounts WHERE id=?`,
-      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo, 180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName, 255) || null, dateOnly(tx?.postDate) || null, clean(tx?.category || tx?.class?.title, 120) || null, remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
+      [localAccountId, `SYNC-${connection.connection_uid}`, rowHash, txDate, transactionDescription(tx), clean(tx?.reference || tx?.referenceNo, 180) || null, debit, credit, tx?.balance == null ? null : decimal(tx.balance), connection.app_user_id || null, provider, externalId || null, clean(tx?.merchant?.name || tx?.merchantName, 255) || null, dateOnly(tx?.postDate) || null, bankCategory.category, bankCategory.category ? 'CLASSIFIED' : 'UNCLASSIFIED', remoteAccountId || null, clean(tx?.status || 'POSTED', 40), rawHash, fingerprint, dateTime(tx?.transactionDate || tx?.postDate), dateTime(tx?.lastUpdated || tx?.updatedAt), localAccountId]
     );
     if (result.affectedRows) inserted += 1; else duplicates += 1;
   }
