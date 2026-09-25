@@ -264,6 +264,47 @@ function getEffectivePermissions() {
     ['stock_in', 'stock_out', 'raw_material', 'packaging'].forEach((id) => permissions.add(id));
   }
 
+  const CANONICAL_UI_PERMISSION_MAP = {
+    VIEW_RFQS: ['rfqs'],
+    EDIT_RFQS: ['rfqs', 'rfqs_input'],
+    VIEW_CUSTOMERS: ['customers'],
+    EDIT_CUSTOMERS: ['customers', 'customers_input'],
+    VIEW_SUPPLIERS: ['suppliers'],
+    EDIT_SUPPLIERS: ['suppliers', 'suppliers_input'],
+    VIEW_OWN_JOBS: ['tasks'],
+    MANAGE_JOBS: ['tasks', 'tasks_input'],
+    MANAGE_TEAM_JOBS: ['tasks', 'tasks_input'],
+    VIEW_OWN_TIMESHEET: ['attendance'],
+    VIEW_TEAM_TIMESHEET: ['attendance'],
+    VIEW_ALL_TIMESHEETS: ['attendance'],
+    APPROVE_TEAM_TIMESHEET: ['attendance', 'attendance_input'],
+    APPROVE_ALL_TIMESHEETS: ['attendance', 'attendance_input'],
+    VIEW_ATTENDANCE: ['attendance', 'roster'],
+    EDIT_ATTENDANCE: ['attendance', 'attendance_input', 'roster', 'roster_input'],
+    VIEW_INVENTORY: ['stock', 'stock_in', 'stock_out', 'raw_material', 'packaging'],
+    EDIT_INVENTORY: ['stock', 'stock_in', 'stock_out', 'raw_material', 'packaging', 'stock_in_input', 'stock_out_input', 'raw_material_input', 'packaging_input'],
+    VIEW_MEETINGS: ['meetings'],
+    MANAGE_MEETINGS: ['meetings', 'meetings_input'],
+    VIEW_COMPLIANCE: ['compliance'],
+    EDIT_COMPLIANCE: ['compliance', 'compliance_input'],
+    VIEW_QMS: ['compliance'],
+    CREATE_QMS_RECORD: ['compliance', 'compliance_input'],
+    EDIT_QMS_RECORD: ['compliance', 'compliance_input'],
+    MANAGE_TRAINING: ['compliance'],
+    VIEW_FINANCE: ['invoices', 'expenses'],
+    EDIT_FINANCE: ['invoices', 'invoices_input', 'expenses', 'expenses_input'],
+    VIEW_BANKING: ['banking'],
+    VIEW_PERSONAL_BANKING: ['banking'],
+    VIEW_BUSINESS_BANKING: ['banking'],
+    VIEW_TRASH: ['trash'],
+    RESTORE_TRASH: ['trash'],
+    VIEW_PROCUREMENT: ['procurement']
+  };
+
+  Object.entries(CANONICAL_UI_PERMISSION_MAP).forEach(([canonical, uiPermissions]) => {
+    if (permissions.has(canonical)) uiPermissions.forEach((permission) => permissions.add(permission));
+  });
+
   if (permissions.has('VIEW_APPROVALS')) permissions.add('approvals');
   if (permissions.has('CREATE_APPROVAL_REQUEST')) permissions.add('approvals_create');
   if (permissions.has('ACTION_APPROVALS')) permissions.add('approvals_action');
