@@ -19,7 +19,9 @@ const server = read('server.js');
 for (const table of ['finance_statement_import_jobs','statement_import_pages','statement_validation_results','statement_duplicate_candidates','processing_errors']) {
   assert(new RegExp(`CREATE TABLE(?: IF NOT EXISTS)? ${table}`).test(migration), `durable ingestion table missing: ${table}`);
 }
-assert(migration.includes('ADD COLUMN IF NOT EXISTS') && migration.includes('information_schema.statistics'), 'additive ingestion migration must be restart-safe after partial DDL');
+assert(!migration.includes('ADD COLUMN IF NOT EXISTS'), 'ingestion migration must avoid MySQL-incompatible ADD COLUMN IF NOT EXISTS syntax');
+assert(migration.includes('information_schema.columns') && migration.includes('information_schema.statistics'), 'additive ingestion migration must be restart-safe after partial DDL');
+assert(migration.includes("IF(@vv_col_sql='', 'SELECT 1', CONCAT('ALTER TABLE"), 'column additions must execute only when schema inspection finds missing columns');
 for (const field of ['secure_document_id','source_bbox_json','source_snippet','confidence_score','final_posted_transaction_id']) {
   assert(migration.includes(field), `source lineage field missing: ${field}`);
 }
