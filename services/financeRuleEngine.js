@@ -167,7 +167,7 @@ async function applyAutoRulesToImport(db, options = {}) {
     const ruleScope = String(rule.ownership_scope || '').toUpperCase();
     const accountCompatible = !ruleScope || ['MIXED', 'UNCLASSIFIED'].includes(accountScope) || accountScope === ruleScope;
     if (accountCompatible) {
-      if (!next.category && rule.category) next.category = rule.category;
+      if (rule.category) next.category = rule.category;
       if (ruleScope && ['MIXED', 'UNCLASSIFIED'].includes(accountScope)
         && ['MIXED', 'UNCLASSIFIED'].includes(String(next.ownership_scope || '').toUpperCase())) next.ownership_scope = ruleScope;
       if (!next.merchant_normalized) next.merchant_normalized = cleanMerchant(transaction.merchant_name || transaction.description || transaction.reference || '');
