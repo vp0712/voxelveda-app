@@ -20,6 +20,7 @@ const sync=read('services/advancedBankingSyncService.js');
 const bankCategory=read('services/financeBankCategoryService.js');
 expect(sync,"suggestConnectedBankCategory",'Connected-bank sync must normalise provider categories before posting them.');
 expect(sync,"bankCategory.category ? 'CLASSIFIED' : 'UNCLASSIFIED'",'Connected-bank sync must classify only mapped categories and leave uncertain items unclassified.');
+expect(sync,"'OPEN_BANKING',?,?,?,?,currency,ownership_scope,?, ?,0,NOW(),NOW(),?,?,?,?,?,?",'Connected-bank INSERT must keep provider fields aligned with canonical transaction columns.');
 expect(bankCategory,'BANK_PROVIDER_CATEGORY_MAPPED','Bank category normaliser must distinguish mapped provider evidence.');
 expect(bankCategory,'UNCLASSIFIED','Unknown connected-bank categories must fail safely to Unclassified.');
 expect(bankCategory,'Fuel & Vehicle','Bank category normaliser must support the canonical fuel category.');
