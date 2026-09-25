@@ -5,6 +5,7 @@ const privacy = require('../services/financePrivacyService');
 const { ensureFinanceSchema } = require('../services/financeSchema');
 const { FinanceError } = require('../services/financeDomain');
 const { logAudit } = require('../services/auditService');
+const { normalizeRow } = require('./statementImportController')._ingestion;
 
 function audit(req, values) {
   return { actorId:req.user?.id, ipAddress:req.ip, userAgent:req.get('user-agent'), ...values };
@@ -184,6 +185,129 @@ exports.clearAccountStatements = async (req,res) => {
     return res.json({message:`${statements} statement(s) removed from this account's analysis. They can be restored individually.`,statements_removed:statements,transactions_removed:transactions});
   } catch(error){if(db)await db.rollback();return fail(res,error,'Failed to clear account statement history.');}
   finally{if(db)db.release();}
+};
+
+
+exports.correctPostedTransaction = async (req,res) => {
+  let db;
+  try {
+    await ensureFinanceSchema();
+    const uid=String(req.params.uid||'').trim();
+    const transactionId=Number(req.params.transactionId||0);
+    const reason=String(req.body?.reason||'').trim();
+    if(!uid||!transactionId) throw new FinanceError('Statement transaction not found.',404,'STATEMENT_TRANSACTION_NOT_FOUND');
+    if(reason.length<3) throw new FinanceError('Add a short reason for this post-import correction.',400,'CORRECTION_REASON_REQUIRED');
+
+    db=await pool.getConnection(); await db.beginTransaction();
+    const file=await getStatement(db,req,uid,true);
+    if(String(file.parse_status||'').toUpperCase()!=='IMPORTED') {
+      throw new FinanceError('Only active imported statements can be edited from Statement Vault.',409,'STATEMENT_NOT_ACTIVE');
+    }
+    const [[session]]=await db.query('SELECT * FROM statement_import_sessions WHERE import_uid=? FOR UPDATE',[uid]);
+    if(!session||String(session.status||'').toUpperCase()!=='IMPORTED') {
+      throw new FinanceError('This statement has not completed review and posting.',409,'STATEMENT_NOT_POSTED');
+    }
+    const [[tx]]=await db.query(
+      'SELECT * FROM bank_transactions WHERE id=? AND bank_account_id=? AND statement_import_uid=? FOR UPDATE',
+      [transactionId,file.bank_account_id,uid]
+    );
+    if(!tx) throw new FinanceError('Posted transaction was not found in this statement.',404,'STATEMENT_TRANSACTION_NOT_FOUND');
+    if(String(tx.reconciliation_status||'').toUpperCase()==='RECONCILED') {
+      throw new FinanceError('Reconciled transactions cannot be changed here. Undo or reopen the reconciliation first.',409,'RECONCILED_TRANSACTION_LOCKED');
+    }
+
+    const [[sourceRow]]=await db.query(
+      'SELECT * FROM statement_import_rows WHERE import_session_id=? AND final_posted_transaction_id=? LIMIT 1 FOR UPDATE',
+      [session.id,transactionId]
+    );
+
+    const direction=String(req.body?.direction||'').trim().toUpperCase();
+    const amount=req.body?.amount;
+    let debit=tx.debit,credit=tx.credit;
+    if(amount!==undefined&&amount!==null&&String(amount).trim()!==''){
+      if(direction==='DEBIT'){debit=amount;credit='0.00';}
+      else if(direction==='CREDIT'){credit=amount;debit='0.00';}
+      else throw new FinanceError('Choose Money out or Money in for the corrected amount.',400,'CORRECTION_DIRECTION_REQUIRED');
+    }
+
+    const candidate=normalizeRow(file.bank_account_id,file.currency,{
+      transaction_date:req.body?.transaction_date ?? tx.transaction_date,
+      posting_date:req.body?.posting_date ?? tx.posting_date,
+      description:req.body?.description ?? tx.description,
+      reference:req.body?.reference ?? tx.reference,
+      debit,credit,
+      running_balance:req.body?.running_balance ?? tx.running_balance,
+      merchant_name:req.body?.merchant_name ?? tx.merchant_name,
+      currency:tx.currency||file.currency
+    },sourceRow?.row_no||tx.statement_row_id||transactionId);
+
+    if(candidate.validation_status==='REJECTED'||!candidate.row_hash){
+      throw new FinanceError(candidate.validation_message||'Correct the date and choose exactly one money-out or money-in amount.',422,'POSTED_CORRECTION_INVALID');
+    }
+    const [[duplicate]]=await db.query(
+      'SELECT id FROM bank_transactions WHERE bank_account_id=? AND row_hash=? AND id<>? LIMIT 1',
+      [file.bank_account_id,candidate.row_hash,transactionId]
+    );
+    if(duplicate) throw new FinanceError('This correction would duplicate another transaction, so it was not saved.',409,'POSTED_CORRECTION_DUPLICATE');
+
+    const oldValue={
+      transaction_date:tx.transaction_date,posting_date:tx.posting_date,description:tx.description,reference:tx.reference,
+      debit:tx.debit,credit:tx.credit,running_balance:tx.running_balance,merchant_name:tx.merchant_name,row_hash:tx.row_hash
+    };
+    await db.query(
+      `UPDATE bank_transactions
+          SET transaction_date=?,posting_date=?,description=?,reference=?,debit=?,credit=?,running_balance=?,
+              merchant_name=?,row_hash=?,manual_override=1,review_source_status='CORRECTED'
+        WHERE id=?`,
+      [candidate.transaction_date,candidate.posting_date,candidate.description,candidate.reference,candidate.debit,candidate.credit,
+       candidate.running_balance,candidate.merchant_name,candidate.row_hash,transactionId]
+    );
+
+    if(sourceRow){
+      const original=sourceRow.override_original_json||JSON.stringify({
+        transaction_date:sourceRow.transaction_date,posting_date:sourceRow.posting_date,description:sourceRow.description,
+        reference:sourceRow.reference,debit:sourceRow.debit,credit:sourceRow.credit,running_balance:sourceRow.running_balance,
+        merchant_name:sourceRow.merchant_name,currency:sourceRow.currency,validation_status:sourceRow.validation_status
+      });
+      const message=('Post-import correction: '+reason).slice(0,500);
+      await db.query(
+        `UPDATE statement_import_rows
+            SET transaction_date=?,posting_date=?,description=?,reference=?,debit=?,credit=?,running_balance=?,merchant_name=?,
+                row_hash=?,validation_status='WARNING',validation_message=?,manual_override=1,override_reason=?,
+                override_original_json=?,corrected_values_json=?,review_status='POSTED',overridden_by=?,overridden_at=NOW(),
+                override_version=override_version+1
+          WHERE id=? AND import_session_id=?`,
+        [candidate.transaction_date,candidate.posting_date,candidate.description,candidate.reference,candidate.debit,candidate.credit,
+         candidate.running_balance,candidate.merchant_name,candidate.row_hash,message,reason.slice(0,500),
+         typeof original==='string'?original:JSON.stringify(original),JSON.stringify(candidate),req.user.id,sourceRow.id,session.id]
+      );
+    }
+
+    await recalcAccount(db,file.bank_account_id);
+    await logAudit(db,audit(req,{
+      action:'STATEMENT_POSTED_TRANSACTION_CORRECTED',
+      module:'finance_intelligence',
+      recordType:'bank_transaction',
+      recordId:transactionId,
+      oldValue,
+      newValue:{
+        transaction_date:candidate.transaction_date,posting_date:candidate.posting_date,description:candidate.description,
+        reference:candidate.reference,debit:candidate.debit,credit:candidate.credit,running_balance:candidate.running_balance,
+        merchant_name:candidate.merchant_name,row_hash:candidate.row_hash,reason,source_statement_uid:uid
+      },
+      metadata:{original_bank_evidence_preserved:true,post_import_correction:true}
+    }));
+    await db.commit();
+    return res.json({
+      message:'Statement transaction corrected. Original bank evidence is preserved in the audit/source record.',
+      transaction_id:transactionId,
+      import_uid:uid,
+      corrected:true
+    });
+  } catch(error){
+    if(db) await db.rollback();
+    return fail(res,error,'Failed to correct posted statement transaction.');
+  } finally { if(db) db.release(); }
 };
 
 exports.purge = async (req,res) => {
