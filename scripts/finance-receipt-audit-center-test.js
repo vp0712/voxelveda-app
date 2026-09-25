@@ -9,6 +9,8 @@ const routes=read('routes/financeRoutes.js');
 const receipts=read('controllers/financeReceiptController.js');
 const audit=read('controllers/financeAuditController.js');
 const migration=read('migrations/20260923_finance_receipt_requirements.sql');
+const compatibilityMigration=read('migrations/20260926_finance_document_compatibility.sql');
+const securitySchema=read('services/securityOperationsSchema.js');
 const privacy=read('services/financePrivacyService.js');
 const client=read('public/finance-master.js');
 
@@ -28,6 +30,12 @@ assert(receipts.includes("/api/documents/\${row.id}/download"),'receipt download
 assert(!receipts.includes('/uploads/finance/'),'receipt centre must not expose direct upload paths');
 assert(migration.includes('finance_receipt_requirements'),'receipt requirement migration is missing');
 assert(!/\b(?:DROP|TRUNCATE)\b/i.test(migration),'receipt migration must be additive');
+assert(compatibilityMigration.includes("column_name = 'deleted_by'"),'secure document deletion actor compatibility check is missing');
+assert(compatibilityMigration.includes('ALTER TABLE secure_documents ADD COLUMN deleted_by INT NULL'),'secure document deletion actor migration is missing');
+assert(!/ADD COLUMN IF NOT EXISTS/i.test(compatibilityMigration),'compatibility migration must avoid unsupported MySQL ADD COLUMN IF NOT EXISTS syntax');
+assert(!/\b(?:DROP|TRUNCATE)\b/i.test(compatibilityMigration),'secure document compatibility migration must be additive');
+assert(securitySchema.includes('deleted_by INT NULL'),'runtime secure document schema must include the deletion actor');
+assert(securitySchema.includes('ALTER TABLE secure_documents ADD COLUMN deleted_by INT NULL'),'runtime schema must repair existing secure document tables');
 
 assert(audit.includes("FROM audit_logs"),'transaction timeline must reuse the canonical audit chain');
 assert(audit.includes("record_type='bank_transaction'"),'timeline must include bank transaction audit records');

@@ -27,12 +27,14 @@ async function createSecurityOperationsSchema() {
     scan_status VARCHAR(20) NOT NULL DEFAULT 'UNAVAILABLE',
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at DATETIME NULL,
+    deleted_by INT NULL,
     INDEX idx_secure_document_record (module, record_type, record_id, deleted_at),
     INDEX idx_secure_document_uploader (uploaded_by, created_at)
   ) ENGINE=InnoDB`);
 
   await tolerateDuplicate('ALTER TABLE secure_documents ADD COLUMN content_sha256 CHAR(64) NULL AFTER size_bytes');
   await tolerateDuplicate("ALTER TABLE secure_documents ADD COLUMN access_policy VARCHAR(40) NOT NULL DEFAULT 'MODULE_OR_OWNER' AFTER classification");
+  await tolerateDuplicate('ALTER TABLE secure_documents ADD COLUMN deleted_by INT NULL AFTER deleted_at');
   const [[uploadedByColumn]] = await pool.query(
     `SELECT IS_NULLABLE
        FROM information_schema.columns

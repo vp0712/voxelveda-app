@@ -50,6 +50,8 @@ Last updated: 2026-09-26 (Australia/Sydney)
 15. **No XLS, HEIC, JPG/JPEG or PNG statement pipeline exists.** The shared upload middleware recognises some of these for other modules, but Finance does not ingest them.
 16. **Money is converted through JavaScript `Number` in browser parsers and for reconciliation input.** Server commit uses decimal strings/BigInt helpers, but extraction is not yet integer-minor-unit end to end.
 17. **Local startup cannot run without secrets.** The production command fails closed locally because no `.env` provides a valid `JWT_SECRET`; production readiness previously confirmed Railway secrets are present.
+18. **Finance receipt recovery fails against the live security-document schema.** The controller writes and selects `secure_documents.deleted_by`, but the authoritative security schema and historical migration created only `deleted_at`. Root cause: the later receipt recovery feature added a soft-delete actor contract without an additive compatibility migration.
+19. **Receipt-dependent accountant and report queries can fail on mixed database collations.** They compared `secure_documents.record_id` with a character-cast transaction ID. Root cause: independently created historical tables use different `utf8mb4` collations, so text equality is not portable. The relationship is numeric and now uses `CAST(sd.record_id AS UNSIGNED)=bt.id` consistently.
 
 ## Files requiring modification
 
@@ -64,6 +66,7 @@ Last updated: 2026-09-26 (Australia/Sydney)
 - New focused ingestion, parser, validation and worker services under `services/`
 - New migration and real-format fixtures/tests under `migrations/` and `scripts/`
 - `docs/finance-statement-ingestion.md`
+- `services/securityOperationsSchema.js`, `controllers/financeReceiptController.js`, `controllers/financeAccountantHandoverController.js`, and `controllers/financeReportBuilderController.js`
 
 ## Database migrations required
 
@@ -72,6 +75,7 @@ Last updated: 2026-09-26 (Australia/Sydney)
 - Add page/source evidence and row source-location/confidence/original-vs-corrected fields without duplicating the existing review tables.
 - Add mapping templates, validation results, duplicate candidates and parser-template metadata only where no authoritative equivalent exists.
 - Add constraints/indexes for file/account dedupe, queue claims, status polling and exactly-once posting.
+- Add the missing nullable `secure_documents.deleted_by` audit column with restart-safe, information-schema-guarded DDL.
 
 ## Production configuration gaps
 
@@ -110,6 +114,7 @@ Last updated: 2026-09-26 (Australia/Sydney)
 - [x] Add actual-byte format, OCR, encrypted/corrupt/oversize, validation and duplicate tests.
 - [x] Run local lint, full application test suite, 50-check Finance release build and dependency audit.
 - [x] Verify Railway variables and migration plan; deploy and verify production readiness.
+- [ ] Deploy the additive secure-document compatibility migration and verify receipt/accountant report errors are cleared.
 - [ ] Complete one authenticated production statement upload/review/post smoke test with an owner-provided MFA session.
 
 ## Deployment status

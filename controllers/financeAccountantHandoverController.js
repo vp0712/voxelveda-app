@@ -67,7 +67,7 @@ async function buildPack(db,fy){
         SUM(CASE WHEN COALESCE(TRIM(bt.category),'')='' THEN 1 ELSE 0 END) unclassified_count,
         SUM(CASE WHEN bt.id IS NOT NULL AND NOT EXISTS (
           SELECT 1 FROM secure_documents sd
-          WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND sd.record_id=CAST(bt.id AS CHAR) AND sd.deleted_at IS NULL
+          WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND CAST(sd.record_id AS UNSIGNED)=bt.id AND sd.deleted_at IS NULL
         ) THEN 1 ELSE 0 END) missing_receipt_count
       FROM bank_accounts ba
       LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
