@@ -387,6 +387,10 @@ async function resolveTransactionCategory(db, req, row, body = {}) {
     [createName, actorId]
   );
   if (existing) {
+    const existingScope=String(existing.scope||'BOTH').toUpperCase();
+    const existingAccountScope=String(row.account_scope||'').toUpperCase();
+    if(existingAccountScope==='PERSONAL'&&!['PERSONAL','BOTH'].includes(existingScope)) throw new FinanceError('A Personal account cannot use this Business-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
+    if(existingAccountScope==='BUSINESS'&&!['BUSINESS','BOTH'].includes(existingScope)) throw new FinanceError('A Company account cannot use this Personal-only category.',400,'CATEGORY_SCOPE_ACCOUNT_MISMATCH');
     if (!Number(existing.active) || existing.archived_at) {
       await db.query('UPDATE finance_system_categories SET active=1,archived_at=NULL,archived_by=NULL,updated_by=? WHERE id=?',[actorId, existing.id]);
       await logAudit(db, audit(req, {
