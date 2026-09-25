@@ -1,8 +1,8 @@
-finance-release: 20260926-smart-category-intelligence-v35
-source-commit: 6bfc635daacbb1fab317d8ef43f3fd34ea4fac12
-candidate-ci: pending-railway-build
-final-system-consolidation: pending-railway-build
-security-ci: pending-railway-build
-banking-platform-ci: pending-railway-build
-bank-account-lifecycle-ci: pending-railway-build
+finance-release: 20260926-document-schema-compatibility
+source-commit: 3dd22f914e4a8f0bdfb5376b6afd5c584cbc0031
+candidate-ci: passed-run-36169102949
+final-system-consolidation: passed-run-36169102841
+security-ci: passed-run-36169102877
+banking-platform-ci: passed-run-36169103044
+bank-account-lifecycle-ci: not-required-no-lifecycle-change
 policy: marker-only-production-deploy
