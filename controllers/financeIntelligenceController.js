@@ -70,8 +70,10 @@ exports.getOverview = async (req, res) => {
                 ba.ownership_scope,ba.entity_name,ba.account_type,ba.financial_purpose,
                 ba.connection_type,ba.connection_status,ba.current_ledger_balance,
                 ba.available_balance,ba.history_start_date,ba.history_end_date,ba.last_synced_at,
-                (SELECT COUNT(*) FROM bank_transactions bx WHERE bx.bank_account_id=ba.id) AS transaction_count,
-                (SELECT COUNT(*) FROM bank_transactions bx WHERE bx.bank_account_id=ba.id AND bx.reconciliation_status='UNRECONCILED') AS unreconciled_count
+                (SELECT COUNT(*) FROM bank_transactions bx
+                  WHERE bx.bank_account_id=ba.id AND bx.reconciliation_status<>'IGNORED' AND bx.archived_at IS NULL) AS transaction_count,
+                (SELECT COUNT(*) FROM bank_transactions bx
+                  WHERE bx.bank_account_id=ba.id AND bx.reconciliation_status='UNRECONCILED' AND bx.archived_at IS NULL) AS unreconciled_count
            FROM bank_accounts ba
           WHERE ${accountClauses.join(' AND ')}
           ORDER BY ba.ownership_scope,ba.nickname`, accountParams
@@ -1491,9 +1493,14 @@ exports.getHistoryCoverage = async (req, res) => {
       `SELECT ba.id, ba.nickname, ba.ownership_scope, ba.connection_type, ba.connection_status,
               ba.history_start_date, ba.history_end_date,
               MIN(bt.transaction_date) AS transaction_start, MAX(bt.transaction_date) AS transaction_end,
+              COUNT(bt.id) AS transaction_count,
               SUM(CASE WHEN bt.source_type='OPEN_BANKING' THEN 1 ELSE 0 END) AS open_banking_rows,
               SUM(CASE WHEN bt.source_type='STATEMENT_IMPORT' THEN 1 ELSE 0 END) AS statement_rows
-         FROM bank_accounts ba LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
+         FROM bank_accounts ba
+         LEFT JOIN bank_transactions bt
+           ON bt.bank_account_id=ba.id
+          AND bt.reconciliation_status<>'IGNORED'
+          AND bt.archived_at IS NULL
         WHERE ba.status='ACTIVE' AND ${privacy.visibilitySql('ba', req)}
         GROUP BY ba.id ORDER BY ba.ownership_scope, ba.nickname`, privacy.visibilityParams(req)
     );
@@ -1527,7 +1534,9 @@ exports.getDataQuality = async (req, res) => {
         SUM(CASE WHEN bt.reconciliation_status='UNRECONCILED' THEN 1 ELSE 0 END) AS unreconciled,
         SUM(CASE WHEN bt.ownership_scope='UNCLASSIFIED' THEN 1 ELSE 0 END) AS ownership_missing
        FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
-       WHERE ${privacy.visibilitySql('ba', req)}`, privacy.visibilityParams(req)
+       WHERE bt.reconciliation_status<>'IGNORED'
+         AND bt.archived_at IS NULL
+         AND ${privacy.visibilitySql('ba', req)}`, privacy.visibilityParams(req)
     );
     const [[accounts]] = await pool.query(
       `SELECT SUM(CASE WHEN connection_type='OPEN_BANKING' AND (connection_status IS NULL OR connection_status <> 'CONNECTED') THEN 1 ELSE 0 END) AS disconnected,
