@@ -5,9 +5,9 @@ Last updated: 2026-09-26 (Australia/Sydney)
 ## Current Git release
 
 - Original baseline commit: `2a636bb856318aa9202da31ba47abce372a1f815` (`Release Finance Control v14 to Railway`).
-- Current live production commit: `5a1f857ea075b9610d2f1879308a45d78901b2b4` (`Release Finance document compatibility repair`), which includes the Finance v26 ingestion release and its downstream receipt/report compatibility repair.
+- Current live production commit: `bbab5e3e2d6d49300b5d9671ba6702f383547cb0` (`Release Finance active history filter`), which includes the Finance v26 ingestion release, its downstream receipt/report compatibility repair and the inactive-row history-count correction.
 - Finance v26 rollout commit: `5fa7461ad50a24860591e7477522e9123a99a0e4` (`Release Finance v26 migration retry hotfix`).
-- Primary release PR: #254; production migration recovery PRs: #255, #256, #257 and #258; downstream production compatibility/release PRs: #260 and #261.
+- Primary release PR: #254; production migration recovery PRs: #255, #256, #257 and #258; downstream production compatibility/release PRs: #260 and #261; final active-history correction/release PRs: #263 and #264.
 - Finance v25 baseline incorporated before the v26 release: `d7b8c694bf85598137baf0f21380f4120387fb3a` (`Release Finance statement date integrity v25 r2`).
 - Ingestion implementation commit: `e07fd9b`; v25 integration commit: `9d96bab`.
 
@@ -52,6 +52,7 @@ Last updated: 2026-09-26 (Australia/Sydney)
 17. **Local startup cannot run without secrets.** The production command fails closed locally because no `.env` provides a valid `JWT_SECRET`; production readiness previously confirmed Railway secrets are present.
 18. **Finance receipt recovery fails against the live security-document schema.** The controller writes and selects `secure_documents.deleted_by`, but the authoritative security schema and historical migration created only `deleted_at`. Root cause: the later receipt recovery feature added a soft-delete actor contract without an additive compatibility migration.
 19. **Receipt-dependent accountant and report queries can fail on mixed database collations.** They compared `secure_documents.record_id` with a character-cast transaction ID. Root cause: independently created historical tables use different `utf8mb4` collations, so text equality is not portable. The relationship is numeric and now uses `CAST(sd.record_id AS UNSIGNED)=bt.id` consistently.
+20. **Soft-removed statement rows remained in History coverage and account transaction counts.** Posting and removal correctly excluded the rows from active balances and cash flow, but the Overview account-count subquery and History coverage join counted all `bank_transactions`. They now require non-`IGNORED`, non-archived rows; data-quality counters and account lifecycle recalculation use the same active-row rule.
 
 ## Files requiring modification
 
@@ -115,15 +116,16 @@ Last updated: 2026-09-26 (Australia/Sydney)
 - [x] Run local lint, full application test suite, 50-check Finance release build and dependency audit.
 - [x] Verify Railway variables and migration plan; deploy and verify production readiness.
 - [x] Deploy the additive secure-document compatibility migration and verify receipt/accountant report errors are cleared.
-- [ ] Complete one authenticated production statement upload/review/post smoke test with an owner-provided MFA session.
+- [x] Complete an authenticated production statement upload/review/post/duplicate/cleanup smoke test in the owner session.
 
 ## Deployment status
 
-- Finance statement ingestion v26 remains live in Railway production within deployment `27d7b6d3-a95f-4362-9396-1270e038c42c` from main SHA `5a1f857ea075b9610d2f1879308a45d78901b2b4`; its original successful rollout was deployment `dee1cf41-3eee-4bb3-b213-1506685c7977` from SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
+- Finance statement ingestion v26 remains live in Railway production within deployment `64a67228-dbb6-46aa-8097-a1cee5b9d970` from main SHA `bbab5e3e2d6d49300b5d9671ba6702f383547cb0`; its original successful rollout was deployment `dee1cf41-3eee-4bb3-b213-1506685c7977` from SHA `5fa7461ad50a24860591e7477522e9123a99a0e4`.
 - The first rollout correctly failed closed on MySQL-incompatible `ADD COLUMN IF NOT EXISTS`. The hotfix replaced it with guarded dynamic DDL and added a compatibility regression.
 - The next rollout exposed a failed-migration checksum retry deadlock. The runner now permits corrected checksum replacement only for incomplete `FAILED`/`RUNNING` entries; `APPLIED`/`BASELINED` migrations remain immutable.
 - The corrected migration applied in 6745 ms and the ledger reports schema `20260925_finance_ingestion_pipeline` with 77 migrations verified.
 - The additive downstream compatibility migration applied in 644 ms; production now reports schema `20260926_finance_document_compatibility` with 78 migrations verified.
+- The final inactive-row history correction was released from PRs #263 and #264 as deployment `64a67228-dbb6-46aa-8097-a1cee5b9d970`, main SHA `bbab5e3e2d6d49300b5d9671ba6702f383547cb0`. Railway verified 79 migrations and all critical services remained operational.
 
 ## Current local verification
 
@@ -137,17 +139,20 @@ Last updated: 2026-09-26 (Australia/Sydney)
 ## Production verification evidence
 
 - `/api/health`: HTTP 200 after the backend became ready.
-- `/api/ready`: HTTP 200, `ready: true`, schema `20260926_finance_document_compatibility`, deployment SHA `5a1f857ea075b9610d2f1879308a45d78901b2b4`.
+- `/api/ready`: HTTP 200, `ready: true`, schema `20260926_finance_document_compatibility`, deployment SHA `bbab5e3e2d6d49300b5d9671ba6702f383547cb0`.
 - `finance_ingestion_worker`, background workers, migrations, Finance schema, database and all other critical services report `OPERATIONAL`.
 - Runtime evidence verifies Redis rate limiting, ClamAV malware scanning, Railway S3 private object storage and the least-privileged `voxelveda_app` database identity.
 - The deployed Finance client contains multipart durable upload, job polling, password/mapping recovery, protected review and original-statement evidence paths. Both ingestion paths reject unauthenticated calls with HTTP 401.
 - Post-release logs contain zero `secure_documents.deleted_by` missing-column errors, zero mixed-collation errors and zero unexpected runtime errors for the new deployment.
-- Authenticated upload/review/post verification remains pending an authorised MFA code; the production test account correctly requires MFA and no code was fabricated or bypassed.
+- Authenticated secure upload parsed a sanitised PDF fixture into two rows. Both initially failed closed for ambiguous direction, were manually corrected against the source and running balances with audit reasons, and were posted only after explicit action-time approval.
+- Posting committed exactly two transactions, preserved immutable original bank evidence under statement UID `STMT-MUHDI0MJ-FB2F10BDB1C1`, and produced the expected register totals: AUD money in `$2.00`, money out `$1.00`, net cash flow `$1.00`.
+- Exact-file re-upload was rejected as an existing statement without changing the transaction count. The fixture statement was then soft-removed with explicit confirmation; it remains `1 recoverable` in Removed Statements and is absent from the active Statement Vault.
+- After the inactive-row history correction deployed, authenticated refresh showed `553` active transactions and coverage `10/02/2016 → 31/08/2024`. Overview remained clean at a `$6.00` position with `$0.00` money in, money out and net cash flow for the selected period, and no recent synthetic transactions.
 
 ## Remaining blockers and assumptions
 
 - No destructive migration was used. All v26 schema work is additive and backward-compatible.
 - A production database backup is not yet externally verified. This blocks destructive/high-risk migrations, not safe local implementation or additive migration preparation.
-- Final authenticated upload/review/post testing requires the owner MFA session.
+- The production smoke fixture is sanitised and soft-removed; no synthetic smoke transaction remains active in balances, transaction history, cash flow or reporting.
 - HEIC and legacy XLS will be shown as unsupported unless the selected production parser stack proves them with real files and bounded resource controls.
 - Any third-party paid OCR provider would require owner selection. The implementation will first use a local, deterministic OCR engine so work can continue without transmitting financial documents to a third party.
