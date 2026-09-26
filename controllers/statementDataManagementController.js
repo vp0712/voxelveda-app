@@ -45,11 +45,11 @@ async function recalcAccount(db,accountId) {
   const [[range]]=await db.query(
     `SELECT MIN(transaction_date) AS start_date,MAX(transaction_date) AS end_date
        FROM bank_transactions
-      WHERE bank_account_id=? AND reconciliation_status<>'IGNORED'`,[accountId]
+      WHERE bank_account_id=? AND reconciliation_status<>'IGNORED' AND archived_at IS NULL`,[accountId]
   );
   const [[latest]]=await db.query(
     `SELECT running_balance FROM bank_transactions
-      WHERE bank_account_id=? AND reconciliation_status<>'IGNORED' AND running_balance IS NOT NULL
+      WHERE bank_account_id=? AND reconciliation_status<>'IGNORED' AND archived_at IS NULL AND running_balance IS NOT NULL
       ORDER BY transaction_date DESC,id DESC LIMIT 1`,[accountId]
   );
   const [[account]]=await db.query('SELECT opening_balance FROM bank_accounts WHERE id=? LIMIT 1',[accountId]);
