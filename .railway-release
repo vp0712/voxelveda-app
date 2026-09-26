@@ -1,8 +1,8 @@
-finance-release: 20260926-document-schema-compatibility
-source-commit: 3dd22f914e4a8f0bdfb5376b6afd5c584cbc0031
-candidate-ci: passed-run-36169102949
-final-system-consolidation: passed-run-36169102841
-security-ci: passed-run-36169102877
-banking-platform-ci: passed-run-36169103044
+finance-release: 20260926-active-history-filter
+source-commit: db59c7b6d65a4147c4f142fe4e89e90dafc46130
+candidate-ci: passed-run-36233290438
+final-system-consolidation: passed-run-36233290443
+security-ci: passed-run-36233290562
+banking-platform-ci: passed-run-36233290492
 bank-account-lifecycle-ci: not-required-no-lifecycle-change
 policy: marker-only-production-deploy
