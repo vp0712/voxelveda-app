@@ -602,12 +602,53 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
   doc.font('Helvetica').fontSize(6.5).fillColor('#64748B').text(`Statement ID ${reportId} · Generated from permission-scoped ledger data`,56,y+46,{width:300});
 }
 
+function buildBankStatementPdfArtifact(report,profile,title){
+  const reportId='FIN-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const filename='Voxel-Veda-' + title.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'') + '.pdf';
+  return new Promise((resolve,reject)=>{
+    const chunks=[];
+    let pageCount=0;
+    const doc=new PDFDocument({
+      size:'A4',
+      margins:{top:112,left:42,right:42,bottom:66},
+      bufferPages:true,
+      info:{Title:(profile.tradingName||profile.legalName||'Voxel Veda') + ' - ' + title,Author:profile.legalName||'Voxel Veda Pty Ltd'}
+    });
+    doc.on('data',chunk=>chunks.push(chunk));
+    doc.on('error',reject);
+    doc.on('end',()=>resolve({buffer:Buffer.concat(chunks),reportId,filename,pages:pageCount}));
+    try{
+      renderBankStyleAccountStatement(doc,report,profile,reportId);
+      const pages=doc.bufferedPageRange();
+      pageCount=pages.count;
+      for(let index=0;index<pages.count;index+=1){
+        doc.switchToPage(index);
+        renderBankStatementPageChrome(doc,profile,report,reportId,index+1,pages.count);
+        doc.moveTo(42,774).lineTo(553,774).strokeColor('#D9E6F3').lineWidth(0.6).stroke();
+        doc.font('Helvetica').fontSize(6.5).fillColor('#64748B').text(
+          (profile.footer||'Confidential Financial Information') + ' · ' + (profile.website||'') + ' · Page ' + (index+1) + ' of ' + pages.count,
+          42,782,{width:511,align:'center'}
+        );
+      }
+      doc.end();
+    }catch(error){
+      try{doc.end()}catch{}
+      reject(error);
+    }
+  });
+}
+
+function buildReportPdfArtifact(report,profile,title){
+  if(report.metadata.report_type==='ACCOUNT_STATEMENT') return buildBankStatementPdfArtifact(report,profile,title);
+  return buildFinancePdfArtifact(report,profile,title);
+}
+
 exports.pdf=async(req,res)=>{
   try{
     const report=await buildReport(req);
     const profile=await reportCompanyProfile();
     const title=reportTitle(report.metadata.report_type);
-    const artifact=await buildFinancePdfArtifact(report,profile,title);
+    const artifact=await buildReportPdfArtifact(report,profile,title);
     await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report',artifact.reportId,{
       filters:report.metadata,format:'PDF',pages:artifact.pages
     }));
@@ -629,7 +670,7 @@ exports.emailPdf=async(req,res)=>{
     const report=await buildReport(req,definition);
     const profile=await reportCompanyProfile();
     const title=reportTitle(report.metadata.report_type);
-    const artifact=await buildFinancePdfArtifact(report,profile,title);
+    const artifact=await buildReportPdfArtifact(report,profile,title);
     const period=(report.metadata.from||'All history') + ' to ' + (report.metadata.to||'Now');
 
     const result=await sendMail({
