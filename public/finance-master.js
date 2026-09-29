@@ -492,6 +492,60 @@ async function openAccountCategory(accountId,category,currency){
  history.replaceState(null,'','#transactions');
  await loadTransactions();
 }
+function financeAccountCardReference(account){
+ const digits=String(account?.account_number_masked||'').replace(/\D/g,'');
+ const suffix=(digits.slice(-4)||String(account?.id||0).padStart(4,'0').slice(-4));
+ return 'VV-FIN-'+String(account?.id||0).padStart(4,'0')+'-'+suffix;
+}
+function financeAccountCardMarkup(account,options={}){
+ const a=account||{};
+ const compact=Boolean(options.compact);
+ const balance=a.profile_balance??a.available_balance??a.current_ledger_balance??0;
+ const holder=a.entity_name||a.nickname||'Account holder';
+ const masked=a.account_number_masked||('Account '+String(a.id||''));
+ const bsb=a.bsb_masked?('BSB '+a.bsb_masked):'Voxel Veda Finance';
+ return `<section class="fm-finance-account-card ${compact?'compact':''}" aria-label="Voxel Veda Finance internal account card">
+  <div class="fm-finance-card-head"><div class="fm-finance-card-brand"><span class="fm-finance-card-mark">VV</span><div><b>Voxel Veda</b><small>Finance Account</small></div></div><span class="fm-finance-card-chip" aria-hidden="true"></span></div>
+  <div class="fm-finance-card-name">${esc(a.nickname||'Finance Account')}</div>
+  <div class="fm-finance-card-number">${esc(masked)}</div>
+  <div class="fm-finance-card-meta"><span><small>ACCOUNT HOLDER</small><b>${esc(holder)}</b></span><span><small>CURRENCY</small><b>${esc(a.currency||'AUD')}</b></span></div>
+  <div class="fm-finance-card-meta"><span><small>ACCOUNT REF</small><b>${esc(financeAccountCardReference(a))}</b></span><span><small>ROUTING</small><b>${esc(bsb)}</b></span></div>
+  <div class="fm-finance-card-balance"><small>LEDGER BALANCE</small><strong>${nativeMoney(balance,a.currency||'AUD')}</strong></div>
+  <div class="fm-finance-card-footer"><span>INTERNAL ACCOUNT CARD</span><b>NOT A PAYMENT CARD</b></div>
+ </section>`;
+}
+function financeAccountCardSvg(account){
+ const a=account||{};
+ const ref=financeAccountCardReference(a);
+ const holder=String(a.entity_name||a.nickname||'Account holder').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+ const name=String(a.nickname||'Finance Account').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+ const masked=String(a.account_number_masked||('Account '+String(a.id||''))).replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+ const currency=String(a.currency||'AUD').replace(/[&<>"]/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[s]));
+ return `<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="638" viewBox="0 0 1011 638">
+ <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#071521"/><stop offset="1" stop-color="#18384a"/></linearGradient></defs>
+ <rect width="1011" height="638" rx="48" fill="url(#g)"/><circle cx="870" cy="100" r="180" fill="#ffffff" opacity=".035"/>
+ <rect x="60" y="54" width="76" height="76" rx="20" fill="#fff" opacity=".12"/><text x="98" y="103" text-anchor="middle" fill="#fff" font-family="Arial" font-size="30" font-weight="700">VV</text>
+ <text x="158" y="86" fill="#fff" font-family="Arial" font-size="34" font-weight="700">Voxel Veda</text><text x="158" y="116" fill="#b9cbd6" font-family="Arial" font-size="18">Finance Account</text>
+ <rect x="790" y="64" width="112" height="82" rx="16" fill="#d3b85f"/><path d="M846 64v82M790 105h112" stroke="#8c7939" stroke-width="5" opacity=".65"/>
+ <text x="60" y="230" fill="#b9cbd6" font-family="Arial" font-size="22">${name}</text><text x="60" y="292" fill="#fff" font-family="Arial" font-size="36" font-weight="700">${masked}</text>
+ <text x="60" y="385" fill="#829aaa" font-family="Arial" font-size="16">ACCOUNT HOLDER</text><text x="60" y="422" fill="#fff" font-family="Arial" font-size="25" font-weight="700">${holder}</text>
+ <text x="625" y="385" fill="#829aaa" font-family="Arial" font-size="16">CURRENCY</text><text x="625" y="422" fill="#fff" font-family="Arial" font-size="25" font-weight="700">${currency}</text>
+ <text x="60" y="492" fill="#829aaa" font-family="Arial" font-size="16">ACCOUNT REF</text><text x="60" y="530" fill="#fff" font-family="Arial" font-size="23" font-weight="700">${ref}</text>
+ <text x="60" y="587" fill="#b9cbd6" font-family="Arial" font-size="17">INTERNAL ACCOUNT CARD</text><text x="951" y="587" text-anchor="end" fill="#fff" font-family="Arial" font-size="17" font-weight="700">NOT A PAYMENT CARD</text>
+ </svg>`;
+}
+function downloadFinanceAccountCard(accountId){
+ const account=state.accounts.find(a=>String(a.id)===String(accountId));if(!account){notice('Account card is unavailable.',true);return}
+ const blob=new Blob([financeAccountCardSvg(account)],{type:'image/svg+xml;charset=utf-8'});
+ const url=URL.createObjectURL(blob),link=document.createElement('a');
+ link.href=url;link.download='Voxel-Veda-Account-Card-'+String(account.id)+'.svg';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function openFinanceAccountCard(accountId){
+ const a=state.accounts.find(x=>String(x.id)===String(accountId));if(!a){notice('Account card is unavailable.',true);return}
+ $('fmModalEyebrow').textContent='VOXEL VEDA FINANCE';$('fmModalTitle').textContent=(a.nickname||'Account')+' · Account card';
+ $('fmModalBody').innerHTML=`<div class="fm-account-card-modal">${financeAccountCardMarkup(a)}<p class="fm-helper">This is an internal Voxel Veda Finance account-identification card. It does not contain a payment PAN, CVV or expiry date and cannot be used to make payments.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Close</button><button class="primary" type="button" data-account-card-download="${esc(a.id)}">Download card</button></div></div>`;
+ $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());document.querySelector('[data-account-card-download]')?.addEventListener('click',()=>downloadFinanceAccountCard(a.id));
+}
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
@@ -524,7 +578,7 @@ function accounts(){
     ${renderAccountCategoryChart(a,accountCategoryRows.filter(row=>String(row.bank_account_id)===String(a.id)),null,{compact:true,label:chartPeriod})}
     <div class="fm-account-card-footer">
      <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)} · ${transactionCount.toLocaleString('en-AU')} tx</small></div></div>
-     <div class="fm-account-footer-actions"><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
+     <div class="fm-account-footer-actions"><button type="button" data-account-card="${a.id}">Account card</button><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
     </div>
    </div>
   </article>`;
@@ -2575,6 +2629,7 @@ function bindDynamic(){
  if($('txBulkReview'))$('txBulkReview').onclick=openBulkReview;
  document.querySelectorAll('[data-reconciliation]').forEach(r=>{r.onclick=()=>openReconciliationDetail(r.dataset.reconciliation);r.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();openReconciliationDetail(r.dataset.reconciliation)}}});
  document.querySelectorAll('[data-account]').forEach(r=>r.onclick=()=>accountDetail(r.dataset.account));
+ document.querySelectorAll('[data-account-card]').forEach(b=>b.onclick=e=>{e.stopPropagation();openFinanceAccountCard(b.dataset.accountCard)});
  document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=e=>{e.stopPropagation();purgeAccount(b.dataset.accountPurge)});
  document.querySelectorAll('[data-customer-statement-name]').forEach(b=>b.onclick=()=>{const q=new URLSearchParams();if(b.dataset.customerStatementEmail)q.set('customer_email',b.dataset.customerStatementEmail);else if(b.dataset.customerStatementName)q.set('customer_name',b.dataset.customerStatementName);window.open('/api/invoice/statement/pdf?'+q.toString(),'_blank','noopener')});
  document.querySelectorAll('[data-company-bill]').forEach(b=>b.onclick=()=>supplierBillDetail(b.dataset.companyBill));
@@ -2789,10 +2844,11 @@ async function accountDetail(id){
 
   const tx=(d.transactions||[]).slice(0,20).map(x=>`<div class="fm-row" data-tx="${x.id}"><div><h3>${esc(x.merchant_name||x.description)}</h3><p>${date(x.transaction_date)} · ${esc(x.category||'Uncategorised')}</p></div><b>${nativeMoney(Math.abs(num(x.credit)-num(x.debit)),x.currency||a.currency||'AUD')}</b></div>`).join('');
   const purgeButton=`<button class="bad" data-account-purge="${a.id}">Delete account & all data</button>`;
-  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad">${categoryChart}</div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
+  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-card="${a.id}">Account card</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-account-card-drawer">${financeAccountCardMarkup(a,{compact:true})}</div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad">${categoryChart}</div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
   setTimeout(()=>{
    document.querySelectorAll('[data-account-action]').forEach(b=>b.onclick=()=>accountLifecycle(b.dataset.id,b.dataset.accountAction));
    document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=()=>purgeAccount(b.dataset.accountPurge));
+   document.querySelector('[data-account-card]')?.addEventListener('click',()=>openFinanceAccountCard(a.id));
    document.querySelector('[data-account-edit]')?.addEventListener('click',()=>{closeDrawer();openAccountForm('',a.id)});
    document.querySelectorAll('[data-tx]').forEach(x=>x.onclick=()=>transactionDetail(x.dataset.tx));
    document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
