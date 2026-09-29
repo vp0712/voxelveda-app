@@ -10,6 +10,7 @@ const pdfService=read('services/financeReportPdfService.js');
 const filterContract=read('services/financeFilterContract.js');
 const routes=read('routes/financeRoutes.js');
 const client=read('public/finance-master.js');
+const emailService=read('services/emailService.js');
 const migration=read('migrations/20260923_finance_saved_reports.sql');
 
 assert(controller.includes("trustedTotals.cashTotalsByCurrency"),'report builder must use Trusted Totals');
@@ -28,6 +29,13 @@ assert(controller.includes('exports.pdf'),'filtered branded PDF export is missin
 assert(controller.includes('doc.switchToPage(index)'),'filtered PDF must repeat company branding on every page');
 assert(controller.includes('reportCompanyProfile'),'filtered PDF must consume company reporting settings');
 assert(controller.includes('profile.footer'),'filtered PDF must repeat the configured confidential footer');
+assert(controller.includes('assertPdfArtifact'),'emailed Finance PDFs must be validated before delivery');
+assert(controller.includes("contentDisposition:'attachment'"),'emailed Finance PDFs must force MIME attachment disposition');
+assert(controller.includes("attachment_content_type:'application/pdf'"),'email response must confirm PDF MIME type');
+assert(emailService.includes('assertAttachmentIntegrity'),'email service must validate attachment bytes');
+assert(emailService.includes("buffer.subarray(0, 5).toString('ascii') !== '%PDF-'"),'email service must verify the PDF magic header');
+assert(emailService.includes('if (hasPdf)'),'PDF delivery must use the dedicated attachment-safe transport path');
+assert(emailService.includes('sendViaSmtp'),'PDF delivery must support direct SMTP MIME attachment transport');
 
 assert(routes.includes("router.get('/reports/builder'"),'report builder route is missing');
 assert(routes.includes("router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE')"),'filtered CSV must require export permission, step-up and sensitive export approval');
