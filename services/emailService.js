@@ -197,7 +197,67 @@ function createTransporter() {
   });
 }
 
+function attachmentBuffer(attachment) {
+  if (!attachment) return null;
+  if (Buffer.isBuffer(attachment.content)) return attachment.content;
+  if (attachment.content !== undefined && attachment.content !== null) {
+    return Buffer.from(
+      String(attachment.content),
+      String(attachment.encoding || '').toLowerCase() === 'base64' ? 'base64' : 'utf8'
+    );
+  }
+  return null;
+}
+
+function isPdfAttachment(attachment) {
+  const filename = String(attachment?.filename || '').toLowerCase();
+  const contentType = String(attachment?.contentType || attachment?.content_type || '').toLowerCase();
+  return filename.endsWith('.pdf') || contentType === 'application/pdf';
+}
+
+function assertAttachmentIntegrity(attachments = []) {
+  for (const attachment of attachments) {
+    if (!isPdfAttachment(attachment)) continue;
+    const buffer = attachmentBuffer(attachment);
+    if (!buffer || buffer.length < 5 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+      const error = new Error('PDF attachment is not a valid PDF document.');
+      error.code = 'PDF_ATTACHMENT_INVALID';
+      throw error;
+    }
+    if (!String(attachment.filename || '').toLowerCase().endsWith('.pdf')) {
+      const error = new Error('PDF attachment filename must end in .pdf.');
+      error.code = 'PDF_ATTACHMENT_FILENAME_INVALID';
+      throw error;
+    }
+    attachment.contentType = 'application/pdf';
+    attachment.contentDisposition = 'attachment';
+  }
+  return attachments;
+}
+
+async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachments = [] }) {
+  const config = smtpConfig();
+  const transporter = createTransporter();
+  try {
+    const result = await transporter.sendMail({
+      from: `"${config.fromName}" <${config.fromEmail}>`,
+      to,
+      cc: cc?.length ? cc : undefined,
+      bcc: bcc?.length ? bcc : undefined,
+      subject: String(subject || '').trim(),
+      html: html || undefined,
+      text: text || undefined,
+      replyTo: replyTo || config.replyTo || undefined,
+      attachments
+    });
+    return { ...result, transport: 'smtp' };
+  } finally {
+    transporter.close();
+  }
+}
+
 async function verifyConnection() {
+  let relayResult = null;
   if (isRelayConfigured()) {
     const config = relayConfig();
     const controller = new AbortController();
@@ -213,32 +273,36 @@ async function verifyConnection() {
         error.code = 'EMAIL_HTTPS_RELAY_FAILED';
         throw error;
       }
+      relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https' };
       console.log('Email HTTPS relay evidence: ok=yes provider=wordpress_wp_mail transport=https');
-      return { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https' };
     } catch (error) {
       if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
       console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code}`);
-      throw error;
+      if (missingSmtpKeys().length) throw error;
     } finally {
       clearTimeout(timeout);
     }
   }
 
-  const transporter = createTransporter();
-  try {
-    await transporter.verify();
-    const summary = smtpReadinessSummary();
-    console.log(`SMTP transport evidence: ok=yes host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} identity_domain=${summary.identity_domain || 'unknown'} from_domain=${summary.from_domain || 'unknown'}`);
-    return summary;
-  } catch (error) {
-    const summary = smtpReadinessSummary(error);
-    const f = summary.failure;
-    console.warn(`SMTP transport evidence: ok=no category=${f.category} code=${f.code} response_code=${f.response_code || 'none'} command=${f.command || 'none'} host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} identity_domain=${summary.identity_domain || 'unknown'} from_domain=${summary.from_domain || 'unknown'}`);
-    error.smtpReadiness = summary;
-    throw error;
-  } finally {
-    transporter.close();
+  if (!missingSmtpKeys().length) {
+    const transporter = createTransporter();
+    try {
+      await transporter.verify();
+      const summary = smtpReadinessSummary();
+      console.log(`SMTP transport evidence: ok=yes host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} identity_domain=${summary.identity_domain || 'unknown'} from_domain=${summary.from_domain || 'unknown'} attachment_pdf=yes`);
+      return { ...summary, relay: relayResult };
+    } catch (error) {
+      const summary = smtpReadinessSummary(error);
+      const f = summary.failure;
+      console.warn(`SMTP transport evidence: ok=no category=${f.category} code=${f.code} response_code=${f.response_code || 'none'} command=${f.command || 'none'} host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} attachment_pdf=no`);
+      error.smtpReadiness = summary;
+      if (!relayResult) throw error;
+      return { ...relayResult, smtp: summary, attachment_pdf: false };
+    } finally {
+      transporter.close();
+    }
   }
+  return relayResult || smtpReadinessSummary();
 }
 
 async function relayAttachments(attachments = []) {
@@ -319,9 +383,14 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   const recipients = validateRecipients(to, 'to');
   const ccRecipients = validateRecipients(cc, 'cc');
   const bccRecipients = validateRecipients(bcc, 'bcc');
+  const safeAttachments = assertAttachmentIntegrity(attachments);
+  const hasPdf = safeAttachments.some(isPdfAttachment);
 
-  if (isRelayConfigured()) {
-    return sendViaHttpsRelay({
+  // PDF reports must be delivered as real MIME attachments. The HTTPS relay is
+  // retained for ordinary notification mail, but PDF exports use direct SMTP
+  // so WordPress/JSON relay transformations cannot downgrade the attachment.
+  if (hasPdf) {
+    return sendViaSmtp({
       to: recipients,
       cc: ccRecipients,
       bcc: bccRecipients,
@@ -329,28 +398,34 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
       html,
       text,
       replyTo,
-      attachments
+      attachments: safeAttachments
     });
   }
 
-  const config = smtpConfig();
-  const transporter = createTransporter();
-
-  try {
-    return await transporter.sendMail({
-      from: `"${config.fromName}" <${config.fromEmail}>`,
+  if (isRelayConfigured()) {
+    const result = await sendViaHttpsRelay({
       to: recipients,
-      cc: ccRecipients.length ? ccRecipients : undefined,
-      bcc: bccRecipients.length ? bccRecipients : undefined,
-      subject: String(subject || '').trim(),
-      html: html || undefined,
-      text: text || undefined,
-      replyTo: replyTo || config.replyTo || undefined,
-      attachments
+      cc: ccRecipients,
+      bcc: bccRecipients,
+      subject,
+      html,
+      text,
+      replyTo,
+      attachments: safeAttachments
     });
-  } finally {
-    transporter.close();
+    return { ...result, transport: 'https_relay' };
   }
+
+  return sendViaSmtp({
+    to: recipients,
+    cc: ccRecipients,
+    bcc: bccRecipients,
+    subject,
+    html,
+    text,
+    replyTo,
+    attachments: safeAttachments
+  });
 }
 
 module.exports = {
@@ -367,5 +442,8 @@ module.exports = {
   normalizeAddressList,
   validateRecipients,
   isEmailTransportError,
-  emailFailureDetails
+  emailFailureDetails,
+  assertAttachmentIntegrity,
+  isPdfAttachment,
+  sendViaSmtp
 };
