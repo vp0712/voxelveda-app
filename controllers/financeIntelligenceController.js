@@ -69,7 +69,13 @@ exports.getOverview = async (req, res) => {
         `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,
                 ba.ownership_scope,ba.entity_name,ba.account_type,ba.financial_purpose,
                 ba.connection_type,ba.connection_status,ba.current_ledger_balance,
-                ba.available_balance,ba.history_start_date,ba.history_end_date,ba.last_synced_at,
+                ba.available_balance,
+                CASE
+                  WHEN UPPER(COALESCE(ba.connection_type,''))='MANUAL' OR UPPER(COALESCE(ba.connection_status,''))='MANUAL'
+                    THEN COALESCE(ba.current_ledger_balance,ba.available_balance,ba.opening_balance,0)
+                  ELSE COALESCE(ba.available_balance,ba.current_ledger_balance,ba.opening_balance,0)
+                END AS profile_balance,
+                ba.history_start_date,ba.history_end_date,ba.last_synced_at,
                 (SELECT COUNT(*) FROM bank_transactions bx
                   WHERE bx.bank_account_id=ba.id AND bx.reconciliation_status<>'IGNORED' AND bx.archived_at IS NULL) AS transaction_count,
                 (SELECT COUNT(*) FROM bank_transactions bx
@@ -1016,7 +1022,13 @@ exports.getBankingDashboard = async (req, res) => {
       pool.query(
         `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
                 ba.entity_name,ba.account_type,ba.financial_purpose,ba.connection_type,ba.connection_status,
-                ba.current_ledger_balance,ba.available_balance,ba.last_synced_at,
+                ba.current_ledger_balance,ba.available_balance,
+                CASE
+                  WHEN UPPER(COALESCE(ba.connection_type,''))='MANUAL' OR UPPER(COALESCE(ba.connection_status,''))='MANUAL'
+                    THEN COALESCE(ba.current_ledger_balance,ba.available_balance,ba.opening_balance,0)
+                  ELSE COALESCE(ba.available_balance,ba.current_ledger_balance,ba.opening_balance,0)
+                END AS profile_balance,
+                ba.last_synced_at,
                 COUNT(bt.id) AS transaction_count
            FROM bank_accounts ba
            LEFT JOIN bank_transactions bt ON bt.bank_account_id=ba.id
@@ -1026,7 +1038,13 @@ exports.getBankingDashboard = async (req, res) => {
       ).then(([rows]) => rows),
       pool.query(
         `SELECT ba.currency,COUNT(*) AS account_count,
-                COALESCE(SUM(COALESCE(ba.available_balance,ba.current_ledger_balance,0)),0) AS balance
+                COALESCE(SUM(
+                  CASE
+                    WHEN UPPER(COALESCE(ba.connection_type,''))='MANUAL' OR UPPER(COALESCE(ba.connection_status,''))='MANUAL'
+                      THEN COALESCE(ba.current_ledger_balance,ba.available_balance,ba.opening_balance,0)
+                    ELSE COALESCE(ba.available_balance,ba.current_ledger_balance,ba.opening_balance,0)
+                  END
+                ),0) AS balance
            FROM bank_accounts ba
           WHERE ${accountClauses.join(' AND ')}
           GROUP BY ba.currency ORDER BY ba.currency`,
