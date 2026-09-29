@@ -1890,6 +1890,35 @@ async function exportBuiltReportXlsx(){
  location.href=API+'/reports/builder.xlsx?'+reportQuery(def);
 }
 
+function openReportEmailDialog(){
+ const def=reportDefinitionFromUi();if(!def)return;
+ $('fmModalEyebrow').textContent='FINANCE REPORT DELIVERY';
+ $('fmModalTitle').textContent='Email PDF report';
+ $('fmModalBody').innerHTML=`<form id="reportEmailForm" class="fm-form">
+  <div class="fm-state"><strong>PDF attachment</strong><p>The generated report will be attached as a real .pdf document with its original filename and application/pdf MIME type.</p></div>
+  <label>Recipient email<input name="to" type="email" autocomplete="email" placeholder="name@example.com" required></label>
+  <label>Delivery note<textarea name="note" rows="3" maxlength="500" placeholder="Optional note for the recipient"></textarea></label>
+  <div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Send PDF</button></div>
+ </form>`;
+ $('fmModal').showModal();
+ document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
+ const form=$('reportEmailForm');
+ form.onsubmit=async e=>{
+  e.preventDefault();
+  const fd=new FormData(form),to=String(fd.get('to')||'').trim(),note=String(fd.get('note')||'').trim();
+  const button=form.querySelector('button[type="submit"]');button.disabled=true;button.textContent='Sending…';
+  try{
+   const x=await api(API+'/reports/builder/email-pdf',{method:'POST',body:JSON.stringify({to,note,definition:def}),timeoutMs:90000});
+   $('fmModal').close();
+   const filename=x.filename||'Finance report.pdf';
+   const integrity=x.attachment_filename_verified?'Filename verified':'Delivery accepted';
+   showFinancePopup('Finance PDF sent',x.message||'Finance PDF sent successfully.',filename+' · '+integrity+(x.delivery_transport?' · '+String(x.delivery_transport).replaceAll('_',' ').toUpperCase():''));
+  }catch(error){
+   button.disabled=false;button.textContent='Send PDF';notice(error.message,true);
+  }
+ };
+}
+
 function controlActionsView(){
  const payload=state.controlActions||{},items=payload.issues||[],s=payload.summary||{};
  const active=items.filter(x=>['OPEN','IN_PROGRESS'].includes(String(x.status||'').toUpperCase()));
@@ -2664,16 +2693,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-show-all-history]').forEach(b=>b.onclick=()=>{state.period='all';state.txMeta.page=1;if($('fmPeriod'))$('fmPeriod').value='all';refresh()});
  if($('reportBuilderForm'))$('reportBuilderForm').onsubmit=async e=>{e.preventDefault();try{await generateBuiltReport()}catch(error){notice(error.message,true)}};
  if($('reportPdf'))$('reportPdf').onclick=()=>{const def=reportDefinitionFromUi();if(def)location.href=API+'/reports/builder.pdf?'+reportQuery(def)};
- if($('reportEmailPdf'))$('reportEmailPdf').onclick=async()=>{
-  const def=reportDefinitionFromUi();if(!def)return;
-  const to=String(prompt('Send this Finance PDF to which email address?')||'').trim();if(!to)return;
-  const button=$('reportEmailPdf');button.disabled=true;button.textContent='Sending…';
-  try{
-   const x=await api(API+'/reports/builder/email-pdf',{method:'POST',body:JSON.stringify({to,definition:def}),timeoutMs:90000});
-   notice((x.message||'Finance PDF sent successfully.')+(x.filename?' · '+x.filename+' attached as PDF':'')+(x.delivery_transport?' · '+String(x.delivery_transport).toUpperCase():'') );
-  }catch(error){notice(error.message,true)}
-  finally{if(button&&document.body.contains(button)){button.disabled=false;button.textContent='Email PDF'}}
- };
+ if($('reportEmailPdf'))$('reportEmailPdf').onclick=()=>openReportEmailDialog();
  if($('reportCsv'))$('reportCsv').onclick=()=>{const def=reportDefinitionFromUi();if(def)location.href=API+'/reports/builder.csv?'+reportQuery(def)};
  if($('reportXlsx'))$('reportXlsx').onclick=()=>exportBuiltReportXlsx().catch(error=>notice(error.message,true));
  if($('reportSave'))$('reportSave').onclick=()=>saveBuiltReport().catch(error=>notice(error.message,true));
