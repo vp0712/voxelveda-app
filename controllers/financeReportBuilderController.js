@@ -16,6 +16,7 @@ const { ensureFinanceSchema } = require('../services/financeSchema');
 const { companyProfile } = require('../config/companyProfile');
 const { buildFinancePdfArtifact } = require('../services/financeReportPdfService');
 const { sendMail, isEmailTransportError, emailFailureDetails } = require('../services/emailService');
+const { brandedLayout } = require('../services/emailTemplates');
 
 const VALID_SCOPES = new Set(['ALL','PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
 const VALID_TYPES = new Set(['TRANSACTION_REGISTER','INCOME','EXPENSE','INCOME_VS_EXPENSE','CASH_FLOW','ACCOUNT_ACTIVITY','ACCOUNT_STATEMENT','CATEGORY','MERCHANT','CASH','TRANSFER','REFUND','REIMBURSEMENT','GST_SUMMARY','RECONCILIATION','DATA_QUALITY','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY']);
@@ -689,11 +690,34 @@ exports.emailPdf=async(req,res)=>{
     const artifact=assertPdfArtifact(await buildReportPdfArtifact(report,profile,title));
     const period=(report.metadata.from||'All history') + ' to ' + (report.metadata.to||'Now');
 
+    const companyName=profile.tradingName||profile.legalName||'Voxel Veda';
+    const textBody=[
+      companyName + ' Finance',
+      '',
+      'Attached: ' + artifact.filename,
+      'Report: ' + title,
+      'Period: ' + period,
+      'Report ID: ' + artifact.reportId,
+      '',
+      'This PDF was generated from the permission-scoped Voxel Veda Finance ledger.'
+    ].join('\n');
+    const htmlBody=brandedLayout(
+      '<h2 style="margin-top:0">' + title + '</h2>' +
+      '<p>Your requested Finance report is attached as a PDF document.</p>' +
+      '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
+      '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
+      '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
+      '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
+      '</table>' +
+      '<p style="font-size:12px;color:#607080">The attachment must appear with a .pdf filename and application/pdf MIME type. If your mail client cannot preview it, download the attachment and open it with a PDF reader.</p>',
+      title + ' PDF attached'
+    );
+
     const result=await sendMail({
       to:recipient,
-      subject:(profile.tradingName||profile.legalName||'Voxel Veda') + ' - ' + title,
-      text:'Attached is the ' + title + ' for ' + period + '. Report ID: ' + artifact.reportId + '.',
-      html:'<p>Attached is the <strong>' + title + '</strong> for ' + period + '.</p><p>Report ID: ' + artifact.reportId + '</p><p>' + (profile.legalName||'Voxel Veda Pty Ltd') + '</p>',
+      subject:companyName + ' | ' + title + ' | ' + period,
+      text:textBody,
+      html:htmlBody,
       replyTo:profile.email,
       attachments:[{
         filename:artifact.filename,
@@ -719,7 +743,9 @@ exports.emailPdf=async(req,res)=>{
       sender:profile.email,
       attachment_content_type:'application/pdf',
       attachment_bytes:artifact.buffer.length,
-      delivery_transport:result?.transport||null
+      delivery_transport:result?.transport||null,
+      attachment_filename_verified:Boolean(result?.attachmentFilenameGuaranteed),
+      attachment_contract_version:2
     });
   }catch(error){
     if(isEmailTransportError(error)){
