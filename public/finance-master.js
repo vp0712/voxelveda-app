@@ -682,7 +682,7 @@ async function openStatementVaultEditor(uid){
   const payload=await api(I+'/statements/'+encodeURIComponent(uid)+'/report');
   const statement=payload.statement||{};
   const transactions=[...(payload.transactions||[])].sort((a,b)=>String(a.transaction_date||'').localeCompare(String(b.transaction_date||''))||num(a.id)-num(b.id));
-  const rows=transactions.map(tx=>`<tr>
+  const rows=transactions.map(tx=>`<tr class="fm-vault-editor-row">
     <td>${date(tx.transaction_date)}</td>
     <td><b>${esc(tx.merchant_name||tx.description||'Transaction')}</b><small>${esc(tx.description||'')}${tx.reference?' · Ref '+esc(tx.reference):''}</small></td>
     <td><button type="button" class="fm-category-link" data-statement-classify-tx="${esc(tx.id)}">${esc(tx.category||'Unclassified')}</button></td>
