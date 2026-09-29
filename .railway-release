@@ -1,5 +1,6 @@
-finance-release: 20260929-email-pdf-account-card-domain-v1
-source-commit: 57f123b8b2f4e3f065954daefc53dd228c502561
-scope: smtp-pdf-attachment-integrity-internal-account-card-canonical-app-domain
-verification: finance-production-regression-domain-runtime-smtp-health
+finance-release: 20260929-email-pdf-relay-domain-v2
+source-commit: 3909545d80d6f462659a610db0c6de22b223a952
+scope: attachment-safe-pdf-email-https-relay-internal-account-card-canonical-app-domain
+ci: security-1127-success; banking-638-success; enterprise-audit-546-success; consolidation-800-success
+runtime: email-primary=https_relay; pdf-email=https_relay; canonical=https://app.voxelveda.com
 policy: single-marker-controlled-production-deploy
