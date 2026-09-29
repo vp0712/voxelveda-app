@@ -516,12 +516,14 @@ function renderBankStatementPageChrome(doc,profile,report,reportId,pageNumber,pa
 function bankStatementTableHeader(doc,y){
   doc.save();
   doc.rect(42,y,511,22).fill('#0B5ED7');
-  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(7.2);
-  doc.text('Date',48,y+7,{width:50});
-  doc.text('Transaction',98,y+7,{width:250});
-  doc.text('Debit',356,y+7,{width:58,align:'right'});
-  doc.text('Credit',420,y+7,{width:58,align:'right'});
-  doc.text('Balance',484,y+7,{width:63,align:'right'});
+  doc.fillColor('#FFFFFF').font('Helvetica-Bold').fontSize(6.4);
+  doc.text('Date',48,y+7,{width:42});
+  doc.text('Description',92,y+7,{width:128});
+  doc.text('Reference',222,y+7,{width:80});
+  doc.text('Category',304,y+7,{width:80});
+  doc.text('Debit',388,y+7,{width:48,align:'right'});
+  doc.text('Credit',440,y+7,{width:48,align:'right'});
+  doc.text('Balance',492,y+7,{width:55,align:'right'});
   doc.restore();
   return y+22;
 }
@@ -565,11 +567,15 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
   y=bankStatementTableHeader(doc,y);
   const rows=[...(report.transactions||[])].sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||Number(a.id)-Number(b.id));
   for(const row of rows){
-    const description=String(row.merchant_name||row.description||'Transaction').replace(/\s+/g,' ').trim();
-    const ref=row.reference?String(row.reference).trim():'';
-    const detail=ref&&ref!==description?`${description}\nRef: ${ref}`:description;
-    const textHeight=Math.min(24,doc.heightOfString(detail,{width:246,lineGap:1}));
-    const rowH=Math.max(28,textHeight+10);
+    const description=String(row.description||row.merchant_name||'Transaction').replace(/\s+/g,' ').trim();
+    const ref=row.reference?String(row.reference).replace(/\s+/g,' ').trim():'';
+    const category=String(row.category||'Unclassified').replace(/\s+/g,' ').trim();
+    const textHeight=Math.max(
+      doc.heightOfString(description,{width:124,lineGap:1}),
+      doc.heightOfString(ref,{width:76,lineGap:1}),
+      doc.heightOfString(category,{width:76,lineGap:1})
+    );
+    const rowH=Math.max(28,Math.min(45,textHeight+10));
     if(y+rowH>746){
       doc.addPage();
       y=118;
@@ -577,13 +583,14 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
     }
     if(Math.floor((y-323)/28)%2===1)doc.rect(42,y,511,rowH).fill('#FAFCFF');
     doc.moveTo(42,y+rowH).lineTo(553,y+rowH).strokeColor('#E5EDF6').lineWidth(0.45).stroke();
-    doc.fillColor('#334155').font('Helvetica').fontSize(7.1);
-    doc.text(bankStatementDate(row.transaction_date),48,y+8,{width:47});
-    doc.fillColor('#172033').text(detail,98,y+7,{width:250,height:rowH-8,ellipsis:true,lineGap:1});
-    doc.fillColor('#334155');
-    doc.text(Number(row.debit||0)>0?bankStatementMoney(row.debit,''): '',356,y+8,{width:58,align:'right'});
-    doc.text(Number(row.credit||0)>0?bankStatementMoney(row.credit,''): '',420,y+8,{width:58,align:'right'});
-    doc.font('Helvetica-Bold').fillColor('#172033').text(row.running_balance===null||row.running_balance===undefined?'—':bankStatementMoney(row.running_balance,''),484,y+8,{width:63,align:'right'});
+    doc.fillColor('#334155').font('Helvetica').fontSize(6.3);
+    doc.text(bankStatementDate(row.transaction_date),48,y+8,{width:42});
+    doc.fillColor('#172033').text(description,92,y+7,{width:128,height:rowH-8,ellipsis:true,lineGap:1});
+    doc.fillColor('#475569').text(ref,222,y+7,{width:80,height:rowH-8,ellipsis:true,lineGap:1});
+    doc.fillColor('#334155').text(category,304,y+7,{width:80,height:rowH-8,ellipsis:true,lineGap:1});
+    doc.text(Number(row.debit||0)>0?bankStatementMoney(row.debit,''): '',388,y+8,{width:48,align:'right'});
+    doc.text(Number(row.credit||0)>0?bankStatementMoney(row.credit,''): '',440,y+8,{width:48,align:'right'});
+    doc.font('Helvetica-Bold').fillColor('#172033').text(row.running_balance===null||row.running_balance===undefined?'—':bankStatementMoney(row.running_balance,''),492,y+8,{width:55,align:'right'});
     y+=rowH;
   }
   if(y+78>746){doc.addPage();y=118}
