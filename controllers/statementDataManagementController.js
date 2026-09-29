@@ -243,6 +243,7 @@ exports.correctPostedTransaction = async (req,res) => {
       debit,credit,
       running_balance:req.body?.running_balance ?? tx.running_balance,
       merchant_name:req.body?.merchant_name ?? tx.merchant_name,
+      category:req.body?.category ?? tx.category,
       currency:tx.currency||file.currency
     },sourceRow?.row_no||tx.statement_row_id||transactionId);
 
@@ -257,15 +258,16 @@ exports.correctPostedTransaction = async (req,res) => {
 
     const oldValue={
       transaction_date:tx.transaction_date,posting_date:tx.posting_date,description:tx.description,reference:tx.reference,
-      debit:tx.debit,credit:tx.credit,running_balance:tx.running_balance,merchant_name:tx.merchant_name,row_hash:tx.row_hash
+      debit:tx.debit,credit:tx.credit,running_balance:tx.running_balance,merchant_name:tx.merchant_name,category:tx.category,row_hash:tx.row_hash
     };
     await db.query(
       `UPDATE bank_transactions
           SET transaction_date=?,posting_date=?,description=?,reference=?,debit=?,credit=?,running_balance=?,
-              merchant_name=?,row_hash=?,manual_override=1,review_source_status='CORRECTED'
+              merchant_name=?,category=?,classification_status=IF(? IS NULL OR ?='','UNCLASSIFIED','CLASSIFIED'),
+              row_hash=?,manual_override=1,review_source_status='CORRECTED'
         WHERE id=?`,
       [candidate.transaction_date,candidate.posting_date,candidate.description,candidate.reference,candidate.debit,candidate.credit,
-       candidate.running_balance,candidate.merchant_name,candidate.row_hash,transactionId]
+       candidate.running_balance,candidate.merchant_name,candidate.category,candidate.category,candidate.category,candidate.row_hash,transactionId]
     );
 
     if(sourceRow){
@@ -277,13 +279,13 @@ exports.correctPostedTransaction = async (req,res) => {
       const message=('Post-import correction: '+reason).slice(0,500);
       await db.query(
         `UPDATE statement_import_rows
-            SET transaction_date=?,posting_date=?,description=?,reference=?,debit=?,credit=?,running_balance=?,merchant_name=?,
+            SET transaction_date=?,posting_date=?,description=?,reference=?,debit=?,credit=?,running_balance=?,merchant_name=?,category=?,
                 row_hash=?,validation_status='WARNING',validation_message=?,manual_override=1,override_reason=?,
                 override_original_json=?,corrected_values_json=?,review_status='POSTED',overridden_by=?,overridden_at=NOW(),
                 override_version=override_version+1
           WHERE id=? AND import_session_id=?`,
         [candidate.transaction_date,candidate.posting_date,candidate.description,candidate.reference,candidate.debit,candidate.credit,
-         candidate.running_balance,candidate.merchant_name,candidate.row_hash,message,reason.slice(0,500),
+         candidate.running_balance,candidate.merchant_name,candidate.category,candidate.row_hash,message,reason.slice(0,500),
          typeof original==='string'?original:JSON.stringify(original),JSON.stringify(candidate),req.user.id,sourceRow.id,session.id]
       );
     }
@@ -298,7 +300,7 @@ exports.correctPostedTransaction = async (req,res) => {
       newValue:{
         transaction_date:candidate.transaction_date,posting_date:candidate.posting_date,description:candidate.description,
         reference:candidate.reference,debit:candidate.debit,credit:candidate.credit,running_balance:candidate.running_balance,
-        merchant_name:candidate.merchant_name,row_hash:candidate.row_hash,reason,source_statement_uid:uid
+        merchant_name:candidate.merchant_name,category:candidate.category,row_hash:candidate.row_hash,reason,source_statement_uid:uid
       },
       metadata:{original_bank_evidence_preserved:true,post_import_correction:true}
     }));
