@@ -505,7 +505,7 @@ function financeAccountCardMarkup(account,options={}){
  const masked=a.account_number_masked||('Account '+String(a.id||''));
  const bsb=a.bsb_masked?('BSB '+a.bsb_masked):'Voxel Veda Finance';
  return `<section class="fm-finance-account-card ${compact?'compact':''}" aria-label="Voxel Veda Finance internal account card">
-  <div class="fm-finance-card-head"><div class="fm-finance-card-brand"><span class="fm-finance-card-mark">VV</span><div><b>Voxel Veda</b><small>Finance Account</small></div></div><span class="fm-finance-card-chip" aria-hidden="true"></span></div>
+  <div class="fm-finance-card-head"><div class="fm-finance-card-brand"><img src="/Frame%201.png" alt="Voxel Veda" style="width:108px;max-height:54px;object-fit:contain;object-position:left center;background:#fff;border-radius:10px;padding:4px 8px"><div><b>Voxel Veda</b><small>Finance Account</small></div></div><span class="fm-finance-card-chip" aria-hidden="true"></span></div>
   <div class="fm-finance-card-name">${esc(a.nickname||'Finance Account')}</div>
   <div class="fm-finance-card-number">${esc(masked)}</div>
   <div class="fm-finance-card-meta"><span><small>ACCOUNT HOLDER</small><b>${esc(holder)}</b></span><span><small>CURRENCY</small><b>${esc(a.currency||'AUD')}</b></span></div>
@@ -524,8 +524,8 @@ function financeAccountCardSvg(account){
  return `<svg xmlns="http://www.w3.org/2000/svg" width="1011" height="638" viewBox="0 0 1011 638">
  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#071521"/><stop offset="1" stop-color="#18384a"/></linearGradient></defs>
  <rect width="1011" height="638" rx="48" fill="url(#g)"/><circle cx="870" cy="100" r="180" fill="#ffffff" opacity=".035"/>
- <rect x="60" y="54" width="76" height="76" rx="20" fill="#fff" opacity=".12"/><text x="98" y="103" text-anchor="middle" fill="#fff" font-family="Arial" font-size="30" font-weight="700">VV</text>
- <text x="158" y="86" fill="#fff" font-family="Arial" font-size="34" font-weight="700">Voxel Veda</text><text x="158" y="116" fill="#b9cbd6" font-family="Arial" font-size="18">Finance Account</text>
+ <image href="https://app.voxelveda.com/Frame%201.png" x="60" y="54" width="225" height="76" preserveAspectRatio="xMinYMid meet"/>
+ <text x="300" y="100" fill="#b9cbd6" font-family="Arial" font-size="20">Finance Account</text>
  <rect x="790" y="64" width="112" height="82" rx="16" fill="#d3b85f"/><path d="M846 64v82M790 105h112" stroke="#8c7939" stroke-width="5" opacity=".65"/>
  <text x="60" y="230" fill="#b9cbd6" font-family="Arial" font-size="22">${name}</text><text x="60" y="292" fill="#fff" font-family="Arial" font-size="36" font-weight="700">${masked}</text>
  <text x="60" y="385" fill="#829aaa" font-family="Arial" font-size="16">ACCOUNT HOLDER</text><text x="60" y="422" fill="#fff" font-family="Arial" font-size="25" font-weight="700">${holder}</text>
