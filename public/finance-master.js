@@ -263,15 +263,16 @@ function filterQuery(extra={}){
  return '?'+p.toString();
 }
 function accountChartsQuery(){
- const range=dateRange(),p=new URLSearchParams({scope:state.scope});
- if(range.from)p.set('from',range.from);if(range.to)p.set('to',range.to);
+ const p=new URLSearchParams({scope:state.scope});
  p.set('include_transactions','0');
  return '?'+p.toString();
 }
 window.__financeFilterQuery=(extra={})=>filterQuery(extra);
 window.__financeOpenCategory=async({category='',accountId='',currency=''}={})=>{
  state.account=accountId?String(accountId):'';
+ state.period='all';state.customFrom='';state.customTo='';
  if($('fmAccount'))$('fmAccount').value=state.account;
+ if($('fmPeriod'))$('fmPeriod').value='all';
  state.txFilters={...state.txFilters,q:'',type:'',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
  state.txMeta.page=1;
  state.view='transactions';
@@ -481,7 +482,9 @@ function renderAccountCategoryChart(account,rows=[],definitions=null,{compact=fa
 }
 async function openAccountCategory(accountId,category,currency){
  state.account=String(accountId||'');
+ state.period='all';state.customFrom='';state.customTo='';
  if($('fmAccount'))$('fmAccount').value=state.account;
+ if($('fmPeriod'))$('fmPeriod').value='all';
  state.txFilters={...state.txFilters,q:'',type:'',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
  state.txMeta.page=1;
  closeDrawer();
@@ -494,8 +497,7 @@ function accounts(){
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
  const spending=state.accountCategorySpending||{};
  const accountCategoryRows=Array.isArray(spending.account_categories)?spending.account_categories:[];
- const periodLabels={all:'All history',today:'Today',yesterday:'Yesterday',week:'This week',last7:'Last 7 days',month:'This month',last_month:'Last month',last30:'Last 30 days',quarter:'This quarter',previous_quarter:'Previous quarter',fy:'Current financial year',previous_fy:'Previous financial year',year:'Calendar year',custom:'Custom range'};
- const chartPeriod=periodLabels[state.period]||'Selected period';
+ const chartPeriod='All imported history';
  const cards=state.accounts.map((a,index)=>{
   const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
   const accountName=esc(a.nickname||'Account');
@@ -505,6 +507,9 @@ function accounts(){
   const connection=esc(a.connection_status||'MANUAL');
   const searchText=esc([a.nickname,a.institution,a.account_number_masked,a.ownership_scope,a.account_type,a.currency].filter(Boolean).join(' ').toLowerCase());
   const tone=(index%3)+1;
+  const manualAccount=String(a.connection_type||a.connection_status||'').toUpperCase()==='MANUAL'||String(a.connection_status||'').toUpperCase()==='MANUAL';
+  const profileBalance=a.profile_balance??(manualAccount?(a.current_ledger_balance??a.available_balance):(a.available_balance??a.current_ledger_balance));
+  const transactionCount=num(history.transaction_count??a.transaction_count);
   return `<article class="fm-account-card-shell fm-account-tone-${tone}" data-account-card-shell data-search-text="${searchText}">
    <div class="fm-account-card">
     <div class="fm-account-card-top">
@@ -513,12 +518,12 @@ function accounts(){
      <button class="fm-account-more" type="button" data-account="${a.id}" aria-label="Open account controls">•••</button>
     </div>
     <div class="fm-account-balance-row">
-     <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>${scope} · ${connection}</small></div>
+     <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(profileBalance,a.currency||'AUD')}</strong><small>${scope} · ${connection}</small></div>
      <div class="fm-account-main-actions"><button type="button" class="soft" data-account="${a.id}">View</button><button type="button" class="primary" data-account-transactions="${a.id}">Transactions</button></div>
     </div>
     ${renderAccountCategoryChart(a,accountCategoryRows.filter(row=>String(row.bank_account_id)===String(a.id)),null,{compact:true,label:chartPeriod})}
     <div class="fm-account-card-footer">
-     <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)}</small></div></div>
+     <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)} · ${transactionCount.toLocaleString('en-AU')} tx</small></div></div>
      <div class="fm-account-footer-actions"><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
     </div>
    </div>
@@ -2469,7 +2474,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));
  document.querySelectorAll('[data-account-statement]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountStatementForm(b.dataset.accountStatement)});
  document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
- document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');if($('fmAccount'))$('fmAccount').value=state.account;state.txMeta.page=1;go('transactions');loadTransactions()});
+ document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');state.period='all';state.customFrom='';state.customTo='';if($('fmAccount'))$('fmAccount').value=state.account;if($('fmPeriod'))$('fmPeriod').value='all';state.txMeta.page=1;go('transactions');loadTransactions()});
  document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
  const accountSearch=document.querySelector('[data-account-search]');
  if(accountSearch)accountSearch.oninput=e=>{const q=String(e.currentTarget.value||'').trim().toLowerCase();document.querySelectorAll('[data-account-card-shell]').forEach(card=>{card.hidden=Boolean(q)&&!String(card.dataset.searchText||'').includes(q)})};
