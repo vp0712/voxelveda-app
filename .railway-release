@@ -1,5 +1,5 @@
-finance-release: 20260929-account-profile-all-history-fix
-source-commit: 278bddc569735c23e34d403180ccae6e1ae2a6cb
-scope: manual-account-balance-all-history-category-chart-and-account-transactions
-verification: finance-production-regression-suite-on-railway-build
+finance-release: 20260929-bank-style-statement-category-order-fix
+source-commit: 89a9158560d337b80d046ace5e45ffaa24cd56a4
+scope: statement-category-backfill-future-classification-oldest-first-ledger
+verification: railway-finance-regression-suite-and-live-category-backfill
 policy: marker-only-production-deploy
