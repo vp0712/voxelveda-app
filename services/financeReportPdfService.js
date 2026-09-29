@@ -133,8 +133,12 @@ function renderSummary(doc, report, title) {
     ' · ' + report.metadata.source_transaction_count + ' canonical transaction(s)',
     42, 141, { width: 511 }
   );
+  doc.font('Helvetica').fontSize(6.6).fillColor('#64748B').text(
+    'Currency treatment: native currencies remain separate; this report does not invent foreign-exchange conversion.',
+    42, 152, { width: 511 }
+  );
 
-  let y = 162;
+  let y = 171;
   doc.roundedRect(42, y, 511, 82, 9).fillAndStroke('#F4F8FC', '#D7E4F0');
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#0F2744').text('Financial summary', 56, y + 12, { width: 150 });
 
@@ -164,7 +168,7 @@ function renderSummary(doc, report, title) {
       56, y + 64, { width: 480 }
     );
   }
-  return 261;
+  return 270;
 }
 
 function renderCategoryTable(doc, report, y) {
