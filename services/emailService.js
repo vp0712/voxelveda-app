@@ -264,7 +264,7 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
       replyTo: replyTo || config.replyTo || undefined,
       attachments
     });
-    return { ...result, transport: 'smtp' };
+    return { ...result, transport: 'smtp', attachmentFilenameGuaranteed: true };
   } finally {
     transporter.close();
   }
@@ -419,7 +419,7 @@ async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attac
       error.responseCode = response.status;
       throw error;
     }
-    return { messageId: null, accepted: to, transport: 'hostinger_mail_api' };
+    return { messageId: null, accepted: to, transport: 'hostinger_mail_api', attachmentFilenameGuaranteed: true };
   } catch (error) {
     if (error.name === 'AbortError') {
       error.code = 'HOSTINGER_MAIL_API_TIMEOUT';
@@ -467,7 +467,13 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
       error.responseCode = response.status;
       throw error;
     }
-    return { messageId: result.provider_message_id || result.request_id || null, accepted: to };
+    return {
+      messageId: result.provider_message_id || result.request_id || null,
+      accepted: to,
+      attachmentFilenameGuaranteed: result.attachment_filename_preserved === true
+        || result.preserve_attachment_filenames === true
+        || result.attachment_contract_version >= 2
+    };
   } catch (error) {
     if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
     throw error;
