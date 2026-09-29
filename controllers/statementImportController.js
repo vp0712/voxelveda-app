@@ -1001,10 +1001,18 @@ exports.commit = async (req, res) => {
           history_start_date=CASE WHEN history_start_date IS NULL OR ? < history_start_date THEN ? ELSE history_start_date END,
           history_end_date=CASE WHEN history_end_date IS NULL OR ? > history_end_date THEN ? ELSE history_end_date END,
           current_ledger_balance=CASE WHEN ?=1 THEN ? ELSE current_ledger_balance END,
-          reconciled_balance=CASE WHEN ?=1 THEN ? ELSE reconciled_balance END
+          reconciled_balance=CASE WHEN ?=1 THEN ? ELSE reconciled_balance END,
+          available_balance=CASE
+            WHEN ?=1 AND (UPPER(COALESCE(connection_type,''))='MANUAL' OR UPPER(COALESCE(connection_status,''))='MANUAL')
+              THEN ?
+            ELSE available_balance
+          END
          WHERE id=?`,
-        [minDate, minDate, maxDate, maxDate, advancesAccountBalance ? 1 : 0, statementClosingBalance,
-          advancesAccountBalance ? 1 : 0, statementClosingBalance, account.id]
+        [minDate, minDate, maxDate, maxDate,
+          advancesAccountBalance ? 1 : 0, statementClosingBalance,
+          advancesAccountBalance ? 1 : 0, statementClosingBalance,
+          advancesAccountBalance ? 1 : 0, statementClosingBalance,
+          account.id]
       );
     }
     const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
