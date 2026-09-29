@@ -327,10 +327,17 @@ async function relayAttachments(attachments = []) {
       error.code = 'EMAIL_RELAY_ATTACHMENT_LIMIT';
       throw error;
     }
+    const filename = String(attachment.filename || 'attachment').slice(0, 180);
+    const contentType = String(attachment.contentType || attachment.content_type || 'application/octet-stream').slice(0, 120);
+    const contentBase64 = content.toString('base64');
     encoded.push({
-      filename: String(attachment.filename || 'attachment').slice(0, 180),
-      content_type: String(attachment.contentType || 'application/octet-stream').slice(0, 120),
-      content_base64: content.toString('base64')
+      filename,
+      content: contentBase64,
+      encoding: 'base64',
+      contentType,
+      contentDisposition: String(attachment.contentDisposition || 'attachment'),
+      content_type: contentType,
+      content_base64: contentBase64
     });
   }
   return encoded;
@@ -385,38 +392,9 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   const bccRecipients = validateRecipients(bcc, 'bcc');
   const safeAttachments = assertAttachmentIntegrity(attachments);
   const hasPdf = safeAttachments.some(isPdfAttachment);
+  const pdfTransport = String(process.env.PDF_EMAIL_TRANSPORT || 'auto').trim().toLowerCase();
 
-  // PDF reports must be delivered as real MIME attachments. The HTTPS relay is
-  // retained for ordinary notification mail, but PDF exports use direct SMTP
-  // so WordPress/JSON relay transformations cannot downgrade the attachment.
-  if (hasPdf) {
-    return sendViaSmtp({
-      to: recipients,
-      cc: ccRecipients,
-      bcc: bccRecipients,
-      subject,
-      html,
-      text,
-      replyTo,
-      attachments: safeAttachments
-    });
-  }
-
-  if (isRelayConfigured()) {
-    const result = await sendViaHttpsRelay({
-      to: recipients,
-      cc: ccRecipients,
-      bcc: bccRecipients,
-      subject,
-      html,
-      text,
-      replyTo,
-      attachments: safeAttachments
-    });
-    return { ...result, transport: 'https_relay' };
-  }
-
-  return sendViaSmtp({
+  const smtpArgs = {
     to: recipients,
     cc: ccRecipients,
     bcc: bccRecipients,
@@ -425,7 +403,30 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
     text,
     replyTo,
     attachments: safeAttachments
-  });
+  };
+  const relayArgs = { ...smtpArgs };
+
+  if (hasPdf && isRelayConfigured() && pdfTransport === 'https_relay') {
+    const result = await sendViaHttpsRelay(relayArgs);
+    return { ...result, transport: 'https_relay_pdf' };
+  }
+
+  if (hasPdf) {
+    try {
+      return await sendViaSmtp(smtpArgs);
+    } catch (error) {
+      if (!isRelayConfigured() || !isEmailTransportError(error)) throw error;
+      const result = await sendViaHttpsRelay(relayArgs);
+      return { ...result, transport: 'https_relay_pdf_fallback', smtp_error: String(error.code || 'SMTP_FAILED') };
+    }
+  }
+
+  if (isRelayConfigured()) {
+    const result = await sendViaHttpsRelay(relayArgs);
+    return { ...result, transport: 'https_relay' };
+  }
+
+  return sendViaSmtp(smtpArgs);
 }
 
 module.exports = {
