@@ -523,7 +523,7 @@ function bankStatementTableHeader(doc,y){
   doc.text('Category',304,y+7,{width:80});
   doc.text('Debit',388,y+7,{width:48,align:'right'});
   doc.text('Credit',440,y+7,{width:48,align:'right'});
-  doc.text('Balance',492,y+7,{width:55,align:'right'});
+  doc.text('Running balance',492,y+5,{width:55,align:'right'});
   doc.restore();
   return y+22;
 }
