@@ -993,9 +993,9 @@ exports.commit = async (req, res) => {
     const statementClosingBalance = session.closing_balance !== null && session.closing_balance !== undefined && session.closing_balance !== ''
       ? session.closing_balance
       : (latestRunningBalance ? latestRunningBalance.running_balance : null);
-    const advancesAccountBalance = statementClosingBalance !== null
+    const advancesAccountBalance = imported > 0 && statementClosingBalance !== null
       && (!account.history_end_date || !maxDate || String(maxDate) >= String(account.history_end_date).slice(0,10));
-    if (minDate || maxDate || advancesAccountBalance) {
+    if (imported > 0 && (minDate || maxDate || advancesAccountBalance)) {
       await db.query(
         `UPDATE bank_accounts SET
           history_start_date=CASE WHEN history_start_date IS NULL OR ? < history_start_date THEN ? ELSE history_start_date END,
