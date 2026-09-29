@@ -201,7 +201,7 @@ exports.getTransactions = async (req, res) => {
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
          LEFT JOIN statement_import_files sif ON sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id
         WHERE ${where}
-        ORDER BY bt.transaction_date DESC, bt.id DESC
+        ORDER BY bt.transaction_date ASC, bt.id ASC
         LIMIT ? OFFSET ?`,
       [...params, limit, offset]
     );
