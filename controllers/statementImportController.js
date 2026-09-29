@@ -58,6 +58,99 @@ function statementRowHash(accountId, row) {
 }
 
 
+function canonicalDuplicateText(value, max = 220) {
+  return String(value || '')
+    .normalize('NFKC')
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+function semanticTransactionKey(accountId, row) {
+  const transactionDate = dateOnly(row?.transaction_date);
+  if (!transactionDate) return null;
+  let debitCents;
+  let creditCents;
+  try {
+    debitCents = money.toCents(row?.debit || 0);
+    creditCents = money.toCents(row?.credit || 0);
+  } catch {
+    return null;
+  }
+  const hasDebit = debitCents > 0n;
+  const hasCredit = creditCents > 0n;
+  if (hasDebit === hasCredit) return null;
+
+  const reference = canonicalDuplicateText(row?.reference, 160);
+  const description = canonicalDuplicateText(row?.description, 260);
+  const merchant = canonicalDuplicateText(row?.merchant_name, 180);
+  let runningBalance = '';
+  if (row?.running_balance !== '' && row?.running_balance !== null && row?.running_balance !== undefined) {
+    try { runningBalance = money.fromCents(money.toCents(row.running_balance)); } catch {}
+  }
+
+  // A stable reference is the strongest cross-statement identity. Without one,
+  // require a source running balance as an additional discriminator so two
+  // legitimate same-day/same-amount purchases are not silently collapsed.
+  let identity = '';
+  if (reference.length >= 4) identity = `REF:${reference}`;
+  else if (runningBalance && (description || merchant)) identity = `TEXT:${merchant || description}|DESC:${description}|BAL:${runningBalance}`;
+  else return null;
+
+  const amount = money.fromCents(hasDebit ? debitCents : creditCents);
+  const direction = hasDebit ? 'DEBIT' : 'CREDIT';
+  return crypto.createHash('sha256').update(
+    [accountId, transactionDate, direction, amount, identity].join('|')
+  ).digest('hex');
+}
+
+async function loadSemanticDuplicateSources(db, accountId, rows, options = {}) {
+  const datedRows = (Array.isArray(rows) ? rows : []).filter((row) => dateOnly(row?.transaction_date));
+  if (!datedRows.length) return new Map();
+  const dates = datedRows.map((row) => dateOnly(row.transaction_date)).sort();
+  const from = dates[0];
+  const to = dates[dates.length - 1];
+  const sources = new Map();
+
+  const [ledgerRows] = await db.query(
+    `SELECT transaction_date,posting_date,description,reference,debit,credit,running_balance,merchant_name
+       FROM bank_transactions
+      WHERE bank_account_id=? AND transaction_date BETWEEN ? AND ?`,
+    [accountId, from, to]
+  );
+  for (const row of ledgerRows) {
+    const key = semanticTransactionKey(accountId, row);
+    if (key && !sources.has(key)) sources.set(key, 'same transaction already exists in the committed ledger');
+  }
+
+  if (options.includePending !== false) {
+    const contentHash = String(options.contentHash || '').trim().toLowerCase();
+    const [pendingRows] = await db.query(
+      `SELECT sir.transaction_date,sir.posting_date,sir.description,sir.reference,sir.debit,sir.credit,
+              sir.running_balance,sir.merchant_name,sis.import_uid,sis.original_name
+         FROM statement_import_rows sir
+         JOIN statement_import_sessions sis ON sis.id=sir.import_session_id
+        WHERE sis.bank_account_id=?
+          AND sis.status='PENDING_REVIEW'
+          AND (?='' OR sis.content_hash<>?)
+          AND sir.validation_status IN ('VALID','WARNING')
+          AND sir.selected=1
+          AND sir.transaction_date BETWEEN ? AND ?`,
+      [accountId, contentHash, contentHash, from, to]
+    );
+    for (const row of pendingRows) {
+      const key = semanticTransactionKey(accountId, row);
+      if (key && !sources.has(key)) {
+        sources.set(key, `same transaction already staged in ${String(row.original_name || row.import_uid || 'another statement review').slice(0, 180)}`);
+      }
+    }
+  }
+  return sources;
+}
+
+
 function autoStatementCategory(row) {
   const explicit = String(row?.category || '').trim().slice(0, 120);
   if (explicit) return explicit;
@@ -252,22 +345,38 @@ async function normalizeAndDedupe(db, account, inputRows, options = {}) {
     }
   }
 
+  const semanticSources = await loadSemanticDuplicateSources(db, account.id, normalized, {
+    contentHash,
+    includePending: true
+  });
   const seenInFile = new Set();
+  const seenSemanticInFile = new Set();
   for (const row of normalized) {
     if (!row.row_hash || row.validation_status === 'REJECTED') continue;
+    const semanticKey = semanticTransactionKey(account.id, row);
     let duplicateReason = null;
-    if (duplicateHashes.has(row.row_hash)) duplicateReason = duplicateSources.get(row.row_hash) || 'already exists in another statement';
-    else if (seenInFile.has(row.row_hash)) duplicateReason = 'repeated inside this statement file';
+    let duplicateStatus = null;
+    if (duplicateHashes.has(row.row_hash)) {
+      duplicateReason = duplicateSources.get(row.row_hash) || 'already exists in another statement';
+      duplicateStatus = 'EXACT_DUPLICATE';
+    } else if (semanticKey && semanticSources.has(semanticKey)) {
+      duplicateReason = semanticSources.get(semanticKey);
+      duplicateStatus = 'SEMANTIC_DUPLICATE';
+    } else if (seenInFile.has(row.row_hash) || (semanticKey && seenSemanticInFile.has(semanticKey))) {
+      duplicateReason = 'repeated inside this statement file';
+      duplicateStatus = 'DUPLICATE_IN_FILE';
+    }
 
     if (duplicateReason) {
       row.validation_status = 'DUPLICATE';
       const message = `Duplicate transaction — ${duplicateReason}. Excluded from import, totals and reports.`;
       row.validation_message = row.validation_message ? `${row.validation_message}; ${message}` : message;
       row.selected = 0;
-      row.duplicate_status = duplicateHashes.has(row.row_hash) ? 'EXACT_DUPLICATE' : 'DUPLICATE_IN_FILE';
+      row.duplicate_status = duplicateStatus || 'EXACT_DUPLICATE';
       row.review_status = 'DUPLICATE_LOCKED';
     }
     seenInFile.add(row.row_hash);
+    if (semanticKey) seenSemanticInFile.add(semanticKey);
   }
   return { normalized, counts: countRows(normalized) };
 }
@@ -726,11 +835,40 @@ exports.commit = async (req, res) => {
       });
     }
 
+    // Re-check semantic identity while the account row is locked. This closes
+    // the race between overlapping statement sessions that were staged together.
+    const committedSemantic = await loadSemanticDuplicateSources(db, account.id, selectedRows, { includePending: false });
+    const semanticSeen = new Set();
+    const semanticDuplicateRowIds = [];
+    const rows = [];
+    for (const row of selectedRows) {
+      const key = semanticTransactionKey(account.id, row);
+      if (key && (committedSemantic.has(key) || semanticSeen.has(key))) {
+        semanticDuplicateRowIds.push(Number(row.id));
+        continue;
+      }
+      rows.push(row);
+      if (key) semanticSeen.add(key);
+    }
+    if (semanticDuplicateRowIds.length) {
+      const ids = [...new Set(semanticDuplicateRowIds.filter((id) => Number.isInteger(id) && id > 0))];
+      const placeholders = ids.map(() => '?').join(',');
+      await db.query(
+        `UPDATE statement_import_rows
+            SET selected=0,
+                validation_status='DUPLICATE',
+                duplicate_status='SEMANTIC_DUPLICATE',
+                review_status='DUPLICATE_LOCKED',
+                validation_message=LEFT(CONCAT_WS('; ',NULLIF(validation_message,''),'Duplicate detected against the committed ledger during final verification — excluded from totals and reports.'),500)
+          WHERE id IN (${placeholders})`,
+        ids
+      );
+    }
+
     const batchUid = uid('BANK');
     let imported = 0;
-    let duplicates = 0;
+    let duplicates = semanticDuplicateRowIds.length;
     const finalDuplicateRowIds = [];
-    const rows = selectedRows;
     const dates = rows.map((row) => String(row.transaction_date || '').slice(0, 10)).filter(Boolean).sort();
     const minDate = dates[0] || null;
     const maxDate = dates[dates.length - 1] || null;
@@ -947,4 +1085,4 @@ exports.reject = async (req, res) => {
   } catch (error) { return fail(res, error, 'Failed to reject statement review'); }
 };
 
-exports._ingestion = { countRows, insertReviewRows, normalizeAndDedupe, normalizeRow, statementRowHash };
+exports._ingestion = { countRows, insertReviewRows, normalizeAndDedupe, normalizeRow, statementRowHash, semanticTransactionKey, loadSemanticDuplicateSources };
