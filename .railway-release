@@ -1,6 +1,6 @@
-finance-release: 20260929-email-domain-account-card-final-v3
-source-commit: 7499251a228fc037a4f5b9ddc03a0b2f40fe4935
-scope: attachment-safe-https-relay-pdf-original-logo-account-card-canonical-app-domain
-ci: security-1130-success; banking-641-success; bank-lifecycle-288-success; enterprise-audit-549-success; consolidation-803-success
-runtime: email-primary=https_relay; pdf-email=https_relay; canonical=https://app.voxelveda.com
+finance-release: 20260929-pdf-attachment-contract-and-email-modal-v4
+source-commit: 0d8989586995b1180c13dfb4884f7048070a0e04
+scope: hostinger-mail-api-ready-relay-v2-filename-contract-branded-email-modal
+ci: security-1137-success; banking-648-success; enterprise-audit-556-success; consolidation-810-success
+runtime: preserve-current-domain-safe-mode; pdf-email-relay-until-hostinger-api-token-configured
 policy: single-marker-controlled-production-deploy
