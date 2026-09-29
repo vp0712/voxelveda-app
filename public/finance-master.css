@@ -695,3 +695,74 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .fm-table-wrap{border-radius:10px}
   .fm-report-catalogue{grid-template-columns:1fr}
 }
+
+
+/* Voxel Veda Finance internal account card */
+.fm-account-card-drawer{display:flex;justify-content:center;margin:4px 0 16px}
+.fm-account-card-modal{display:grid;gap:14px}
+.fm-finance-account-card{
+  position:relative;
+  overflow:hidden;
+  width:min(100%,520px);
+  aspect-ratio:1.585/1;
+  border-radius:22px;
+  padding:24px;
+  color:#fff;
+  background:linear-gradient(135deg,#071521 0%,#0d293c 54%,#18384a 100%);
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:0 22px 55px rgba(6,24,39,.25);
+  display:flex;
+  flex-direction:column;
+  gap:12px;
+}
+.fm-finance-account-card::after{
+  content:"";
+  position:absolute;
+  width:280px;height:280px;border-radius:50%;
+  right:-110px;top:-120px;
+  background:rgba(255,255,255,.04);
+  pointer-events:none;
+}
+.fm-finance-account-card.compact{width:min(100%,430px);padding:20px;border-radius:18px;gap:9px}
+.fm-finance-card-head,.fm-finance-card-meta,.fm-finance-card-footer,.fm-finance-card-balance{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.fm-finance-card-brand{display:flex;align-items:center;gap:11px}
+.fm-finance-card-brand b{display:block;font-size:1.05rem;letter-spacing:.01em}
+.fm-finance-card-brand small{display:block;color:#b8cad5;margin-top:2px}
+.fm-finance-card-mark{
+  width:42px;height:42px;border-radius:12px;
+  display:grid;place-items:center;
+  background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.12);
+  font-weight:800;letter-spacing:.05em
+}
+.fm-finance-card-chip{
+  width:54px;height:40px;border-radius:9px;
+  background:linear-gradient(145deg,#e3cf7c,#a68e3c);
+  border:1px solid rgba(255,255,255,.35);
+  position:relative
+}
+.fm-finance-card-chip::before,.fm-finance-card-chip::after{content:"";position:absolute;background:rgba(74,57,18,.35)}
+.fm-finance-card-chip::before{left:50%;top:0;bottom:0;width:1px}
+.fm-finance-card-chip::after{left:0;right:0;top:50%;height:1px}
+.fm-finance-card-name{margin-top:auto;color:#b8cad5;font-size:.86rem}
+.fm-finance-card-number{font-size:1.42rem;font-weight:750;letter-spacing:.06em;word-break:break-word}
+.fm-finance-card-meta span{display:grid;gap:3px;min-width:0}
+.fm-finance-card-meta small,.fm-finance-card-balance small{font-size:.62rem;letter-spacing:.08em;color:#8fa8b8}
+.fm-finance-card-meta b{font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px}
+.fm-finance-card-balance{border-top:1px solid rgba(255,255,255,.1);padding-top:10px}
+.fm-finance-card-balance strong{font-size:1.1rem}
+.fm-finance-card-footer{margin-top:2px;font-size:.58rem;letter-spacing:.09em;color:#b8cad5}
+.fm-finance-card-footer b{color:#fff}
+.fm-finance-account-card.compact .fm-finance-card-number{font-size:1.15rem}
+.fm-finance-account-card.compact .fm-finance-card-balance strong{font-size:.95rem}
+.fm-finance-account-card.compact .fm-finance-card-meta b{font-size:.7rem}
+
+@media(max-width:700px){
+  .fm-finance-account-card{padding:18px;border-radius:17px;gap:8px}
+  .fm-finance-card-mark{width:36px;height:36px;border-radius:10px}
+  .fm-finance-card-chip{width:46px;height:34px}
+  .fm-finance-card-number{font-size:1.05rem}
+  .fm-finance-card-meta b{font-size:.66rem;max-width:150px}
+  .fm-finance-card-meta small,.fm-finance-card-balance small{font-size:.55rem}
+  .fm-finance-card-footer{font-size:.5rem}
+}
