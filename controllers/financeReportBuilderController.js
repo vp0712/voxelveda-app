@@ -682,6 +682,7 @@ exports.emailPdf=async(req,res)=>{
   try{
     const definition=definitionFrom(req.body && req.body.definition ? req.body.definition : (req.body||{}));
     const recipient=safeText(req.body && req.body.to,254);
+    const deliveryNote=safeText(req.body && req.body.note,500);
     if(!recipient) throw new FinanceError('Recipient email is required.',400,'REPORT_EMAIL_RECIPIENT_REQUIRED');
 
     const report=await buildReport(req,definition);
@@ -698,9 +699,11 @@ exports.emailPdf=async(req,res)=>{
       'Report: ' + title,
       'Period: ' + period,
       'Report ID: ' + artifact.reportId,
+      deliveryNote ? '' : null,
+      deliveryNote ? 'Note: ' + deliveryNote : null,
       '',
       'This PDF was generated from the permission-scoped Voxel Veda Finance ledger.'
-    ].join('\n');
+    ].filter((line)=>line!==null).join('\n');
     const htmlBody=brandedLayout(
       '<h2 style="margin-top:0">' + title + '</h2>' +
       '<p>Your requested Finance report is attached as a PDF document.</p>' +
@@ -709,6 +712,7 @@ exports.emailPdf=async(req,res)=>{
       '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
       '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
       '</table>' +
+      (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
       '<p style="font-size:12px;color:#607080">The attachment must appear with a .pdf filename and application/pdf MIME type. If your mail client cannot preview it, download the attachment and open it with a PDF reader.</p>',
       title + ' PDF attached'
     );
