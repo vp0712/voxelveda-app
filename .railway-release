@@ -1,6 +1,6 @@
-finance-release: 20260929-pdf-attachment-contract-and-email-modal-v4
-source-commit: 0d8989586995b1180c13dfb4884f7048070a0e04
-scope: hostinger-mail-api-ready-relay-v2-filename-contract-branded-email-modal
-ci: security-1137-success; banking-648-success; enterprise-audit-556-success; consolidation-810-success
-runtime: preserve-current-domain-safe-mode; pdf-email-relay-until-hostinger-api-token-configured
+finance-release: 20260929-pdf-attachment-relay-endpoint-diagnostics-v5
+source-commit: 3ccc5af49df007a61e13c47ab9d9b3048b7df5ca
+scope: safe-relay-endpoint-diagnostics-after-pdf-attachment-hardening
+ci: security-1139-success; banking-650-success; enterprise-audit-558-success; consolidation-812-success
+runtime: preserve-current-domain-safe-mode; pdf-email-relay-diagnostics
 policy: single-marker-controlled-production-deploy
