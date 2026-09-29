@@ -1,5 +1,6 @@
-finance-release: 20260929-email-pdf-relay-final-v2
-source-commit: 3909545d80d6f462659a610db0c6de22b223a952
-scope: attachment-safe-https-relay-pdf-internal-account-card-canonical-app-domain
-verification: single-controlled-build-finance-regression-runtime-relay-health
-policy: no-smtp-dependency
+finance-release: 20260929-email-domain-account-card-final-v3
+source-commit: 7499251a228fc037a4f5b9ddc03a0b2f40fe4935
+scope: attachment-safe-https-relay-pdf-original-logo-account-card-canonical-app-domain
+ci: security-1130-success; banking-641-success; bank-lifecycle-288-success; enterprise-audit-549-success; consolidation-803-success
+runtime: email-primary=https_relay; pdf-email=https_relay; canonical=https://app.voxelveda.com
+policy: single-marker-controlled-production-deploy
