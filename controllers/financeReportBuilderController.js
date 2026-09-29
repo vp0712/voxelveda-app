@@ -647,6 +647,18 @@ function buildReportPdfArtifact(report,profile,title){
   return buildFinancePdfArtifact(report,profile,title);
 }
 
+function assertPdfArtifact(artifact){
+  const buffer=artifact?.buffer;
+  if(!Buffer.isBuffer(buffer)||buffer.length<5||buffer.subarray(0,5).toString('ascii')!=='%PDF-'){
+    const error=new FinanceError('Generated report is not a valid PDF attachment.',500,'PDF_ATTACHMENT_INVALID');
+    throw error;
+  }
+  if(!String(artifact?.filename||'').toLowerCase().endsWith('.pdf')){
+    throw new FinanceError('Generated report filename is not a PDF.',500,'PDF_ATTACHMENT_FILENAME_INVALID');
+  }
+  return artifact;
+}
+
 exports.pdf=async(req,res)=>{
   try{
     const report=await buildReport(req);
@@ -674,7 +686,7 @@ exports.emailPdf=async(req,res)=>{
     const report=await buildReport(req,definition);
     const profile=await reportCompanyProfile();
     const title=reportTitle(report.metadata.report_type);
-    const artifact=await buildReportPdfArtifact(report,profile,title);
+    const artifact=assertPdfArtifact(await buildReportPdfArtifact(report,profile,title));
     const period=(report.metadata.from||'All history') + ' to ' + (report.metadata.to||'Now');
 
     const result=await sendMail({
@@ -686,7 +698,8 @@ exports.emailPdf=async(req,res)=>{
       attachments:[{
         filename:artifact.filename,
         content:artifact.buffer,
-        contentType:'application/pdf'
+        contentType:'application/pdf',
+        contentDisposition:'attachment'
       }]
     });
 
@@ -703,7 +716,10 @@ exports.emailPdf=async(req,res)=>{
       report_id:artifact.reportId,
       filename:artifact.filename,
       message_id:result && result.messageId ? result.messageId : null,
-      sender:profile.email
+      sender:profile.email,
+      attachment_content_type:'application/pdf',
+      attachment_bytes:artifact.buffer.length,
+      delivery_transport:result?.transport||null
     });
   }catch(error){
     if(isEmailTransportError(error)){
@@ -761,4 +777,4 @@ exports.runSaved=async(req,res)=>{
   }catch(error){return fail(res,error,'Failed to run saved Finance report.')}
 };
 
-module.exports._test={buildFilters,definitionFrom,createReportWorkbook};
+module.exports._test={buildFilters,definitionFrom,createReportWorkbook,assertPdfArtifact};
