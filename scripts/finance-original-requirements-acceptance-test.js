@@ -12,6 +12,7 @@ const ui=read('public/finance-master.js');
 const css=read('public/finance-master.css');
 const financeRoutes=read('routes/financeRoutes.js');
 const report=read('controllers/financeReportBuilderController.js');
+const reportPdf=read('services/financeReportPdfService.js');
 const transactionLifecycle=read('controllers/financeTransactionLifecycleController.js');
 
 assert(html.includes('/finance-master.js')&&html.includes('/finance-master.css'),'one canonical Finance frontend must be loaded');
@@ -57,7 +58,7 @@ assert(css.includes('.fm-mobile-nav')&&css.includes('@media(max-width:700px)'),'
 for(const type of ['TRANSACTION_REGISTER','INCOME_VS_EXPENSE','CASH_FLOW','ACCOUNT_STATEMENT','CATEGORY','MERCHANT','CASH','TRANSFER','REFUND','REIMBURSEMENT','GST_SUMMARY','RECONCILIATION','DATA_QUALITY','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY']){
   assert(report.includes(type),'report backend missing '+type);
 }
-assert(report.includes('doc.switchToPage(index)'),'branded PDF header/footer must be applied across report pages');
+assert(reportPdf.includes('doc.switchToPage(index)'),'branded PDF header/footer must be applied across report pages');
 assert(ui.includes('id="reportPdf"')&&ui.includes('id="reportCsv"')&&ui.includes('id="reportXlsx"'),'PDF CSV XLSX report actions are required');
 
 assert(financeRoutes.includes("requireStepUp('IMPORT_BANK_TRANSACTIONS')"),'statement import must remain step-up protected');
