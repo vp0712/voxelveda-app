@@ -250,6 +250,10 @@ async function buildReport(req,definition=null){
     };
   }
 
+  const reportTransactions=f.report_type==='ACCOUNT_STATEMENT'
+    ? [...transactions].sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||Number(a.id)-Number(b.id))
+    : transactions;
+
   const reportId=uid();
   return {
     metadata:{
@@ -262,7 +266,7 @@ async function buildReport(req,definition=null){
     },
     summary:trustedTotals.singleCurrencySummary(summaryByCurrency),
     summary_by_currency:summaryByCurrency,
-    categories,merchants,transactions,coverage,monthly,gst_summary:gstSummary,reimbursements,
+    categories,merchants,transactions:reportTransactions,coverage,monthly,gst_summary:gstSummary,reimbursements,
     reconciliation_summary:reconciliationSummary,data_quality:dataQuality,account_statement:accountStatement
   };
 }
@@ -281,10 +285,10 @@ function csvDataset(report){
   if(type==='DATA_QUALITY') return {header:['Metric','Value'],rows:Object.entries(report.data_quality||{})};
   const statement=type==='ACCOUNT_STATEMENT';
   return {
-    header:statement?['Date','Posting Date','Description','Reference','Debit','Credit','Running Balance','Currency','Reconciliation','Receipt']:
+    header:statement?['Date','Posting Date','Description','Reference','Category','Debit','Credit','Running Balance','Currency','Reconciliation','Receipt']:
       ['Date','Posting Date','Account','Institution','Merchant','Description','Reference','Category','Scope','Currency','Debit','Credit','Type','Source','Reconciliation','Receipt'],
     rows:report.transactions.map(t=>statement?
-      [t.transaction_date,t.posting_date,t.description,t.reference,t.debit,t.credit,t.running_balance,t.currency,t.reconciliation_status,Number(t.has_receipt)?'ATTACHED':'MISSING']:
+      [t.transaction_date,t.posting_date,t.description,t.reference,t.category||'Unclassified',t.debit,t.credit,t.running_balance,t.currency,t.reconciliation_status,Number(t.has_receipt)?'ATTACHED':'MISSING']:
       [t.transaction_date,t.posting_date,t.account_name,t.institution,t.merchant_name,t.description,t.reference,t.category,t.ownership_scope,t.currency,t.debit,t.credit,Number(t.is_internal_transfer)?'TRANSFER':Number(t.debit)>0?'EXPENSE':'INCOME',t.source_type,t.reconciliation_status,Number(t.has_receipt)?'ATTACHED':'MISSING'])
   };
 }
