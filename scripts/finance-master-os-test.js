@@ -81,6 +81,11 @@ assert.match(js,/data-account-category=/,'Account category chart columns must be
 assert.match(js,/openAccountCategory\(/,'Account category columns must drill into filtered transactions.');
 assert.match(js,/accountCategorySpending/,'Accounts page must hydrate per-account category totals for the selected period.');
 assert.match(css,/\.fm-account-category-chart/,'Per-account category chart must be styled.');
+assert.match(js,/function financeAccountCardMarkup\(/,'Finance accounts must render an internal account-identification card.');
+assert.match(js,/NOT A PAYMENT CARD/,'Finance account card must not be presented as a payment instrument.');
+assert.match(js,/data-account-card=/,'Accounts page must expose the account card action.');
+assert.match(js,/function downloadFinanceAccountCard\(/,'Finance account card must support a downloadable non-payment card artifact.');
+assert.match(css,/\.fm-finance-account-card/,'Finance account card must have dedicated responsive styling.');
 
 assert.match(js,/data-account-purge/,'Account workspace must expose explicit permanent account-and-data deletion.');
 assert.match(js,/Type exactly:/,'Permanent account deletion must require typed confirmation.');
