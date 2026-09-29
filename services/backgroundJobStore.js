@@ -12,6 +12,50 @@ class BackgroundJobStore {
     ]) {
       await this.pool.query(`SELECT 1 FROM ${table} LIMIT 1`);
     }
+    await this.pruneTelemetry({ aggressive: true });
+  }
+
+  async pruneTelemetry(options = {}) {
+    const aggressive = Boolean(options.aggressive);
+    const runRetentionDays = aggressive ? 2 : 7;
+    const failureRetentionDays = aggressive ? 14 : 30;
+    const resolvedRetentionDays = aggressive ? 14 : 30;
+    const batchSize = aggressive ? 1000 : 250;
+    const maxBatches = aggressive ? 80 : 4;
+    let deletedRuns = 0;
+
+    for (let i = 0; i < maxBatches; i += 1) {
+      const [result] = await this.pool.query(
+        `DELETE FROM background_job_runs
+          WHERE status IN ('COMPLETED','FAILED','RETRY')
+            AND completed_at IS NOT NULL
+            AND completed_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
+          ORDER BY completed_at ASC
+          LIMIT ?`,
+        [runRetentionDays, batchSize]
+      );
+      const affected = Number(result.affectedRows || 0);
+      deletedRuns += affected;
+      if (affected < batchSize) break;
+    }
+
+    await this.pool.query(
+      `DELETE FROM background_job_failures
+        WHERE created_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
+        LIMIT ?`,
+      [failureRetentionDays, aggressive ? 5000 : 500]
+    ).catch(() => {});
+    await this.pool.query(
+      `DELETE FROM background_job_dead_letters
+        WHERE status='RESOLVED'
+          AND resolved_at IS NOT NULL
+          AND resolved_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
+        LIMIT ?`,
+      [resolvedRetentionDays, aggressive ? 5000 : 500]
+    ).catch(() => {});
+
+    if (deletedRuns) console.log(`BACKGROUND_JOB_TELEMETRY_PRUNED runs=${deletedRuns} retention_days=${runRetentionDays}`);
+    return { deletedRuns, runRetentionDays };
   }
 
   async acquireLease({ jobKey, leaseOwner, leaseToken, leaseSeconds }) {
@@ -124,6 +168,7 @@ class BackgroundJobStore {
        WHERE run_uuid = ? AND status = 'RUNNING'`,
       [processedCount, failedCount, runUuid]
     );
+    await this.pruneTelemetry({ aggressive: false }).catch(() => {});
   }
 
   async scheduleRetry({ runUuid, jobKey, attempt, errorCode, errorSummary, retryAt }) {
