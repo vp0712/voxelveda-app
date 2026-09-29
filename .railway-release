@@ -1,5 +1,5 @@
-finance-release: 20260929-bank-style-statement-category-order-fix-v2
-source-commit: cb884430c42a381388a6d175cb84a1147962dd14
-scope: statement-category-backfill-future-classification-oldest-first-ledger
-verification: railway-finance-regression-suite-and-live-category-backfill
-policy: marker-only-production-deploy
+finance-release: 20260929-email-pdf-account-card-domain-v1
+source-commit: 57f123b8b2f4e3f065954daefc53dd228c502561
+scope: smtp-pdf-attachment-integrity-internal-account-card-canonical-app-domain
+verification: finance-production-regression-domain-runtime-smtp-health
+policy: single-marker-controlled-production-deploy
