@@ -64,8 +64,22 @@ function isRelayConfigured() {
   return Boolean(config.url.startsWith('https://') && config.token);
 }
 
+function hostingerMailApiConfig() {
+  return {
+    baseUrl: String(process.env.HOSTINGER_MAIL_API_BASE_URL || 'https://api.mail.hostinger.com').trim().replace(/\/+$/, ''),
+    token: String(process.env.HOSTINGER_MAIL_API_TOKEN || '').trim(),
+    mailboxResourceId: String(process.env.HOSTINGER_MAILBOX_RESOURCE_ID || '').trim(),
+    timeoutMs: Math.max(3000, Math.min(Number(process.env.HOSTINGER_MAIL_API_TIMEOUT_MS || 20000), 60000))
+  };
+}
+
+function isHostingerMailApiConfigured() {
+  const config = hostingerMailApiConfig();
+  return Boolean(config.baseUrl.startsWith('https://') && config.token && config.mailboxResourceId);
+}
+
 function isEmailConfigured() {
-  return isRelayConfigured() || missingSmtpKeys().length === 0;
+  return isHostingerMailApiConfigured() || isRelayConfigured() || missingSmtpKeys().length === 0;
 }
 
 const EMAIL_TRANSPORT_CODES = new Set([
@@ -310,6 +324,13 @@ async function verifyConnection() {
   return relayResult || smtpReadinessSummary();
 }
 
+function safeAttachmentFilename(value, contentType = '') {
+  let filename = String(value || 'attachment').trim().replace(/[\\/\r\n\0]/g, '-').replace(/\s+/g, ' ').slice(0, 180);
+  if (!filename) filename = 'attachment';
+  if (String(contentType).toLowerCase() === 'application/pdf' && !filename.toLowerCase().endsWith('.pdf')) filename += '.pdf';
+  return filename;
+}
+
 async function relayAttachments(attachments = []) {
   let totalBytes = 0;
   const encoded = [];
@@ -332,20 +353,82 @@ async function relayAttachments(attachments = []) {
       error.code = 'EMAIL_RELAY_ATTACHMENT_LIMIT';
       throw error;
     }
-    const filename = String(attachment.filename || 'attachment').slice(0, 180);
     const contentType = String(attachment.contentType || attachment.content_type || 'application/octet-stream').slice(0, 120);
+    const filename = safeAttachmentFilename(attachment.filename, contentType);
     const contentBase64 = content.toString('base64');
     encoded.push({
       filename,
+      name: filename,
+      original_filename: filename,
       content: contentBase64,
+      data: contentBase64,
       encoding: 'base64',
       contentType,
+      mime_type: contentType,
       contentDisposition: String(attachment.contentDisposition || 'attachment'),
       content_type: contentType,
       content_base64: contentBase64
     });
   }
   return encoded;
+}
+
+async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attachments = [] }) {
+  const config = hostingerMailApiConfig();
+  if (!isHostingerMailApiConfigured()) {
+    const error = new Error('Hostinger Mail API transport is not configured.');
+    error.code = 'HOSTINGER_MAIL_API_CONFIG_MISSING';
+    throw error;
+  }
+  const encoded = await relayAttachments(attachments);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(
+      config.baseUrl + '/api/v1/mailboxes/' + encodeURIComponent(config.mailboxResourceId) + '/send',
+      {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: 'Bearer ' + config.token,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          to,
+          cc: cc?.length ? cc : undefined,
+          bcc: bcc?.length ? bcc : undefined,
+          subject: String(subject || '').trim(),
+          html: html || undefined,
+          text: text || undefined,
+          displayName: smtpConfig().fromName,
+          attachments: encoded.map((item) => ({
+            filename: item.filename,
+            content: item.content,
+            contentType: item.contentType,
+            encoding: 'base64'
+          }))
+        }),
+        signal: controller.signal
+      }
+    );
+    if (response.status !== 204) {
+      let details = {};
+      try { details = await response.json(); } catch {}
+      const error = new Error(details.error || details.message || 'Hostinger Mail API returned ' + response.status);
+      error.code = String(details.code || 'HOSTINGER_MAIL_API_FAILED');
+      error.responseCode = response.status;
+      throw error;
+    }
+    return { messageId: null, accepted: to, transport: 'hostinger_mail_api' };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      error.code = 'HOSTINGER_MAIL_API_TIMEOUT';
+      error.message = 'Hostinger Mail API timed out.';
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, attachments }) {
@@ -369,6 +452,8 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
         text: text || '',
         reply_to: replyTo || '',
         request_id: `railway-${Date.now()}`,
+        attachment_contract_version: 2,
+        preserve_attachment_filenames: true,
         attachments: await relayAttachments(attachments)
       }),
       signal: controller.signal
@@ -411,6 +496,15 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   };
   const relayArgs = { ...smtpArgs };
 
+  if (isHostingerMailApiConfigured() && (pdfTransport === 'hostinger_mail_api' || hasPdf)) {
+    try {
+      return await sendViaHostingerMailApi(relayArgs);
+    } catch (error) {
+      if (pdfTransport === 'hostinger_mail_api') throw error;
+      if (!isRelayConfigured() && missingSmtpKeys().length) throw error;
+    }
+  }
+
   if (hasPdf && isRelayConfigured() && pdfTransport === 'https_relay') {
     const result = await sendViaHttpsRelay(relayArgs);
     return { ...result, transport: 'https_relay_pdf' };
@@ -445,6 +539,11 @@ module.exports = {
   classifySmtpFailure,
   isRelayConfigured,
   relayConfig,
+  isHostingerMailApiConfigured,
+  hostingerMailApiConfig,
+  sendViaHostingerMailApi,
+  relayAttachments,
+  safeAttachmentFilename,
   normalizeAddressList,
   validateRecipients,
   isEmailTransportError,
