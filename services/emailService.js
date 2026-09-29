@@ -245,8 +245,18 @@ async function relayAttachments(attachments = []) {
   let totalBytes = 0;
   const encoded = [];
   for (const attachment of attachments) {
-    if (!attachment?.path) continue;
-    const content = await fs.promises.readFile(attachment.path);
+    let content = null;
+    if (attachment?.path) {
+      content = await fs.promises.readFile(attachment.path);
+    } else if (Buffer.isBuffer(attachment?.content)) {
+      content = attachment.content;
+    } else if (attachment?.content !== undefined && attachment?.content !== null) {
+      content = Buffer.from(
+        String(attachment.content),
+        String(attachment.encoding || '').toLowerCase() === 'base64' ? 'base64' : 'utf8'
+      );
+    }
+    if (!content) continue;
     totalBytes += content.length;
     if (totalBytes > 20 * 1024 * 1024) {
       const error = new Error('Email relay attachments exceed the 20 MB limit.');

@@ -95,10 +95,11 @@ expect(routes, "router.get('/reports/builder.pdf'", 'Protected branded Report Bu
 expect(ui, "id=\"reportPdf\"", 'Report Builder must expose PDF export');
 expect(ui, "reports/builder.pdf", 'Report Builder PDF button must use the filtered report definition');
 const reportBuilder = read('controllers/financeReportBuilderController.js');
+const reportPdf = read('services/financeReportPdfService.js');
 expect(reportBuilder, "INCOME_VS_EXPENSE", 'Report Builder must include income vs expense reporting');
 expect(reportBuilder, "GST_SUMMARY", 'Report Builder must include GST summary reporting');
 expect(reportBuilder, "COMPANY_MONTHLY_SUMMARY", 'Report Builder must include company monthly summary reporting');
-expect(reportBuilder, "doc.switchToPage(index)", 'Filtered Finance PDFs must repeat branding on every page');
+expect(reportPdf, "doc.switchToPage(index)", 'Filtered Finance PDFs must repeat branding on every page');
 
 console.log('FINANCE_FINAL_PRODUCTION_VERIFICATION_OK');
 

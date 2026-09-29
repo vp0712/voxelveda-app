@@ -108,6 +108,7 @@ router.get('/reports', controller.getReports);
 router.get('/reports/builder', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.generate);
 router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.csv);
 router.get('/reports/builder.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.pdf);
+router.post('/reports/builder/email-pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.emailPdf);
 router.get('/reports/builder.xlsx', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.xlsx);
 router.get('/reports/saved', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.listSaved);
 router.post('/reports/saved', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.save);

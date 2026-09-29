@@ -37,6 +37,7 @@ const tests=[
   "finance-statement-ingestion-architecture-test.js",
   "finance-statement-ingestion-real-files-test.js",
   "finance-statement-review-test.js",
+  "finance-statement-dedupe-report-test.js",
   "finance-pdf-statement-parser-test.js",
   "finance-date-integrity-repair-test.js",
   "finance-import-wizard-test.js",
