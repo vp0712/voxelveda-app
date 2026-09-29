@@ -52,13 +52,18 @@ async function recalcAccount(db,accountId) {
       WHERE bank_account_id=? AND reconciliation_status<>'IGNORED' AND archived_at IS NULL AND running_balance IS NOT NULL
       ORDER BY transaction_date DESC,id DESC LIMIT 1`,[accountId]
   );
-  const [[account]]=await db.query('SELECT opening_balance FROM bank_accounts WHERE id=? LIMIT 1',[accountId]);
+  const [[account]]=await db.query('SELECT opening_balance,connection_type,connection_status FROM bank_accounts WHERE id=? LIMIT 1',[accountId]);
   const balance=latest?.running_balance===null||latest?.running_balance===undefined
     ? Number(account?.opening_balance||0)
     : Number(latest.running_balance||0);
+  const manualAccount=String(account?.connection_type||account?.connection_status||'').toUpperCase()==='MANUAL'
+    ||String(account?.connection_status||'').toUpperCase()==='MANUAL';
   await db.query(
-    `UPDATE bank_accounts SET history_start_date=?,history_end_date=?,current_ledger_balance=?,reconciled_balance=? WHERE id=?`,
-    [range?.start_date||null,range?.end_date||null,balance,balance,accountId]
+    `UPDATE bank_accounts
+        SET history_start_date=?,history_end_date=?,current_ledger_balance=?,reconciled_balance=?,
+            available_balance=CASE WHEN ?=1 THEN ? ELSE available_balance END
+      WHERE id=?`,
+    [range?.start_date||null,range?.end_date||null,balance,balance,manualAccount?1:0,balance,accountId]
   );
 }
 async function removeInTx(db,req,file) {
