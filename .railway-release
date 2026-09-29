@@ -1,9 +1,5 @@
-finance-release: 20260929-statement-dedupe-pdf-email-ui-db-retention
-source-commit: 0b03659849d89cb28a5cb3cc88706f0ec6e6c958
-candidate-ci: passed-run-36521774932
-final-system-consolidation: passed-run-36521774931
-security-ci: passed-run-36521774934
-banking-platform-ci: passed-run-36521774970
-bank-account-lifecycle-ci: passed-run-36521774929
-runtime-hotfix: background-job-telemetry-retention
+finance-release: 20260929-account-profile-all-history-fix
+source-commit: 278bddc569735c23e34d403180ccae6e1ae2a6cb
+scope: manual-account-balance-all-history-category-chart-and-account-transactions
+verification: finance-production-regression-suite-on-railway-build
 policy: marker-only-production-deploy
