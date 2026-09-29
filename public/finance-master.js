@@ -2670,7 +2670,7 @@ function bindDynamic(){
   const button=$('reportEmailPdf');button.disabled=true;button.textContent='Sending…';
   try{
    const x=await api(API+'/reports/builder/email-pdf',{method:'POST',body:JSON.stringify({to,definition:def}),timeoutMs:90000});
-   notice(x.message||'Finance PDF sent successfully.');
+   notice((x.message||'Finance PDF sent successfully.')+(x.filename?' · '+x.filename+' attached as PDF':'')+(x.delivery_transport?' · '+String(x.delivery_transport).toUpperCase():'') );
   }catch(error){notice(error.message,true)}
   finally{if(button&&document.body.contains(button)){button.disabled=false;button.textContent='Email PDF'}}
  };
