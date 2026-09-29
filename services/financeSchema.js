@@ -763,6 +763,14 @@ async function backfillStatementCategories() {
   );
 
   await pool.query(
+    `UPDATE bank_transactions
+        SET classification_status='CLASSIFIED'
+      WHERE source_type='STATEMENT_IMPORT'
+        AND category IS NOT NULL AND category<>''
+        AND (classification_status IS NULL OR classification_status='UNCLASSIFIED')`
+  ).catch(() => {});
+
+  await pool.query(
     `UPDATE statement_import_rows sir
        JOIN bank_transactions bt ON bt.id=sir.final_posted_transaction_id
         SET sir.category=bt.category
