@@ -289,7 +289,12 @@ async function verifyConnection() {
         throw error;
       }
       relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay' };
-      console.log('Email HTTPS relay evidence: ok=yes provider=wordpress_wp_mail transport=https_relay');
+      let relayEndpoint='configured';
+      try {
+        const relayUrl=new URL(config.url);
+        relayEndpoint=relayUrl.hostname + relayUrl.pathname;
+      } catch {}
+      console.log('Email HTTPS relay evidence: ok=yes provider=wordpress_wp_mail transport=https_relay endpoint=' + relayEndpoint);
       if (primaryTransport === 'https_relay') {
         console.log('SMTP transport probe skipped: HTTPS relay is configured as the primary production mail transport.');
         return relayResult;
