@@ -1,5 +1,5 @@
-finance-release: 20260929-bank-style-statement-category-order-fix
-source-commit: 89a9158560d337b80d046ace5e45ffaa24cd56a4
+finance-release: 20260929-bank-style-statement-category-order-fix-v2
+source-commit: cb884430c42a381388a6d175cb84a1147962dd14
 scope: statement-category-backfill-future-classification-oldest-first-ledger
 verification: railway-finance-regression-suite-and-live-category-backfill
 policy: marker-only-production-deploy
