@@ -1,8 +1,9 @@
-finance-release: 20260929-statement-dedupe-pdf-email-ui
-source-commit: faa8e27f2c0146c539c95742ebb433e97eac9a74
+finance-release: 20260929-statement-dedupe-pdf-email-ui-db-retention
+source-commit: 0b03659849d89cb28a5cb3cc88706f0ec6e6c958
 candidate-ci: passed-run-36521774932
 final-system-consolidation: passed-run-36521774931
 security-ci: passed-run-36521774934
 banking-platform-ci: passed-run-36521774970
 bank-account-lifecycle-ci: passed-run-36521774929
+runtime-hotfix: background-job-telemetry-retention
 policy: marker-only-production-deploy
