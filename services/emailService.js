@@ -258,6 +258,7 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
 
 async function verifyConnection() {
   let relayResult = null;
+  const primaryTransport = String(process.env.EMAIL_PRIMARY_TRANSPORT || '').trim().toLowerCase();
   if (isRelayConfigured()) {
     const config = relayConfig();
     const controller = new AbortController();
@@ -273,12 +274,16 @@ async function verifyConnection() {
         error.code = 'EMAIL_HTTPS_RELAY_FAILED';
         throw error;
       }
-      relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https' };
-      console.log('Email HTTPS relay evidence: ok=yes provider=wordpress_wp_mail transport=https');
+      relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay' };
+      console.log('Email HTTPS relay evidence: ok=yes provider=wordpress_wp_mail transport=https_relay');
+      if (primaryTransport === 'https_relay') {
+        console.log('SMTP transport probe skipped: HTTPS relay is configured as the primary production mail transport.');
+        return relayResult;
+      }
     } catch (error) {
       if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
       console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code}`);
-      if (missingSmtpKeys().length) throw error;
+      if (missingSmtpKeys().length || primaryTransport === 'https_relay') throw error;
     } finally {
       clearTimeout(timeout);
     }
