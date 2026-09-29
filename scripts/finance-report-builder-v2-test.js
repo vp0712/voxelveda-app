@@ -6,6 +6,7 @@ function read(file){return fs.readFileSync(path.join(__dirname,'..',file),'utf8'
 function assert(value,message){if(!value)throw new Error(message)}
 
 const controller=read('controllers/financeReportBuilderController.js');
+const pdfService=read('services/financeReportPdfService.js');
 const filterContract=read('services/financeFilterContract.js');
 const routes=read('routes/financeRoutes.js');
 const client=read('public/finance-master.js');
@@ -74,8 +75,8 @@ assert(controller.includes("data_quality:dataQuality"),'data-quality report summ
 assert(controller.includes("function csvDataset(report)"),'report-specific CSV datasets are missing');
 assert(controller.includes("workbook.addWorksheet('GST Review')"),'GST XLSX worksheet is missing');
 assert(controller.includes("workbook.addWorksheet('Reimbursements')"),'reimbursement XLSX worksheet is missing');
-assert(controller.includes("GST review summary"),'GST PDF section is missing');
-assert(controller.includes("Reconciliation summary"),'reconciliation PDF section is missing');
+assert(pdfService.includes("GST review summary"),'GST PDF section is missing');
+assert(pdfService.includes("Reconciliation summary"),'reconciliation PDF section is missing');
 assert(controller.includes("Running balance"),'bank-style Account Statement PDF must expose running balance');
 assert(controller.includes('renderBankStyleAccountStatement'),'Account Statement PDF must use the dedicated customer statement renderer');
 assert(controller.includes('bankStatementTableHeader'),'Account Statement PDF must repeat Date / Transaction / Debit / Credit / Balance columns');
