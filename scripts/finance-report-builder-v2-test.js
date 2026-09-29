@@ -36,6 +36,13 @@ assert(emailService.includes('assertAttachmentIntegrity'),'email service must va
 assert(emailService.includes("buffer.subarray(0, 5).toString('ascii') !== '%PDF-'"),'email service must verify the PDF magic header');
 assert(emailService.includes('if (hasPdf)'),'PDF delivery must use the dedicated attachment-safe transport path');
 assert(emailService.includes('sendViaSmtp'),'PDF delivery must support direct SMTP MIME attachment transport');
+assert(emailService.includes('sendViaHostingerMailApi'),'PDF delivery must support the official Hostinger Mail API HTTPS transport');
+assert(emailService.includes("https://api.mail.hostinger.com"),'Hostinger Mail API transport must use the official HTTPS endpoint');
+assert(emailService.includes('original_filename: filename'),'relay fallback must explicitly preserve the original attachment filename');
+assert(emailService.includes('attachment_contract_version: 2'),'relay fallback must advertise the filename-preserving attachment contract');
+assert(emailService.includes('attachmentFilenameGuaranteed: true'),'attachment-safe transports must expose filename integrity evidence');
+assert(controller.includes('brandedLayout'),'emailed Finance PDFs must use the branded email template');
+assert(controller.includes('attachment_filename_verified'),'email response must expose attachment filename integrity evidence');
 
 assert(routes.includes("router.get('/reports/builder'"),'report builder route is missing');
 assert(routes.includes("router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE')"),'filtered CSV must require export permission, step-up and sensitive export approval');
@@ -68,6 +75,9 @@ assert(client.includes("API+'/reports/builder.xlsx?'"),'XLSX action must use the
 assert(client.includes("API+'/reports/builder.csv?'"),'CSV report export is missing');
 assert(client.includes("API+'/reports/builder.pdf?'"),'PDF report export is missing');
 assert(client.includes('id="reportPdf"'),'Report Builder PDF action is missing');
+assert(client.includes('openReportEmailDialog'),'Report Builder must use a validated email delivery modal');
+assert(!client.includes("prompt('Send this Finance PDF to which email address?')"),'Report Builder must not use a raw browser prompt for PDF delivery');
+assert(client.includes('attachment_filename_verified'),'Report Builder must show attachment filename integrity evidence');
 assert(client.includes("API+'/reports/saved'"),'saved report UI is missing');
 assert(client.includes('Currencies are never converted or relabelled'),'currency safety disclosure is missing');
 
