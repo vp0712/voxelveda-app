@@ -721,10 +721,64 @@ async function ensureFinancialYears() {
   }
 }
 
+async function backfillStatementCategories() {
+  const textExpr = "UPPER(CONCAT_WS(' ',COALESCE(description,''),COALESCE(merchant_name,''),COALESCE(reference,'')))";
+  const [result] = await pool.query(
+    `UPDATE bank_transactions
+        SET category = CASE
+          WHEN ${textExpr} LIKE '%CASH DEPOSIT%' OR ${textExpr} LIKE '%CASH WITHDRAWAL%' OR ${textExpr} LIKE '%CASH WDL%' OR ${textExpr} LIKE '%ATM %' THEN 'Cash'
+          WHEN ${textExpr} LIKE '%FAST TRANSFER%' OR ${textExpr} LIKE '%INTERNAL TRANSFER%' OR ${textExpr} LIKE '%TRANSFER FROM%' OR ${textExpr} LIKE '%TRANSFER TO%' OR ${textExpr} LIKE '%OSKO%' OR ${textExpr} LIKE '%PAYID%' OR ${textExpr} LIKE '%PAY ID%' THEN 'Transfer'
+          WHEN ${textExpr} LIKE '%COLES%' OR ${textExpr} LIKE '%WOOLWORTHS%' OR ${textExpr} LIKE '%ALDI%' OR ${textExpr} LIKE '%COSTCO%' OR ${textExpr} LIKE '%7-ELEVEN%' OR ${textExpr} LIKE '%7 ELEVEN%' THEN 'Groceries'
+          WHEN ${textExpr} LIKE '%SHELL%' OR ${textExpr} LIKE '%AMPOL%' OR ${textExpr} LIKE '%CALTEX%' OR ${textExpr} LIKE '%UNITED PETROLEUM%' OR ${textExpr} LIKE '%PETROL%' OR ${textExpr} LIKE '%FUEL%' THEN 'Fuel & Vehicle'
+          WHEN ${textExpr} LIKE '%TELSTRA%' OR ${textExpr} LIKE '%OPTUS%' OR ${textExpr} LIKE '%OPUS BILLING SERVICES%' OR ${textExpr} LIKE '%VODAFONE%' OR ${textExpr} LIKE '%AUSSIE BROADBAND%' OR ${textExpr} LIKE '% NBN %' THEN 'Phone & Internet'
+          WHEN ${textExpr} LIKE '%FIREFLY EXPRESS%' OR ${textExpr} LIKE '%MYKI%' OR ${textExpr} LIKE '%METRO TRAINS%' OR ${textExpr} LIKE '%V/LINE%' OR ${textExpr} LIKE '%13CABS%' OR ${textExpr} LIKE '%TAXI%' OR ${textExpr} LIKE '%LINKT%' OR ${textExpr} LIKE '%EASTLINK%' THEN 'Transport'
+          WHEN ${textExpr} LIKE '%SUPERDRY%' OR ${textExpr} LIKE '%KMART%' OR ${textExpr} LIKE '%TARGET%' OR ${textExpr} LIKE '%BIG W%' OR ${textExpr} LIKE '%AMAZON%' OR ${textExpr} LIKE '%EBAY%' OR ${textExpr} LIKE '%JB HI-FI%' OR ${textExpr} LIKE '%OFFICEWORKS%' OR ${textExpr} LIKE '%APPLE KEW%' OR ${textExpr} LIKE '%APPLE CHADSTONE%' OR ${textExpr} LIKE '%APPLE DONCASTER%' OR ${textExpr} LIKE '%APPLE SOUTHLAND%' OR ${textExpr} LIKE '%APPLE HIGHPOINT%' THEN 'Shopping'
+          WHEN ${textExpr} LIKE '%MCDONALD%' OR ${textExpr} LIKE '%KFC%' OR ${textExpr} LIKE '%SUBWAY%' OR ${textExpr} LIKE '%UBER EATS%' OR ${textExpr} LIKE '%MENULOG%' OR ${textExpr} LIKE '%DOORDASH%' OR ${textExpr} LIKE '%RESTAURANT%' OR ${textExpr} LIKE '%CAFE%' OR ${textExpr} LIKE '%COFFEE%' THEN 'Eating Out'
+          WHEN ${textExpr} LIKE '%ADOBE%' OR ${textExpr} LIKE '%MICROSOFT%' OR ${textExpr} LIKE '%OPENAI%' OR ${textExpr} LIKE '%CHATGPT%' OR ${textExpr} LIKE '%CANVA%' OR ${textExpr} LIKE '%AUTODESK%' OR ${textExpr} LIKE '%GITHUB%' THEN 'Software & Subscriptions'
+          WHEN ${textExpr} LIKE '%HOSTINGER%' OR ${textExpr} LIKE '%CLOUDFLARE%' OR ${textExpr} LIKE '%RAILWAY%' OR ${textExpr} LIKE '%VERCEL%' OR ${textExpr} LIKE '%NETLIFY%' OR ${textExpr} LIKE '%HOSTING%' THEN 'Website & Hosting'
+          WHEN ${textExpr} LIKE '%BUNNINGS%' OR ${textExpr} LIKE '%TOTAL TOOLS%' OR ${textExpr} LIKE '%SYDNEY TOOLS%' OR ${textExpr} LIKE '%RS COMPONENTS%' OR ${textExpr} LIKE '%ELEMENT14%' OR ${textExpr} LIKE '%JAYCAR%' THEN 'Materials & Manufacturing'
+          WHEN ${textExpr} LIKE '%AAMI%' OR ${textExpr} LIKE '%ALLIANZ%' OR ${textExpr} LIKE '%BINGLE%' OR ${textExpr} LIKE '%NRMA%' OR ${textExpr} LIKE '%RACV%' OR ${textExpr} LIKE '%INSURANCE%' THEN 'Insurance'
+          WHEN ${textExpr} LIKE '%RENT%' OR ${textExpr} LIKE '%REAL ESTATE%' OR ${textExpr} LIKE '%PROPERTY MANAGEMENT%' OR ${textExpr} LIKE '%MORTGAGE%' OR ${textExpr} LIKE '%HOME LOAN%' THEN 'Rent & Housing'
+          WHEN ${textExpr} LIKE '%AGL%' OR ${textExpr} LIKE '%ORIGIN ENERGY%' OR ${textExpr} LIKE '%ENERGY AUSTRALIA%' OR ${textExpr} LIKE '%RED ENERGY%' OR ${textExpr} LIKE '%ELECTRICITY%' OR ${textExpr} LIKE '%GAS BILL%' OR ${textExpr} LIKE '%WATER BILL%' THEN 'Utilities'
+          WHEN ${textExpr} LIKE '%CHEMIST WAREHOUSE%' OR ${textExpr} LIKE '%PRICELINE PHARMACY%' OR ${textExpr} LIKE '%PHARMACY%' OR ${textExpr} LIKE '%MEDICAL%' OR ${textExpr} LIKE '%DENTAL%' OR ${textExpr} LIKE '%HOSPITAL%' THEN 'Health & Pharmacy'
+          WHEN ${textExpr} LIKE '%UNIVERSITY%' OR ${textExpr} LIKE '%TAFE%' OR ${textExpr} LIKE '%COLLEGE%' OR ${textExpr} LIKE '%INSTITUTE%' OR ${textExpr} LIKE '%TUITION%' THEN 'Education & Training'
+          WHEN ${textExpr} LIKE '%VICROADS%' OR ${textExpr} LIKE '%SERVICE VICTORIA%' OR ${textExpr} LIKE '%AUSTRALIAN TAXATION OFFICE%' OR ${textExpr} LIKE '% ATO %' OR ${textExpr} LIKE '%ASIC%' THEN 'Tax & Government'
+          WHEN ${textExpr} LIKE '%BANK FEE%' OR ${textExpr} LIKE '%ACCOUNT FEE%' OR ${textExpr} LIKE '%CARD FEE%' OR ${textExpr} LIKE '%INTEREST CHARGE%' OR ${textExpr} LIKE '%OVERDRAWN FEE%' THEN 'Bank Fees & Interest'
+          WHEN ${textExpr} LIKE '%QANTAS%' OR ${textExpr} LIKE '%VIRGIN AUSTRALIA%' OR ${textExpr} LIKE '%JETSTAR%' OR ${textExpr} LIKE '%AIRBNB%' OR ${textExpr} LIKE '%BOOKING.COM%' OR ${textExpr} LIKE '%EXPEDIA%' THEN 'Travel'
+          WHEN ${textExpr} LIKE '%SALARY%' OR ${textExpr} LIKE '%PAYROLL%' OR ${textExpr} LIKE '%WAGES%' OR ${textExpr} LIKE '%CREDIT INTEREST%' OR ${textExpr} LIKE '%DIVIDEND%' THEN 'Income'
+          ELSE category
+        END,
+        classification_status = CASE
+          WHEN category IS NULL OR category='' THEN
+            CASE
+              WHEN ${textExpr} LIKE '%CASH DEPOSIT%' OR ${textExpr} LIKE '%CASH WITHDRAWAL%' OR ${textExpr} LIKE '%FAST TRANSFER%' OR ${textExpr} LIKE '%TRANSFER FROM%' OR ${textExpr} LIKE '%TRANSFER TO%'
+                OR ${textExpr} LIKE '%COLES%' OR ${textExpr} LIKE '%WOOLWORTHS%' OR ${textExpr} LIKE '%ALDI%' OR ${textExpr} LIKE '%COSTCO%' OR ${textExpr} LIKE '%7-ELEVEN%' OR ${textExpr} LIKE '%7 ELEVEN%'
+                OR ${textExpr} LIKE '%OPTUS%' OR ${textExpr} LIKE '%OPUS BILLING SERVICES%' OR ${textExpr} LIKE '%TELSTRA%' OR ${textExpr} LIKE '%FIREFLY EXPRESS%' OR ${textExpr} LIKE '%SUPERDRY%'
+                OR ${textExpr} LIKE '%KMART%' OR ${textExpr} LIKE '%TARGET%' OR ${textExpr} LIKE '%AMAZON%' OR ${textExpr} LIKE '%BUNNINGS%' OR ${textExpr} LIKE '%AAMI%'
+                OR ${textExpr} LIKE '%AGL%' OR ${textExpr} LIKE '%CHEMIST WAREHOUSE%' OR ${textExpr} LIKE '%QANTAS%' OR ${textExpr} LIKE '%SALARY%' OR ${textExpr} LIKE '%PAYROLL%'
+              THEN 'CLASSIFIED' ELSE classification_status END
+          ELSE classification_status
+        END
+      WHERE source_type='STATEMENT_IMPORT' AND (category IS NULL OR category='')`
+  );
+
+  await pool.query(
+    `UPDATE statement_import_rows sir
+       JOIN bank_transactions bt ON bt.id=sir.final_posted_transaction_id
+        SET sir.category=bt.category
+      WHERE (sir.category IS NULL OR sir.category='') AND bt.category IS NOT NULL AND bt.category<>''`
+  ).catch(() => {});
+
+  if (Number(result.affectedRows || 0) > 0) {
+    console.log(`FINANCE_STATEMENT_CATEGORY_BACKFILL_OK rows=${Number(result.affectedRows || 0)}`);
+  }
+}
+
 async function createFinanceSchema() {
   await createTables();
   await seedReferenceData();
   await ensureFinancialYears();
+  await backfillStatementCategories();
 }
 
 async function ensureFinanceSchema() {
