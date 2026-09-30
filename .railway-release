@@ -1,6 +1,6 @@
-finance-release: 20260929-pdf-attachment-relay-endpoint-diagnostics-v5
-source-commit: 3ccc5af49df007a61e13c47ab9d9b3048b7df5ca
-scope: safe-relay-endpoint-diagnostics-after-pdf-attachment-hardening
-ci: security-1139-success; banking-650-success; enterprise-audit-558-success; consolidation-812-success
-runtime: preserve-current-domain-safe-mode; pdf-email-relay-diagnostics
+finance-release: 20260930-finance-pdf-email-secure-delivery
+source-commit: 15ab909fc94f17b6d76efec0c6a42537a7ad8370
+scope: stop-tmp-pdf-relay-and-enable-secure-pdf-delivery
+ci: security-success; finance-release-success-56-checks; banking-success; consolidation-success; branding-success
+runtime: wordpress-relay-for-message-body; no-pdf-attachment-via-unsafe-relay; signed-pdf-download-fallback
 policy: single-marker-controlled-production-deploy
