@@ -1,0 +1,39 @@
+name: Railway Domain Public Diagnostic
+
+on:
+  push:
+    branches:
+      - diag/railway-domain-status-20261001
+    paths:
+      - '.github/workflows/railway-domain-public-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Public DNS and TLS checks
+        shell: bash
+        run: |
+          set -u
+          echo "=== CNAME ==="
+          dig +noall +answer app.voxelveda.com CNAME || true
+          echo "=== A/AAAA ==="
+          dig +noall +answer app.voxelveda.com A || true
+          dig +noall +answer app.voxelveda.com AAAA || true
+          echo "=== Railway verification TXT ==="
+          dig +noall +answer _railway-verify.app.voxelveda.com TXT || true
+          echo "=== ACME challenge ==="
+          dig +noall +answer _acme-challenge.app.voxelveda.com TXT || true
+          dig +noall +answer _acme-challenge.app.voxelveda.com CNAME || true
+          echo "=== CAA ==="
+          dig +noall +answer voxelveda.com CAA || true
+          echo "=== TLS certificate ==="
+          timeout 20 openssl s_client -connect app.voxelveda.com:443 -servername app.voxelveda.com </dev/null 2>/dev/null \
+            | openssl x509 -noout -subject -issuer -dates -ext subjectAltName || true
+          echo "=== HTTPS headers ==="
+          curl -k -sS -I --max-time 20 https://app.voxelveda.com/ | sed -n '1,25p' || true
