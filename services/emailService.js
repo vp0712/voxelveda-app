@@ -93,7 +93,8 @@ const EMAIL_TRANSPORT_CODES = new Set([
   'EHOSTUNREACH',
   'ENETUNREACH',
   'EDNS',
-  'EMAIL_HTTPS_RELAY_FAILED'
+  'EMAIL_HTTPS_RELAY_FAILED',
+  'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE'
 ]);
 
 function isEmailTransportError(error) {
@@ -517,8 +518,9 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   }
 
   if (hasPdf && isRelayConfigured() && pdfTransport === 'https_relay') {
-    const result = await sendViaHttpsRelay(relayArgs);
-    return { ...result, transport: 'https_relay_pdf' };
+    const error = new Error('The WordPress HTTPS relay cannot guarantee the original PDF attachment filename. Use secure PDF delivery instead.');
+    error.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
+    throw error;
   }
 
   if (hasPdf) {
@@ -526,8 +528,10 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
       return await sendViaSmtp(smtpArgs);
     } catch (error) {
       if (!isRelayConfigured() || !isEmailTransportError(error)) throw error;
-      const result = await sendViaHttpsRelay(relayArgs);
-      return { ...result, transport: 'https_relay_pdf_fallback', smtp_error: String(error.code || 'SMTP_FAILED') };
+      const unsafe = new Error('Direct PDF email transport is unavailable and the WordPress relay cannot safely preserve the PDF filename.');
+      unsafe.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
+      unsafe.cause = error;
+      throw unsafe;
     }
   }
 
