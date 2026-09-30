@@ -5,12 +5,14 @@ const fs=require('node:fs');
 const path=require('node:path');
 
 process.env.FINANCE_REPORT_DELIVERY_SECRET='test-finance-report-delivery-secret-20260930';
+process.env.FINANCE_REPORT_PUBLIC_BASE_URL='https://verified.example.test/';
 
 const delivery=require('../services/financeReportDeliveryService');
 
 assert.equal(delivery.safePdfFilename('Monthly Report.pdf'),'Monthly Report.pdf');
 assert.equal(delivery.safePdfFilename('Monthly Report'),'Monthly Report.pdf');
 assert.equal(delivery.safePdfFilename('../bad\\name'),'..-bad-name.pdf');
+assert.equal(delivery._test.publicAppUrl(),'https://verified.example.test');
 
 const payload={
   v:1,
