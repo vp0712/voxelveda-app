@@ -77,7 +77,12 @@ function decodeDeliveryToken(token) {
 }
 
 function publicAppUrl() {
-  const value = String(process.env.PUBLIC_APP_URL || process.env.APP_URL || 'https://app.voxelveda.com').trim();
+  const value = String(
+    process.env.FINANCE_REPORT_PUBLIC_BASE_URL
+    || process.env.PUBLIC_APP_URL
+    || process.env.APP_URL
+    || 'https://voxelveda-app-production.up.railway.app'
+  ).trim();
   return value.replace(/\/+$/, '');
 }
 
@@ -172,5 +177,5 @@ module.exports = {
   revokePdfDelivery,
   safePdfFilename,
   servePdfDelivery,
-  _test: { assertPdfBuffer }
+  _test: { assertPdfBuffer, publicAppUrl }
 };
