@@ -177,5 +177,5 @@ module.exports = {
   revokePdfDelivery,
   safePdfFilename,
   servePdfDelivery,
-  _test: { assertPdfBuffer }
+  _test: { assertPdfBuffer, publicAppUrl }
 };
