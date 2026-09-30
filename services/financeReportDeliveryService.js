@@ -124,6 +124,13 @@ async function issuePdfDelivery({ buffer, filename, ttlMinutes = DEFAULT_TTL_MIN
   };
 }
 
+async function revokePdfDelivery(delivery) {
+  const key = String(delivery?.objectKey || '').trim();
+  if (!key) return false;
+  await deleteObject(key).catch(() => {});
+  return true;
+}
+
 async function servePdfDelivery(req, res) {
   let payload;
   try {
@@ -162,6 +169,7 @@ module.exports = {
   createDeliveryToken,
   decodeDeliveryToken,
   issuePdfDelivery,
+  revokePdfDelivery,
   safePdfFilename,
   servePdfDelivery,
   _test: { assertPdfBuffer }
