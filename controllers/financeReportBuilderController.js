@@ -15,8 +15,9 @@ const { logAudit } = require('../services/auditService');
 const { ensureFinanceSchema } = require('../services/financeSchema');
 const { companyProfile } = require('../config/companyProfile');
 const { buildFinancePdfArtifact } = require('../services/financeReportPdfService');
-const { sendMail, isEmailTransportError, emailFailureDetails } = require('../services/emailService');
+const { sendMail, isEmailTransportError, emailFailureDetails, isHostingerMailApiConfigured, isRelayConfigured } = require('../services/emailService');
 const { brandedLayout } = require('../services/emailTemplates');
+const { issuePdfDelivery, revokePdfDelivery } = require('../services/financeReportDeliveryService');
 
 const VALID_SCOPES = new Set(['ALL','PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
 const VALID_TYPES = new Set(['TRANSACTION_REGISTER','INCOME','EXPENSE','INCOME_VS_EXPENSE','CASH_FLOW','ACCOUNT_ACTIVITY','ACCOUNT_STATEMENT','CATEGORY','MERCHANT','CASH','TRANSFER','REFUND','REIMBURSEMENT','GST_SUMMARY','RECONCILIATION','DATA_QUALITY','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY']);
@@ -679,6 +680,7 @@ exports.pdf=async(req,res)=>{
 };
 
 exports.emailPdf=async(req,res)=>{
+  let secureDelivery=null;
   try{
     const definition=definitionFrom(req.body && req.body.definition ? req.body.definition : (req.body||{}));
     const recipient=safeText(req.body && req.body.to,254);
@@ -690,57 +692,117 @@ exports.emailPdf=async(req,res)=>{
     const title=reportTitle(report.metadata.report_type);
     const artifact=assertPdfArtifact(await buildReportPdfArtifact(report,profile,title));
     const period=(report.metadata.from||'All history') + ' to ' + (report.metadata.to||'Now');
-
     const companyName=profile.tradingName||profile.legalName||'Voxel Veda';
-    const textBody=[
-      companyName + ' Finance',
-      '',
-      'Attached: ' + artifact.filename,
-      'Report: ' + title,
-      'Period: ' + period,
-      'Report ID: ' + artifact.reportId,
-      deliveryNote ? '' : null,
-      deliveryNote ? 'Note: ' + deliveryNote : null,
-      '',
-      'This PDF was generated from the permission-scoped Voxel Veda Finance ledger.'
-    ].filter((line)=>line!==null).join('\n');
-    const htmlBody=brandedLayout(
-      '<h2 style="margin-top:0">' + title + '</h2>' +
-      '<p>Your requested Finance report is attached as a PDF document.</p>' +
-      '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
-      '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
-      '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
-      '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
-      '</table>' +
-      (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
-      '<p style="font-size:12px;color:#607080">The attachment must appear with a .pdf filename and application/pdf MIME type. If your mail client cannot preview it, download the attachment and open it with a PDF reader.</p>',
-      title + ' PDF attached'
-    );
 
-    const result=await sendMail({
-      to:recipient,
-      subject:companyName + ' | ' + title + ' | ' + period,
-      text:textBody,
-      html:htmlBody,
-      replyTo:profile.email,
-      attachments:[{
+    const hostingerAttachmentReady=isHostingerMailApiConfigured();
+    const relayOnlyPdfDelivery=!hostingerAttachmentReady && isRelayConfigured();
+
+    let result;
+    let deliveryMode='pdf_attachment';
+    let deliveryExpiresAt=null;
+
+    if(relayOnlyPdfDelivery){
+      secureDelivery=await issuePdfDelivery({
+        buffer:artifact.buffer,
         filename:artifact.filename,
-        content:artifact.buffer,
-        contentType:'application/pdf',
-        contentDisposition:'attachment'
-      }]
-    });
+        ttlMinutes:Number(process.env.FINANCE_REPORT_EMAIL_LINK_TTL_MINUTES||1440)
+      });
+      deliveryMode='secure_pdf_download';
+      deliveryExpiresAt=secureDelivery.expiresAt;
+      const safeUrl=secureDelivery.url.replace(/[<>&"]/g,'');
+      const textBody=[
+        companyName + ' Finance',
+        '',
+        'Your requested Finance report is ready as a secure PDF download.',
+        'File: ' + artifact.filename,
+        'Report: ' + title,
+        'Period: ' + period,
+        'Report ID: ' + artifact.reportId,
+        deliveryNote ? 'Note: ' + deliveryNote : null,
+        '',
+        'Download PDF: ' + secureDelivery.url,
+        'This secure link expires at ' + secureDelivery.expiresAt + '.',
+        '',
+        'The downloaded file is delivered as application/pdf with the original .pdf filename.'
+      ].filter((line)=>line!==null).join('\n');
+
+      const htmlBody=brandedLayout(
+        '<h2 style="margin-top:0">' + title + '</h2>' +
+        '<p>Your requested Finance report is ready as a secure PDF download.</p>' +
+        '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
+        '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
+        '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
+        '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
+        '</table>' +
+        (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
+        '<p style="margin:24px 0"><a href="' + safeUrl + '" style="display:inline-block;padding:12px 18px;background:#0B5ED7;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Download PDF Report</a></p>' +
+        '<p style="font-size:12px;color:#607080">The download is an actual application/pdf file using the original .pdf filename. This secure link expires automatically.</p>',
+        title + ' PDF ready'
+      );
+
+      result=await sendMail({
+        to:recipient,
+        subject:companyName + ' | ' + title + ' | ' + period,
+        text:textBody,
+        html:htmlBody,
+        replyTo:profile.email,
+        attachments:[]
+      });
+    }else{
+      const textBody=[
+        companyName + ' Finance',
+        '',
+        'Attached: ' + artifact.filename,
+        'Report: ' + title,
+        'Period: ' + period,
+        'Report ID: ' + artifact.reportId,
+        deliveryNote ? 'Note: ' + deliveryNote : null,
+        '',
+        'This PDF was generated from the permission-scoped Voxel Veda Finance ledger.'
+      ].filter((line)=>line!==null).join('\n');
+      const htmlBody=brandedLayout(
+        '<h2 style="margin-top:0">' + title + '</h2>' +
+        '<p>Your requested Finance report is attached as a PDF document.</p>' +
+        '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
+        '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
+        '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
+        '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
+        '</table>' +
+        (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
+        '<p style="font-size:12px;color:#607080">The attachment is application/pdf and preserves the .pdf filename.</p>',
+        title + ' PDF attached'
+      );
+
+      result=await sendMail({
+        to:recipient,
+        subject:companyName + ' | ' + title + ' | ' + period,
+        text:textBody,
+        html:htmlBody,
+        replyTo:profile.email,
+        attachments:[{
+          filename:artifact.filename,
+          content:artifact.buffer,
+          contentType:'application/pdf',
+          contentDisposition:'attachment'
+        }]
+      });
+    }
 
     await logAudit(pool,audit(req,'FILTERED_REPORT_EMAILED','finance_report',artifact.reportId,{
       filters:report.metadata,
       format:'PDF',
       pages:artifact.pages,
       recipient_count:1,
-      provider_message_id:result && result.messageId ? result.messageId : null
+      provider_message_id:result && result.messageId ? result.messageId : null,
+      delivery_mode:deliveryMode,
+      filename:artifact.filename,
+      delivery_expires_at:deliveryExpiresAt
     }));
 
     return res.json({
-      message:'PDF report sent successfully to ' + recipient + '.',
+      message:deliveryMode==='pdf_attachment'
+        ? 'PDF report sent successfully to ' + recipient + '.'
+        : 'Secure PDF report delivery email sent successfully to ' + recipient + '.',
       report_id:artifact.reportId,
       filename:artifact.filename,
       message_id:result && result.messageId ? result.messageId : null,
@@ -748,10 +810,13 @@ exports.emailPdf=async(req,res)=>{
       attachment_content_type:'application/pdf',
       attachment_bytes:artifact.buffer.length,
       delivery_transport:result?.transport||null,
-      attachment_filename_verified:Boolean(result?.attachmentFilenameGuaranteed),
-      attachment_contract_version:2
+      delivery_mode:deliveryMode,
+      delivery_expires_at:deliveryExpiresAt,
+      attachment_filename_verified:deliveryMode==='pdf_attachment' && Boolean(result?.attachmentFilenameGuaranteed),
+      attachment_contract_version:3
     });
   }catch(error){
+    if(secureDelivery) await revokePdfDelivery(secureDelivery);
     if(isEmailTransportError(error)){
       const details=emailFailureDetails(error);
       return res.status(details.status).json(details);
