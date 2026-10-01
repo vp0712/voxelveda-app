@@ -35,10 +35,13 @@ function normalizeBankCountryCode(value, market) {
 
 function normalizeBankAccountType(value) {
   const raw = String(value || 'TRANSACTION').trim().toUpperCase();
-  const aliases = { REGULAR: 'TRANSACTION', EVERYDAY: 'TRANSACTION', CURRENT_ACCOUNT: 'CURRENT', SAVING: 'SAVINGS' };
+  const aliases = { REGULAR: 'TRANSACTION', EVERYDAY: 'TRANSACTION', CURRENT_ACCOUNT: 'CURRENT', SAVING: 'SAVINGS', TERM_DEPOSIT: 'TERM DEPOSIT' };
   const type = aliases[raw] || raw;
-  if (!BANK_ACCOUNT_TYPES.has(type)) throw new FinanceError('Select a supported bank account type.', 400, 'INVALID_BANK_ACCOUNT_TYPE');
-  return type;
+  if (BANK_ACCOUNT_TYPES.has(type)) return type;
+  // Preserve a safe legacy/provider account type instead of making an existing
+  // connected account impossible to edit after this UI upgrade.
+  if (/^[A-Z][A-Z0-9 _\/-]{0,39}$/.test(type)) return type;
+  throw new FinanceError('Select a supported bank account type.', 400, 'INVALID_BANK_ACCOUNT_TYPE');
 }
 
 function uid(prefix) {
@@ -1049,7 +1052,8 @@ exports.getBankingDashboard = async (req, res) => {
 
     const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
       pool.query(
-        `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
+        `SELECT ba.id,ba.nickname,ba.institution,ba.bank_market,ba.bank_country_code,ba.bsb_masked,ba.routing_code_masked,
+                ba.account_number_masked,ba.currency,ba.ownership_scope,
                 ba.entity_name,ba.account_type,ba.financial_purpose,ba.connection_type,ba.connection_status,
                 ba.current_ledger_balance,ba.available_balance,
                 CASE
