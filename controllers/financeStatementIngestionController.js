@@ -82,6 +82,7 @@ exports.upload = async (req, res) => {
         message: `This exact statement already exists as ${existing.import_uid}. The existing import was reused and no duplicate file was created.`,
         import_uid: existing.import_uid,
         reused: true,
+        code: 'DUPLICATE_STATEMENT_FILE_REUSED',
         existing_status: existing.status,
         status_url: `/api/finance/intelligence/statement-imports/${encodeURIComponent(existing.import_uid)}/status`
       });
