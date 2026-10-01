@@ -3,7 +3,7 @@
 const { amountDirection, normaliseMoneyToken } = require('../financeStatementMoney');
 
 const VERSION = 'generic-statement-v1';
-const DATE_TOKEN = /\b(?:\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})\b/;
+const DATE_TOKEN = /\b(?:\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?)\b/;
 const MONEY_TOKEN = /(?:\b(?:AUD|USD|NZD|EUR|GBP|INR|JPY|CAD|SGD)\b\s*)?(?:CR|DR)?\s*[-+]?\(?[$€£¥₹]?\d[\d.,]*[.,]\d{2}\)?(?:\s*(?:CR|DR))?/gi;
 
 function pad(number) { return String(number).padStart(2, '0'); }
@@ -30,6 +30,23 @@ function normaliseDate(input, options = {}) {
     let year = Number(match[3]); if (year < 100) year += year >= 70 ? 1900 : 2000;
     if (month) return { value: `${year}-${pad(month)}-${pad(match[1])}`, ambiguous: false };
   }
+  match = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})$/);
+  if (match) {
+    const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+    const month = months.indexOf(match[2].slice(0, 3).toLowerCase()) + 1;
+    if (month) {
+      const start = String(options.statementStartDate || '');
+      const end = String(options.statementEndDate || '');
+      let year = Number(options.defaultYear || 0);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(start) && /^\d{4}-\d{2}-\d{2}$/.test(end)) {
+        const startYear = Number(start.slice(0,4)), endYear = Number(end.slice(0,4));
+        const startMonth = Number(start.slice(5,7));
+        year = startYear === endYear ? startYear : (month >= startMonth ? startYear : endYear);
+      }
+      if (year >= 1900 && year <= 2200) return { value: `${year}-${pad(month)}-${pad(match[1])}`, ambiguous: false };
+      return { value: null, ambiguous: true, raw };
+    }
+  }
   return { value: null, ambiguous: false, raw };
 }
 
@@ -48,9 +65,76 @@ function confidenceForLine(line) {
   return values.length ? Math.max(0, Math.min(1, values.reduce((sum, value) => sum + value, 0) / values.length / 100)) : 1;
 }
 
+function logicalTransactionLines(lines) {
+  const source = Array.isArray(lines) ? lines : [];
+  const logical = [];
+  for (let index = 0; index < source.length; index += 1) {
+    const line = source[index] || {};
+    const text = String(line.text || '').replace(/\s+/g, ' ').trim();
+    if (!DATE_TOKEN.test(text)) continue;
+    let combined = text;
+    const words = Array.isArray(line.words) ? [...line.words] : [];
+    let end = index;
+    let amountCount = [...combined.matchAll(MONEY_TOKEN)].length;
+    while (amountCount < 2 && end + 1 < source.length && end - index < 3) {
+      const next = source[end + 1] || {};
+      const nextText = String(next.text || '').replace(/\s+/g, ' ').trim();
+      if (!nextText || DATE_TOKEN.test(nextText)) break;
+      combined += ' ' + nextText;
+      if (Array.isArray(next.words)) words.push(...next.words);
+      end += 1;
+      amountCount = [...combined.matchAll(MONEY_TOKEN)].length;
+    }
+    logical.push({ ...line, text: combined, words });
+    index = end;
+  }
+  return logical;
+}
+
+function inferUnsignedBalanceDirections(rows) {
+  const values = Array.isArray(rows) ? rows : [];
+  let order = null;
+  for (let index = 0; index + 1 < values.length; index += 1) {
+    const left = String(values[index]?.transaction_date || '');
+    const right = String(values[index + 1]?.transaction_date || '');
+    if (!left || !right || left === right) continue;
+    order = left < right ? 'ASC' : 'DESC';
+    break;
+  }
+  if (!order) return values;
+
+  for (let index = 0; index < values.length; index += 1) {
+    const row = values[index];
+    if (!row?._unsigned_amount || row.running_balance === null || row.running_balance === undefined) continue;
+    const neighbourIndex = order === 'ASC' ? index - 1 : index + 1;
+    if (neighbourIndex < 0 || neighbourIndex >= values.length) continue;
+    const neighbour = values[neighbourIndex];
+    if (neighbour?.running_balance === null || neighbour?.running_balance === undefined) continue;
+    const amount = normaliseMoneyToken(row._unsigned_amount);
+    const currentBalance = normaliseMoneyToken(row.running_balance);
+    const previousBalance = normaliseMoneyToken(neighbour.running_balance);
+    if (!amount || !currentBalance || !previousBalance) continue;
+    const absolute = amount.cents < 0n ? -amount.cents : amount.cents;
+    const delta = currentBalance.cents - previousBalance.cents;
+    const absoluteDelta = delta < 0n ? -delta : delta;
+    if (absolute === 0n || absoluteDelta !== absolute) continue;
+
+    const inferred = amountDirection(row._unsigned_amount, { direction: delta < 0n ? 'DEBIT' : 'CREDIT' });
+    row.debit = inferred?.debit || '0.00';
+    row.credit = inferred?.credit || '0.00';
+    row.force_rejected = Boolean(row._date_ambiguous);
+    const notes = [];
+    if (row._date_ambiguous) notes.push(row.validation_hint);
+    notes.push('Debit/credit direction verified from the source running-balance movement');
+    if (Number(row.confidence_score || 1) < 0.72) notes.push('Low OCR confidence requires review');
+    row.validation_hint = notes.filter(Boolean).join('; ');
+  }
+  return values;
+}
+
 function parseLines(lines, options = {}) {
   const rows = [];
-  for (const line of lines || []) {
+  for (const line of logicalTransactionLines(lines)) {
     const text = String(line.text || '').replace(/\s+/g, ' ').trim();
     const dateMatch = text.match(DATE_TOKEN);
     if (!dateMatch) continue;
@@ -58,16 +142,17 @@ function parseLines(lines, options = {}) {
     if (!amounts.length) continue;
     const transactionAmount = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0];
     const balanceAmount = amounts.length >= 2 ? normaliseMoneyToken(amounts[amounts.length - 1].raw) : null;
-    const direction = amountDirection(transactionAmount.raw, { signedAmountRule: options.signedAmountRule });
     const explicitDirection = /\b(?:CR|DR)\b|^[+\-(]/i.test(transactionAmount.raw.trim());
+    const direction = amountDirection(transactionAmount.raw, { signedAmountRule: options.signedAmountRule });
     const parsedDate = normaliseDate(dateMatch[0], options);
     const description = text.slice((dateMatch.index || 0) + dateMatch[0].length, transactionAmount.index).trim();
     const confidence = confidenceForLine(line);
+    const unsignedNeedsBalanceProof = !explicitDirection && !options.allowUnsignedAmounts;
     rows.push({
       transaction_date: parsedDate.value,
       description: description || null,
-      debit: direction?.debit || '0.00',
-      credit: direction?.credit || '0.00',
+      debit: explicitDirection || options.allowUnsignedAmounts ? (direction?.debit || '0.00') : '0.00',
+      credit: explicitDirection || options.allowUnsignedAmounts ? (direction?.credit || '0.00') : '0.00',
       running_balance: balanceAmount?.decimal || null,
       currency: options.currency || null,
       confidence_score: confidence,
@@ -75,14 +160,20 @@ function parseLines(lines, options = {}) {
       source_bbox: bboxForLine(line),
       source_snippet: text.slice(0, 1000),
       validation_hint: parsedDate.ambiguous
-        ? `Ambiguous date ${dateMatch[0]}; choose a date format before approval`
-        : (!explicitDirection && !options.allowUnsignedAmounts ? 'Transaction direction is not explicit in the source row' : (confidence < 0.72 ? 'Low OCR confidence requires review' : null)),
-      force_rejected: parsedDate.ambiguous || (!explicitDirection && !options.allowUnsignedAmounts)
+        ? `Ambiguous date ${dateMatch[0]}; verify statement period/date format`
+        : (unsignedNeedsBalanceProof ? 'Transaction direction requires running-balance verification' : (confidence < 0.72 ? 'Low OCR confidence requires review' : null)),
+      force_rejected: parsedDate.ambiguous || unsignedNeedsBalanceProof,
+      _unsigned_amount: unsignedNeedsBalanceProof ? transactionAmount.raw : null,
+      _date_ambiguous: parsedDate.ambiguous
     });
   }
-  return rows;
+  inferUnsignedBalanceDirections(rows);
+  return rows.map((row) => {
+    const { _unsigned_amount, _date_ambiguous, ...clean } = row;
+    return clean;
+  });
 }
 
 function match() { return 0.1; }
 
-module.exports = { DATE_TOKEN, MONEY_TOKEN, VERSION, match, normaliseDate, parseLines };
+module.exports = { DATE_TOKEN, MONEY_TOKEN, VERSION, match, normaliseDate, parseLines, _test: { inferUnsignedBalanceDirections, logicalTransactionLines } };
