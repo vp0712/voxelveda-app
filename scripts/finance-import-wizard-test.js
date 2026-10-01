@@ -39,4 +39,20 @@ assert(client.includes('waitForStatementImport')&&client.includes('DEAD_LETTER')
 assert(client.includes("['REMOVED','REVERSED','CANCELLED']")&&client.includes('.slice(0,25)'),'removed imports must stay out of the active wizard while recent batches remain visible');
 const ingestion=read('controllers/financeStatementIngestionController.js');
 assert(ingestion.includes('reused: true')&&ingestion.includes("parse_status<>'REMOVED'"),'exact re-uploads must reuse an active import instead of failing a multi-file batch');
+const generic=require('../services/financeStatementAdapters/generic');
+assert.equal(
+  generic.normaliseDate('25 May',{statementStartDate:'2026-05-01',statementEndDate:'2026-05-31'}).value,
+  '2026-05-25',
+  'PDF bank rows with day/month only must inherit the verified statement year'
+);
+const inferred=generic.parseLines([
+  {page:1,text:'26 May WOOLWORTHS MELBOURNE',words:[]},
+  {page:1,text:'20.00 970.00',words:[]},
+  {page:1,text:'25 May COLES MELBOURNE 10.00 990.00',words:[]},
+  {page:1,text:'24 May OPENING ACTIVITY 100.00 1000.00',words:[]}
+],{statementStartDate:'2026-05-01',statementEndDate:'2026-05-31',currency:'AUD',allowUnsignedAmounts:false});
+assert(inferred.length>=3,'split PDF transaction rows must be assembled into logical rows');
+assert(inferred[0].debit==='20.00'&&inferred[0].credit==='0.00','unsigned PDF amount must infer debit only when running-balance movement proves it');
+assert(inferred[1].debit==='10.00'&&inferred[1].credit==='0.00','running-balance inference must work across consecutive descending statement rows');
+
 console.log('Unified secure Finance statement import and historical migration checks passed.');
