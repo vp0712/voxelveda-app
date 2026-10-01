@@ -54,4 +54,9 @@ assert(inferred.length>=3,'split PDF transaction rows must be assembled into log
 assert(inferred[0].debit==='20.00'&&inferred[0].credit==='0.00','unsigned PDF amount must infer debit only when running-balance movement proves it');
 assert(inferred[1].debit==='10.00'&&inferred[1].credit==='0.00','running-balance inference must work across consecutive descending statement rows');
 
+const ingestionController=read('controllers/financeStatementIngestionController.js');
+assert(ingestionController.includes("fields.push('attempt=0', 'completed_at=NULL')"),'explicit retry must reset exhausted failed/dead-letter attempts');
+assert(client.includes("STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v1'")&&client.includes("PDF_NO_SAFE_TRANSACTIONS")&&client.includes("OCR_NO_SAFE_TRANSACTIONS"),'legacy parser failures must receive one versioned automatic recovery retry');
+assert(client.includes("localStorage.setItem(key,new Date().toISOString())"),'automatic parser recovery must be loop-protected per import and parser version');
+
 console.log('Unified secure Finance statement import and historical migration checks passed.');
