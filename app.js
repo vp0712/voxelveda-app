@@ -39,6 +39,7 @@ const operationalTrustRoutes = require('./routes/operationalTrustRoutes');
 const continuousAssuranceRoutes = require('./routes/continuousAssuranceRoutes');
 const securityGovernanceRoutes = require('./routes/securityGovernanceRoutes');
 const integrationWebhookRoutes = require('./routes/integrationWebhookRoutes');
+const vomWhatsAppRoutes = require('./routes/vomWhatsAppRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const trashRoutes = require('./routes/trashRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
@@ -110,6 +111,9 @@ app.use(express.urlencoded({extended:false,limit:process.env.FORM_BODY_LIMIT||'1
 // but register it before CSRF enforcement so CSP violations do not create false
 // production errors. All normal state-changing application APIs remain protected.
 app.post('/api/security/csp-report', rateLimitPolicy('csp_report'), securityTelemetryController.recordCspViolation);
+// Meta WhatsApp webhooks are provider-signed and cannot include the browser CSRF token.
+// Signature verification remains fail-closed inside the dedicated VOM webhook route.
+app.use('/api/integrations/whatsapp', vomWhatsAppRoutes);
 app.use(csrfProtection);
 app.get('/api/health',readinessController.health);
 app.get('/api/ready',readinessController.ready);
