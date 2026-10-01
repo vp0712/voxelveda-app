@@ -766,3 +766,76 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   .fm-finance-card-meta small,.fm-finance-card-balance small{font-size:.55rem}
   .fm-finance-card-footer{font-size:.5rem}
 }
+
+
+/* ==========================================================================
+   Finance Premium UI v18 — global banking theme + account segmentation
+   ========================================================================== */
+:root{
+  --bg:#eef5fc;
+  --card:#ffffff;
+  --ink:#0b1730;
+  --muted:#687d98;
+  --line:#d8e5f2;
+  --dark:#102b4d;
+  --accent:#0877ff;
+  --accent-soft:#eaf4ff;
+  --good:#07906d;
+  --bad:#c83b50;
+  --warn:#a56b00;
+  --shadow:0 14px 36px rgba(28,68,111,.085);
+}
+html,body{background:linear-gradient(180deg,#eaf4ff 0,#f7fbff 330px,#eef5fc 100%);color:var(--ink)}
+.fm-main{background:transparent}
+.fm-sidebar{background:rgba(255,255,255,.96);border-right-color:#dbe7f3;box-shadow:8px 0 32px rgba(31,69,108,.045)}
+#fmNav button{color:#526982}
+#fmNav button span{background:#edf4fb;color:#35516f}
+#fmNav button.active{background:linear-gradient(135deg,#102b4d,#174a7a);box-shadow:0 10px 24px rgba(16,43,77,.16)}
+#fmNav button.active span{background:#eaf4ff;color:#0877ff}
+.fm-side-footer{background:linear-gradient(135deg,#102b4d,#173e69)}
+.fm-topbar{background:rgba(238,245,252,.9);border-bottom:1px solid rgba(216,229,242,.65)}
+.fm-search,.fm-filterbar label,.fm-icon{border-color:#d7e4f1;box-shadow:0 8px 24px rgba(37,77,119,.045)}
+.fm-primary{background:linear-gradient(135deg,#1788ff,#0868df);box-shadow:0 9px 22px rgba(8,119,255,.2)}
+.fm-card,.fm-kpi{border-color:#dce8f4;box-shadow:var(--shadow)}
+.fm-modal,.fm-drawer{border-color:#dce8f4}
+.fm-modal header,.fm-drawer header{background:linear-gradient(180deg,#fbfdff,#f5faff)}
+.fm-form input,.fm-form select,.fm-form textarea{border-color:#d6e4f2;background:#fff}
+.fm-form input:focus,.fm-form select:focus,.fm-form textarea:focus{border-color:#75b5ff;box-shadow:0 0 0 3px rgba(8,119,255,.1)}
+.fm-account-segment-filters{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.fm-account-segment-filters label{height:48px;display:flex;align-items:center;gap:7px;background:#fff;border:1px solid #dce7f2;border-radius:14px;padding:0 11px;color:#6e829c;font-size:.58rem;font-weight:900;box-shadow:0 8px 22px rgba(38,79,123,.045)}
+.fm-account-segment-filters select{max-width:175px;border:0;outline:0;background:transparent;color:#173456;font-size:.62rem;font-weight:900}
+.fm-account-filter-count{display:inline-flex;height:34px;align-items:center;padding:0 10px;border-radius:999px;background:#eaf4ff;color:#0877ff;font-size:.57rem;font-weight:900;white-space:nowrap}
+.fm-account-card-shell{border-color:#dbe8f5;box-shadow:0 14px 36px rgba(33,75,119,.075)}
+.fm-account-card{background:linear-gradient(180deg,#fff 0%,#fbfdff 100%)}
+.fm-account-identity .fm-account-type{background:#eaf4ff;color:#0877ff;border:1px solid #d8ebff}
+.fm-account-main-actions .primary{background:linear-gradient(135deg,#1688ff,#0969e2)}
+.fm-account-footer-actions .details{background:#eaf4ff;color:#0877ff}
+.fm-account-category-chart{border-color:#dce8f4!important;background:linear-gradient(180deg,#fafdff,#f3f8fe)!important}
+.fm-account-category-column{color:#183452}
+.fm-account-category-column .fm-account-category-barbox i{background:linear-gradient(180deg,#2b9aff,#0877ff)}
+.fm-mobile-nav{background:rgba(255,255,255,.96);border-top-color:#dce8f4;box-shadow:0 -12px 30px rgba(20,55,92,.08)}
+.fm-mobile-nav button.active{color:#0877ff}
+
+@media(max-width:900px){
+  .fm-accounts-toolbar{align-items:stretch;flex-direction:column}
+  .fm-account-search{max-width:none;width:100%}
+  .fm-account-segment-filters{justify-content:stretch}
+  .fm-account-segment-filters label{flex:1 1 210px}
+  .fm-account-segment-filters select{max-width:none;min-width:0;flex:1}
+}
+@media(max-width:700px){
+  .fm-main{padding-left:12px;padding-right:12px}
+  .fm-account-segment-filters{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+  .fm-account-segment-filters label{min-width:0;width:100%;height:46px;padding:0 9px;display:grid;gap:1px;align-content:center}
+  .fm-account-segment-filters label select{width:100%;font-size:.59rem}
+  .fm-account-filter-count{grid-column:1/-1;justify-self:start}
+  .fm-account-card{padding:15px}
+  .fm-account-card-top{grid-template-columns:52px minmax(0,1fr) 36px}
+  .fm-bank-mark{width:52px;height:52px;border-radius:16px}
+  .fm-account-balance-row{align-items:stretch;flex-direction:column}
+  .fm-account-main-actions{display:grid;grid-template-columns:1fr 2fr;width:100%}
+  .fm-account-main-actions button{width:100%}
+  .fm-account-card-footer{align-items:stretch;flex-direction:column}
+  .fm-account-footer-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
+  .fm-account-footer-actions .details{grid-column:1/-1}
+}
