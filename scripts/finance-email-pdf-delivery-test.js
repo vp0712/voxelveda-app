@@ -31,6 +31,7 @@ assert.throws(
 
 const root=path.resolve(__dirname,'..');
 const emailService=fs.readFileSync(path.join(root,'services','emailService.js'),'utf8');
+const deliveryService=fs.readFileSync(path.join(root,'services','financeReportDeliveryService.js'),'utf8');
 const reportController=fs.readFileSync(path.join(root,'controllers','financeReportBuilderController.js'),'utf8');
 const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 
@@ -43,5 +44,11 @@ assert.match(app,/\/api\/public\/finance-report\/:token\/:filename/);
 assert.match(delivery._test.publicAppUrl(),/^https:\/\//);
 assert.equal(delivery._test.boundedTtlMinutes(1),60);
 assert.equal(delivery._test.boundedTtlMinutes(999999),90*24*60);
+assert.equal(delivery._test.chunkUid(payload.id,3),'EPDF_11111111-2222-3333-4444-555555555555_0003');
+assert.equal(delivery._test.chunkPattern(payload.id),'EPDF_11111111-2222-3333-4444-555555555555_%');
+assert.match(deliveryService,/EMAIL_PDF_BLOB/);
+assert.doesNotMatch(deliveryService,/finance_report_email_deliveries/);
+assert.match(reportController,/report_type<>'EMAIL_PDF_BLOB'/);
+assert.equal(fs.existsSync(path.join(root,'migrations','20261002_finance_report_email_delivery.sql')),false);
 
 console.log('FINANCE_EMAIL_PDF_DELIVERY_TEST_OK');
