@@ -44,6 +44,17 @@ function normalizeBankAccountType(value) {
   throw new FinanceError('Select a supported bank account type.', 400, 'INVALID_BANK_ACCOUNT_TYPE');
 }
 
+const BANK_MARKET_SQL = `CASE
+  WHEN UPPER(COALESCE(ba.currency,''))='INR' OR UPPER(COALESCE(ba.account_type,'')) IN ('CURRENT','NRE','NRO') THEN 'INDIA'
+  WHEN UPPER(COALESCE(ba.currency,''))='AUD' THEN 'AUSTRALIA'
+  ELSE 'OTHER'
+END`;
+const BANK_COUNTRY_SQL = `CASE
+  WHEN UPPER(COALESCE(ba.currency,''))='INR' OR UPPER(COALESCE(ba.account_type,'')) IN ('CURRENT','NRE','NRO') THEN 'IN'
+  WHEN UPPER(COALESCE(ba.currency,''))='AUD' THEN 'AU'
+  ELSE 'XX'
+END`;
+
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 }
@@ -1052,7 +1063,9 @@ exports.getBankingDashboard = async (req, res) => {
 
     const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
       pool.query(
-        `SELECT ba.id,ba.nickname,ba.institution,ba.bank_market,ba.bank_country_code,ba.bsb_masked,ba.routing_code_masked,
+        `SELECT ba.id,ba.nickname,ba.institution,
+                ${BANK_MARKET_SQL} AS bank_market,${BANK_COUNTRY_SQL} AS bank_country_code,ba.bsb_masked,
+                CASE WHEN ${BANK_MARKET_SQL}='INDIA' THEN ba.bsb_masked ELSE NULL END AS routing_code_masked,
                 ba.account_number_masked,ba.currency,ba.ownership_scope,
                 ba.entity_name,ba.account_type,ba.financial_purpose,ba.connection_type,ba.connection_status,
                 ba.current_ledger_balance,ba.available_balance,
@@ -1418,6 +1431,9 @@ exports.getAccounts = async (req, res) => {
     await ensureFinanceSchema();
     const [rows] = await pool.query(
       `SELECT ba.*,
+              ${BANK_MARKET_SQL} AS bank_market,
+              ${BANK_COUNTRY_SQL} AS bank_country_code,
+              CASE WHEN ${BANK_MARKET_SQL}='INDIA' THEN ba.bsb_masked ELSE NULL END AS routing_code_masked,
               MIN(bt.transaction_date) AS imported_history_start,
               MAX(bt.transaction_date) AS imported_history_end,
               COUNT(bt.id) AS transaction_count,
@@ -1436,15 +1452,21 @@ exports.saveAccount = async (req, res) => {
     await ensureFinanceSchema();
     const nickname = String(req.body.nickname || '').trim();
     if (!nickname) throw new FinanceError('Account nickname is required.', 400, 'BANK_NICKNAME_REQUIRED');
-    const currency = String(req.body.currency || 'AUD').trim().toUpperCase();
+    let currency = String(req.body.currency || 'AUD').trim().toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) throw new FinanceError('Enter a valid three-letter currency code.', 400, 'INVALID_CURRENCY');
 
     const ownershipScope = normalizeScope(req.body.ownership_scope);
     const accountType = normalizeBankAccountType(req.body.account_type);
     const bankMarket = normalizeBankMarket(req.body.bank_market, currency);
     const bankCountryCode = normalizeBankCountryCode(req.body.bank_country_code, bankMarket);
-    const routingCodeMasked = String(req.body.routing_code_masked || '').trim().slice(0, 40) || null;
+    if (bankMarket === 'INDIA' && currency === 'AUD') currency = 'INR';
+    if (bankMarket === 'AUSTRALIA' && currency === 'INR') currency = 'AUD';
+
+    const routingCodeMasked = String(req.body.routing_code_masked || '').trim().slice(0, 30) || null;
     const bsbMasked = String(req.body.bsb_masked || '').trim().slice(0, 30) || null;
+    const routingIdentifier = bankMarket === 'INDIA'
+      ? (routingCodeMasked || bsbMasked)
+      : (bsbMasked || routingCodeMasked);
     const accountNumberMasked = String(req.body.account_number_masked || '').trim().slice(0, 40) || null;
     const opening = money.fromCents(money.toCents(req.body.opening_balance || 0));
     const id = Number(req.body.id || 0);
@@ -1452,10 +1474,11 @@ exports.saveAccount = async (req, res) => {
     if (id) {
       const existing = await privacy.assertAccountAccess(pool, id, req);
       await pool.query(
-        `UPDATE bank_accounts SET nickname=?, institution=?, bank_market=?, bank_country_code=?, bsb_masked=?, routing_code_masked=?,
+        `UPDATE bank_accounts SET nickname=?, institution=?, bsb_masked=?,
          account_number_masked=?, currency=?, ownership_scope=?, entity_name=?, account_type=?, financial_purpose=?, status=? WHERE id=?`,
-        [nickname, req.body.institution || null, bankMarket, bankCountryCode, bsbMasked, routingCodeMasked, accountNumberMasked,
-          currency, ownershipScope, req.body.entity_name || null, accountType, req.body.financial_purpose || null, req.body.status || 'ACTIVE', id]
+        [nickname, req.body.institution || null, routingIdentifier, accountNumberMasked,
+          currency, ownershipScope, req.body.entity_name || null, accountType, req.body.financial_purpose || null,
+          req.body.status || 'ACTIVE', id]
       );
       await pool.query('UPDATE bank_transactions SET ownership_scope=? WHERE bank_account_id=?', [ownershipScope, id]);
       await logAudit(pool, audit(req, {
@@ -1474,12 +1497,13 @@ exports.saveAccount = async (req, res) => {
 
     const [insert] = await pool.query(
       `INSERT INTO bank_accounts
-       (nickname, institution, bank_market, bank_country_code, bsb_masked, routing_code_masked, account_number_masked, currency,
+       (nickname, institution, bsb_masked, account_number_masked, currency,
         opening_balance, current_ledger_balance, reconciled_balance, ownership_scope, entity_name, account_type, financial_purpose,
         connection_type, connection_status, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MANUAL', 'MANUAL', ?)`,
-      [nickname, req.body.institution || null, bankMarket, bankCountryCode, bsbMasked, routingCodeMasked, accountNumberMasked,
-        currency, opening, opening, opening, ownershipScope, req.body.entity_name || null, accountType, req.body.financial_purpose || null, req.user.id]
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MANUAL', 'MANUAL', ?)`,
+      [nickname, req.body.institution || null, routingIdentifier, accountNumberMasked,
+        currency, opening, opening, opening, ownershipScope, req.body.entity_name || null,
+        accountType, req.body.financial_purpose || null, req.user.id]
     );
 
     await logAudit(pool, audit(req, {
