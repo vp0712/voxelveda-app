@@ -830,7 +830,7 @@ exports.emailPdf=async(req,res)=>{
 exports.listSaved=async(req,res)=>{
   try{
     await ensureFinanceSchema();
-    const [rows]=await pool.query('SELECT report_uid,name,report_type,definition_json,created_at,updated_at,last_run_at FROM finance_saved_reports WHERE created_by=? ORDER BY updated_at DESC',[userId(req)]);
+    const [rows]=await pool.query("SELECT report_uid,name,report_type,definition_json,created_at,updated_at,last_run_at FROM finance_saved_reports WHERE created_by=? AND report_type<>'EMAIL_PDF_BLOB' ORDER BY updated_at DESC",[userId(req)]);
     return res.json({saved_reports:rows.map(r=>({...r,definition:typeof r.definition_json==='string'?JSON.parse(r.definition_json):r.definition_json}))});
   }catch(error){return fail(res,error,'Failed to load saved Finance reports.')}
 };
