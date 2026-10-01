@@ -1,6 +1,6 @@
-vom-whatsapp-release: 20261001-operations-monitor-hotfix-no-ddl
-source-commit: d2eac7b619e3f38202fbeb55251c7a39b4f6f03d
-scope: signed-whatsapp-webhook; hourly-operations-report; authorised-command-replies
-ci: prior-vom-pr-all-green
-runtime: whatsapp-disabled; database-ddl-deferred-because-provider-returned-disk-full
+vom-whatsapp-release: 20261001-operations-monitor-hotfix-no-ddl-v2
+source-commit: c696184b77c9e65c097d34a9733eee8e0a60493b
+scope: whatsapp-operations-monitor; no-new-database-tables; existing-background-job-deduplication
+ci: security-success; consolidation-success
+runtime: whatsapp-disabled-until-meta-credentials-and-recipient-allowlist
 policy: single-marker-controlled-production-deploy
