@@ -1,6 +1,6 @@
-finance-release: 20261002-durable-email-pdf-no-ddl
-source-commit: 579b9515986059cb42f662c4ea185a00856e2030
-scope: durable-finance-pdf-email-delivery; explicit-pdf-filename; hidden-existing-table-chunks; redundant-object-storage
-ci: security-success; finance-release-success; consolidation-success; banking-success
-runtime: no-new-database-tables; no-ddl; pdf-only-download; 30-day-signed-delivery
+finance-release: 20261002-real-pdf-email-attachment
+source-commit: 0ada79edd5c003775aaa7c453bbc2bdfd5069ee6
+scope: finance-email-real-pdf-attachment; application-pdf-only; verified-dot-pdf-filename; no-broken-download-link-fallback
+ci: syntax-success; targeted-pdf-delivery-success; production-build-success
+runtime: actual-pdf-attachment; relay-requires-filename-preservation; fail-closed-on-unverified-attachment
 policy: single-marker-controlled-production-deploy
