@@ -10,7 +10,7 @@ const state={
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
   transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,accountCategorySpending:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,cashCustody:null,debtPlanner:null,commitments:null,savingsReserve:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,anomalyExplain:null,controlActions:null,jobProfitability:null,counterpartyControl:null,handover:null,personalIntegrity:null,personalTaxControl:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
-  resources:{},txFilters:{q:'',type:'',category:'',merchant:'',currency:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
+  resources:{},accountFilters:{market:'ALL',type:'ALL'},txFilters:{q:'',type:'',category:'',merchant:'',currency:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
 };
@@ -390,7 +390,7 @@ async function loadBase(){
  }
  if(state.account&&!state.accounts.some(a=>String(a.id)===String(state.account)))state.account='';
  const sel=$('fmAccount'),keep=state.account;
-  sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
+  sel.innerHTML='<option value="">All permitted accounts</option>'+state.accounts.map(a=>`<option value="${a.id}">${esc(accountMarketLabel(a))} · ${esc(accountTypeLabel(a.account_type))} · ${esc(a.institution||a.nickname||'Account')} · ${esc(a.nickname||a.account_name||'Account')} · ${esc(a.currency||'AUD')}</option>`).join('');
   sel.value=keep;
   return cycle;
 }
@@ -546,33 +546,59 @@ function openFinanceAccountCard(accountId){
  $('fmModalBody').innerHTML=`<div class="fm-account-card-modal">${financeAccountCardMarkup(a)}<p class="fm-helper">This is an internal Voxel Veda Finance account-identification card. It does not contain a payment PAN, CVV or expiry date and cannot be used to make payments.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Close</button><button class="primary" type="button" data-account-card-download="${esc(a.id)}">Download card</button></div></div>`;
  $('fmModal').showModal();document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());document.querySelector('[data-account-card-download]')?.addEventListener('click',()=>downloadFinanceAccountCard(a.id));
 }
+function accountMarketLabel(account){
+ const market=String(account?.bank_market||'').toUpperCase();
+ if(market==='INDIA')return 'India';
+ if(market==='AUSTRALIA')return 'Australia';
+ const code=String(account?.bank_country_code||'').toUpperCase();
+ if(code==='IN')return 'India';
+ if(code==='AU')return 'Australia';
+ return code&&code!=='XX'?code:'International';
+}
+function accountTypeLabel(value){
+ const type=String(value||'TRANSACTION').toUpperCase();
+ return ({TRANSACTION:'Everyday / Transaction',SAVINGS:'Savings',CURRENT:'Current',NRE:'NRE',NRO:'NRO','TERM DEPOSIT':'Term Deposit','CREDIT CARD':'Credit Card',LOAN:'Loan',CASH:'Cash','PETTY CASH':'Petty Cash',WALLET:'Digital Wallet',OTHER:'Other'})[type]||type;
+}
+function statementAccountOptions(selected=''){
+ const groups=new Map();
+ const marketRank={AUSTRALIA:1,INDIA:2,OTHER:3};
+ const rows=[...state.accounts].sort((a,b)=>(marketRank[String(a.bank_market||'OTHER').toUpperCase()]||9)-(marketRank[String(b.bank_market||'OTHER').toUpperCase()]||9)||String(a.institution||'').localeCompare(String(b.institution||''))||String(a.account_type||'').localeCompare(String(b.account_type||''))||String(a.nickname||'').localeCompare(String(b.nickname||'')));
+ for(const a of rows){
+  const group=accountMarketLabel(a)+' · '+accountTypeLabel(a.account_type);
+  if(!groups.has(group))groups.set(group,[]);
+  groups.get(group).push(a);
+ }
+ return [...groups.entries()].map(([label,items])=>'<optgroup label="'+esc(label)+'">'+items.map(a=>'<option value="'+esc(a.id)+'" '+(String(a.id)===String(selected)?'selected':'')+'>'+esc(a.institution||'Manual')+' · '+esc(a.nickname||'Account')+' · '+esc(a.account_number_masked||'No number')+' · '+esc(a.currency||'AUD')+'</option>').join('')+'</optgroup>').join('');
+}
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
  const spending=state.accountCategorySpending||{};
  const accountCategoryRows=Array.isArray(spending.account_categories)?spending.account_categories:[];
  const chartPeriod='All imported history';
- const cards=state.accounts.map((a,index)=>{
+ const marketFilter=String(state.accountFilters?.market||'ALL').toUpperCase(),typeFilter=String(state.accountFilters?.type||'ALL').toUpperCase();
+ const visibleAccounts=state.accounts.filter(a=>(marketFilter==='ALL'||String(a.bank_market||'OTHER').toUpperCase()===marketFilter)&&(typeFilter==='ALL'||String(a.account_type||'TRANSACTION').toUpperCase()===typeFilter));
+ const cards=visibleAccounts.map((a,index)=>{
   const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
   const accountName=esc(a.nickname||'Account');
   const institution=esc(a.institution||'Manual');
   const accountNumber=esc(a.account_number_masked||'number masked');
   const scope=esc(a.ownership_scope||'UNCLASSIFIED');
   const connection=esc(a.connection_status||'MANUAL');
-  const searchText=esc([a.nickname,a.institution,a.account_number_masked,a.ownership_scope,a.account_type,a.currency].filter(Boolean).join(' ').toLowerCase());
+  const searchText=esc([a.nickname,a.institution,a.account_number_masked,a.ownership_scope,a.account_type,a.bank_market,a.bank_country_code,a.currency].filter(Boolean).join(' ').toLowerCase());
   const tone=(index%3)+1;
   const manualAccount=String(a.connection_type||a.connection_status||'').toUpperCase()==='MANUAL'||String(a.connection_status||'').toUpperCase()==='MANUAL';
   const profileBalance=a.profile_balance??(manualAccount?(a.current_ledger_balance??a.available_balance):(a.available_balance??a.current_ledger_balance));
   const transactionCount=num(history.transaction_count??a.transaction_count);
-  return `<article class="fm-account-card-shell fm-account-tone-${tone}" data-account-card-shell data-search-text="${searchText}">
+  return `<article class="fm-account-card-shell fm-account-tone-${tone}" data-account-card-shell data-market="${esc(String(a.bank_market||'OTHER').toUpperCase())}" data-account-type="${esc(String(a.account_type||'TRANSACTION').toUpperCase())}" data-search-text="${searchText}">
    <div class="fm-account-card">
     <div class="fm-account-card-top">
      <button class="fm-bank-mark" type="button" data-account="${a.id}" aria-label="Open ${accountName}"><span>▥</span></button>
-     <div class="fm-account-identity"><span class="fm-account-type">${esc(a.account_type||'Account')}</span><h3>${accountName}</h3><p>${institution} · ${accountNumber}</p></div>
+     <div class="fm-account-identity"><span class="fm-account-type">${esc(accountMarketLabel(a))} · ${esc(accountTypeLabel(a.account_type))}</span><h3>${accountName}</h3><p>${institution} · ${accountNumber}</p></div>
      <button class="fm-account-more" type="button" data-account="${a.id}" aria-label="Open account controls">•••</button>
     </div>
     <div class="fm-account-balance-row">
-     <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(profileBalance,a.currency||'AUD')}</strong><small>${scope} · ${connection}</small></div>
+     <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(profileBalance,a.currency||'AUD')}</strong><small>${scope} · ${esc(accountMarketLabel(a))} · ${connection}</small></div>
      <div class="fm-account-main-actions"><button type="button" class="soft" data-account="${a.id}">View</button><button type="button" class="primary" data-account-transactions="${a.id}">Transactions</button></div>
     </div>
     ${renderAccountCategoryChart(a,accountCategoryRows.filter(row=>String(row.bank_account_id)===String(a.id)),null,{compact:true,label:chartPeriod})}
@@ -585,9 +611,14 @@ function accounts(){
  }).join('');
  return `<section class="fm-accounts-premium">
   <div class="fm-accounts-toolbar">
-   <label class="fm-account-search"><span>⌕</span><input type="search" data-account-search placeholder="Search accounts..." autocomplete="off"></label>
+   <label class="fm-account-search"><span>⌕</span><input type="search" data-account-search placeholder="Search bank, account, number or country..." autocomplete="off"></label>
+   <div class="fm-account-segment-filters">
+    <label>Banking market<select data-account-market-filter><option value="ALL" ${state.accountFilters.market==='ALL'?'selected':''}>All markets</option><option value="AUSTRALIA" ${state.accountFilters.market==='AUSTRALIA'?'selected':''}>Australia</option><option value="INDIA" ${state.accountFilters.market==='INDIA'?'selected':''}>India</option><option value="OTHER" ${state.accountFilters.market==='OTHER'?'selected':''}>Other / international</option></select></label>
+    <label>Account type<select data-account-type-filter><option value="ALL" ${state.accountFilters.type==='ALL'?'selected':''}>All types</option><option value="TRANSACTION" ${state.accountFilters.type==='TRANSACTION'?'selected':''}>Everyday / Transaction</option><option value="SAVINGS" ${state.accountFilters.type==='SAVINGS'?'selected':''}>Savings</option><option value="CURRENT" ${state.accountFilters.type==='CURRENT'?'selected':''}>Current</option><option value="NRE" ${state.accountFilters.type==='NRE'?'selected':''}>NRE</option><option value="NRO" ${state.accountFilters.type==='NRO'?'selected':''}>NRO</option><option value="CREDIT CARD" ${state.accountFilters.type==='CREDIT CARD'?'selected':''}>Credit card</option><option value="LOAN" ${state.accountFilters.type==='LOAN'?'selected':''}>Loan</option></select></label>
+    <span class="fm-account-filter-count">${visibleAccounts.length} of ${state.accounts.length} accounts</span>
+   </div>
   </div>
-  <article class="fm-card fm-accounts-panel"><div class="fm-pad"><div class="fm-card-head fm-accounts-head"><div><span class="fm-section-kicker">YOUR FINANCIAL ACCOUNTS</span><h2>Financial accounts</h2><p>Balances, history coverage, transactions and lifecycle controls in one place.</p></div><button data-quick="account">＋ Add account</button></div><div class="fm-account-grid">${cards||emptyState('No accounts','Create a financial account to begin.')}</div></div></article>
+  <article class="fm-card fm-accounts-panel"><div class="fm-pad"><div class="fm-card-head fm-accounts-head"><div><span class="fm-section-kicker">YOUR FINANCIAL ACCOUNTS</span><h2>Financial accounts</h2><p>Balances, history coverage, transactions and lifecycle controls in one place.</p></div><button data-quick="account">＋ Add account</button></div><div class="fm-account-grid">${cards||emptyState(state.accounts.length?'No accounts match these filters':'No accounts',state.accounts.length?'Choose another banking market or account type.':'Create a financial account to begin.')}</div></div></article>
  </section>`;
 }
 function transactions(){
@@ -674,7 +705,7 @@ async function stageStatementFiles(account,files,queue,mapping=null){
 }
 async function openHistoricalImport(accountId=''){
  $('fmModalEyebrow').textContent='HISTORICAL IMPORT';$('fmModalTitle').textContent='Import statement history';
- $('fmModalBody').innerHTML=`<form id="historicalImportForm" class="fm-form"><label>Account<select name="account_id" required><option value="">Choose account</option>${state.accounts.map(a=>`<option value="${a.id}" ${String(a.id)===String(accountId)?'selected':''}>${esc(a.nickname||'Account')} · ${esc(a.institution||'')} · ${esc(a.currency||'AUD')}</option>`).join('')}</select></label><label>Statement files<input name="files" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" multiple required></label><p class="fm-helper">Each original file is privately retained and processed one-by-one for stability as its own resumable server job. Duplicates are excluded from import, totals, screens and reports. Nothing is committed automatically. Posting requires explicit review and approval.</p><div id="historyImportQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload all securely</button></div></form>`;
+ $('fmModalBody').innerHTML=`<form id="historicalImportForm" class="fm-form"><label>Account<select name="account_id" required><option value="">Choose account</option>${statementAccountOptions(accountId)}</select></label><label>Statement files<input name="files" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" multiple required></label><p class="fm-helper">Each original file is privately retained and processed one-by-one for stability as its own resumable server job. Duplicates are excluded from import, totals, screens and reports. Nothing is committed automatically. Posting requires explicit review and approval.</p><div id="historyImportQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload all securely</button></div></form>`;
  $('fmModal').showModal();
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
  $('historicalImportForm').onsubmit=async e=>{
@@ -2331,10 +2362,10 @@ async function waitForStatementImport(uid,holder,{openReview=true}={}){
 }
 async function openStatementWizard(){
  let templates=[];try{templates=(await api(I+'/statement-imports/mappings')).mapping_templates||[]}catch{}
- const accountOptions=state.accounts.map(a=>'<option value="'+esc(a.id)+'">'+esc(a.nickname||'Account')+' · '+esc(a.currency||'AUD')+'</option>').join('');
+ const accountOptions=statementAccountOptions();
  $('fmModalEyebrow').textContent='STATEMENT IMPORT';$('fmModalTitle').textContent='Import statements';
  const templateOptions=templates.length?'<label>Saved mapping (optional)<select name="mapping_template"><option value="">Detect columns automatically</option>'+templates.map(template=>'<option value="'+esc(template.template_uid)+'">'+esc(template.template_name)+' · '+esc(template.institution)+' · '+esc(template.source_format)+'</option>').join('')+'</select></label>':'';
- $('fmModalBody').innerHTML='<form id="statementWizard" class="fm-form"><label>1. Account<select name="account_id" required><option value="">Choose account</option>'+accountOptions+'</select></label><label>2. Statement files<input name="files" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" multiple required></label>'+templateOptions+'<p class="fm-helper">Upload one or many statements. Original bytes are retained privately and processed one-by-one for stability by resumable server jobs. Duplicate transactions are blocked before they can enter Finance calculations, the ledger or exports. Nothing is committed automatically. No transaction reaches the ledger until review and approval.</p><div id="statementProgress" class="fm-state" hidden></div><div id="statementBatchQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload & verify files</button></div></form>';
+ $('fmModalBody').innerHTML='<form id="statementWizard" class="fm-form"><label>1. Destination account<select name="account_id" required><option value="">Choose the exact account this statement belongs to</option>'+accountOptions+'</select></label><label>2. Statement files<input name="files" type="file" accept=".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx" multiple required></label>'+templateOptions+'<p class="fm-helper">Upload one or many statements to this exact bank account only. Australian, Indian, savings, everyday/current and card accounts remain separate. Original bytes are retained privately and processed one-by-one for stability by resumable server jobs. Duplicate transactions are blocked before they can enter Finance calculations, the ledger or exports. Nothing is committed automatically. No transaction reaches the ledger until review and approval.</p><div id="statementProgress" class="fm-state" hidden></div><div id="statementBatchQueue" class="fm-import-queue"></div><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Upload & verify files</button></div></form>';
  $('fmModal').showModal();
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
  $('statementWizard').onsubmit=async e=>{
@@ -2571,6 +2602,8 @@ function bindDynamic(){
  document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
  const accountSearch=document.querySelector('[data-account-search]');
  if(accountSearch)accountSearch.oninput=e=>{const q=String(e.currentTarget.value||'').trim().toLowerCase();document.querySelectorAll('[data-account-card-shell]').forEach(card=>{card.hidden=Boolean(q)&&!String(card.dataset.searchText||'').includes(q)})};
+ const accountMarketFilter=document.querySelector('[data-account-market-filter]');if(accountMarketFilter)accountMarketFilter.onchange=e=>{state.accountFilters.market=String(e.currentTarget.value||'ALL').toUpperCase();render()};
+ const accountTypeFilter=document.querySelector('[data-account-type-filter]');if(accountTypeFilter)accountTypeFilter.onchange=e=>{state.accountFilters.type=String(e.currentTarget.value||'ALL').toUpperCase();render()};
  document.querySelectorAll('[data-fx-new]').forEach(b=>b.onclick=()=>openFxRateForm());
  document.querySelectorAll('[data-fx-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this FX rate? Historical native transactions are not changed.'))return;try{const x=await api(API+'/fx-rates/'+encodeURIComponent(b.dataset.fxArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await loadResource('fxRates',API+'/fx-rates');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
@@ -2897,12 +2930,16 @@ function openAccountForm(presetType='',accountId=''){
  const existing=state.accounts.find(a=>String(a.id)===String(accountId))||{};
  $('fmModalEyebrow').textContent='FINANCIAL ACCOUNT';$('fmModalTitle').textContent=accountId?'Edit financial account':'Add financial account';
  const type=String(presetType||existing.account_type||'TRANSACTION').toUpperCase();
- $('fmModalBody').innerHTML=`<form id="financeAccountForm" class="fm-form"><input type="hidden" name="id" value="${esc(accountId)}"><label>Account name<input name="nickname" value="${esc(existing.nickname||'')}" placeholder="e.g. ANZ Business, Personal Savings, Petty Cash" required></label><div class="fm-form-grid"><label>Institution<input name="institution" value="${esc(existing.institution||'')}" placeholder="Bank or provider"></label><label>Currency<input name="currency" value="${esc(existing.currency||'AUD')}" maxlength="3" required></label></div><div class="fm-form-grid"><label>Account type<select name="account_type"><option value="TRANSACTION">Transaction account</option><option value="SAVINGS">Savings</option><option value="CREDIT CARD">Credit card</option><option value="LOAN">Loan</option><option value="CASH">Cash</option><option value="PETTY CASH">Petty cash</option><option value="WALLET">Digital wallet</option><option value="OTHER">Other</option></select></label><label>Ownership<select name="ownership_scope"><option value="BUSINESS">Company</option><option value="PERSONAL">Personal</option><option value="MIXED">Mixed</option><option value="UNCLASSIFIED">Unclassified</option></select></label></div><div class="fm-form-grid"><label>Masked BSB<input name="bsb_masked" value="${esc(existing.bsb_masked||'')}" placeholder="e.g. ***-123"></label><label>Masked account number<input name="account_number_masked" value="${esc(existing.account_number_masked||'')}" placeholder="e.g. ******789"></label></div><div class="fm-form-grid"><label>Entity / owner<input name="entity_name" value="${esc(existing.entity_name||'')}" placeholder="Voxel Veda Pty Ltd or private"></label><label>Purpose<input name="financial_purpose" value="${esc(existing.financial_purpose||'')}" placeholder="Operating, tax, savings, vehicle..."></label></div>${accountId?'':'<label>Opening balance<input name="opening_balance" inputmode="decimal" value="0"></label>'}<p class="fm-helper">Create each real bank/card/cash account once. Statement history is imported into that account and never silently merged with another account.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">${accountId?'Save account':'Create account'}</button></div></form>`;
+ const inferredMarket=String(existing.bank_market||(String(existing.currency||'').toUpperCase()==='INR'?'INDIA':'AUSTRALIA')).toUpperCase();
+ const inferredCountry=String(existing.bank_country_code||(inferredMarket==='INDIA'?'IN':inferredMarket==='AUSTRALIA'?'AU':'XX')).toUpperCase();
+ $('fmModalBody').innerHTML=`<form id="financeAccountForm" class="fm-form"><input type="hidden" name="id" value="${esc(accountId)}"><label>Account name<input name="nickname" value="${esc(existing.nickname||'')}" placeholder="e.g. ANZ Everyday, ANZ Savings, HDFC Savings" required></label><div class="fm-form-grid"><label>Institution<input name="institution" value="${esc(existing.institution||'')}" placeholder="Bank or provider"></label><label>Currency<input name="currency" value="${esc(existing.currency||(inferredMarket==='INDIA'?'INR':'AUD'))}" maxlength="3" required></label></div><div class="fm-form-grid"><label>Banking market<select name="bank_market"><option value="AUSTRALIA">Australia</option><option value="INDIA">India</option><option value="OTHER">Other / international</option></select></label><label>Bank country code<input name="bank_country_code" value="${esc(inferredCountry)}" maxlength="2" placeholder="AU or IN" required></label></div><div class="fm-form-grid"><label>Account type<select name="account_type"><option value="TRANSACTION">Everyday / transaction (Australia)</option><option value="SAVINGS">Savings</option><option value="CURRENT">Current account (India)</option><option value="NRE">NRE account</option><option value="NRO">NRO account</option><option value="TERM DEPOSIT">Term deposit</option><option value="CREDIT CARD">Credit card</option><option value="LOAN">Loan</option><option value="CASH">Cash</option><option value="PETTY CASH">Petty cash</option><option value="WALLET">Digital wallet</option><option value="OTHER">Other</option></select></label><label>Ownership<select name="ownership_scope"><option value="BUSINESS">Company</option><option value="PERSONAL">Personal</option><option value="MIXED">Mixed</option><option value="UNCLASSIFIED">Unclassified</option></select></label></div><div class="fm-form-grid"><label>Masked BSB (Australia)<input name="bsb_masked" value="${esc(existing.bsb_masked||'')}" placeholder="e.g. ***-123"></label><label>Masked routing / IFSC (India or other)<input name="routing_code_masked" value="${esc(existing.routing_code_masked||'')}" placeholder="e.g. HDFC****123"></label></div><label>Masked account number<input name="account_number_masked" value="${esc(existing.account_number_masked||'')}" placeholder="e.g. ******789"></label><div class="fm-form-grid"><label>Entity / owner<input name="entity_name" value="${esc(existing.entity_name||'')}" placeholder="Voxel Veda Pty Ltd or private"></label><label>Purpose<input name="financial_purpose" value="${esc(existing.financial_purpose||'')}" placeholder="Operating, tax, savings, vehicle..."></label></div>${accountId?'':'<label>Opening balance<input name="opening_balance" inputmode="decimal" value="0"></label>'}<p class="fm-helper"><b>One real bank account = one Finance account.</b> Create ANZ Everyday and ANZ Savings separately, and keep Australian and Indian accounts separate. Upload each statement only to the exact account it belongs to so balances, categories, reports and history never mix.</p><div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">${accountId?'Save account':'Create account'}</button></div></form>`;
  $('fmModal').showModal();
- const form=$('financeAccountForm');form.elements.account_type.value=type;form.elements.ownership_scope.value=existing.ownership_scope||(state.scope==='PERSONAL'?'PERSONAL':'BUSINESS');
+ const form=$('financeAccountForm');form.elements.account_type.value=type;form.elements.ownership_scope.value=existing.ownership_scope||(state.scope==='PERSONAL'?'PERSONAL':'BUSINESS');form.elements.bank_market.value=inferredMarket;form.elements.bank_country_code.value=inferredCountry;
  if(existing.ownership_scope)form.elements.ownership_scope.value=existing.ownership_scope;
+ const marketChanged=()=>{const market=String(form.elements.bank_market.value||'OTHER').toUpperCase();if(!accountId){if(market==='INDIA'&&String(form.elements.currency.value||'').toUpperCase()==='AUD')form.elements.currency.value='INR';if(market==='AUSTRALIA'&&String(form.elements.currency.value||'').toUpperCase()==='INR')form.elements.currency.value='AUD'}if(market==='INDIA'&&['AU','XX',''].includes(String(form.elements.bank_country_code.value||'').toUpperCase()))form.elements.bank_country_code.value='IN';if(market==='AUSTRALIA'&&['IN','XX',''].includes(String(form.elements.bank_country_code.value||'').toUpperCase()))form.elements.bank_country_code.value='AU';};
+ form.elements.bank_market.addEventListener('change',marketChanged);
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
- form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),body=Object.fromEntries(fd.entries());body.id=body.id?Number(body.id):undefined;body.currency=String(body.currency||'AUD').toUpperCase();try{const x=await api(I+'/accounts',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh();if(x.bank_account_id){state.view='accounts';history.replaceState(null,'','#accounts');render()}}catch(error){notice(error.message,true)}};
+ form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),body=Object.fromEntries(fd.entries());body.id=body.id?Number(body.id):undefined;body.currency=String(body.currency||'AUD').toUpperCase();body.bank_country_code=String(body.bank_country_code||'').toUpperCase();try{const x=await api(I+'/accounts',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh();if(x.bank_account_id){state.view='accounts';history.replaceState(null,'','#accounts');render()}}catch(error){notice(error.message,true)}};
 }
 function openNew(kind='expense',presetAccount=''){
  if(kind==='statement'){openStatementWizard();return}
