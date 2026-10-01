@@ -31,9 +31,12 @@ assert(!html.includes('finance-bank-app-v3')&&!html.includes('premium-banking-ap
 
 assert(client.includes('function stageStatementFiles('),'multi-file statement processing must use the shared stable batch verifier');
 assert(client.includes('name="files" type="file"')&&client.includes('multiple required'),'standard Statement Import must support multiple selected files/PDFs');
-assert(client.includes('processed one-by-one for stability'),'large multi-PDF selections must be processed sequentially for stability');
+assert(client.includes('Promise.all(workers)')&&client.includes('Every selected file is queued to private storage first'),'multi-file selections must enqueue all accepted files before waiting for extraction');
 assert(client.includes('duplicate(s) excluded'),'batch import must report duplicate exclusions to the user');
 assert(client.includes('showFinancePopup'),'batch extraction/verification must finish with a centred result popup');
 assert(client.includes('excluded from import, totals, screens and reports')||client.includes('blocked before they can enter Finance calculations'),'duplicate policy must be visible in the import UI');
 assert(client.includes('waitForStatementImport')&&client.includes('DEAD_LETTER'),'batch import must surface durable job progress and safe terminal states');
+assert(client.includes("['REMOVED','REVERSED','CANCELLED']")&&client.includes('.slice(0,25)'),'removed imports must stay out of the active wizard while recent batches remain visible');
+const ingestion=read('controllers/financeStatementIngestionController.js');
+assert(ingestion.includes('reused: true')&&ingestion.includes("parse_status<>'REMOVED'"),'exact re-uploads must reuse an active import instead of failing a multi-file batch');
 console.log('Unified secure Finance statement import and historical migration checks passed.');
