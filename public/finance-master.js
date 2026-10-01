@@ -300,9 +300,47 @@ async function loadResource(name,path,cycle=null){
  catch(error){if(cycle===null||cycle===loadCycle)setResource(name,error.status===403?'permission':'error',null,error,path);return null}
 }
 function resourceData(name){return state.resources[name]?.status==='loaded'?state.resources[name].data:null}
+const STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v1';
+let statementParserRecoveryRunning=false;
+async function recoverLegacyParserFailuresOnce(){
+ if(statementParserRecoveryRunning)return 0;
+ const recoverable=new Set(['PDF_NO_SAFE_TRANSACTIONS','OCR_NO_SAFE_TRANSACTIONS']);
+ const candidates=(state.reviews||[]).filter(row=>{
+  const status=String(row.status||row.job_status||'').toUpperCase();
+  const code=String(row.last_error_code||row.job_error_code||'').toUpperCase();
+  return ['FAILED','DEAD_LETTER'].includes(status)&&recoverable.has(code)&&row.import_uid;
+ }).slice(0,10);
+ if(!candidates.length)return 0;
+ statementParserRecoveryRunning=true;
+ let retried=0;
+ try{
+  for(const row of candidates){
+   const key='vv:statement-parser-recovery:'+STATEMENT_PARSER_RECOVERY_VERSION+':'+row.import_uid;
+   if(localStorage.getItem(key))continue;
+   // Mark before the request so page refresh/network retries cannot create a loop.
+   localStorage.setItem(key,new Date().toISOString());
+   try{
+    await api(I+'/statement-imports/'+encodeURIComponent(row.import_uid)+'/retry',{method:'POST',body:'{}'});
+    retried+=1;
+   }catch(error){
+    // Authentication/temporary network failures are safe to try again later.
+    if(Number(error?.status||0)>=500||!error?.status)localStorage.removeItem(key);
+   }
+  }
+ }finally{statementParserRecoveryRunning=false}
+ if(retried){
+  notice(retried+' older PDF import'+(retried===1?'':'s')+' re-queued once with the upgraded statement parser.');
+  window.setTimeout(()=>refresh(),2500);
+ }
+ return retried;
+}
 function syncSupplementaryState(){
  const removed=resourceData('removedStatementPayload');if(removed)state.removedStatements=removed.removed_statements||[];
- const reviews=resourceData('reviewPayload');if(reviews)state.reviews=reviews.sessions||[];
+ const reviews=resourceData('reviewPayload');
+ if(reviews){
+  state.reviews=reviews.sessions||[];
+  void recoverLegacyParserFailuresOnce();
+ }
 }
 function canProgressivelyRender(cycle){
  return cycle===loadCycle&&!$('fmModal')?.open&&!$('fmDrawer')?.classList.contains('open');
