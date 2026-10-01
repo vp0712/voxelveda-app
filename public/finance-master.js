@@ -673,34 +673,66 @@ async function stageStatementPreview(account,file,parsed,index,totalFiles,onRetr
 }
 async function stageStatementFiles(account,files,queue,mapping=null){
  const staged=[];
- const summary={files:Number(files.length||0),processed:0,failed:0,attention:0,rows:0,ready:0,duplicates:0,rejected:0};
+ const summary={files:Number(files.length||0),uploaded:0,processed:0,failed:0,attention:0,rows:0,ready:0,duplicates:0,rejected:0};
  queue.innerHTML='';
- for(let index=0;index<files.length;index++){
-  const file=files[index];
+ const entries=[...files].map((file,index)=>{
   const item=document.createElement('div');
   item.className='fm-import-item';
   item.innerHTML='<div class="fm-import-item-main"><b>'+esc(file.name)+'</b><div class="fm-import-status">Queued '+(index+1)+' of '+files.length+'</div></div><span class="fm-badge">QUEUED</span>';
   queue.appendChild(item);
-  const holder=item.querySelector('.fm-import-status'),badge=item.querySelector('.fm-badge');
+  return {file,index,item,holder:item.querySelector('.fm-import-status'),badge:item.querySelector('.fm-badge'),uploaded:null,error:null};
+ });
+
+ // Phase 1: enqueue every selected file before waiting for extraction. This makes
+ // a 10-file selection durable on the server even when the first PDF needs OCR.
+ // Keep upload concurrency bounded so mobile connections and Railway are not flooded.
+ let cursor=0;
+ const workers=Array.from({length:Math.min(3,entries.length)},async()=>{
+  while(cursor<entries.length){
+   const entry=entries[cursor++];
+   try{
+    entry.holder.textContent='Uploading original bytes to private statement storage…';
+    entry.badge.textContent='UPLOAD';
+    entry.uploaded=await uploadStatementFile(account.id,entry.file,mapping);
+    summary.uploaded+=1;
+    entry.badge.textContent=entry.uploaded.reused?'EXISTS':'QUEUED';
+    entry.holder.textContent=entry.uploaded.reused?'Existing verified upload reused; checking status…':'Stored securely; waiting for extraction…';
+   }catch(error){
+    entry.error=error;
+    summary.failed+=1;
+    entry.item.classList.add('bad');entry.badge.className='fm-badge bad';entry.badge.textContent='ERROR';
+    entry.holder.textContent=error.message;
+   }
+  }
+ });
+ await Promise.all(workers);
+
+ // Phase 2: observe all accepted jobs concurrently. Server ingestion itself remains
+ // lease-controlled/idempotent, while the browser no longer blocks later uploads.
+ await Promise.all(entries.filter(entry=>entry.uploaded).map(async(entry)=>{
   try{
-   holder.textContent='Uploading original bytes to private statement storage…';badge.textContent='UPLOAD';
-   const uploaded=await uploadStatementFile(account.id,file,mapping);
-   const outcome=await waitForStatementImport(uploaded.import_uid,holder,{openReview:false});
+   const outcome=await waitForStatementImport(entry.uploaded.import_uid,entry.holder,{openReview:false});
    const record=outcome.record||{},status=String(outcome.status||'').toUpperCase();
    if(status==='PENDING_REVIEW'){
     const duplicates=num(record.duplicate_rows),rejected=num(record.rejected_rows),ready=num(record.valid_rows)+num(record.warning_rows);
     summary.processed+=1;summary.rows+=num(record.total_rows);summary.ready+=ready;summary.duplicates+=duplicates;summary.rejected+=rejected;
-    staged.push({file:file.name,uid:uploaded.import_uid,summary:record,reused:Boolean(uploaded.reused)});
-    item.classList.add(duplicates||rejected?'warn':'good');badge.className='fm-badge '+(duplicates||rejected?'warn':'good');badge.textContent=duplicates?(duplicates+' DUPLICATE'+(duplicates===1?'':'S')+' EXCLUDED'):(rejected?(rejected+' REJECTED'):'READY');
+    staged.push({file:entry.file.name,uid:entry.uploaded.import_uid,summary:record,reused:Boolean(entry.uploaded.reused)});
+    entry.item.classList.add(duplicates||rejected?'warn':'good');entry.badge.className='fm-badge '+(duplicates||rejected?'warn':'good');
+    entry.badge.textContent=duplicates?(duplicates+' DUPLICATE'+(duplicates===1?'':'S')+' EXCLUDED'):(rejected?(rejected+' REJECTED'):'READY');
+   }else if(status==='IMPORTED'){
+    summary.processed+=1;
+    staged.push({file:entry.file.name,uid:entry.uploaded.import_uid,summary:record,reused:true});
+    entry.item.classList.add('good');entry.badge.className='fm-badge good';entry.badge.textContent='ALREADY IMPORTED';
+    entry.holder.textContent='This exact statement already exists. No duplicate file or transactions were created.';
    }else if(['NEEDS_PASSWORD','NEEDS_MAPPING'].includes(status)){
-    summary.attention+=1;item.classList.add('warn');badge.className='fm-badge warn';badge.textContent='ACTION';
+    summary.attention+=1;entry.item.classList.add('warn');entry.badge.className='fm-badge warn';entry.badge.textContent='ACTION';
    }else{
-    summary.failed+=1;item.classList.add('bad');badge.className='fm-badge bad';badge.textContent=status||'FAILED';
+    summary.failed+=1;entry.item.classList.add('bad');entry.badge.className='fm-badge bad';entry.badge.textContent=status||'FAILED';
    }
   }catch(error){
-   summary.failed+=1;item.classList.add('bad');badge.className='fm-badge bad';badge.textContent='ERROR';holder.textContent=error.message;
+   summary.failed+=1;entry.item.classList.add('bad');entry.badge.className='fm-badge bad';entry.badge.textContent='ERROR';entry.holder.textContent=error.message;
   }
- }
+ }));
  return {staged,summary};
 }
 async function openHistoricalImport(accountId=''){
@@ -725,9 +757,27 @@ async function openHistoricalImport(accountId=''){
  };
 }
 function statements(){
- const pending=state.reviews.filter(x=>x.status==='PENDING_REVIEW');
- const processing=state.reviews.filter(x=>!['PENDING_REVIEW','IMPORTED','REJECTED','CANCELLED','REVERSED'].includes(String(x.status||'').toUpperCase()));
- return `<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Import Wizard</h2><p>Choose account → secure upload → classify/OCR → validate → review → approve and post.</p></div><button data-quick="statement">Start import</button></div><div class="fm-list">${processing.slice(0,8).map(x=>`<button class="fm-row fm-row-button" data-import-status="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement import')}</h3><p>${esc(x.account_name||'')} · ${esc(String(x.current_stage||x.status||'PROCESSING').replace(/_/g,' '))}</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${num(x.progress_percent)}% · open status / recovery</small></div></button>`).join('')}${pending.slice(0,8).map(x=>`<div class="fm-row" data-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ${esc(x.source_format||'')} · ${num(x.total_rows)} rows</p></div><div class="fm-row-right">${statusBadge(x.status)}<small>${num(x.warning_rows)} uncertain · ${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small></div></div>`).join('')||(processing.length?'':emptyState('No pending reviews','New statement uploads will appear here before they affect the ledger.'))}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Supported formats</h2><p>Verified by file content and processed by the secure server pipeline.</p></div></div><div class="fm-format-grid"><span>CSV</span><span>PDF + OCR</span><span>PNG/JPEG</span><span>OFX</span><span>QFX</span><span>QIF</span><span>XLSX</span></div><p class="fm-helper">Original statements and row-level source evidence are retained. Legacy XLS and HEIC are rejected explicitly.</p></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Vault</h2><p>Committed history with coverage and import quality.</p></div></div>${resourceError('statementPayload','Statement Vault')}<div class="fm-list">${state.statements.map(x=>`<div class="fm-row"><div><h3>${esc(x.original_name||'Statement')}</h3><p>${esc(x.account_name||'')} · ${date(x.statement_start_date)} – ${date(x.statement_end_date)} · ${esc(x.source_format||'')}</p></div><div class="fm-row-right"><b>${num(x.imported_rows)} imported</b><small>${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small><div class="fm-inline-actions"><button type="button" data-statement-edit="${esc(x.import_uid)}">Edit</button><button type="button" data-statement-remove="${esc(x.import_uid)}">Remove</button></div></div></div>`).join('')||emptyState('No committed statements','Use the import wizard to build verified account history.')}</div></div></article>${removedStatementsSection()}`;
+ const recent=state.reviews
+  .filter(x=>!['REMOVED','REVERSED','CANCELLED'].includes(String(x.status||'').toUpperCase()))
+  .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))
+  .slice(0,25);
+ const importRows=recent.map(x=>{
+  const status=String(x.status||'').toUpperCase();
+  const failed=['FAILED','DEAD_LETTER'].includes(status);
+  const pending=status==='PENDING_REVIEW';
+  const imported=status==='IMPORTED';
+  const detail=failed
+   ? esc(x.last_error_summary||x.job_error_summary||String(x.current_stage||status).replace(/_/g,' '))
+   : imported
+     ? num(x.total_rows)+' rows processed · '+num(x.duplicate_rows)+' duplicates excluded'
+     : pending
+       ? num(x.total_rows)+' rows · '+num(x.duplicate_rows)+' duplicates · '+num(x.rejected_rows)+' rejected'
+       : num(x.progress_percent)+'% · '+esc(String(x.current_stage||status||'PROCESSING').replace(/_/g,' '));
+  if(pending)return `<button class="fm-row fm-row-button" data-import-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ready for review</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail}</small></div></button>`;
+  if(imported)return `<div class="fm-row"><div><h3>${esc(x.original_name||'Statement import')}</h3><p>${esc(x.account_name||'')} · posted</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail}</small></div></div>`;
+  return `<button class="fm-row fm-row-button" data-import-status="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement import')}</h3><p>${esc(x.account_name||'')} · ${esc(String(x.current_stage||status||'PROCESSING').replace(/_/g,' '))}</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail} · open status / recovery</small></div></button>`;
+ }).join('');
+ return `<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Import Wizard</h2><p>Choose account → secure upload → classify/OCR → validate → review → approve and post. Up to 25 recent active imports are shown; removed statements stay only in recovery.</p></div><button data-quick="statement">Start import</button></div><div class="fm-list">${importRows||emptyState('No recent imports','New statement uploads will appear here before they affect the ledger.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Supported formats</h2><p>Verified by file content and processed by the secure server pipeline.</p></div></div><div class="fm-format-grid"><span>CSV</span><span>PDF + OCR</span><span>PNG/JPEG</span><span>OFX</span><span>QFX</span><span>QIF</span><span>XLSX</span></div><p class="fm-helper">Original statements and row-level source evidence are retained. Legacy XLS and HEIC are rejected explicitly.</p></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Vault</h2><p>Committed history with coverage and import quality.</p></div></div>${resourceError('statementPayload','Statement Vault')}<div class="fm-list">${state.statements.map(x=>`<div class="fm-row"><div><h3>${esc(x.original_name||'Statement')}</h3><p>${esc(x.account_name||'')} · ${date(x.statement_start_date)} – ${date(x.statement_end_date)} · ${esc(x.source_format||'')}</p></div><div class="fm-row-right"><b>${num(x.imported_rows)} imported</b><small>${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small><div class="fm-inline-actions"><button type="button" data-statement-edit="${esc(x.import_uid)}">Edit</button><button type="button" data-statement-remove="${esc(x.import_uid)}">Remove</button></div></div></div>`).join('')||emptyState('No committed statements','Use the import wizard to build verified account history.')}</div></div></article>${removedStatementsSection()}`;
 }
 function removedStatementsSection(){
  const rows=(state.removedStatements||[]).map(x=>'<div class="fm-row"><div><h3>'+esc(x.original_name||'Removed statement')+'</h3><p>'+esc(x.account_name||'')+' · '+date(x.statement_start_date)+' – '+date(x.statement_end_date)+' · '+esc(x.source_format||'')+'</p></div><div class="fm-row-right">'+statusBadge('REMOVED')+'<small>Excluded from active reports and analysis</small><div class="fm-inline-actions"><button type="button" data-statement-restore="'+esc(x.import_uid)+'">Restore</button><button type="button" class="bad" data-statement-purge="'+esc(x.import_uid)+'">Danger Zone purge</button></div></div></div>').join('')||emptyState('No removed statements','Soft-removed statements will appear here for controlled recovery.');
@@ -2355,7 +2405,7 @@ async function waitForStatementImport(uid,holder,{openReview=true}={}){
    holder.querySelector?.('[data-import-review]')?.addEventListener('click',()=>{$('fmModal').close();openStatementReview(uid)});
    return {status,record};
   }
-  if(['NEEDS_PASSWORD','NEEDS_MAPPING','FAILED','DEAD_LETTER','CANCELLED'].includes(status)){renderStatementAttention(uid,record,holder);return {status,record}}
+  if(status==='IMPORTED'){holder.className='fm-state fm-state-success';holder.innerHTML='<strong>Already imported</strong><p>This exact statement already exists. No duplicate file or transactions were created.</p>';return {status,record}}\n  if(['NEEDS_PASSWORD','NEEDS_MAPPING','FAILED','DEAD_LETTER','CANCELLED','REMOVED','REVERSED'].includes(status)){renderStatementAttention(uid,record,holder);return {status,record}}
   await statementDelay(1500);
  }
  throw new Error('Statement processing is still running. It remains safely queued; reopen the Statement Vault to check progress.');
