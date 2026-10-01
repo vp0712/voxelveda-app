@@ -518,9 +518,13 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   }
 
   if (hasPdf && isRelayConfigured() && pdfTransport === 'https_relay') {
-    const error = new Error('The WordPress HTTPS relay cannot guarantee the original PDF attachment filename. Use secure PDF delivery instead.');
-    error.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
-    throw error;
+    const result = await sendViaHttpsRelay(relayArgs);
+    if (!result.attachmentFilenameGuaranteed) {
+      const error = new Error('The HTTPS mail relay did not verify preservation of the .pdf attachment filename.');
+      error.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
+      throw error;
+    }
+    return { ...result, transport: 'https_relay' };
   }
 
   if (hasPdf) {
@@ -528,10 +532,14 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
       return await sendViaSmtp(smtpArgs);
     } catch (error) {
       if (!isRelayConfigured() || !isEmailTransportError(error)) throw error;
-      const unsafe = new Error('Direct PDF email transport is unavailable and the WordPress relay cannot safely preserve the PDF filename.');
-      unsafe.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
-      unsafe.cause = error;
-      throw unsafe;
+      const result = await sendViaHttpsRelay(relayArgs);
+      if (!result.attachmentFilenameGuaranteed) {
+        const unsafe = new Error('The HTTPS mail relay did not verify preservation of the .pdf attachment filename.');
+        unsafe.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
+        unsafe.cause = error;
+        throw unsafe;
+      }
+      return { ...result, transport: 'https_relay' };
     }
   }
 
