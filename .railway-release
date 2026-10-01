@@ -1,6 +1,6 @@
-vom-whatsapp-release: 20261001-operations-monitor-hotfix-no-ddl-v2
-source-commit: c696184b77c9e65c097d34a9733eee8e0a60493b
-scope: whatsapp-operations-monitor; no-new-database-tables; existing-background-job-deduplication
-ci: security-success; consolidation-success
-runtime: whatsapp-disabled-until-meta-credentials-and-recipient-allowlist
+finance-release: 20261002-durable-email-pdf-no-ddl
+source-commit: 579b9515986059cb42f662c4ea185a00856e2030
+scope: durable-finance-pdf-email-delivery; explicit-pdf-filename; hidden-existing-table-chunks; redundant-object-storage
+ci: security-success; finance-release-success; consolidation-success; banking-success
+runtime: no-new-database-tables; no-ddl; pdf-only-download; 30-day-signed-delivery
 policy: single-marker-controlled-production-deploy
