@@ -18,6 +18,7 @@ assert(controller.includes('normalizeBankMarket'),'controller must validate bank
 assert(controller.includes('normalizeBankAccountType'),'controller must validate account type');
 assert(controller.includes('bank_country_code'),'controller must persist country');
 assert(controller.includes('routing_code_masked'),'controller must persist routing code');
+assert(controller.includes('ba.bank_market,ba.bank_country_code'),'banking dashboard must return market metadata');
 assert(ui.includes('data-account-market-filter'),'accounts UI must expose market filter');
 assert(ui.includes('data-account-type-filter'),'accounts UI must expose account-type filter');
 assert(ui.includes('Banking market'),'account form must expose banking market');
@@ -25,6 +26,8 @@ assert(ui.includes('Current account (India)'),'account form must expose Indian c
 assert(ui.includes('NRE account'),'account form must expose NRE');
 assert(ui.includes('NRO account'),'account form must expose NRO');
 assert(ui.includes('statementAccountOptions'),'statement uploader must group individual accounts');
+assert(ui.includes("accounts?.bank_accounts||accounts?.accounts||[]"),'account fallback must read the actual accounts response');
+assert(ui.includes('One real bank account = one Finance account.'),'account form must explain exact account boundaries');
 assert(css.includes('.fm-account-segment-filters'),'theme must style account segmentation filters');
 
 console.log('FINANCE_ACCOUNT_SEGMENTATION_TEST_OK');
