@@ -156,6 +156,10 @@ async function resume(req, res, options) {
     if (!session) return res.status(404).json({ message: 'Statement import was not found.', code: 'STATEMENT_IMPORT_NOT_FOUND' });
     if (['IMPORTED', 'CANCELLED', 'REVERSED'].includes(session.status)) return res.status(409).json({ message: `This import is ${session.status} and cannot be resumed.`, code: 'STATEMENT_IMPORT_LOCKED' });
     const fields = ["status='QUEUED'", "stage='QUEUED'", 'progress_percent=0', 'available_at=NOW()', 'locked_by=NULL', 'locked_at=NULL', 'error_code=NULL', 'error_summary=NULL'];
+    // A deliberate retry is a new processing attempt. Failed/dead-letter jobs must
+    // reset their exhausted attempt counter or "Retry" can immediately dead-letter
+    // again without ever reaching the upgraded parser.
+    if (['FAILED', 'DEAD_LETTER'].includes(String(session.status || '').toUpperCase())) fields.push('attempt=0', 'completed_at=NULL');
     const params = [];
     if (options.password !== undefined) { fields.push('encrypted_password=?'); params.push(options.password ? encryptSensitive(options.password) : null); }
     if (options.mapping !== undefined) { fields.push('mapping_json=?'); params.push(JSON.stringify(options.mapping)); }
