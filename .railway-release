@@ -1,6 +1,6 @@
-finance-release: 20261001-account-market-segmentation
-source-commit: 6ef3ec332e5237d089cdaaa8e974b77435c3545b
-scope: australian-indian-exact-account-segmentation-and-finance-ui-v18
-ci: security-success; finance-release-success; consolidation-success; bank-lifecycle-success; advanced-banking-success
-runtime: exact-account-ledger-boundaries; grouped-statement-destinations; retry-safe-migration
+finance-release: 20261001-account-market-segmentation-schema-free
+source-commit: 0b077252cf2937bb3ae9ff284a05aa4110844cb8
+scope: australian-indian-exact-account-segmentation-schema-free-production-recovery
+ci: security-success; finance-release-success; consolidation-success; advanced-banking-success
+runtime: exact-account-ledger-boundaries; grouped-statement-destinations; schema-free-migration-retry
 policy: single-marker-controlled-production-deploy
