@@ -1,6 +1,6 @@
-finance-release: 20261002-real-pdf-email-attachment
-source-commit: 0ada79edd5c003775aaa7c453bbc2bdfd5069ee6
-scope: finance-email-real-pdf-attachment; application-pdf-only; verified-dot-pdf-filename; no-broken-download-link-fallback
-ci: syntax-success; targeted-pdf-delivery-success; production-build-success
-runtime: actual-pdf-attachment; relay-requires-filename-preservation; fail-closed-on-unverified-attachment
+finance-release: 20261002-statement-batch-ingestion-dedupe
+source-commit: 5d73c439fcb7475b0e0d1dc84eb7efe0a2da6cba
+scope: enqueue-all-statement-files; hide-removed-imports; anz-pdf-ocr-fallback; balance-aware-dedupe; preserve-source-category; one-time-parser-recovery
+ci: security-success; finance-release-success; banking-success; lifecycle-success; consolidation-success
+runtime: durable-statement-upload; controlled-worker-processing; review-before-post; exact-file-reuse
 policy: single-marker-controlled-production-deploy
