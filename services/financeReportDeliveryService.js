@@ -7,6 +7,8 @@ const { putObject, getObject, deleteObject } = require('./objectStorageService')
 const DEFAULT_TTL_MINUTES = 30 * 24 * 60;
 const MAX_TTL_MINUTES = 90 * 24 * 60;
 const MAX_PDF_BYTES = 20 * 1024 * 1024;
+const CHUNK_BYTES = 192 * 1024;
+const INTERNAL_REPORT_TYPE = 'EMAIL_PDF_BLOB';
 
 function signingSecret() {
   const value = String(
@@ -124,6 +126,20 @@ function boundedTtlMinutes(value) {
   return Math.max(60, Math.min(Math.floor(safe), MAX_TTL_MINUTES));
 }
 
+function chunkUid(deliveryUid, index) {
+  return `EPDF_${deliveryUid}_${String(index).padStart(4, '0')}`;
+}
+
+function chunkPattern(deliveryUid) {
+  return `EPDF_${deliveryUid}_%`;
+}
+
+function parseDefinition(value) {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  try { return JSON.parse(String(value)); } catch { return null; }
+}
+
 async function writeObjectStorageBackup(key, buffer) {
   try {
     await putObject(key, buffer, 'application/pdf');
@@ -135,6 +151,66 @@ async function writeObjectStorageBackup(key, buffer) {
       Number(error?.status || 0) || ''
     );
     return false;
+  }
+}
+
+async function persistPdfChunks({
+  deliveryUid,
+  reportUid,
+  filename,
+  buffer,
+  sha256,
+  objectKey,
+  createdBy,
+  expiresAt
+}) {
+  const chunkCount = Math.ceil(buffer.length / CHUNK_BYTES);
+  const connection = await pool.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    for (let index = 0; index < chunkCount; index += 1) {
+      const start = index * CHUNK_BYTES;
+      const end = Math.min(start + CHUNK_BYTES, buffer.length);
+      const chunk = buffer.subarray(start, end);
+
+      const definition = {
+        internal_type: INTERNAL_REPORT_TYPE,
+        delivery_uid: deliveryUid,
+        source_report_uid: reportUid ? String(reportUid).slice(0, 80) : null,
+        filename,
+        mime_type: 'application/pdf',
+        sha256,
+        object_storage_key: objectKey,
+        byte_size: buffer.length,
+        expires_at: expiresAt,
+        chunk_index: index,
+        chunk_count: chunkCount,
+        data_base64: chunk.toString('base64')
+      };
+
+      await connection.query(
+        `INSERT INTO finance_saved_reports
+          (report_uid, name, report_type, definition_json, created_by, last_run_at)
+         VALUES (?, ?, ?, ?, ?, NOW())`,
+        [
+          chunkUid(deliveryUid, index),
+          `Internal PDF delivery ${deliveryUid}`.slice(0, 160),
+          INTERNAL_REPORT_TYPE,
+          JSON.stringify(definition),
+          Number(createdBy || 0) || 0
+        ]
+      );
+    }
+
+    await connection.commit();
+    return chunkCount;
+  } catch (error) {
+    await connection.rollback().catch(() => {});
+    throw error;
+  } finally {
+    connection.release();
   }
 }
 
@@ -154,22 +230,16 @@ async function issuePdfDelivery({
   const sha256 = digestPdf(buffer);
   const objectKey = `finance-email-delivery-v2/${deliveryUid}/${safeFilename}`;
 
-  await pool.query(
-    `INSERT INTO finance_report_email_deliveries
-      (delivery_uid, report_uid, filename, mime_type, pdf_blob, byte_size, sha256, object_storage_key, created_by, expires_at)
-     VALUES (?, ?, ?, 'application/pdf', ?, ?, ?, ?, ?, FROM_UNIXTIME(?))`,
-    [
-      deliveryUid,
-      reportUid ? String(reportUid).slice(0, 80) : null,
-      safeFilename,
-      buffer,
-      buffer.length,
-      sha256,
-      objectKey,
-      Number(createdBy || 0) || null,
-      Math.floor(expiresAt / 1000)
-    ]
-  );
+  const chunkCount = await persistPdfChunks({
+    deliveryUid,
+    reportUid,
+    filename: safeFilename,
+    buffer,
+    sha256,
+    objectKey,
+    createdBy,
+    expiresAt
+  });
 
   const backupStored = await writeObjectStorageBackup(objectKey, buffer);
 
@@ -179,6 +249,7 @@ async function issuePdfDelivery({
     key: objectKey,
     filename: safeFilename,
     sha256,
+    chunks: chunkCount,
     exp: expiresAt
   });
 
@@ -189,21 +260,26 @@ async function issuePdfDelivery({
     expiresInMinutes,
     deliveryUid,
     objectKey,
-    backupStored
+    backupStored,
+    chunkCount
   };
+}
+
+async function deleteDurableChunks(deliveryUid) {
+  if (!deliveryUid) return;
+  await pool.query(
+    `DELETE FROM finance_saved_reports
+      WHERE report_type = ?
+        AND report_uid LIKE ?`,
+    [INTERNAL_REPORT_TYPE, chunkPattern(deliveryUid)]
+  ).catch(() => {});
 }
 
 async function revokePdfDelivery(delivery) {
   const deliveryUid = String(delivery?.deliveryUid || '').trim();
   const key = String(delivery?.objectKey || '').trim();
 
-  if (deliveryUid) {
-    await pool.query(
-      'DELETE FROM finance_report_email_deliveries WHERE delivery_uid = ?',
-      [deliveryUid]
-    ).catch(() => {});
-  }
-
+  if (deliveryUid) await deleteDurableChunks(deliveryUid);
   if (key) await deleteObject(key).catch(() => {});
   return Boolean(deliveryUid || key);
 }
@@ -214,46 +290,82 @@ async function loadLegacyObject(payload) {
   return body;
 }
 
-async function loadDurableDatabasePdf(payload) {
-  const [[row]] = await pool.query(
-    `SELECT delivery_uid, filename, mime_type, pdf_blob, byte_size, sha256, object_storage_key,
-            expires_at, revoked_at
-       FROM finance_report_email_deliveries
-      WHERE delivery_uid = ?
-      LIMIT 1`,
-    [payload.id]
+async function loadDurableChunks(payload) {
+  const [rows] = await pool.query(
+    `SELECT report_uid, definition_json
+       FROM finance_saved_reports
+      WHERE report_type = ?
+        AND report_uid LIKE ?
+      ORDER BY report_uid ASC`,
+    [INTERNAL_REPORT_TYPE, chunkPattern(payload.id)]
   );
 
-  if (!row) return { state: 'missing', row: null, body: null };
-  if (row.revoked_at) return { state: 'revoked', row, body: null };
+  if (!rows.length) return { state: 'missing', body: null, meta: null };
 
-  const expiresAt = row.expires_at ? new Date(row.expires_at).getTime() : 0;
-  if (expiresAt && Date.now() > expiresAt) return { state: 'expired', row, body: null };
+  const definitions = rows.map((row) => parseDefinition(row.definition_json));
+  if (definitions.some((item) => !item || item.delivery_uid !== payload.id)) {
+    const error = new Error('Durable Finance PDF chunk metadata is invalid.');
+    error.code = 'FINANCE_REPORT_DELIVERY_CHUNK_METADATA_INVALID';
+    throw error;
+  }
 
-  const body = Buffer.isBuffer(row.pdf_blob)
-    ? row.pdf_blob
-    : Buffer.from(row.pdf_blob || Buffer.alloc(0));
+  const meta = definitions[0];
+  const expectedCount = Number(meta.chunk_count || 0);
+  if (!expectedCount || rows.length !== expectedCount) {
+    const error = new Error('Durable Finance PDF chunk set is incomplete.');
+    error.code = 'FINANCE_REPORT_DELIVERY_CHUNK_INCOMPLETE';
+    throw error;
+  }
+
+  const ordered = definitions
+    .slice()
+    .sort((left, right) => Number(left.chunk_index) - Number(right.chunk_index));
+
+  for (let index = 0; index < ordered.length; index += 1) {
+    if (Number(ordered[index].chunk_index) !== index || Number(ordered[index].chunk_count) !== expectedCount) {
+      const error = new Error('Durable Finance PDF chunk sequence is invalid.');
+      error.code = 'FINANCE_REPORT_DELIVERY_CHUNK_SEQUENCE_INVALID';
+      throw error;
+    }
+  }
+
+  const expiresAt = Number(meta.expires_at || 0);
+  if (expiresAt && Date.now() > expiresAt) return { state: 'expired', body: null, meta };
+
+  const body = Buffer.concat(
+    ordered.map((item) => Buffer.from(String(item.data_base64 || ''), 'base64'))
+  );
 
   assertPdfBuffer(body);
 
   const digest = digestPdf(body);
-  if (String(row.sha256 || '') !== digest || (payload.sha256 && String(payload.sha256) !== digest)) {
+  if (String(meta.sha256 || '') !== digest || (payload.sha256 && String(payload.sha256) !== digest)) {
     const error = new Error('Durable Finance PDF hash verification failed.');
     error.code = 'FINANCE_REPORT_DELIVERY_HASH_MISMATCH';
     throw error;
   }
 
-  if (Number(row.byte_size || 0) !== body.length) {
+  if (Number(meta.byte_size || 0) !== body.length) {
     const error = new Error('Durable Finance PDF size verification failed.');
     error.code = 'FINANCE_REPORT_DELIVERY_SIZE_MISMATCH';
     throw error;
   }
 
-  return { state: 'ready', row, body };
+  return { state: 'ready', body, meta };
 }
 
-async function loadBackupPdf(payload, row = null) {
-  const key = String(row?.object_storage_key || payload?.key || '').trim();
+async function markDurableAccess(deliveryUid) {
+  await pool.query(
+    `UPDATE finance_saved_reports
+        SET last_run_at = NOW()
+      WHERE report_type = ?
+        AND report_uid LIKE ?`,
+    [INTERNAL_REPORT_TYPE, chunkPattern(deliveryUid)]
+  ).catch(() => {});
+}
+
+async function loadBackupPdf(payload, meta = null) {
+  const key = String(meta?.object_storage_key || payload?.key || '').trim();
   if (!key) return null;
 
   try {
@@ -276,15 +388,12 @@ async function loadBackupPdf(payload, row = null) {
   }
 }
 
-async function cleanupExpiredDelivery(payload, row = null) {
+async function cleanupExpiredDelivery(payload, meta = null) {
   if (Number(payload?.v) === 2 && payload?.id) {
-    await pool.query(
-      'DELETE FROM finance_report_email_deliveries WHERE delivery_uid = ?',
-      [payload.id]
-    ).catch(() => {});
+    await deleteDurableChunks(payload.id);
   }
 
-  const key = String(row?.object_storage_key || payload?.key || '').trim();
+  const key = String(meta?.object_storage_key || payload?.key || '').trim();
   if (key) await deleteObject(key).catch(() => {});
 }
 
@@ -343,44 +452,36 @@ async function servePdfDelivery(req, res) {
     }
   }
 
-  let databaseResult = null;
-  let databaseError = null;
+  let durableResult = null;
+  let durableError = null;
 
   try {
-    databaseResult = await loadDurableDatabasePdf(payload);
+    durableResult = await loadDurableChunks(payload);
   } catch (error) {
-    databaseError = error;
+    durableError = error;
   }
 
-  if (databaseResult?.state === 'revoked') {
-    return res.status(410).json({ message: 'This PDF delivery link has been revoked.' });
-  }
-
-  if (databaseResult?.state === 'expired') {
-    await cleanupExpiredDelivery(payload, databaseResult.row);
+  if (durableResult?.state === 'expired') {
+    await cleanupExpiredDelivery(payload, durableResult.meta);
     return res.status(410).json({ message: 'This PDF delivery link has expired.' });
   }
 
-  if (databaseResult?.state === 'ready') {
-    await pool.query(
-      `UPDATE finance_report_email_deliveries
-          SET access_count = access_count + 1,
-              first_accessed_at = COALESCE(first_accessed_at, NOW()),
-              last_accessed_at = NOW()
-        WHERE delivery_uid = ?`,
-      [payload.id]
-    ).catch(() => {});
-
-    return sendPdfResponse(res, databaseResult.body, databaseResult.row.filename || tokenFilename);
+  if (durableResult?.state === 'ready') {
+    await markDurableAccess(payload.id);
+    return sendPdfResponse(
+      res,
+      durableResult.body,
+      durableResult.meta?.filename || tokenFilename
+    );
   }
 
-  const backupBody = await loadBackupPdf(payload, databaseResult?.row || null);
+  const backupBody = await loadBackupPdf(payload, durableResult?.meta || null);
   if (backupBody) return sendPdfResponse(res, backupBody, tokenFilename);
 
   console.error(
     'FINANCE PDF DELIVERY ERROR:',
-    String(databaseError?.code || 'DURABLE_PDF_UNAVAILABLE'),
-    Number(databaseError?.status || 0) || ''
+    String(durableError?.code || 'DURABLE_PDF_UNAVAILABLE'),
+    Number(durableError?.status || 0) || ''
   );
   return res.status(404).json({ message: 'The requested PDF report is no longer available.' });
 }
@@ -395,6 +496,8 @@ module.exports = {
   _test: {
     assertPdfBuffer,
     boundedTtlMinutes,
+    chunkPattern,
+    chunkUid,
     digestPdf,
     publicAppUrl
   }
