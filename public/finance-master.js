@@ -386,7 +386,7 @@ async function loadBase(){
   state.accounts=dash?.accounts||[];
   if(dash&&!state.accounts.length){
    const accounts=await loadResource('accountPayload',I+'/accounts?scope='+encodeURIComponent(state.scope),cycle);
-  state.accounts=accounts?.accounts||[];
+  state.accounts=accounts?.bank_accounts||accounts?.accounts||[];
  }
  if(state.account&&!state.accounts.some(a=>String(a.id)===String(state.account)))state.account='';
  const sel=$('fmAccount'),keep=state.account;
