@@ -40,9 +40,8 @@ assert(client.includes("['REMOVED','REVERSED','CANCELLED']")&&client.includes('.
 const ingestion=read('controllers/financeStatementIngestionController.js');
 assert(ingestion.includes('reused: true')&&ingestion.includes("parse_status<>'REMOVED'"),'exact re-uploads must reuse an active import instead of failing a multi-file batch');
 const generic=require('../services/financeStatementAdapters/generic');
-assert.equal(
-  generic.normaliseDate('25 May',{statementStartDate:'2026-05-01',statementEndDate:'2026-05-31'}).value,
-  '2026-05-25',
+assert(
+  generic.normaliseDate('25 May',{statementStartDate:'2026-05-01',statementEndDate:'2026-05-31'}).value==='2026-05-25',
   'PDF bank rows with day/month only must inherit the verified statement year'
 );
 const inferred=generic.parseLines([
