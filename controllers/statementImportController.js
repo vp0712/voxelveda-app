@@ -91,13 +91,18 @@ function semanticTransactionKey(accountId, row) {
     try { runningBalance = money.fromCents(money.toCents(row.running_balance)); } catch {}
   }
 
-  // A stable reference is the strongest cross-statement identity. Without one,
-  // require a source running balance as an additional discriminator so two
-  // legitimate same-day/same-amount purchases are not silently collapsed.
+  // Cross-statement dedupe must be conservative. Date + direction + amount are
+  // never enough by themselves. When a running balance is available, include it
+  // even with a stable reference so two legitimate same-day payments sharing a
+  // merchant/reference are not silently collapsed.
   let identity = '';
-  if (reference.length >= 4) identity = `REF:${reference}`;
-  else if (runningBalance && (description || merchant)) identity = `TEXT:${merchant || description}|DESC:${description}|BAL:${runningBalance}`;
-  else return null;
+  if (reference.length >= 4) {
+    identity = runningBalance
+      ? `REF:${reference}|BAL:${runningBalance}|PLACE:${merchant || description}`
+      : `REF:${reference}|PLACE:${merchant || description}`;
+  } else if (runningBalance && (description || merchant)) {
+    identity = `PLACE:${merchant || description}|DESC:${description}|BAL:${runningBalance}`;
+  } else return null;
 
   const amount = money.fromCents(hasDebit ? debitCents : creditCents);
   const direction = hasDebit ? 'DEBIT' : 'CREDIT';
@@ -604,12 +609,20 @@ exports.list = async (req, res) => {
   try {
     const status = String(req.query.status || '').trim().toUpperCase();
     const params = [];
-    const where = status ? 'WHERE s.status=?' : '';
-    if (status) params.push(status);
+    let where = "WHERE s.status NOT IN ('REMOVED','REVERSED','CANCELLED')";
+    if (status) {
+      where += ' AND s.status=?';
+      params.push(status);
+    }
     const [rows] = await pool.query(
-      `SELECT s.*, ba.nickname AS account_name, ba.ownership_scope
-       FROM statement_import_sessions s JOIN bank_accounts ba ON ba.id=s.bank_account_id
-       ${where} ORDER BY s.created_at DESC LIMIT 100`, params
+      `SELECT s.*, ba.nickname AS account_name, ba.ownership_scope,
+              j.status AS job_status,j.stage AS job_stage,j.progress_percent AS job_progress,
+              j.error_code AS job_error_code,j.error_summary AS job_error_summary,j.attempt,j.max_attempts
+       FROM statement_import_sessions s
+       JOIN bank_accounts ba ON ba.id=s.bank_account_id
+       LEFT JOIN finance_statement_import_jobs j ON j.import_session_id=s.id
+       ${where}
+       ORDER BY s.created_at DESC LIMIT 100`, params
     );
     return res.json({ sessions: rows });
   } catch (error) { return fail(res, error, 'Failed to load statement review queue'); }
