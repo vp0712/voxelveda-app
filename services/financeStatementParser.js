@@ -416,24 +416,67 @@ async function parsePdf(buffer, options = {}, progress) {
     allLines.push(...lines);
     page.cleanup?.();
   }
+  let text = allLines.map((line) => line.text).join('\n');
+  let classification = classify(text, { pageCount: pages.length, selectableText: textCharacters > 24 && !ocrRequired, ocrRequired, appearsIncomplete: pages.some((page) => !page.word_count) });
+  let adapterChoice = selectAdapter({ text });
+  const parseWithContext = (candidateLines, candidateClassification, choice) => {
+    const statementStartDate = candidateClassification.statement_start_date || null;
+    const statementEndDate = candidateClassification.statement_end_date || null;
+    const defaultYear = Number(String(statementEndDate || statementStartDate || '').slice(0, 4)) || null;
+    return choice.adapter.parseLines(candidateLines, {
+      dateFormat: options.mapping?.date_format,
+      currency: candidateClassification.statement_currency || options.currency,
+      signedAmountRule: options.mapping?.signed_amount_rule,
+      allowUnsignedAmounts: false,
+      statementStartDate,
+      statementEndDate,
+      defaultYear
+    });
+  };
+
+  let rows = parseWithContext(allLines, classification, adapterChoice);
+  let outputPages = pages;
+  const warnings = [];
+
+  // Some bank PDFs contain selectable text but encode table columns in a way
+  // that destroys row structure. If the safe text parser finds zero rows,
+  // retry from rendered pages with OCR before declaring the statement failed.
+  if (!rows.length && pages.some((page) => page.extraction_method === 'PDF_TEXT')) {
+    const ocrLines = [];
+    const ocrPages = [];
+    for (let pageNo = 1; pageNo <= document.numPages; pageNo += 1) {
+      progress?.({ stage: 'OCR_REQUIRED', page: pageNo, totalPages: document.numPages });
+      const page = await document.getPage(pageNo);
+      const ocr = await ocrImage(await renderPdfPage(page), pageNo, progress);
+      ocrLines.push(...ocr.lines);
+      ocrPages.push({
+        page_number: pageNo,
+        extraction_method: 'OCR_FALLBACK',
+        text_content: String(ocr.text || '').slice(0, 200000),
+        word_count: ocr.lines.reduce((sum, line) => sum + line.words.length, 0),
+        confidence: ocr.lines.length
+          ? ocr.lines.reduce((sum, line) => sum + (line.words.reduce((inner, word) => inner + Number(word.confidence || 0), 0) / Math.max(1, line.words.length)), 0) / ocr.lines.length / 100
+          : 0
+      });
+      page.cleanup?.();
+    }
+    const ocrText = ocrLines.map((line) => line.text).join('\n');
+    const ocrClassification = classify(ocrText, { pageCount: ocrPages.length, selectableText: false, ocrRequired: true, appearsIncomplete: ocrPages.some((page) => !page.word_count) });
+    const ocrChoice = selectAdapter({ text: ocrText });
+    const ocrRows = parseWithContext(ocrLines, ocrClassification, ocrChoice);
+    if (ocrRows.length) {
+      rows = ocrRows;
+      text = ocrText;
+      classification = ocrClassification;
+      adapterChoice = ocrChoice;
+      outputPages = ocrPages;
+      warnings.push('Selectable PDF text could not preserve transaction rows; rendered OCR fallback was used.');
+    }
+  }
+
   await document.destroy?.();
-  const text = allLines.map((line) => line.text).join('\n');
-  const classification = classify(text, { pageCount: pages.length, selectableText: textCharacters > 24 && !ocrRequired, ocrRequired, appearsIncomplete: pages.some((page) => !page.word_count) });
-  const adapterChoice = selectAdapter({ text });
-  const statementStartDate = classification.statement_start_date || null;
-  const statementEndDate = classification.statement_end_date || null;
-  const defaultYear = Number(String(statementEndDate || statementStartDate || '').slice(0, 4)) || null;
-  const rows = adapterChoice.adapter.parseLines(allLines, {
-    dateFormat: options.mapping?.date_format,
-    currency: classification.statement_currency || options.currency,
-    signedAmountRule: options.mapping?.signed_amount_rule,
-    allowUnsignedAmounts: false,
-    statementStartDate,
-    statementEndDate,
-    defaultYear
-  });
-  if (!rows.length) throw parserError('No transaction rows with a safely identifiable date and amount were extracted. The original PDF remains stored for retry/recovery.', 'PDF_NO_SAFE_TRANSACTIONS');
-  return { rows, pages, classification, parserName: adapterChoice.adapter.VERSION, parserConfidence: adapterChoice.score, needsMapping: false, warnings: [] };
+  if (!rows.length) throw parserError('No transaction rows with a safely identifiable date and amount were extracted after text and OCR parsing. The original PDF remains stored for retry/recovery.', 'PDF_NO_SAFE_TRANSACTIONS');
+  return { rows, pages: outputPages, classification, parserName: adapterChoice.adapter.VERSION, parserConfidence: adapterChoice.score, needsMapping: false, warnings };
 }
 
 async function parseImage(buffer, detection, options = {}, progress) {
