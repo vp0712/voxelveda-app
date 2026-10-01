@@ -420,8 +420,19 @@ async function parsePdf(buffer, options = {}, progress) {
   const text = allLines.map((line) => line.text).join('\n');
   const classification = classify(text, { pageCount: pages.length, selectableText: textCharacters > 24 && !ocrRequired, ocrRequired, appearsIncomplete: pages.some((page) => !page.word_count) });
   const adapterChoice = selectAdapter({ text });
-  const rows = adapterChoice.adapter.parseLines(allLines, { dateFormat: options.mapping?.date_format, currency: classification.statement_currency || options.currency, signedAmountRule: options.mapping?.signed_amount_rule, allowUnsignedAmounts: false });
-  if (!rows.length) throw parserError('No transaction rows with a safely identifiable date and debit/credit direction were extracted.', 'PDF_NO_SAFE_TRANSACTIONS');
+  const statementStartDate = classification.statement_start_date || null;
+  const statementEndDate = classification.statement_end_date || null;
+  const defaultYear = Number(String(statementEndDate || statementStartDate || '').slice(0, 4)) || null;
+  const rows = adapterChoice.adapter.parseLines(allLines, {
+    dateFormat: options.mapping?.date_format,
+    currency: classification.statement_currency || options.currency,
+    signedAmountRule: options.mapping?.signed_amount_rule,
+    allowUnsignedAmounts: false,
+    statementStartDate,
+    statementEndDate,
+    defaultYear
+  });
+  if (!rows.length) throw parserError('No transaction rows with a safely identifiable date and amount were extracted. The original PDF remains stored for retry/recovery.', 'PDF_NO_SAFE_TRANSACTIONS');
   return { rows, pages, classification, parserName: adapterChoice.adapter.VERSION, parserConfidence: adapterChoice.score, needsMapping: false, warnings: [] };
 }
 
@@ -429,7 +440,15 @@ async function parseImage(buffer, detection, options = {}, progress) {
   const ocr = await ocrImage(buffer, 1, progress);
   const classification = classify(ocr.text, { pageCount: 1, selectableText: false, ocrRequired: true, appearsIncomplete: !ocr.lines.length });
   const adapterChoice = selectAdapter({ text: ocr.text });
-  const rows = adapterChoice.adapter.parseLines(ocr.lines, { dateFormat: options.mapping?.date_format, currency: classification.statement_currency || options.currency, signedAmountRule: options.mapping?.signed_amount_rule, allowUnsignedAmounts: false });
+  const rows = adapterChoice.adapter.parseLines(ocr.lines, {
+    dateFormat: options.mapping?.date_format,
+    currency: classification.statement_currency || options.currency,
+    signedAmountRule: options.mapping?.signed_amount_rule,
+    allowUnsignedAmounts: false,
+    statementStartDate: classification.statement_start_date || null,
+    statementEndDate: classification.statement_end_date || null,
+    defaultYear: Number(String(classification.statement_end_date || classification.statement_start_date || '').slice(0, 4)) || null
+  });
   if (!rows.length) throw parserError('OCR completed but no transaction rows with a safe debit/credit direction were found.', 'OCR_NO_SAFE_TRANSACTIONS');
   return { rows, pages: [{ page_number: 1, extraction_method: 'OCR', text_content: ocr.text.slice(0, 200000), word_count: ocr.lines.reduce((sum, line) => sum + line.words.length, 0), confidence: rows.reduce((sum, row) => sum + Number(row.confidence_score || 0), 0) / rows.length }], classification, parserName: adapterChoice.adapter.VERSION, parserConfidence: adapterChoice.score, needsMapping: false, warnings: [], detectedFormat: detection.format };
 }
