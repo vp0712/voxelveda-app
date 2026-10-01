@@ -68,11 +68,24 @@ exports.upload = async (req, res) => {
     const detection = detectStatementFile(body, req.file.originalname, req.file.mimetype);
     const contentHash = sha256(body);
     const [[existing]] = await pool.query(
-      `SELECT import_uid,status FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=?
-       UNION ALL SELECT import_uid,parse_status AS status FROM statement_import_files WHERE bank_account_id=? AND content_hash=? LIMIT 1`,
+      `SELECT import_uid,status FROM statement_import_sessions
+        WHERE bank_account_id=? AND content_hash=? AND status NOT IN ('REMOVED','REVERSED','CANCELLED')
+       UNION ALL
+       SELECT import_uid,parse_status AS status FROM statement_import_files
+        WHERE bank_account_id=? AND content_hash=? AND parse_status<>'REMOVED'
+       LIMIT 1`,
       [accountId, contentHash, accountId, contentHash]
     );
-    if (existing) throw Object.assign(new Error(`This exact statement already exists as ${existing.import_uid}.`), { code: 'DUPLICATE_STATEMENT_FILE', status: 409, details: { import_uid: existing.import_uid, status: existing.status } });
+    if (existing) {
+      await removeTemporary(req.file);
+      return res.status(200).json({
+        message: `This exact statement already exists as ${existing.import_uid}. The existing import was reused and no duplicate file was created.`,
+        import_uid: existing.import_uid,
+        reused: true,
+        existing_status: existing.status,
+        status_url: `/api/finance/intelligence/statement-imports/${encodeURIComponent(existing.import_uid)}/status`
+      });
+    }
 
     const importUid = uid('STMT');
     const correlationId = crypto.randomUUID();
