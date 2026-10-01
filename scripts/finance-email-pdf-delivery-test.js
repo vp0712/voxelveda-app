@@ -37,9 +37,13 @@ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 
 assert.match(emailService,/PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE/);
 assert.doesNotMatch(emailService,/transport:\s*'https_relay_pdf_fallback'/);
-assert.match(reportController,/deliveryMode='durable_pdf_download'/);
-assert.match(reportController,/attachments:\[\]/);
-assert.match(reportController,/issuePdfDelivery/);
+assert.match(emailService,/sendViaHttpsRelay\(relayArgs\)/);
+assert.match(emailService,/did not verify preservation of the \.pdf attachment filename/);
+assert.doesNotMatch(reportController,/durable_pdf_download/);
+assert.doesNotMatch(reportController,/issuePdfDelivery/);
+assert.match(reportController,/delivery_mode:'pdf_attachment'/);
+assert.match(reportController,/contentType:'application\/pdf'/);
+assert.match(reportController,/attachment_filename_verified:true/);
 assert.match(app,/\/api\/public\/finance-report\/:token\/:filename/);
 assert.match(delivery._test.publicAppUrl(),/^https:\/\//);
 assert.equal(delivery._test.boundedTtlMinutes(1),60);
