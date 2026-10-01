@@ -68,11 +68,25 @@ exports.upload = async (req, res) => {
     const detection = detectStatementFile(body, req.file.originalname, req.file.mimetype);
     const contentHash = sha256(body);
     const [[existing]] = await pool.query(
-      `SELECT import_uid,status FROM statement_import_sessions WHERE bank_account_id=? AND content_hash=?
-       UNION ALL SELECT import_uid,parse_status AS status FROM statement_import_files WHERE bank_account_id=? AND content_hash=? LIMIT 1`,
+      `SELECT import_uid,status FROM statement_import_sessions
+        WHERE bank_account_id=? AND content_hash=? AND status NOT IN ('REMOVED','REVERSED','CANCELLED')
+       UNION ALL
+       SELECT import_uid,parse_status AS status FROM statement_import_files
+        WHERE bank_account_id=? AND content_hash=? AND parse_status<>'REMOVED'
+       LIMIT 1`,
       [accountId, contentHash, accountId, contentHash]
     );
-    if (existing) throw Object.assign(new Error(`This exact statement already exists as ${existing.import_uid}.`), { code: 'DUPLICATE_STATEMENT_FILE', status: 409, details: { import_uid: existing.import_uid, status: existing.status } });
+    if (existing) {
+      await removeTemporary(req.file);
+      return res.status(200).json({
+        message: `This exact statement already exists as ${existing.import_uid}. The existing import was reused and no duplicate file was created.`,
+        import_uid: existing.import_uid,
+        reused: true,
+        code: 'DUPLICATE_STATEMENT_FILE_REUSED',
+        existing_status: existing.status,
+        status_url: `/api/finance/intelligence/statement-imports/${encodeURIComponent(existing.import_uid)}/status`
+      });
+    }
 
     const importUid = uid('STMT');
     const correlationId = crypto.randomUUID();
@@ -142,6 +156,10 @@ async function resume(req, res, options) {
     if (!session) return res.status(404).json({ message: 'Statement import was not found.', code: 'STATEMENT_IMPORT_NOT_FOUND' });
     if (['IMPORTED', 'CANCELLED', 'REVERSED'].includes(session.status)) return res.status(409).json({ message: `This import is ${session.status} and cannot be resumed.`, code: 'STATEMENT_IMPORT_LOCKED' });
     const fields = ["status='QUEUED'", "stage='QUEUED'", 'progress_percent=0', 'available_at=NOW()', 'locked_by=NULL', 'locked_at=NULL', 'error_code=NULL', 'error_summary=NULL'];
+    // A deliberate retry is a new processing attempt. Failed/dead-letter jobs must
+    // reset their exhausted attempt counter or "Retry" can immediately dead-letter
+    // again without ever reaching the upgraded parser.
+    if (['FAILED', 'DEAD_LETTER'].includes(String(session.status || '').toUpperCase())) fields.push('attempt=0', 'completed_at=NULL');
     const params = [];
     if (options.password !== undefined) { fields.push('encrypted_password=?'); params.push(options.password ? encryptSensitive(options.password) : null); }
     if (options.mapping !== undefined) { fields.push('mapping_json=?'); params.push(JSON.stringify(options.mapping)); }

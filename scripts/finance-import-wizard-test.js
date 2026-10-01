@@ -31,9 +31,32 @@ assert(!html.includes('finance-bank-app-v3')&&!html.includes('premium-banking-ap
 
 assert(client.includes('function stageStatementFiles('),'multi-file statement processing must use the shared stable batch verifier');
 assert(client.includes('name="files" type="file"')&&client.includes('multiple required'),'standard Statement Import must support multiple selected files/PDFs');
-assert(client.includes('processed one-by-one for stability'),'large multi-PDF selections must be processed sequentially for stability');
+assert(client.includes('Promise.all(workers)')&&client.includes('Every selected file is queued to private storage first'),'multi-file selections must enqueue all accepted files before waiting for extraction');
 assert(client.includes('duplicate(s) excluded'),'batch import must report duplicate exclusions to the user');
 assert(client.includes('showFinancePopup'),'batch extraction/verification must finish with a centred result popup');
 assert(client.includes('excluded from import, totals, screens and reports')||client.includes('blocked before they can enter Finance calculations'),'duplicate policy must be visible in the import UI');
 assert(client.includes('waitForStatementImport')&&client.includes('DEAD_LETTER'),'batch import must surface durable job progress and safe terminal states');
+assert(client.includes("['REMOVED','REVERSED','CANCELLED']")&&client.includes('.slice(0,25)'),'removed imports must stay out of the active wizard while recent batches remain visible');
+const ingestion=read('controllers/financeStatementIngestionController.js');
+assert(ingestion.includes('reused: true')&&ingestion.includes("parse_status<>'REMOVED'"),'exact re-uploads must reuse an active import instead of failing a multi-file batch');
+const generic=require('../services/financeStatementAdapters/generic');
+assert(
+  generic.normaliseDate('25 May',{statementStartDate:'2026-05-01',statementEndDate:'2026-05-31'}).value==='2026-05-25',
+  'PDF bank rows with day/month only must inherit the verified statement year'
+);
+const inferred=generic.parseLines([
+  {page:1,text:'26 May WOOLWORTHS MELBOURNE',words:[]},
+  {page:1,text:'20.00 970.00',words:[]},
+  {page:1,text:'25 May COLES MELBOURNE 10.00 990.00',words:[]},
+  {page:1,text:'24 May OPENING ACTIVITY 100.00 1000.00',words:[]}
+],{statementStartDate:'2026-05-01',statementEndDate:'2026-05-31',currency:'AUD',allowUnsignedAmounts:false});
+assert(inferred.length>=3,'split PDF transaction rows must be assembled into logical rows');
+assert(inferred[0].debit==='20.00'&&inferred[0].credit==='0.00','unsigned PDF amount must infer debit only when running-balance movement proves it');
+assert(inferred[1].debit==='10.00'&&inferred[1].credit==='0.00','running-balance inference must work across consecutive descending statement rows');
+
+const ingestionController=read('controllers/financeStatementIngestionController.js');
+assert(ingestionController.includes("fields.push('attempt=0', 'completed_at=NULL')"),'explicit retry must reset exhausted failed/dead-letter attempts');
+assert(client.includes("STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v1'")&&client.includes("PDF_NO_SAFE_TRANSACTIONS")&&client.includes("OCR_NO_SAFE_TRANSACTIONS"),'legacy parser failures must receive one versioned automatic recovery retry');
+assert(client.includes("localStorage.setItem(key,new Date().toISOString())"),'automatic parser recovery must be loop-protected per import and parser version');
+
 console.log('Unified secure Finance statement import and historical migration checks passed.');

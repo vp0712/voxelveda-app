@@ -25,14 +25,20 @@ async function main(){
   assert.equal(typeof semantic,'function','semantic transaction key must be exported for regression coverage');
 
   const a=semantic(7,transaction({description:'Woolworths   1234'}));
-  const b=semantic(7,transaction({description:'WOOLWORTHS-1234',running_balance:'999.99'}));
-  assert.equal(a,b,'stable bank reference must identify the same transaction across overlapping statements');
+  const same=semantic(7,transaction({description:'WOOLWORTHS-1234',running_balance:'1250.10'}));
+  assert.equal(a,same,'same date, amount, place/reference and running balance must dedupe across overlapping statements');
+
+  const differentBalance=semantic(7,transaction({description:'WOOLWORTHS-1234',running_balance:'999.99'}));
+  assert.notEqual(a,differentBalance,'different running balances must protect legitimate same-day/same-reference activity from false dedupe');
 
   const differentReference=semantic(7,transaction({reference:'OSKO REF 112233'}));
   assert.notEqual(a,differentReference,'different stable references must not be collapsed');
 
   const noStrongIdentity=semantic(7,transaction({reference:'',running_balance:null}));
-  assert.equal(noStrongIdentity,null,'same-day/same-amount activity without reference or running balance must not be auto-collapsed');
+  assert.equal(noStrongIdentity,null,'same-day/same-amount activity without place/reference plus balance context must not be auto-collapsed');
+
+  const explicitCategory=statementReview._ingestion.autoStatementCategory({category:'Bank supplied category',description:'WOOLWORTHS'});
+  assert.equal(explicitCategory,'Bank supplied category','an explicit source-statement category must be preserved instead of overwritten by auto-classification');
 
   const report={
     metadata:{
