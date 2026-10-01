@@ -1,6 +1,6 @@
-vom-whatsapp-release: 20261001-operations-monitor
-source-commit: d42cfe3c555e3142e1617d60b89b4935e2855c52
-scope: signed-whatsapp-webhook; hourly-operations-report; durable-deduplication; authorised-command-replies
-ci: security-success; finance-release-success; consolidation-success; advanced-banking-success; branding-success
-runtime: disabled-until-meta-credentials-and-recipient-allowlist
+vom-whatsapp-release: 20261001-operations-monitor-hotfix-no-ddl
+source-commit: d2eac7b619e3f38202fbeb55251c7a39b4f6f03d
+scope: signed-whatsapp-webhook; hourly-operations-report; authorised-command-replies
+ci: prior-vom-pr-all-green
+runtime: whatsapp-disabled; database-ddl-deferred-because-provider-returned-disk-full
 policy: single-marker-controlled-production-deploy
