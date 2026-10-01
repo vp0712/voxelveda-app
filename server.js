@@ -48,6 +48,7 @@ const { ensureEnterpriseControlPlaneSchema } = require('./services/enterpriseCon
 const { ensureCareersSchema } = require('./services/careersSchema');
 const { ensureEmployeeIdentitySchema } = require('./services/employeeIdentitySchema');
 const { startWeeklyTimesheetScheduler, stopWeeklyTimesheetScheduler } = require('./services/weeklyTimesheetScheduler');
+const { startVomWhatsAppScheduler, stopVomWhatsAppScheduler } = require('./services/vomWhatsAppService');
 const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
 const { startWorkflowSlaScheduler, stopWorkflowSlaScheduler } = require('./services/workflowEscalationService');
 const {
@@ -241,6 +242,7 @@ async function initializeWorkers() {
     startWeeklyTimesheetScheduler(),
     startTrashPurgeScheduler(),
     startWorkflowSlaScheduler(),
+    startVomWhatsAppScheduler(),
     startEmailQueueWorker(),
     financeWorkerStarted
   ].filter(Boolean).length;
@@ -338,6 +340,7 @@ async function bootstrap() {
     stopWeeklyTimesheetScheduler();
     stopTrashPurgeScheduler();
     stopWorkflowSlaScheduler();
+    stopVomWhatsAppScheduler();
     await stopFinanceStatementIngestionWorker().catch(() => {});
     await getRateLimitService().close().catch(() => {});
     await pool.end().catch(() => {});
@@ -357,6 +360,7 @@ async function shutdown(signal = 'shutdown', exitCode = 0) {
   stopWeeklyTimesheetScheduler();
   stopTrashPurgeScheduler();
   stopWorkflowSlaScheduler();
+  stopVomWhatsAppScheduler();
   await stopFinanceStatementIngestionWorker().catch(() => {});
   await getRateLimitService().close().catch(() => {});
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
