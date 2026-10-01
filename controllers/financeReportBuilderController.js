@@ -17,7 +17,6 @@ const { companyProfile } = require('../config/companyProfile');
 const { buildFinancePdfArtifact } = require('../services/financeReportPdfService');
 const { sendMail, isEmailTransportError, emailFailureDetails, isHostingerMailApiConfigured, isRelayConfigured } = require('../services/emailService');
 const { brandedLayout } = require('../services/emailTemplates');
-const { issuePdfDelivery, revokePdfDelivery } = require('../services/financeReportDeliveryService');
 
 const VALID_SCOPES = new Set(['ALL','PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
 const VALID_TYPES = new Set(['TRANSACTION_REGISTER','INCOME','EXPENSE','INCOME_VS_EXPENSE','CASH_FLOW','ACCOUNT_ACTIVITY','ACCOUNT_STATEMENT','CATEGORY','MERCHANT','CASH','TRANSFER','REFUND','REIMBURSEMENT','GST_SUMMARY','RECONCILIATION','DATA_QUALITY','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY']);
@@ -680,7 +679,6 @@ exports.pdf=async(req,res)=>{
 };
 
 exports.emailPdf=async(req,res)=>{
-  let secureDelivery=null;
   try{
     const definition=definitionFrom(req.body && req.body.definition ? req.body.definition : (req.body||{}));
     const recipient=safeText(req.body && req.body.to,254);
@@ -694,100 +692,49 @@ exports.emailPdf=async(req,res)=>{
     const period=(report.metadata.from||'All history') + ' to ' + (report.metadata.to||'Now');
     const companyName=profile.tradingName||profile.legalName||'Voxel Veda';
 
-    const hostingerAttachmentReady=isHostingerMailApiConfigured();
-    const relayOnlyPdfDelivery=!hostingerAttachmentReady && isRelayConfigured();
+    const textBody=[
+      companyName + ' Finance',
+      '',
+      'Attached PDF: ' + artifact.filename,
+      'Report: ' + title,
+      'Period: ' + period,
+      'Report ID: ' + artifact.reportId,
+      deliveryNote ? 'Note: ' + deliveryNote : null,
+      '',
+      'The attached file is the requested Finance report in PDF format.'
+    ].filter((line)=>line!==null).join('\n');
 
-    let result;
-    let deliveryMode='pdf_attachment';
-    let deliveryExpiresAt=null;
+    const htmlBody=brandedLayout(
+      '<h2 style="margin-top:0">' + title + '</h2>' +
+      '<p>Your requested Finance report is attached as a PDF document.</p>' +
+      '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
+      '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
+      '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
+      '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
+      '</table>' +
+      (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
+      '<p style="font-size:12px;color:#607080">Attachment type: application/pdf. Filename ends in .pdf.</p>',
+      title + ' PDF attached'
+    );
 
-    if(relayOnlyPdfDelivery){
-      secureDelivery=await issuePdfDelivery({
-        buffer:artifact.buffer,
+    const result=await sendMail({
+      to:recipient,
+      subject:companyName + ' | ' + title + ' | ' + period,
+      text:textBody,
+      html:htmlBody,
+      replyTo:profile.email,
+      attachments:[{
         filename:artifact.filename,
-        ttlMinutes:Number(process.env.FINANCE_REPORT_EMAIL_LINK_TTL_MINUTES||43200),
-        reportUid:artifact.reportId,
-        createdBy:userId(req)
-      });
-      deliveryMode='durable_pdf_download';
-      deliveryExpiresAt=secureDelivery.expiresAt;
-      const safeUrl=secureDelivery.url.replace(/[<>&"]/g,'');
-      const textBody=[
-        companyName + ' Finance',
-        '',
-        'Your requested Finance report is ready as a durable PDF download.',
-        'File: ' + artifact.filename,
-        'Report: ' + title,
-        'Period: ' + period,
-        'Report ID: ' + artifact.reportId,
-        deliveryNote ? 'Note: ' + deliveryNote : null,
-        '',
-        'Download PDF: ' + secureDelivery.url,
-        'This PDF link remains available until ' + secureDelivery.expiresAt + '.',
-        '',
-        'The downloaded file is delivered as application/pdf with the original .pdf filename.'
-      ].filter((line)=>line!==null).join('\n');
+        content:artifact.buffer,
+        contentType:'application/pdf',
+        contentDisposition:'attachment'
+      }]
+    });
 
-      const htmlBody=brandedLayout(
-        '<h2 style="margin-top:0">' + title + '</h2>' +
-        '<p>Your requested Finance report is ready as a durable PDF download.</p>' +
-        '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
-        '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
-        '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
-        '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
-        '</table>' +
-        (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
-        '<p style="margin:24px 0"><a href="' + safeUrl + '" style="display:inline-block;padding:12px 18px;background:#0B5ED7;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Download PDF Report</a></p>' +
-        '<p style="font-size:12px;color:#607080">The download is an actual application/pdf file using the original .pdf filename. The delivery is stored durably and protected by a signed link.</p>',
-        title + ' PDF ready'
-      );
-
-      result=await sendMail({
-        to:recipient,
-        subject:companyName + ' | ' + title + ' | ' + period,
-        text:textBody,
-        html:htmlBody,
-        replyTo:profile.email,
-        attachments:[]
-      });
-    }else{
-      const textBody=[
-        companyName + ' Finance',
-        '',
-        'Attached: ' + artifact.filename,
-        'Report: ' + title,
-        'Period: ' + period,
-        'Report ID: ' + artifact.reportId,
-        deliveryNote ? 'Note: ' + deliveryNote : null,
-        '',
-        'This PDF was generated from the permission-scoped Voxel Veda Finance ledger.'
-      ].filter((line)=>line!==null).join('\n');
-      const htmlBody=brandedLayout(
-        '<h2 style="margin-top:0">' + title + '</h2>' +
-        '<p>Your requested Finance report is attached as a PDF document.</p>' +
-        '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
-        '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
-        '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
-        '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
-        '</table>' +
-        (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
-        '<p style="font-size:12px;color:#607080">The attachment is application/pdf and preserves the .pdf filename.</p>',
-        title + ' PDF attached'
-      );
-
-      result=await sendMail({
-        to:recipient,
-        subject:companyName + ' | ' + title + ' | ' + period,
-        text:textBody,
-        html:htmlBody,
-        replyTo:profile.email,
-        attachments:[{
-          filename:artifact.filename,
-          content:artifact.buffer,
-          contentType:'application/pdf',
-          contentDisposition:'attachment'
-        }]
-      });
+    if(!result?.attachmentFilenameGuaranteed){
+      const error=new Error('Email provider did not verify the PDF attachment filename.');
+      error.code='PDF_ATTACHMENT_FILENAME_UNVERIFIED';
+      throw error;
     }
 
     await logAudit(pool,audit(req,'FILTERED_REPORT_EMAILED','finance_report',artifact.reportId,{
@@ -796,15 +743,12 @@ exports.emailPdf=async(req,res)=>{
       pages:artifact.pages,
       recipient_count:1,
       provider_message_id:result && result.messageId ? result.messageId : null,
-      delivery_mode:deliveryMode,
-      filename:artifact.filename,
-      delivery_expires_at:deliveryExpiresAt
+      delivery_mode:'pdf_attachment',
+      filename:artifact.filename
     }));
 
     return res.json({
-      message:deliveryMode==='pdf_attachment'
-        ? 'PDF report sent successfully to ' + recipient + '.'
-        : 'Durable PDF report delivery email sent successfully to ' + recipient + '.',
+      message:'PDF report sent successfully to ' + recipient + '.',
       report_id:artifact.reportId,
       filename:artifact.filename,
       message_id:result && result.messageId ? result.messageId : null,
@@ -812,13 +756,11 @@ exports.emailPdf=async(req,res)=>{
       attachment_content_type:'application/pdf',
       attachment_bytes:artifact.buffer.length,
       delivery_transport:result?.transport||null,
-      delivery_mode:deliveryMode,
-      delivery_expires_at:deliveryExpiresAt,
-      attachment_filename_verified:deliveryMode==='pdf_attachment' && Boolean(result?.attachmentFilenameGuaranteed),
-      attachment_contract_version:3
+      delivery_mode:'pdf_attachment',
+      attachment_filename_verified:true,
+      attachment_contract_version:4
     });
   }catch(error){
-    if(secureDelivery) await revokePdfDelivery(secureDelivery);
     if(isEmailTransportError(error)){
       const details=emailFailureDetails(error);
       return res.status(details.status).json(details);
