@@ -15,9 +15,11 @@ assert.equal(delivery.safePdfFilename('../bad\\name'),'..-bad-name.pdf');
 assert.equal(delivery._test.publicAppUrl(),'https://verified.example.test');
 
 const payload={
-  v:1,
-  key:'finance-email-delivery/123/test/Report.pdf',
+  v:2,
+  id:'11111111-2222-3333-4444-555555555555',
+  key:'finance-email-delivery-v2/11111111-2222-3333-4444-555555555555/Report.pdf',
   filename:'Report.pdf',
+  sha256:'a'.repeat(64),
   exp:Date.now()+60000
 };
 const token=delivery.createDeliveryToken(payload);
@@ -34,9 +36,12 @@ const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
 
 assert.match(emailService,/PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE/);
 assert.doesNotMatch(emailService,/transport:\s*'https_relay_pdf_fallback'/);
-assert.match(reportController,/deliveryMode='secure_pdf_download'/);
+assert.match(reportController,/deliveryMode='durable_pdf_download'/);
 assert.match(reportController,/attachments:\[\]/);
 assert.match(reportController,/issuePdfDelivery/);
-assert.match(app,/\/api\/public\/finance-report\/:token/);
+assert.match(app,/\/api\/public\/finance-report\/:token\/:filename/);
+assert.match(delivery._test.publicAppUrl(),/^https:\/\//);
+assert.equal(delivery._test.boundedTtlMinutes(1),60);
+assert.equal(delivery._test.boundedTtlMinutes(999999),90*24*60);
 
 console.log('FINANCE_EMAIL_PDF_DELIVERY_TEST_OK');

@@ -705,15 +705,17 @@ exports.emailPdf=async(req,res)=>{
       secureDelivery=await issuePdfDelivery({
         buffer:artifact.buffer,
         filename:artifact.filename,
-        ttlMinutes:Number(process.env.FINANCE_REPORT_EMAIL_LINK_TTL_MINUTES||1440)
+        ttlMinutes:Number(process.env.FINANCE_REPORT_EMAIL_LINK_TTL_MINUTES||43200),
+        reportUid:artifact.reportId,
+        createdBy:userId(req)
       });
-      deliveryMode='secure_pdf_download';
+      deliveryMode='durable_pdf_download';
       deliveryExpiresAt=secureDelivery.expiresAt;
       const safeUrl=secureDelivery.url.replace(/[<>&"]/g,'');
       const textBody=[
         companyName + ' Finance',
         '',
-        'Your requested Finance report is ready as a secure PDF download.',
+        'Your requested Finance report is ready as a durable PDF download.',
         'File: ' + artifact.filename,
         'Report: ' + title,
         'Period: ' + period,
@@ -721,14 +723,14 @@ exports.emailPdf=async(req,res)=>{
         deliveryNote ? 'Note: ' + deliveryNote : null,
         '',
         'Download PDF: ' + secureDelivery.url,
-        'This secure link expires at ' + secureDelivery.expiresAt + '.',
+        'This PDF link remains available until ' + secureDelivery.expiresAt + '.',
         '',
         'The downloaded file is delivered as application/pdf with the original .pdf filename.'
       ].filter((line)=>line!==null).join('\n');
 
       const htmlBody=brandedLayout(
         '<h2 style="margin-top:0">' + title + '</h2>' +
-        '<p>Your requested Finance report is ready as a secure PDF download.</p>' +
+        '<p>Your requested Finance report is ready as a durable PDF download.</p>' +
         '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
         '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
         '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
@@ -736,7 +738,7 @@ exports.emailPdf=async(req,res)=>{
         '</table>' +
         (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
         '<p style="margin:24px 0"><a href="' + safeUrl + '" style="display:inline-block;padding:12px 18px;background:#0B5ED7;color:#fff;text-decoration:none;border-radius:8px;font-weight:700">Download PDF Report</a></p>' +
-        '<p style="font-size:12px;color:#607080">The download is an actual application/pdf file using the original .pdf filename. This secure link expires automatically.</p>',
+        '<p style="font-size:12px;color:#607080">The download is an actual application/pdf file using the original .pdf filename. The delivery is stored durably and protected by a signed link.</p>',
         title + ' PDF ready'
       );
 
@@ -802,7 +804,7 @@ exports.emailPdf=async(req,res)=>{
     return res.json({
       message:deliveryMode==='pdf_attachment'
         ? 'PDF report sent successfully to ' + recipient + '.'
-        : 'Secure PDF report delivery email sent successfully to ' + recipient + '.',
+        : 'Durable PDF report delivery email sent successfully to ' + recipient + '.',
       report_id:artifact.reportId,
       filename:artifact.filename,
       message_id:result && result.messageId ? result.messageId : null,
