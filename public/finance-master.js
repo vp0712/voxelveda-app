@@ -2405,7 +2405,8 @@ async function waitForStatementImport(uid,holder,{openReview=true}={}){
    holder.querySelector?.('[data-import-review]')?.addEventListener('click',()=>{$('fmModal').close();openStatementReview(uid)});
    return {status,record};
   }
-  if(status==='IMPORTED'){holder.className='fm-state fm-state-success';holder.innerHTML='<strong>Already imported</strong><p>This exact statement already exists. No duplicate file or transactions were created.</p>';return {status,record}}\n  if(['NEEDS_PASSWORD','NEEDS_MAPPING','FAILED','DEAD_LETTER','CANCELLED','REMOVED','REVERSED'].includes(status)){renderStatementAttention(uid,record,holder);return {status,record}}
+  if(status==='IMPORTED'){holder.className='fm-state fm-state-success';holder.innerHTML='<strong>Already imported</strong><p>This exact statement already exists. No duplicate file or transactions were created.</p>';return {status,record}}
+  if(['NEEDS_PASSWORD','NEEDS_MAPPING','FAILED','DEAD_LETTER','CANCELLED','REMOVED','REVERSED'].includes(status)){renderStatementAttention(uid,record,holder);return {status,record}}
   await statementDelay(1500);
  }
  throw new Error('Statement processing is still running. It remains safely queued; reopen the Statement Vault to check progress.');
