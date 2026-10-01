@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const { backgroundJobService } = require('./backgroundJobService');
 
 const DEFAULT_TIMEZONE = 'Australia/Melbourne';
+const recentInboundMessages = new Map();
 
 function normalizePhone(value) {
   return String(value || '').replace(/\D/g, '');
@@ -281,35 +282,15 @@ async function sendScheduledReport(to, reportText) {
   });
 }
 
-async function alreadyDelivered(reportKey, recipient) {
+async function completedThisHour(reportKey) {
   const [[row]] = await pool.query(
-    `SELECT id FROM vom_report_deliveries
-     WHERE report_key=? AND report_type='HOURLY' AND recipient=? AND channel='WHATSAPP' AND status='DELIVERED'
-     LIMIT 1`,
-    [reportKey, recipient]
+    `SELECT started_at
+     FROM background_job_runs
+     WHERE job_key='vom_whatsapp_hourly_report' AND status='COMPLETED'
+     ORDER BY started_at DESC, run_uuid DESC
+     LIMIT 1`
   );
-  return Boolean(row);
-}
-
-async function recordDelivery({ reportKey, recipient, snapshot, status, messageId = null, error = null }) {
-  await pool.query(
-    `INSERT INTO vom_report_deliveries
-     (report_key, report_type, recipient, channel, message_id, status, snapshot_json, error_code, error_message, delivered_at)
-     VALUES (?, 'HOURLY', ?, 'WHATSAPP', ?, ?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE
-       message_id=VALUES(message_id), status=VALUES(status), snapshot_json=VALUES(snapshot_json),
-       error_code=VALUES(error_code), error_message=VALUES(error_message), delivered_at=VALUES(delivered_at)`,
-    [
-      reportKey,
-      recipient,
-      messageId,
-      status,
-      JSON.stringify(snapshot),
-      error ? String(error.code || 'SEND_FAILED').slice(0, 100) : null,
-      error ? String(error.message || 'Send failed').slice(0, 500) : null,
-      status === 'DELIVERED' ? new Date() : null
-    ]
-  );
+  return Boolean(row?.started_at && hourKey(new Date(row.started_at)) === reportKey);
 }
 
 async function processHourlyReports(options = {}) {
@@ -321,21 +302,19 @@ async function processHourlyReports(options = {}) {
 
   const now = options.now || new Date();
   const reportKey = hourKey(now);
+  if (!options.force && await completedThisHour(reportKey)) {
+    return { skipped: true, reason: 'already_completed_this_hour', processed: 0, report_key: reportKey };
+  }
+
   const snapshot = await collectOperationsSnapshot(now);
   const reportText = renderHourlyReport(snapshot);
   const outcomes = [];
 
   for (const recipient of targets) {
-    if (!options.force && await alreadyDelivered(reportKey, recipient)) {
-      outcomes.push({ recipient, status: 'SKIPPED_DUPLICATE' });
-      continue;
-    }
     try {
       const sent = await sendScheduledReport(recipient, reportText);
-      await recordDelivery({ reportKey, recipient, snapshot, status: 'DELIVERED', messageId: sent.provider_message_id });
-      outcomes.push({ recipient, status: 'DELIVERED' });
+      outcomes.push({ recipient, status: 'DELIVERED', provider_message_id: sent.provider_message_id });
     } catch (error) {
-      await recordDelivery({ reportKey, recipient, snapshot, status: 'FAILED', error }).catch(() => {});
       outcomes.push({ recipient, status: 'FAILED', code: error.code || 'SEND_FAILED' });
       throw error;
     }
@@ -379,27 +358,25 @@ function inboundMessages(payload) {
   return messages;
 }
 
+function inboundSeenRecently(providerId) {
+  const now = Date.now();
+  if (recentInboundMessages.size > 1000) {
+    for (const [key, timestamp] of recentInboundMessages) {
+      if (now - timestamp > 24 * 60 * 60 * 1000) recentInboundMessages.delete(key);
+    }
+  }
+  if (recentInboundMessages.has(providerId)) return true;
+  recentInboundMessages.set(providerId, now);
+  return false;
+}
+
 async function handleInboundMessage(message) {
   const providerId = String(message?.id || '');
   const from = normalizePhone(message?.from);
   const body = String(message?.text?.body || '').trim();
   if (!providerId || !from) return { skipped: true, reason: 'invalid_message' };
-
-  const [insert] = await pool.query(
-    `INSERT IGNORE INTO vom_inbound_messages
-     (provider_message_id, sender, message_type, command_text, handled_status)
-     VALUES (?, ?, ?, ?, 'RECEIVED')`,
-    [providerId, from, String(message?.type || 'unknown').slice(0, 40), body.slice(0, 1000)]
-  );
-  if (!insert.affectedRows) return { skipped: true, reason: 'duplicate' };
-
-  if (!authorisedNumbers().includes(from)) {
-    await pool.query(
-      "UPDATE vom_inbound_messages SET handled_status='UNAUTHORISED', handled_at=NOW() WHERE provider_message_id=?",
-      [providerId]
-    );
-    return { skipped: true, reason: 'unauthorised' };
-  }
+  if (inboundSeenRecently(providerId)) return { skipped: true, reason: 'duplicate' };
+  if (!authorisedNumbers().includes(from)) return { skipped: true, reason: 'unauthorised' };
 
   let responseText;
   const normalized = body.toLowerCase();
@@ -421,13 +398,7 @@ async function handleInboundMessage(message) {
   }
 
   const sent = await sendWhatsAppText(from, responseText);
-  await pool.query(
-    `UPDATE vom_inbound_messages
-     SET handled_status='RESPONDED', response_message_id=?, handled_at=NOW()
-     WHERE provider_message_id=?`,
-    [sent.provider_message_id, providerId]
-  );
-  return { skipped: false, responded: true };
+  return { skipped: false, responded: true, provider_message_id: sent.provider_message_id };
 }
 
 async function processWebhookPayload(payload) {
