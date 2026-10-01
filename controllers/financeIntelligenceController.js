@@ -11,6 +11,38 @@ const { cleanMerchant, normalizeTags, normalizeGstTreatment, upsertExactAutoCate
 
 const VALID_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'MIXED', 'UNCLASSIFIED']);
 const DASHBOARD_SCOPES = new Set(['PERSONAL', 'BUSINESS', 'ALL']);
+const BANK_MARKETS = new Set(['AUSTRALIA', 'INDIA', 'OTHER']);
+const BANK_ACCOUNT_TYPES = new Set([
+  'TRANSACTION', 'SAVINGS', 'CURRENT', 'CREDIT CARD', 'LOAN', 'CASH',
+  'PETTY CASH', 'WALLET', 'TERM DEPOSIT', 'NRE', 'NRO', 'OTHER'
+]);
+
+function normalizeBankMarket(value, currency = 'AUD') {
+  const fallback = String(currency || '').toUpperCase() === 'INR'
+    ? 'INDIA'
+    : (String(currency || '').toUpperCase() === 'AUD' ? 'AUSTRALIA' : 'OTHER');
+  const market = String(value || fallback).trim().toUpperCase();
+  if (!BANK_MARKETS.has(market)) throw new FinanceError('Banking market must be Australia, India or Other.', 400, 'INVALID_BANK_MARKET');
+  return market;
+}
+
+function normalizeBankCountryCode(value, market) {
+  const fallback = market === 'INDIA' ? 'IN' : market === 'AUSTRALIA' ? 'AU' : 'XX';
+  const code = String(value || fallback).trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(code)) throw new FinanceError('Bank country code must be a two-letter code.', 400, 'INVALID_BANK_COUNTRY');
+  return code;
+}
+
+function normalizeBankAccountType(value) {
+  const raw = String(value || 'TRANSACTION').trim().toUpperCase();
+  const aliases = { REGULAR: 'TRANSACTION', EVERYDAY: 'TRANSACTION', CURRENT_ACCOUNT: 'CURRENT', SAVING: 'SAVINGS', TERM_DEPOSIT: 'TERM DEPOSIT' };
+  const type = aliases[raw] || raw;
+  if (BANK_ACCOUNT_TYPES.has(type)) return type;
+  // Preserve a safe legacy/provider account type instead of making an existing
+  // connected account impossible to edit after this UI upgrade.
+  if (/^[A-Z][A-Z0-9 _\/-]{0,39}$/.test(type)) return type;
+  throw new FinanceError('Select a supported bank account type.', 400, 'INVALID_BANK_ACCOUNT_TYPE');
+}
 
 function uid(prefix) {
   return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -1020,7 +1052,8 @@ exports.getBankingDashboard = async (req, res) => {
 
     const [accounts, balances, flow, categories, merchants, monthly, recent, detectedRecurring] = await Promise.all([
       pool.query(
-        `SELECT ba.id,ba.nickname,ba.institution,ba.account_number_masked,ba.currency,ba.ownership_scope,
+        `SELECT ba.id,ba.nickname,ba.institution,ba.bank_market,ba.bank_country_code,ba.bsb_masked,ba.routing_code_masked,
+                ba.account_number_masked,ba.currency,ba.ownership_scope,
                 ba.entity_name,ba.account_type,ba.financial_purpose,ba.connection_type,ba.connection_status,
                 ba.current_ledger_balance,ba.available_balance,
                 CASE
@@ -1405,31 +1438,66 @@ exports.saveAccount = async (req, res) => {
     if (!nickname) throw new FinanceError('Account nickname is required.', 400, 'BANK_NICKNAME_REQUIRED');
     const currency = String(req.body.currency || 'AUD').trim().toUpperCase();
     if (!/^[A-Z]{3}$/.test(currency)) throw new FinanceError('Enter a valid three-letter currency code.', 400, 'INVALID_CURRENCY');
+
     const ownershipScope = normalizeScope(req.body.ownership_scope);
+    const accountType = normalizeBankAccountType(req.body.account_type);
+    const bankMarket = normalizeBankMarket(req.body.bank_market, currency);
+    const bankCountryCode = normalizeBankCountryCode(req.body.bank_country_code, bankMarket);
+    const routingCodeMasked = String(req.body.routing_code_masked || '').trim().slice(0, 40) || null;
+    const bsbMasked = String(req.body.bsb_masked || '').trim().slice(0, 30) || null;
+    const accountNumberMasked = String(req.body.account_number_masked || '').trim().slice(0, 40) || null;
     const opening = money.fromCents(money.toCents(req.body.opening_balance || 0));
     const id = Number(req.body.id || 0);
+
     if (id) {
       const existing = await privacy.assertAccountAccess(pool, id, req);
       await pool.query(
-        `UPDATE bank_accounts SET nickname=?, institution=?, bsb_masked=?, account_number_masked=?, currency=?,
-         ownership_scope=?, entity_name=?, account_type=?, financial_purpose=?, status=? WHERE id=?`,
-        [nickname, req.body.institution || null, req.body.bsb_masked || null, req.body.account_number_masked || null,
-          currency, ownershipScope, req.body.entity_name || null, req.body.account_type || null, req.body.financial_purpose || null, req.body.status || 'ACTIVE', id]
+        `UPDATE bank_accounts SET nickname=?, institution=?, bank_market=?, bank_country_code=?, bsb_masked=?, routing_code_masked=?,
+         account_number_masked=?, currency=?, ownership_scope=?, entity_name=?, account_type=?, financial_purpose=?, status=? WHERE id=?`,
+        [nickname, req.body.institution || null, bankMarket, bankCountryCode, bsbMasked, routingCodeMasked, accountNumberMasked,
+          currency, ownershipScope, req.body.entity_name || null, accountType, req.body.financial_purpose || null, req.body.status || 'ACTIVE', id]
       );
       await pool.query('UPDATE bank_transactions SET ownership_scope=? WHERE bank_account_id=?', [ownershipScope, id]);
-      await logAudit(pool, audit(req, { action: 'EDITED', module: 'finance_intelligence', recordType: 'bank_account', recordId: id, oldValue: existing, newValue: { ...req.body, ownership_scope: ownershipScope } }));
+      await logAudit(pool, audit(req, {
+        action: 'EDITED',
+        module: 'finance_intelligence',
+        recordType: 'bank_account',
+        recordId: id,
+        oldValue: existing,
+        newValue: {
+          nickname, currency, ownership_scope: ownershipScope, account_type: accountType,
+          bank_market: bankMarket, bank_country_code: bankCountryCode
+        }
+      }));
       return res.json({ message: 'Financial account updated.', bank_account_id: id });
     }
+
     const [insert] = await pool.query(
       `INSERT INTO bank_accounts
-       (nickname, institution, bsb_masked, account_number_masked, currency, opening_balance, current_ledger_balance,
-        reconciled_balance, ownership_scope, entity_name, account_type, financial_purpose, connection_type, connection_status, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MANUAL', 'MANUAL', ?)`,
-      [nickname, req.body.institution || null, req.body.bsb_masked || null, req.body.account_number_masked || null,
-        currency, opening, opening, opening, ownershipScope, req.body.entity_name || null, req.body.account_type || null, req.body.financial_purpose || null, req.user.id]
+       (nickname, institution, bank_market, bank_country_code, bsb_masked, routing_code_masked, account_number_masked, currency,
+        opening_balance, current_ledger_balance, reconciled_balance, ownership_scope, entity_name, account_type, financial_purpose,
+        connection_type, connection_status, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'MANUAL', 'MANUAL', ?)`,
+      [nickname, req.body.institution || null, bankMarket, bankCountryCode, bsbMasked, routingCodeMasked, accountNumberMasked,
+        currency, opening, opening, opening, ownershipScope, req.body.entity_name || null, accountType, req.body.financial_purpose || null, req.user.id]
     );
-    await logAudit(pool, audit(req, { action: 'CREATED', module: 'finance_intelligence', recordType: 'bank_account', recordId: insert.insertId, newValue: { nickname, currency, ownership_scope: ownershipScope } }));
-    return res.status(201).json({ message: ownershipScope === 'BUSINESS' ? 'Voxel Veda financial account created.' : 'Private financial account created. Only you can access it.', bank_account_id: insert.insertId });
+
+    await logAudit(pool, audit(req, {
+      action: 'CREATED',
+      module: 'finance_intelligence',
+      recordType: 'bank_account',
+      recordId: insert.insertId,
+      newValue: {
+        nickname, currency, ownership_scope: ownershipScope, account_type: accountType,
+        bank_market: bankMarket, bank_country_code: bankCountryCode
+      }
+    }));
+    return res.status(201).json({
+      message: ownershipScope === 'BUSINESS'
+        ? 'Voxel Veda financial account created.'
+        : 'Private financial account created. Only you can access it.',
+      bank_account_id: insert.insertId
+    });
   } catch (error) { return fail(res, error, 'Failed to save financial account'); }
 };
 
