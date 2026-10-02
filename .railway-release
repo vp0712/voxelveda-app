@@ -1,6 +1,6 @@
-finance-release: 20261002-statement-batch-ingestion-dedupe
-source-commit: 5d73c439fcb7475b0e0d1dc84eb7efe0a2da6cba
-scope: enqueue-all-statement-files; hide-removed-imports; anz-pdf-ocr-fallback; balance-aware-dedupe; preserve-source-category; one-time-parser-recovery
-ci: security-success; finance-release-success; banking-success; lifecycle-success; consolidation-success
-runtime: durable-statement-upload; controlled-worker-processing; review-before-post; exact-file-reuse
+finance-release: 20261002-statement-ocr-timeout-recovery
+source-commit: 74fa7d75ec033c69932579fc4474299ff6f27830
+scope: bounded-pdf-render; bounded-ocr-recognition; terminate-hung-ocr-worker; retry-timeouts; stale-recovery-5m
+ci: security-success; finance-release-success; consolidation-success
+runtime: ocr-timeout=120000ms; pdf-render-timeout=60000ms; stale-job-recovery=5m
 policy: single-marker-controlled-production-deploy
