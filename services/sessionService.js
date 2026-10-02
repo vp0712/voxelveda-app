@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const pool = require('../config/db');
 const { ensureSecuritySchema } = require('./securitySchema');
 const { redactSensitive } = require('../utils/securityRedaction');
+const { isSecurityEventCapacityError, pruneSecurityEvents } = require('./securityEventRetentionService');
 
 const hashToken = (token) => crypto.createHash('sha256').update(String(token)).digest('hex');
 
@@ -78,9 +79,8 @@ async function markSessionStepUp(userId, sessionId, method = 'PASSWORD_TOTP') {
   return result.affectedRows > 0;
 }
 
-async function logSecurityEvent(entry) {
-  await ensureSecuritySchema();
-  await pool.query(
+async function insertSecurityEvent(entry) {
+  return pool.query(
     `INSERT INTO security_events
      (actor_id, target_user_id, event_type, result, request_id, session_id, ip_address, user_agent, metadata_json)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -89,6 +89,42 @@ async function logSecurityEvent(entry) {
       entry.req?.ip || null, String(entry.req?.get?.('user-agent') || '').slice(0, 255),
       entry.metadata ? JSON.stringify(redactSensitive(entry.metadata)) : null]
   );
+}
+
+async function logSecurityEvent(entry) {
+  await ensureSecuritySchema();
+  try {
+    await insertSecurityEvent(entry);
+    return { persisted: true, fallback: null };
+  } catch (error) {
+    if (!isSecurityEventCapacityError(error)) throw error;
+
+    // Recover space from bounded operational telemetry and retry once. A full
+    // security_events table must not turn a correct password/TOTP into a 500.
+    await pruneSecurityEvents({ emergency: true }).catch(() => {});
+    try {
+      await insertSecurityEvent(entry);
+      return { persisted: true, fallback: 'EMERGENCY_PRUNE' };
+    } catch (retryError) {
+      if (!isSecurityEventCapacityError(retryError)) throw retryError;
+
+      // Last-resort durable platform evidence: Railway captures stderr with
+      // timestamps/deployment provenance. Never print passwords, OTPs, tokens
+      // or unredacted metadata. This keeps authentication available while the
+      // database telemetry table recovers.
+      const safeMetadata = entry.metadata ? redactSensitive(entry.metadata) : null;
+      console.error('SECURITY_EVENT_CAPACITY_FALLBACK', JSON.stringify({
+        event_type: String(entry.eventType || 'UNKNOWN').slice(0, 80),
+        result: String(entry.result || 'SUCCESS').slice(0, 20),
+        actor_id: entry.actorId || null,
+        target_user_id: entry.targetUserId || null,
+        session_id: entry.sessionId || null,
+        request_id: entry.req?.requestId || entry.req?.headers?.['x-request-id'] || null,
+        metadata: safeMetadata
+      }));
+      return { persisted: false, fallback: 'RUNTIME_LOG' };
+    }
+  }
 }
 
 module.exports = {

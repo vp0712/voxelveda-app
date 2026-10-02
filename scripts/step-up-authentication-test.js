@@ -40,4 +40,21 @@ assert.match(client, /Security Verification Required/);
 assert.match(client, /nativeFetch\('\/api\/auth\/step-up'/);
 assert(!client.includes('localStorage'), 'step-up credentials or state must not be stored in localStorage');
 
+
+const retentionSource = read('services/securityEventRetentionService.js');
+const sessionSource = read('services/sessionService.js');
+const securitySchemaSource = read('services/securitySchema.js');
+const { isSecurityEventCapacityError } = require('../services/securityEventRetentionService');
+
+assert.equal(isSecurityEventCapacityError({ code: 'ER_RECORD_FILE_FULL', errno: 1114, message: "The table 'security_events' is full" }), true);
+assert.equal(isSecurityEventCapacityError({ code: 'ER_BAD_FIELD_ERROR', errno: 1054, message: 'Unknown column' }), false);
+assert.match(retentionSource, /STEP_UP_REQUIRED/);
+assert.match(retentionSource, /SECURITY_EVENT_ROUTINE_ROW_CAP/);
+assert.match(sessionSource, /SECURITY_EVENT_CAPACITY_FALLBACK/);
+assert.match(sessionSource, /pruneSecurityEvents\(\{ emergency: true \}\)/);
+assert.match(sessionSource, /return \{ persisted: false, fallback: 'RUNTIME_LOG' \}/);
+assert.match(securitySchemaSource, /pruneSecurityEvents\(\)/);
+assert(!sessionSource.includes('password:'), 'capacity fallback must never log password fields');
+assert(!sessionSource.includes('code: entry.code'), 'capacity fallback must never log authenticator codes');
+
 console.log('Step-up authentication tests passed.');
