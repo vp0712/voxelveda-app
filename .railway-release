@@ -1,7 +1,7 @@
-finance-release: 20261002-statement-parser-quality-fallback
-source-commit: 58c4ff6ad6e3cd9c0b36126cb22e246c45773ea5
-scope: anz-period-detection; balance-marker-context; rejected-only-pdf-ocr-fallback; rejected-review-recovery-v2; original-filename-restoration; stale-import-visibility
-preserves: bounded-pdf-render; bounded-ocr-recognition; terminate-hung-ocr-worker; retry-timeouts; stale-recovery-5m
-ci: security-success; finance-release-success; banking-success; lifecycle-success; consolidation-success
-runtime: review-before-post; exact-balance-direction-proof; secure-document-name-preferred
+security-release: 20261002-step-up-security-events-capacity
+source-commit: f1ca25b4e550537d6b99f603b3418a5e406d36ad
+scope: bounded-security-event-retention; emergency-step-up-required-prune; runtime-log-fallback; step-up-availability
+preserves: statement-parser-quality-fallback; bounded-ocr-recovery; secure-document-filenames
+ci: security-success; consolidation-success
+runtime: security-events-retention=90d; step-up-required-retention=7d; routine-cap=5000
 policy: single-marker-controlled-production-deploy
