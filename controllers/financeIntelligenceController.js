@@ -791,7 +791,9 @@ exports.getStatementLibrary = async (req, res) => {
     if (accountId) { clauses.push('sif.bank_account_id=?'); params.push(accountId); }
 
     const [rows] = await pool.query(
-      `SELECT sif.import_uid, sif.bank_account_id, sif.original_name, sif.source_format, sif.statement_start_date,
+      `SELECT sif.import_uid, sif.bank_account_id,
+              COALESCE(NULLIF(sis.original_name,''),NULLIF(sd.original_name,''),sif.original_name) AS original_name,
+              sif.source_format, sif.statement_start_date,
               sif.statement_end_date, sif.opening_balance, sif.closing_balance, sif.parse_status, sif.imported_rows,
               sif.duplicate_rows, sif.rejected_rows, sif.reviewed_at, ba.nickname AS account_name, ba.institution,
               ba.ownership_scope, ba.currency,
@@ -803,9 +805,11 @@ exports.getStatementLibrary = async (req, res) => {
               SUM(CASE WHEN COALESCE(NULLIF(bt.category,''),'Unclassified')='Unclassified' THEN 1 ELSE 0 END) AS unclassified_transactions
          FROM statement_import_files sif
          JOIN bank_accounts ba ON ba.id=sif.bank_account_id
+         LEFT JOIN statement_import_sessions sis ON sis.import_uid=sif.import_uid AND sis.bank_account_id=sif.bank_account_id
+         LEFT JOIN secure_documents sd ON sd.id=sif.secure_document_id AND sd.deleted_at IS NULL
          LEFT JOIN bank_transactions bt ON bt.statement_import_uid=sif.import_uid AND bt.bank_account_id=sif.bank_account_id
         WHERE ${clauses.join(' AND ')}
-        GROUP BY sif.id, ba.id
+        GROUP BY sif.id, ba.id, sis.id, sd.id
         ORDER BY COALESCE(sif.reviewed_at, sif.uploaded_at) DESC, sif.id DESC
         LIMIT 200`, params
     );
