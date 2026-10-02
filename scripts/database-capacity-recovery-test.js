@@ -39,4 +39,11 @@ assert.match(predeploy,/DB_CAPACITY_PREDEPLOY_AFTER/);
 assert.match(predeploy,/process\.exit\(0\)/);
 assert.doesNotMatch(predeploy,/process\.exit\(1\)/);
 
+
+assert.match(predeploy,/DB_PROVIDER_IDENTITY/);
+assert.match(predeploy,/DB_MYSQL_IDENTITY/);
+assert.match(predeploy,/DB_TARGET_TABLES/);
+assert.doesNotMatch(predeploy,/DB_PASSWORD/);
+assert.doesNotMatch(predeploy,/password:/i);
+
 console.log('DATABASE_CAPACITY_RECOVERY_TEST_OK');
