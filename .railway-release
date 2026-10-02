@@ -1,7 +1,7 @@
 database-release: 20261002-mysql-provider-capacity-diagnostic
-source-commit: 75b5640bb90fd32f7f9e239595e0e9e4f62c2e81
-scope: sanitized-provider-identity; targeted-table-footprint; force-safe-predeploy-capacity-recovery
+source-commit: ffd5cf37ae34b7f1e22704604483ba95f7958a64
+scope: finance-anz-column-aware-withdrawals-deposits-parser
 preserves: finance-ledger; bank-transactions; statement-rows; original-pdf-object-storage; immutable-audit-ledger
-ci: security-success; consolidation-success; database-capacity-test-success
-runtime: diagnostic-no-secrets; predeploy-recovery-non-failing
+ci: security-success; consolidation-success; finance-release-candidate-success
+runtime: exact-user-pdf-verified; text-extraction; fail-closed-ambiguous-rows
 policy: single-marker-controlled-production-deploy
