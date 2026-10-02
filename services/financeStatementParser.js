@@ -358,7 +358,7 @@ function classify(text, metadata = {}) {
     const match = source.match(new RegExp(`${label}\\s*(?:balance)?\\s*[:$]?\\s*((?:CR|DR)?\\s*[-+]?\\(?[$€£¥₹]?\\d[\\d.,]*[.,]\\d{2}\\)?(?:\\s*(?:CR|DR))?)`, 'i'));
     return match ? normaliseMoneyToken(match[1])?.decimal || null : null;
   };
-  const dated = String.raw`(\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4})`;
+  const dated = String.raw`(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})`;
   const header = source.slice(0, 8000);
   let periodMatch = header.match(new RegExp(`(?:statement period|period)\\s*[:\\-]?\\s*${dated}\\s*(?:to|through|[-–—])\\s*${dated}`, 'i'));
   if (!periodMatch) {
