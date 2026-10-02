@@ -160,7 +160,19 @@ class BackgroundJobStore {
     }
   }
 
-  async completeRun({ runUuid, processedCount, failedCount }) {
+  async completeRun({ runUuid, processedCount, failedCount, triggerSource }) {
+    // Scheduled no-op polls carry no operational evidence worth retaining. With
+    // a 5-second Finance queue poll they otherwise create ~17k rows/day even
+    // when there is nothing to process, eventually exhausting small MySQL plans.
+    if (String(triggerSource || '').toUpperCase() === 'SCHEDULED'
+      && Number(processedCount || 0) === 0
+      && Number(failedCount || 0) === 0) {
+      await this.pool.query(
+        "DELETE FROM background_job_runs WHERE run_uuid = ? AND status = 'RUNNING'",
+        [runUuid]
+      );
+      return;
+    }
     await this.pool.query(
       `UPDATE background_job_runs
        SET status = 'COMPLETED', completed_at = NOW(3), processed_count = ?, failed_count = ?,
