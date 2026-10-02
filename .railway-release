@@ -1,7 +1,7 @@
-security-release: 20261002-step-up-security-events-capacity
-source-commit: f1ca25b4e550537d6b99f603b3418a5e406d36ad
-scope: bounded-security-event-retention; emergency-step-up-required-prune; runtime-log-fallback; step-up-availability
-preserves: statement-parser-quality-fallback; bounded-ocr-recovery; secure-document-filenames
-ci: security-success; consolidation-success
-runtime: security-events-retention=90d; step-up-required-retention=7d; routine-cap=5000
+database-release: 20261002-external-mysql-capacity-recovery
+source-commit: ca3a52c989362c48aa7ad01ce508bd935a29e97a
+scope: pre-migration-capacity-recovery; prune-operational-telemetry; compact-imported-page-text; emergency-background-job-run-reclaim; suppress-idle-scheduled-run-retention
+preserves: finance-ledger; bank-transactions; statement-rows; original-pdf-object-storage; immutable-audit-ledger
+ci: security-success; consolidation-success; finance-release-success; database-capacity-test-success; finance-regression-59-checks
+runtime: db-capacity-recovery=true; prune-batch=1000; max-batches=50; finance-poll=30000ms
 policy: single-marker-controlled-production-deploy
