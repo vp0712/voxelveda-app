@@ -36,6 +36,7 @@ const tests=[
   "finance-original-bank-data-test.js",
   "open-banking-sandbox-foundation-test.js",
   "finance-statement-ingestion-architecture-test.js",
+  "finance-statement-timeout-recovery-test.js",
   "finance-statement-ingestion-real-files-test.js",
   "finance-statement-review-test.js",
   "finance-statement-dedupe-report-test.js",
