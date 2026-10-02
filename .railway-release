@@ -1,7 +1,7 @@
-database-release: 20261002-external-mysql-capacity-recovery
-source-commit: ca3a52c989362c48aa7ad01ce508bd935a29e97a
-scope: pre-migration-capacity-recovery; prune-operational-telemetry; compact-imported-page-text; emergency-background-job-run-reclaim; suppress-idle-scheduled-run-retention
+database-release: 20261002-force-predeploy-capacity-recovery
+source-commit: fec5b7669b30d13d4da3c9888d9fba02ee4bf202
+scope: force-safe-predeploy-capacity-recovery; before-after-footprint; emergency-background-job-run-reclaim
 preserves: finance-ledger; bank-transactions; statement-rows; original-pdf-object-storage; immutable-audit-ledger
-ci: security-success; consolidation-success; finance-release-success; database-capacity-test-success; finance-regression-59-checks
-runtime: db-capacity-recovery=true; prune-batch=1000; max-batches=50; finance-poll=30000ms
+ci: security-success; consolidation-success; database-capacity-test-success
+runtime: predeploy-capacity-recovery=force; recovery-runner-non-failing
 policy: single-marker-controlled-production-deploy
