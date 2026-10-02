@@ -81,13 +81,20 @@ async function clearImportedPageText(maxRows = 5000) {
   for (let batch = 0; batch < maxBatches && cleared < maxRows; batch += 1) {
     const limit = Math.min(batchSize, maxRows - cleared);
     const [result] = await pool.query(
-      `UPDATE statement_import_pages p
-       JOIN statement_import_sessions s ON s.id=p.import_session_id
-          SET p.text_content=NULL
-        WHERE p.text_content IS NOT NULL
-          AND s.status='IMPORTED'
-          AND COALESCE(s.posted_at,s.committed_at,s.created_at) < DATE_SUB(NOW(), INTERVAL 7 DAY)
-        LIMIT ${limit}`
+      `UPDATE statement_import_pages
+          SET text_content=NULL
+        WHERE id IN (
+          SELECT id FROM (
+            SELECT p.id
+              FROM statement_import_pages p
+              JOIN statement_import_sessions s ON s.id=p.import_session_id
+             WHERE p.text_content IS NOT NULL
+               AND s.status='IMPORTED'
+               AND COALESCE(s.posted_at,s.committed_at,s.created_at) < DATE_SUB(NOW(), INTERVAL 7 DAY)
+             ORDER BY p.id ASC
+             LIMIT ${limit}
+          ) vv_pages
+        )`
     );
     const affected = Number(result?.affectedRows || 0);
     cleared += affected;
