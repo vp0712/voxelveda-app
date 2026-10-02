@@ -141,8 +141,8 @@ function parseLines(lines, options = {}) {
     const amounts = [...text.matchAll(MONEY_TOKEN)].map((match) => ({ raw: match[0].trim(), index: match.index || 0 }));
     if (!amounts.length) continue;
     const parsedDate = normaliseDate(dateMatch[0], options);
-    const afterDate = text.slice((dateMatch.index || 0) + dateMatch[0].length).trim();
-    const markerText = afterDate.slice(0, amounts[0].index - ((dateMatch.index || 0) + dateMatch[0].length)).trim();
+    const dateEnd = (dateMatch.index || 0) + dateMatch[0].length;
+    const markerText = text.slice(dateEnd, amounts[0].index).trim();
     const balanceMarker = /\b(?:OPENING|CLOSING)\s+BALANCE\b|\bBALANCE\s+(?:B\/F|C\/F|BROUGHT\s+FORWARD|CARRIED\s+FORWARD)\b/i.test(markerText);
     const transactionAmount = balanceMarker ? null : (amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0]);
     const balanceAmount = balanceMarker
