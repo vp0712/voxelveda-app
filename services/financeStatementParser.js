@@ -18,6 +18,27 @@ const MAX_IMAGE_PIXELS = () => Math.max(1000000, Number(process.env.FINANCE_STAT
 let pdfModulePromise;
 let ocrWorkerPromise;
 
+const OCR_TIMEOUT_MS = () => Math.max(30000, Math.min(300000, Number(process.env.FINANCE_OCR_TIMEOUT_MS || 120000)));
+const PDF_RENDER_TIMEOUT_MS = () => Math.max(15000, Math.min(180000, Number(process.env.FINANCE_PDF_RENDER_TIMEOUT_MS || 60000)));
+
+function timeoutError(message, code) {
+  return parserError(message, code, 503, { retryable: true });
+}
+
+function withTimeout(promise, timeoutMs, onTimeout, errorFactory) {
+  let timer;
+  return Promise.race([
+    Promise.resolve(promise),
+    new Promise((_, reject) => {
+      timer = setTimeout(async () => {
+        try { if (typeof onTimeout === 'function') await onTimeout(); } catch {}
+        reject(errorFactory());
+      }, timeoutMs);
+      if (typeof timer.unref === 'function') timer.unref();
+    })
+  ]).finally(() => clearTimeout(timer));
+}
+
 function parserError(message, code, status = 422, details = {}) {
   const error = new Error(message);
   error.code = code;
@@ -316,7 +337,12 @@ async function ocrImage(buffer, page, progress) {
   progress?.({ stage: 'OCR_REQUIRED', page });
   const prepared = await preprocessImage(buffer);
   const worker = await ocrWorker();
-  const result = await worker.recognize(prepared.buffer, {}, { text: true, tsv: true, blocks: true });
+  const result = await withTimeout(
+    worker.recognize(prepared.buffer, {}, { text: true, tsv: true, blocks: true }),
+    OCR_TIMEOUT_MS(),
+    async () => { await shutdownOcrWorker(); },
+    () => timeoutError('OCR recognition exceeded the safe processing timeout and will be retried with a fresh OCR worker.', 'OCR_TIMEOUT')
+  );
   const lines = parseTsv(result.data.tsv, page);
   if (!lines.length) lines.push(...linesFromBlocks(result.data.blocks, page));
   return { lines, text: result.data.text || lines.map((line) => line.text).join('\n'), metadata: prepared.metadata };
@@ -333,7 +359,13 @@ async function renderPdfPage(page) {
   const viewport = page.getViewport({ scale: Math.max(1.5, Math.min(3, Number(process.env.FINANCE_PDF_RENDER_SCALE || 2.2))) });
   const canvas = canvasModule.createCanvas(Math.ceil(viewport.width), Math.ceil(viewport.height));
   const context = canvas.getContext('2d');
-  await page.render({ canvasContext: context, viewport, canvas }).promise;
+  const renderTask = page.render({ canvasContext: context, viewport, canvas });
+  await withTimeout(
+    renderTask.promise,
+    PDF_RENDER_TIMEOUT_MS(),
+    async () => { try { renderTask.cancel(); } catch {} },
+    () => timeoutError('PDF page rendering exceeded the safe processing timeout and will be retried.', 'PDF_RENDER_TIMEOUT')
+  );
   return canvas.toBuffer('image/png');
 }
 
@@ -536,5 +568,5 @@ module.exports = {
   parseTabularRows,
   parseXlsx,
   shutdownOcrWorker,
-  _test: { linesFromBlocks, ocrImage, parseTsv, pdfTextLines, preprocessImage }
+  _test: { linesFromBlocks, ocrImage, parseTsv, pdfTextLines, preprocessImage, withTimeout, OCR_TIMEOUT_MS, PDF_RENDER_TIMEOUT_MS }
 };
