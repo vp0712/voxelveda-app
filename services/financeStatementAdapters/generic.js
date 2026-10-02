@@ -2,7 +2,7 @@
 
 const { amountDirection, normaliseMoneyToken } = require('../financeStatementMoney');
 
-const VERSION = 'generic-statement-v1';
+const VERSION = 'generic-statement-v2';
 const DATE_TOKEN = /\b(?:\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?)\b/;
 const MONEY_TOKEN = /(?:\b(?:AUD|USD|NZD|EUR|GBP|INR|JPY|CAD|SGD)\b\s*)?(?:CR|DR)?\s*[-+]?\(?[$€£¥₹]?\d[\d.,]*[.,]\d{2}\)?(?:\s*(?:CR|DR))?/gi;
 
@@ -140,19 +140,26 @@ function parseLines(lines, options = {}) {
     if (!dateMatch) continue;
     const amounts = [...text.matchAll(MONEY_TOKEN)].map((match) => ({ raw: match[0].trim(), index: match.index || 0 }));
     if (!amounts.length) continue;
-    const transactionAmount = amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0];
-    const balanceAmount = amounts.length >= 2 ? normaliseMoneyToken(amounts[amounts.length - 1].raw) : null;
-    const explicitDirection = /\b(?:CR|DR)\b|^[+\-(]/i.test(transactionAmount.raw.trim());
-    const direction = amountDirection(transactionAmount.raw, { signedAmountRule: options.signedAmountRule });
     const parsedDate = normaliseDate(dateMatch[0], options);
-    const description = text.slice((dateMatch.index || 0) + dateMatch[0].length, transactionAmount.index).trim();
+    const dateEnd = (dateMatch.index || 0) + dateMatch[0].length;
+    const markerText = text.slice(dateEnd, amounts[0].index).trim();
+    const balanceMarker = /\b(?:OPENING|CLOSING)\s+BALANCE\b|\bBALANCE\s+(?:B\/F|C\/F|BROUGHT\s+FORWARD|CARRIED\s+FORWARD)\b/i.test(markerText);
+    const transactionAmount = balanceMarker ? null : (amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0]);
+    const balanceAmount = balanceMarker
+      ? normaliseMoneyToken(amounts[amounts.length - 1].raw)
+      : (amounts.length >= 2 ? normaliseMoneyToken(amounts[amounts.length - 1].raw) : null);
+    const explicitDirection = transactionAmount ? /\b(?:CR|DR)\b|^[+\-(]/i.test(transactionAmount.raw.trim()) : false;
+    const direction = transactionAmount ? amountDirection(transactionAmount.raw, { signedAmountRule: options.signedAmountRule }) : null;
+    const descriptionEnd = transactionAmount ? transactionAmount.index : amounts[0].index;
+    const description = text.slice((dateMatch.index || 0) + dateMatch[0].length, descriptionEnd).trim();
     const confidence = confidenceForLine(line);
-    const unsignedNeedsBalanceProof = !explicitDirection && !options.allowUnsignedAmounts;
+    const unsignedNeedsBalanceProof = Boolean(transactionAmount) && !explicitDirection && !options.allowUnsignedAmounts;
+    const markerHint = balanceMarker ? 'Opening/closing balance marker retained only as balance context' : null;
     rows.push({
       transaction_date: parsedDate.value,
       description: description || null,
-      debit: explicitDirection || options.allowUnsignedAmounts ? (direction?.debit || '0.00') : '0.00',
-      credit: explicitDirection || options.allowUnsignedAmounts ? (direction?.credit || '0.00') : '0.00',
+      debit: transactionAmount && (explicitDirection || options.allowUnsignedAmounts) ? (direction?.debit || '0.00') : '0.00',
+      credit: transactionAmount && (explicitDirection || options.allowUnsignedAmounts) ? (direction?.credit || '0.00') : '0.00',
       running_balance: balanceAmount?.decimal || null,
       currency: options.currency || null,
       confidence_score: confidence,
@@ -161,8 +168,8 @@ function parseLines(lines, options = {}) {
       source_snippet: text.slice(0, 1000),
       validation_hint: parsedDate.ambiguous
         ? `Ambiguous date ${dateMatch[0]}; verify statement period/date format`
-        : (unsignedNeedsBalanceProof ? 'Transaction direction requires running-balance verification' : (confidence < 0.72 ? 'Low OCR confidence requires review' : null)),
-      force_rejected: parsedDate.ambiguous || unsignedNeedsBalanceProof,
+        : (markerHint || (unsignedNeedsBalanceProof ? 'Transaction direction requires running-balance verification' : (confidence < 0.72 ? 'Low OCR confidence requires review' : null))),
+      force_rejected: balanceMarker || parsedDate.ambiguous || unsignedNeedsBalanceProof,
       _unsigned_amount: unsignedNeedsBalanceProof ? transactionAmount.raw : null,
       _date_ambiguous: parsedDate.ambiguous
     });

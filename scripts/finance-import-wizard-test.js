@@ -54,9 +54,32 @@ assert(inferred.length>=3,'split PDF transaction rows must be assembled into log
 assert(inferred[0].debit==='20.00'&&inferred[0].credit==='0.00','unsigned PDF amount must infer debit only when running-balance movement proves it');
 assert(inferred[1].debit==='10.00'&&inferred[1].credit==='0.00','running-balance inference must work across consecutive descending statement rows');
 
+const parser=require('../services/financeStatementParser');
+const anzClassification=parser.classify(
+  'ANZ ACCESS ADVANTAGE 28 January 2025 to 27 February 2025 Date Transaction Details Withdrawals Deposits Balance',
+  {pageCount:2,selectableText:true}
+);
+assert(anzClassification.statement_start_date==='2025-01-28'&&anzClassification.statement_end_date==='2025-02-27','ANZ standalone statement ranges must be detected for short transaction dates');
+
+const anzRows=generic.parseLines([
+  {page:1,text:'27 JAN OPENING BALANCE 1,000.00',words:[]},
+  {page:1,text:'28 JAN WOOLWORTHS 50.00 950.00',words:[]},
+  {page:1,text:'29 JAN SALARY 100.00 1,050.00',words:[]}
+],{statementStartDate:'2025-01-27',statementEndDate:'2025-02-27',currency:'AUD',allowUnsignedAmounts:false});
+assert(anzRows.length===3,'ANZ opening balance and transaction rows must remain available to the parser');
+assert(anzRows[0].running_balance==='1000.00'&&anzRows[0].force_rejected===true,'opening balance must be retained as balance context but never imported as a transaction');
+assert(anzRows[1].debit==='50.00'&&anzRows[1].credit==='0.00'&&!anzRows[1].force_rejected,'first ANZ transaction after opening balance must infer debit from exact running-balance movement');
+assert(anzRows[2].credit==='100.00'&&anzRows[2].debit==='0.00'&&!anzRows[2].force_rejected,'ANZ credit direction must infer from exact running-balance movement');
+
+const statementController=read('controllers/statementImportController.js');
+const intelligenceController=read('controllers/financeIntelligenceController.js');
+assert(statementController.includes("COALESCE(NULLIF(sd.original_name,''),s.original_name) AS original_name"),'active import list must prefer the original secure upload filename');
+assert(intelligenceController.includes("COALESCE(NULLIF(sis.original_name,''),NULLIF(sd.original_name,''),sif.original_name) AS original_name"),'Statement Vault must recover the original user-facing filename when available');
+assert(client.includes("const allRejectedPdf=status==='PENDING_REVIEW'")&&client.includes("num(row.rejected_rows)>=num(row.total_rows)"),'all-rejected PDF reviews must receive one safe parser-upgrade retry');
+
 const ingestionController=read('controllers/financeStatementIngestionController.js');
 assert(ingestionController.includes("fields.push('attempt=0', 'completed_at=NULL')"),'explicit retry must reset exhausted failed/dead-letter attempts');
-assert(client.includes("STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v1'")&&client.includes("PDF_NO_SAFE_TRANSACTIONS")&&client.includes("OCR_NO_SAFE_TRANSACTIONS"),'legacy parser failures must receive one versioned automatic recovery retry');
+assert(client.includes("STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v2'")&&client.includes("PDF_NO_SAFE_TRANSACTIONS")&&client.includes("OCR_NO_SAFE_TRANSACTIONS"),'legacy parser failures must receive one versioned automatic recovery retry');
 assert(client.includes("localStorage.setItem(key,new Date().toISOString())"),'automatic parser recovery must be loop-protected per import and parser version');
 
 console.log('Unified secure Finance statement import and historical migration checks passed.');
