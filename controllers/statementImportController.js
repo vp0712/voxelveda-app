@@ -615,12 +615,17 @@ exports.list = async (req, res) => {
       params.push(status);
     }
     const [rows] = await pool.query(
-      `SELECT s.*, ba.nickname AS account_name, ba.ownership_scope,
+      `SELECT s.*,
+              COALESCE(NULLIF(sd.original_name,''),s.original_name) AS original_name,
+              ba.nickname AS account_name, ba.ownership_scope,
               j.status AS job_status,j.stage AS job_stage,j.progress_percent AS job_progress,
-              j.error_code AS job_error_code,j.error_summary AS job_error_summary,j.attempt,j.max_attempts
+              j.error_code AS job_error_code,j.error_summary AS job_error_summary,j.attempt,j.max_attempts,
+              j.heartbeat_at,
+              CASE WHEN j.status='PROCESSING' AND j.heartbeat_at < DATE_SUB(NOW(),INTERVAL 15 MINUTE) THEN 1 ELSE 0 END AS stalled
        FROM statement_import_sessions s
        JOIN bank_accounts ba ON ba.id=s.bank_account_id
        LEFT JOIN finance_statement_import_jobs j ON j.import_session_id=s.id
+       LEFT JOIN secure_documents sd ON sd.id=s.secure_document_id AND sd.deleted_at IS NULL
        ${where}
        ORDER BY s.created_at DESC LIMIT 100`, params
     );
