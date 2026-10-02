@@ -3,7 +3,6 @@
 const generic = require('./generic');
 
 const VERSION = 'australian-crdr-v2-column-aware';
-const MONEY_TOKEN = /(?:\\b(?:AUD|USD|NZD|EUR|GBP|INR|JPY|CAD|SGD)\\b\\s*)?(?:CR|DR)?\\s*[-+]?\\(?[$€£¥₹]?\\d[\\d.,]*[.,]\\d{2}\\)?(?:\\s*(?:CR|DR))?/gi;
 const INSTITUTION_PATTERNS = [
   ['Commonwealth Bank', /\b(?:COMMONWEALTH BANK|COMMBANK|CBA)\b/i],
   ['ANZ', /\b(?:AUSTRALIA AND NEW ZEALAND BANKING GROUP|ANZ)\b/i],
