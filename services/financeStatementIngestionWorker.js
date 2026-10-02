@@ -168,7 +168,14 @@ async function failJob(job, error) {
   const safe = safeError(error);
   const passwordFailure = ['PDF_PASSWORD_REQUIRED', 'PDF_PASSWORD_INVALID'].includes(safe.code);
   const mappingFailure = safe.code === 'STATEMENT_MAPPING_REQUIRED';
-  const retryable = !passwordFailure && !mappingFailure && ['OBJECT_STORAGE_REQUEST_FAILED', 'STORED_DOCUMENT_SECURITY_PENDING', 'ER_LOCK_DEADLOCK', 'ETIMEDOUT'].includes(safe.code) && job.attempt < Number(job.max_attempts || 5);
+  const retryable = !passwordFailure && !mappingFailure && [
+    'OBJECT_STORAGE_REQUEST_FAILED',
+    'STORED_DOCUMENT_SECURITY_PENDING',
+    'ER_LOCK_DEADLOCK',
+    'ETIMEDOUT',
+    'OCR_TIMEOUT',
+    'PDF_RENDER_TIMEOUT'
+  ].includes(safe.code) && job.attempt < Number(job.max_attempts || 5);
   const status = passwordFailure ? 'NEEDS_PASSWORD' : mappingFailure ? 'NEEDS_MAPPING' : retryable ? 'RETRY' : job.attempt >= Number(job.max_attempts || 5) ? 'DEAD_LETTER' : 'FAILED';
   const delay = Math.min(3600, 30 * (2 ** Math.max(0, job.attempt - 1)));
   await pool.query(
