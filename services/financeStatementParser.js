@@ -358,7 +358,19 @@ function classify(text, metadata = {}) {
     const match = source.match(new RegExp(`${label}\\s*(?:balance)?\\s*[:$]?\\s*((?:CR|DR)?\\s*[-+]?\\(?[$€£¥₹]?\\d[\\d.,]*[.,]\\d{2}\\)?(?:\\s*(?:CR|DR))?)`, 'i'));
     return match ? normaliseMoneyToken(match[1])?.decimal || null : null;
   };
-  const periodMatch = source.match(/(?:statement period|period)\s*[:\-]?\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})\s*(?:to|through|[-–—])\s*(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})/i);
+  const dated = String.raw`(\\d{1,2}[\\/.-]\\d{1,2}[\\/.-]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}\\s+\\d{2,4})`;
+  const header = source.slice(0, 8000);
+  let periodMatch = header.match(new RegExp(`(?:statement period|period)\\s*[:\\-]?\\s*${dated}\\s*(?:to|through|[-–—])\\s*${dated}`, 'i'));
+  if (!periodMatch) {
+    const starts = header.match(new RegExp(`statement\\s+starts?\\s*[:\\-]?\\s*${dated}`, 'i'));
+    const ends = header.match(new RegExp(`statement\\s+ends?\\s*[:\\-]?\\s*${dated}`, 'i'));
+    if (starts && ends) periodMatch = [null, starts[1], ends[1]];
+  }
+  if (!periodMatch) {
+    // ANZ retail statements commonly print the statement range as a standalone
+    // heading, e.g. "28 January 2025 to 27 February 2025".
+    periodMatch = header.match(new RegExp(`\\b${dated}\\s+(?:to|through|[-–—])\\s+${dated}\\b`, 'i'));
+  }
   const periodStart = periodMatch ? normaliseDate(periodMatch[1], { dateFormat: institution ? 'DMY' : '' }).value : null;
   const periodEnd = periodMatch ? normaliseDate(periodMatch[2], { dateFormat: institution ? 'DMY' : '' }).value : null;
   return {
@@ -437,11 +449,23 @@ async function parsePdf(buffer, options = {}, progress) {
   let rows = parseWithContext(allLines, classification, adapterChoice);
   let outputPages = pages;
   const warnings = [];
+  const rowQuality = (candidateRows) => {
+    const sourceRows = Array.isArray(candidateRows) ? candidateRows : [];
+    const transactionRows = sourceRows.filter((row) => !/\b(?:OPENING|CLOSING)\s+BALANCE\b|\bBALANCE\s+(?:B\/F|C\/F|BROUGHT\s+FORWARD|CARRIED\s+FORWARD)\b/i.test(String(row.description || '')));
+    const importable = transactionRows.filter((row) => {
+      if (!row.transaction_date || row.force_rejected) return false;
+      const debit = Number(row.debit || 0);
+      const credit = Number(row.credit || 0);
+      return Number.isFinite(debit) && Number.isFinite(credit) && ((debit > 0) !== (credit > 0));
+    }).length;
+    return { total: sourceRows.length, transactions: transactionRows.length, importable };
+  };
+  let textQuality = rowQuality(rows);
 
   // Some bank PDFs contain selectable text but encode table columns in a way
-  // that destroys row structure. If the safe text parser finds zero rows,
-  // retry from rendered pages with OCR before declaring the statement failed.
-  if (!rows.length && pages.some((page) => page.extraction_method === 'PDF_TEXT')) {
+  // that leaves only opening/closing markers or rejected rows. Treat zero
+  // importable transactions as a failed text extraction and force OCR fallback.
+  if (textQuality.importable === 0 && pages.some((page) => page.extraction_method === 'PDF_TEXT')) {
     const ocrLines = [];
     const ocrPages = [];
     for (let pageNo = 1; pageNo <= document.numPages; pageNo += 1) {
@@ -464,18 +488,20 @@ async function parsePdf(buffer, options = {}, progress) {
     const ocrClassification = classify(ocrText, { pageCount: ocrPages.length, selectableText: false, ocrRequired: true, appearsIncomplete: ocrPages.some((page) => !page.word_count) });
     const ocrChoice = selectAdapter({ text: ocrText });
     const ocrRows = parseWithContext(ocrLines, ocrClassification, ocrChoice);
-    if (ocrRows.length) {
+    const ocrQuality = rowQuality(ocrRows);
+    if (ocrQuality.importable > textQuality.importable || (ocrQuality.importable === textQuality.importable && ocrQuality.transactions > textQuality.transactions)) {
       rows = ocrRows;
+      textQuality = ocrQuality;
       text = ocrText;
       classification = ocrClassification;
       adapterChoice = ocrChoice;
       outputPages = ocrPages;
-      warnings.push('Selectable PDF text could not preserve transaction rows; rendered OCR fallback was used.');
+      warnings.push('Selectable PDF text did not yield safe transaction rows; rendered OCR fallback was used.');
     }
   }
 
   await document.destroy?.();
-  if (!rows.length) throw parserError('No transaction rows with a safely identifiable date and amount were extracted after text and OCR parsing. The original PDF remains stored for retry/recovery.', 'PDF_NO_SAFE_TRANSACTIONS');
+  if (!rows.length || rowQuality(rows).importable === 0) throw parserError('No safely importable transaction rows were extracted after text and OCR parsing. The original PDF remains stored for retry/recovery.', 'PDF_NO_SAFE_TRANSACTIONS');
   return { rows, pages: outputPages, classification, parserName: adapterChoice.adapter.VERSION, parserConfidence: adapterChoice.score, needsMapping: false, warnings };
 }
 
