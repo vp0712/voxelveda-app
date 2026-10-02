@@ -31,4 +31,12 @@ assert.match(store,/Scheduled no-op polls carry no operational evidence worth re
 assert.match(store,/DELETE FROM background_job_runs WHERE run_uuid = \? AND status = 'RUNNING'/);
 assert.match(service,/triggerSource: run\.triggerSource/);
 
+
+const predeploy=fs.readFileSync(path.join(root,'scripts','run-database-capacity-recovery-once.js'),'utf8');
+assert.match(predeploy,/recoverDatabaseCapacity\(\{ force: true \}\)/);
+assert.match(predeploy,/DB_CAPACITY_PREDEPLOY_BEFORE/);
+assert.match(predeploy,/DB_CAPACITY_PREDEPLOY_AFTER/);
+assert.match(predeploy,/process\.exit\(0\)/);
+assert.doesNotMatch(predeploy,/process\.exit\(1\)/);
+
 console.log('DATABASE_CAPACITY_RECOVERY_TEST_OK');
