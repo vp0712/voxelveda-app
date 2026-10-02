@@ -214,7 +214,7 @@ class BackgroundJobService {
         throw error;
       }
       const counts = resultCounts(result);
-      await this.store.completeRun({ runUuid: run.runUuid, ...counts });
+      await this.store.completeRun({ runUuid: run.runUuid, triggerSource: run.triggerSource, ...counts });
       await this.store.resolveDeadLetters(definition.jobKey, run.runUuid);
       return { jobKey: definition.jobKey, runUuid: run.runUuid, status: JOB_STATES.COMPLETED, attempt: run.attempt, ...counts, result };
     } catch (error) {
