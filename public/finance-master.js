@@ -300,7 +300,7 @@ async function loadResource(name,path,cycle=null){
  catch(error){if(cycle===null||cycle===loadCycle)setResource(name,error.status===403?'permission':'error',null,error,path);return null}
 }
 function resourceData(name){return state.resources[name]?.status==='loaded'?state.resources[name].data:null}
-const STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v1';
+const STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v2';
 let statementParserRecoveryRunning=false;
 async function recoverLegacyParserFailuresOnce(){
  if(statementParserRecoveryRunning)return 0;
@@ -308,7 +308,12 @@ async function recoverLegacyParserFailuresOnce(){
  const candidates=(state.reviews||[]).filter(row=>{
   const status=String(row.status||row.job_status||'').toUpperCase();
   const code=String(row.last_error_code||row.job_error_code||'').toUpperCase();
-  return ['FAILED','DEAD_LETTER'].includes(status)&&recoverable.has(code)&&row.import_uid;
+  const allRejectedPdf=status==='PENDING_REVIEW'
+    && String(row.source_format||'').toUpperCase()==='PDF'
+    && num(row.total_rows)>0
+    && num(row.valid_rows)+num(row.warning_rows)===0
+    && num(row.rejected_rows)>=num(row.total_rows);
+  return row.import_uid&&((['FAILED','DEAD_LETTER'].includes(status)&&recoverable.has(code))||allRejectedPdf);
  }).slice(0,10);
  if(!candidates.length)return 0;
  statementParserRecoveryRunning=true;
@@ -804,13 +809,16 @@ function statements(){
   const failed=['FAILED','DEAD_LETTER'].includes(status);
   const pending=status==='PENDING_REVIEW';
   const imported=status==='IMPORTED';
+  const stalled=Number(x.stalled||0)===1;
   const detail=failed
    ? esc(x.last_error_summary||x.job_error_summary||String(x.current_stage||status).replace(/_/g,' '))
    : imported
      ? num(x.total_rows)+' rows processed · '+num(x.duplicate_rows)+' duplicates excluded'
      : pending
        ? num(x.total_rows)+' rows · '+num(x.duplicate_rows)+' duplicates · '+num(x.rejected_rows)+' rejected'
-       : num(x.progress_percent)+'% · '+esc(String(x.current_stage||status||'PROCESSING').replace(/_/g,' '));
+       : stalled
+         ? 'Processing heartbeat is stale · automatic recovery will re-queue safely'
+         : num(x.progress_percent)+'% · '+esc(String(x.current_stage||status||'PROCESSING').replace(/_/g,' '));
   if(pending)return `<button class="fm-row fm-row-button" data-import-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ready for review</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail}</small></div></button>`;
   if(imported)return `<div class="fm-row"><div><h3>${esc(x.original_name||'Statement import')}</h3><p>${esc(x.account_name||'')} · posted</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail}</small></div></div>`;
   return `<button class="fm-row fm-row-button" data-import-status="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement import')}</h3><p>${esc(x.account_name||'')} · ${esc(String(x.current_stage||status||'PROCESSING').replace(/_/g,' '))}</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail} · open status / recovery</small></div></button>`;
