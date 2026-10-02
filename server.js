@@ -14,6 +14,7 @@ const pool = require('./config/db');
 const { isEmailConfigured, verifyConnection } = require('./services/emailService');
 const { startEmailQueueWorker, stopEmailQueueWorker } = require('./services/emailQueueWorker');
 const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./services/databaseRuntimeService');
+const { recoverDatabaseCapacity } = require('./services/databaseCapacityRecoveryService');
 const { runMigrations } = require('./services/migrationRunner');
 const { allowedHosts } = require('./services/outboundRequestPolicy');
 const { getRateLimitService } = require('./services/rateLimitService');
@@ -309,6 +310,10 @@ async function bootstrap() {
     await verifyDatabaseConnection(pool);
     setCriticalService('database', CONTROL_STATES.OPERATIONAL);
     console.log('Database connection ready.');
+
+    // Capacity recovery runs before migrations/schedulers so a full external
+    // MySQL database cannot strand authentication, statement ingestion or email.
+    await recoverDatabaseCapacity();
 
     setPhase('RUNNING_MIGRATIONS');
     setMigrations({ state: CONTROL_STATES.INITIALIZING });
