@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { pruneSecurityEvents } = require('./securityEventRetentionService');
 
 let schemaPromise;
 
@@ -64,6 +65,12 @@ async function createSecuritySchema() {
     INDEX idx_security_event_time (event_type, created_at),
     INDEX idx_security_target_time (target_user_id, created_at)
   ) ENGINE=InnoDB`);
+  // Prevent operational security telemetry from growing until it can take
+  // authentication offline. Finance/audit ledgers are separate tables and are
+  // not touched by this retention policy.
+  await pruneSecurityEvents().catch((error) => {
+    console.warn(`SECURITY_EVENT_RETENTION_STARTUP_WARNING code=${error?.code || 'UNKNOWN'}`);
+  });
 
   await pool.query(`CREATE TABLE IF NOT EXISTS auth_action_tokens (
     id CHAR(36) PRIMARY KEY,
