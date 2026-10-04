@@ -1,9 +1,10 @@
 'use strict';
 
 const australianCrDr = require('./australianCrDr');
+const international = require('./international');
 const generic = require('./generic');
 
-const adapters = [australianCrDr, generic];
+const adapters = [australianCrDr, international, generic];
 
 function selectAdapter(context) {
   return adapters
