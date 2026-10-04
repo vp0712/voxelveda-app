@@ -403,7 +403,7 @@ function classify(text, metadata = {}) {
     // heading, e.g. "28 January 2025 to 27 February 2025".
     periodMatch = header.match(new RegExp(`\\b${dated}\\s+(?:to|through|[-–—])\\s+${dated}\\b`, 'i'));
   }
-  const periodStart = periodMatch ? normaliseDate(periodMatch[1], { dateFormat: (adapterChoice.adapter.dateFormatFor?.(source) || adapterChoice.adapter.DATE_FORMAT || '') }).value : null;
+  const periodStart = periodMatch ? normaliseDate(periodMatch[1], { dateFormat: (adapterChoice.adapter.dateFormatFor?.(source) || adapterChoice.adapter.DATE_FORMAT || (institution ? 'DMY' : '')) }).value : null;
   const periodEnd = periodMatch ? normaliseDate(periodMatch[2], { dateFormat: adapterChoice.adapter.DATE_FORMAT || '' }).value : null;
   return {
     document_type: documentType,
@@ -468,7 +468,7 @@ async function parsePdf(buffer, options = {}, progress) {
     const statementEndDate = candidateClassification.statement_end_date || null;
     const defaultYear = Number(String(statementEndDate || statementStartDate || '').slice(0, 4)) || null;
     return choice.adapter.parseLines(candidateLines, {
-      dateFormat: options.mapping?.date_format || (choice.adapter.dateFormatFor?.(candidateClassification.institution ? text : '') || choice.adapter.DATE_FORMAT || null),
+      dateFormat: options.mapping?.date_format || (choice.adapter.dateFormatFor?.(candidateClassification.institution || '') || choice.adapter.DATE_FORMAT || null),
       currency: candidateClassification.statement_currency || options.currency,
       signedAmountRule: options.mapping?.signed_amount_rule,
       allowUnsignedAmounts: false,
