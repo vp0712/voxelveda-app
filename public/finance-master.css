@@ -1,4 +1,4 @@
-:root{--bg:#f3f5f7;--card:#fff;--ink:#161a1f;--muted:#6d7783;--line:#e2e7eb;--dark:#14181d;--accent:#d9ff35;--good:#117e5b;--bad:#c63c49;--warn:#a06b00;--shadow:0 10px 28px rgba(19,30,44,.07)}
+:root{--bg:#edf3f8;--card:#fff;--ink:#10263c;--muted:#60758a;--line:#d7e2ed;--dark:#10263c;--accent:#21c9a6;--good:#117a62;--bad:#bd4558;--warn:#986719;--shadow:0 12px 32px rgba(14,39,64,.09)}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 button,input,select,textarea{font:inherit}.fm-shell{min-height:100vh;display:grid;grid-template-columns:245px minmax(0,1fr)}.fm-sidebar{height:100vh;position:sticky;top:0;background:#fff;border-right:1px solid var(--line);padding:18px 13px;display:flex;flex-direction:column;z-index:40}
 .fm-brand{display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit;padding:2px 7px 17px;border-bottom:1px solid var(--line)}.fm-brand img{width:42px;height:42px;object-fit:contain}.fm-brand strong,.fm-brand span{display:block}.fm-brand span{font-size:.58rem;color:var(--muted);letter-spacing:.16em;margin-top:3px}
@@ -839,3 +839,37 @@ html,body{background:linear-gradient(180deg,#eaf4ff 0,#f7fbff 330px,#eef5fc 100%
   .fm-account-footer-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
   .fm-account-footer-actions .details{grid-column:1/-1}
 }
+
+
+/* Voxel Veda Finance OS palette: navy structure, clear white surfaces and teal actions. */
+.fm-sidebar{background:#10263c;color:#f3f8fc;border-right-color:#203c58}
+.fm-brand{color:#f3f8fc;border-bottom-color:#29445e}
+.fm-brand span,.fm-side-footer small{color:#afc2d4}
+#fmNav button{color:#d5e2ee}
+#fmNav button span{background:#1c3854;color:#c9d8e6}
+#fmNav button.active{background:#1b3d5b;color:#fff}
+#fmNav button.active span{background:var(--accent);color:#082b32}
+.fm-side-footer{background:#1b3d5b;border:1px solid #315472}
+.fm-topbar{background:rgba(237,243,248,.95)}
+.fm-primary,.fm-accounts-head>button,.fm-bank-group-heading button{background:#0e705f;color:#fff}
+.fm-primary:hover,.fm-accounts-head>button:hover,.fm-bank-group-heading button:hover{background:#095b4e}
+.fm-hero{background:linear-gradient(135deg,#10263c 0%,#164d63 100%)}
+.fm-hero .accent,.fm-hero-actions .accent{background:var(--accent);color:#082b32;border-color:var(--accent)}
+.fm-kpi,.fm-card,.fm-account-card,.fm-account-card-shell{border-color:var(--line)}
+.fm-account-tone-1 .fm-bank-mark{background:#e1f4f0;color:#08765f}
+.fm-account-tone-2 .fm-bank-mark{background:#e7effa;color:#24568a}
+.fm-account-tone-3 .fm-bank-mark{background:#f0eafa;color:#65459a}
+.fm-account-category-barbox i,.fm-chart-bar i{background:linear-gradient(180deg,#29d3af,#1682a0)}
+.fm-badge.good{background:#e0f4ed;color:#126b56}
+.fm-badge.bad{background:#fae8eb;color:#a2394b}
+.fm-badge.warn{background:#fcf2df;color:#835d14}
+.fm-account-card-shell{box-shadow:0 14px 32px rgba(15,42,68,.08)}
+.fm-account-card{background:linear-gradient(155deg,#fff 55%,#f5fafc)}
+.fm-account-group-heading,.fm-bank-group-heading{grid-column:1/-1}
+.fm-bank-group-heading{display:flex;justify-content:space-between;align-items:center;gap:14px;margin:18px 0 0;padding:13px 16px;border:1px solid #c8dbe6;border-radius:14px;background:linear-gradient(100deg,#e6f4f2,#f7fbfc)}
+.fm-bank-group-heading span{display:block;color:#117a70;font-size:.56rem;font-weight:900;letter-spacing:.12em}
+.fm-bank-group-heading h3{margin:3px 0;color:#10263c;font-size:.88rem}
+.fm-bank-group-heading small{color:#60758a;font-size:.62rem}
+.fm-bank-group-heading button{border:0;border-radius:10px;padding:9px 12px;font-weight:850;cursor:pointer}
+.fm-table th{color:#536d83}
+@media(max-width:760px){.fm-sidebar{background:#10263c}.fm-bank-group-heading{padding:11px}.fm-bank-group-heading button{padding:8px}}
