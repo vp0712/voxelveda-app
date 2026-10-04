@@ -602,16 +602,22 @@ function accountTypeLabel(value){
  const type=String(value||'TRANSACTION').toUpperCase();
  return ({TRANSACTION:'Everyday / Transaction',SAVINGS:'Savings',CURRENT:'Current',NRE:'NRE',NRO:'NRO','TERM DEPOSIT':'Term Deposit','CREDIT CARD':'Credit Card',LOAN:'Loan',CASH:'Cash','PETTY CASH':'Petty Cash',WALLET:'Digital Wallet',OTHER:'Other'})[type]||type;
 }
+function financeAccountInstitutionKey(account){
+ return [String(account?.bank_market||account?.bank_country_code||'OTHER').toUpperCase(),String(account?.institution||'Manual').trim().toLowerCase()].join('|');
+}
+function financeAccountInstitutionLabel(account){
+ return String(account?.institution||'Manual bank / provider').trim()||'Manual bank / provider';
+}
 function statementAccountOptions(selected=''){
  const groups=new Map();
  const marketRank={AUSTRALIA:1,INDIA:2,OTHER:3};
  const rows=[...state.accounts].sort((a,b)=>(marketRank[String(a.bank_market||'OTHER').toUpperCase()]||9)-(marketRank[String(b.bank_market||'OTHER').toUpperCase()]||9)||String(a.institution||'').localeCompare(String(b.institution||''))||String(a.account_type||'').localeCompare(String(b.account_type||''))||String(a.nickname||'').localeCompare(String(b.nickname||'')));
- for(const a of rows){
-  const group=accountMarketLabel(a)+' · '+accountTypeLabel(a.account_type);
+ for(const account of rows){
+  const group=accountMarketLabel(account)+' · '+financeAccountInstitutionLabel(account);
   if(!groups.has(group))groups.set(group,[]);
-  groups.get(group).push(a);
+  groups.get(group).push(account);
  }
- return [...groups.entries()].map(([label,items])=>'<optgroup label="'+esc(label)+'">'+items.map(a=>'<option value="'+esc(a.id)+'" '+(String(a.id)===String(selected)?'selected':'')+'>'+esc(a.institution||'Manual')+' · '+esc(a.nickname||'Account')+' · '+esc(a.account_number_masked||'No number')+' · '+esc(a.currency||'AUD')+'</option>').join('')+'</optgroup>').join('');
+ return [...groups.entries()].map(([label,items])=>'<optgroup label="'+esc(label)+'">'+items.map(account=>'<option value="'+esc(account.id)+'" '+(String(account.id)===String(selected)?'selected':'')+'>'+esc(accountTypeLabel(account.account_type))+' · '+esc(account.nickname||'Account')+' · '+esc(account.account_number_masked||'No number')+' · '+esc(account.currency||'AUD')+'</option>').join('')+'</optgroup>').join('');
 }
 function accounts(){
  const err=resourceError('dash','Accounts');if(err&&!state.accounts.length)return err;
@@ -620,7 +626,8 @@ function accounts(){
  const accountCategoryRows=Array.isArray(spending.account_categories)?spending.account_categories:[];
  const chartPeriod='All imported history';
  const marketFilter=String(state.accountFilters?.market||'ALL').toUpperCase(),typeFilter=String(state.accountFilters?.type||'ALL').toUpperCase();
- const visibleAccounts=state.accounts.filter(a=>(marketFilter==='ALL'||String(a.bank_market||'OTHER').toUpperCase()===marketFilter)&&(typeFilter==='ALL'||String(a.account_type||'TRANSACTION').toUpperCase()===typeFilter));
+ const marketRank={AUSTRALIA:1,INDIA:2,OTHER:3};
+ const visibleAccounts=state.accounts.filter(a=>(marketFilter==='ALL'||String(a.bank_market||'OTHER').toUpperCase()===marketFilter)&&(typeFilter==='ALL'||String(a.account_type||'TRANSACTION').toUpperCase()===typeFilter)).sort((a,b)=>(marketRank[String(a.bank_market||'OTHER').toUpperCase()]||9)-(marketRank[String(b.bank_market||'OTHER').toUpperCase()]||9)||String(a.institution||'Manual').localeCompare(String(b.institution||'Manual'))||String(a.ownership_scope||'').localeCompare(String(b.ownership_scope||''))||String(a.account_type||'').localeCompare(String(b.account_type||''))||String(a.nickname||'').localeCompare(String(b.nickname||'')));
  const cards=visibleAccounts.map((a,index)=>{
   const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
   const accountName=esc(a.nickname||'Account');
@@ -630,10 +637,16 @@ function accounts(){
   const connection=esc(a.connection_status||'MANUAL');
   const searchText=esc([a.nickname,a.institution,a.account_number_masked,a.ownership_scope,a.account_type,a.bank_market,a.bank_country_code,a.currency].filter(Boolean).join(' ').toLowerCase());
   const tone=(index%3)+1;
+  const bankGroupKey=financeAccountInstitutionKey(a);
+  const startsBankGroup=index===0||financeAccountInstitutionKey(visibleAccounts[index-1])!==bankGroupKey;
+  const bankProducts=visibleAccounts.filter(item=>financeAccountInstitutionKey(item)===bankGroupKey);
+  const bankCurrencies=[...new Set(bankProducts.map(item=>String(item.currency||'AUD').toUpperCase()))].join(' / ');
+  const bankGroupHeading=startsBankGroup?'<div class="fm-bank-group-heading"><div><span>BANK / PROVIDER</span><h3>'+esc(financeAccountInstitutionLabel(a))+'</h3><small>'+esc(accountMarketLabel(a))+' · '+bankProducts.length+' account'+(bankProducts.length===1?'':'s')+' · '+esc(bankCurrencies)+'</small></div><button type="button" data-quick="account">＋ Add account</button></div>':'';
+
   const manualAccount=String(a.connection_type||a.connection_status||'').toUpperCase()==='MANUAL'||String(a.connection_status||'').toUpperCase()==='MANUAL';
   const profileBalance=a.profile_balance??(manualAccount?(a.current_ledger_balance??a.available_balance):(a.available_balance??a.current_ledger_balance));
   const transactionCount=num(history.transaction_count??a.transaction_count);
-  return `<article class="fm-account-card-shell fm-account-tone-${tone}" data-account-card-shell data-market="${esc(String(a.bank_market||'OTHER').toUpperCase())}" data-account-type="${esc(String(a.account_type||'TRANSACTION').toUpperCase())}" data-search-text="${searchText}">
+  return bankGroupHeading+`<article class="fm-account-card-shell fm-account-tone-${tone}" data-account-card-shell data-market="${esc(String(a.bank_market||'OTHER').toUpperCase())}" data-account-type="${esc(String(a.account_type||'TRANSACTION').toUpperCase())}" data-search-text="${searchText}">
    <div class="fm-account-card">
     <div class="fm-account-card-top">
      <button class="fm-bank-mark" type="button" data-account="${a.id}" aria-label="Open ${accountName}"><span>▥</span></button>
