@@ -11,7 +11,7 @@ const { amountDirection, normaliseMoneyToken } = require('./financeStatementMone
 const { selectAdapter } = require('./financeStatementAdapters');
 const { normaliseDate } = require('./financeStatementAdapters/generic');
 
-const PARSER_VERSION = 'finance-ingestion-v1';
+const PARSER_VERSION = 'finance-ingestion-v2-bank-aware';
 const MAX_ROWS = () => Math.max(1, Math.min(50000, Number(process.env.FINANCE_STATEMENT_MAX_ROWS || 10000)));
 const MAX_PAGES = () => Math.max(1, Math.min(500, Number(process.env.FINANCE_STATEMENT_MAX_PAGES || 100)));
 const MAX_IMAGE_PIXELS = () => Math.max(1000000, Number(process.env.FINANCE_STATEMENT_MAX_IMAGE_PIXELS || 40000000));
@@ -403,8 +403,8 @@ function classify(text, metadata = {}) {
     // heading, e.g. "28 January 2025 to 27 February 2025".
     periodMatch = header.match(new RegExp(`\\b${dated}\\s+(?:to|through|[-–—])\\s+${dated}\\b`, 'i'));
   }
-  const periodStart = periodMatch ? normaliseDate(periodMatch[1], { dateFormat: institution ? 'DMY' : '' }).value : null;
-  const periodEnd = periodMatch ? normaliseDate(periodMatch[2], { dateFormat: institution ? 'DMY' : '' }).value : null;
+  const periodStart = periodMatch ? normaliseDate(periodMatch[1], { dateFormat: (adapterChoice.adapter.dateFormatFor?.(source) || adapterChoice.adapter.DATE_FORMAT || (institution ? 'DMY' : '')) }).value : null;
+  const periodEnd = periodMatch ? normaliseDate(periodMatch[2], { dateFormat: adapterChoice.adapter.DATE_FORMAT || '' }).value : null;
   return {
     document_type: documentType,
     classification_confidence: documentType === 'UNKNOWN_FINANCIAL_DOCUMENT' ? 0.35 : Math.max(0.75, adapterChoice.score),
@@ -468,7 +468,7 @@ async function parsePdf(buffer, options = {}, progress) {
     const statementEndDate = candidateClassification.statement_end_date || null;
     const defaultYear = Number(String(statementEndDate || statementStartDate || '').slice(0, 4)) || null;
     return choice.adapter.parseLines(candidateLines, {
-      dateFormat: options.mapping?.date_format,
+      dateFormat: options.mapping?.date_format || (choice.adapter.dateFormatFor?.(candidateClassification.institution || '') || choice.adapter.DATE_FORMAT || null),
       currency: candidateClassification.statement_currency || options.currency,
       signedAmountRule: options.mapping?.signed_amount_rule,
       allowUnsignedAmounts: false,
