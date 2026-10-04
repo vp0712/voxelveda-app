@@ -1,7 +1,7 @@
-database-release: 20261002-mysql-provider-capacity-diagnostic
-source-commit: ffd5cf37ae34b7f1e22704604483ba95f7958a64
-scope: finance-anz-column-aware-withdrawals-deposits-parser
+database-release: 20261004-finance-bank-adapters-and-account-hub
+source-commit: 6d73afa14b88f6cc55d53fb809548ffb0b38e918
+scope: international-bank-aware-pdf-dates; institution-grouped-savings-current-accounts; finance-os-navy-teal-palette
 preserves: finance-ledger; bank-transactions; statement-rows; original-pdf-object-storage; immutable-audit-ledger
-ci: security-success; consolidation-success; finance-release-candidate-success
-runtime: exact-user-pdf-verified; text-extraction; fail-closed-ambiguous-rows
+ci: security-success; consolidation-success; finance-release-candidate-success; bank-account-lifecycle-success; advanced-banking-platform-success
+runtime: awaiting-railway-deployment-and-health-verification
 policy: single-marker-controlled-production-deploy
