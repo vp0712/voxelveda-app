@@ -110,6 +110,7 @@ async function verifyStoredStatement(file, { apply = false, actorId = null } = {
           reconciliation_status='IGNORED',ignored_reason='Source evidence repair: header or subtotal is not a transaction'
           WHERE id=? AND archived_at IS NULL`, [actor, 'Verified against the original statement: header/balance/total artifact', row.id]);
         await db.query("UPDATE statement_import_rows SET validation_status='REJECTED',selected=0,validation_message='Verified source header or total; excluded from active calculations' WHERE final_posted_transaction_id=?", [row.id]);
+        if (row.import_batch_uid) await db.query('UPDATE bank_import_batches SET imported_rows=GREATEST(0,imported_rows-1) WHERE batch_uid=?', [row.import_batch_uid]);
         await logAudit(db, { actorId: actor, action: 'STATEMENT_SOURCE_ARTIFACT_ARCHIVED', module: 'finance_intelligence', recordType: 'bank_transaction', recordId: row.id, oldValue: { debit: row.debit, credit: row.credit, reconciliation_status: row.reconciliation_status }, newValue: { archived: true, reversible: true, parser_version: PARSER_VERSION, source_file_hash: parsed.fileHash } });
         archived += 1;
       }
@@ -149,7 +150,7 @@ async function verifyStoredStatement(file, { apply = false, actorId = null } = {
       const counts = countRows(freshRows);
       if (added) await db.query('UPDATE bank_import_batches SET imported_rows=imported_rows+? WHERE batch_uid=?', [added,batch]);
       await db.query('UPDATE statement_import_sessions SET total_rows=?,valid_rows=?,warning_rows=?,duplicate_rows=?,rejected_rows=? WHERE id=?', [freshRows.length,counts.valid,counts.warning,counts.duplicate,counts.rejected,session.id]);
-      await db.query('UPDATE statement_import_files SET imported_rows=imported_rows+?,rejected_rows=?,duplicate_rows=?,parser_version=?,reconciliation_status=? WHERE import_uid=?', [added,counts.rejected,counts.duplicate,PARSER_VERSION,plan.validation.reconciliationStatus,file.import_uid]);
+      await db.query('UPDATE statement_import_files SET imported_rows=GREATEST(0,imported_rows+?),rejected_rows=?,duplicate_rows=?,parser_version=?,reconciliation_status=? WHERE import_uid=?', [added-archived,counts.rejected,counts.duplicate,PARSER_VERSION,plan.validation.reconciliationStatus,file.import_uid]);
       await db.query('UPDATE statement_import_sessions SET parser_version=?,extraction_diagnostics_json=?,reconciliation_status=? WHERE id=?', [PARSER_VERSION,JSON.stringify({parser_name:parsed.parserName,classification:parsed.classification,totals:plan.validation.totals,source_repair:{added,archived}}),plan.validation.reconciliationStatus,session.id]);
       const reportedBalance = parsed.classification.closing_balance ?? parsed.classification.reported_balance_as_of;
       if (reportedBalance !== null && reportedBalance !== undefined && (!account.history_end_date || String(parsed.classification.statement_end_date || '') >= String(account.history_end_date).slice(0,10))) {
