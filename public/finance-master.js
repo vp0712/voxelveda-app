@@ -755,7 +755,7 @@ async function stageStatementFiles(account,files,queue,mapping=null){
     entry.uploaded=await uploadStatementFile(account.id,entry.file,mapping);
     summary.uploaded+=1;
     entry.badge.textContent=entry.uploaded.reused?'EXISTS':'QUEUED';
-    entry.holder.textContent=entry.uploaded.reused?'Existing verified upload reused; checking status…':'Stored securely; waiting for extraction…';
+    entry.holder.textContent=entry.uploaded.original_attached?'Matching original restored securely; checking status…':entry.uploaded.reused?'Existing verified upload reused; checking status…':'Stored securely; waiting for extraction…';
    }catch(error){
     entry.error=error;
     summary.failed+=1;
@@ -770,7 +770,7 @@ async function stageStatementFiles(account,files,queue,mapping=null){
  // lease-controlled/idempotent, while the browser no longer blocks later uploads.
  await Promise.all(entries.filter(entry=>entry.uploaded).map(async(entry)=>{
   try{
-   const outcome=await waitForStatementImport(entry.uploaded.import_uid,entry.holder,{openReview:false});
+   const outcome=entry.uploaded.existing_status==='IMPORTED'?{status:'IMPORTED',record:{}}:await waitForStatementImport(entry.uploaded.import_uid,entry.holder,{openReview:false});
    const record=outcome.record||{},status=String(outcome.status||'').toUpperCase();
    if(status==='PENDING_REVIEW'){
     const duplicates=num(record.duplicate_rows),rejected=num(record.rejected_rows),ready=num(record.valid_rows)+num(record.warning_rows);
@@ -780,9 +780,10 @@ async function stageStatementFiles(account,files,queue,mapping=null){
     entry.badge.textContent=duplicates?(duplicates+' DUPLICATE'+(duplicates===1?'':'S')+' EXCLUDED'):(rejected?(rejected+' REJECTED'):'READY');
    }else if(status==='IMPORTED'){
     summary.processed+=1;
-    staged.push({file:entry.file.name,uid:entry.uploaded.import_uid,summary:record,reused:true});
+    staged.push({file:entry.file.name,uid:entry.uploaded.import_uid,summary:record,reused:true,posted:true});
     entry.item.classList.add('good');entry.badge.className='fm-badge good';entry.badge.textContent='ALREADY IMPORTED';
-    entry.holder.textContent='This exact statement already exists. No duplicate file or transactions were created.';
+    entry.holder.textContent=entry.uploaded.original_attached?'Original restored. Verify it to review corrections to posted transactions.':'This exact statement already exists. No duplicate file or transactions were created.';
+    if(entry.uploaded.original_available){const verify=document.createElement('button');verify.type='button';verify.className='fm-pill';verify.textContent='Verify original';verify.onclick=()=>{$('fmModal').close();verifyOriginalStatement(entry.uploaded.import_uid)};entry.item.appendChild(verify)}
    }else if(['NEEDS_PASSWORD','NEEDS_MAPPING'].includes(status)){
     summary.attention+=1;entry.item.classList.add('warn');entry.badge.className='fm-badge warn';entry.badge.textContent='ACTION';
    }else{
@@ -812,7 +813,8 @@ async function openHistoricalImport(accountId=''){
   state.view='history';history.replaceState(null,'','#history');render();
   $('fmModal').close();
   const s=batch.summary;
-  showFinancePopup(s.duplicates?'Statements verified — duplicates excluded':'Statements processed securely',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':'')+(s.attention?' · '+s.attention+' need action':''),{tone:s.failed||s.attention?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
+  const target=batch.staged.find(item=>!item.posted)||batch.staged[0];
+  showFinancePopup(s.duplicates?'Statements verified — duplicates excluded':'Statements processed securely',s.processed+' file(s) processed. '+(target.posted?'Existing posted statements are ready for source verification.':s.ready+' transaction row(s) are ready for review.'),s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':'')+(s.attention?' · '+s.attention+' need action':''),{tone:s.failed||s.attention?'warning':'success',actionLabel:target.posted?'Verify original':'Open first review',onAction:()=>target.posted?verifyOriginalStatement(target.uid):openStatementReview(target.uid)});
  };
 }
 function statementEntries(){
@@ -866,7 +868,13 @@ async function verifyOriginalStatement(uid){
   const checks=(result.validations||[]).map(item=>'<div class="fm-validation-row"><span>'+esc(String(item.check).replace(/_/g,' '))+'</span>'+statusBadge(item.status)+'<small>Printed: '+esc(item.expected??'—')+' · Extracted: '+esc(item.actual??'—')+'</small></div>').join('');
   openDrawer('Original statement verification','<div class="fm-state '+(result.repairable?'fm-state-warning':'')+'"><strong>'+esc(result.message)+'</strong><p>'+num(result.source_rows)+' source transactions · '+num(result.artifact_count)+' header/total row(s) to exclude · '+num(result.missing_count)+' source transaction(s) missing from the ledger</p></div>'+checks+(result.repairable?'<button type="button" class="fm-primary" data-apply-source-repair="'+esc(uid)+'">Apply verified source corrections</button>':''),'SOURCE VERIFICATION');
   document.querySelector('[data-apply-source-repair]')?.addEventListener('click',async()=>{try{const repaired=await api(I+'/statements/'+encodeURIComponent(uid)+'/verify',{method:'POST',body:JSON.stringify({apply:true}),timeoutMs:180000});closeDrawer();financeDataChanged();await refresh();showFinancePopup('Source corrections saved',repaired.message)}catch(error){notice(error.message,true)}});
- }catch(error){notice(error.message,true)}
+ }catch(error){
+  if(error.code==='STATEMENT_ORIGINAL_UNAVAILABLE'){
+   const file=statementEntries().find(item=>item.import_uid===uid);
+   if(file){openDrawer('Restore the original statement','<p class="fm-helper">Upload the exact original file into this account. Its fingerprint must match the existing statement. The file will be retained privately, then you can verify posted corrections.</p><button type="button" class="fm-primary" data-restore-statement-original>Upload matching original</button>','SOURCE VERIFICATION');document.querySelector('[data-restore-statement-original]')?.addEventListener('click',()=>{closeDrawer();openHistoricalImport(file.bank_account_id)});return}
+  }
+  notice(error.message,true)
+ }
 }
 function openCommittedStatementTransactionEditor(uid,tx){
  const debit=num(tx.debit),credit=num(tx.credit),direction=debit>0?'DEBIT':credit>0?'CREDIT':'',amount=debit>0?debit:credit>0?credit:'';
@@ -2529,7 +2537,8 @@ async function openStatementWizard(){
   if(batch.summary.attention){progress.className='fm-state fm-state-warn';progress.textContent='Some files are ready for review and others still need the action shown below.';return}
   $('fmModal').close();
   const s=batch.summary;
-  showFinancePopup(s.duplicates?'Statement import verified — duplicates excluded':'Statement processing completed',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':''),{tone:s.failed?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
+  const target=batch.staged.find(item=>!item.posted)||batch.staged[0];
+  showFinancePopup(s.duplicates?'Statement import verified — duplicates excluded':'Statement processing completed',s.processed+' file(s) processed. '+(target.posted?'Existing posted statements are ready for source verification.':s.ready+' transaction row(s) are ready for review.'),s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':''),{tone:s.failed?'warning':'success',actionLabel:target.posted?'Verify original':'Open first review',onAction:()=>target.posted?verifyOriginalStatement(target.uid):openStatementReview(target.uid)});
  };
 }
 async function openStatementImportStatus(uid){

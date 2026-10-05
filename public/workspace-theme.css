@@ -1,5 +1,5 @@
 /* Shared Voxel Veda sapphire workspace. Original logo artwork is unchanged. */
-:root{color-scheme:light;--vv-bg:#f3f6fc;--vv-bg-raised:#fff;--vv-surface:#fff;--vv-surface-2:#f7faff;--vv-surface-3:#edf3ff;--vv-line:#d8e3f3;--vv-line-strong:#91b3f3;--vv-text:#172e4d;--vv-muted:#526c8a;--vv-soft:#697f9a;--vv-accent:#2463eb;--vv-accent-strong:#184ccd;--vv-info:#4f6dcc;--vv-warning:#9b6615;--vv-danger:#b6304b;--vv-success:#087b5d;--vv-radius:12px;--vv-shadow:0 8px 28px rgba(32,62,112,.07)}
+:root{color-scheme:light;--vv-bg:#f3f6fc!important;--vv-bg-raised:#fff!important;--vv-surface:#fff!important;--vv-surface-2:#f7faff!important;--vv-surface-3:#edf3ff!important;--vv-line:#d8e3f3!important;--vv-line-strong:#91b3f3!important;--vv-text:#172e4d!important;--vv-muted:#526c8a!important;--vv-soft:#697f9a!important;--vv-accent:#2463eb!important;--vv-accent-strong:#184ccd!important;--vv-info:#4f6dcc!important;--vv-warning:#9b6615!important;--vv-danger:#b6304b!important;--vv-success:#087b5d!important;--vv-radius:12px!important;--vv-shadow:0 8px 28px rgba(32,62,112,.07)!important;}
 body:not(.finance-os-page){background:#f3f6fc!important;color:#172e4d!important}
 body:not(.finance-os-page)::before,body:not(.finance-os-page)::after{display:none!important}
 body:not(.finance-os-page) :is(.sidebar,.vv-sidebar){background:linear-gradient(180deg,#102850,#163569)!important;color:#fff!important;border-right:0!important}
@@ -20,7 +20,7 @@ body:not(.finance-os-page) :is(.hero,.dashboard-hero,.portal-hero,.welcome-panel
 body:not(.finance-os-page) table{color:#172e4d!important;background:#fff!important}body:not(.finance-os-page) :is(th,td){border-color:#e1e9f5!important}body:not(.finance-os-page) thead{background:#edf3ff!important}body:not(.finance-os-page) tbody tr:hover{background:#f4f8ff!important}
 body:not(.finance-os-page) :is(button,a,input,select,textarea,summary):focus-visible{outline:3px solid #89aff4!important;outline-offset:3px!important}
 /* Legacy pages use both token sets; keep their surfaces and text consistent. */
-:root{--bg:#f3f6fc;--panel:#fff;--border:#d8e3f3;--accent:#2463eb;--accent-2:#4f6dcc;--text:#172e4d;--muted:#526c8a;--danger:#b6304b;--warning:#9b6615;--success:#087b5d}
+:root{--bg:#f3f6fc!important;--panel:#fff!important;--border:#d8e3f3!important;--accent:#2463eb!important;--accent-2:#4f6dcc!important;--text:#172e4d!important;--muted:#526c8a!important;--danger:#b6304b!important;--warning:#9b6615!important;--success:#087b5d!important;}
 body:not(.finance-os-page) :is(.login-wrapper,.login-box,.auth-panel,.section-card,.table-card,.form-card,.summary-card,.kpi-card,.home-kpi-card,.dashboard-panel,.home-command-hero,.page-header,.top-header){background:#fff!important;color:#172e4d!important;border-color:#d8e3f3!important;box-shadow:0 8px 24px rgba(32,62,112,.06)!important}
 body:not(.finance-os-page) :is(.home-command-hero h1,.page-header h1,.brand h1,.login-box h1,.login-box label){color:inherit!important}
 body:not(.finance-os-page) :is(.sidebar,.vv-sidebar) :is(.brand h1,.brand p,.nav-group-toggle){color:#d0dff5!important}
@@ -33,3 +33,8 @@ body:not(.finance-os-page) :is(.icon-btn,.profile-chip,.notification-bell,.staff
 body:not(.finance-os-page) table th{background:#edf3ff!important;color:#172e4d!important}
 body:not(.finance-os-page) :is(.page-section,#invoiceSection) :is(.card,.table-wrap){background:#fff!important;color:#172e4d!important;border-color:#d8e3f3!important}
 body:not(.finance-os-page) :is(.page-section,#invoiceSection) :is(.metric-grid>.card strong,.table-wrap>h3,table th){color:#172e4d!important}body:not(.finance-os-page) :is(.page-section,#invoiceSection) table th{background:#edf3ff!important}
+
+:root{--vv-bg-0:#f3f6fc!important;--vv-bg-1:#fff!important;--vv-accent-2:#4f6dcc!important;--accent-3:#9b6615!important}
+body:not(.finance-os-page) button[type="submit"]:not(.secondary-btn):not(.logout-btn){background:#2463eb!important;color:#fff!important;border-color:#2463eb!important;box-shadow:none!important}
+body:not(.finance-os-page) button[type="submit"]:not(.secondary-btn):not(.logout-btn):hover{background:#184ccd!important;border-color:#184ccd!important}
+body.login-page .portal-links a{color:#214e94!important}
