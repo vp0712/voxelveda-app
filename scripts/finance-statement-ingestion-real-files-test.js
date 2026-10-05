@@ -75,18 +75,20 @@ async function run() {
   assert.equal(pdfResult.rows.length, 2);
   const { parseLines: parseGenericStatement } = require('../services/financeStatementAdapters/generic');
   const genericTotals = parseGenericStatement([
-    { page: 1, text: '02/09/2026 Supplier invoice 120.00' },
+    { page: 1, text: '02/09/2026 Supplier invoice 120.00 DR 1380.00 CR' },
     { page: 1, text: 'Page 1 of 2' },
     { page: 1, text: 'Total Withdrawals 120.00' },
-    { page: 2, text: '03/09/2026 Customer deposit 500.00 CR 1500.00 CR' },
+    { page: 2, text: '03/09/2026 Customer deposit 500.00 CR 1880.00 CR' },
     { page: 2, text: 'Page 2 of 2' },
     { page: 2, text: 'Total Deposits 500.00' }
   ], { currency: 'AUD', dateFormat: 'DMY' });
   assert.equal(genericTotals.length, 2, 'page totals and markers must not be merged into statement rows');
   assert.equal(genericTotals[0].description, 'Supplier invoice');
-  assert.equal(genericTotals[0].force_rejected, true, 'unsigned rows without a running balance remain review-only');
+  assert.equal(genericTotals[0].debit, '120.00');
+  assert.equal(genericTotals[0].running_balance, '1380.00');
   assert.equal(genericTotals[1].description, 'Customer deposit');
   assert.equal(genericTotals[1].credit, '500.00');
+  assert.equal(genericTotals[1].running_balance, '1880.00');
 
   assert.equal(pdfResult.classification.selectable_text, true);
   assert.ok(pdfResult.rows[0].source_bbox);
