@@ -5,6 +5,8 @@ const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
 const { applyAutoRulesToImport } = require('../services/financeRuleEngine');
+const { evaluateStatement } = require('../services/financeStatementValidation');
+const { _test: { isStatementSummaryLine } } = require('../services/financeStatementAdapters/generic');
 
 const FORMATS = new Set(['CSV', 'PDF', 'OFX', 'QFX', 'QIF', 'XLSX', 'PNG', 'JPEG']);
 
@@ -40,12 +42,14 @@ function fail(res, error, message) {
 function isBalanceMarker(row) {
   const text = String(row?.description || row?.merchant_name || '').trim().toLowerCase().replace(/\s+/g, ' ');
   return /^(opening|closing) balance\b/.test(text)
+    || isStatementSummaryLine(text)
+    || (row?.validation_status === 'REJECTED' && /^Verified source header or total;/i.test(String(row.validation_message || '')))
     || /\bbalance (?:brought|carried) forward\b/.test(text)
     || /\bbalance (?:b\/f|c\/f)\b/.test(text);
 }
 
 function statementRowHash(accountId, row) {
-  return crypto.createHash('sha256').update([
+  const identity = [
     accountId,
     dateOnly(row.transaction_date) || '',
     String(row.description || '').trim().toLowerCase().replace(/\s+/g, ' '),
@@ -54,7 +58,12 @@ function statementRowHash(accountId, row) {
     money.fromCents(money.toCents(row.credit || 0)),
     row.running_balance === '' || row.running_balance === null || row.running_balance === undefined
       ? '' : money.fromCents(money.toCents(row.running_balance))
-  ].join('|')).digest('hex');
+  ].join('|');
+  // Two identical purchases in one original report may be genuine. Without a
+  // stable reference or balance, preserve the source occurrence count, while
+  // using the same occurrence fingerprints to dedupe overlapping reports.
+  const occurrence = Math.max(1, Number(row.source_occurrence || 1));
+  return crypto.createHash('sha256').update(identity + (occurrence > 1 ? `|OCCURRENCE:${occurrence}` : '')).digest('hex');
 }
 
 
@@ -305,7 +314,14 @@ function countRows(rows) {
 }
 
 async function normalizeAndDedupe(db, account, inputRows, options = {}) {
-  const normalized = inputRows.map((row, index) => normalizeRow(account.id, account.currency, row, index + 1));
+  const occurrences = new Map();
+  const normalized = inputRows.map((row, index) => {
+    if (semanticTransactionKey(account.id, row)) return normalizeRow(account.id, account.currency, row, index + 1);
+    const baseHash = statementRowHash(account.id, { ...row, source_occurrence: 1 });
+    const occurrence = (occurrences.get(baseHash) || 0) + 1;
+    occurrences.set(baseHash, occurrence);
+    return normalizeRow(account.id, account.currency, { ...row, source_occurrence: occurrence }, index + 1);
+  });
   const hashes = [...new Set(normalized.map((row) => row.row_hash).filter(Boolean))];
   const duplicateHashes = new Set();
   const duplicateSources = new Map();
@@ -627,7 +643,7 @@ exports.list = async (req, res) => {
        LEFT JOIN finance_statement_import_jobs j ON j.import_session_id=s.id
        LEFT JOIN secure_documents sd ON sd.id=s.secure_document_id AND sd.deleted_at IS NULL
        ${where}
-       ORDER BY s.created_at DESC LIMIT 100`, params
+       ORDER BY s.created_at DESC LIMIT 2000`, params
     );
     return res.json({ sessions: rows });
   } catch (error) { return fail(res, error, 'Failed to load statement review queue'); }
@@ -639,7 +655,7 @@ exports.get = async (req, res) => {
     db = await pool.getConnection();
     await db.beginTransaction();
     const [[session]] = await db.query(
-      `SELECT s.*, ba.nickname AS account_name, ba.ownership_scope, ba.currency AS account_currency
+      `SELECT s.*, ba.nickname AS account_name, ba.ownership_scope, ba.currency AS account_currency, ba.account_type
        FROM statement_import_sessions s JOIN bank_accounts ba ON ba.id=s.bank_account_id WHERE s.import_uid=? FOR UPDATE`, [req.params.uid]
     );
     if (!session) throw new FinanceError('Statement review session not found.', 404, 'STATEMENT_REVIEW_NOT_FOUND');
@@ -650,14 +666,15 @@ exports.get = async (req, res) => {
     const allowedFilters = new Set(['ALL', 'VALID', 'WARNING', 'DUPLICATE', 'REJECTED']);
     if (!allowedFilters.has(filter)) throw new FinanceError('Unknown statement-row filter.', 400, 'STATEMENT_ROW_FILTER_INVALID');
     const rows = filter === 'ALL' ? allRows : allRows.filter((row) => row.validation_status === filter);
-    const [validationResults] = await db.query('SELECT * FROM statement_validation_results WHERE import_session_id=? ORDER BY id', [session.id]);
+    const evidence = typeof session.extraction_diagnostics_json === 'string' ? JSON.parse(session.extraction_diagnostics_json || '{}') : session.extraction_diagnostics_json || {};
+    const freshValidation = evaluateStatement({ rows: allRows.filter(row => !isBalanceMarker(row)), classification: { ...evidence.classification, opening_balance: session.opening_balance, closing_balance: session.closing_balance }, account: { currency: session.account_currency, account_type: session.account_type } });
     const [[job]] = await db.query('SELECT job_uuid,status,stage,progress_percent,attempt,max_attempts,error_code,error_summary,correlation_id,heartbeat_at,completed_at FROM finance_statement_import_jobs WHERE import_session_id=? LIMIT 1', [session.id]);
     await db.commit();
     return res.json({
       session: repaired.session || session,
       rows,
       row_filter: requestedFilter,
-      validation_results: validationResults,
+      validation_results: freshValidation.validations.map(item => ({ validation_key: item.check, status: item.status, expected_value: item.expected, actual_value: item.actual, difference_value: item.difference, detail: item.detail })),
       job: job || null,
       repaired_rows: repaired.repaired,
       future_date_rows_repaired: repaired.future_dates_repaired || 0
@@ -720,6 +737,7 @@ exports.overrideRejectedRow = async (req, res) => {
     }
 
     const candidate = normalizeRow(account.id, account.currency, {
+      source_occurrence: originalStatementPayload(row)?.source_occurrence || 1,
       transaction_date: req.body.transaction_date ?? row.transaction_date,
       posting_date: req.body.posting_date ?? row.posting_date,
       description: req.body.description ?? row.description,
@@ -832,7 +850,20 @@ exports.commit = async (req, res) => {
     const [[account]] = await db.query('SELECT * FROM bank_accounts WHERE id=? AND status="ACTIVE" FOR UPDATE', [session.bank_account_id]);
     if (!account) throw new FinanceError('Active financial account not found.', 404, 'BANK_ACCOUNT_NOT_FOUND');
 
+    if (session.source_format === 'PDF' && session.secure_document_id && session.parser_version === 'finance-ingestion-v2-bank-aware') {
+      throw new FinanceError('Re-read the original file with the corrected parser before posting this older PDF review. Use Re-read original in the review screen.',422,'STATEMENT_PARSER_UPGRADE_REQUIRED');
+    }
     const repaired = await repairPendingReview(db, session);
+    const diagnostics = typeof session.extraction_diagnostics_json === 'string' ? JSON.parse(session.extraction_diagnostics_json || '{}') : session.extraction_diagnostics_json || {};
+    const [sourceReviewRows] = await db.query('SELECT * FROM statement_import_rows WHERE import_session_id=? ORDER BY row_no', [session.id]);
+    const verification = evaluateStatement({ rows: sourceReviewRows.filter(row => !isBalanceMarker(row)), classification: { ...diagnostics.classification, opening_balance: session.opening_balance, closing_balance: session.closing_balance }, account });
+    const failedChecks = verification.validations.filter(item => item.status === 'FAIL');
+    if (failedChecks.length && req.body?.acknowledge_validation_mismatch !== true) {
+      throw new FinanceError('Source totals or running balances do not match. Check the highlighted validation results and correct the rows before posting, or explicitly acknowledge the difference after checking the original document.', 422, 'STATEMENT_VALIDATION_MISMATCH', failedChecks);
+    }
+    session.reconciliation_status = verification.reconciliationStatus;
+    session.reconciliation_difference = verification.totals.reconciliation_difference;
+    await db.query('UPDATE statement_import_sessions SET reconciliation_status=?,reconciliation_difference=? WHERE id=?', [session.reconciliation_status,session.reconciliation_difference,session.id]);
     const [selectedRows] = await db.query(
       `SELECT * FROM statement_import_rows
        WHERE import_session_id=? AND selected=1 AND validation_status IN ('VALID','WARNING') ORDER BY row_no`, [session.id]
@@ -1007,10 +1038,13 @@ exports.commit = async (req, res) => {
       'UPDATE statement_import_sessions SET status="IMPORTED", current_stage="POSTED", progress_percent=100, reviewed_by=?, reviewed_at=NOW(), committed_by=?, committed_at=NOW(), approved_by=?, approved_at=NOW(), posted_at=NOW() WHERE id=?',
       [req.user.id, req.user.id, req.user.id, session.id]
     );
-    const latestRunningBalance = [...rows].reverse().find((row) => row.running_balance !== null && row.running_balance !== undefined && row.running_balance !== '');
+    const firstDated = rows.find(row => row.transaction_date), lastDated = [...rows].reverse().find(row => row.transaction_date);
+    const descendingSource = firstDated && lastDated && String(firstDated.transaction_date) > String(lastDated.transaction_date);
+    const newestFirst = [...rows].sort((a,b) => String(b.transaction_date).localeCompare(String(a.transaction_date)) || (descendingSource ? Number(a.row_no) - Number(b.row_no) : Number(b.row_no) - Number(a.row_no)));
+    const latestRunningBalance = newestFirst.find((row) => row.running_balance !== null && row.running_balance !== undefined && row.running_balance !== '');
     const statementClosingBalance = session.closing_balance !== null && session.closing_balance !== undefined && session.closing_balance !== ''
       ? session.closing_balance
-      : (latestRunningBalance ? latestRunningBalance.running_balance : null);
+      : (latestRunningBalance ? latestRunningBalance.running_balance : diagnostics.classification?.reported_balance_as_of ?? null);
     const advancesAccountBalance = imported > 0 && statementClosingBalance !== null
       && (!account.history_end_date || !maxDate || String(maxDate) >= String(account.history_end_date).slice(0,10));
     if (imported > 0 && (minDate || maxDate || advancesAccountBalance)) {
@@ -1028,13 +1062,13 @@ exports.commit = async (req, res) => {
          WHERE id=?`,
         [minDate, minDate, maxDate, maxDate,
           advancesAccountBalance ? 1 : 0, statementClosingBalance,
-          advancesAccountBalance ? 1 : 0, statementClosingBalance,
+          advancesAccountBalance && verification.reconciliationStatus === 'BALANCED' ? 1 : 0, statementClosingBalance,
           advancesAccountBalance ? 1 : 0, statementClosingBalance,
           account.id]
       );
     }
     const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates: finalCounts.duplicate, duplicates_at_commit: duplicates, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, repaired_future_dates: repaired.future_dates_repaired || 0, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates: finalCounts.duplicate, duplicates_at_commit: duplicates, source_validation: verification.reconciliationStatus, validation_mismatch_acknowledged: failedChecks.length > 0 && req.body?.acknowledge_validation_mismatch === true, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, repaired_future_dates: repaired.future_dates_repaired || 0, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
     await db.commit();
     return res.json({
       message: `${imported} statement transactions committed after review. ${finalCounts.duplicate} duplicate transaction(s) were excluded from the ledger, totals and reports.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,

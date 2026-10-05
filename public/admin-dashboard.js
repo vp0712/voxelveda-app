@@ -10065,3 +10065,20 @@ if (!window.__adminStaffMessagePoller) {
     }
   }, 30000);
 }
+
+// Filter the existing permission-controlled navigation without changing access.
+document.addEventListener('DOMContentLoaded',()=>{
+  const search=document.getElementById('workspaceNavSearch');
+  const nav=document.getElementById('workspaceNavigation');
+  if(!search||!nav)return;
+  const filter=()=>{
+    const query=search.value.trim().toLowerCase();
+    nav.querySelectorAll('.nav-btn').forEach(button=>button.classList.toggle('workspace-nav-filtered',Boolean(query)&&!String(button.dataset.title||button.textContent).toLowerCase().includes(query)));
+    nav.querySelectorAll('.nav-group').forEach(group=>{
+      group.classList.toggle('workspace-nav-filtered',Boolean(query)&&!group.querySelector('.nav-btn:not(.workspace-nav-filtered)'));
+      if(query&&!group.classList.contains('workspace-nav-filtered'))group.open=true;
+    });
+  };
+  search.addEventListener('input',filter);
+  search.addEventListener('keydown',event=>{if(event.key==='Escape'){search.value='';filter()}});
+});

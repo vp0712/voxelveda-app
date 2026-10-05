@@ -124,8 +124,8 @@ async function run() {
   assert.equal(mismatch.reconciliationStatus, 'MISMATCH');
 
   const duplicateInput = [
-    { transaction_date: '2026-09-24', description: 'Same', debit: '12.00', credit: '0.00', currency: 'AUD' },
-    { transaction_date: '2026-09-24', description: 'Same', debit: '12.00', credit: '0.00', currency: 'AUD' }
+    { transaction_date: '2026-09-24', description: 'Same', reference: 'unique-bank-payment-1', debit: '12.00', credit: '0.00', currency: 'AUD' },
+    { transaction_date: '2026-09-24', description: 'Same', reference: 'unique-bank-payment-1', debit: '12.00', credit: '0.00', currency: 'AUD' }
   ];
   const deduped = await statementReview._ingestion.normalizeAndDedupe({ query: async () => [[]] }, { id: 1, currency: 'AUD' }, duplicateInput);
   assert.equal(deduped.normalized[1].validation_status, 'DUPLICATE');

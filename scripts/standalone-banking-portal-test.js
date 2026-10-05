@@ -17,7 +17,7 @@ assert(routes.includes("requireAnyPermission('EDIT_BANK_DETAILS','CONNECT_BANK_A
 assert(routes.includes("requireAnyPermission('APPROVE_PAYMENT')"),'payment approval remains permission-gated');
 assert(financeHtml.includes('/finance-master.js')&&financeHtml.includes('FINANCE OPERATING SYSTEM'),'canonical Finance page uses the single Finance OS');
 assert(financeUi.includes('BANKING OPERATIONS')&&financeUi.includes('Payment workflow'),'Banking operations are integrated into Finance OS');
-assert(financeUi.includes('Banking Connections')&&financeUi.includes('Statement Import Wizard'),'connections and statement workflows are integrated into Finance OS');
+assert(financeUi.includes('Banking Connections')&&financeUi.includes('function openStatementWizard()'),'connections and statement workflows are integrated into Finance OS');
 assert(!app.includes('premium-banking-app.js')&&!renderer.includes('premium-banking-app'),'retired premium Banking frontend is not served or injected');
 assert(html.includes('permission-banking hidden-section'),'staff portal contains permission-gated Finance OS entry');
 assert(html.includes('href="/finance-intelligence#bankops"'),'staff Banking permission entry opens Finance OS Banking Operations');

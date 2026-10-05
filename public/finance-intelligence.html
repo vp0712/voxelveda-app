@@ -5,12 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>Finance Operating System | Voxel Veda</title>
-  <link rel="stylesheet" href="/finance-master.css?v=20260930-control-v37">
+  <link rel="stylesheet" href="/finance-master.css?v=20261005-control-v35">
 </head>
 <body class="finance-os-page">
   <div class="fm-shell">
     <aside class="fm-sidebar" aria-label="Finance navigation">
       <a class="fm-brand fm-brand-text" href="/admin"><div><strong>Voxel Veda</strong><span>FINANCE OS</span></div></a>
+      <label class="fm-nav-search"><span class="sr-only">Find a Finance feature</span><input id="fmNavSearch" type="search" placeholder="Find a feature…"></label>
       <nav id="fmNav"></nav>
       <div class="fm-side-footer"><small>Trusted finance workspace</small><b>Personal · Company · Consolidated</b></div>
     </aside>
@@ -24,12 +25,14 @@
           <button id="fmNew" class="fm-primary" type="button">+ New</button>
         </div>
       </header>
+      <nav class="fm-workspace-shortcuts" aria-label="Common banking tasks"><button type="button" data-viewjump="accounts">Accounts</button><button type="button" data-viewjump="transactions">Transactions</button><button type="button" data-viewjump="statements">Statement folders</button><button type="button" data-viewjump="review">Review centre</button><button type="button" data-viewjump="reports">Reports</button></nav>
 
       <section class="fm-filterbar" aria-label="Finance filters">
         <label>Workspace<select id="fmScope"><option value="ALL">Consolidated</option><option value="PERSONAL">Personal</option><option value="BUSINESS">Company</option></select></label>
         <label>Account<select id="fmAccount"><option value="">All permitted accounts</option></select></label>
         <label>Period<select id="fmPeriod">
-          <option value="all">All History</option>\n          <option value="today">Today</option>
+          <option value="all">All History</option>
+          <option value="today">Today</option>
           <option value="yesterday">Yesterday</option>
           <option value="week">This Week</option>
           <option value="last7">Last 7 Days</option>
@@ -67,6 +70,6 @@
   </dialog>
 
   <script src="/finance-bootstrap-guard.js?v=20260924-startup-hardening" defer></script>
-  <script src="/finance-master.js?v=20260930-control-v37" defer></script>
+  <script src="/finance-master.js?v=20261005-control-v35" defer></script>
 </body>
 </html>

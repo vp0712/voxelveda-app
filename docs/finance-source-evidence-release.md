@@ -1,0 +1,13 @@
+# Statement source evidence and workspace refresh
+
+The corrected reader excludes account metadata, report dates, balance-as-of headers and printed totals from transactions. Debit, credit and balance values follow the original table coordinates. Invalid calendar dates and ambiguous directions remain visible for correction. Printed debit and credit totals and chronological running balances are checked independently of opening/closing balance availability.
+
+Identical physical purchases without a stable reference or balance retain their source occurrence count. The first occurrence keeps the existing row fingerprint; subsequent occurrences have stable additional fingerprints, so overlapping reimports remain protected. Reprocessing excludes its own staged rows from duplicate lookup.
+
+Existing posted PDF imports from the affected previous reader are verified against retained, hash-matched original bytes after startup. A proven header/total artifact is archived reversibly. A missing transaction can be recovered only when both printed document totals match, the account/currency is consistent, and there are no unexplained source differences. Manual corrections, intentional exclusions and archived transactions are preserved. Changes run in an account-locked transaction and retain original evidence and audit events. Other differences require manual review. The protected Verify original action allows the same verification from the statement folder.
+
+Older pending PDF reviews require Re-read original before posting. Current validation is recomputed after corrections and at commit. A failed source check blocks posting until rows are corrected or the reviewer explicitly acknowledges the difference; the acknowledgement is audited. An incomplete report does not advance the reconciled account balance.
+
+Statements now open as bank folders, then account folders, then original files and reviews, with breadcrumbs, filename/date search, status filters, protected download and review/correction actions. Active lists support up to 2,000 records rather than clipping the visible centre to 25 files. Both workspaces use the sapphire/light theme and feature search; Finance has direct account, transaction, statement, review and report shortcuts.
+
+Validation includes the production Finance suite and the full app regression suite. Anonymous generated PDF cases cover header artifacts, multi-page totals, identical purchases, overlapping reimports, reverse-order balances, invalid dates, reversible repairs, preservation of manual exclusions, SQL parameter binding and rollback. Folder behavior checks cover bank/account hierarchy, more than 25 files, search, status and workspace scope. No customer PDF or extracted private rows are committed.

@@ -24,8 +24,8 @@ assert(html.includes('id="fmAccount"'),'statement workflows share the Finance ac
 assert(html.includes('Personal · Company · Consolidated'),'UI keeps ownership workspaces visibly separated');
 assert(!html.includes('id="bankAppV5"'),'retired Banking V5 root is not reintroduced');
 
-assert(js.includes('Statement Import Wizard'),'master Finance OS contains the statement import wizard');
-assert(js.includes('Statement Vault'),'master Finance OS contains statement history');
+assert(js.includes('function openStatementWizard()'),'master Finance OS contains the statement import wizard');
+assert(js.includes('Imported statements'),'master Finance OS contains statement history');
 assert(js.includes('openStatementWizard'),'statement upload opens a real in-context wizard');
 assert(js.includes("accept=\".csv,.pdf,.png,.jpg,.jpeg,.ofx,.qfx,.qif,.xlsx\""),'wizard advertises only supported formats');
 assert(js.includes('async function uploadStatementFile(accountId,file,mapping=null)'),'wizard uploads the selected original statement with optional mapping metadata');

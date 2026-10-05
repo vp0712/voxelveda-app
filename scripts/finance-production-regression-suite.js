@@ -4,6 +4,10 @@ const path=require('node:path');
 
 const tests=[
   "finance-release-consistency-test.js",
+  "bank-account-lifecycle-test.js",
+  "advanced-banking-platform-test.js",
+  "statement-first-money-warehouse-test.js",
+  "standalone-banking-portal-test.js",
   "finance-account-segmentation-test.js",
   "finance-original-requirements-acceptance-test.js",
   "finance-bootstrap-resilience-test.js",
@@ -39,6 +43,7 @@ const tests=[
   "finance-statement-ingestion-architecture-test.js",
   "finance-statement-timeout-recovery-test.js",
   "finance-statement-ingestion-real-files-test.js",
+  "finance-statement-source-evidence-test.js",
   "finance-statement-review-test.js",
   "finance-statement-dedupe-report-test.js",
   "finance-pdf-statement-parser-test.js",

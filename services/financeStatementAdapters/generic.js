@@ -1,17 +1,24 @@
 'use strict';
 
 const { amountDirection, normaliseMoneyToken } = require('../financeStatementMoney');
+const { isTableHeaderLine, createAmountColumnResolver } = require('../financeStatementColumns');
 
 const VERSION = 'generic-statement-v3';
-const DATE_TOKEN = /\b(?:\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?)\b/;
+const DATE_TOKEN = /\b(?:\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?)\b/;
 const MONEY_TOKEN = /(?:\b(?:AUD|USD|NZD|EUR|GBP|INR|JPY|CAD|SGD)\b\s*)?(?:CR|DR)?\s*[-+]?\(?[$€£¥₹]?\d[\d.,]*[.,]\d{2}\)?(?:\s*(?:CR|DR))?/gi;
 
 function pad(number) { return String(number).padStart(2, '0'); }
+function checkedDate(year, month, day, raw) {
+  const y = Number(year), m = Number(month), d = Number(day);
+  const actual = new Date(Date.UTC(y, m - 1, d));
+  if (y < 1900 || y > 2200 || actual.getUTCFullYear() !== y || actual.getUTCMonth() !== m - 1 || actual.getUTCDate() !== d) return { value: null, ambiguous: false, raw };
+  return { value: `${y}-${pad(m)}-${pad(d)}`, ambiguous: false };
+}
 
 function normaliseDate(input, options = {}) {
   const raw = String(input || '').trim();
   let match = raw.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
-  if (match) return { value: `${match[1]}-${pad(match[2])}-${pad(match[3])}`, ambiguous: false };
+  if (match) return checkedDate(match[1], match[2], match[3], raw);
   match = raw.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})$/);
   if (match) {
     const first = Number(match[1]); const second = Number(match[2]);
@@ -21,14 +28,14 @@ function normaliseDate(input, options = {}) {
     const day = format === 'MDY' ? second : first;
     const month = format === 'MDY' ? first : second;
     if (day < 1 || day > 31 || month < 1 || month > 12) return { value: null, ambiguous: false, raw };
-    return { value: `${year}-${pad(month)}-${pad(day)}`, ambiguous: false };
+    return checkedDate(year, month, day, raw);
   }
   match = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{2,4})$/);
   if (match) {
     const months = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
     const month = months.indexOf(match[2].slice(0, 3).toLowerCase()) + 1;
     let year = Number(match[3]); if (year < 100) year += year >= 70 ? 1900 : 2000;
-    if (month) return { value: `${year}-${pad(month)}-${pad(match[1])}`, ambiguous: false };
+    if (month) return checkedDate(year, month, match[1], raw);
   }
   match = raw.match(/^(\d{1,2})\s+([A-Za-z]{3,9})$/);
   if (match) {
@@ -43,7 +50,7 @@ function normaliseDate(input, options = {}) {
         const startMonth = Number(start.slice(5,7));
         year = startYear === endYear ? startYear : (month >= startMonth ? startYear : endYear);
       }
-      if (year >= 1900 && year <= 2200) return { value: `${year}-${pad(month)}-${pad(match[1])}`, ambiguous: false };
+      if (year >= 1900 && year <= 2200) return checkedDate(year, month, match[1], raw);
       return { value: null, ambiguous: true, raw };
     }
   }
@@ -68,7 +75,7 @@ function confidenceForLine(line) {
 function isStatementSummaryLine(value) {
   const text = String(value || '').replace(/\s+/g, ' ').trim();
   if (!text) return false;
-  if (/^(?:page\s+\d+\s+of\s+\d+|(?:sub)?total(?:s)?\b|page\s+total\b|balance\s+(?:b\/f|c\/f|brought\s+forward|carried\s+forward)\b|continued\s+on\b)/i.test(text)) return true;
+  if (/^(?:page\s+\d+\s+of\s+\d+|(?:page\s+)?(?:sub)?totals?\s*(?=[:$€£₹\d]|(?:withdrawals?|deposits?|debits?|credits?|paid|money|transactions?)\b)|balance\s+(?:as\s+(?:of|at)|b\/f|c\/f|brought\s+forward|carried\s+forward)\b|(?:available|current|ledger|account)\s+balance\b|continued\s+on\b|transaction\s+report\s+generated\b)/i.test(text)) return true;
   const dateMatch = text.match(DATE_TOKEN);
   if (!dateMatch) return false;
   const afterDate = text.slice((dateMatch.index || 0) + dateMatch[0].length).trim();
@@ -78,18 +85,25 @@ function isStatementSummaryLine(value) {
 function logicalTransactionLines(lines) {
   const source = Array.isArray(lines) ? lines : [];
   const logical = [];
+  const hasTableHeader = source.some(isTableHeaderLine);
+  let insideTable = !hasTableHeader;
   for (let index = 0; index < source.length; index += 1) {
     const line = source[index] || {};
     const text = String(line.text || '').replace(/\s+/g, ' ').trim();
-    if (!DATE_TOKEN.test(text) || isStatementSummaryLine(text)) continue;
+    if (isTableHeaderLine(line)) { insideTable = true; continue; }
+    const date = text.match(DATE_TOKEN);
+    if (!insideTable || !date || date.index !== 0 || isStatementSummaryLine(text)) continue;
+    if (/^\s*(?:to|through|[-–—])\s+\d/i.test(text.slice(date[0].length))) continue;
     let combined = text;
     const words = Array.isArray(line.words) ? [...line.words] : [];
     let end = index;
     let amountCount = [...combined.matchAll(MONEY_TOKEN)].length;
-    while (amountCount < 2 && end + 1 < source.length && end - index < 3) {
+    while (end + 1 < source.length && end - index < 6) {
       const next = source[end + 1] || {};
       const nextText = String(next.text || '').replace(/\s+/g, ' ').trim();
-      if (!nextText || DATE_TOKEN.test(nextText) || isStatementSummaryLine(nextText)) break;
+      if (!nextText || Number(next.page || 1) !== Number(line.page || 1) || DATE_TOKEN.test(nextText) || isStatementSummaryLine(nextText) || isTableHeaderLine(next) || /^(?:statement|account\s+(?:no|number|name)|branch\s+number|please\s+check|date\b|[A-Z]{3}\s+\d{4}\b)/i.test(nextText)) break;
+      if (amountCount >= 2 && [...nextText.matchAll(MONEY_TOKEN)].length) break;
+      if (/^blank$/i.test(nextText)) { end += 1; continue; }
       combined += ' ' + nextText;
       if (Array.isArray(next.words)) words.push(...next.words);
       end += 1;
@@ -144,27 +158,33 @@ function inferUnsignedBalanceDirections(rows) {
 
 function parseLines(lines, options = {}) {
   const rows = [];
+  const resolveColumns = createAmountColumnResolver(lines);
   for (const line of logicalTransactionLines(lines)) {
     const text = String(line.text || '').replace(/\s+/g, ' ').trim();
     const dateMatch = text.match(DATE_TOKEN);
     if (!dateMatch) continue;
-    const amounts = [...text.matchAll(MONEY_TOKEN)].map((match) => ({ raw: match[0].trim(), index: match.index || 0 }));
+    const amounts = [...text.matchAll(MONEY_TOKEN)].map((match) => ({ raw: match[0].trim(), index: (match.index || 0) + match[0].length - match[0].trimStart().length }));
     if (!amounts.length) continue;
     const parsedDate = normaliseDate(dateMatch[0], options);
     const dateEnd = (dateMatch.index || 0) + dateMatch[0].length;
     const markerText = text.slice(dateEnd, amounts[0].index).trim();
     const balanceMarker = /\b(?:OPENING|CLOSING)\s+BALANCE\b|\bBALANCE\s+(?:B\/F|C\/F|BROUGHT\s+FORWARD|CARRIED\s+FORWARD)\b/i.test(markerText);
-    const transactionAmount = balanceMarker ? null : (amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0]);
-    const balanceAmount = balanceMarker
+    const columns = resolveColumns({ line, amounts });
+    const positiveColumns = ['debit','credit','amount'].filter(key => columns?.[key] && (normaliseMoneyToken(columns[key].raw)?.cents || 0n) !== 0n);
+    const ambiguousColumns = Boolean(columns?.ambiguous || positiveColumns.length > 1);
+    const transactionAmount = balanceMarker || ambiguousColumns ? null : positiveColumns.length === 1 ? columns[positiveColumns[0]] : (amounts.length >= 2 ? amounts[amounts.length - 2] : amounts[0]);
+    const balanceAmount = columns?.balance ? normaliseMoneyToken(columns.balance.raw) : balanceMarker
       ? normaliseMoneyToken(amounts[amounts.length - 1].raw)
       : (amounts.length >= 2 ? normaliseMoneyToken(amounts[amounts.length - 1].raw) : null);
     const explicitDirection = transactionAmount ? /\b(?:CR|DR)\b|^[+\-(]/i.test(transactionAmount.raw.trim()) : false;
-    const descriptionEnd = transactionAmount ? transactionAmount.index : amounts[0].index;
+    const columnAmounts = ['debit','credit','amount'].map(key => columns?.[key]).filter(Boolean);
+    const descriptionEnd = columnAmounts.length ? Math.min(...columnAmounts.map(amount => amount.index)) : transactionAmount ? transactionAmount.index : amounts[0].index;
     const description = text.slice((dateMatch.index || 0) + dateMatch[0].length, descriptionEnd).trim();
     const confidence = confidenceForLine(line);
     const unsignedNeedsBalanceProof = Boolean(transactionAmount) && !explicitDirection && !options.allowUnsignedAmounts;
     let inferredDirection = null;
-    if (unsignedNeedsBalanceProof && typeof options.inferUnsignedDirection === 'function') {
+    if (!ambiguousColumns && positiveColumns.length === 1 && positiveColumns[0] !== 'amount') inferredDirection = positiveColumns[0] === 'debit' ? 'DEBIT' : 'CREDIT';
+    if (!inferredDirection && unsignedNeedsBalanceProof && typeof options.inferUnsignedDirection === 'function') {
       try {
         inferredDirection = options.inferUnsignedDirection({
           line, text, amountIndex: transactionAmount.index,
@@ -192,8 +212,8 @@ function parseLines(lines, options = {}) {
       source_snippet: text.slice(0, 1000),
       validation_hint: parsedDate.ambiguous
         ? `Ambiguous date ${dateMatch[0]}; verify statement period/date format`
-        : (markerHint || (unsignedNeedsBalanceProof && !inferredDirection ? 'Transaction direction requires running-balance verification' : (confidence < 0.72 ? 'Low OCR confidence requires review' : null))),
-      force_rejected: balanceMarker || parsedDate.ambiguous || (unsignedNeedsBalanceProof && !inferredDirection),
+        : (ambiguousColumns ? 'Multiple values occupy debit/credit columns; verify the original row' : markerHint || (unsignedNeedsBalanceProof && !inferredDirection ? 'Transaction direction requires running-balance verification' : (confidence < 0.72 ? 'Low OCR confidence requires review' : null))),
+      force_rejected: ambiguousColumns || balanceMarker || parsedDate.ambiguous || (unsignedNeedsBalanceProof && !inferredDirection),
       _unsigned_amount: unsignedNeedsBalanceProof && !inferredDirection ? transactionAmount.raw : null,
       _date_ambiguous: parsedDate.ambiguous
     });

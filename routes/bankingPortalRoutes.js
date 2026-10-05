@@ -55,6 +55,7 @@ router.delete('/intelligence/accounts/:id', bankAdmin, financePrivacy.accountPar
 router.delete('/intelligence/accounts/:id/purge', bankAdmin, financePrivacy.accountParam('id'), requireStepUp('CHANGE_BANK_DETAILS'), bankAccountLifecycle.purge);
 router.get('/intelligence/statements', intelligence.getStatementLibrary);
 router.get('/intelligence/statements/:uid/report', financePrivacy.statementUid('uid'), intelligence.getStatementReport);
+router.post('/intelligence/statements/:uid/verify', edit, financePrivacy.statementUid('uid'), requireStepUp('IMPORT_BANK_TRANSACTIONS'), statementData.verifyOriginal);
 router.get('/intelligence/statements-removed', statementData.listRemoved);
 router.post('/intelligence/statements/:uid/remove', edit, financePrivacy.statementUid('uid'), requireStepUp('DELETE_BANK_STATEMENT'), statementData.remove);
 router.post('/intelligence/statements/:uid/restore', edit, financePrivacy.statementUid('uid'), requireStepUp('RESTORE_BANK_STATEMENT'), statementData.restore);

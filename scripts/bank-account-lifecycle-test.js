@@ -21,8 +21,8 @@ assert.match(routes, /requireStepUp\('CHANGE_BANK_DETAILS'\)/);
 assert.match(routes, /financePrivacy\.accountParam\('id'\)/);
 assert.match(routes, /\/intelligence\/active-overview/);
 
-assert.match(html, /finance-master\.css\?v=202609\d{2}-[a-z0-9-]+-v\d+/);
-assert.match(html, /finance-master\.js\?v=202609\d{2}-[a-z0-9-]+-v\d+/);
+assert.match(html, /finance-master\.css\?v=20\d{6}-[a-z0-9-]+-v\d+/);
+assert.match(html, /finance-master\.js\?v=20\d{6}-[a-z0-9-]+-v\d+/);
 assert.match(ui, /Archive/);
 assert.match(ui, /Set inactive/);
 assert.match(ui, /Restore/);

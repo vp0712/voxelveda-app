@@ -97,7 +97,7 @@ async function persistResult(job, parsed, validation) {
     await db.query('DELETE FROM statement_import_rows WHERE import_session_id=?', [session.id]);
 
     const sourceRows = (parsed.rows || []).map((row) => ({ ...row, source_file_id: session.secure_document_id, parser_name: parsed.parserName, parser_version: parsed.parserVersion }));
-    const prepared = await statementReview._ingestion.normalizeAndDedupe(db, account, sourceRows);
+    const prepared = await statementReview._ingestion.normalizeAndDedupe(db, account, sourceRows, { contentHash: session.content_hash });
     await statementReview._ingestion.insertReviewRows(db, session.id, prepared.normalized);
 
     for (const page of parsed.pages || []) {
@@ -147,7 +147,7 @@ async function persistResult(job, parsed, validation) {
         classification.multiple_accounts ? 1 : 0, classification.multiple_currencies ? 1 : 0, classification.appears_incomplete ? 1 : 0,
         finalStatus, finalStage, prepared.normalized.length, counts.valid, counts.warning, counts.duplicate, counts.rejected,
         parsed.parserVersion, parsed.parserConfidence, validation.reconciliationStatus, validation.totals.reconciliation_difference,
-        JSON.stringify({ parser_name: parsed.parserName, warnings: parsed.warnings || [], headers: parsed.headers || [], totals: validation.totals }), session.id]
+        JSON.stringify({ parser_name: parsed.parserName, warnings: parsed.warnings || [], headers: parsed.headers || [], totals: validation.totals, classification, validations: validation.validations }), session.id]
     );
     await db.query("UPDATE finance_statement_import_jobs SET status='COMPLETED',stage=?,progress_percent=100,completed_at=NOW(),heartbeat_at=NOW(),encrypted_password=NULL,error_code=NULL,error_summary=NULL WHERE id=?", [finalStage, job.id]);
     await logAudit(db, {
