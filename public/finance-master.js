@@ -2346,7 +2346,16 @@ function parsePdfLines(lines) {
  const dateStart=/^(\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?|\d{1,2}\s+[A-Za-z]{3,9}(?:\s+\d{2,4})?)(?=\s|$)/i;
  const amountPattern=/(?:\b(?:CR|DR)\s*)?[-+]?\(?\$?\s*\d[\d,]*\.\d{2}\)?(?:\s*(?:CR|DR)\b)?/gi;
  const blocks=[];let current=null;
+ const isSummary=line=>{
+  const text=String(line||'').replace(/\s+/g,' ').trim();
+  if(/^(?:page\s+\d+\s+of\s+\d+|(?:sub)?total(?:s)?\b|page\s+total\b|balance\s+(?:b\/f|c\/f|brought\s+forward|carried\s+forward)\b|continued\s+on\b)/i.test(text))return true;
+  const match=text.match(dateStart);if(!match)return false;
+  const after=text.slice(match[1].length).trim();
+  return /^(?:(?:page\s+)?(?:sub)?total(?:s)?|total\s+(?:debits?|withdrawals?|credits?|deposits?|payments?|transactions?))(?:\s+(?:debits?|withdrawals?|credits?|deposits?|payments?|transactions?))?\s*(?=(?:AUD|USD|NZD|EUR|GBP|INR|JPY|CAD|SGD)?\s*[-+($€£¥\d])/i.test(after);
+ };
+
  for(const line of source){
+  if(isSummary(line)){if(current)blocks.push(current);current=null;continue}
   const dateMatch=line.match(dateStart);
   if(dateMatch){if(current)blocks.push(current);current={date_raw:dateMatch[1],parts:[line]}}
   else if(current)current.parts.push(line);
