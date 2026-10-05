@@ -153,8 +153,45 @@ async function run() {
     await assert.rejects(()=>verifyStoredStatement(file,{apply:true,actorId:1}),/simulated database failure/);
     assert.equal(rolledBack,1);
     assert.equal(released,2);
+    const {attachOriginalSource}=require('../services/financeStatementOriginalRecovery');
+    const sourceQueries=[];
+    let legacySession={id:13,status:'IMPORTED',secure_document_id:null};
+    let legacyFile={id:4,parse_status:'IMPORTED',secure_document_id:null};
+    let activeAccount=true;
+    const sourceDb={query:async(sql,params=[])=>{
+      assert.equal((sql.match(/\?/g)||[]).length,params.length,'restoration SQL binds every value');
+      sourceQueries.push({sql,params});
+      if(sql.startsWith('SELECT id FROM bank_accounts'))return [activeAccount?[{id:7}]:[]];
+      if(sql.startsWith('SELECT * FROM statement_import_sessions'))return [legacySession?[legacySession]:[]];
+      if(sql.startsWith('SELECT * FROM statement_import_files'))return [legacyFile?[legacyFile]:[]];
+      return [{affectedRows:1}];
+    }};
+    const restoration={accountId:7,importUid:file.import_uid,contentHash:file.content_hash,document:{id:'anonymous-original',content_sha256:file.content_hash},detection:{detectedMime:'application/pdf',sizeBytes:pdf.length},actor:{actorId:1}};
+    const attached=await attachOriginalSource(sourceDb,restoration);
+    assert.deepEqual(attached,{attached:true,queued:false,status:'IMPORTED'});
+    assert.equal(sourceQueries.filter(item=>item.sql.startsWith('UPDATE statement_import_')).length,2,'both posted source links are restored under the same import identity');
+    assert.ok(!sourceQueries.some(item=>/bank_transactions|INSERT INTO finance_statement_import_jobs/.test(item.sql)),'restoring a posted original cannot alter money or queue reposting');
+    assert.equal(auditEvents.at(-1).action,'STATEMENT_ORIGINAL_RESTORED');
+    assert.equal(auditEvents.at(-1).newValue.posted_transactions_unchanged,true);
+    sourceQueries.length=0;
+    legacyFile.secure_document_id='already-retained';
+    assert.equal((await attachOriginalSource(sourceDb,restoration)).attached,false,'a concurrent existing original is never replaced');
+    assert.ok(!sourceQueries.some(item=>item.sql.startsWith('UPDATE')));
+    legacyFile=null;legacySession={id:13,status:'PENDING_REVIEW',secure_document_id:null};sourceQueries.length=0;
+    const pending=await attachOriginalSource(sourceDb,restoration);
+    assert.deepEqual(pending,{attached:true,queued:true,status:'QUEUED'});
+    assert.ok(sourceQueries.some(item=>item.sql.includes('ON DUPLICATE KEY UPDATE')&&item.sql.includes('attempt=0')),'pending legacy sources obtain a resumable current-reader job');
+    legacySession=null;legacyFile={id:4,parse_status:'IMPORTED',secure_document_id:null};
+    assert.equal((await attachOriginalSource(sourceDb,restoration)).queued,false,'a posted file without review history restores its evidence without creating a new import');
+    legacyFile=null;
+    await assert.rejects(()=>attachOriginalSource(sourceDb,restoration),error=>error.code==='STATEMENT_CHANGED');
+    activeAccount=false;
+    await assert.rejects(()=>attachOriginalSource(sourceDb,restoration),error=>error.code==='BANK_ACCOUNT_NOT_ACTIVE');
+    sourceQueries.length=0;
+    await assert.rejects(()=>attachOriginalSource(sourceDb,{...restoration,document:{id:'wrong-original',content_sha256:'different'}}),error=>error.code==='STATEMENT_FILE_HASH_MISMATCH');
+    assert.equal(sourceQueries.length,0,'wrong source bytes are rejected before any database action');
   } finally {pool.getConnection=savedConnection;documentSecurity.readDocumentBodyInternal=savedRead;auditService.logAudit=savedAudit}
-  console.log('FINANCE_STATEMENT_SOURCE_EVIDENCE_OK metadata, columns, printed_totals, source_occurrences, overlapping_imports, reverse_balances, source_repairs, calendar');
+  console.log('FINANCE_STATEMENT_SOURCE_EVIDENCE_OK metadata, columns, printed_totals, source_occurrences, overlapping_imports, reverse_balances, source_repairs, original_recovery, calendar');
 }
 
 run().catch(error=>{console.error(error);process.exitCode=1;});

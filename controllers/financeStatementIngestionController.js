@@ -7,6 +7,7 @@ const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
 const { detectStatementFile } = require('../services/financeStatementDetection');
 const { encryptSensitive } = require('../services/financeEncryptionService');
+const { attachOriginalSource } = require('../services/financeStatementOriginalRecovery');
 const {
   objectStorageDocumentsEnabled,
   registerDocument,
@@ -55,6 +56,7 @@ exports.legacyDisabled = (_req, res) => res.status(410).json({
 exports.upload = async (req, res) => {
   let document;
   let db;
+  let documentRetained = false;
   try {
     await ensureFinanceSchema();
     if (!req.file?.path) throw Object.assign(new Error('Choose one statement file to upload.'), { code: 'STATEMENT_FILE_REQUIRED', status: 400 });
@@ -68,20 +70,43 @@ exports.upload = async (req, res) => {
     const detection = detectStatementFile(body, req.file.originalname, req.file.mimetype);
     const contentHash = sha256(body);
     const [[existing]] = await pool.query(
-      `SELECT import_uid,status FROM statement_import_sessions
+      `SELECT import_uid,status,secure_document_id FROM statement_import_sessions
         WHERE bank_account_id=? AND content_hash=? AND status NOT IN ('REMOVED','REVERSED','CANCELLED')
        UNION ALL
-       SELECT import_uid,parse_status AS status FROM statement_import_files
+       SELECT import_uid,parse_status AS status,secure_document_id FROM statement_import_files
         WHERE bank_account_id=? AND content_hash=? AND parse_status<>'REMOVED'
        LIMIT 1`,
       [accountId, contentHash, accountId, contentHash]
     );
     if (existing) {
+      if (!existing.secure_document_id) {
+        document = await registerDocument({
+          module:'finance', recordType:'statement_import', recordId:existing.import_uid,
+          ownerUserId:String(account.ownership_scope || '').toUpperCase() === 'BUSINESS' ? null : req.user.id,
+          uploadedBy:req.user.id, file:req.file, classification:'RESTRICTED'
+        });
+        db = await pool.getConnection();
+        await db.beginTransaction();
+        const restored = await attachOriginalSource(db, { accountId, importUid:existing.import_uid, contentHash, document, detection,
+          mapping:parseMapping(req.body?.mapping), actor:actor(req), maxAttempts:Math.max(1,Math.min(10,Number(process.env.FINANCE_INGESTION_MAX_ATTEMPTS || 5))) });
+        await db.commit();
+        documentRetained = restored.attached;
+        if (!restored.attached) { await removeDocumentInternal(document.id); document = null; }
+        await removeTemporary(req.file);
+        if (restored.queued) setImmediate(() => triggerFinanceStatementIngestion(req.user.id).catch(error => console.error('Finance source recovery trigger failed:',error.code || error.message)));
+        return res.status(restored.queued ? 202 : 200).json({
+          message:restored.attached ? restored.queued ? 'The matching original was restored privately; the existing review is queued for current extraction.' : 'The matching original was restored privately. Use Verify original to review posted corrections.' : 'The existing private original was reused.',
+          import_uid:existing.import_uid, reused:true, original_attached:restored.attached, original_available:true,
+          code:'DUPLICATE_STATEMENT_FILE_REUSED', existing_status:restored.status,
+          status_url:`/api/finance/intelligence/statement-imports/${encodeURIComponent(existing.import_uid)}/status`
+        });
+      }
       await removeTemporary(req.file);
       return res.status(200).json({
         message: `This exact statement already exists as ${existing.import_uid}. The existing import was reused and no duplicate file was created.`,
         import_uid: existing.import_uid,
         reused: true,
+        original_available: true,
         code: 'DUPLICATE_STATEMENT_FILE_REUSED',
         existing_status: existing.status,
         status_url: `/api/finance/intelligence/statement-imports/${encodeURIComponent(existing.import_uid)}/status`
@@ -118,6 +143,7 @@ exports.upload = async (req, res) => {
     await logAudit(db, { ...actor(req), action: 'STATEMENT_FILE_UPLOADED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: importUid,
       newValue: { bank_account_id: accountId, source_format: detection.format, detected_mime: detection.detectedMime, size_bytes: detection.sizeBytes, secure_document_id: document.id, job_uuid: jobUuid, scan_status: document.scan_status } });
     await db.commit();
+    documentRetained = true;
     setImmediate(() => triggerFinanceStatementIngestion(req.user.id).catch((error) => console.error('Finance ingestion trigger failed:', error.code || error.message)));
     return res.status(202).json({
       message: 'Statement stored privately and queued for secure server-side extraction.',
@@ -128,7 +154,7 @@ exports.upload = async (req, res) => {
     });
   } catch (error) {
     if (db) await db.rollback().catch(() => {});
-    if (document?.id) await removeDocumentInternal(document.id).catch(() => {});
+    if (document?.id && !documentRetained) await removeDocumentInternal(document.id).catch(() => {});
     await removeTemporary(req.file);
     return fail(res, error, 'Statement upload failed');
   } finally { if (db) db.release(); }
