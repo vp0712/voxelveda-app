@@ -47,12 +47,12 @@ const pageTotals=parsePdfLines([
  'Page 2 of 2',
  'Total Deposits 500.00'
 ]);
-assert.equal(pageTotals.length,2,'page totals and page markers must never become transaction entries');
-assert.equal(pageTotals[0].description,'Supplier invoice','original statement description must be preserved');
-assert.equal(pageTotals[0].debit,120,'real withdrawal amount must be preserved');
-assert.equal(pageTotals[1].credit,500,'real deposit amount must be preserved');
+assert(pageTotals.length===2,'page totals and page markers must never become transaction entries');
+assert(pageTotals[0].description==='Supplier invoice','original statement description must be preserved');
+assert(pageTotals[0].debit===120,'real withdrawal amount must be preserved');
+assert(pageTotals[1].credit===500,'real deposit amount must be preserved');
 const merchantTotal=parsePdfLines(['04/09/2026 Total Tools Melbourne 42.00 DR']);
-assert.equal(merchantTotal.length,1,'a merchant whose name begins with Total must remain a transaction');
+assert(merchantTotal.length===1,'a merchant whose name begins with Total must remain a transaction');
 
 assert(rows[0].transaction_date==='2024-04-11','yearless CBA transaction date must inherit statement year');
 
