@@ -37,6 +37,25 @@ assert(Number(rows[0].debit)===50.95&&Number(rows[0].credit)===0,'unsigned debit
 assert(Number(rows[1].credit)===1546.61,'Direct Credit must be identified as money in');
 assert(Number(rows[2].debit)===1000,'Transfer-to transaction must be identified as money out');
 assert(Number(rows[3].debit)===86.14,'Cash-out/purchase aggregate must use the transaction total, not detail amounts');
+const pageTotals=parsePdfLines([
+ 'ANZ Access Advantage Statement 01/09/2026 to 30/09/2026',
+ 'Date Transaction Details Withdrawals Deposits',
+ '02/09/2026 Supplier invoice 120.00 DR 1380.00 CR',
+ 'Page 1 of 2',
+ 'Total Withdrawals 120.00',
+ '03/09/2026 Customer deposit 500.00 CR 1880.00 CR',
+ 'Page 2 of 2',
+ 'Total Deposits 500.00'
+]);
+assert(pageTotals.length===2,'page totals and page markers must never become transaction entries');
+assert(pageTotals[0].description==='Supplier invoice','original statement description must be preserved');
+assert(pageTotals[0].debit===120,'real withdrawal amount must be preserved');
+assert(pageTotals[0].running_balance===1380,'source running balance must be preserved');
+assert(pageTotals[1].credit===500,'real deposit amount must be preserved');
+assert(pageTotals[1].running_balance===1880,'source running balance must be preserved');
+const merchantTotal=parsePdfLines(['04/09/2026 Total Tools Melbourne 42.00 DR']);
+assert(merchantTotal.length===1,'a merchant whose name begins with Total must remain a transaction');
+
 assert(rows[0].transaction_date==='2024-04-11','yearless CBA transaction date must inherit statement year');
 
 const modern=[

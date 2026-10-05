@@ -65,13 +65,23 @@ function confidenceForLine(line) {
   return values.length ? Math.max(0, Math.min(1, values.reduce((sum, value) => sum + value, 0) / values.length / 100)) : 1;
 }
 
+function isStatementSummaryLine(value) {
+  const text = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!text) return false;
+  if (/^(?:page\s+\d+\s+of\s+\d+|(?:sub)?total(?:s)?\b|page\s+total\b|balance\s+(?:b\/f|c\/f|brought\s+forward|carried\s+forward)\b|continued\s+on\b)/i.test(text)) return true;
+  const dateMatch = text.match(DATE_TOKEN);
+  if (!dateMatch) return false;
+  const afterDate = text.slice((dateMatch.index || 0) + dateMatch[0].length).trim();
+  return /^(?:(?:page\s+)?(?:sub)?total(?:s)?|total\s+(?:debits?|withdrawals?|credits?|deposits?|payments?|transactions?))(?:\s+(?:debits?|withdrawals?|credits?|deposits?|payments?|transactions?))?\s*(?=(?:AUD|USD|NZD|EUR|GBP|INR|JPY|CAD|SGD)?\s*[-+($€£¥\d])/i.test(afterDate);
+}
+
 function logicalTransactionLines(lines) {
   const source = Array.isArray(lines) ? lines : [];
   const logical = [];
   for (let index = 0; index < source.length; index += 1) {
     const line = source[index] || {};
     const text = String(line.text || '').replace(/\s+/g, ' ').trim();
-    if (!DATE_TOKEN.test(text)) continue;
+    if (!DATE_TOKEN.test(text) || isStatementSummaryLine(text)) continue;
     let combined = text;
     const words = Array.isArray(line.words) ? [...line.words] : [];
     let end = index;
@@ -79,7 +89,7 @@ function logicalTransactionLines(lines) {
     while (amountCount < 2 && end + 1 < source.length && end - index < 3) {
       const next = source[end + 1] || {};
       const nextText = String(next.text || '').replace(/\s+/g, ' ').trim();
-      if (!nextText || DATE_TOKEN.test(nextText)) break;
+      if (!nextText || DATE_TOKEN.test(nextText) || isStatementSummaryLine(nextText)) break;
       combined += ' ' + nextText;
       if (Array.isArray(next.words)) words.push(...next.words);
       end += 1;
@@ -197,4 +207,4 @@ function parseLines(lines, options = {}) {
 
 function match() { return 0.1; }
 
-module.exports = { DATE_TOKEN, MONEY_TOKEN, VERSION, match, normaliseDate, parseLines, _test: { inferUnsignedBalanceDirections, logicalTransactionLines } };
+module.exports = { DATE_TOKEN, MONEY_TOKEN, VERSION, match, normaliseDate, parseLines, _test: { inferUnsignedBalanceDirections, isStatementSummaryLine, logicalTransactionLines } };
