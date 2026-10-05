@@ -1,0 +1,29 @@
+/* Shared Voxel Veda sapphire workspace. Original logo artwork is unchanged. */
+:root{color-scheme:light;--vv-bg:#f3f6fc;--vv-bg-raised:#fff;--vv-surface:#fff;--vv-surface-2:#f7faff;--vv-surface-3:#edf3ff;--vv-line:#d8e3f3;--vv-line-strong:#91b3f3;--vv-text:#172e4d;--vv-muted:#526c8a;--vv-soft:#697f9a;--vv-accent:#2463eb;--vv-accent-strong:#184ccd;--vv-info:#4f6dcc;--vv-warning:#9b6615;--vv-danger:#b6304b;--vv-success:#087b5d;--vv-radius:12px;--vv-shadow:0 8px 28px rgba(32,62,112,.07)}
+body:not(.finance-os-page){background:#f3f6fc!important;color:#172e4d!important}
+body:not(.finance-os-page)::before,body:not(.finance-os-page)::after{display:none!important}
+body:not(.finance-os-page) :is(.sidebar,.vv-sidebar){background:linear-gradient(180deg,#102850,#163569)!important;color:#fff!important;border-right:0!important}
+body:not(.finance-os-page) :is(.sidebar,.vv-sidebar) :is(.nav-btn,.sidebar-link,.nav-link,.nav-group-title,.brand-text,.brand-title,small){color:#d0dff5!important}
+body:not(.finance-os-page) :is(.sidebar,.vv-sidebar) :is(.nav-btn,.sidebar-link,.nav-link){background:transparent!important;border-color:transparent!important;border-radius:10px!important}
+body:not(.finance-os-page) :is(.sidebar,.vv-sidebar) :is(.nav-btn.active,.nav-btn:hover,.nav-link.active,.sidebar-link.active){background:#2463eb!important;color:#fff!important}
+body:not(.finance-os-page) :is(.card,.panel,.metric-card,.dashboard-card,.login-card,.login-panel,.auth-card,.modal-content,.drawer,.stat-card){background:#fff!important;color:#172e4d!important;border:1px solid #d8e3f3!important;border-radius:14px!important;box-shadow:0 7px 25px rgba(32,62,112,.06)!important}
+body:not(.finance-os-page) :is(.topbar,.top-bar,.main-header,.content-header){background:#f3f6fc!important;border-color:#d8e3f3!important;color:#172e4d!important}
+body:not(.finance-os-page) :is(.section-title,.section-head h2,.panel h2,.panel h3,.card h3,.metric-value,.stat-value,thead th){color:#172e4d!important}
+body:not(.finance-os-page) :is(.muted,.subtitle,.status-note,.section-head p,.panel-head p,.panelHead p,.card p,.metric-label,.stat-label){color:#526c8a!important}
+body:not(.finance-os-page) :is(input:not([type=checkbox]):not([type=radio]),select,textarea){background:#fff!important;color:#172e4d!important;border-color:#cad8ed!important;border-radius:9px!important}
+body:not(.finance-os-page) :is(input,textarea)::placeholder{color:#697f9a!important}
+body:not(.finance-os-page) :is(.primary-btn,.btn-primary,button.primary,.submit-btn,.auth-submit){background:#2463eb!important;color:#fff!important;border-color:#2463eb!important;box-shadow:none!important}
+body:not(.finance-os-page) :is(.secondary-btn,.quick-pill,.command-pill,.tab-btn){background:#edf3ff!important;color:#214e94!important;border-color:#cfdef6!important}
+body:not(.finance-os-page) :is(.tab-btn.active,.finance-tab.active){background:#2463eb!important;color:#fff!important}
+body:not(.finance-os-page) :is(.hero,.dashboard-hero,.portal-hero,.welcome-panel){background:linear-gradient(120deg,#163769,#2458ae)!important;color:#fff!important;border-radius:16px!important}
+body:not(.finance-os-page) :is(.hero,.dashboard-hero,.portal-hero,.welcome-panel) :is(h1,h2,h3,p,small,span){color:#fff!important}
+body:not(.finance-os-page) table{color:#172e4d!important;background:#fff!important}body:not(.finance-os-page) :is(th,td){border-color:#e1e9f5!important}body:not(.finance-os-page) thead{background:#edf3ff!important}body:not(.finance-os-page) tbody tr:hover{background:#f4f8ff!important}
+body:not(.finance-os-page) :is(button,a,input,select,textarea,summary):focus-visible{outline:3px solid #89aff4!important;outline-offset:3px!important}
+/* Legacy pages use both token sets; keep their surfaces and text consistent. */
+:root{--bg:#f3f6fc;--panel:#fff;--border:#d8e3f3;--accent:#2463eb;--accent-2:#4f6dcc;--text:#172e4d;--muted:#526c8a;--danger:#b6304b;--warning:#9b6615;--success:#087b5d}
+body:not(.finance-os-page) :is(.login-wrapper,.login-box,.auth-panel,.section-card,.table-card,.form-card,.summary-card,.kpi-card,.home-kpi-card,.dashboard-panel,.home-command-hero,.page-header,.top-header){background:#fff!important;color:#172e4d!important;border-color:#d8e3f3!important;box-shadow:0 8px 24px rgba(32,62,112,.06)!important}
+body:not(.finance-os-page) :is(.home-command-hero h1,.page-header h1,.brand h1,.login-box h1,.login-box label){color:inherit!important}
+body:not(.finance-os-page) :is(.sidebar,.vv-sidebar) :is(.brand h1,.brand p,.nav-group-toggle){color:#d0dff5!important}
+body:not(.finance-os-page) :is(.sidebar-footer,.nav-group){background:transparent!important}
+body:not(.finance-os-page) :is(.login-card,.login-panel,.login-box,.auth-panel) :is(p,label){color:#526c8a!important}
+.workspace-nav-search{display:grid;gap:6px;margin:0 0 16px;font-size:12px;color:#d0dff5}.workspace-nav-search input{width:100%;padding:10px 12px;min-height:44px;font:inherit}.workspace-nav-filtered{display:none!important}

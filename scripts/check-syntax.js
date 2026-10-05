@@ -2,6 +2,7 @@ const { spawnSync } = require('child_process');
 const path = require('path');
 
 const files = [
+  'services/financeStatementColumns.js', 'services/financeStatementEvidence.js', 'services/financeStatementSourceRepair.js', 'scripts/finance-statement-source-evidence-test.js', 'controllers/statementDataManagementController.js', 'routes/bankingPortalRoutes.js',
   'app.js', 'server.js', 'config/urls.js', 'config/databaseConfig.js',
   'controllers/attendanceController.js', 'controllers/authController.js', 'controllers/securityAuthController.js', 'controllers/mfaController.js', 'controllers/emailController.js',
   'controllers/invoiceController.js', 'controllers/materialController.js', 'controllers/timesheetWorkflowController.js', 'controllers/readinessController.js',

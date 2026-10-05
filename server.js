@@ -292,6 +292,11 @@ function listenApplication() {
             addWarning(`Finance legacy PDF date-integrity repair did not complete: ${error.code || error.message}`);
             console.error('Finance date-integrity repair failed safely:', error.code || error.message);
           });
+        require('./services/financeStatementSourceRepair').repairKnownStatementSourceArtifacts()
+          .catch((error) => {
+            addWarning(`Statement source verification did not complete: ${error.code || 'SOURCE_REPAIR_UNAVAILABLE'}`);
+            console.error('Statement source verification failed safely:', error.code || 'SOURCE_REPAIR_UNAVAILABLE');
+          });
       });
 
       resolve(server);

@@ -9,9 +9,10 @@ const canvasModule = require('@napi-rs/canvas');
 const { detectStatementFile, printableText, rejection } = require('./financeStatementDetection');
 const { amountDirection, normaliseMoneyToken } = require('./financeStatementMoney');
 const { selectAdapter } = require('./financeStatementAdapters');
-const { normaliseDate } = require('./financeStatementAdapters/generic');
+const { normaliseDate, _test: { isStatementSummaryLine } } = require('./financeStatementAdapters/generic');
+const { extractStatementEvidence } = require('./financeStatementEvidence');
 
-const PARSER_VERSION = 'finance-ingestion-v2-bank-aware';
+const PARSER_VERSION = 'finance-ingestion-v3-evidence';
 const MAX_ROWS = () => Math.max(1, Math.min(50000, Number(process.env.FINANCE_STATEMENT_MAX_ROWS || 10000)));
 const MAX_PAGES = () => Math.max(1, Math.min(500, Number(process.env.FINANCE_STATEMENT_MAX_PAGES || 100)));
 const MAX_IMAGE_PIXELS = () => Math.max(1000000, Number(process.env.FINANCE_STATEMENT_MAX_IMAGE_PIXELS || 40000000));
@@ -147,6 +148,7 @@ function parseTabularRows(matrix, options = {}) {
   for (let position = headerRow; position < matrix.length; position += 1) {
     const cells = matrix[position] || [];
     if (!cells.some((cell) => String(cell ?? '').trim())) continue;
+    if (isStatementSummaryLine(cells[indexes.description]) || isStatementSummaryLine(cells[indexes.transaction_date])) continue;
     const parsedDate = normaliseDate(cells[indexes.transaction_date], { dateFormat: options.mapping?.date_format || options.dateFormat });
     let debit = normaliseMoneyToken(indexes.debit >= 0 ? cells[indexes.debit] : '')?.decimal || '0.00';
     let credit = normaliseMoneyToken(indexes.credit >= 0 ? cells[indexes.credit] : '')?.decimal || '0.00';
@@ -375,7 +377,7 @@ function classify(text, metadata = {}) {
   let documentType = 'UNKNOWN_FINANCIAL_DOCUMENT';
   if (/CREDIT CARD STATEMENT|CARD ACCOUNT/.test(upper)) documentType = 'CREDIT_CARD_STATEMENT';
   else if (/LOAN STATEMENT|MORTGAGE STATEMENT/.test(upper)) documentType = 'LOAN_STATEMENT';
-  else if (/BANK STATEMENT|ACCOUNT STATEMENT|TRANSACTION HISTORY/.test(upper)) documentType = 'BANK_STATEMENT';
+  else if (/BANK STATEMENT|ACCOUNT STATEMENT|TRANSACTION HISTORY|TRANSACTION REPORT/.test(upper)) documentType = 'BANK_STATEMENT';
   else if (/DIGITAL WALLET|PAYPAL|WALLET STATEMENT/.test(upper)) documentType = 'DIGITAL_WALLET_STATEMENT';
   else if (/CREDIT NOTE/.test(upper)) documentType = 'CREDIT_NOTE';
   else if (/TAX INVOICE|SUPPLIER INVOICE/.test(upper)) documentType = 'SUPPLIER_INVOICE';
@@ -404,7 +406,8 @@ function classify(text, metadata = {}) {
     periodMatch = header.match(new RegExp(`\\b${dated}\\s+(?:to|through|[-–—])\\s+${dated}\\b`, 'i'));
   }
   const periodStart = periodMatch ? normaliseDate(periodMatch[1], { dateFormat: (adapterChoice.adapter.dateFormatFor?.(source) || adapterChoice.adapter.DATE_FORMAT || (institution ? 'DMY' : '')) }).value : null;
-  const periodEnd = periodMatch ? normaliseDate(periodMatch[2], { dateFormat: adapterChoice.adapter.DATE_FORMAT || '' }).value : null;
+  const periodEnd = periodMatch ? normaliseDate(periodMatch[2], { dateFormat: adapterChoice.adapter.dateFormatFor?.(source) || adapterChoice.adapter.DATE_FORMAT || (institution ? 'DMY' : '') }).value : null;
+  const accountIdentifiers = [...new Set([...source.matchAll(/\b(?:account\s+(?:number|no\.?|#)|acct)\s*[:#-]?\s*([*xX•\d -]{4,30})/gi)].map(match => match[1].replace(/\s/g, '')).filter(Boolean))];
   return {
     document_type: documentType,
     classification_confidence: documentType === 'UNKNOWN_FINANCIAL_DOCUMENT' ? 0.35 : Math.max(0.75, adapterChoice.score),
@@ -420,12 +423,13 @@ function classify(text, metadata = {}) {
     page_count: metadata.pageCount || 1,
     selectable_text: Boolean(metadata.selectableText),
     ocr_required: Boolean(metadata.ocrRequired),
-    multiple_accounts: (source.match(/\bACCOUNT(?: NUMBER| NO\.?| #)?\b/gi) || []).length > 2,
+    multiple_accounts: accountIdentifiers.length > 1,
     multiple_currencies: currencies.length > 1,
     appears_incomplete: Boolean(metadata.appearsIncomplete),
     currencies,
     adapter_name: adapterChoice.adapter.VERSION,
-    adapter_confidence: adapterChoice.score
+    adapter_confidence: adapterChoice.score,
+    ...extractStatementEvidence(metadata.lines || [])
   };
 }
 
@@ -461,7 +465,7 @@ async function parsePdf(buffer, options = {}, progress) {
     page.cleanup?.();
   }
   let text = allLines.map((line) => line.text).join('\n');
-  let classification = classify(text, { pageCount: pages.length, selectableText: textCharacters > 24 && !ocrRequired, ocrRequired, appearsIncomplete: pages.some((page) => !page.word_count) });
+  let classification = classify(text, { pageCount: pages.length, selectableText: textCharacters > 24 && !ocrRequired, ocrRequired, appearsIncomplete: pages.some((page) => !page.word_count), lines: allLines });
   let adapterChoice = selectAdapter({ text });
   const parseWithContext = (candidateLines, candidateClassification, choice) => {
     const statementStartDate = candidateClassification.statement_start_date || null;
@@ -517,7 +521,7 @@ async function parsePdf(buffer, options = {}, progress) {
       page.cleanup?.();
     }
     const ocrText = ocrLines.map((line) => line.text).join('\n');
-    const ocrClassification = classify(ocrText, { pageCount: ocrPages.length, selectableText: false, ocrRequired: true, appearsIncomplete: ocrPages.some((page) => !page.word_count) });
+    const ocrClassification = classify(ocrText, { pageCount: ocrPages.length, selectableText: false, ocrRequired: true, appearsIncomplete: ocrPages.some((page) => !page.word_count), lines: ocrLines });
     const ocrChoice = selectAdapter({ text: ocrText });
     const ocrRows = parseWithContext(ocrLines, ocrClassification, ocrChoice);
     const ocrQuality = rowQuality(ocrRows);
@@ -539,7 +543,7 @@ async function parsePdf(buffer, options = {}, progress) {
 
 async function parseImage(buffer, detection, options = {}, progress) {
   const ocr = await ocrImage(buffer, 1, progress);
-  const classification = classify(ocr.text, { pageCount: 1, selectableText: false, ocrRequired: true, appearsIncomplete: !ocr.lines.length });
+  const classification = classify(ocr.text, { pageCount: 1, selectableText: false, ocrRequired: true, appearsIncomplete: !ocr.lines.length, lines: ocr.lines });
   const adapterChoice = selectAdapter({ text: ocr.text });
   const rows = adapterChoice.adapter.parseLines(ocr.lines, {
     dateFormat: options.mapping?.date_format,

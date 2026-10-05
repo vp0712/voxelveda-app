@@ -10,7 +10,7 @@ const state={
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
   transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,accountCategorySpending:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,cashCustody:null,debtPlanner:null,commitments:null,savingsReserve:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,anomalyExplain:null,controlActions:null,jobProfitability:null,counterpartyControl:null,handover:null,personalIntegrity:null,personalTaxControl:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
-  resources:{},accountFilters:{market:'ALL',type:'ALL'},txFilters:{q:'',type:'',category:'',merchant:'',currency:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
+  statementBank:'',statementAccount:'',statementQuery:'',statementStatus:'ALL',resources:{},accountFilters:{market:'ALL',type:'ALL'},txFilters:{q:'',type:'',category:'',merchant:'',currency:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
 };
@@ -124,7 +124,7 @@ function showFinancePopup(title,message,detail='',options={}){
  document.body.appendChild(overlay);requestAnimationFrame(()=>overlay.classList.add('show'));
  return overlay;
 }
-async function downloadFinanceFile(url,filename,successTitle='Download ready'){
+async function downloadFinanceFile(url,filename,successTitle='Download ready',successMessage='Your PDF was generated successfully and is ready to save.'){
  let response;
  for(let attempt=0;attempt<2;attempt++){
   response=await fetch(url,{credentials:'same-origin'});
@@ -138,7 +138,7 @@ async function downloadFinanceFile(url,filename,successTitle='Download ready'){
  const objectUrl=URL.createObjectURL(blob),link=document.createElement('a');
  link.href=objectUrl;link.download=filename||'finance-document.pdf';document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
- showFinancePopup(successTitle,'Your PDF was generated successfully and is ready to save.','The document was produced from the permission-scoped Finance ledger.');
+  showFinancePopup(successTitle,successMessage);
 }
 function openAccountStatementForm(accountId){
  const account=state.accounts.find(a=>String(a.id)===String(accountId));
@@ -176,6 +176,9 @@ function renderFinanceFatal(error,title='Finance could not start'){
 function navButtons(){
  $('fmNav').innerHTML=NAV_GROUPS.map(([group,items])=>`<div class="fm-nav-group"><small>${esc(group)}</small>${items.map(([v,i,l])=>`<button type="button" data-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span>${l}</button>`).join('')}</div>`).join('');
  $('fmNav').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
+ const navSearch=$('fmNavSearch');
+ const filterNavigation=()=>{const query=String(navSearch?.value||'').toLowerCase().trim();$('fmNav').querySelectorAll('[data-view]').forEach(button=>button.hidden=Boolean(query)&&!button.textContent.toLowerCase().includes(query));$('fmNav').querySelectorAll('.fm-nav-group').forEach(group=>group.hidden=![...group.querySelectorAll('[data-view]')].some(button=>!button.hidden))};
+ if(navSearch)navSearch.oninput=filterNavigation;filterNavigation();
  const mobile=$('fmMobileNav');
  if(mobile){
   mobile.innerHTML=MOBILE_NAV.map(([v,i,l])=>{const isPrimary=MOBILE_NAV.some(([key])=>key===state.view),active=state.view===v||(v==='more'&&!isPrimary);return `<button type="button" data-mobile-view="${v}" class="${active?'active':''}"><span>${i}</span><b>${l}</b></button>`}).join('');
@@ -812,35 +815,58 @@ async function openHistoricalImport(accountId=''){
   showFinancePopup(s.duplicates?'Statements verified — duplicates excluded':'Statements processed securely',s.processed+' file(s) processed. '+s.ready+' transaction row(s) are ready for review.',s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':'')+(s.attention?' · '+s.attention+' need action':''),{tone:s.failed||s.attention?'warning':'success',actionLabel:'Open first review',onAction:()=>openStatementReview(batch.staged[0].uid)});
  };
 }
+function statementEntries(){
+ const entries=new Map();
+ for(const review of state.reviews||[])if(!['REMOVED','REVERSED','CANCELLED'].includes(String(review.status||'').toUpperCase()))entries.set(String(review.import_uid),{...review,status:String(review.status||'').toUpperCase()});
+ for(const file of state.statements||[])entries.set(String(file.import_uid),{...entries.get(String(file.import_uid)),...file,status:'IMPORTED'});
+ return [...entries.values()].filter(file=>!state.account||String(file.bank_account_id)===String(state.account)).map(file=>{
+  const account=state.accounts.find(item=>String(item.id)===String(file.bank_account_id))||{};
+  const institution=file.institution||account.institution||'Other accounts';
+  const market=account.market_code||account.banking_market||(String(file.currency||account.currency).toUpperCase()==='INR'?'India':'Australia / International');
+  return {...file,account_name:file.account_name||account.nickname||'Account',institution,market,folder_key:String(market)+'|'+String(institution).trim().toLowerCase()};
+ }).filter(file=>state.scope==='ALL'||file.ownership_scope===state.scope).sort((a,b)=>String(b.created_at||b.reviewed_at||b.statement_end_date||'').localeCompare(String(a.created_at||a.reviewed_at||a.statement_end_date||'')));
+}
+function statementFileRow(file){
+ const status=String(file.status||'').toUpperCase(),posted=status==='IMPORTED',pending=status==='PENDING_REVIEW';
+ const detail=posted?num(file.imported_rows)+' posted · '+num(file.duplicate_rows)+' overlaps excluded':pending?num(file.total_rows)+' extracted · '+num(file.rejected_rows)+' need correction':file.last_error_summary||file.job_error_summary||String(file.current_stage||status).replace(/_/g,' ');
+ const primary=posted?'<button type="button" data-statement-edit="'+esc(file.import_uid)+'">Transactions</button>':pending?'<button type="button" data-import-review="'+esc(file.import_uid)+'">Review & approve</button>':'<button type="button" data-import-status="'+esc(file.import_uid)+'">Status / retry</button>';
+ const original=file.secure_document_id?'<button type="button" data-statement-original="'+esc(file.secure_document_id)+'" data-original-name="'+esc(file.original_name||'Statement')+'">Original file</button>':'';
+ return '<div class="fm-statement-file"><span class="fm-file-icon" aria-hidden="true">▤</span><div class="fm-file-detail"><h3>'+esc(file.original_name||'Statement')+'</h3><p>'+esc(file.account_name)+' · '+date(file.statement_start_date)+' – '+date(file.statement_end_date)+'</p><small>'+esc(detail)+'</small></div><div class="fm-file-actions">'+statusBadge(status)+'<div class="fm-inline-actions">'+primary+original+(posted?'<button type="button" data-statement-verify="'+esc(file.import_uid)+'">Verify original</button><button type="button" data-statement-remove="'+esc(file.import_uid)+'">Remove</button>':'')+'</div></div></div>';
+}
+function statementFolderBody(){
+ const entries=statementEntries(),query=state.statementQuery.trim().toLowerCase();
+ const statusMatch=file=>state.statementStatus==='ALL'||(state.statementStatus==='ATTENTION'?['FAILED','DEAD_LETTER','NEEDS_PASSWORD','NEEDS_MAPPING'].includes(file.status):file.status===state.statementStatus);
+ const filtered=entries.filter(statusMatch).filter(file=>!query||[file.original_name,file.account_name,file.institution,file.market,file.statement_start_date,file.statement_end_date,file.status].join(' ').toLowerCase().includes(query));
+ if(query)return '<div class="fm-folder-results"><p class="fm-helper">'+filtered.length+' matching file(s) across your permitted account folders</p>'+filtered.map(statementFileRow).join('')+(filtered.length?'':emptyState('No matching statement','Search a file name, bank, account or statement date.'))+'</div>';
+ if(!state.statementBank){
+  const banks=new Map();for(const file of filtered){if(!banks.has(file.folder_key))banks.set(file.folder_key,{name:file.institution,market:file.market,files:[],accounts:new Set()});const folder=banks.get(file.folder_key);folder.files.push(file);folder.accounts.add(String(file.bank_account_id))}
+  return '<div class="fm-folder-grid">'+[...banks.entries()].map(([key,folder])=>'<button type="button" class="fm-folder-card" data-statement-bank="'+esc(key)+'"><span class="fm-folder-icon" aria-hidden="true">▰</span><span><strong>'+esc(folder.name)+'</strong><small>'+esc(folder.market)+'</small><b>'+folder.files.length+' file(s) · '+folder.accounts.size+' account(s)</b></span><i aria-hidden="true">›</i></button>').join('')+(!banks.size?emptyState('Your statement folder is empty','Upload a statement to place its original file and import status inside the matching account folder.'):'')+'</div>';
+ }
+ const bankFiles=filtered.filter(file=>file.folder_key===state.statementBank);
+ if(!state.statementAccount){
+  const accounts=new Map();for(const file of bankFiles){const id=String(file.bank_account_id);if(!accounts.has(id))accounts.set(id,{name:file.account_name,files:[]});accounts.get(id).files.push(file)}
+  return '<div class="fm-folder-grid">'+[...accounts.entries()].map(([id,folder])=>'<button type="button" class="fm-folder-card" data-statement-account="'+esc(id)+'"><span class="fm-folder-icon" aria-hidden="true">▰</span><span><strong>'+esc(folder.name)+'</strong><small>Account statement folder</small><b>'+folder.files.length+' file(s) · '+folder.files.filter(file=>file.status==='PENDING_REVIEW').length+' waiting for review</b></span><i aria-hidden="true">›</i></button>').join('')+(!accounts.size?emptyState('No files match this status','Change the status filter or return to All statements.'):'')+'</div>';
+ }
+ const files=bankFiles.filter(file=>String(file.bank_account_id)===state.statementAccount);
+ return '<div class="fm-list">'+files.map(statementFileRow).join('')+(!files.length?emptyState('No files match this status','Change the filter to see this account’s imported statements.'):'')+'</div>';
+}
 function statements(){
- const recent=state.reviews
-  .filter(x=>!['REMOVED','REVERSED','CANCELLED'].includes(String(x.status||'').toUpperCase()))
-  .sort((a,b)=>String(b.created_at||'').localeCompare(String(a.created_at||'')))
-  .slice(0,25);
- const importRows=recent.map(x=>{
-  const status=String(x.status||'').toUpperCase();
-  const failed=['FAILED','DEAD_LETTER'].includes(status);
-  const pending=status==='PENDING_REVIEW';
-  const imported=status==='IMPORTED';
-  const stalled=Number(x.stalled||0)===1;
-  const detail=failed
-   ? esc(x.last_error_summary||x.job_error_summary||String(x.current_stage||status).replace(/_/g,' '))
-   : imported
-     ? num(x.total_rows)+' rows processed · '+num(x.duplicate_rows)+' duplicates excluded'
-     : pending
-       ? num(x.total_rows)+' rows · '+num(x.duplicate_rows)+' duplicates · '+num(x.rejected_rows)+' rejected'
-       : stalled
-         ? 'Processing heartbeat is stale · automatic recovery will re-queue safely'
-         : num(x.progress_percent)+'% · '+esc(String(x.current_stage||status||'PROCESSING').replace(/_/g,' '));
-  if(pending)return `<button class="fm-row fm-row-button" data-import-review="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement review')}</h3><p>${esc(x.account_name||'')} · ready for review</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail}</small></div></button>`;
-  if(imported)return `<div class="fm-row"><div><h3>${esc(x.original_name||'Statement import')}</h3><p>${esc(x.account_name||'')} · posted</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail}</small></div></div>`;
-  return `<button class="fm-row fm-row-button" data-import-status="${esc(x.import_uid)}"><div><h3>${esc(x.original_name||'Statement import')}</h3><p>${esc(x.account_name||'')} · ${esc(String(x.current_stage||status||'PROCESSING').replace(/_/g,' '))}</p></div><div class="fm-row-right">${statusBadge(status)}<small>${detail} · open status / recovery</small></div></button>`;
- }).join('');
- return `<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Import Wizard</h2><p>Choose account → secure upload → classify/OCR → validate → review → approve and post. Up to 25 recent active imports are shown; removed statements stay only in recovery.</p></div><button data-quick="statement">Start import</button></div><div class="fm-list">${importRows||emptyState('No recent imports','New statement uploads will appear here before they affect the ledger.')}</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Supported formats</h2><p>Verified by file content and processed by the secure server pipeline.</p></div></div><div class="fm-format-grid"><span>CSV</span><span>PDF + OCR</span><span>PNG/JPEG</span><span>OFX</span><span>QFX</span><span>QIF</span><span>XLSX</span></div><p class="fm-helper">Original statements and row-level source evidence are retained. Legacy XLS and HEIC are rejected explicitly.</p></div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Statement Vault</h2><p>Committed history with coverage and import quality.</p></div></div>${resourceError('statementPayload','Statement Vault')}<div class="fm-list">${state.statements.map(x=>`<div class="fm-row"><div><h3>${esc(x.original_name||'Statement')}</h3><p>${esc(x.account_name||'')} · ${date(x.statement_start_date)} – ${date(x.statement_end_date)} · ${esc(x.source_format||'')}</p></div><div class="fm-row-right"><b>${num(x.imported_rows)} imported</b><small>${num(x.duplicate_rows)} duplicates · ${num(x.rejected_rows)} rejected</small><div class="fm-inline-actions"><button type="button" data-statement-edit="${esc(x.import_uid)}">Edit</button><button type="button" data-statement-remove="${esc(x.import_uid)}">Remove</button></div></div></div>`).join('')||emptyState('No committed statements','Use the import wizard to build verified account history.')}</div></div></article>${removedStatementsSection()}`;
+ const entries=statementEntries(),bank=entries.find(file=>file.folder_key===state.statementBank),account=entries.find(file=>String(file.bank_account_id)===state.statementAccount);
+ const breadcrumbs='<nav class="fm-folder-breadcrumb" aria-label="Statement folder path"><button type="button" data-statement-root>All statements</button>'+(bank?'<span>›</span><button type="button" data-statement-back-bank>'+esc(bank.institution)+'</button>':'')+(account&&state.statementBank?'<span>›</span><strong>'+esc(account.account_name)+'</strong>':'')+'</nav>';
+ return '<section class="fm-statement-hub fm-card"><div class="fm-pad"><div class="fm-card-head"><div><span class="fm-eyebrow">DOCUMENT CENTRE</span><h2>Imported statements</h2><p>Every original file, pending review and posted statement stays inside its bank and account folder.</p></div><button type="button" class="fm-primary" data-quick="statement">+ Upload statements</button></div><div class="fm-statement-stats"><span><b>'+entries.length+'</b> files</span><span><b>'+entries.filter(file=>file.status==='PENDING_REVIEW').length+'</b> to review</span><span><b>'+entries.filter(file=>['FAILED','DEAD_LETTER','NEEDS_PASSWORD','NEEDS_MAPPING'].includes(file.status)).length+'</b> need attention</span></div><div class="fm-folder-toolbar"><label class="fm-search"><span>⌕</span><input type="search" data-statement-search aria-label="Search statement folders" placeholder="Find a bank, account, file or date" value="'+esc(state.statementQuery)+'"></label><label>Status<select data-statement-status><option value="ALL">All files</option><option value="PENDING_REVIEW" '+(state.statementStatus==='PENDING_REVIEW'?'selected':'')+'>Ready for review</option><option value="IMPORTED" '+(state.statementStatus==='IMPORTED'?'selected':'')+'>Posted</option><option value="ATTENTION" '+(state.statementStatus==='ATTENTION'?'selected':'')+'>Needs attention</option></select></label></div>'+resourceError('statementPayload','Statements')+resourceError('reviewPayload','Statement imports')+breadcrumbs+'<div data-statement-folder-body>'+statementFolderBody()+'</div></div></section><details class="fm-card"><summary class="fm-pad">Import guide & supported formats</summary><div class="fm-pad"><p class="fm-helper">Select the exact account → upload → check printed totals and balances → correct uncertain rows → approve. CSV, selectable or scanned PDF, PNG/JPEG, OFX, QFX, QIF and XLSX are supported. Originals remain private and never affect the ledger until approval.</p></div></details>'+removedStatementsSection();
 }
 function removedStatementsSection(){
  const rows=(state.removedStatements||[]).map(x=>'<div class="fm-row"><div><h3>'+esc(x.original_name||'Removed statement')+'</h3><p>'+esc(x.account_name||'')+' · '+date(x.statement_start_date)+' – '+date(x.statement_end_date)+' · '+esc(x.source_format||'')+'</p></div><div class="fm-row-right">'+statusBadge('REMOVED')+'<small>Excluded from active reports and analysis</small><div class="fm-inline-actions"><button type="button" data-statement-restore="'+esc(x.import_uid)+'">Restore</button><button type="button" class="bad" data-statement-purge="'+esc(x.import_uid)+'">Danger Zone purge</button></div></div></div>').join('')||emptyState('No removed statements','Soft-removed statements will appear here for controlled recovery.');
  return '<details class="fm-card fm-removed-statements"><summary class="fm-pad"><strong>Removed Statements</strong><span>'+(state.removedStatements||[]).length+' recoverable</span></summary><div class="fm-pad"><p class="fm-helper">Restore returns the statement to active history. Permanent deletion is hidden in this controlled recovery area, requires step-up authentication, and cannot be undone.</p><div class="fm-list">'+rows+'</div></div></details>';
+}
+async function verifyOriginalStatement(uid){
+ try{
+  notice('Checking the original file against the posted ledger…');
+  const result=await api(I+'/statements/'+encodeURIComponent(uid)+'/verify',{method:'POST',body:'{}',timeoutMs:180000});
+  const checks=(result.validations||[]).map(item=>'<div class="fm-validation-row"><span>'+esc(String(item.check).replace(/_/g,' '))+'</span>'+statusBadge(item.status)+'<small>Printed: '+esc(item.expected??'—')+' · Extracted: '+esc(item.actual??'—')+'</small></div>').join('');
+  openDrawer('Original statement verification','<div class="fm-state '+(result.repairable?'fm-state-warning':'')+'"><strong>'+esc(result.message)+'</strong><p>'+num(result.source_rows)+' source transactions · '+num(result.artifact_count)+' header/total row(s) to exclude · '+num(result.missing_count)+' source transaction(s) missing from the ledger</p></div>'+checks+(result.repairable?'<button type="button" class="fm-primary" data-apply-source-repair="'+esc(uid)+'">Apply verified source corrections</button>':''),'SOURCE VERIFICATION');
+  document.querySelector('[data-apply-source-repair]')?.addEventListener('click',async()=>{try{const repaired=await api(I+'/statements/'+encodeURIComponent(uid)+'/verify',{method:'POST',body:JSON.stringify({apply:true}),timeoutMs:180000});closeDrawer();financeDataChanged();await refresh();showFinancePopup('Source corrections saved',repaired.message)}catch(error){notice(error.message,true)}});
+ }catch(error){notice(error.message,true)}
 }
 function openCommittedStatementTransactionEditor(uid,tx){
  const debit=num(tx.debit),credit=num(tx.credit),direction=debit>0?'DEBIT':credit>0?'CREDIT':'',amount=debit>0?debit:credit>0?credit:'';
@@ -2576,14 +2602,16 @@ async function openStatementReview(uid,initialFilter='ALL'){
   const selectedCount=rows.filter(row=>Number(row.selected||0)&&['VALID','WARNING'].includes(String(row.validation_status||'').toUpperCase())).length;
   const filters=[['ALL','All',session.total_rows],['VALID','Valid',session.valid_rows],['UNCERTAIN','Uncertain',warnings],['DUPLICATE','Duplicates',session.duplicate_rows],['REJECTED','Rejected',session.rejected_rows]];
   const evidence=session.secure_document_id?'<a class="fm-evidence-link" href="/api/documents/'+encodeURIComponent(session.secure_document_id)+'/download" target="_blank" rel="noopener">Open original statement</a>':'';
-  const validationHtml=validations.map(item=>'<div class="fm-validation-row"><span>'+esc(String(item.validation_key||'').replace(/_/g,' '))+'</span>'+statusBadge(item.status)+'<small>'+esc(item.detail||item.actual_value||'')+'</small></div>').join('');
+  const failedValidation=validations.some(item=>item.status==='FAIL');
+  const validationHtml=validations.map(item=>'<div class="fm-validation-row"><span>'+esc(String(item.validation_key||'').replace(/_/g,' '))+'</span>'+statusBadge(item.status)+'<small>Expected: '+esc(item.expected_value??'—')+' · Extracted: '+esc(item.actual_value??'—')+(item.difference_value!==null&&item.difference_value!==undefined?' · Difference: '+esc(item.difference_value):'')+'<br>'+esc(item.detail||'')+'</small></div>').join('');
   const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked and excluded from the ledger, totals and exports.</p></div>':'';
   const tableRows=rows.map(row=>statementReviewRowMarkup(row,session)).join('');
   const brandHeader='<section class="fm-review-bank-sheet-head"><div class="fm-review-brand"><img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda"><div><b>Voxel Veda</b><span>Finance Statement Review</span></div></div><div class="fm-review-statement-title"><strong>Your Statement</strong><span>'+esc(session.original_name||'Statement review')+'</span></div><div class="fm-review-account-meta"><span>Statement rows <b>'+num(session.total_rows)+'</b></span><span>Selected <b>'+selectedCount+'</b></span><span>Currency <b>'+esc(session.account_currency||'AUD')+'</b></span></div></section>';
   const statusCards='<div class="fm-review-toolbar"><div class="fm-review-status-grid" role="tablist" aria-label="Statement row filters">'+filters.map(([key,label,count])=>'<button type="button" data-review-filter="'+key+'"><span>'+label+'</span><strong>'+num(count)+'</strong><small>'+({ALL:'All rows',VALID:'Verified rows',UNCERTAIN:manualFixes+' manual fix'+(manualFixes===1?'':'es'),DUPLICATE:'Excluded',REJECTED:'Needs attention'}[key])+'</small></button>').join('')+'</div>'+evidence+'</div>';
   const metadata='<div class="fm-statement-meta"><span>Account<b>'+esc(session.account_name||'—')+'</b></span><span>Format<b>'+esc(session.source_format||'—')+'</b></span><span>Parser<b>'+esc(session.parser_version||'—')+'</b></span><span>Reconciliation<b>'+esc(session.reconciliation_status||'INCOMPLETE')+(session.reconciliation_difference!==null&&session.reconciliation_difference!==undefined?' · '+nativeMoney(session.reconciliation_difference,session.statement_currency||session.account_currency):'')+'</b></span></div>';
-  const validationPanel=validationHtml?'<details class="fm-validation"><summary>Validation and reconciliation evidence</summary>'+validationHtml+'</details>':'';
-  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+metadata+validationPanel+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction & source</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Approve & post selected rows</button></div></div>';
+  const validationPanel=validationHtml?'<details class="fm-validation" '+(failedValidation?'open':'')+'><summary>Validation and reconciliation evidence</summary>'+validationHtml+'</details>'+(failedValidation?'<div class="fm-state fm-state-warning"><strong>The source totals or running balances do not match.</strong><p>Check the original document and correct the highlighted rows before posting.</p><label><input type="checkbox" data-acknowledge-validation> I checked the original document and explicitly approve posting with these differences.</label></div>':''):'';
+  const parserUpgrade=session.source_format==='PDF'&&session.secure_document_id&&session.parser_version==='finance-ingestion-v2-bank-aware' ? '<div class="fm-state fm-state-warning"><strong>Corrected statement reader available</strong><p>Re-read the original to fix header rows, totals and repeated purchases before posting. This rebuilds the pending review; check your selections and corrections again.</p><button type="button" data-review-reparse="'+esc(uid)+'">Re-read original</button><div data-review-reparse-progress hidden></div></div>' : '';
+  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+metadata+validationPanel+parserUpgrade+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction & source</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Approve & post selected rows</button></div></div>';
   openDrawer('Review '+(session.original_name||'statement'),body,'STATEMENT REVIEW');
 
   setTimeout(()=>{
@@ -2603,6 +2631,7 @@ async function openStatementReview(uid,initialFilter='ALL'){
     const table=document.querySelector('.fm-review-table-wrap');if(table)table.scrollIntoView({behavior:'smooth',block:'start'});
    };
 
+   document.querySelector('[data-review-reparse]')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{await api(I+'/statement-imports/'+encodeURIComponent(uid)+'/retry',{method:'POST',body:'{}'});await waitForStatementImport(uid,document.querySelector('[data-review-reparse-progress]'))}catch(error){button.disabled=false;notice(error.message,true)}});
    document.querySelectorAll('[data-review-filter]').forEach(button=>button.onclick=()=>applyFilter(button.dataset.reviewFilter));
    document.querySelectorAll('[data-review-select]').forEach(box=>box.onchange=async()=>{try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(box.dataset.reviewSelect)+'/select',{method:'POST',body:JSON.stringify({selected:box.checked})})}catch(error){box.checked=!box.checked;notice(error.message,true)}});
    document.querySelectorAll('[data-review-override]').forEach(box=>box.onchange=()=>{if(!box.checked)return;const row=rows.find(item=>String(item.id)===String(box.dataset.reviewOverride));if(row)openRejectedRowOverride(uid,row,session,box)});
@@ -2610,7 +2639,9 @@ async function openStatementReview(uid,initialFilter='ALL'){
    document.querySelectorAll('[data-review-edit]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewEdit));if(row)openRejectedRowOverride(uid,row,session,null)});
    document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{
     try{
-     const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:'{}'});
+     const acknowledged=Boolean(document.querySelector('[data-acknowledge-validation]')?.checked);
+     if(failedValidation&&!acknowledged){notice('Check the original statement and correct the differences before approving.',true);return}
+     const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:JSON.stringify({acknowledge_validation_mismatch:acknowledged})});
      closeDrawer();await refresh();
      showFinancePopup('Statement imported successfully',x.message,num(x.imported)+' imported · '+num(x.duplicates)+' duplicate(s) excluded · '+num(x.excluded_balance_markers)+' balance marker(s) excluded');
     }catch(error){notice(error.message,true)}
@@ -2727,6 +2758,14 @@ function bindDynamic(){
  document.querySelectorAll('[data-fx-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this FX rate? Historical native transactions are not changed.'))return;try{const x=await api(API+'/fx-rates/'+encodeURIComponent(b.dataset.fxArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await loadResource('fxRates',API+'/fx-rates');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
  document.querySelectorAll('[data-import-status]').forEach(b=>b.onclick=()=>openStatementImportStatus(b.dataset.importStatus));
+ document.querySelectorAll('[data-statement-bank]').forEach(button=>button.onclick=()=>{state.statementBank=button.dataset.statementBank;state.statementAccount='';render()});
+ document.querySelectorAll('[data-statement-account]').forEach(button=>button.onclick=()=>{state.statementAccount=String(button.dataset.statementAccount);render()});
+ document.querySelector('[data-statement-root]')?.addEventListener('click',()=>{state.statementBank='';state.statementAccount='';state.statementQuery='';render()});
+ document.querySelector('[data-statement-back-bank]')?.addEventListener('click',()=>{state.statementAccount='';render()});
+ const statementSearch=document.querySelector('[data-statement-search]');if(statementSearch)statementSearch.oninput=event=>{const position=event.currentTarget.selectionStart;state.statementQuery=event.currentTarget.value;render();const input=document.querySelector('[data-statement-search]');input?.focus();input?.setSelectionRange(position,position)};
+ const statementStatus=document.querySelector('[data-statement-status]');if(statementStatus)statementStatus.onchange=event=>{state.statementStatus=event.currentTarget.value;render()};
+ document.querySelectorAll('[data-statement-original]').forEach(button=>button.onclick=()=>downloadFinanceFile('/api/documents/'+encodeURIComponent(button.dataset.statementOriginal)+'/download',button.dataset.originalName,'Original file ready','The original uploaded file is ready to save.').catch(error=>notice(error.message,true)));
+ document.querySelectorAll('[data-statement-verify]').forEach(button=>button.onclick=()=>verifyOriginalStatement(button.dataset.statementVerify));
  document.querySelectorAll('[data-quick]').forEach(b=>b.onclick=()=>openNew(b.dataset.quick));
  document.querySelectorAll('[data-personal-new]').forEach(b=>b.onclick=()=>openPersonalForm(b.dataset.personalNew));
  if($('planningCreate'))$('planningCreate').onclick=openPlanningPlanForm;

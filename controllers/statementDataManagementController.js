@@ -136,6 +136,20 @@ exports.listRemoved = async (req,res) => {
   } catch(error){return fail(res,error,'Failed to load removed statements.');}
 };
 
+exports.verifyOriginal = async (req,res) => {
+  try {
+    await ensureFinanceSchema();
+    const file = await getStatement(pool, req, String(req.params.uid || ''));
+    if (file.parse_status !== 'IMPORTED') throw new FinanceError('Only posted statements can be verified against their original file.',409,'STATEMENT_NOT_POSTED');
+    const { verifyStoredStatement } = require('../services/financeStatementSourceRepair');
+    const result = await verifyStoredStatement(file, { apply: req.body?.apply === true, actorId: req.user.id });
+    return res.json(result);
+  } catch (error) {
+    if (error.statusCode && error.code) return res.status(error.statusCode).json({message:error.message,code:error.code});
+    return fail(res,error,'Statement source verification failed.');
+  }
+};
+
 exports.remove = async (req,res) => {
   let db;
   try {
@@ -236,6 +250,7 @@ exports.correctPostedTransaction = async (req,res) => {
     }
 
     const candidate=normalizeRow(file.bank_account_id,file.currency,{
+      source_occurrence: (() => { try { return (typeof sourceRow?.raw_payload_json==='string' ? JSON.parse(sourceRow.raw_payload_json) : sourceRow?.raw_payload_json)?.source_occurrence || 1; } catch { return 1; } })(),
       transaction_date:req.body?.transaction_date ?? tx.transaction_date,
       posting_date:req.body?.posting_date ?? tx.posting_date,
       description:req.body?.description ?? tx.description,
