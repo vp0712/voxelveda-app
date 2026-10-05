@@ -72,7 +72,7 @@ assert(financeRoutes.includes('/intelligence/transactions/:id'),'transaction man
 assert(financeRoutes.includes("requireStepUp('IMPORT_BANK_TRANSACTIONS')"),'statement import/correction must retain step-up protection');
 
 assert(html.includes('/finance-master.js')&&html.includes('FINANCE OPERATING SYSTEM'),'single Finance OS page/client contract missing');
-for(const marker of ['FINANCE COMMAND CENTRE','Statement Import Wizard','Statement Vault','SPENDING & COST INTELLIGENCE','BANKING OPERATIONS','Money Spaces','Beneficiaries','Payment workflow','Banking Connections','CURRENT CLASSIFICATION','ORIGINAL BANK DATA'])assert(ui.includes(marker),`unified Finance OS missing ${marker}`);
+for(const marker of ['FINANCE COMMAND CENTRE','function openStatementWizard()','Imported statements','SPENDING & COST INTELLIGENCE','BANKING OPERATIONS','Money Spaces','Beneficiaries','Payment workflow','Banking Connections','CURRENT CLASSIFICATION','ORIGINAL BANK DATA'])assert(ui.includes(marker),`unified Finance OS missing ${marker}`);
 assert(ui.includes('const MOBILE_NAV')&&ui.includes("'more','☰','More'"),'unified Finance mobile navigation incomplete');
 assert(ui.includes('External bank payment execution is not enabled')||ui.includes('provider-capability gated'),'external bank execution boundary missing');
 assert(css.includes('.fm-mobile-nav')&&css.includes('.fm-command-centre')&&css.includes('.fm-intelligence-grid'),'unified Finance mobile/intelligence styles missing');

@@ -27,3 +27,9 @@ body:not(.finance-os-page) :is(.sidebar,.vv-sidebar) :is(.brand h1,.brand p,.nav
 body:not(.finance-os-page) :is(.sidebar-footer,.nav-group){background:transparent!important}
 body:not(.finance-os-page) :is(.login-card,.login-panel,.login-box,.auth-panel) :is(p,label){color:#526c8a!important}
 .workspace-nav-search{display:grid;gap:6px;margin:0 0 16px;font-size:12px;color:#d0dff5}.workspace-nav-search input{width:100%;padding:10px 12px;min-height:44px;font:inherit}.workspace-nav-filtered{display:none!important}
+body:not(.finance-os-page) :is(.section-head,.vv-suite-panel,.admin-workhub-control,.staff-work-panel,.staff-suite-panel,.workforce-intelligence-panel,.roster-generator-card,.supplier-intelligence-card,.stock-table-card,.table-wrap,.dialog-panel,.modal,.public-card,.settings-qr-frame,.qr-tool-card,.announcement-panel,.notification-panel,.notification-dropdown,.vv-suite-card,.command-insight-card,.system-action,.staff-action-card,.roster-signal-card,.roster-week-card){background:#fff!important;color:#172e4d!important;border-color:#d8e3f3!important;box-shadow:0 8px 24px rgba(32,62,112,.06)!important}
+body:not(.finance-os-page) :is(.login-btn,.small-btn,.topbar-quick-action){background:#2463eb!important;color:#fff!important;border-color:#2463eb!important}
+body:not(.finance-os-page) :is(.icon-btn,.profile-chip,.notification-bell,.staff-task-alert){background:#edf3ff!important;color:#214e94!important;border-color:#cfdef6!important}
+body:not(.finance-os-page) table th{background:#edf3ff!important;color:#172e4d!important}
+body:not(.finance-os-page) :is(.page-section,#invoiceSection) :is(.card,.table-wrap){background:#fff!important;color:#172e4d!important;border-color:#d8e3f3!important}
+body:not(.finance-os-page) :is(.page-section,#invoiceSection) :is(.metric-grid>.card strong,.table-wrap>h3,table th){color:#172e4d!important}body:not(.finance-os-page) :is(.page-section,#invoiceSection) table th{background:#edf3ff!important}
