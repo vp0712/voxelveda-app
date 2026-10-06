@@ -141,7 +141,7 @@ async function verifyStoredStatement(file, { apply = false, actorId = null } = {
            original_debit,original_credit,original_running_balance,original_currency,original_payload_json,captured_by)
           VALUES (?,?,'STATEMENT_IMPORT',?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           [insert.insertId,account.id,file.import_uid,reviewRow.id,row.transaction_date,row.posting_date,row.description,row.merchant_name,row.reference,row.category,row.debit,row.credit,row.running_balance,row.currency,row.original_extracted_json||row.raw_payload_json,actor]);
-        await db.query("UPDATE statement_import_rows SET row_hash=?,validation_status=?,selected=1,review_status='POSTED',duplicate_status=NULL,final_posted_transaction_id=?,validation_message='Source transaction recovered after both printed totals were verified' WHERE id=?", [row.row_hash,row.validation_status,insert.insertId,reviewRow.id]);
+        await db.query("UPDATE statement_import_rows SET row_hash=?,validation_status=?,selected=1,review_status='POSTED',duplicate_status='NOT_DUPLICATE',final_posted_transaction_id=?,validation_message='Source transaction recovered after both printed totals were verified' WHERE id=?", [row.row_hash,row.validation_status,insert.insertId,reviewRow.id]);
         reviewRow.final_posted_transaction_id = insert.insertId;
         await logAudit(db, { actorId: actor, action: 'STATEMENT_SOURCE_TRANSACTION_RECOVERED', module: 'finance_intelligence', recordType: 'bank_transaction', recordId: insert.insertId, newValue: { debit: row.debit, credit: row.credit, parser_version: PARSER_VERSION, source_file_hash: parsed.fileHash, source_row_id: reviewRow.id } });
         added += 1;
