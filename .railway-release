@@ -1,8 +1,8 @@
-database-release: 20261006-unified-app-finance-theme-contrast
-source-commit: 1ab1cae423be051f39574eb2d4e465a61ae69187
-candidate-commit: 528d264fa289ccdbd46f695c62c731d8b173d36e
-scope: unified-sapphire-operations-finance-role-quality-profile-security-themes; legacy-contrast-repair; truthful-statement-attention-processing
-preserves: original-logo; permissions; hidden-states; statement-source-evidence; posted-ledger-step-up-controls
-ci: follow-up-security-success; follow-up-consolidation-success; follow-up-finance-release-candidate-success; parent-all-seven-workflows-success
-runtime: awaiting-railway-deployment-and-health-verification
+database-release: 20261006-verified-source-repair-status
+source-commit: 4c5db65afe7902005aa7df56e80c50fc69f397f5
+candidate-commit: 9471dd98a8df6eaa6d30e48617c8b34aa671fb0e
+scope: source-repair-not-null-duplicate-status; capacitor-8.5.2; proxy-addr-2.0.8
+preserves: original-logo; source-evidence; account-locks; reversible-audit-history; step-up-authentication
+ci: finance-release-candidate-success; security-success; consolidation-success; production-audit-zero-vulnerabilities
+runtime: awaiting-production-health-and-protected-source-repair-verification
 policy: single-marker-controlled-production-deploy
