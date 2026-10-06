@@ -120,6 +120,10 @@ async function run() {
   let committed=0,rolledBack=0,released=0;
   const db={beginTransaction:async()=>{},commit:async()=>{committed++},rollback:async()=>{rolledBack++},release:()=>{released++},query:async(sql,params=[])=>{
     assert.equal((sql.match(/\?/g)||[]).length,params.length,'every SQL placeholder must have a bound value');
+    if (sql.startsWith('UPDATE statement_import_rows') && sql.includes("review_status='POSTED'")) {
+      assert.doesNotMatch(sql,/duplicate_status\s*=\s*NULL/i,'production duplicate_status is NOT NULL; recovering a duplicate must retain a concrete status');
+      assert.match(sql,/duplicate_status\s*=\s*'NOT_DUPLICATE'/i,'a recovered source transaction is no longer an excluded duplicate');
+    }
     queries.push(sql);
     if(sql.startsWith('SELECT * FROM bank_accounts'))return [[{...account,status:'ACTIVE',history_end_date:'2024-09-30'}]];
     if(sql.startsWith('SELECT * FROM statement_import_files'))return [[file]];
