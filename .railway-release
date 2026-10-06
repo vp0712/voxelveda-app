@@ -1,8 +1,8 @@
-database-release: 20261006-progress-state-recovery
-source-commit: c12c67ba82ca169a9070de5f95977f6707d32773
-candidate-commit: 3b98eaaef5f00bcbde816e57f8cc4746a8a0253c
-scope: ordered-statement-progress; terminal-state-guards; completed-review-status-recovery; durable-failure-ui; finance-assets-v38
-preserves: original-evidence; existing-review-corrections; ledger-step-up; intentional-exclusions; account-locks; audit-history
-ci: finance-success; security-success; consolidation-success; bank-account-lifecycle-success; advanced-banking-success; production-audit-zero-vulnerabilities
-runtime: awaiting-production-health-and-live-import-status-verification
+database-release: 20261006-integrated-erp-workspace
+source-commit: 8576173eada1a71fb51e8373a7dbe52cc12dddee
+candidate-commit: 4b6e467483a78c51f633a9e36ac275aeaa053b5c
+scope: integrated-main-app-erp; role-filtered-departments; audited-campaign-lifecycle; planning-only-work-orders; serialized-machine-reservations; erp-assets-20261006-erp1
+preserves: original-logo; existing-company-records; finance-statement-review; audit-history; permission-boundaries; quality-release; operator-and-machine-gates
+ci: finance-pr-success; finance-push-success; security-success; consolidation-success; original-logo-success; advanced-banking-success; production-audit-zero-vulnerabilities
+runtime: awaiting-production-migration-health-and-live-erp-verification
 policy: single-marker-controlled-production-deploy
