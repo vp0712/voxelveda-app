@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Voxel Veda Operations Control</title>
+  <title>Voxel Veda ERP Workspace</title>
+  <link rel="stylesheet" href="/erp-workspace.css?v=20261006-erp1" />
 <link rel="stylesheet" href="/style.css?v=20260909-erp-wave1"/>
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
 <link rel="stylesheet" href="/step-up.css?v=20260905"/>
@@ -32,23 +33,27 @@
         <img src="/Frame 1.png?v=20260703-brand" class="logo-img" alt="Voxel Veda Logo">
         <div>
           <h1>VOXEL VEDA</h1>
-          <p>Operations Control</p>
+          <p>Integrated ERP Workspace</p>
         </div>
       </div>
 
       <label class="workspace-nav-search"><span>Find a feature</span><input id="workspaceNavSearch" type="search" placeholder="Invoices, stock, finance…" aria-controls="workspaceNavigation"></label>
       <nav id="workspaceNavigation" class="sidebar-nav" aria-label="Admin sections">
         <span class="nav-section-label">Dashboard</span>
+        <button class="nav-btn" data-icon="ERP" data-title="ERP Workspace" data-section="erpSection" data-erp-focus="home">ERP Workspace</button>
         <button class="nav-btn active" data-icon="H" data-title="Home" data-section="dashboardSection">Home</button>
 
         <span class="nav-section-label">Sales</span>
         <button class="nav-btn" data-icon="Q" data-title="RFQs" data-section="rfqSection">RFQs</button>
         <button class="nav-btn" data-icon="I" data-title="Invoices" data-section="invoiceSection">Invoices</button>
         <button class="nav-btn" data-icon="C" data-title="Customers" data-section="customerSection">Customers</button>
+        <button class="nav-btn hidden-section" data-icon="MK" data-title="Marketing" data-section="erpSection" data-erp-focus="marketing">Marketing</button>
         <button class="nav-btn" data-icon="S" data-title="Suppliers" data-section="supplierSection">Suppliers</button>
         <button class="nav-btn" data-icon="PO" data-title="Procurement" data-section="procurementSection">Procurement</button>
 
         <span class="nav-section-label">Operations</span>
+        <button class="nav-btn hidden-section" data-icon="PL" data-title="Production Planning" data-section="erpSection" data-erp-focus="planning">Production Planning</button>
+        <button class="nav-btn hidden-section" data-icon="SC" data-title="Supply Chain" data-section="erpSection" data-erp-focus="supply">Supply Chain</button>
         <button class="nav-btn" data-icon="X" data-title="Competitors" data-section="competitorSection">Competitors</button>
         <details class="nav-group" open>
           <summary class="nav-group-toggle" data-icon="M">
@@ -160,6 +165,12 @@
         </div>
       </header>
 
+      <section id="erpSection" class="page-section hidden-section" aria-label="Integrated ERP workspace">
+        <div class="erp-hero"><div><span class="erp-eyebrow">VOXEL VEDA · INTEGRATED ERP</span><h1>One company.<br>Every operation.</h1><p>Find your department, see what needs attention and continue the same controlled workflow.</p></div><div class="erp-hero-aside"><span>COMPANY WORKSPACE</span><strong>Sales → Plan → Make → Deliver</strong><small>Shared records. Existing permissions. No duplicate finance system.</small><button type="button" id="erpRefresh">Refresh workspace</button></div></div>
+        <div class="erp-toolbar"><label><span>Find a department or task</span><input type="search" id="erpSearch" placeholder="Payroll, campaign, stock, delivery…"></label><p id="erpStatus" role="status">Loading permitted departments…</p></div>
+        <nav id="erpTabs" class="erp-tabs" aria-label="ERP departments"></nav>
+        <div id="erpContent" aria-live="polite"><div class="erp-empty">Checking live registers. Figures are never guessed.</div></div>
+      </section>
       <!-- OVERVIEW -->
       <section id="dashboardSection" class="page-section">
         <div class="home-command-hero">
@@ -167,6 +178,7 @@
             <span class="panel-kicker">Operations Core</span>
             <h1>Voxel Veda Control Room</h1>
             <div class="home-command-actions">
+              <button class="primary-btn" onclick="goSection('erpSection')">Open Integrated ERP</button>
               <button class="primary-btn" onclick="goSection('invoiceSection')">Create / Review Invoice</button>
               <button class="secondary-btn" onclick="goSection('expenseSection')">Supplier Payments</button>
               <button class="secondary-btn" onclick="goSection('stockSection')">Inventory Control</button>
@@ -1887,7 +1899,8 @@
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260919-access-fix"></script>
-  <script src="/admin-dashboard.js?v=20260919-access-fix"></script>
+  <script src="/admin-dashboard.js?v=20261006-erp1"></script>
+  <script src="/erp-workspace.js?v=20261006-erp1"></script>
   <script src="/workflow-ui.js?v=20260910-erp-wave2"></script>
   <script src="/procurement-ui.js?v=20260923-bom236-live3"></script>
   <script src="/expense-payments.js?v=20260904"></script>

@@ -3,6 +3,7 @@ const { spawnSync }=require('node:child_process');
 const path=require('node:path');
 
 const tests=[
+  "erp-workspace-test.js",
   "finance-release-consistency-test.js",
   "finance-workspace-theme-test.js",
   "bank-account-lifecycle-test.js",

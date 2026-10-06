@@ -1005,6 +1005,7 @@ function setupNavigation() {
       if (btn.dataset.section === 'approvalsSection') window.VoxelWorkflowUI?.load();
       if (btn.dataset.section === 'procurementSection') window.VoxelProcurementUI?.load();
       if (btn.dataset.section === 'trashSection') loadTrash();
+      if (btn.dataset.section === 'erpSection') window.VoxelERP?.open(btn.dataset.erpFocus || 'home');
       toggleMobileMenu(false);
     };
   });
@@ -1565,6 +1566,7 @@ function hasCurrentPermission(permission) {
 }
 
 const ADMIN_SECTION_ACCESS = Object.freeze({
+  erpSection: ['dashboard','rfqs','customers','procurement','stock','VIEW_QMS','compliance','staff','attendance','finance','approvals'],
   dashboardSection: ['dashboard'],
   rfqSection: ['rfqs'],
   invoiceSection: ['invoices'],
@@ -1598,6 +1600,7 @@ function canAccessAdminSection(sectionId) {
 function requestedAdminSection() {
   const view = new URLSearchParams(window.location.search).get('view');
   const sections = {
+    erp: 'erpSection', marketing: 'erpSection', planning: 'erpSection', 'supply-chain': 'erpSection',
     rfqs: 'rfqSection', invoices: 'invoiceSection', customers: 'customerSection',
     suppliers: 'supplierSection', procurement: 'procurementSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
     packaging: 'packagingSection', finance: 'financeSection', expenses: 'expenseSection', workforce: 'attendanceSection',
@@ -1605,7 +1608,7 @@ function requestedAdminSection() {
     compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection', security: 'securitySection',
     meetings: 'meetingSection', tasks: 'taskSection', approvals: 'approvalsSection', trash: 'trashSection'
   };
-  return sections[view] || '';
+  return sections[view] || (!view ? 'erpSection' : '');
 }
 
 function configureRestrictedWorkspaceView() {
@@ -1669,6 +1672,7 @@ async function loadMe() {
   const role = String(data.user.role || '').trim().toLowerCase();
 
   currentUser = { ...data.user, role };
+  window.VoxelERP?.load();
   currentRole = role;
   localStorage.setItem('user', JSON.stringify(currentUser));
   localStorage.setItem('role', role);
