@@ -115,6 +115,8 @@ async function run(){
   await context.window.VoxelERP.open('planning');assert.match(el('erpContent').innerHTML,/Register unavailable/);assert(!el('erpContent').innerHTML.includes('New work order'));
   const html=fs.readFileSync(path.join(__dirname,'../public/admin-dashboard.html'),'utf8');assert.match(html,/id="erpSection"/);assert.match(html,/erp-workspace\.js\?v=/);
   const ui=fs.readFileSync(path.join(__dirname,'../public/erp-workspace.js'),'utf8');assert.match(ui,/form\.dataset\.busy==='true'/);assert.match(ui,/payload\.revision=Number/);assert.match(ui,/\/shop-floor\?type=job&id=/);
+  const css=fs.readFileSync(path.join(__dirname,'../public/erp-workspace.css'),'utf8');
+  assert.match(css,/#erpSection \.erp-section-head h2\{color:var\(--erp-ink\)!important\}/,'ERP headings must override inherited dark-shell text on their light panels');
   const migration=fs.readFileSync(path.join(__dirname,'../migrations/20261006_erp_campaign_register.sql'),'utf8');assert.match(migration,/revision INT UNSIGNED/);assert(!/DROP TABLE|TRUNCATE/i.test(migration));
   console.log('ERP_WORKSPACE_OK: permissions, unavailable data, audited campaign lifecycle, revision conflicts, planning-only jobs, UTC schedules, machine conflict locks and safe UI rendering.');
 }
