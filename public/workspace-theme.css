@@ -38,3 +38,149 @@ body:not(.finance-os-page) :is(.page-section,#invoiceSection) :is(.metric-grid>.
 body:not(.finance-os-page) button[type="submit"]:not(.secondary-btn):not(.logout-btn){background:#2463eb!important;color:#fff!important;border-color:#2463eb!important;box-shadow:none!important}
 body:not(.finance-os-page) button[type="submit"]:not(.secondary-btn):not(.logout-btn):hover{background:#184ccd!important;border-color:#184ccd!important}
 body.login-page .portal-links a{color:#214e94!important}
+
+/* Unified portal appearance. Scoped selectors outrank legacy dark overrides,
+   including .sidebar button:not(...) and role-specific panel headings. */
+body[data-vv-theme="sapphire"] {
+  --ink: #172e4d;
+  --card: #fff;
+  --surface: #fff;
+  --surface-2: #f7faff;
+  --panel2: #f7faff;
+  --line: #d8e3f3;
+  --dark: #102850;
+  --role-accent: #214e94;
+  --role-accent-rgb: 33, 78, 148;
+  --role-soft: #edf3ff;
+  --role-border: #d8e3f3;
+  --vv-brand-line: #2463eb;
+  background: #f3f6fc !important;
+  color: #172e4d !important;
+  accent-color: #2463eb;
+}
+body[data-vv-theme="sapphire"] :is(.app-shell, .app-shell > .main, .client-shell, .visitor-shell, .fm-shell, .fm-main) {
+  background: #f3f6fc !important;
+  color: #172e4d !important;
+}
+body[data-vv-theme="sapphire"] .sidebar .sidebar-nav :is(.nav-btn, .nav-sub-btn, .nav-group-toggle, a) {
+  background: transparent !important;
+  color: #d0dff5 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+body[data-vv-theme="sapphire"] .sidebar .sidebar-nav :is(.nav-btn, .nav-sub-btn, .nav-group-toggle, a):hover {
+  background: #203e70 !important;
+  color: #fff !important;
+}
+body[data-vv-theme="sapphire"] .sidebar .sidebar-nav :is(.nav-btn.active, .nav-sub-btn.active, a.active) {
+  background: #2463eb !important;
+  color: #fff !important;
+}
+body[data-vv-theme="sapphire"] .sidebar :is(.nav-submenu, .nav-group-items, .brand, .staff-sidebar-profile) {
+  background: transparent !important;
+  border-color: #36517c !important;
+}
+body[data-vv-theme="sapphire"] .sidebar :is(.brand h1, .brand p, .staff-sidebar-profile strong, .staff-sidebar-profile span, .staff-sidebar-profile small, .nav-section-label, .nav-section-title, .nav-group-caret) {
+  color: #d0dff5 !important;
+}
+body[data-vv-theme="sapphire"] .sidebar :is(.sidebar-footer button, .logout-btn, .sidebar-close) {
+  background: #203e70 !important;
+  color: #fff !important;
+  border-color: #36517c !important;
+  box-shadow: none !important;
+}
+body[data-vv-theme="sapphire"] :is(.workspace-nav-search, .fm-nav-search) input {
+  background: #203e70 !important;
+  color: #fff !important;
+  border: 1px solid #45618b !important;
+}
+body[data-vv-theme="sapphire"] :is(.workspace-nav-search, .fm-nav-search) input::placeholder { color: #d0dff5 !important; }
+body[data-vv-theme="sapphire"] :is(.topbar, .vv-topbar, .client-top, .fm-topbar) {
+  background: #f3f6fc !important;
+  color: #172e4d !important;
+  border-color: #d8e3f3 !important;
+  box-shadow: 0 6px 20px rgba(32,62,112,.06) !important;
+}
+body[data-vv-theme="sapphire"] :is(.topbar, .vv-topbar)::after { background: #d8e3f3 !important; }
+body[data-vv-theme="sapphire"] :is(.vv-suite-panel, .admin-workhub-control, .staff-work-panel, .staff-suite-panel, .workforce-intelligence-panel, .role-command-panel, .role-command-card, .role-focus-card, .role-access-card, .client-card, .client-action, .visitor-card, .public-card, .dialog-panel, .modal, .fm-modal, .fm-drawer) {
+  background: #fff !important;
+  color: #172e4d !important;
+  border-color: #d8e3f3 !important;
+  box-shadow: 0 8px 24px rgba(32,62,112,.06) !important;
+}
+body[data-vv-theme="sapphire"] :is(.vv-suite-panel, .admin-workhub-control, .staff-work-panel, .staff-suite-panel, .workforce-intelligence-panel, .role-command-panel, .role-command-card, .role-focus-card, .role-access-card, .client-card, .client-action, .visitor-card, .public-card, .dialog-panel, .modal) :is(h1, h2, h3, h4, strong, b) {
+  color: #172e4d !important;
+}
+body[data-vv-theme="sapphire"] :is(.vv-suite-panel, .admin-workhub-control, .staff-work-panel, .staff-suite-panel, .workforce-intelligence-panel, .role-command-panel, .role-command-card, .role-focus-card, .role-access-card, .client-card, .client-action, .visitor-card, .public-card, .dialog-panel, .modal) :is(p, small, label) {
+  color: #526c8a !important;
+}
+body[data-vv-theme="sapphire"] :is(.role-command-card > span, .role-command-head > small, .client-card > .eyebrow, .visitor-card > span, .panel-kicker) { color: #214e94 !important; }
+body[data-vv-theme="sapphire"] .role-identity-chip { color: #214e94; background: #edf3ff; border-color: #cfdef6; }
+body[data-vv-theme="sapphire"] .sidebar .role-identity-chip { color: #d0dff5; background: #203e70; border-color: #36517c; }
+body[data-vv-theme="sapphire"] :is(.home-command-hero, .staff-mission-hero, .client-hero, .visitor-hero, .fm-hero) {
+  background: linear-gradient(120deg,#102850,#2458ae) !important;
+  color: #fff !important;
+  border-color: #365b94 !important;
+  box-shadow: 0 12px 30px rgba(32,62,112,.12) !important;
+}
+body[data-vv-theme="sapphire"] :is(.home-command-hero, .staff-mission-hero, .client-hero, .visitor-hero, .fm-hero) :is(h1, h2, h3, p, strong, small, .eyebrow, .home-command-kicker, .panel-kicker) { color: #fff !important; }
+body[data-vv-theme="sapphire"] :is(.home-kpi-card, .metric-card, .stat-card) :is(h3, strong, .metric-value, .stat-value) { color: #172e4d !important; }
+body[data-vv-theme="sapphire"] :is(.home-kpi-card, .metric-card, .stat-card) :is(p, small, .metric-label, .stat-label) { color: #526c8a !important; }
+body[data-vv-theme="sapphire"] :is(.client-profile-row span, .role-focus-card span, .role-access-card span) { color: #526c8a !important; }
+body[data-vv-theme="sapphire"] :is(.client-brand h1, .fm-topbar h1, .fm-drawer h2, .fm-modal h2) { color: #172e4d !important; }
+body[data-vv-theme="sapphire"] :is(.client-action, .visitor-card):hover { border-color: #91b3f3 !important; }
+/* Quality, shop-floor, security and profile use their own component vocabulary. */
+body[data-vv-theme="sapphire"] :is(.top, .public-nav, .public-footer),
+body[data-vv-theme="sapphire"] > header {
+  background: #f3f6fc !important;
+  color: #172e4d !important;
+  border-color: #d8e3f3 !important;
+}
+body[data-vv-theme="sapphire"] :is(.metric, .scan, .op, .public-panel, .step-up-panel, .completion, .securityNote, .output, #recordOutput) {
+  background: #fff !important;
+  color: #172e4d !important;
+  border-color: #d8e3f3 !important;
+  box-shadow: 0 8px 24px rgba(32,62,112,.06) !important;
+}
+body[data-vv-theme="sapphire"] :is(.public-panel, .step-up-panel, .metric, .scan, .op, .photoCard, .card .meta) :is(h1, h2, h3, strong) { color: #172e4d !important; }
+body[data-vv-theme="sapphire"] :is(.field label, .metric small, .scan p, .op small, .step-up-panel p, .public-panel p, .top small, .roleBadge) { color: #526c8a !important; }
+body[data-vv-theme="sapphire"] :is(.links a, .actions a, .actions button, .toolRow button, .panelHead button, .opActions button, .row button, .back, .photoActions .btn:not(.danger), .button-secondary) {
+  background: #edf3ff !important;
+  color: #214e94 !important;
+  border-color: #cfdef6 !important;
+}
+body[data-vv-theme="sapphire"] :is(.public-hero, .hero) { background: linear-gradient(120deg,#102850,#2458ae) !important; color: #fff !important; }
+body[data-vv-theme="sapphire"] :is(.public-hero, .hero) :is(h1, h2, h3, p, small, .kicker, .state span, .state strong) { color: #fff !important; }
+body[data-vv-theme="sapphire"] .notice { background: #fff8e8 !important; color: #795a13 !important; border-color: #f0d99a !important; }
+body[data-vv-theme="sapphire"] :is(.blocked, .high, .status.error) { color: #b6304b !important; }
+body[data-vv-theme="sapphire"] :is(.ok, .status.ok) { color: #087b5d !important; }
+body[data-vv-theme="sapphire"] .btn.danger { background: #fff0f3 !important; color: #b6304b !important; border-color: #ebbfca !important; }
+body[data-vv-theme="sapphire"] :is(.button:not(.button-secondary), .btn.primary, .step-up-submit) { background: #2463eb !important; color: #fff !important; border-color: #2463eb !important; }
+body[data-vv-theme="sapphire"] :is(.fm-primary, .fm-form-actions .primary, .fm-centre-popup-actions .primary) {
+  background: #2463eb !important;
+  color: #fff !important;
+  border-color: #2463eb !important;
+}
+body[data-vv-theme="sapphire"] :is(.fm-primary, .fm-form-actions .primary, .fm-centre-popup-actions .primary):hover { background: #184ccd !important; }
+body[data-vv-theme="sapphire"] :is(.fm-mobile-nav button.active, .fm-mobile-nav button.active span) { color: #2463eb !important; }
+body[data-vv-theme="sapphire"] .fm-mobile-nav button.active::after { background: #2463eb; }
+body[data-vv-theme="sapphire"] :is(.fm-account-category-barbox i, .fac-category-bar) { background: linear-gradient(180deg,#5085f0,#2463eb) !important; }
+/* Loader decoration follows the new palette; the original image is not filtered. */
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader { background: rgba(243,246,252,.97) !important; }
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader .vv-brand-orbit-ring { border-color: #cfdef6 !important; border-right-color: #2463eb !important; border-bottom-color: #91b3f3 !important; }
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader .vv-brand-loader-logo-stage { background: #102850 !important; border-color: #36517c !important; box-shadow: 0 12px 32px rgba(32,62,112,.15) !important; }
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader .vv-brand-loader-pill { background: #fff !important; border-color: #d8e3f3 !important; box-shadow: 0 8px 24px rgba(32,62,112,.08) !important; }
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader .vv-brand-loader-label { color: #172e4d !important; }
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader .vv-brand-loader-context { color: #526c8a !important; opacity: 1 !important; }
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader .vv-brand-scan-line { box-shadow: 0 0 14px rgba(36,99,235,.35) !important; }
+body[data-vv-theme="sapphire"] #vvGlobalBrandLoader .vv-brand-loader-dot { background: #2463eb !important; box-shadow: 0 0 0 5px #edf3ff !important; }
+body[data-vv-theme="sapphire"] :is(button, a, input, select, textarea, summary):focus-visible { outline: 3px solid #89aff4 !important; outline-offset: 3px !important; }
+/* Never turn an inaccessible/archived permission state into a visible control. */
+body[data-vv-theme="sapphire"] [hidden] { display: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  body[data-vv-theme="sapphire"] :is(.role-command-card, .fm-card, .fm-account-card-shell, .fm-module-card) { transition: none !important; }
+}
+@media print {
+  body[data-vv-theme="sapphire"] :is(.home-command-hero, .staff-mission-hero, .client-hero, .visitor-hero, .fm-hero) { background: #fff !important; color: #172e4d !important; box-shadow: none !important; }
+  body[data-vv-theme="sapphire"] :is(.home-command-hero, .staff-mission-hero, .client-hero, .visitor-hero, .fm-hero) :is(h1, h2, h3, p, strong, small, .eyebrow) { color: #172e4d !important; }
+}

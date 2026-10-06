@@ -4,6 +4,7 @@ const path=require('node:path');
 
 const tests=[
   "finance-release-consistency-test.js",
+  "finance-workspace-theme-test.js",
   "bank-account-lifecycle-test.js",
   "advanced-banking-platform-test.js",
   "statement-first-money-warehouse-test.js",
