@@ -8,6 +8,7 @@ const tests=[
   "finance-workspace-theme-test.js",
   "bank-account-lifecycle-test.js",
   "advanced-banking-platform-test.js",
+  "access-update-actions-test.js",
   "statement-first-money-warehouse-test.js",
   "standalone-banking-portal-test.js",
   "finance-account-segmentation-test.js",
