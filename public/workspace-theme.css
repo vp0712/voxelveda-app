@@ -89,12 +89,12 @@ body[data-vv-theme="sapphire"] .sidebar :is(.sidebar-footer button, .logout-btn,
   border-color: #36517c !important;
   box-shadow: none !important;
 }
-body[data-vv-theme="sapphire"] :is(.workspace-nav-search, .fm-nav-search) input {
+body[data-vv-theme="sapphire"] :is(.sidebar, .fm-sidebar) :is(.workspace-nav-search, .fm-nav-search) input {
   background: #203e70 !important;
   color: #fff !important;
   border: 1px solid #45618b !important;
 }
-body[data-vv-theme="sapphire"] :is(.workspace-nav-search, .fm-nav-search) input::placeholder { color: #d0dff5 !important; }
+body[data-vv-theme="sapphire"] :is(.sidebar, .fm-sidebar) :is(.workspace-nav-search, .fm-nav-search) input::placeholder { color: #d0dff5 !important; }
 body[data-vv-theme="sapphire"] :is(.topbar, .vv-topbar, .client-top, .fm-topbar) {
   background: #f3f6fc !important;
   color: #172e4d !important;

@@ -22,6 +22,7 @@ assert.match(rendered, /class="staff-portal" data-vv-role="hr" data-vv-theme="sa
 assert.match(rendered, /<button hidden class="hidden-section permission-finance">Restricted<\/button>/);
 assert.match(rendered, /<img src="\/logo.png">/);
 assert.match(css, /\.sidebar \.sidebar-nav :is\(\.nav-btn, \.nav-sub-btn, \.nav-group-toggle, a\)/, 'navigation overrides outrank legacy button:not(...) rules');
+assert.ok(css.includes('body[data-vv-theme="sapphire"] :is(.sidebar, .fm-sidebar) :is(.workspace-nav-search, .fm-nav-search) input {'), 'sidebar input specificity outranks the legacy all-input light background');
 for (const selector of ['.app-shell > .main', '.role-command-panel', '.staff-mission-hero', '.client-card', '.visitor-card', '.public-panel', '.step-up-panel', '.scan', '.metric', '#recordOutput', '.fm-modal', '.fm-drawer', '.fm-mobile-nav button.active', '.home-kpi-card']) {
   assert.ok(css.includes(selector), `shared appearance covers ${selector}`);
 }
