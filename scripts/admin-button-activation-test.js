@@ -4,6 +4,7 @@ const path = require('path');
 const htmlPath = path.join(__dirname, '..', 'public', 'admin-dashboard.html');
 const jsPaths = [
   path.join(__dirname, '..', 'public', 'admin-dashboard.js'),
+  path.join(__dirname, '..', 'public', 'erp-workspace.js'),
   path.join(__dirname, '..', 'public', 'workflow-ui.js'),
   path.join(__dirname, '..', 'public', 'procurement-ui.js'),
   path.join(__dirname, '..', 'public', 'expense-payments.js'),

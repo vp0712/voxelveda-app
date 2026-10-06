@@ -15,8 +15,8 @@ assert(admin.includes('A reason is required before access can be updated.'),'adm
 assert(admin.includes("primaryBtn.textContent = 'Updating…'"),'admin Update Access has loading state');
 assert(admin.includes('await fetch(`/api/users/${userId}/access`'),'admin Update Access sends save request');
 assert(admin.includes('catch (error)'),'admin Update Access handles network/runtime failures');
-assert(adminHtml.includes('/step-up.js?v=20260919-access-fix'),'admin step-up client remains cache-busted');
-assert(adminHtml.includes('/admin-dashboard.js?v=20260919-access-fix'),'admin access client remains cache-busted');
+assert(/src=["']\/step-up\.js\?v=[^"'\s]+["']/.test(adminHtml),'admin step-up client remains cache-busted');
+assert(/src=["']\/admin-dashboard\.js\?v=[^"'\s]+["']/.test(adminHtml),'admin access client remains cache-busted');
 
 assert(finance.includes('function openTeamAccessForm('),'Finance OS has banking team-access editor');
 assert(finance.includes('data-team-account'),'Finance access editor has stable account controls');
