@@ -84,6 +84,13 @@ async function run(){
   assert.equal(restricted.data.inventory,null);assert.equal(restricted.checks.find(c=>c.key==='inventory').status,'UNAVAILABLE');
   assert(!readQueries.some(q=>/invoices|users|campaigns|bank_|manufacturing/.test(q)));
   assert(!restricted.capabilities.production_edit);assert(!restricted.capabilities.campaign_edit);
+  const procurement=await service.workspace({async query(options){
+    assert.match(options.sql,/COUNT\(i\.id\) AS line_count/,'Delivery line count must not use the reserved MySQL LINES keyword as a bare alias');
+    assert.match(options.sql,/i\.quantity-i\.received_quantity/);
+    return [[{id:5,po_number:'PO-5',line_count:2,outstanding_units:'4.000',status:'PART_RECEIVED'}]];
+  }},{id:4,role:'custom',permissions:['VIEW_PROCUREMENT']});
+  assert.equal(procurement.data.supply[0].line_count,2);assert.equal(procurement.data.supply[0].outstanding_units,'4.000');
+  assert.deepEqual(procurement.checks,[{key:'supply',status:'READY'}]);
   const bounded=await service.workspace(readPool,{id:4,role:'custom',permissions:['VIEW_RFQS','VIEW_INVENTORY'],permission_boundary:['VIEW_RFQS']});
   assert.deepEqual(bounded.modules.map(m=>m.key),['sales']);
   const empty=await service.workspace(readPool,{id:1,role:'staff',permissions:[],permission_boundary:['VIEW_OWN_JOBS']});
