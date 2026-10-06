@@ -77,8 +77,14 @@ async function progress(job, event) {
   const stage = String(event?.stage || 'PROCESSING').slice(0, 40);
   let percentage = stages[stage] || Number(event?.progress || 10);
   if (event?.page && event?.totalPages) percentage = Math.min(80, Math.max(percentage, 20 + Math.round((Number(event.page) / Number(event.totalPages)) * 55)));
-  await pool.query('UPDATE finance_statement_import_jobs SET stage=?,progress_percent=?,heartbeat_at=NOW() WHERE id=? AND status="PROCESSING"', [stage, percentage, job.id]);
-  await pool.query('UPDATE statement_import_sessions SET status=?,current_stage=?,progress_percent=? WHERE id=?', [stage === 'OCR_REQUIRED' ? 'OCR_REQUIRED' : stage === 'PARSING' ? 'PARSING' : 'EXTRACTING', stage, percentage, job.import_session_id]);
+  await pool.query('UPDATE finance_statement_import_jobs SET stage=?,progress_percent=?,heartbeat_at=NOW() WHERE id=? AND status="PROCESSING" AND attempt=?', [stage, percentage, job.id, job.attempt]);
+  // A delayed parser callback must never overwrite a completed/failed job or
+  // revive a posted, removed or cancelled statement after its transaction commits.
+  await pool.query(`UPDATE statement_import_sessions s JOIN finance_statement_import_jobs j ON j.import_session_id=s.id
+    SET s.status=?,s.current_stage=?,s.progress_percent=?
+    WHERE s.id=? AND j.id=? AND j.status='PROCESSING' AND j.attempt=?
+      AND s.status NOT IN ('IMPORTED','CANCELLED','REVERSED','REMOVED','PENDING_REVIEW','REJECTED')`,
+    [stage === 'OCR_REQUIRED' ? 'OCR_REQUIRED' : stage === 'PARSING' ? 'PARSING' : 'EXTRACTING', stage, percentage, job.import_session_id, job.id, job.attempt]);
 }
 
 async function persistResult(job, parsed, validation) {
@@ -202,7 +208,11 @@ async function processClaimedJob(job) {
     if (stored.contentSha256 !== job.content_hash) throw Object.assign(new Error('Stored file hash does not match the import session.'), { code: 'STATEMENT_FILE_HASH_MISMATCH' });
     const mapping = job.mapping_json ? (typeof job.mapping_json === 'string' ? JSON.parse(job.mapping_json) : job.mapping_json) : {};
     const password = job.encrypted_password ? decryptSensitive(job.encrypted_password) : null;
-    const parsed = await parseStatementBuffer(stored.body, { originalName: job.original_name, mimeType: job.detected_mime || stored.document.mime_type }, { mapping, password, currency: job.account_currency }, (event) => { progress(job, event).catch(() => {}); });
+    let pendingProgress = Promise.resolve();
+    const parsed = await parseStatementBuffer(stored.body, { originalName: job.original_name, mimeType: job.detected_mime || stored.document.mime_type }, { mapping, password, currency: job.account_currency }, (event) => {
+      pendingProgress = pendingProgress.then(() => progress(job, event)).catch(() => {});
+    });
+    await pendingProgress;
     await progress(job, { stage: 'VALIDATING' });
     const validation = evaluateStatement({ rows: parsed.rows, classification: parsed.classification, account: job });
     await progress(job, { stage: 'PERSISTING' });

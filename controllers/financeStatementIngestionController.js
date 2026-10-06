@@ -21,6 +21,7 @@ const {
 function uid(prefix) { return `${prefix}-${Date.now().toString(36).toUpperCase()}-${crypto.randomBytes(6).toString('hex').toUpperCase()}`; }
 function sha256(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function actor(req) { return { actorId: req.user?.id, ipAddress: req.ip, userAgent: req.get('user-agent'), requestId: req.id || req.get('x-request-id') || null, sessionId: req.session?.id || null }; }
+const PROCESSING_SESSION_STATES = new Set(['QUEUED','SECURITY_CHECKING','CLASSIFYING','EXTRACTING','OCR_REQUIRED','PARSING','NORMALISING','VALIDATING','PERSISTING','PROCESSING','RETRY']);
 
 async function removeTemporary(file) { if (file?.path) await fs.promises.unlink(file.path).catch(() => {}); }
 
@@ -172,8 +173,13 @@ exports.status = async (req, res) => {
       [req.params.uid]
     );
     if (!row) return res.status(404).json({ message: 'Statement import was not found.', code: 'STATEMENT_IMPORT_NOT_FOUND' });
-    const recoveryRequired = !row.job_uuid && !['IMPORTED','CANCELLED','REVERSED','REMOVED','PENDING_REVIEW'].includes(row.status);
-    return res.json({ import: row, recovery_required: recoveryRequired, stalled: row.job_status === 'PROCESSING' && row.heartbeat_at && Date.now() - new Date(row.heartbeat_at).getTime() > 15 * 60 * 1000 });
+    const completedRecovery = row.job_status === 'COMPLETED' && PROCESSING_SESSION_STATES.has(row.status);
+    const recoveryRequired = completedRecovery || (!row.job_uuid && !['IMPORTED','CANCELLED','REVERSED','REMOVED','PENDING_REVIEW'].includes(row.status));
+    // Legacy late callbacks can leave the session looking active after its job
+    // stopped. Expose the durable failure so Retry is reachable without polling.
+    const displayRow = PROCESSING_SESSION_STATES.has(row.status) && ['FAILED','DEAD_LETTER','NEEDS_PASSWORD','NEEDS_MAPPING'].includes(row.job_status)
+      ? {...row,status:row.job_status,current_stage:row.job_stage,progress_percent:row.job_progress,last_error_code:row.job_error_code,last_error_summary:row.job_error_summary} : row;
+    return res.json({ import: displayRow, recovery_required: recoveryRequired, recovery_reason:completedRecovery ? 'COMPLETED_JOB_STATUS' : recoveryRequired ? 'MISSING_JOB' : null, stalled: row.job_status === 'PROCESSING' && row.heartbeat_at && Date.now() - new Date(row.heartbeat_at).getTime() > 15 * 60 * 1000 });
   } catch (error) { return fail(res, error, 'Failed to load statement import status'); }
 };
 
@@ -187,7 +193,14 @@ async function resume(req, res, options) {
     if (['IMPORTED', 'CANCELLED', 'REVERSED', 'REMOVED'].includes(session.status)) throw Object.assign(new Error(`This import is ${session.status} and cannot be resumed.`), { status:409, code:'STATEMENT_IMPORT_LOCKED' });
     const [[account]] = await db.query('SELECT id FROM bank_accounts WHERE id=? AND status="ACTIVE" FOR UPDATE', [session.bank_account_id]);
     if (!account) throw Object.assign(new Error('The source account is not active.'), { status:409, code:'BANK_ACCOUNT_NOT_ACTIVE' });
-    const [[job]] = await db.query('SELECT id FROM finance_statement_import_jobs WHERE import_session_id=? FOR UPDATE', [session.id]);
+    const [[job]] = await db.query('SELECT id,status,stage FROM finance_statement_import_jobs WHERE import_session_id=? FOR UPDATE', [session.id]);
+    if (job?.status === 'COMPLETED' && PROCESSING_SESSION_STATES.has(session.status)) {
+      const restoredStatus = job.stage === 'NEEDS_MAPPING' ? 'NEEDS_MAPPING' : 'PENDING_REVIEW';
+      await db.query('UPDATE statement_import_sessions SET status=?,current_stage=?,progress_percent=100,last_error_code=NULL,last_error_summary=NULL WHERE id=?', [restoredStatus,job.stage,session.id]);
+      await logAudit(db, {...actor(req),action:'STATEMENT_PROCESSING_STATUS_RECOVERED',module:'finance_intelligence',recordType:'statement_import_session',recordId:session.import_uid,newValue:{status:restoredStatus,existing_review_retained:true,ledger_unchanged:true}});
+      await db.commit();
+      return res.status(202).json({message:'The completed extraction status was restored. Existing review rows were retained.',import_uid:session.import_uid,status:restoredStatus});
+    }
     if (!job) {
       if (!session.secure_document_id || !session.content_hash) throw Object.assign(new Error('Restore the matching original statement before retrying this legacy import.'), { status:422, code:'STATEMENT_ORIGINAL_UNAVAILABLE' });
       await db.query(`INSERT INTO finance_statement_import_jobs

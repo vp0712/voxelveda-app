@@ -2516,7 +2516,7 @@ async function waitForStatementImport(uid,holder,{openReview=true}={}){
    return {status,record};
   }
   if(status==='IMPORTED'){holder.className='fm-state fm-state-success';holder.innerHTML='<strong>Already imported</strong><p>This exact statement already exists. No duplicate file or transactions were created.</p>';return {status,record}}
-  if(payload.recovery_required){renderStatementAttention(uid,{...record,status:'RECOVERY_REQUIRED',last_error_summary:'This legacy import has no processing job. Retry to resume extraction from its retained original; no transactions will be posted automatically.'},holder);return {status:'RECOVERY_REQUIRED',record}}
+  if(payload.recovery_required){renderStatementAttention(uid,{...record,status:'RECOVERY_REQUIRED',last_error_summary:payload.recovery_reason==='COMPLETED_JOB_STATUS'?'Extraction already finished, but a late progress update left its status stuck. Retry to restore the existing review; its rows and corrections will be retained.':'This legacy import has no processing job. Retry to resume extraction from its retained original; no transactions will be posted automatically.'},holder);return {status:'RECOVERY_REQUIRED',record}}
   if(['NEEDS_PASSWORD','NEEDS_MAPPING','FAILED','DEAD_LETTER','CANCELLED','REMOVED','REVERSED'].includes(status)){renderStatementAttention(uid,record,holder);return {status,record}}
   await statementDelay(1500);
  }
