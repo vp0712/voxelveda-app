@@ -1,8 +1,8 @@
-database-release: 20261006-unified-app-finance-theme
-source-commit: ed8294a507457d20f557029207472c853c489f48
-candidate-commit: e2a5cb361ff64639ea9f635c5f6f1b10ee7702b0
+database-release: 20261006-unified-app-finance-theme-contrast
+source-commit: 1ab1cae423be051f39574eb2d4e465a61ae69187
+candidate-commit: 528d264fa289ccdbd46f695c62c731d8b173d36e
 scope: unified-sapphire-operations-finance-role-quality-profile-security-themes; legacy-contrast-repair; truthful-statement-attention-processing
 preserves: original-logo; permissions; hidden-states; statement-source-evidence; posted-ledger-step-up-controls
-ci: security-success; consolidation-success; finance-release-candidate-success; bank-account-lifecycle-success; advanced-banking-platform-success; loader-success; original-logo-success
+ci: follow-up-security-success; follow-up-consolidation-success; follow-up-finance-release-candidate-success; parent-all-seven-workflows-success
 runtime: awaiting-railway-deployment-and-health-verification
 policy: single-marker-controlled-production-deploy
