@@ -44,6 +44,9 @@ body.login-page .portal-links a{color:#214e94!important}
 body[data-vv-theme="sapphire"] {
   --ink: #172e4d;
   --card: #fff;
+  --surface: #fff;
+  --surface-2: #f7faff;
+  --panel2: #f7faff;
   --line: #d8e3f3;
   --dark: #102850;
   --role-accent: #214e94;
@@ -126,6 +129,33 @@ body[data-vv-theme="sapphire"] :is(.home-kpi-card, .metric-card, .stat-card) :is
 body[data-vv-theme="sapphire"] :is(.client-profile-row span, .role-focus-card span, .role-access-card span) { color: #526c8a !important; }
 body[data-vv-theme="sapphire"] :is(.client-brand h1, .fm-topbar h1, .fm-drawer h2, .fm-modal h2) { color: #172e4d !important; }
 body[data-vv-theme="sapphire"] :is(.client-action, .visitor-card):hover { border-color: #91b3f3 !important; }
+/* Quality, shop-floor, security and profile use their own component vocabulary. */
+body[data-vv-theme="sapphire"] :is(.top, .public-nav, .public-footer),
+body[data-vv-theme="sapphire"] > header {
+  background: #f3f6fc !important;
+  color: #172e4d !important;
+  border-color: #d8e3f3 !important;
+}
+body[data-vv-theme="sapphire"] :is(.metric, .scan, .op, .public-panel, .step-up-panel, .completion, .securityNote, .output, #recordOutput) {
+  background: #fff !important;
+  color: #172e4d !important;
+  border-color: #d8e3f3 !important;
+  box-shadow: 0 8px 24px rgba(32,62,112,.06) !important;
+}
+body[data-vv-theme="sapphire"] :is(.public-panel, .step-up-panel, .metric, .scan, .op, .photoCard, .card .meta) :is(h1, h2, h3, strong) { color: #172e4d !important; }
+body[data-vv-theme="sapphire"] :is(.field label, .metric small, .scan p, .op small, .step-up-panel p, .public-panel p, .top small, .roleBadge) { color: #526c8a !important; }
+body[data-vv-theme="sapphire"] :is(.links a, .actions a, .actions button, .toolRow button, .panelHead button, .opActions button, .row button, .back, .photoActions .btn:not(.danger), .button-secondary) {
+  background: #edf3ff !important;
+  color: #214e94 !important;
+  border-color: #cfdef6 !important;
+}
+body[data-vv-theme="sapphire"] :is(.public-hero, .hero) { background: linear-gradient(120deg,#102850,#2458ae) !important; color: #fff !important; }
+body[data-vv-theme="sapphire"] :is(.public-hero, .hero) :is(h1, h2, h3, p, small, .kicker, .state span, .state strong) { color: #fff !important; }
+body[data-vv-theme="sapphire"] .notice { background: #fff8e8 !important; color: #795a13 !important; border-color: #f0d99a !important; }
+body[data-vv-theme="sapphire"] :is(.blocked, .high, .status.error) { color: #b6304b !important; }
+body[data-vv-theme="sapphire"] :is(.ok, .status.ok) { color: #087b5d !important; }
+body[data-vv-theme="sapphire"] .btn.danger { background: #fff0f3 !important; color: #b6304b !important; border-color: #ebbfca !important; }
+body[data-vv-theme="sapphire"] :is(.button:not(.button-secondary), .btn.primary, .step-up-submit) { background: #2463eb !important; color: #fff !important; border-color: #2463eb !important; }
 body[data-vv-theme="sapphire"] :is(.fm-primary, .fm-form-actions .primary, .fm-centre-popup-actions .primary) {
   background: #2463eb !important;
   color: #fff !important;
