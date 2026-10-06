@@ -172,15 +172,30 @@ exports.status = async (req, res) => {
       [req.params.uid]
     );
     if (!row) return res.status(404).json({ message: 'Statement import was not found.', code: 'STATEMENT_IMPORT_NOT_FOUND' });
-    return res.json({ import: row, stalled: row.job_status === 'PROCESSING' && row.heartbeat_at && Date.now() - new Date(row.heartbeat_at).getTime() > 15 * 60 * 1000 });
+    const recoveryRequired = !row.job_uuid && !['IMPORTED','CANCELLED','REVERSED','REMOVED','PENDING_REVIEW'].includes(row.status);
+    return res.json({ import: row, recovery_required: recoveryRequired, stalled: row.job_status === 'PROCESSING' && row.heartbeat_at && Date.now() - new Date(row.heartbeat_at).getTime() > 15 * 60 * 1000 });
   } catch (error) { return fail(res, error, 'Failed to load statement import status'); }
 };
 
 async function resume(req, res, options) {
+  let db;
   try {
-    const [[session]] = await pool.query('SELECT * FROM statement_import_sessions WHERE import_uid=? LIMIT 1', [req.params.uid]);
-    if (!session) return res.status(404).json({ message: 'Statement import was not found.', code: 'STATEMENT_IMPORT_NOT_FOUND' });
-    if (['IMPORTED', 'CANCELLED', 'REVERSED'].includes(session.status)) return res.status(409).json({ message: `This import is ${session.status} and cannot be resumed.`, code: 'STATEMENT_IMPORT_LOCKED' });
+    db = await pool.getConnection();
+    await db.beginTransaction();
+    const [[session]] = await db.query('SELECT * FROM statement_import_sessions WHERE import_uid=? FOR UPDATE', [req.params.uid]);
+    if (!session) throw Object.assign(new Error('Statement import was not found.'), { status:404, code:'STATEMENT_IMPORT_NOT_FOUND' });
+    if (['IMPORTED', 'CANCELLED', 'REVERSED', 'REMOVED'].includes(session.status)) throw Object.assign(new Error(`This import is ${session.status} and cannot be resumed.`), { status:409, code:'STATEMENT_IMPORT_LOCKED' });
+    const [[account]] = await db.query('SELECT id FROM bank_accounts WHERE id=? AND status="ACTIVE" FOR UPDATE', [session.bank_account_id]);
+    if (!account) throw Object.assign(new Error('The source account is not active.'), { status:409, code:'BANK_ACCOUNT_NOT_ACTIVE' });
+    const [[job]] = await db.query('SELECT id FROM finance_statement_import_jobs WHERE import_session_id=? FOR UPDATE', [session.id]);
+    if (!job) {
+      if (!session.secure_document_id || !session.content_hash) throw Object.assign(new Error('Restore the matching original statement before retrying this legacy import.'), { status:422, code:'STATEMENT_ORIGINAL_UNAVAILABLE' });
+      await db.query(`INSERT INTO finance_statement_import_jobs
+        (job_uuid,import_session_id,idempotency_key,status,stage,progress_percent,max_attempts,mapping_json,correlation_id,requested_by)
+        VALUES (?,?,?,'QUEUED','QUEUED',0,?,?,?,?)`,
+        [crypto.randomUUID(),session.id,sha256(`${session.bank_account_id}|${session.content_hash}`),
+          Math.max(1,Math.min(10,Number(process.env.FINANCE_INGESTION_MAX_ATTEMPTS || 5))),JSON.stringify(options.mapping || {}),session.correlation_id || crypto.randomUUID(),req.user.id]);
+    }
     const fields = ["status='QUEUED'", "stage='QUEUED'", 'progress_percent=0', 'available_at=NOW()', 'locked_by=NULL', 'locked_at=NULL', 'error_code=NULL', 'error_summary=NULL'];
     // A deliberate retry is a new processing attempt. Failed/dead-letter jobs must
     // reset their exhausted attempt counter or "Retry" can immediately dead-letter
@@ -190,11 +205,16 @@ async function resume(req, res, options) {
     if (options.password !== undefined) { fields.push('encrypted_password=?'); params.push(options.password ? encryptSensitive(options.password) : null); }
     if (options.mapping !== undefined) { fields.push('mapping_json=?'); params.push(JSON.stringify(options.mapping)); }
     params.push(session.id);
-    await pool.query(`UPDATE finance_statement_import_jobs SET ${fields.join(',')} WHERE import_session_id=?`, params);
-    await pool.query("UPDATE statement_import_sessions SET status='QUEUED',current_stage='QUEUED',progress_percent=0,last_error_code=NULL,last_error_summary=NULL WHERE id=?", [session.id]);
+    await db.query(`UPDATE finance_statement_import_jobs SET ${fields.join(',')} WHERE import_session_id=?`, params);
+    await db.query("UPDATE statement_import_sessions SET status='QUEUED',current_stage='QUEUED',progress_percent=0,last_error_code=NULL,last_error_summary=NULL WHERE id=?", [session.id]);
+    await logAudit(db, { ...actor(req), action:'STATEMENT_PROCESSING_RESUMED', module:'finance_intelligence', recordType:'statement_import_session', recordId:session.import_uid, newValue:{legacy_job_created:!job,source_retained:true,ledger_unchanged:true} });
+    await db.commit();
     setImmediate(() => triggerFinanceStatementIngestion(req.user.id).catch((error) => console.error('Finance ingestion resume trigger failed:', error.code || error.message)));
     return res.status(202).json({ message: 'Statement processing was safely re-queued.', import_uid: session.import_uid, status: 'QUEUED' });
-  } catch (error) { return fail(res, error, 'Failed to resume statement processing'); }
+  } catch (error) {
+    if (db) await db.rollback().catch(() => {});
+    return fail(res, error, 'Failed to resume statement processing');
+  } finally { if (db) db.release(); }
 }
 
 exports.password = async (req, res) => {

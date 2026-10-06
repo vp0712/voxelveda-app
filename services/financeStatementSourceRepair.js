@@ -57,7 +57,10 @@ function planSourceRepair(account, parsed, statementRows = [], accountRows = [],
     const key = fingerprint(account.id, row), count = counts.get(key) || 0;
     if (count) counts.set(key, count - 1); else missing.push(row);
   }
-  const unexpected = statementRows.filter(row => !artifactIds.has(Number(row.id)) && !sourceKeys.has(fingerprint(account.id, originalRow(row))));
+  // Retain inactive rows in occurrence counts to preserve intentional exclusions,
+  // but do not flag already-excluded history as an active source discrepancy.
+  const unexpected = statementRows.filter(row => !row.archived_at && row.reconciliation_status !== 'IGNORED'
+    && !artifactIds.has(Number(row.id)) && !sourceKeys.has(fingerprint(account.id, originalRow(row))));
   const noFailures = !validation.validations.some(item => item.status === 'FAIL');
   const sourceConsistent = noFailures && !parsed.classification.multiple_accounts && !parsed.classification.multiple_currencies
     && !parsed.classification.appears_incomplete && validation.validations.some(item => item.check === 'CURRENCY_CONSISTENCY' && item.status === 'PASS');
