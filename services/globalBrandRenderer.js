@@ -2,7 +2,7 @@
 
 const BRAND_CSS = '/global-brand.css?v=20260918-global-loader';
 const BRAND_JS = '/global-brand.js?v=20260918-global-loader';
-const WORKSPACE_CSS = '/workspace-theme.css?v=20261005-sapphire';
+const WORKSPACE_CSS = '/workspace-theme.css?v=20261006-unified-sapphire';
 const FINANCE_PDF_ENHANCER_JS = '/finance-pdf-import-enhancer.js?v=20260918-pdf-parser2'; // retained as legacy asset reference only
 const CANONICAL_LOGO = '/logo.png';
 
@@ -17,6 +17,17 @@ function canonicalizeLogoPaths(html) {
 function injectGlobalBrand(html) {
   let rendered = canonicalizeLogoPaths(html);
   if (!rendered) return rendered;
+
+  // One appearance contract for every portal, including generated and role pages.
+  // Additive metadata never changes role, permission, hidden or workflow attributes.
+  rendered = rendered.replace(/<body([^>]*)>/i, (match, attributes) =>
+    /\bdata-vv-theme\s*=/i.test(attributes) ? match : `<body${attributes} data-vv-theme="sapphire">`);
+  if (/<meta\b[^>]*name=["']theme-color["'][^>]*>/i.test(rendered)) {
+    rendered = rendered.replace(/<meta\b[^>]*name=["']theme-color["'][^>]*>/gi,
+      '<meta name="theme-color" content="#102850">');
+  } else {
+    rendered = rendered.replace(/<\/head>/i, '  <meta name="theme-color" content="#102850">\n</head>');
+  }
 
   if (!rendered.includes(BRAND_CSS)) rendered = rendered.replace(/<\/head>/i, `  <link rel="stylesheet" href="${BRAND_CSS}">\n</head>`);
   if (!rendered.includes(WORKSPACE_CSS)) rendered = rendered.replace(/<\/head>/i, `  <link rel="stylesheet" href="${WORKSPACE_CSS}">\n</head>`);
