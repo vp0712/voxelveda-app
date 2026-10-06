@@ -1,8 +1,8 @@
-database-release: 20261006-integrated-erp-workspace
-source-commit: 8576173eada1a71fb51e8373a7dbe52cc12dddee
-candidate-commit: 4b6e467483a78c51f633a9e36ac275aeaa053b5c
-scope: integrated-main-app-erp; role-filtered-departments; audited-campaign-lifecycle; planning-only-work-orders; serialized-machine-reservations; erp-assets-20261006-erp1
-preserves: original-logo; existing-company-records; finance-statement-review; audit-history; permission-boundaries; quality-release; operator-and-machine-gates
-ci: finance-pr-success; finance-push-success; security-success; consolidation-success; original-logo-success; advanced-banking-success; production-audit-zero-vulnerabilities
-runtime: awaiting-production-migration-health-and-live-erp-verification
+database-release: 20261006-integrated-erp-supply-register
+source-commit: 973f56b1d6aa2a315a3d86f403e829979b81d8c5
+candidate-commit: 6b91fe97b7d10b2ba5f4f26135c8d75f282796aa
+scope: integrated-main-app-erp; audited-campaign-lifecycle; planning-only-work-orders; serialized-machine-reservations; safe-supply-chain-aggregate; erp-assets-20261006-erp1
+preserves: original-logo; company-records; bank-source-review; audit-history; permission-boundaries; operator-machine-and-quality-release-gates
+ci: finance-push-success; security-success; consolidation-success; original-erp-candidate-all-six-checks-success; production-audit-zero-vulnerabilities
+runtime: live-erp-and-campaign-planning-forms-verified; awaiting-supply-register-recheck-after-production-deploy
 policy: single-marker-controlled-production-deploy
