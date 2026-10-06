@@ -85,10 +85,13 @@ async function run() {
   assert.equal(planSourceRepair(account,parsed,damaged,damaged,[intentionalExclusion]).missing.length,0,'an explicitly deselected transaction is not recovered automatically');
   const correctedArtifact={...artifact,manual_override:1};
   assert.equal(planSourceRepair(account,parsed,[...ledger,correctedArtifact],[...ledger,correctedArtifact]).artifacts.length,0,'manual corrections are never overwritten');
+  assert.equal(planSourceRepair(account,parsed,[...ledger,correctedArtifact],[...ledger,correctedArtifact]).unexpected,1,'an active unexplained manual correction still requires review');
   const archived=prepared.normalized.map((row,index)=>({...row,id:index+1,archived_at:index===2?'2024-10-01':null}));
   assert.equal(planSourceRepair(account,parsed,archived,archived).missing.length,0,'intentional archive is never reactivated');
   const complete=[...archived,{...artifact,archived_at:'2024-10-01',reconciliation_status:'IGNORED'}];
   assert.equal(planSourceRepair(account,parsed,complete,complete).artifacts.length,0,'repeated verification is idempotent');
+  assert.equal(planSourceRepair(account,parsed,complete,complete).unexpected,0,'an archived source artifact cannot create a new discrepancy after successful repair');
+  assert.equal(planSourceRepair(account,parsed,complete,complete).missing.length,0,'repeated checks must not restore intentionally archived source transactions');
   const manuallyEdited=archived.map((row,index)=>({...row,archived_at:null,manual_override:index===1?1:0,reference:index===1?'user-added-reference':null,running_balance:index===1?'999.00':null,original_transaction_date:row.transaction_date,original_description:row.description,original_reference:null,original_debit:row.debit,original_credit:row.credit,original_running_balance:null}));
   assert.equal(planSourceRepair(account,parsed,manuallyEdited,manuallyEdited).missing.length,0,'null original reference/balance must stay null when current values were manually edited');
 
