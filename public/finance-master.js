@@ -2,6 +2,8 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const API='/api/finance';
+// Capture explicit navigation filters before canonical history writes add defaults.
+const initialFinanceQuery=new URLSearchParams(location.search);
 const I=API+'/intelligence';
 const OS=API+'/banking-os';
 const state={
@@ -391,6 +393,11 @@ function primeFinanceCoreLoading(){
  ];
  resources.forEach(([name,path])=>setResource(name,'loading',null,null,path));
 }
+function applyFinancePreferenceDefaults(pref, requested=initialFinanceQuery){
+ if(!requested.has('scope')&&!requested.has('account_id')&&['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
+ if(!requested.has('period')&&pref.default_period)state.period=pref.default_period;
+ if(!requested.has('account_id')&&pref.default_account_id)state.account=String(pref.default_account_id);
+}
 async function loadBase(){
   const cycle=++loadCycle;
   const [setup,prefPayload]=await Promise.all([
@@ -400,14 +407,11 @@ async function loadBase(){
   state.setup=setup||state.setup;
   state.userPreferences=prefPayload?.preferences||state.userPreferences;
  if(!state.preferencesApplied&&state.userPreferences){
-  const pref=state.userPreferences;
-  const requested=new URLSearchParams(location.search);
-  if(!requested.has('scope')&&['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
-  if(!requested.has('period')&&pref.default_period)state.period=pref.default_period;
-  if(!requested.has('account_id')&&pref.default_account_id)state.account=String(pref.default_account_id);
+  applyFinancePreferenceDefaults(state.userPreferences);
   state.preferencesApplied=true;
   if($('fmScope'))$('fmScope').value=state.scope;
   if($('fmPeriod'))$('fmPeriod').value=state.period;
+  saveFinanceLocation(true);
  }
   if(cycle!==loadCycle)return cycle;
   const base=filterQuery();

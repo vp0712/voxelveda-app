@@ -23,7 +23,7 @@ function renderFrame(req,res){
     const value=res.get(header);if(value)res.set(header,value.replace("frame-ancestors 'none'","frame-ancestors 'self'"));
   }
   const send=res.send.bind(res);
-  res.send=html=>send(typeof html==='string'?html.replace(/<body([^>]*)>/i,'<body$1 data-vv-layout-check="frame">').replace('</body>','<script src="/workspace-layout-check.js?v=20261007" defer></script></body>'):html);
+  res.send=html=>send(typeof html==='string'?html.replace(/<body([^>]*)>/i,'<body$1 data-vv-layout-check="frame">').replace('</body>','<script src="/workspace-layout-check.js?v=20261007-sidebar-recovery" defer></script></body>'):html);
   return req.params.module==='admin'?renderAdminPage(req,res):renderFinancePage(req,res);
 }
 module.exports={renderCheck,renderFrame};

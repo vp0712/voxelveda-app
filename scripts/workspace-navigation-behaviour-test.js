@@ -46,4 +46,14 @@ for(const file of ['public/style.css','public/advanced-theme.css']){
 }
 const finance=fs.readFileSync('public/finance-master.js','utf8');
 assert.match(finance,/!requested\.has\('period'\).*state\.period=pref\.default_period/,'An account/category deep link retains its explicit period');
+const preferenceFunction=finance.slice(finance.indexOf('function applyFinancePreferenceDefaults('),finance.indexOf('async function loadBase('));
+assert.match(finance,/const initialFinanceQuery=new URLSearchParams\(location.search\)/,'Requested filters are captured before canonical history adds defaults');
+const pref={default_workspace:'PERSONAL',default_period:'last7',default_account_id:7};
+function preferenceCase(query,initial={scope:'ALL',period:'month',account:''}){
+ const state={...initial},requested=new URLSearchParams(query);
+ vm.runInNewContext(preferenceFunction+'\napplyFinancePreferenceDefaults(pref,requested);',{state,pref,requested});return state;
+}
+assert.deepEqual(preferenceCase(''),{scope:'PERSONAL',period:'last7',account:'7'},'Absent navigation filters retain saved preferences');
+assert.deepEqual(preferenceCase('scope=BUSINESS&period=all&account_id=12',{scope:'BUSINESS',period:'all',account:'12'}),{scope:'BUSINESS',period:'all',account:'12'},'Explicit account, period and workspace win over saved defaults');
+assert.equal(preferenceCase('account_id=12',{scope:'ALL',period:'month',account:'12'}).scope,'ALL','An account deep link is not narrowed to a conflicting saved workspace');
 console.log('WORKSPACE_NAVIGATION_OK: one open/close state, bounded scroll region, focus/rotation/Back recovery, no double binding, 44px controls and deep-link preference precedence.');
