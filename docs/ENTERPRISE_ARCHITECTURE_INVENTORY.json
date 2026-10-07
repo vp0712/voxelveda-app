@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "baseline_sha": "12e8cccd4837bf21821bc2e9c8aa67ebe0ff619d",
-  "source_sha": "12e8cccd4837bf21821bc2e9c8aa67ebe0ff619d",
-  "generated_at": "2026-10-07T13:10:28+11:00",
+  "baseline_sha": "edeb1baef0c0aa0028eac5692496c325a062a322",
+  "source_sha": "edeb1baef0c0aa0028eac5692496c325a062a322",
+  "generated_at": "2026-10-07T18:17:38+11:00",
   "generator_version": "2.0.0",
   "scope": [
     "/",
@@ -20,10 +20,10 @@
     ".github/workflows/"
   ],
   "totals": {
-    "text_source_files": 831,
+    "text_source_files": 832,
     "binary_assets": 50,
-    "text_bytes": 7590949,
-    "text_lines": 130575,
+    "text_bytes": 7558545,
+    "text_lines": 129591,
     "routes": 1043,
     "migrations": 81,
     "worker_timer_sites": 84,
@@ -41,7 +41,7 @@
     "migrations": 81,
     "root_or_other": 24,
     "routes": 45,
-    "scripts": 222,
+    "scripts": 223,
     "services": 114
   },
   "routes": [
@@ -5555,13 +5555,13 @@
     },
     {
       "file": "scripts/finance-intelligence-admin-integration-test.js",
-      "line": 16,
+      "line": 21,
       "method": "GET",
       "path": "/finance-intelligence"
     },
     {
       "file": "scripts/finance-intelligence-admin-integration-test.js",
-      "line": 17,
+      "line": 22,
       "method": "GET",
       "path": "/finance-intelligence.html"
     },
@@ -6307,117 +6307,117 @@
   "workers": [
     {
       "file": "public/admin-dashboard.js",
-      "line": 239,
+      "line": 244,
       "evidence": "window.setTimeout(() => document.querySelector('.sidebar .nav-btn, .sidebar .nav-group-toggle')?.focus?.(), 80);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 475,
+      "line": 480,
       "evidence": "window.__notificationUndoTimer = setTimeout(() => toast.classList.remove('show'), 8000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 866,
+      "line": 871,
       "evidence": "window.__actionSuccessTimer = setTimeout(() => popup.classList.remove('show'), 4600);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 885,
+      "line": 890,
       "evidence": "setTimeout(() => {"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 911,
+      "line": 916,
       "evidence": "window.__voxelBannerTimer = setTimeout(() => banner.classList.remove('show'), 5200);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 1089,
+      "line": 1094,
       "evidence": "if (section && canAccessAdminSection(section)) window.setTimeout(() => goSection(section), 0);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 1545,
+      "line": 1550,
       "evidence": "window.__trashSearchTimer = setTimeout(() => loadTrash(1), 280);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 1716,
+      "line": 1721,
       "evidence": "if (target) window.setTimeout(() => goSection(target), 0);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 3970,
+      "line": 3975,
       "evidence": "setTimeout(() => URL.revokeObjectURL(url), 60000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 4403,
+      "line": 4408,
       "evidence": "setTimeout(() => URL.revokeObjectURL(url), 60000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 6483,
+      "line": 6488,
       "evidence": "shiftQrCountdownTimer = setInterval(() => {"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 6512,
+      "line": 6517,
       "evidence": "shiftQrTimer = setTimeout(loadShiftQr, Number(data.refresh_seconds || 20) * 1000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 7300,
+      "line": 7305,
       "evidence": "setTimeout(updateIssueStockPreview, 0);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 8320,
+      "line": 8325,
       "evidence": "financeState.searchTimer = setTimeout(() => loadFinanceTransactions(1), 280);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 8447,
+      "line": 8452,
       "evidence": "financeState.billSearchTimer = setTimeout(() => loadFinanceSupplierBills(1), 280);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9252,
+      "line": 9257,
       "evidence": "setTimeout(() => URL.revokeObjectURL(url), 1000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9270,
+      "line": 9275,
       "evidence": "setInterval(loadNotificationCenter, 60000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9305,
+      "line": 9310,
       "evidence": "setInterval(loadAttendance, 15000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9306,
+      "line": 9311,
       "evidence": "setInterval(loadAccessAttempts, 20000);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9490,
+      "line": 9495,
       "evidence": "setTimeout(() => win.print(), 350);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9603,
+      "line": 9608,
       "evidence": "window.setTimeout(() => document.querySelectorAll(rowClass).forEach((row) => row.classList.remove('timesheet-focus-row')), 2800);"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9797,
+      "line": 9802,
       "evidence": "window.setInterval(() => {"
     },
     {
       "file": "public/admin-dashboard.js",
-      "line": 9806,
+      "line": 9811,
       "evidence": "window.__adminStaffMessagePoller = setInterval(() => {"
     },
     {
@@ -6462,77 +6462,77 @@
     },
     {
       "file": "public/finance-master.js",
-      "line": 602,
+      "line": 603,
       "evidence": "link.href=url;link.download='Voxel-Veda-Account-Card-'+String(account.id)+'.svg';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),"
     },
     {
       "file": "public/finance-master.js",
-      "line": 731,
+      "line": 732,
       "evidence": "function waitFinance(ms){return new Promise(resolve=>setTimeout(resolve,Math.max(0,Number(ms)||0)))}"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1326,
+      "line": 1327,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1607,
+      "line": 1608,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1734,
+      "line": 1735,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1843,
+      "line": 1844,
       "evidence": "if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1847,
+      "line": 1848,
       "evidence": "setTimeout(ensureAdvancedControlLoaded,0);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2308,
+      "line": 2309,
       "evidence": "const timer=setTimeout(()=>finish(new Error('PDF parser timed out. Use CSV/OFX or try the PDF again.')),10000);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2497,
+      "line": 2498,
       "evidence": "const statementDelay=ms=>new Promise(resolve=>setTimeout(resolve,ms));"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2650,
+      "line": 2651,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2756,
+      "line": 2757,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3062,
+      "line": 3063,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3092,
+      "line": 3093,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3179,
+      "line": 3180,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3197,
+      "line": 3198,
       "evidence": "setTimeout(()=>{document.querySelectorAll('[data-search-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.searchTx));document.querySelectorAll('[data-search-account]').for"
     },
     {
@@ -9453,7 +9453,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "public/admin-dashboard.js",
-      "line": 955,
+      "line": 960,
       "evidence": "}).catch(() => {});"
     },
     {
@@ -9467,7 +9467,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "public/finance-master.js",
-      "line": 2868,
+      "line": 2869,
       "evidence": "document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)"
     },
     {
@@ -10322,9 +10322,9 @@
     {
       "file": ".github/workflows/integrated-repair.yml",
       "category": "ci",
-      "bytes": 1168,
-      "lines": 43,
-      "sha256": "e3c0ee8380e056b31280812f01365b58741bb859f027af7c4afd3488d89143f7"
+      "bytes": 1233,
+      "lines": 44,
+      "sha256": "f5a3b562b5a7930a1c0770b51b504873887ba43dfd476e33b2ae722c9400d608"
     },
     {
       "file": ".github/workflows/professional-loader-network-stability.yml",
@@ -11381,7 +11381,7 @@
       "category": "documentation",
       "bytes": 25136,
       "lines": 309,
-      "sha256": "0a95703aa7c9bdeb8fac30156371522ab05dcc69cf7451a8e2201324f2dcc394"
+      "sha256": "5688f25ce9ee22644ec9ce689483b76aa28340dec0d734dc4bf5ef1823566137"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -11456,9 +11456,9 @@
     {
       "file": "docs/INTEGRATED_REPAIR_COVERAGE.md",
       "category": "documentation",
-      "bytes": 6578,
-      "lines": 79,
-      "sha256": "cebd0c039d0f51144dfe64fc26b0529c210de458c82ba0606d3dfb1a138bd614"
+      "bytes": 8022,
+      "lines": 101,
+      "sha256": "69d5170fee12101cb1f951c634179571ff8fe281623e8746faaa4fcf53672c20"
     },
     {
       "file": "docs/loader-network-stability-note.md",
@@ -12478,23 +12478,23 @@
     {
       "file": "public/admin-dashboard.html",
       "category": "frontend",
-      "bytes": 105329,
+      "bytes": 105332,
       "lines": 1911,
-      "sha256": "4d084a00b2d21105e06dac48f7005561ab3a63cf057e7997444613ed110d5d53"
+      "sha256": "ff3ddecab5cb0988523df3724ec145e4734bbf8a0a0971526596aa2fb9b4680c"
     },
     {
       "file": "public/admin-dashboard.js",
       "category": "frontend",
-      "bytes": 489835,
-      "lines": 9830,
-      "sha256": "2f919edda0b9a6deee9d922f15a3ce39a81cb4d3281eb85a1833abd3a8d384a6"
+      "bytes": 489979,
+      "lines": 9835,
+      "sha256": "a4bd62e4419d8443ccc9c26181c268dd3798338581a1bb05fd10fae1e4706c11"
     },
     {
       "file": "public/advanced-theme.css",
       "category": "frontend",
-      "bytes": 186844,
-      "lines": 6032,
-      "sha256": "a0ebb4adbd23fcb814a26c2a36608e7feff1caa8dbb8a294189ac96d98852134"
+      "bytes": 166140,
+      "lines": 5620,
+      "sha256": "4e09297f626ce97f55f54ccfceee26f210d603af90c0a591cb700aab732ab953"
     },
     {
       "file": "public/auth-lifecycle.js",
@@ -12627,7 +12627,7 @@
       "category": "frontend",
       "bytes": 4715,
       "lines": 75,
-      "sha256": "072499443130ffae92cdd4d55b9e51e5e734648b32535a56c5386c0bc430bf8f"
+      "sha256": "eae0b90247130c61ce5e96957547bcba389c52b3349795e3063cc608455a388e"
     },
     {
       "file": "public/finance-master.css",
@@ -12639,9 +12639,9 @@
     {
       "file": "public/finance-master.js",
       "category": "frontend",
-      "bytes": 556142,
-      "lines": 3259,
-      "sha256": "894fb16ba058cdc846332d200e8e4e44ba7f4721e5a989944a14f6e175ec1187"
+      "bytes": 556279,
+      "lines": 3260,
+      "sha256": "dc974d3e95850df3c14924e80ec3aac48bd692c0aacc09943729a5868bc7cb05"
     },
     {
       "file": "public/financial-decision-assistant.js",
@@ -13234,9 +13234,9 @@
     {
       "file": "public/style.css",
       "category": "frontend",
-      "bytes": 374852,
-      "lines": 17286,
-      "sha256": "751a1aabc831c6319305bbcafc8706babbbf1deef8e266b5898d5603eed24537"
+      "bytes": 353626,
+      "lines": 16584,
+      "sha256": "c0fcc9dbf2f0918ae54e60f9417fdd874932df9098d8ed9153476f4d8e4eab36"
     },
     {
       "file": "public/support.html",
@@ -13290,23 +13290,23 @@
     {
       "file": "public/workspace-layout-check.js",
       "category": "frontend",
-      "bytes": 2237,
-      "lines": 28,
-      "sha256": "a0f4c33687c2088faecf9a70342f0f0be2cbc9f470d2ef00e13f104295a6bd84"
+      "bytes": 2415,
+      "lines": 30,
+      "sha256": "9b0d68697ba5d126a2bb9b8534389788dafe2287c744cda6b411b88436d63ff3"
     },
     {
       "file": "public/workspace-shell.js",
       "category": "frontend",
-      "bytes": 3760,
-      "lines": 41,
-      "sha256": "8f013a0c631b49cb04d542d068064bbe335283d1a09ef3f5dc9ac1c62888726a"
+      "bytes": 5295,
+      "lines": 73,
+      "sha256": "bf766ee86b787ff7270dee517c9ca4c9d42cd260a9b478d8c0e2e216533013b9"
     },
     {
       "file": "public/workspace-theme.css",
       "category": "frontend",
-      "bytes": 19089,
-      "lines": 194,
-      "sha256": "c41e90934d6f994d4e26f431357d9edb75013c0eb0706f1300a49ce01fbe8290"
+      "bytes": 20531,
+      "lines": 204,
+      "sha256": "b9067e35841a886de6f38376c1aed4a508234bde856dd9db8dab9dc9d7f65a62"
     },
     {
       "file": "public/workspace-theme.js",
@@ -13759,9 +13759,9 @@
     {
       "file": "scripts/check-syntax.js",
       "category": "scripts",
-      "bytes": 8312,
+      "bytes": 8362,
       "lines": 49,
-      "sha256": "76e2b7a3a83621cfd7bdba9ad286e00c6f0619c7dc5bdc2e0c5d601f6f7cdcd9"
+      "sha256": "4b2dbea4880829c50d233c508b14b7c2e68e5ae129bce615be1c0c25c014cfad"
     },
     {
       "file": "scripts/continuous-assurance-test.js",
@@ -14081,9 +14081,9 @@
     {
       "file": "scripts/finance-intelligence-admin-integration-test.js",
       "category": "scripts",
-      "bytes": 2077,
-      "lines": 26,
-      "sha256": "1a17b4749c0c02111007187b4a6101b0e3e5b8a95ec5c15729458025c5aefd76"
+      "bytes": 2646,
+      "lines": 31,
+      "sha256": "72778cb50e832dab0be9393579beb32f21f0f1cac7e177f600d5f5aaf96fa39c"
     },
     {
       "file": "scripts/finance-international-bank-adapter-test.js",
@@ -14165,9 +14165,9 @@
     {
       "file": "scripts/finance-production-regression-suite.js",
       "category": "scripts",
-      "bytes": 3487,
-      "lines": 89,
-      "sha256": "9e1e8e3f18f876f5bab74f5988d8f053be6dcf3be37b18e16f8429e38b887f33"
+      "bytes": 3531,
+      "lines": 90,
+      "sha256": "0d251da3abf77b9cf18958b46de262af56f53692ae7b746643183ab40073c04c"
     },
     {
       "file": "scripts/finance-receipt-audit-center-test.js",
@@ -14326,9 +14326,9 @@
     {
       "file": "scripts/finance-workspace-theme-test.js",
       "category": "scripts",
-      "bytes": 5925,
+      "bytes": 5931,
       "lines": 78,
-      "sha256": "4fceec43713b467fd247cd10c3b5cf572c4aef6b3f41b4706607171253d39e34"
+      "sha256": "d4ac27c6298a3602c4a6c0df84736970969b71cd6e012850b5bdda57da612632"
     },
     {
       "file": "scripts/finance-xlsx-export-test.js",
@@ -15199,6 +15199,13 @@
       "sha256": "6b90dc251f5817da625d228c9f06d4be697037635e16558c48e561a2dda52133"
     },
     {
+      "file": "scripts/workspace-navigation-behaviour-test.js",
+      "category": "scripts",
+      "bytes": 3982,
+      "lines": 50,
+      "sha256": "9ce85d66dc4bcd03f173ac31765d89ca431bdcc9b28c81162fb6cd1b197e16f9"
+    },
+    {
       "file": "SECURITY-CHECKLIST.md",
       "category": "root_or_other",
       "bytes": 1969,
@@ -15229,9 +15236,9 @@
     {
       "file": "services/adminPageRenderer.js",
       "category": "services",
-      "bytes": 8385,
-      "lines": 57,
-      "sha256": "09c772cae343188d6e35ca168b89829c407b7461a529565d9841a6a2863a6ac6"
+      "bytes": 8026,
+      "lines": 55,
+      "sha256": "f659a951f08d650833b232221a1727ef220a1c20e16cc9cf333f687eb9605fa5"
     },
     {
       "file": "services/advancedBankingSyncService.js",
@@ -15614,9 +15621,9 @@
     {
       "file": "services/globalBrandRenderer.js",
       "category": "services",
-      "bytes": 3919,
-      "lines": 48,
-      "sha256": "00894557f0a2ec0f843468ea64503100771040e629db824cba6999beb7f83ddf"
+      "bytes": 4205,
+      "lines": 51,
+      "sha256": "dad8a039fc4aaadf8b9f0f3e002f66d34189771c7c42b390022baa11076e4827"
     },
     {
       "file": "services/highRiskFinanceSchema.js",
