@@ -17,6 +17,7 @@ const files = [
   'routes/attendanceRoutes.js', 'routes/authRoutes.js', 'routes/emailRoutes.js', 'routes/uploadRoutes.js',
   'routes/notificationRoutes.js', 'routes/trashRoutes.js', 'routes/workflowRoutes.js', 'routes/procurementRoutes.js', 'routes/readinessRoutes.js', 'routes/backgroundJobRoutes.js',
   'routes/financeRoutes.js', 'routes/highRiskFinanceRoutes.js', 'routes/expenseRoutes.js', 'routes/invoiceRoutes.js', 'routes/taskRoutes.js', 'routes/userRoutes.js', 'routes/meetingRoutes.js', 'routes/rosterRoutes.js', 'routes/documentSecurityRoutes.js', 'routes/securityDashboardRoutes.js', 'routes/securityGovernanceRoutes.js', 'routes/operationalTrustRoutes.js', 'routes/continuousAssuranceRoutes.js', 'routes/integrationWebhookRoutes.js',
+  'services/financeReportSnapshotService.js', 'services/financeReportHtmlService.js', 'services/financePdfValidationService.js', 'public/report-viewer.js', 'scripts/finance-report-snapshot-test.js', 'scripts/finance-report-snapshot-mysql-test.js',
   'services/auditService.js', 'services/emailQueue.js', 'services/emailService.js', 'services/emailQueueWorker.js',
   'services/databaseRuntimeService.js', 'services/migrationRunner.js', 'services/runtimeState.js', 'services/rateLimitService.js', 'services/botChallengeService.js', 'services/publicSubmissionDedupeService.js', 'services/backgroundJobStore.js', 'services/backgroundJobService.js', 'services/qmsDefinitionService.js',
   'services/emailTemplates.js', 'services/notificationService.js',

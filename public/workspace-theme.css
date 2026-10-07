@@ -126,7 +126,7 @@ body::before, body::after, .chart-card::before, .supplier-payables-shell::before
 /* Finance sits inside the same ERP shell. Its department menu is contextual. */
 .fm-shell { display:block; }
 .finance-os-page .main.fm-main { margin-left:var(--vv-sidebar-width); padding:20px 24px; width:auto; }
-.fm-topbar { position:static; background:transparent; padding:12px 0; }
+.fm-topbar { position:static; background:transparent; padding:12px 0; margin-inline:0; }
 .fm-department-nav { margin:14px 0; }
 .fm-department-nav #fmNav { display:flex; gap:8px; flex-wrap:wrap; }
 .fm-department-nav .fm-nav-group { position:relative; min-width:0; margin:0; }

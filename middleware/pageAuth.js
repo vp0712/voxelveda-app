@@ -48,8 +48,9 @@ function pageAuth({ adminOnly = false, workspaceOnly = false, allowMfaSetup = fa
 
       const role = String(user.role || decoded.role || 'staff').trim().toLowerCase();
       if (!allowMfaSetup && (requiresMfa(role) || Number(user.mfa_enabled) === 1) && Number(session.assurance_level || 1) < 2) {
-        if (Number(user.mfa_enabled) !== 1) return res.redirect(302, '/security?mfa_setup=required');
-        return res.redirect(302, '/login?message=Multi-factor%20verification%20is%20required');
+        const returnTo=encodeURIComponent(safeReturnTo(req.originalUrl,'/'));
+        if (Number(user.mfa_enabled) !== 1) return res.redirect(302, '/security?mfa_setup=required&returnTo='+returnTo);
+        return res.redirect(302, '/login?returnTo='+returnTo+'&message=Multi-factor%20verification%20is%20required');
       }
       const permissions = parsePermissions(user.permissions);
       const authorizationUser = { ...user, role, permissions };
@@ -73,6 +74,7 @@ function pageAuth({ adminOnly = false, workspaceOnly = false, allowMfaSetup = fa
         role,
         permissions
       };
+      req.session=session;
       return next();
     } catch {
       return redirectToLogin(req, res);

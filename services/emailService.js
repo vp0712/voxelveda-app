@@ -215,6 +215,7 @@ function createTransporter() {
 function attachmentBuffer(attachment) {
   if (!attachment) return null;
   if (Buffer.isBuffer(attachment.content)) return attachment.content;
+  if (attachment.content?.type === 'Buffer' && Array.isArray(attachment.content.data)) return Buffer.from(attachment.content.data);
   if (attachment.content !== undefined && attachment.content !== null) {
     return Buffer.from(
       String(attachment.content),
@@ -233,7 +234,7 @@ function isPdfAttachment(attachment) {
 function assertAttachmentIntegrity(attachments = []) {
   for (const attachment of attachments) {
     if (!isPdfAttachment(attachment)) continue;
-    const buffer = attachmentBuffer(attachment);
+    const buffer = attachment.path ? fs.readFileSync(attachment.path) : attachmentBuffer(attachment);
     if (!buffer || buffer.length < 5 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
       const error = new Error('PDF attachment is not a valid PDF document.');
       error.code = 'PDF_ATTACHMENT_INVALID';
@@ -246,6 +247,9 @@ function assertAttachmentIntegrity(attachments = []) {
     }
     attachment.contentType = 'application/pdf';
     attachment.contentDisposition = 'attachment';
+    attachment.content = buffer;
+    delete attachment.path;
+    delete attachment.encoding;
   }
   return attachments;
 }
@@ -476,9 +480,10 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
     return {
       messageId: result.provider_message_id || result.request_id || null,
       accepted: to,
-      attachmentFilenameGuaranteed: result.attachment_filename_preserved === true
-        || result.preserve_attachment_filenames === true
-        || result.attachment_contract_version >= 2
+      // This is only the relay's claim; it is never recipient-side verification.
+      attachmentFilenameGuaranteed: result.attachment_filename_preserved === true,
+      attachmentContractVersion: Number(result.attachment_contract_version || 0),
+      receivedVerified: false
     };
   } catch (error) {
     if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
@@ -488,7 +493,7 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
   }
 }
 
-async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [] }) {
+async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [], attachmentFallback = null }) {
   const recipients = validateRecipients(to, 'to');
   const ccRecipients = validateRecipients(cc, 'cc');
   const bccRecipients = validateRecipients(bcc, 'bcc');
@@ -507,6 +512,15 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
     attachments: safeAttachments
   };
   const relayArgs = { ...smtpArgs };
+  // Finance supplies truthful alternative bodies. Do not send its PDF through a
+  // relay whose live filename behaviour has not been recipient-tested. Other
+  // established mail flows keep their existing transport contract.
+  async function relayDelivery(){
+    const omitPdf=hasPdf&&attachmentFallback&&process.env.WORDPRESS_MAIL_RELAY_PDF_FILENAME_VERIFIED!=='true';
+    const args=omitPdf?{...relayArgs,html:attachmentFallback.html,text:attachmentFallback.text,attachments:[]}:relayArgs;
+    const result=await sendViaHttpsRelay(args);
+    return {...result,transport:'https_relay',attachmentOmitted:!!omitPdf,attachmentOmissionReason:omitPdf?'RELAY_FILENAME_UNVERIFIED':null};
+  }
 
   if (isHostingerMailApiConfigured() && (pdfTransport === 'hostinger_mail_api' || hasPdf)) {
     try {
@@ -518,12 +532,9 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   }
 
   if (hasPdf && isRelayConfigured() && pdfTransport === 'https_relay') {
-    const result = await sendViaHttpsRelay(relayArgs);
-    if (!result.attachmentFilenameGuaranteed) {
-      const error = new Error('The HTTPS mail relay did not verify preservation of the .pdf attachment filename.');
-      error.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
-      throw error;
-    }
+    const result = await relayDelivery();
+    // The relay already sent the message. A missing acknowledgment cannot turn
+    // acceptance into a failed response and encourage a duplicate resend.
     return { ...result, transport: 'https_relay' };
   }
 
@@ -532,19 +543,13 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
       return await sendViaSmtp(smtpArgs);
     } catch (error) {
       if (!isRelayConfigured() || !isEmailTransportError(error)) throw error;
-      const result = await sendViaHttpsRelay(relayArgs);
-      if (!result.attachmentFilenameGuaranteed) {
-        const unsafe = new Error('The HTTPS mail relay did not verify preservation of the .pdf attachment filename.');
-        unsafe.code = 'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE';
-        unsafe.cause = error;
-        throw unsafe;
-      }
+      const result = await relayDelivery();
       return { ...result, transport: 'https_relay' };
     }
   }
 
   if (isRelayConfigured()) {
-    const result = await sendViaHttpsRelay(relayArgs);
+    const result = await relayDelivery();
     return { ...result, transport: 'https_relay' };
   }
 

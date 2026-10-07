@@ -139,15 +139,16 @@ function renderSummary(doc, report, title) {
   );
 
   let y = 171;
-  doc.roundedRect(42, y, 511, 82, 9).fillAndStroke('#F4F8FC', '#D7E4F0');
+  const summaries = Array.isArray(report.summary_by_currency) ? report.summary_by_currency : [];
+  doc.roundedRect(42, y, 511, Math.min(530,Math.max(82,45+summaries.length*14)), 9).fillAndStroke('#F4F8FC', '#D7E4F0');
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#0F2744').text('Financial summary', 56, y + 12, { width: 150 });
 
   let lineY = y + 31;
-  const summaries = Array.isArray(report.summary_by_currency) ? report.summary_by_currency : [];
   if (!summaries.length) {
     doc.font('Helvetica').fontSize(7.1).fillColor('#64748B').text('No financial activity for the selected filters.', 56, lineY, { width: 470 });
   }
-  summaries.slice(0, 3).forEach(function (row) {
+  summaries.forEach(function (row) {
+    if(lineY+28>738){doc.addPage();lineY=128;}
     doc.font('Helvetica-Bold').fontSize(7.1).fillColor('#1D4ED8').text(String(row.currency || 'AUD'), 56, lineY, { width: 38 });
     doc.font('Helvetica').fillColor('#334155').text(
       'Money in ' + signedAmount(row.money_in, row.currency) +
@@ -168,7 +169,7 @@ function renderSummary(doc, report, title) {
       56, y + 64, { width: 480 }
     );
   }
-  return 270;
+  return Math.max(270,lineY+30);
 }
 
 
@@ -411,8 +412,8 @@ function renderTransactions(doc, report, y) {
 }
 
 function buildFinancePdfArtifact(report, profile, title) {
-  const reportId = 'FIN-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
-  const generatedAt = new Date();
+  const reportId = report.metadata.report_id || 'FIN-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const generatedAt = new Date(report.metadata.generated_at || Date.now());
   const filename = 'Voxel-Veda-' + safeName(title) + '.pdf';
 
   return new Promise(function (resolve, reject) {

@@ -84,8 +84,8 @@ async function categorySpendByCurrency(db, whereSql, params, limit = 120) {
       WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${whereSql}
       GROUP BY bt.currency,CASE WHEN s.id IS NOT NULL THEN COALESCE(NULLIF(s.category,''),'Unclassified') ELSE COALESCE(NULLIF(bt.category,''),'Unclassified') END
       ORDER BY bt.currency,spent DESC
-      LIMIT ?`,
-    [...params, Math.max(1, Math.min(500, Number(limit) || 120))]
+      ${limit === null ? '' : 'LIMIT ?'}`,
+    limit === null ? params : [...params, Math.max(1, Math.min(500, Number(limit) || 120))]
   );
   return rows.map((row) => ({
     currency: String(row.currency || 'AUD').toUpperCase(),

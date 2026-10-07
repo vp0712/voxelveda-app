@@ -87,7 +87,7 @@ async function checkDownloads(){
  const downloadSource=finance.slice(finance.indexOf('async function downloadFinanceFile('),finance.indexOf('function openAccountStatementForm('));
  let calls=[],verifications=0,clicks=0,popups=0;
  const responses=[new Response(JSON.stringify({code:'STEP_UP_REQUIRED'}),{status:403,headers:{'Content-Type':'application/json'}}),new Response('%PDF-1.7\nfixture',{headers:{'Content-Type':'application/pdf'}})];
- const context={financeDownloadsInFlight:new Set(),fetch:async(url,options)=>{calls.push({url,options});return responses.shift();},financeAuthError:()=>null,requestFinanceStepUp:async()=>verifications++,URL:{createObjectURL:()=> 'blob:fixture',revokeObjectURL(){}},document:{createElement:()=>({click(){clicks++},remove(){}}),body:{appendChild(){}}},setTimeout:()=>0,showFinancePopup:()=>popups++};
+ const context={financeDownloadsInFlight:new Set(),AbortController,clearTimeout:()=>{},fetch:async(url,options)=>{calls.push({url,options});return responses.shift();},financeAuthError:()=>null,requestFinanceStepUp:async()=>verifications++,URL:{createObjectURL:()=> 'blob:fixture',revokeObjectURL(){}},document:{createElement:()=>({click(){clicks++},remove(){}}),body:{appendChild(){}}},setTimeout:()=>0,showFinancePopup:()=>popups++};
  vm.runInNewContext(downloadSource+'\nthis.download=downloadFinanceFile;',context);
  const url='/api/finance/reports/builder.pdf?account_ids=12&currency=AUD';
  await context.download(url,'Voxel-Veda-Report.pdf');
@@ -100,7 +100,7 @@ async function checkDownloads(){
  responses.push(new Response(JSON.stringify({code:'EXPORT_APPROVAL_REQUIRED',message:'Independent export approval is required'}),{status:403,headers:{'Content-Type':'application/json'}}));
  await assert.rejects(()=>context.download(url,'report.pdf'),/Independent export approval/);assert.equal(verifications,1,'Independent approval is never bypassed by another verification retry');
  context.financeDownloadsInFlight.add(url);await assert.rejects(()=>context.download(url,'report.pdf'),/already being prepared/);
- assert.match(finance,/reportPdf'\)\.onclick[\s\S]*?runFinanceDownload/,'Report PDF remains in the app and uses the secured handler');
+ assert.match(finance,/reportPdf'\)\.onclick[\s\S]*?downloadBuiltReport/,'Report PDF remains in the app and uses the secured handler');
  console.log('WORKSPACE_NAVIGATION_OK: shared menu state/scroll/focus/rotation/Back, 44px controls, explicit filters and saved defaults; secure export retry, exact filters, MIME/signature validation, approval boundary and duplicate protection.');
 }
 checkDownloads().catch(error=>{console.error(error);process.exitCode=1});

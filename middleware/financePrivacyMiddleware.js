@@ -12,8 +12,7 @@ function fail(res, error) {
 }
 
 
-async function resolveBankingAccessScope(req, res, next) {
-  try {
+async function loadBankingAccessScope(req) {
     const role = String(req.user?.role || '').toLowerCase();
     const isAdmin = ['super_admin','admin','finance_admin'].includes(role)
       || hasPermission(req.user, 'EDIT_BANK_DETAILS')
@@ -32,8 +31,19 @@ async function resolveBankingAccessScope(req, res, next) {
       can_view_all_business: hasPermission(req.user, 'VIEW_BUSINESS_BANKING'),
       allowed_business_account_ids: [...new Set(allowed)]
     };
-    return next();
-  } catch (error) { return fail(res, error); }
+    return req.bankingAccessScope;
+}
+async function resolveBankingAccessScope(req,res,next){
+  try{await loadBankingAccessScope(req);return next()}catch(error){return fail(res,error)}
+}
+async function resolveBankingReportPageScope(req,res,next){
+  try{await loadBankingAccessScope(req);return next()}
+  catch(error){
+    const {renderFinanceDocument}=require('../services/workspaceShellRenderer');
+    const {errorDocument}=require('../services/financeReportHtmlService');
+    res.set('Cache-Control','private, no-store').set('Referrer-Policy','no-referrer');
+    return res.status(error.statusCode||503).type('html').send(renderFinanceDocument(req,errorDocument('Report permissions could not be checked. Please retry.','REPORT_ACCESS_UNAVAILABLE')));
+  }
 }
 
 function accountParam(name = 'id') {
@@ -119,4 +129,4 @@ async function filterStatementList(req, res, next) {
   } catch (error) { return fail(res, error); }
 }
 
-module.exports = { resolveBankingAccessScope, accountParam, accountBody, protectScopeConversion, bankTransactionParam, insightParam, statementUid, filterAccountList, filterStatementList };
+module.exports = { resolveBankingAccessScope, resolveBankingReportPageScope, accountParam, accountBody, protectScopeConversion, bankTransactionParam, insightParam, statementUid, filterAccountList, filterStatementList };

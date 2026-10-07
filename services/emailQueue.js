@@ -1,4 +1,6 @@
 const pool = require('../config/db');
+const fs = require('node:fs');
+const crypto = require('node:crypto');
 const { ensureWorkforceSchema } = require('./workforceSchema');
 const { sendMail, normalizeAddressList, isEmailTransportError, classifySmtpFailure } = require('./emailService');
 
@@ -10,10 +12,31 @@ function parseJson(value, fallback) {
   }
 }
 
-function serializableAttachments(attachments = []) {
-  return attachments
-    .filter((item) => item && item.path)
-    .map((item) => ({ filename: item.filename, path: item.path, contentType: item.contentType }));
+async function serializableAttachments(attachments = []) {
+  const saved=[];
+  let total=0;
+  for(const item of attachments||[]){
+    if(!item)continue;
+    let bytes;
+    if(item.path)bytes=await fs.promises.readFile(item.path);
+    else if(Buffer.isBuffer(item.content))bytes=item.content;
+    else if(item.content?.type==='Buffer'&&Array.isArray(item.content.data))bytes=Buffer.from(item.content.data);
+    else if(item.content!==undefined&&item.content!==null)bytes=Buffer.from(String(item.content),item.encoding==='base64'?'base64':'utf8');
+    else throw new Error('Queued attachment has no durable content.');
+    total+=bytes.length;
+    if(total>20*1024*1024)throw new Error('Queued attachments exceed the 20 MB limit.');
+    saved.push({filename:item.filename,contentType:item.contentType||'application/octet-stream',contentDisposition:item.contentDisposition||'attachment',
+      content:bytes.toString('base64'),encoding:'base64',byteLength:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')});
+  }
+  return saved;
+}
+function restoreAttachments(items=[]){
+  return items.map(item=>{
+    if(item.encoding!=='base64')return item; // Legacy durable path rows retain their existing behaviour.
+    const bytes=Buffer.from(String(item.content||''),'base64');
+    if(bytes.length!==Number(item.byteLength)||crypto.createHash('sha256').update(bytes).digest('hex')!==item.sha256)throw new Error('Queued attachment integrity check failed.');
+    return {...item,content:bytes,encoding:undefined};
+  });
 }
 
 async function queueEmail(message) {
@@ -27,7 +50,7 @@ async function queueEmail(message) {
     message.subject,
     message.html || null,
     message.text || null,
-    JSON.stringify(serializableAttachments(message.attachments)),
+    JSON.stringify(await serializableAttachments(message.attachments)),
     message.relatedModule || null,
     message.relatedRecordId ? String(message.relatedRecordId) : null,
     message.scheduledAt || new Date(),
@@ -109,7 +132,7 @@ async function processEmailQueue(limit = 10) {
         subject: row.subject,
         html: row.html_body,
         text: row.text_body,
-        attachments: parseJson(row.attachments_json, [])
+        attachments: restoreAttachments(parseJson(row.attachments_json, []))
       });
       await pool.query(
         `UPDATE email_queue SET status = 'SENT', sent_at = NOW(), message_id = ?, last_error = NULL WHERE id = ?`,
@@ -149,4 +172,4 @@ async function processEmailQueue(limit = 10) {
   return outcomes;
 }
 
-module.exports = { queueEmail, processEmailQueue };
+module.exports = { queueEmail, processEmailQueue, _test:{serializableAttachments,restoreAttachments} };

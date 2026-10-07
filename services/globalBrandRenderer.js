@@ -2,7 +2,7 @@
 
 const BRAND_CSS = '/global-brand.css?v=20261007-navigation-final';
 const BRAND_JS = '/global-brand.js?v=20260918-global-loader';
-const WORKSPACE_CSS = '/workspace-theme.css?v=20261007-navigation-context';
+const WORKSPACE_CSS = '/workspace-theme.css?v=20261007-report-viewer';
 const FINANCE_PDF_ENHANCER_JS = '/finance-pdf-import-enhancer.js?v=20260918-pdf-parser2'; // retained as legacy asset reference only
 const CANONICAL_LOGO = '/logo.png';
 

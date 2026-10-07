@@ -73,6 +73,8 @@ const { publicRouter: publicCareersRoutes, adminRouter: adminCareersRoutes } = r
 const employeeIdentityRoutes = require('./routes/employeeIdentityRoutes');
 const employeeIdentityController = require('./controllers/employeeIdentityController');
 const { servePdfDelivery } = require('./services/financeReportDeliveryService');
+const financeReportBuilder = require('./controllers/financeReportBuilderController');
+const financePrivacy = require('./middleware/financePrivacyMiddleware');
 
 const app = express();
 const publicDir = path.join(__dirname, 'public');
@@ -94,6 +96,7 @@ function isRetiredFinanceUiAsset(asset){
 }
 const noStorePublicAssets = new Set([
   'erp-workspace.js', 'erp-workspace.css',
+  'report-viewer.js', 'report-viewer.css',
   'workspace-theme.css', 'workspace-theme.js', 'workspace-shell.js', 'workspace-charts.js',
   'login.js','admin-dashboard.js','staff.js','profile.js','procurement-ui.js','auth-lifecycle.js','mfa.js','security-page.js','step-up.js','step-up.css','style.css','advanced-theme.css','mobile-shell.js','quality.js','quality.css','shop-floor.js','shop-floor.css','service-worker.js','finance-bootstrap-guard.js','finance-master.js','finance-master.css','finance-advanced-control.js','finance-statement-parsers.js','global-brand.css','global-brand.js',
   'recovery-assurance.css','recovery-assurance.js','recovery-drill.css','recovery-drill.js','recovery-drill-ledger.css','recovery-drill-ledger.js','recovery-drill-governance.css','recovery-drill-governance.js','recovery-remediation.css','recovery-remediation.js','recovery-executive.css','recovery-executive.js','role-portal.css','role-portal.js','client-portal.html','client-portal.js','visitor-portal.html'
@@ -155,6 +158,7 @@ app.get('/',sendPage('index.html'));app.get('/login',noIndex,sendPage('login.htm
 app.get('/admin',noIndex,pageAuth({workspaceOnly:true}),renderAdminPage);app.get('/finance-intelligence',noIndex,pageAuth({workspaceOnly:true}),renderFinancePage);app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'));app.get('/finance-reconciliation',noIndex,pageAuth(),(req,res)=>res.redirect(302,'/finance-intelligence#reconciliation'));app.get('/dashboard',noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPathForRequestUser(req.user)));app.get('/portal/:role',noIndex,pageAuth(),serveRolePortal);app.get('/client',noIndex,pageAuth(),(req,res)=>{const target=portalPathForRequestUser(req.user);if(target!=='/client')return res.redirect(302,target);res.type('html');return res.send(brandedPage('client-portal.html'))});app.get('/profile',noIndex,pageAuth(),sendPage('profile.html'));app.get('/employee-id',noIndex,pageAuth({workspaceOnly:true}),sendPage('employee-id.html'));app.get('/quality',noIndex,pageAuth({workspaceOnly:true}),sendPage('quality.html'));app.get('/shop-floor',noIndex,pageAuth(),sendPage('shop-floor.html'));app.get('/invoice/view',noIndex,pageAuth(),sendPage('invoice-pdf.html'));
 app.get('/index.html',redirectPreservingQuery('/'));app.get('/login.html',redirectPreservingQuery('/login'));app.get('/register.html',redirectPreservingQuery('/register'));app.get('/customer.html',redirectPreservingQuery('/request-quote'));app.get('/privacy-policy.html',redirectPreservingQuery('/privacy'));app.get('/admin-dashboard.html',redirectPreservingQuery('/admin'));app.get('/finance-intelligence.html',redirectPreservingQuery('/finance-intelligence'));app.get('/finance-reconciliation.html',redirectPreservingQuery('/finance-intelligence#reconciliation'));app.get('/staff-dashboard.html',redirectPreservingQuery('/dashboard'));app.get('/profile.html',redirectPreservingQuery('/profile'));app.get('/quality.html',redirectPreservingQuery('/quality'));app.get('/shop-floor.html',redirectPreservingQuery('/shop-floor'));app.get('/dashboard.html',redirectPreservingQuery('/dashboard'));app.get('/invoice-pdf.html',redirectPreservingQuery('/invoice/view'));app.get('/shift-qr.html',redirectPreservingQuery('/attendance-terminal'));app.get('/careers-admin.html',redirectPreservingQuery('/careers-admin'));
 app.get('/approvals',noIndex,pageAuth(),(req,res)=>{const portal=portalPathForRequestUser(req.user);return res.redirect(302,`${portal}?view=approvals`)});
+app.get('/finance/reports/:reportId/view',noIndex,pageAuth(),financePrivacy.resolveBankingReportPageScope,financeReportBuilder.viewSnapshot);
 const protectedModuleRoutes=['/rfqs','/invoices','/customers','/suppliers','/procurement','/stock','/raw-material','/packaging','/expenses','/workforce','/timesheets','/roster','/staff','/finance','/financial-years','/compliance','/forms','/settings','/meetings','/tasks','/trash'];
 app.get(protectedModuleRoutes,noIndex,pageAuth(),(req,res)=>{const routeName=req.path.replace(/^\//,'');const portal=portalPathForRequestUser(req.user);return res.redirect(302,`${portal}?view=${encodeURIComponent(routeName)}`)});
 app.use((req,res,next)=>{
