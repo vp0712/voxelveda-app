@@ -34,4 +34,3 @@ async function run(){
   console.log('FINANCE_REPORT_VIEWER_BROWSER_TEST_OK: protected HTML download prompts step-up, retries same saved report, validates format and meaningful filename.');
 }
 run().catch(error=>{console.error(error);process.exitCode=1});
-
