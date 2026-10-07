@@ -39,4 +39,5 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: node scripts/integrated-repair-regression-test.js
+      - run: node scripts/workspace-navigation-behaviour-test.js
       - run: node scripts/integrated-repair-mysql-test.js

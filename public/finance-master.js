@@ -401,9 +401,10 @@ async function loadBase(){
   state.userPreferences=prefPayload?.preferences||state.userPreferences;
  if(!state.preferencesApplied&&state.userPreferences){
   const pref=state.userPreferences;
-  if(['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
-  if(pref.default_period)state.period=pref.default_period;
-  if(pref.default_account_id)state.account=String(pref.default_account_id);
+  const requested=new URLSearchParams(location.search);
+  if(!requested.has('scope')&&['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
+  if(!requested.has('period')&&pref.default_period)state.period=pref.default_period;
+  if(!requested.has('account_id')&&pref.default_account_id)state.account=String(pref.default_account_id);
   state.preferencesApplied=true;
   if($('fmScope'))$('fmScope').value=state.scope;
   if($('fmPeriod'))$('fmPeriod').value=state.period;

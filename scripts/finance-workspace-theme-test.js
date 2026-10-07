@@ -4,14 +4,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-const { injectGlobalBrand } = require('../services/globalBrandRenderer');
+const { injectGlobalBrand, WORKSPACE_CSS } = require('../services/globalBrandRenderer');
 const root = path.join(__dirname, '..');
 const css = fs.readFileSync(path.join(root, 'public/workspace-theme.css'), 'utf8');
 
 for (const file of ['admin-dashboard.html', 'staff-dashboard.html', 'finance-intelligence.html', 'client-portal.html', 'visitor-portal.html', 'login.html', 'profile.html', 'quality.html', 'shop-floor.html', 'security.html']) {
   const rendered = injectGlobalBrand(fs.readFileSync(path.join(root, 'public', file), 'utf8'));
   assert.match(rendered, /<body[^>]+data-vv-theme="sapphire"/i, `${file} receives the shared theme`);
-  assert.match(rendered, /workspace-theme\.css\?v=20261007-readable-integrated/, `${file} receives the current stylesheet`);
+  assert.ok(rendered.includes(`href="${WORKSPACE_CSS}"`), `${file} receives the authoritative current stylesheet`);
   assert.match(rendered, /<meta name="theme-color" content="#F4F7FB">/, `${file} uses the common mobile chrome colour`);
   assert.equal((rendered.match(/name="theme-color"/g) || []).length, 1, `${file} has one theme colour`);
   assert.equal(injectGlobalBrand(rendered), rendered, `${file} injection is idempotent`);

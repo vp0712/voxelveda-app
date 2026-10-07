@@ -4,7 +4,7 @@ const path = require('path');
 const files = [
   'public/workspace-theme.js','public/workspace-shell.js','public/workspace-charts.js',
   'public/workspace-layout-check.js','services/workspaceLayoutCheck.js',
-  'scripts/workspace-layout-check-test.js',
+  'scripts/workspace-layout-check-test.js', 'scripts/workspace-navigation-behaviour-test.js',
   'services/workspaceShellRenderer.js','services/expenseRegisterFilters.js','services/statementCoverage.js',
   'scripts/integrated-repair-regression-test.js','scripts/integrated-repair-mysql-test.js','scripts/workspace-charts-behaviour-test.js',
   'services/financeStatementColumns.js', 'services/financeStatementEvidence.js', 'services/financeStatementSourceRepair.js', 'scripts/finance-statement-source-evidence-test.js', 'controllers/statementDataManagementController.js', 'routes/bankingPortalRoutes.js',

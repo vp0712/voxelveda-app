@@ -6,6 +6,7 @@ const tests=[
   "integrated-repair-regression-test.js",
   "workspace-charts-behaviour-test.js",
   "workspace-layout-check-test.js",
+  "workspace-navigation-behaviour-test.js",
   "erp-workspace-test.js",
   "finance-release-consistency-test.js",
   "finance-workspace-theme-test.js",

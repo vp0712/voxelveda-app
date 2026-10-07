@@ -63,11 +63,12 @@ evidence repair workflow; this release does not rewrite historical transactions.
 
 ## Known external verification limits
 
-The configured custom app domain has a DNS/certificate issue independent of this
-release. Railway requires CNAME `app → l77jn3h9.up.railway.app` and TXT
-`_railway-verify.app → railway-verify=e9d97aebbcb0342135ecf3f8ca0cd3e3ad5c51ae87b7853f7a81ff3300bbce40`.
-The working existing Railway address is
-`https://voxelveda-app-production.up.railway.app`.
+The initial domain inspection found a pending custom-domain verification. By
+the live check on 7 October at 02:21 UTC, Railway reported the configured custom
+domain verified with a valid certificate, and `https://app.voxelveda.com` served
+the successful release `618cb85a13bb6d1f2f2712a799c314c0b1ea7c38`.
+The old public Railway hostname is intentionally inactive. This repair does not
+restore it or change the existing main website/domain routing.
 
 The MANAGE_USERS-protected `/internal/layout-check` renders the same deployed ERP/Finance code and authenticated data at 320/375/390/430/768/1024/1440 CSS pixel widths, with rotation and 200% layout emulation. Only these diagnostic copies allow same-origin framing; normal app routes retain DENY.
 
@@ -76,3 +77,24 @@ desktop browser result is not claimed as a real-device test. Open release gate
 #183 remains open for that real-device/multi-bank production matrix. Existing
 provider assurance items (MySQL TLS, backup restore evidence, Basiq live consent,
 multi-replica Redis proof) are not silently marked complete by this UI repair.
+
+## Sidebar recovery follow-up
+
+The authenticated 375px live Finance layout exposed a specific scroll defect:
+the outer sidebar scrolled, but its unconstrained inner navigation used
+overscroll containment. A wheel/gesture over the inner navigation could not
+reach the outer scroll area, so lower destinations stayed inaccessible. ERP and
+Finance also had separate menu state handlers and competing legacy z-index and
+geometry rules. Finance inherited a default serif body font after the palette
+migration. Explicit account-period links were overwritten by saved defaults.
+
+The follow-up gives the sidebar a viewport-bounded flex layout with one
+constrained navigation scroller, a stable footer and 44px actions. The shared
+controller owns menu state, focus restoration, dismissal, rotation and Back
+recovery for both ERP and Finance. Obsolete shared geometry is removed at its
+old CSS sources; all consumers receive newly versioned base and shared assets.
+The body font is explicit. One primary Finance link replaces duplicated naming;
+Accounting still opens the existing ERP ledger. Deep-link period/scope/account
+parameters take precedence over preference defaults. The shipped controller is
+exercised by `workspace-navigation-behaviour-test.js` in the production build and
+isolated CI, with post-deployment browser evidence recorded separately.
