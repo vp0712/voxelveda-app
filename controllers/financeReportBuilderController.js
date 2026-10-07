@@ -112,7 +112,7 @@ async function reportCoverage(req,filters,db=pool){
   if(filters.account_ids.length){clauses.push(`ba.id IN (${filters.account_ids.map(()=>'?').join(',')})`);params.push(...filters.account_ids)}
   if(filters.currency){clauses.push('ba.currency=?');params.push(filters.currency)}
   const [rows]=await db.query(
-    `SELECT ba.id,ba.nickname,ba.currency,ba.history_start_date,ba.history_end_date,
+    `SELECT ba.id,ba.nickname,ba.institution,ba.account_type,ba.currency,ba.history_start_date,ba.history_end_date,
             MIN(bt.transaction_date) AS earliest_transaction,MAX(bt.transaction_date) AS latest_transaction,
             MAX(sif.statement_end_date) AS last_statement_date
        FROM bank_accounts ba
@@ -125,7 +125,7 @@ async function reportCoverage(req,filters,db=pool){
     const start=String(row.history_start_date||row.earliest_transaction||'').slice(0,10)||null;
     const end=String(row.history_end_date||row.latest_transaction||'').slice(0,10)||null;
     const status=!start||!end?'UNKNOWN':(filters.from&&start>filters.from)||(filters.to&&end<filters.to)?'PARTIAL':'COMPLETE';
-    return {account_id:row.id,account_name:row.nickname,currency:row.currency,status,history_start:start,history_end:end,last_statement_date:String(row.last_statement_date||'').slice(0,10)||null};
+    return {account_id:row.id,account_name:row.nickname,institution:row.institution,account_type:row.account_type,currency:row.currency,status,history_start:start,history_end:end,last_statement_date:String(row.last_statement_date||'').slice(0,10)||null};
   });
   const statuses=new Set(accounts.map(row=>row.status));
   const status=statuses.has('UNKNOWN')?'UNKNOWN':statuses.has('PARTIAL')?'PARTIAL':accounts.length?'COMPLETE':'UNKNOWN';

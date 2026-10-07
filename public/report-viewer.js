@@ -22,7 +22,9 @@
   document.querySelectorAll('[data-report-download]').forEach(link=>link.addEventListener('click',async event=>{
     event.preventDefault();if(link.getAttribute('aria-busy')==='true')return;link.setAttribute('aria-busy','true');tell('Preparing the saved report download…');
     try{
-      const response=await request(link.href),type=response.headers.get('Content-Type')||'';
+      // Keep the same-origin API path so the shared step-up fetch wrapper can
+      // recognise the protected request and resume it after verification.
+      const response=await request(link.getAttribute('href')),type=response.headers.get('Content-Type')||'';
       const filename=response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1];
       const format=new URL(link.href).pathname.split('/').pop();
       const types={html:'text/html',csv:'text/csv',pdf:'application/pdf',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'};

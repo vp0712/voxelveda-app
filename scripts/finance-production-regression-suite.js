@@ -67,6 +67,7 @@ const tests=[
   "finance-report-builder-v2-test.js",
   "finance-email-pdf-delivery-test.js",
   "finance-report-snapshot-test.js",
+  "finance-report-viewer-browser-test.js",
   "finance-banking-readiness-test.js",
   "finance-xlsx-export-test.js",
   "finance-transaction-lifecycle-test.js",

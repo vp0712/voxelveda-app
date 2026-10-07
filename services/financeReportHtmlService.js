@@ -5,6 +5,7 @@ const snapshots=require('./financeReportSnapshotService');
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const label=value=>String(value||'').replace(/_/g,' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
 const date=value=>String(value||'').slice(0,10)||'—';
+const accountLabel=a=>[a.account_name||a.account_id||a.bank_account_id,a.institution,a.account_type,a.currency].filter(Boolean).join(' · ');
 const amount=(value,currency)=>`${String(currency||'').toUpperCase()} ${new Intl.NumberFormat('en-AU',{minimumFractionDigits:2,maximumFractionDigits:2}).format(Number(value||0))}`.trim();
 function originalLogoData(){return 'data:image/png;base64,'+fs.readFileSync(path.join(__dirname,'..','public','logo.png')).toString('base64');}
 function table(title,headers,rows,{full=false,query={},key='page',reportId,anchor='transactions'}={}){
@@ -29,13 +30,15 @@ function sections(saved,options){
     content+=table('Category analysis',['Currency','Category','Source transactions','Split lines','Spent'],(r.categories||[]).map(x=>[x.currency,x.category,x.source_transaction_count,x.split_line_count,amount(x.spent,x.currency)]),{...o,key:'category_page',anchor:'categories'});
   if(m.report_type==='MERCHANT')content+=table('Merchant analysis',['Currency','Merchant','Transactions','Spent','Received'],(r.merchants||[]).map(x=>[x.currency,x.merchant,x.transaction_count,amount(x.spent,x.currency),amount(x.received,x.currency)]),{...o,key:'merchant_page',anchor:'merchants'});
   if(!(r.transactions||[]).length)content+='<section class="vr-card vr-empty"><h2>No transactions in this period</h2><p>The saved report contains no transactions matching its filters.</p></section>';
-  else content+=table('Transactions',['Date','Posting date','Account','Description','Reference','Category','Currency','Debit','Credit','Running balance','Reconciliation','Receipt'],r.transactions.map(t=>[date(t.transaction_date),date(t.posting_date),t.account_name,t.description||t.merchant_name,t.reference,t.category||'Unclassified',t.currency,amount(t.debit,t.currency),amount(t.credit,t.currency),t.running_balance==null?'Not supplied':amount(t.running_balance,t.currency),t.reconciliation_status,Number(t.has_receipt)?'Attached':'Missing']),{...o,anchor:'transactions'});
+  else content+=table('Transactions',['Date','Posting date','Account','Description','Reference','Category','Currency','Debit','Credit','Running balance','Reconciliation','Receipt'],r.transactions.map(t=>[date(t.transaction_date),date(t.posting_date),accountLabel(t),t.description||t.merchant_name,t.reference,t.category||'Unclassified',t.currency,amount(t.debit,t.currency),amount(t.credit,t.currency),t.running_balance==null?'Not supplied':amount(t.running_balance,t.currency),t.reconciliation_status,Number(t.has_receipt)?'Attached':'Missing']),{...o,anchor:'transactions'});
   return content;
 }
 function reportContent(saved,{full=false,query={},canExport=false}={}){
   const r=saved.report,m=r.metadata,d=snapshots.descriptor(saved.row),title=label(m.report_type);
   const selected=new Set((m.account_ids||[]).map(Number));
-  const accounts=(r.coverage?.accounts||[]).filter(a=>!selected.size||selected.has(Number(a.account_id))).map(a=>a.account_name||a.account_id).join(', ')||'No permitted accounts';
+  const scopeAccounts=new Map((r.coverage?.accounts||[]).map(a=>[Number(a.account_id),a]));
+  for(const t of r.transactions||[]){const id=Number(t.bank_account_id);if(id)scopeAccounts.set(id,{...t,...scopeAccounts.get(id),institution:scopeAccounts.get(id)?.institution||t.institution,account_type:scopeAccounts.get(id)?.account_type||t.account_type});}
+  const accounts=[...scopeAccounts].filter(([id])=>!selected.size||selected.has(id)).map(([,a])=>accountLabel(a)).join('; ')||'No permitted accounts';
   const filters=['transaction_type','category','merchant','source','reconciliation_status','receipt_status','q'].filter(k=>m[k]).map(k=>label(k)+': '+m[k]).join(' · ')||'None';
   const actionUrl=format=>`/api/finance/reports/snapshots/${encodeURIComponent(m.report_id)}/download/${format}`;
   const actions=canExport?`<div class="vr-actions" aria-label="Report actions"><button type="button" data-report-print="${esc(actionUrl('print'))}">Print / Save as PDF</button>${['html','csv','xlsx'].map(f=>`<a data-report-download href="${esc(actionUrl(f))}">Download ${f.toUpperCase()}</a>`).join('')}<a data-report-download href="${esc(actionUrl('pdf'))}">${d.pdf_status==='READY'?'Download PDF':d.pdf_status==='UNAVAILABLE'?'Retry PDF':'Generate PDF'}</a><button type="button" data-report-email="${esc(m.report_id)}">Email report</button></div>`:'';
