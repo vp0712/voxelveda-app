@@ -314,7 +314,7 @@ async function loadResource(name,path,cycle=null){
  catch(error){if(cycle===null||cycle===loadCycle)setResource(name,error.status===403?'permission':'error',null,error,path);return null}
 }
 function resourceData(name){return state.resources[name]?.status==='loaded'?state.resources[name].data:null}
-const STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v2';
+const STATEMENT_PARSER_RECOVERY_VERSION='20261007-verified-no-activity-v4';
 let statementParserRecoveryRunning=false;
 async function recoverLegacyParserFailuresOnce(){
  if(statementParserRecoveryRunning)return 0;
@@ -2663,8 +2663,9 @@ async function openStatementReview(uid,initialFilter='ALL'){
   const warnings=rows.filter(row=>String(row.validation_status||'').toUpperCase()==='WARNING').length;
   const manualFixes=rows.filter(row=>Number(row.manual_override||0)).length;
   const selectedCount=rows.filter(row=>Number(row.selected||0)&&['VALID','WARNING'].includes(String(row.validation_status||'').toUpperCase())).length;
+  const noActivity=rows.length===0&&validations.some(item=>item.validation_key==='NO_ACTIVITY_STATEMENT'&&item.status==='PASS')&&result.job?.status==='COMPLETED'&&result.job?.stage==='VALID';
   const filters=[['ALL','All',session.total_rows],['VALID','Valid',session.valid_rows],['UNCERTAIN','Uncertain',warnings],['DUPLICATE','Duplicates',session.duplicate_rows],['REJECTED','Rejected',session.rejected_rows]];
-  const evidence=session.secure_document_id?'<a class="fm-evidence-link" href="/api/documents/'+encodeURIComponent(session.secure_document_id)+'/download" target="_blank" rel="noopener">Open original statement</a>':'';
+  const evidence=session.secure_document_id?'<button type="button" class="fm-evidence-link" data-review-original>Open original statement</button>':'';
   const failedValidation=validations.some(item=>item.status==='FAIL');
   const validationHtml=validations.map(item=>'<div class="fm-validation-row"><span>'+esc(String(item.validation_key||'').replace(/_/g,' '))+'</span>'+statusBadge(item.status)+'<small>Expected: '+esc(item.expected_value??'—')+' · Extracted: '+esc(item.actual_value??'—')+(item.difference_value!==null&&item.difference_value!==undefined?' · Difference: '+esc(item.difference_value):'')+'<br>'+esc(item.detail||'')+'</small></div>').join('');
   const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked and excluded from the ledger, totals and exports.</p></div>':'';
@@ -2674,7 +2675,8 @@ async function openStatementReview(uid,initialFilter='ALL'){
   const metadata='<div class="fm-statement-meta"><span>Account<b>'+esc(session.account_name||'—')+'</b></span><span>Format<b>'+esc(session.source_format||'—')+'</b></span><span>Parser<b>'+esc(session.parser_version||'—')+'</b></span><span>Reconciliation<b>'+esc(session.reconciliation_status||'INCOMPLETE')+(session.reconciliation_difference!==null&&session.reconciliation_difference!==undefined?' · '+nativeMoney(session.reconciliation_difference,session.statement_currency||session.account_currency):'')+'</b></span></div>';
   const validationPanel=validationHtml?'<details class="fm-validation" '+(failedValidation?'open':'')+'><summary>Validation and reconciliation evidence</summary>'+validationHtml+'</details>'+(failedValidation?'<div class="fm-state fm-state-warning"><strong>The source totals or running balances do not match.</strong><p>Check the original document and correct the highlighted rows before posting.</p><label><input type="checkbox" data-acknowledge-validation> I checked the original document and explicitly approve posting with these differences.</label></div>':''):'';
   const parserUpgrade=session.source_format==='PDF'&&session.secure_document_id&&session.parser_version==='finance-ingestion-v2-bank-aware' ? '<div class="fm-state fm-state-warning"><strong>Corrected statement reader available</strong><p>Re-read the original to fix header rows, totals and repeated purchases before posting. This rebuilds the pending review; check your selections and corrections again.</p><button type="button" data-review-reparse="'+esc(uid)+'">Re-read original</button><div data-review-reparse-progress hidden></div></div>' : '';
-  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+metadata+validationPanel+parserUpgrade+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction & source</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Approve & post selected rows</button></div></div>';
+  const noActivityPanel=noActivity?'<div class="fm-state"><strong>Verified no-activity statement</strong><p>'+date(session.statement_start_date)+' – '+date(session.statement_end_date)+' · 0 transactions. Supplied deposits and withdrawals are zero, and opening/closing balances reconcile. Acceptance retains this original and coverage without changing the ledger or current account balances.</p></div>':'';
+  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+metadata+noActivityPanel+validationPanel+parserUpgrade+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction & source</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">'+(noActivity?'Accept statement (no transactions)':'Approve & post selected rows')+'</button></div></div>';
   openDrawer('Review '+(session.original_name||'statement'),body,'STATEMENT REVIEW');
 
   setTimeout(()=>{
@@ -2695,19 +2697,22 @@ async function openStatementReview(uid,initialFilter='ALL'){
    };
 
    document.querySelector('[data-review-reparse]')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{await api(I+'/statement-imports/'+encodeURIComponent(uid)+'/retry',{method:'POST',body:'{}'});await waitForStatementImport(uid,document.querySelector('[data-review-reparse-progress]'))}catch(error){button.disabled=false;notice(error.message,true)}});
+   document.querySelector('[data-review-original]')?.addEventListener('click',()=>downloadFinanceFile('/api/documents/'+encodeURIComponent(session.secure_document_id)+'/download',session.original_name,'Original file ready','The original statement is ready to save.').catch(error=>notice(error.message,true)));
    document.querySelectorAll('[data-review-filter]').forEach(button=>button.onclick=()=>applyFilter(button.dataset.reviewFilter));
    document.querySelectorAll('[data-review-select]').forEach(box=>box.onchange=async()=>{try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(box.dataset.reviewSelect)+'/select',{method:'POST',body:JSON.stringify({selected:box.checked})})}catch(error){box.checked=!box.checked;notice(error.message,true)}});
    document.querySelectorAll('[data-review-override]').forEach(box=>box.onchange=()=>{if(!box.checked)return;const row=rows.find(item=>String(item.id)===String(box.dataset.reviewOverride));if(row)openRejectedRowOverride(uid,row,session,box)});
    document.querySelectorAll('[data-review-fix]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewFix));if(row)openRejectedRowOverride(uid,row,session,null)});
    document.querySelectorAll('[data-review-edit]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewEdit));if(row)openRejectedRowOverride(uid,row,session,null)});
-   document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{
+   document.querySelector('[data-review-commit]')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;if(button.disabled)return;
+    button.disabled=true;button.setAttribute('aria-busy','true');
     try{
      const acknowledged=Boolean(document.querySelector('[data-acknowledge-validation]')?.checked);
      if(failedValidation&&!acknowledged){notice('Check the original statement and correct the differences before approving.',true);return}
      const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:JSON.stringify({acknowledge_validation_mismatch:acknowledged})});
      closeDrawer();await refresh();
-     showFinancePopup('Statement imported successfully',x.message,num(x.imported)+' imported · '+num(x.duplicates)+' duplicate(s) excluded · '+num(x.excluded_balance_markers)+' balance marker(s) excluded');
-    }catch(error){notice(error.message,true)}
+     showFinancePopup(x.no_activity_statement?'No-activity statement accepted':'Statement imported successfully',x.message,num(x.imported)+' imported · '+num(x.duplicates)+' duplicate(s) excluded · '+num(x.excluded_balance_markers)+' balance marker(s) excluded');
+    }catch(error){notice(error.message,true)}finally{button.disabled=false;button.removeAttribute('aria-busy')}
    });
    document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/reject',{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
    applyFilter(initialFilter);

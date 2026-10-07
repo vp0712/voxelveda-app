@@ -97,7 +97,7 @@ assert(client.includes("const allRejectedPdf=status==='PENDING_REVIEW'")&&client
 
 const ingestionController=read('controllers/financeStatementIngestionController.js');
 assert(ingestionController.includes("fields.push('attempt=0', 'completed_at=NULL')"),'explicit retry must reset exhausted failed/dead-letter attempts');
-assert(client.includes("STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v2'")&&client.includes("PDF_NO_SAFE_TRANSACTIONS")&&client.includes("OCR_NO_SAFE_TRANSACTIONS"),'legacy parser failures must receive one versioned automatic recovery retry');
+assert(client.includes("STATEMENT_PARSER_RECOVERY_VERSION='20261007-verified-no-activity-v4'")&&client.includes("PDF_NO_SAFE_TRANSACTIONS")&&client.includes("OCR_NO_SAFE_TRANSACTIONS"),'legacy parser failures must receive one versioned automatic recovery retry');
 assert(client.includes("localStorage.setItem(key,new Date().toISOString())"),'automatic parser recovery must be loop-protected per import and parser version');
 
 console.log('Unified secure Finance statement import and historical migration checks passed.');

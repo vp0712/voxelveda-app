@@ -7,11 +7,40 @@ const { createAmountColumnResolver, tokenCenter } = require('./financeStatementC
 function extractStatementEvidence(lines = []) {
   const resolveColumns = createAmountColumnResolver(lines);
   const totals = [];
+  const summary = {};
+  const summaryEvidence = [];
+  const summaryLabels = /\b(opening\s+balance|closing\s+balance|total\s+(?:deposits?|credits?|withdrawals?|debits?))\b/gi;
+  const summaryKey = label => /opening/i.test(label) ? 'opening_balance' : /closing/i.test(label) ? 'closing_balance' : /deposit|credit/i.test(label) ? 'summary_total_credits' : 'summary_total_debits';
   let reportedBalance = null;
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const text = String(line.text || '').trim();
     const amounts = [...text.matchAll(MONEY_TOKEN)].map(match => ({ raw: match[0].trim(), index: match.index + match[0].length - match[0].trimStart().length }));
+    for (const label of text.matchAll(summaryLabels)) {
+      const anchor = tokenCenter(line, label.index, label[0].length);
+      const nextLabel = text.slice(label.index + label[0].length).search(summaryLabels);
+      const boundary = nextLabel < 0 ? text.length : label.index + label[0].length + nextLabel;
+      let candidates = amounts.filter(amount => amount.index >= label.index + label[0].length && amount.index < boundary);
+      let valueLine = line;
+      // ANZ's overview prints the currency symbol and amount on separate lines.
+      // Match the amount to the label's physical column, never an unrelated ID.
+      if (!candidates.length && anchor !== null) {
+        for (const next of lines.slice(index + 1, index + 6)) {
+          if (Number(next.page || 1) !== Number(line.page || 1) || new RegExp(summaryLabels.source, 'i').test(String(next.text || ''))) break;
+          candidates = [...String(next.text || '').matchAll(MONEY_TOKEN)].map(match => ({ raw: match[0].trim(), index: match.index + match[0].length - match[0].trimStart().length })).filter(amount => {
+            const center = tokenCenter(next, amount.index, amount.raw.length);
+            return center !== null && Math.abs(center - anchor) < 60;
+          });
+          if (candidates.length) { valueLine = next; break; }
+        }
+      }
+      if (candidates.length !== 1) continue;
+      const value = normaliseMoneyToken(candidates[0].raw)?.decimal;
+      if (value === undefined || value === null) continue;
+      const key = summaryKey(label[0]);
+      summary[key] = key in summary && summary[key] !== value ? null : value;
+      summaryEvidence.push({ key, value, source_page: Number(line.page || 1), source_snippet: `${text} ${valueLine === line ? '' : valueLine.text}`.trim().slice(0, 500) });
+    }
     if (/^(?:(?:page|grand)\s+)?(?:sub)?totals?\b/i.test(text) && amounts.length) {
       const fields = resolveColumns({ line, amounts });
       const debitLabel = /\b(withdrawals?|debits?|money\s+out|paid\s+out)\b/i.test(text);
@@ -39,7 +68,7 @@ function extractStatementEvidence(lines = []) {
       }
     }
   }
-  return { reported_totals: totals, reported_balance_as_of: reportedBalance };
+  return { reported_totals: totals, reported_balance_as_of: reportedBalance, ...summary, statement_summary_evidence: summaryEvidence };
 }
 
 module.exports = { extractStatementEvidence };

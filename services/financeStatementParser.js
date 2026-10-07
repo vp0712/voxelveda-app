@@ -11,8 +11,9 @@ const { amountDirection, normaliseMoneyToken } = require('./financeStatementMone
 const { selectAdapter } = require('./financeStatementAdapters');
 const { normaliseDate, _test: { isStatementSummaryLine } } = require('./financeStatementAdapters/generic');
 const { extractStatementEvidence } = require('./financeStatementEvidence');
+const { hasVerifiedNoActivity } = require('./financeStatementValidation');
 
-const PARSER_VERSION = 'finance-ingestion-v3-evidence';
+const PARSER_VERSION = 'finance-ingestion-v4-verified-empty';
 const MAX_ROWS = () => Math.max(1, Math.min(50000, Number(process.env.FINANCE_STATEMENT_MAX_ROWS || 10000)));
 const MAX_PAGES = () => Math.max(1, Math.min(500, Number(process.env.FINANCE_STATEMENT_MAX_PAGES || 100)));
 const MAX_IMAGE_PIXELS = () => Math.max(1000000, Number(process.env.FINANCE_STATEMENT_MAX_IMAGE_PIXELS || 40000000));
@@ -374,8 +375,11 @@ async function renderPdfPage(page) {
 function classify(text, metadata = {}) {
   const source = String(text || '').replace(/\s+/g, ' ');
   const upper = source.toUpperCase();
+  const heading = String(text || '').split(/\r?\n/).slice(0, 12).join(' ').toUpperCase();
   let documentType = 'UNKNOWN_FINANCIAL_DOCUMENT';
-  if (/CREDIT CARD STATEMENT|CARD ACCOUNT/.test(upper)) documentType = 'CREDIT_CARD_STATEMENT';
+  if (/CREDIT CARD STATEMENT|CARD ACCOUNT/.test(heading)) documentType = 'CREDIT_CARD_STATEMENT';
+  else if (/BANK STATEMENT|ACCOUNT STATEMENT|TRANSACTION HISTORY|TRANSACTION REPORT|ANZ ACCESS (?:ADVANTAGE|SAVINGS) STATEMENT/.test(heading)) documentType = 'BANK_STATEMENT';
+  else if (/CREDIT CARD STATEMENT|CARD ACCOUNT/.test(upper)) documentType = 'CREDIT_CARD_STATEMENT';
   else if (/LOAN STATEMENT|MORTGAGE STATEMENT/.test(upper)) documentType = 'LOAN_STATEMENT';
   else if (/BANK STATEMENT|ACCOUNT STATEMENT|TRANSACTION HISTORY|TRANSACTION REPORT/.test(upper)) documentType = 'BANK_STATEMENT';
   else if (/DIGITAL WALLET|PAYPAL|WALLET STATEMENT/.test(upper)) documentType = 'DIGITAL_WALLET_STATEMENT';
@@ -393,7 +397,9 @@ function classify(text, metadata = {}) {
     return match ? normaliseMoneyToken(match[1])?.decimal || null : null;
   };
   const dated = String.raw`(\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|\d{1,2}\s+[A-Za-z]{3,9}\s+\d{2,4})`;
-  const header = source.slice(0, 8000);
+  // Fee-cycle ranges are not the statement's coverage. Prefer its heading and
+  // exclude later fee summaries from the period search.
+  const header = source.split(/\bfee\s+summary\b|\bfees\s+charged\s+for\s+period\b/i)[0].slice(0, 8000);
   let periodMatch = header.match(new RegExp(`(?:statement period|period)\\s*[:\\-]?\\s*${dated}\\s*(?:to|through|[-–—])\\s*${dated}`, 'i'));
   if (!periodMatch) {
     const starts = header.match(new RegExp(`statement\\s+starts?\\s*[:\\-]?\\s*${dated}`, 'i'));
@@ -455,9 +461,15 @@ async function parsePdf(buffer, options = {}, progress) {
     let pageText = lines.map((line) => line.text).join('\n');
     let method = 'PDF_TEXT';
     if (pageText.replace(/\s/g, '').length < 24) {
-      ocrRequired = true; method = 'OCR';
-      const ocr = await ocrImage(await renderPdfPage(page), pageNo, progress);
-      lines = ocr.lines; pageText = ocr.text;
+      const rendered = await renderPdfPage(page);
+      const visualStats = await sharp(rendered).flatten({ background: '#ffffff' }).removeAlpha().stats();
+      const visuallyBlank = visualStats.channels.slice(0, 3).every(channel => channel.min >= 254);
+      if (visuallyBlank) method = 'PDF_BLANK';
+      else {
+        ocrRequired = true; method = 'OCR';
+        const ocr = await ocrImage(rendered, pageNo, progress);
+        lines = ocr.lines; pageText = ocr.text;
+      }
     }
     textCharacters += pageText.replace(/\s/g, '').length;
     pages.push({ page_number: pageNo, extraction_method: method, text_content: pageText.slice(0, 200000), word_count: lines.reduce((sum, line) => sum + line.words.length, 0), confidence: lines.length ? lines.reduce((sum, line) => sum + (line.words.reduce((inner, word) => inner + Number(word.confidence || 0), 0) / Math.max(1, line.words.length)), 0) / lines.length / 100 : 0 });
@@ -465,7 +477,7 @@ async function parsePdf(buffer, options = {}, progress) {
     page.cleanup?.();
   }
   let text = allLines.map((line) => line.text).join('\n');
-  let classification = classify(text, { pageCount: pages.length, selectableText: textCharacters > 24 && !ocrRequired, ocrRequired, appearsIncomplete: pages.some((page) => !page.word_count), lines: allLines });
+  let classification = classify(text, { pageCount: pages.length, selectableText: textCharacters > 24 && !ocrRequired, ocrRequired, appearsIncomplete: pages.some((page) => !page.word_count && page.extraction_method !== 'PDF_BLANK'), lines: allLines });
   let adapterChoice = selectAdapter({ text });
   const parseWithContext = (candidateLines, candidateClassification, choice) => {
     const statementStartDate = candidateClassification.statement_start_date || null;
@@ -501,7 +513,7 @@ async function parsePdf(buffer, options = {}, progress) {
   // Some bank PDFs contain selectable text but encode table columns in a way
   // that leaves only opening/closing markers or rejected rows. Treat zero
   // importable transactions as a failed text extraction and force OCR fallback.
-  if (textQuality.importable === 0 && pages.some((page) => page.extraction_method === 'PDF_TEXT')) {
+  if (textQuality.importable === 0 && !hasVerifiedNoActivity(classification, rows) && pages.some((page) => page.extraction_method === 'PDF_TEXT')) {
     const ocrLines = [];
     const ocrPages = [];
     for (let pageNo = 1; pageNo <= document.numPages; pageNo += 1) {
@@ -525,7 +537,7 @@ async function parsePdf(buffer, options = {}, progress) {
     const ocrChoice = selectAdapter({ text: ocrText });
     const ocrRows = parseWithContext(ocrLines, ocrClassification, ocrChoice);
     const ocrQuality = rowQuality(ocrRows);
-    if (ocrQuality.importable > textQuality.importable || (ocrQuality.importable === textQuality.importable && ocrQuality.transactions > textQuality.transactions)) {
+    if (hasVerifiedNoActivity(ocrClassification, ocrRows) || ocrQuality.importable > textQuality.importable || (ocrQuality.importable === textQuality.importable && ocrQuality.transactions > textQuality.transactions)) {
       rows = ocrRows;
       textQuality = ocrQuality;
       text = ocrText;
@@ -537,7 +549,11 @@ async function parsePdf(buffer, options = {}, progress) {
   }
 
   await document.destroy?.();
-  if (!rows.length || rowQuality(rows).importable === 0) throw parserError('No safely importable transaction rows were extracted after text and OCR parsing. The original PDF remains stored for retry/recovery.', 'PDF_NO_SAFE_TRANSACTIONS');
+  if (hasVerifiedNoActivity(classification, rows)) {
+    rows = [];
+    classification.no_activity_verified = true;
+    warnings.push('Verified no-activity statement: supplied deposits and withdrawals are zero and opening/closing balances reconcile. Accept the statement manually; no transactions will be created.');
+  } else if (!rows.length || rowQuality(rows).importable === 0) throw parserError('No safely importable transaction rows were extracted after text and OCR parsing. The original PDF remains stored for retry/recovery.', 'PDF_NO_SAFE_TRANSACTIONS');
   return { rows, pages: outputPages, classification, parserName: adapterChoice.adapter.VERSION, parserConfidence: adapterChoice.score, needsMapping: false, warnings };
 }
 

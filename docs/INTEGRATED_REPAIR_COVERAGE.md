@@ -143,3 +143,27 @@ important white backgrounds, and `.topbar.vv-topbar` still forced a three-column
 grid. Those origin declarations are removed too; the shared sidebar explicitly
 owns its dark brand surface and the shared flex header owns wrapping. Regression
 guards now include both actual combined/generic selectors.
+
+The failed original `Anz r 24 3.pdf` was downloaded through the existing secure
+document flow after user-provided step-up verification and inspected as an
+actual four-page PDF. It contains a valid no-activity statement covering
+2 January–1 March 2024: deposits and withdrawals are zero and the supplied
+opening/closing balances agree. The previous reader misclassified legal card
+references as the account type, preferred a fee-cycle period, could not align
+the overview's separately printed closing amount, and treated an appended
+visually blank page/zero transaction count as extraction failure.
+
+The originating parser now prioritises the document heading, excludes fee
+cycles from period detection, captures physically aligned summary evidence,
+and records genuinely blank rendered pages without discarding any originals.
+An empty statement is recognised only with explicit zero debit/credit totals,
+equal supplied balances, a valid period, no unresolved transaction rows and
+complete source evidence. It remains pending manual review. Empty acceptance
+requires a completed server-side extraction job and balanced validation;
+client-supplied preview metadata cannot grant this exception. Acceptance saves
+the original and coverage in the same vault without creating transactions or
+overwriting a newer account balance. The source file was not committed to Git.
+Anonymous generated PDF fixtures exercise the same layout, blank-page and
+fee-cycle cases, ambiguous/mismatched rejection, guarded manual acceptance and
+audit provenance. The original itself parsed locally to zero rows, four retained
+pages and BALANCED validation; production reprocessing is verified separately.

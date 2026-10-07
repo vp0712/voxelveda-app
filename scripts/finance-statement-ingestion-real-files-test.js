@@ -6,7 +6,7 @@ const PDFDocument = require('pdfkit');
 const sharp = require('sharp');
 const { detectStatementFile } = require('../services/financeStatementDetection');
 const parser = require('../services/financeStatementParser');
-const { evaluateStatement } = require('../services/financeStatementValidation');
+const { evaluateStatement, hasVerifiedNoActivity } = require('../services/financeStatementValidation');
 const statementReview = require('../controllers/statementImportController');
 
 function pdfBuffer(options, draw) {
@@ -29,6 +29,47 @@ async function fixtureImage() {
     <text x="70" y="340" font-size="48" font-family="Arial">25/09/2026 Customer receipt 100.00 CR 1157.50 CR</text>
   </svg>`);
   return sharp(svg).png().toBuffer();
+}
+
+async function verifyNoActivityCommit(parsed) {
+  const fs = require('node:fs'), vm = require('node:vm');
+  const source = fs.readFileSync(require.resolve('../controllers/statementImportController'), 'utf8');
+  const commitSource = source.slice(source.indexOf('exports.commit = async'), source.indexOf('exports.reject = async'));
+  const { FinanceError } = require('../services/financeDomain');
+  const account = { id: 7, currency: 'AUD', account_type: 'SAVINGS', history_end_date: '2026-09-30', current_ledger_balance: '500.00' };
+  for (const completedJob of [true, false]) {
+    const queries = [], audits = [];
+    const session = { id: 1, import_uid: 'synthetic-zero-activity', status: 'PENDING_REVIEW', bank_account_id: 7, secure_document_id: 'synthetic-original', source_format: 'PDF', parser_version: parsed.parserVersion, original_name: 'anonymous-zero.pdf', opening_balance: parsed.classification.opening_balance, closing_balance: parsed.classification.closing_balance, statement_start_date: parsed.classification.statement_start_date, statement_end_date: parsed.classification.statement_end_date, extraction_diagnostics_json: JSON.stringify({ classification: parsed.classification }) };
+    const db = { beginTransaction: async () => {}, commit: async () => {}, rollback: async () => {}, release: () => {}, query: async (sql, params = []) => {
+      queries.push({ sql, params });
+      if (sql.startsWith('SELECT * FROM statement_import_sessions')) return [[session]];
+      if (sql.startsWith('SELECT * FROM bank_accounts')) return [[account]];
+      if (sql.startsWith('SELECT id FROM finance_statement_import_jobs')) return [completedJob ? [{ id: 5 }] : []];
+      if (sql.startsWith('SELECT')) return [[]];
+      return [{ affectedRows: 1, insertId: 10 }];
+    } };
+    const context = { exports: {}, pool: { getConnection: async () => db }, FinanceError, evaluateStatement, hasVerifiedNoActivity,
+      repairPendingReview: async () => ({ repaired: 0, future_dates_repaired: 0 }), isBalanceMarker: () => false,
+      loadSemanticDuplicateSources: async () => new Set(), countRows: () => ({ valid: 0, warning: 0, duplicate: 0, rejected: 0 }),
+      applyAutoRulesToImport: async () => ({ changes: [], matched: 0, applied: 0, skipped_period: 0 }), uid: () => 'synthetic-batch',
+      audit: (_req, entry) => entry, logAudit: async (_db, entry) => audits.push(entry),
+      fail: (res, error) => res.status(error.statusCode || 500).json({ code: error.code }) };
+    vm.runInNewContext(commitSource, context);
+    const res = { statusCode: 200, status(value) { this.statusCode = value; return this; }, json(body) { this.body = body; return this; } };
+    await context.exports.commit({ params: { uid: session.import_uid }, body: {}, user: { id: 1 } }, res);
+    assert.equal(res.statusCode, completedJob ? 200 : 422, 'Only a completed server extraction can accept an empty statement');
+    assert.ok(!queries.some(item => /INSERT(?: IGNORE)? INTO bank_transactions\b|UPDATE bank_accounts\b/.test(item.sql)), 'Empty acceptance must never invent transactions or replace a newer account balance');
+    if (completedJob) {
+      assert.equal(res.body.imported, 0);
+      assert.equal(res.body.no_activity_statement, true);
+      assert.deepEqual(JSON.parse(JSON.stringify(res.body.coverage)), { start: '2024-01-02', end: '2024-03-01' });
+      const fileInsert = queries.find(item => item.sql.includes('INSERT INTO statement_import_files'));
+      assert.ok(fileInsert, 'The original statement and its verified coverage are retained in the existing vault');
+      assert.equal(fileInsert.params[5], '2024-01-02');
+      assert.equal(fileInsert.params[6], '2024-03-01');
+      assert.equal(audits.at(-1).newValue.no_activity_statement, true);
+    } else assert.ok(!queries.some(item => item.sql.includes('INSERT INTO statement_import_files')), 'Client metadata without the completed durable-source job cannot create an accepted empty statement');
+  }
 }
 
 async function run() {
@@ -93,6 +134,36 @@ async function run() {
   assert.equal(pdfResult.classification.selectable_text, true);
   assert.ok(pdfResult.rows[0].source_bbox);
 
+  const noActivityPdf = await pdfBuffer({}, document => {
+    document.fontSize(15).text('ANZ ACCESS ADVANTAGE STATEMENT');
+    document.fontSize(11).text('STATEMENT NUMBER 2').text('02 January 2024 to 01 March 2024');
+    document.text('Account Number 0000000123');
+    for (const [label, amount] of [['Opening Balance:', '500.00'], ['Total Deposits:', '0.00'], ['Total Withdrawals:', '0.00'], ['Closing Balance:', '500.00']]) {
+      document.text(label, 350, document.y + 15).text('$', 385, document.y).text(amount, 390, document.y);
+    }
+    document.addPage().text('Transaction Details', 40, 40).text('Fee Summary');
+    document.text('Fees Charged for period: 30 DEC 2023 to 31 JAN 2024');
+    document.text('Your credit card statement and card account terms are separate from this savings account.');
+    document.addPage(); // Real exported statements may append a genuinely blank page.
+  });
+  const stages = [];
+  const noActivity = await parser.parseStatementBuffer(noActivityPdf, { originalName: 'anonymous-zero.pdf', mimeType: 'application/pdf' }, { currency: 'AUD' }, event => stages.push(event.stage));
+  assert.equal(noActivity.rows.length, 0, 'Summary balances and totals are never imported as transactions');
+  assert.equal(noActivity.classification.document_type, 'BANK_STATEMENT', 'Legal/footer card references cannot override the actual savings-statement heading');
+  assert.equal(noActivity.classification.statement_start_date, '2024-01-02');
+  assert.equal(noActivity.classification.statement_end_date, '2024-03-01', 'Fee cycles must not overwrite actual statement coverage');
+  assert.equal(noActivity.classification.no_activity_verified, true);
+  assert.equal(noActivity.pages.length, 3, 'Every original source page, including verified blank pages, remains available for review');
+  assert.equal(noActivity.pages[2].extraction_method, 'PDF_BLANK');
+  assert.ok(!stages.includes('OCR_REQUIRED'), 'Verified selectable zero-activity statements do not require destructive/redundant OCR fallback');
+  const noActivityValidation = evaluateStatement({ rows: noActivity.rows, classification: noActivity.classification, account: { currency: 'AUD', account_type: 'SAVINGS' } });
+  assert.equal(noActivityValidation.reconciliationStatus, 'BALANCED');
+  assert.equal(noActivityValidation.validations.find(item => item.check === 'NO_ACTIVITY_STATEMENT').status, 'PASS');
+  for (const change of [{ closing_balance: '500.01' }, { summary_total_credits: null }, { summary_total_debits: '12.00' }, { statement_end_date: null }, { multiple_accounts: true }, { appears_incomplete: true }]) assert.equal(hasVerifiedNoActivity({ ...noActivity.classification, ...change }, []), false, 'Ambiguous/damaged extraction is never treated as zero activity');
+  assert.equal(hasVerifiedNoActivity(noActivity.classification, [{ description: 'Uncertain purchase', force_rejected: true }]), false, 'Unresolved transaction rows cannot be discarded as no activity');
+  assert.equal(evaluateStatement({ rows: [], classification: { opening_balance: '500.00', closing_balance: '500.00' } }).reconciliationStatus, 'MISMATCH', 'Matching balances alone do not prove no activity');
+  await verifyNoActivityCommit(noActivity);
+
   const image = await fixtureImage();
   if (process.env.FINANCE_OCR_DEBUG === 'true') {
     const debug = await parser._test.ocrImage(image, 1);
@@ -140,7 +211,7 @@ async function run() {
   assert.throws(() => detectStatementFile(Buffer.alloc(1025, 65), 'oversize.csv'), (error) => error.code === 'STATEMENT_FILE_TOO_LARGE');
   if (priorMaxBytes === undefined) delete process.env.FINANCE_STATEMENT_MAX_BYTES; else process.env.FINANCE_STATEMENT_MAX_BYTES = priorMaxBytes;
 
-  console.log('FINANCE_STATEMENT_REAL_FILES_OK formats=CSV,XLSX,OFX,QFX,QIF,PDF_TEXT,PNG_OCR,PDF_OCR,PDF_PASSWORD cases=MAPPING,AMBIGUOUS,MALFORMED,DUPLICATE,MISMATCH,CORRUPT,OVERSIZE');
+  console.log('FINANCE_STATEMENT_REAL_FILES_OK formats=CSV,XLSX,OFX,QFX,QIF,PDF_TEXT,PNG_OCR,PDF_OCR,PDF_PASSWORD cases=MAPPING,AMBIGUOUS,MALFORMED,DUPLICATE,MISMATCH,CORRUPT,OVERSIZE,VERIFIED_ZERO_ACTIVITY,FEE_PERIOD,MANUAL_EMPTY_ACCEPTANCE');
 }
 
 run().catch((error) => {
