@@ -222,6 +222,11 @@ function toggleMobileMenu(open) {
   const shouldOpen = typeof open === 'boolean'
     ? open
     : !document.body.classList.contains('mobile-menu-open');
+  if (window.VoxelWorkspaceMenu) {
+    window.VoxelWorkspaceMenu.set(shouldOpen);
+    if (shouldOpen) closeNotificationPanel();
+    return;
+  }
   document.body.classList.toggle('mobile-menu-open', shouldOpen);
   document.documentElement.classList.toggle('mobile-menu-open', shouldOpen);
   document.body.classList.toggle('vv-scroll-locked', shouldOpen);

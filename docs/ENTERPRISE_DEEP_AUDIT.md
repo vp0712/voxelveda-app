@@ -5,17 +5,17 @@
 ## Audit baseline
 
 - Repository: `vp0712/voxelveda-app`
-- Latest fetched `origin/main` at audit start: `12e8cccd4837bf21821bc2e9c8aa67ebe0ff619d`
-- Audited source SHA: `12e8cccd4837bf21821bc2e9c8aa67ebe0ff619d`
-- Audited source commit time: `2026-10-07T13:10:28+11:00`
-- Inventory generated at: `2026-10-07T13:10:28+11:00` (deterministic source commit time)
+- Latest fetched `origin/main` at audit start: `edeb1baef0c0aa0028eac5692496c325a062a322`
+- Audited source SHA: `edeb1baef0c0aa0028eac5692496c325a062a322`
+- Audited source commit time: `2026-10-07T18:17:38+11:00`
+- Inventory generated at: `2026-10-07T18:17:38+11:00` (deterministic source commit time)
 - Inventory generator version: `2.0.0`
 - Current remediation branch: `main`
 - Scope: root application files plus `config`, `controllers`, `controllers/qms`, `middleware`, `migrations`, `public`, `routes`, `scripts`, `services`, `utils`, `ios`, `android`, and `.github/workflows`.
 - Binary policy: image, font, PDF, and archive bytes were not interpreted as source. Their path, type, size, and deployment presence are inventoried.
 - Machine-readable evidence: `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json`
 
-The deterministic inventory currently records 831 text/source files, 130,575 lines, 1,043 declared HTTP routes, 81 SQL migrations, 84 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
+The deterministic inventory currently records 832 text/source files, 129,591 lines, 1,043 declared HTTP routes, 81 SQL migrations, 84 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
 
 ## Local verification evidence
 
@@ -64,7 +64,7 @@ Wave B PR 3 local evidence:
 
 Wave A was subsequently merged through PR 30 and deployed at exact SHA `090de950289b9c264e52e97198835803657ac825`. Production evidence showed the migration ledger recovering 18 legacy entries, checksum-verifying one existing entry, applying the Wave A migration, and reaching 17 critical schemas before `Server ready`. Public health and readiness returned the same SHA and anonymous detailed readiness was denied. Database TLS, Redis, backup, malware scanning, custom-domain DNS/TLS, WebAuthn, and object-storage provider verification remain separate and unverified unless identified below.
 
-This refreshed architecture inventory represents merged main at `12e8cccd4837bf21821bc2e9c8aa67ebe0ff619d`. New remediation changes are not silently folded into that baseline: `source_sha`, `generated_at`, and `generator_version` are explicit, and CI verifies that the source exists, is an ancestor of the branch, and is named by this audit.
+This refreshed architecture inventory represents merged main at `edeb1baef0c0aa0028eac5692496c325a062a322`. New remediation changes are not silently folded into that baseline: `source_sha`, `generated_at`, and `generator_version` are explicit, and CI verifies that the source exists, is an ancestor of the branch, and is named by this audit.
 
 
 ## Automated baseline refresh

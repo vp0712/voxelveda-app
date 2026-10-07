@@ -11,8 +11,13 @@ const financeHtml = fs.readFileSync(path.join(root, 'public', 'finance-intellige
 const routes = fs.readFileSync(path.join(root, 'routes', 'financeRoutes.js'), 'utf8');
 const migration = fs.readFileSync(path.join(root, 'migrations', '20260915_finance_transaction_intelligence.sql'), 'utf8');
 
-assert(rendered.includes('data-title="Finance Intelligence"'), 'admin sidebar must expose Finance Intelligence');
-assert(rendered.includes('Open Finance Intelligence'), 'admin banking tab must expose Finance Intelligence launch button');
+const sidebar = rendered.match(/<aside id="primarySidebar"[\s\S]*?<\/aside>/)[0];
+assert.equal((sidebar.match(/data-title="Finance"/g) || []).length, 1, 'shared sidebar has exactly one Finance destination');
+assert(sidebar.includes('onclick="openBankingWorkspace()"'), 'primary Finance action opens the existing integrated workspace');
+assert(sidebar.includes('data-title="Accounting" data-section="financeSection"'), 'ERP accounting retains its own clearly named destination');
+assert(!sidebar.includes('data-title="Finance Intelligence"'), 'a second legacy Finance entry must not be injected');
+assert(rendered.includes('Open Finance'), 'admin banking tab retains a contextual Finance launch action');
+assert.equal(injectFinanceIntelligence(rendered), rendered, 'Finance integration remains idempotent');
 assert(appSource.includes("app.get('/finance-intelligence',noIndex,pageAuth({workspaceOnly:true})"), 'Finance Intelligence page must use workspace page authentication');
 assert(appSource.includes("app.get('/finance-intelligence.html',redirectPreservingQuery('/finance-intelligence'))"), 'direct .html route must redirect to protected route');
 assert(financeHtml.includes('FINANCE OPERATING SYSTEM'), 'master Finance OS shell must be visible');

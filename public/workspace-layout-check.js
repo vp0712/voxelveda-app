@@ -1,6 +1,8 @@
 (() => {
  'use strict';
  if(document.body.dataset.vvLayoutCheck==='frame'){
+  // A diagnostic frame must leave its frame when opening normal DENY-protected routes.
+  document.querySelectorAll('#primarySidebar a[href]').forEach(link=>link.target='_top');
   window.addEventListener('message',event=>{
    if(event.origin!==location.origin||event.source!==parent||event.data?.type!=='voxel-layout-focus')return;
    const targets={top:'.main',charts:'#rfqChart',payables:'.supplier-payables-shell',accounts:'.fm-account-cat-chart'};
