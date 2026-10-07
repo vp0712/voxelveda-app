@@ -81,6 +81,13 @@ async function run(){
   const malicious=structuredClone(loaded);malicious.report.transactions[0].description='<img src=x onerror=alert(1)>';
   assert(html.standaloneHtml(malicious).includes('&lt;img src=x onerror=alert(1)&gt;'));
   assert(!html.standaloneHtml(malicious).includes('<img src=x'));
+  const sameNamedAccounts=structuredClone(loaded);
+  sameNamedAccounts.report.metadata.account_ids=[];
+  sameNamedAccounts.report.coverage.accounts=[{account_id:42,account_name:'Viral',institution:'ANZ',currency:'AUD'},{account_id:43,account_name:'Viral',institution:'Commonwealth Bank',currency:'AUD'}];
+  sameNamedAccounts.report.transactions=[];
+  assert(html.standaloneHtml(sameNamedAccounts).includes('Viral · ANZ · AUD; Viral · Commonwealth Bank · AUD'),'same-named accounts remain identifiable in saved scope');
+  sameNamedAccounts.report.metadata.account_ids=[42];
+  assert(!html.standaloneHtml(sameNamedAccounts).includes('Commonwealth Bank'),'account labels retain selected scope');
   const artifact=await controller._test.ensureSnapshotPdf(loaded);assert(artifact&&artifact.buffer.length>5000);
   const validation=await validateReportPdf(artifact,loaded.report);assert(validation.pages>1);
   assert.deepEqual(await snapshots.pdfBytes(await snapshots.authorise(owner,id)),artifact.buffer);
