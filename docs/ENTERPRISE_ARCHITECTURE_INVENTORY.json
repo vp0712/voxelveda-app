@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "baseline_sha": "1ef2e82394a474ad27e7ac64dbe8b9b01891a0da",
-  "source_sha": "1ef2e82394a474ad27e7ac64dbe8b9b01891a0da",
-  "generated_at": "2026-10-07T19:13:25+11:00",
+  "baseline_sha": "30ab395a2d4937d6502a6b0ed5c5c34d93776065",
+  "source_sha": "30ab395a2d4937d6502a6b0ed5c5c34d93776065",
+  "generated_at": "2026-10-07T19:40:13+11:00",
   "generator_version": "2.0.0",
   "scope": [
     "/",
@@ -22,8 +22,8 @@
   "totals": {
     "text_source_files": 832,
     "binary_assets": 50,
-    "text_bytes": 7570019,
-    "text_lines": 129728,
+    "text_bytes": 7586810,
+    "text_lines": 129898,
     "routes": 1043,
     "migrations": 81,
     "worker_timer_sites": 84,
@@ -6507,32 +6507,32 @@
     },
     {
       "file": "public/finance-master.js",
-      "line": 2680,
+      "line": 2682,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2786,
+      "line": 2791,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3092,
+      "line": 3097,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3122,
+      "line": 3127,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3209,
+      "line": 3214,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3227,
+      "line": 3232,
       "evidence": "setTimeout(()=>{document.querySelectorAll('[data-search-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.searchTx));document.querySelectorAll('[data-search-account]').for"
     },
     {
@@ -6722,7 +6722,7 @@
     },
     {
       "file": "services/financeStatementParser.js",
-      "line": 34,
+      "line": 35,
       "evidence": "timer = setTimeout(async () => {"
     }
   ],
@@ -9467,7 +9467,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "public/finance-master.js",
-      "line": 2898,
+      "line": 2903,
       "evidence": "document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)"
     },
     {
@@ -9838,7 +9838,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "services/financeStatementParser.js",
-      "line": 84,
+      "line": 85,
       "evidence": "if (worker) await worker.terminate().catch(() => {});"
     },
     {
@@ -11281,9 +11281,9 @@
     {
       "file": "controllers/statementImportController.js",
       "category": "controllers",
-      "bytes": 70599,
-      "lines": 1161,
-      "sha256": "30abc3dcdb6b0af7f1fc9c565998bda50c6e1fcb2386840424d1a74bbf53ca94"
+      "bytes": 71971,
+      "lines": 1171,
+      "sha256": "c7ce6ea0b8860b87396dd5e0262800e020627fb8911dcfd8796f63c3880c83dc"
     },
     {
       "file": "controllers/stepUpController.js",
@@ -11381,7 +11381,7 @@
       "category": "documentation",
       "bytes": 25136,
       "lines": 309,
-      "sha256": "bc1afc5d5e33350a721cd7db44a3b225f9b4ecf39941cf8cb09efb6928cd2134"
+      "sha256": "f530a66056dba8db92e3dca4049ff3f6905cce9d16ed1bb8b901646274ca832c"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -11456,9 +11456,9 @@
     {
       "file": "docs/INTEGRATED_REPAIR_COVERAGE.md",
       "category": "documentation",
-      "bytes": 11048,
-      "lines": 146,
-      "sha256": "c756b49d53abb2b122ef02690cd03c3c472277152f4c7ac6e3311c0c0bcf3e75"
+      "bytes": 12729,
+      "lines": 170,
+      "sha256": "5c2813af1417f8c3d82373a5e715e50d264ef91b5faa1d49393b8146c52c7152"
     },
     {
       "file": "docs/loader-network-stability-note.md",
@@ -12627,7 +12627,7 @@
       "category": "frontend",
       "bytes": 4715,
       "lines": 75,
-      "sha256": "c1ba91ca9ac2522a150380558921977155b78f8975e308140286bb197bdb4cf4"
+      "sha256": "3027c9fefc3dbe0e1af72976e12c4005f54f8510625fc477d7599d1c98d571ce"
     },
     {
       "file": "public/finance-master.css",
@@ -12639,9 +12639,9 @@
     {
       "file": "public/finance-master.js",
       "category": "frontend",
-      "bytes": 559357,
-      "lines": 3290,
-      "sha256": "96399127a60246b62eb981c05e39fa14ae3f1d8ab1852b35b463f312f0ff4b03"
+      "bytes": 560542,
+      "lines": 3295,
+      "sha256": "59d88aa743b64c69cf9e2bf7c725b2f9162e34700317c78c1b89e79ab54e7e7c"
     },
     {
       "file": "public/financial-decision-assistant.js",
@@ -14074,9 +14074,9 @@
     {
       "file": "scripts/finance-import-wizard-test.js",
       "category": "scripts",
-      "bytes": 10587,
+      "bytes": 10600,
       "lines": 104,
-      "sha256": "f799e65f253473283792f092cf5846f735939178c82ab5ae6260b69c3b4ab610"
+      "sha256": "6852c7e14b8ad157f4e912d9c017c550482283fdbdbed75390374944b182933a"
     },
     {
       "file": "scripts/finance-intelligence-admin-integration-test.js",
@@ -14228,9 +14228,9 @@
     {
       "file": "scripts/finance-statement-ingestion-real-files-test.js",
       "category": "scripts",
-      "bytes": 9798,
-      "lines": 150,
-      "sha256": "354ad7ba409a61e863fa9592c931c7e24a583299eedbad96032454b0919ac569"
+      "bytes": 17052,
+      "lines": 221,
+      "sha256": "5fd3dbc6825e572d524abe1330d9ddbc6b20061c2e2e283a671efc3b95971a35"
     },
     {
       "file": "scripts/finance-statement-legacy-resume-test.js",
@@ -15558,9 +15558,9 @@
     {
       "file": "services/financeStatementEvidence.js",
       "category": "services",
-      "bytes": 2740,
-      "lines": 46,
-      "sha256": "80b58c08358a72d54724b7589d3ddd341197b5554a3cf0753950b1da1d6fb744"
+      "bytes": 4971,
+      "lines": 75,
+      "sha256": "38f34a04de97575a04ff428f55a5cdfd53ef48199cf5645b137c8855d9575c29"
     },
     {
       "file": "services/financeStatementIngestionWorker.js",
@@ -15586,9 +15586,9 @@
     {
       "file": "services/financeStatementParser.js",
       "category": "services",
-      "bytes": 34237,
-      "lines": 603,
-      "sha256": "a003fa7ee223389d6b75eced30fba01627a226eb1dfd109f4fc38562ead2ba5c"
+      "bytes": 35667,
+      "lines": 619,
+      "sha256": "99a3853d8a8d40f213f6b3d47f00ab64725a9fe58840f9202c741b746048ba70"
     },
     {
       "file": "services/financeStatementSourceRepair.js",
@@ -15600,9 +15600,9 @@
     {
       "file": "services/financeStatementValidation.js",
       "category": "services",
-      "bytes": 8856,
-      "lines": 116,
-      "sha256": "d6aee381d2ec2d6d41e24a9f1b1179a28ae965b65707bf175def9c9668982248"
+      "bytes": 10481,
+      "lines": 131,
+      "sha256": "6c7abfa60c030f31bcb5d78dfaa4ea3a470ed1459a7c92eb4ec1ef97b3279ab8"
     },
     {
       "file": "services/financeTrustedTotals.js",

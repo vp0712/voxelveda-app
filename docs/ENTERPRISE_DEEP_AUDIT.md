@@ -5,17 +5,17 @@
 ## Audit baseline
 
 - Repository: `vp0712/voxelveda-app`
-- Latest fetched `origin/main` at audit start: `1ef2e82394a474ad27e7ac64dbe8b9b01891a0da`
-- Audited source SHA: `1ef2e82394a474ad27e7ac64dbe8b9b01891a0da`
-- Audited source commit time: `2026-10-07T19:13:25+11:00`
-- Inventory generated at: `2026-10-07T19:13:25+11:00` (deterministic source commit time)
+- Latest fetched `origin/main` at audit start: `36c9775d3df1ed83df516e801751c4ca47bce391`
+- Audited source SHA: `30ab395a2d4937d6502a6b0ed5c5c34d93776065`
+- Audited source commit time: `2026-10-07T19:40:13+11:00`
+- Inventory generated at: `2026-10-07T19:40:13+11:00` (deterministic source commit time)
 - Inventory generator version: `2.0.0`
-- Current remediation branch: `main`
+- Current remediation branch: `finance-release-account-context-20261007`
 - Scope: root application files plus `config`, `controllers`, `controllers/qms`, `middleware`, `migrations`, `public`, `routes`, `scripts`, `services`, `utils`, `ios`, `android`, and `.github/workflows`.
 - Binary policy: image, font, PDF, and archive bytes were not interpreted as source. Their path, type, size, and deployment presence are inventoried.
 - Machine-readable evidence: `docs/ENTERPRISE_ARCHITECTURE_INVENTORY.json`
 
-The deterministic inventory currently records 832 text/source files, 129,728 lines, 1,043 declared HTTP routes, 81 SQL migrations, 84 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
+The deterministic inventory currently records 832 text/source files, 129,898 lines, 1,043 declared HTTP routes, 81 SQL migrations, 84 worker timer sites, and 50 binary assets. Static matches are triage inputs, not proof by themselves: the inventory intentionally labels the heuristic used.
 
 ## Local verification evidence
 
