@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Voxel Veda · Layout verification</title>
+<style>
+body{margin:0;padding:12px;font-family:Arial,sans-serif;background:var(--page);color:var(--text-primary)}
+.qa-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:12px;max-width:1300px}.qa-controls label{display:grid;gap:5px;font-size:14px}.qa-controls select,.qa-controls button{min-height:44px;padding:8px;border:1px solid var(--control-border);border-radius:6px;background:var(--surface);color:var(--text-primary)}
+.qa-note{font-size:14px;max-width:1200px;margin:0 0 12px}.qa-stage{width:var(--qa-width);height:var(--qa-height);background:var(--surface);border:1px solid var(--control-border)}
+#qaFrame{display:block;border:0;width:calc(var(--qa-width)/var(--qa-scale));height:calc(var(--qa-height)/var(--qa-scale));transform:scale(var(--qa-scale));transform-origin:top left}
+</style></head>
+<body data-vv-layout-check="controller">
+<div class="qa-controls">
+<label>Module<select id="qaModule"><option value="admin">Dashboard / supplier payments</option><option value="finance">Finance accounts</option></select></label>
+<label>Viewport width<select id="qaWidth"><option>320</option><option selected>375</option><option>390</option><option>430</option><option>768</option><option>1024</option><option>1440</option></select></label>
+<label>Height<select id="qaHeight"><option>667</option><option selected>844</option><option>900</option></select></label>
+<label>Layout scale<select id="qaScale"><option value="1">100%</option><option value="2">200% emulation</option></select></label>
+<label>Theme<select id="qaTheme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+<label>Focus<select id="qaFocus"><option value="top">Top</option><option value="charts">Dashboard charts</option><option value="payables">Supplier payments</option><option value="accounts">Account category charts</option><option value="end">Last row / actions</option></select></label>
+<button type="button" id="qaRotate">Rotate viewport</button><button type="button" id="qaHidden">Hide / reveal app</button>
+</div>
+<p id="qaStatus" class="qa-note" role="status">Authenticated deployed-app viewport emulation. Financial records use the existing session, permissions and database. This is not an iPhone/Safari device test.</p>
+<div class="qa-stage" id="qaStage" style="--qa-width:375px;--qa-height:844px;--qa-scale:1"><iframe id="qaFrame" title="Deployed Voxel Veda app layout" src="/internal/layout-check/admin?view=dashboard"></iframe></div>
+<script src="/workspace-layout-check.js?v=20261007" defer></script>
+</body></html>

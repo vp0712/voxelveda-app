@@ -69,6 +69,8 @@ release. Railway requires CNAME `app → l77jn3h9.up.railway.app` and TXT
 The working existing Railway address is
 `https://voxelveda-app-production.up.railway.app`.
 
+The MANAGE_USERS-protected `/internal/layout-check` renders the same deployed ERP/Finance code and authenticated data at 320/375/390/430/768/1024/1440 CSS pixel widths, with rotation and 200% layout emulation. Only these diagnostic copies allow same-origin framing; normal app routes retain DENY.
+
 Actual iPhone/Safari hardware is unavailable in this execution environment. A
 desktop browser result is not claimed as a real-device test. Open release gate
 #183 remains open for that real-device/multi-bank production matrix. Existing

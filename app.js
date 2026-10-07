@@ -53,6 +53,7 @@ const pageAuth = require('./middleware/pageAuth');
 const urls = require('./config/urls');
 const { renderAdminPage } = require('./services/adminPageRenderer');
 const { renderFinancePage } = require('./services/workspaceShellRenderer');
+const {renderCheck,renderFrame}=require('./services/workspaceLayoutCheck');
 const { injectGlobalBrand } = require('./services/globalBrandRenderer');
 const { corsOptions, csrfProtection, enforceHttps, rateLimitPolicy, safeApiResponses, securityHeaders, safeErrorHandler } = require('./middleware/securityMiddleware');
 const {
@@ -128,6 +129,8 @@ app.use('/api/integrations/whatsapp', vomWhatsAppRoutes);
 app.use(csrfProtection);
 app.get('/api/health',readinessController.health);
 app.get('/api/ready',readinessController.ready);
+app.get('/internal/layout-check',noIndex,pageAuth({adminOnly:true}),renderCheck);
+app.get('/internal/layout-check/:module',noIndex,pageAuth({adminOnly:true}),renderFrame);
 app.use((req,res,next)=>{if(process.env.FORCE_CANONICAL_HOST!=='true'||['/api/health','/api/ready'].includes(req.path))return next();const currentHost=String(req.hostname||'').toLowerCase();const canonicalHost=new URL(urls.app).hostname;const fallbackHost=String(process.env.RAILWAY_FALLBACK_HOST||'voxelveda-app-production.up.railway.app').toLowerCase();if(currentHost!==fallbackHost||currentHost===canonicalHost)return next();return res.redirect(302,new URL(req.originalUrl||'/',`${urls.app}/`).toString())});
 function noIndex(req,res,next){res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive');res.setHeader('Cache-Control','private, no-store');next()}
 function brandedPage(filename){const filePath=path.join(publicDir,filename);if(process.env.NODE_ENV==='production'&&pageCache.has(filePath))return pageCache.get(filePath);const rendered=injectGlobalBrand(fs.readFileSync(filePath,'utf8'));if(process.env.NODE_ENV==='production')pageCache.set(filePath,rendered);return rendered}

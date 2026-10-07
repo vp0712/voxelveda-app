@@ -17,7 +17,7 @@
     const update = () => {
       const active = sidebar.querySelector('.nav-btn.active, [aria-current="page"]');
       nav.querySelectorAll('a').forEach(a => {
-        const current = location.pathname === '/finance-intelligence' ? a.hasAttribute('data-primary-finance') : (a.getAttribute('href')==='/dashboard'?active?.dataset.section==='dashboardSection':a.href.includes('view='+ (active?.dataset.section==='invoiceSection' ? 'invoices' : 'erp')));
+        const current = document.body.classList.contains('finance-os-page') ? a.hasAttribute('data-primary-finance') : (a.getAttribute('href')==='/dashboard'?active?.dataset.section==='dashboardSection':a.href.includes('view='+ (active?.dataset.section==='invoiceSection' ? 'invoices' : 'erp')));
         if (current) a.setAttribute('aria-current','page'); else a.removeAttribute('aria-current');
         if (a.dataset.primarySection) a.hidden = !document.querySelector('[data-section="'+a.dataset.primarySection+'"]:not(.hidden-section)');
         if (a.hasAttribute('data-primary-finance')) { const finance=sidebar.querySelector('.app-banking-nav, a[href^="/finance-intelligence"]');a.hidden=!finance||!!finance.closest('.hidden-section'); }
