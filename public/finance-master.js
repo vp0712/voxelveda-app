@@ -2,6 +2,8 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const API='/api/finance';
+// Capture explicit navigation filters before canonical history writes add defaults.
+const initialFinanceQuery=new URLSearchParams(location.search);
 const I=API+'/intelligence';
 const OS=API+'/banking-os';
 const state={
@@ -34,6 +36,7 @@ const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences
 const nativeMoney=(v,c)=>money(v,c||'AUD');
 const date=v=>{if(!v)return '—';const d=new Date(String(v).slice(0,10)+'T00:00:00');const fmt=state.userPreferences?.date_format||'DD/MM/YYYY';if(fmt==='YYYY-MM-DD')return String(v).slice(0,10);if(fmt==='MM/DD/YYYY')return new Intl.DateTimeFormat('en-US',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d);return new Intl.DateTimeFormat('en-AU',{year:'numeric',month:'2-digit',day:'2-digit'}).format(d)};
 let financeStepUpPromise=null;
+const financeDownloadsInFlight=new Set();
 let financeAuthExpiryHandled=false;
 function handleFinanceSessionExpired(){
  if(financeAuthExpiryHandled)return;
@@ -125,6 +128,9 @@ function showFinancePopup(title,message,detail='',options={}){
  return overlay;
 }
 async function downloadFinanceFile(url,filename,successTitle='Download ready',successMessage='Your PDF was generated successfully and is ready to save.'){
+ if(financeDownloadsInFlight.has(url))throw new Error('This export is already being prepared.');
+ financeDownloadsInFlight.add(url);
+ try{
  let response;
  for(let attempt=0;attempt<2;attempt++){
   response=await fetch(url,{credentials:'same-origin'});
@@ -135,10 +141,23 @@ async function downloadFinanceFile(url,filename,successTitle='Download ready',su
   const error=new Error(payload.message||('Download failed ('+response.status+')'));error.status=response.status;error.code=payload.code;throw error;
  }
  const blob=await response.blob();
+ const extension=String(filename||'').split('.').pop().toLowerCase();
+ const types={pdf:['application/pdf'],csv:['text/csv','application/csv','text/plain'],xlsx:['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']};
+ const mime=String(response.headers.get('Content-Type')||'').split(';')[0].toLowerCase();
+ if(!blob.size||(types[extension]&&!types[extension].includes(mime)))throw new Error('The server did not return a valid '+extension.toUpperCase()+' file. Please retry.');
+ if(extension==='pdf'&&(await blob.slice(0,5).text())!=='%PDF-')throw new Error('The PDF response is invalid. No file was downloaded.');
  const objectUrl=URL.createObjectURL(blob),link=document.createElement('a');
  link.href=objectUrl;link.download=filename||'finance-document.pdf';document.body.appendChild(link);link.click();link.remove();
  setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);
   showFinancePopup(successTitle,successMessage);
+ }finally{financeDownloadsInFlight.delete(url)}
+}
+async function runFinanceDownload(button,url,filename){
+ if(button.disabled)return;
+ button.disabled=true;button.setAttribute('aria-busy','true');notice('Preparing your selected records for download…');
+ try{await downloadFinanceFile(url,filename,'Export ready','Your selected records were exported successfully.');notice('Export downloaded.');}
+ catch(error){notice(error.message,true)}
+ finally{button.disabled=false;button.removeAttribute('aria-busy')}
 }
 function openAccountStatementForm(accountId){
  const account=state.accounts.find(a=>String(a.id)===String(accountId));
@@ -391,6 +410,11 @@ function primeFinanceCoreLoading(){
  ];
  resources.forEach(([name,path])=>setResource(name,'loading',null,null,path));
 }
+function applyFinancePreferenceDefaults(pref, requested=initialFinanceQuery){
+ if(!requested.has('scope')&&!requested.has('account_id')&&['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
+ if(!requested.has('period')&&pref.default_period)state.period=pref.default_period;
+ if(!requested.has('account_id')&&pref.default_account_id)state.account=String(pref.default_account_id);
+}
 async function loadBase(){
   const cycle=++loadCycle;
   const [setup,prefPayload]=await Promise.all([
@@ -400,14 +424,11 @@ async function loadBase(){
   state.setup=setup||state.setup;
   state.userPreferences=prefPayload?.preferences||state.userPreferences;
  if(!state.preferencesApplied&&state.userPreferences){
-  const pref=state.userPreferences;
-  const requested=new URLSearchParams(location.search);
-  if(!requested.has('scope')&&['ALL','PERSONAL','BUSINESS'].includes(pref.default_workspace))state.scope=pref.default_workspace;
-  if(!requested.has('period')&&pref.default_period)state.period=pref.default_period;
-  if(!requested.has('account_id')&&pref.default_account_id)state.account=String(pref.default_account_id);
+  applyFinancePreferenceDefaults(state.userPreferences);
   state.preferencesApplied=true;
   if($('fmScope'))$('fmScope').value=state.scope;
   if($('fmPeriod'))$('fmPeriod').value=state.period;
+  saveFinanceLocation(true);
  }
   if(cycle!==loadCycle)return cycle;
   const base=filterQuery();
@@ -2900,7 +2921,7 @@ function bindDynamic(){
   state.scope=b.dataset.scopeView;state.account='';if($('fmScope'))$('fmScope').value=state.scope;
   state.view=b.dataset.scopeTarget||'overview';saveFinanceLocation();await refresh();
  });
- document.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>{location.href=b.dataset.export});
+ document.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>runFinanceDownload(b,b.dataset.export,'Voxel-Veda-'+new URL(b.dataset.export,location.origin).pathname.split('/').pop()));
  document.querySelectorAll('[data-retry]').forEach(b=>b.onclick=refresh);
  document.querySelectorAll('[data-resource-retry]').forEach(b=>b.onclick=()=>retryFinanceResource(b.dataset.resourceRetry));
  document.querySelectorAll('[data-transfer-debit]').forEach(b=>b.onclick=async()=>{try{const x=await api(API+'/bank-transactions/'+b.dataset.transferDebit+'/transfer-links',{method:'POST',body:JSON.stringify({counterpart_transaction_id:Number(b.dataset.transferCredit)})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
@@ -2917,9 +2938,9 @@ function bindDynamic(){
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
  document.querySelectorAll('[data-show-all-history]').forEach(b=>b.onclick=()=>{state.period='all';state.txMeta.page=1;if($('fmPeriod'))$('fmPeriod').value='all';refresh()});
  if($('reportBuilderForm'))$('reportBuilderForm').onsubmit=async e=>{e.preventDefault();try{await generateBuiltReport()}catch(error){notice(error.message,true)}};
- if($('reportPdf'))$('reportPdf').onclick=()=>{const def=reportDefinitionFromUi();if(def)location.href=API+'/reports/builder.pdf?'+reportQuery(def)};
+ if($('reportPdf'))$('reportPdf').onclick=()=>{const def=reportDefinitionFromUi();if(def)runFinanceDownload($('reportPdf'),API+'/reports/builder.pdf?'+reportQuery(def),'Voxel-Veda-Report.pdf')};
  if($('reportEmailPdf'))$('reportEmailPdf').onclick=()=>openReportEmailDialog();
- if($('reportCsv'))$('reportCsv').onclick=()=>{const def=reportDefinitionFromUi();if(def)location.href=API+'/reports/builder.csv?'+reportQuery(def)};
+ if($('reportCsv'))$('reportCsv').onclick=()=>{const def=reportDefinitionFromUi();if(def)runFinanceDownload($('reportCsv'),API+'/reports/builder.csv?'+reportQuery(def),'Voxel-Veda-Report.csv')};
  if($('reportXlsx'))$('reportXlsx').onclick=()=>exportBuiltReportXlsx().catch(error=>notice(error.message,true));
  if($('reportSave'))$('reportSave').onclick=()=>saveBuiltReport().catch(error=>notice(error.message,true));
  document.querySelectorAll('[data-report-run]').forEach(b=>b.onclick=async()=>{try{state.reportResult=await api(API+'/reports/saved/'+encodeURIComponent(b.dataset.reportRun)+'/run');render()}catch(error){notice(error.message,true)}});
