@@ -6,6 +6,7 @@ const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
 const privacy = require('../services/financePrivacyService');
 const trustedTotals = require('../services/financeTrustedTotals');
+const {statementCoverage,balanceMetadata}=require('../services/statementCoverage');
 const { buildCoreBankTransactionFilter } = require('../services/financeFilterContract');
 const { cleanMerchant, normalizeTags, normalizeGstTreatment, upsertExactAutoCategoryRule } = require('../services/financeRuleEngine');
 
@@ -204,12 +205,8 @@ exports.getTransactions = async (req, res) => {
     if (bank) { clauses.push('ba.institution LIKE ?'); params.push(`%${bank}%`); }
     if (merchant) { clauses.push('COALESCE(bt.merchant_normalized,bt.merchant_name) LIKE ?'); params.push(`%${merchant}%`); }
     if (category) {
-      if (category.toUpperCase() === 'UNCLASSIFIED') {
-        clauses.push("((NOT EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id) AND (bt.category IS NULL OR bt.category='')) OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND (sx.category IS NULL OR sx.category='')))");
-      } else {
-        clauses.push("(bt.category=? OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND sx.category=?))");
-        params.push(category, category);
-      }
+      clauses.push("((NOT EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id) AND LOWER(COALESCE(NULLIF(bt.category,''),'Unclassified'))=LOWER(?)) OR EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id AND LOWER(COALESCE(NULLIF(sx.category,''),'Unclassified'))=LOWER(?)))");
+      params.push(category,category);
     }
     if (type === 'TRANSFER') clauses.push('bt.is_internal_transfer=1');
     else if (type === 'INCOME') clauses.push('bt.credit>0 AND bt.is_internal_transfer=0');
@@ -231,10 +228,11 @@ exports.getTransactions = async (req, res) => {
          JOIN bank_accounts ba ON ba.id=bt.bank_account_id
         WHERE ${where}`, params
     );
-    const summaryByCurrency = await trustedTotals.cashTotalsByCurrency(pool, where, params);
+    const allocated=trustedTotals.categoryDebit(category);
+    const summaryByCurrency = await trustedTotals.cashTotalsByCurrency(pool, where, params, {category});
     const [rows] = await pool.query(
       `SELECT bt.id, bt.bank_account_id, bt.transaction_date, bt.posting_date, bt.description, bt.reference,
-              bt.debit, bt.credit, bt.running_balance, bt.merchant_name, bt.merchant_normalized, bt.category, bt.currency,
+              bt.debit, bt.credit, ${allocated.sql} AS category_allocated_debit, bt.running_balance, bt.merchant_name, bt.merchant_normalized, bt.category, bt.currency,
               bt.ownership_scope, bt.classification_status, bt.reconciliation_status, bt.is_internal_transfer, bt.ignored_reason,
               bt.project_ref,bt.tags_json,bt.gst_treatment,bt.reviewed_at,bt.reviewed_by,
               bt.source_type, bt.source_provider, bt.statement_import_uid, bt.statement_row_id, bt.review_source_status, bt.manual_override, bt.imported_at,
@@ -246,7 +244,7 @@ exports.getTransactions = async (req, res) => {
         WHERE ${where}
         ORDER BY bt.transaction_date ASC, bt.id ASC
         LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
+      [...allocated.params,...params, limit, offset]
     );
 
     return res.json({
@@ -261,6 +259,7 @@ exports.getTransactions = async (req, res) => {
       summary: {
         ...trustedTotals.singleCurrencySummary(summaryByCurrency),
         manual_overrides: Number(count.manual_overrides || 0),
+        allocation_basis:category?'Matched category allocations; original debit remains in transaction detail.':'Source cash debits',
         transfer_policy: 'Internal transfers are excluded from money-in and money-out totals.',
         refund_policy: 'Linked refunds are cash inflow but are separated from ordinary money-in.'
       },
@@ -1444,11 +1443,13 @@ exports.getAccounts = async (req, res) => {
               COUNT(bt.id) AS transaction_count,
               SUM(CASE WHEN bt.reconciliation_status = 'UNRECONCILED' THEN 1 ELSE 0 END) AS unreconciled_count
          FROM bank_accounts ba
-         LEFT JOIN bank_transactions bt ON bt.bank_account_id = ba.id
+         LEFT JOIN bank_transactions bt ON bt.bank_account_id = ba.id AND bt.archived_at IS NULL AND bt.reconciliation_status<>'IGNORED'
         WHERE ${privacy.visibilitySql('ba', req)}
         GROUP BY ba.id ORDER BY ba.status = 'ACTIVE' DESC, ba.ownership_scope, ba.nickname`, privacy.visibilityParams(req)
     );
-    return res.json({ bank_accounts: rows, privacy: { personal_accounts_owner_only: true } });
+    const [statementRows]=await pool.query(`SELECT sif.bank_account_id,sif.statement_start_date,sif.statement_end_date,sif.closing_balance,sif.reviewed_at FROM statement_import_files sif JOIN bank_accounts ba ON ba.id=sif.bank_account_id WHERE sif.parse_status='IMPORTED' AND ${privacy.visibilitySql('ba',req)} ORDER BY sif.statement_end_date DESC,sif.id DESC`,privacy.visibilityParams(req));
+    const accounts=rows.map(account=>{const statements=statementRows.filter(row=>Number(row.bank_account_id)===Number(account.id));const closing=statements.find(row=>row.closing_balance!=null);return {...account,...balanceMetadata(account),...statementCoverage(statements),statement_closing_balance:closing?.closing_balance??null,statement_balance_date:closing?.statement_end_date??null};});
+    return res.json({ bank_accounts: accounts, privacy: { personal_accounts_owner_only: true } });
   } catch (error) { return fail(res, error, 'Failed to load finance accounts'); }
 };
 
@@ -1726,9 +1727,9 @@ exports.getPortfolioHistoryReport = async (req, res) => {
     const liquidPosition = {};
     for (const account of accountRows) {
       const cur = account.currency || 'AUD';
-      const raw = Number(account.available_balance == null ? account.current_ledger_balance : account.available_balance || 0);
+      const raw=money.toCents(balanceMetadata(account).profile_balance);
       const liability = /credit\s*card|loan|overdraft/i.test(String(account.account_type || ''));
-      liquidPosition[cur] = Number(((liquidPosition[cur] || 0) + (liability ? -Math.abs(raw) : raw)).toFixed(2));
+      const magnitude=raw<0n?-raw:raw;liquidPosition[cur]=money.fromCents(money.toCents(liquidPosition[cur]||0)+(liability?-magnitude:raw));
     }
     const categoriesByCurrency = {};
     for (const row of categoryRows) (categoriesByCurrency[row.currency || 'AUD'] ||= []).push({
@@ -1753,7 +1754,7 @@ exports.getPortfolioHistoryReport = async (req, res) => {
       summary_by_currency: summaryByCurrency,
       categories_by_currency: categoriesByCurrency,
       monthly_by_currency: monthlyByCurrency,
-      accounts: accountRows.map((row) => ({ ...row, transaction_count: Number(row.transaction_count || 0), statement_count: Number(row.statement_count || 0) })),
+      accounts: accountRows.map((row) => ({ ...row, ...statementCoverage(statementRows.filter(item=>Number(item.bank_account_id)===Number(row.id))), transaction_count: Number(row.transaction_count || 0), statement_count: Number(row.statement_count || 0) })),
       statements: statementRows,
       transactions: transactionRows,
       generated_at: new Date().toISOString()

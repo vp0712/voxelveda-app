@@ -116,7 +116,7 @@ function semanticTransactionKey(accountId, row) {
   const amount = money.fromCents(hasDebit ? debitCents : creditCents);
   const direction = hasDebit ? 'DEBIT' : 'CREDIT';
   return crypto.createHash('sha256').update(
-    [accountId, transactionDate, direction, amount, identity].join('|')
+    [accountId, String(row.currency||'AUD').toUpperCase(), transactionDate, direction, amount, identity].join('|')
   ).digest('hex');
 }
 
@@ -129,7 +129,7 @@ async function loadSemanticDuplicateSources(db, accountId, rows, options = {}) {
   const sources = new Map();
 
   const [ledgerRows] = await db.query(
-    `SELECT transaction_date,posting_date,description,reference,debit,credit,running_balance,merchant_name
+    `SELECT transaction_date,posting_date,description,reference,debit,credit,running_balance,merchant_name,currency
        FROM bank_transactions
       WHERE bank_account_id=? AND transaction_date BETWEEN ? AND ?`,
     [accountId, from, to]
@@ -143,7 +143,7 @@ async function loadSemanticDuplicateSources(db, accountId, rows, options = {}) {
     const contentHash = String(options.contentHash || '').trim().toLowerCase();
     const [pendingRows] = await db.query(
       `SELECT sir.transaction_date,sir.posting_date,sir.description,sir.reference,sir.debit,sir.credit,
-              sir.running_balance,sir.merchant_name,sis.import_uid,sis.original_name
+              sir.running_balance,sir.merchant_name,sir.currency,sis.import_uid,sis.original_name
          FROM statement_import_rows sir
          JOIN statement_import_sessions sis ON sis.id=sir.import_session_id
         WHERE sis.bank_account_id=?
@@ -218,6 +218,7 @@ function normalizeRow(accountId, accountCurrency, input, rowNo) {
     try { runningBalance = money.fromCents(money.toCents(row.running_balance)); } catch { if (validationStatus === 'VALID') validationStatus = 'WARNING'; messages.push('Running balance could not be parsed'); }
   }
   const currency = String(row.currency || accountCurrency || 'AUD').trim().toUpperCase();
+  if(currency!==String(accountCurrency||'AUD').toUpperCase()){validationStatus='REJECTED';messages.push('Currency differs from this account; select the correct account before accepting this row');}
   if (!/^[A-Z]{3}$/.test(currency)) { validationStatus = 'REJECTED'; messages.push('Invalid currency code'); }
   if (!String(row.description || row.merchant_name || '').trim()) {
     if (validationStatus === 'VALID') validationStatus = 'WARNING';
@@ -325,6 +326,7 @@ async function normalizeAndDedupe(db, account, inputRows, options = {}) {
   const hashes = [...new Set(normalized.map((row) => row.row_hash).filter(Boolean))];
   const duplicateHashes = new Set();
   const duplicateSources = new Map();
+  const sourceFileHashes=new Map();
   const contentHash = String(options.contentHash || '').trim().toLowerCase();
 
   if (hashes.length) {
@@ -334,11 +336,12 @@ async function normalizeAndDedupe(db, account, inputRows, options = {}) {
       const placeholders = chunk.map(() => '?').join(',');
 
       const [existingLedger] = await db.query(
-        `SELECT row_hash FROM bank_transactions WHERE bank_account_id=? AND row_hash IN (${placeholders})`,
-        [account.id, ...chunk]
+        `SELECT row_hash, (SELECT sif.content_hash FROM statement_import_files sif WHERE sif.import_uid=bt.statement_import_uid AND sif.bank_account_id=bt.bank_account_id LIMIT 1) AS source_content_hash FROM bank_transactions bt WHERE bank_account_id=? AND currency=? AND row_hash IN (${placeholders})`,
+        [account.id, account.currency, ...chunk]
       );
       for (const item of existingLedger) {
         duplicateHashes.add(item.row_hash);
+        sourceFileHashes.set(item.row_hash,String(item.source_content_hash||'').toLowerCase());
         duplicateSources.set(item.row_hash, 'already exists in the committed transaction ledger');
       }
 
@@ -388,7 +391,16 @@ async function normalizeAndDedupe(db, account, inputRows, options = {}) {
       duplicateStatus = 'DUPLICATE_IN_FILE';
     }
 
-    if (duplicateReason) {
+    if(duplicateReason&&!semanticKey&&(!contentHash||sourceFileHashes.get(row.row_hash)!==contentHash)){
+      // Similar rows from different originals are not proof of duplication. Keep
+      // a reviewable row with a source-specific identity; never silently lose a
+      // legitimate repeated payment or automatically post a possible duplicate.
+      const originalHash=row.row_hash;const provenance=contentHash||crypto.createHash('sha256').update(JSON.stringify(inputRows)).digest('hex');
+      row.row_hash=crypto.createHash('sha256').update(originalHash+'|REVIEW_SOURCE:'+provenance).digest('hex');
+      row.raw_payload_json=JSON.stringify({...JSON.parse(row.raw_payload_json),possible_duplicate_hash:originalHash});
+      row.validation_status='WARNING';row.selected=0;row.duplicate_status='POSSIBLE_DUPLICATE';row.review_status='NEEDS_REVIEW';
+      row.validation_message='Possible duplicate in another source; compare original file, description and amount, then select this row only if it is a separate payment.';
+    } else if (duplicateReason) {
       row.validation_status = 'DUPLICATE';
       const message = `Duplicate transaction — ${duplicateReason}. Excluded from import, totals and reports.`;
       row.validation_message = row.validation_message ? `${row.validation_message}; ${message}` : message;

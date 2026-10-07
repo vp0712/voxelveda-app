@@ -19,6 +19,15 @@ function walk(dir) {
 
 const app = read('app.js');
 const servedPages = new Set();
+// First-party bundles may be served from a locked package by an explicit route.
+// Verify both the route declaration and its actual installed file, instead of
+// treating a functioning Express asset route as a missing public file.
+const routedAssets = new Map();
+for(const match of app.matchAll(/app\.get\('([^']+)',[^\n]*?sendFile\(path\.join\(__dirname,((?:'[^']+'[,\s]*)+)\)\)/g)) {
+  const parts=[...match[2].matchAll(/'([^']+)'/g)].map(item=>item[1]);
+  const target=path.join(...parts);
+  if(exists(target))routedAssets.set(match[1],target);
+}
 
 // 1) App-level route modules and live public pages must exist.
 for (const match of app.matchAll(/require\(['"]\.\/(routes\/[^'"]+)['"]\)/g)) {
@@ -67,7 +76,7 @@ for (const htmlPath of servedPages) {
     const value = m[1].trim();
     if (!value.startsWith('/') || value.startsWith('//') || !staticAsset.test(value)) continue;
     const clean = value.split(/[?#]/)[0].replace(/^\/+/, '');
-    if (!exists(`public/${clean}`)) fail(`${htmlPath} references missing local asset: /${clean}`);
+    if (!exists(`public/${clean}`) && !routedAssets.has('/'+clean)) fail(`${htmlPath} references missing local asset: /${clean}`);
   }
 }
 

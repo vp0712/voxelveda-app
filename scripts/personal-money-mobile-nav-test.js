@@ -9,9 +9,9 @@ const savedController=fs.readFileSync('controllers/personalFinanceSavedViewsCont
 const savedMigration=fs.readFileSync('migrations/20260916_personal_saved_views.sql','utf8');
 
 assert(html.includes('/finance-master.js'),'Mobile Personal Money must live inside the canonical Finance OS.');
-const mobileNav=(ui.match(/const MOBILE_NAV=(\[[^;]+\]);/)||[])[1]||'';
-assert(mobileNav,'Unified mobile bottom navigation must be declared.');
-for(const view of ['accounts','transactions','statements','more'])assert(mobileNav.includes("['"+view+"'"),'Unified mobile bottom navigation must retain '+view+' access.');
+const shell=fs.readFileSync('public/workspace-shell.js','utf8');
+assert(shell.includes('vv-primary-nav')&&shell.includes('data-primary-finance'),'One main mobile navigation links Finance');
+for(const view of ['accounts','transactions','statements'])assert(ui.includes("['"+view+"'"),'Finance contextual navigation must retain '+view+' access.');
 assert(ui.includes("['advanced','⚡','Control Centre']"),'The complete mobile module launcher must retain Advanced Control Centre access.');
 assert(ui.includes('function moreView()')&&ui.includes('All finance modules'),'More must expose the complete Finance module launcher on mobile.');
 for(const moduleName of ['My Money','Budgets','Savings Goals','Net Worth','Forecast','Cash Flow Calendar','Borrow & Lend','Recurring'])assert(ui.includes(moduleName),'Mobile module launcher must retain '+moduleName);

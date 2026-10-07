@@ -1,4 +1,4 @@
-const CACHE_NAME = 'voxel-veda-public-v2';
+const CACHE_NAME = 'voxel-veda-public-v3';
 const PUBLIC_ASSETS = ['/public-pages.css', '/favicon-192.png', '/favicon-512.png', '/logo.png'];
 
 self.addEventListener('install', (event) => {
@@ -9,7 +9,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('voxel-veda-public-') && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });

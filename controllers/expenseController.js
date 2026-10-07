@@ -4,7 +4,8 @@ const pool = require('../config/db');
 const { logSecurityEvent } = require('../services/sessionService');
 const { safeDispositionName } = require('../services/documentSecurityService');
 const money = require('../utils/money');
-const { paymentState, validatePaymentAmount } = require('../services/expensePaymentDomain');
+const { paymentState, validatePaymentAmount, paymentSql } = require('../services/expensePaymentDomain');
+const { expenseFilters } = require('../services/expenseRegisterFilters');
 const { logAudit } = require('../services/auditService');
 
 async function ensureExpenseTables() {
@@ -92,27 +93,14 @@ function cleanMoney(value) {
   return Number.isFinite(num) ? num : 0;
 }
 
-async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
-  const bounds = financialYearBounds(fy);
-  const safeLimit = Math.min(Math.max(Number(limit || 25), 5), 200);
-  const safePage = Math.max(Number(page || 1), 1);
-  const offset = (safePage - 1) * safeLimit;
-  const filters = ['e.deleted = 0'];
-  const params = [];
-
-  if (fy) {
-    filters.push('e.expense_date BETWEEN ? AND ?');
-    params.push(bounds.start, bounds.end);
-  }
-
-  if (search) {
-    filters.push('(e.supplier_name LIKE ? OR e.category LIKE ? OR e.invoice_no LIKE ? OR e.description LIKE ?)');
-    params.push(`%${search}%`, `%${search}%`, `%${search}%`, `%${search}%`);
-  }
-
-  const where = `WHERE ${filters.join(' AND ')}`;
-
-  const [[countRow]] = await pool.query(`SELECT COUNT(*) AS total FROM expenses e ${where}`, params);
+async function getExpenseRows(input = {}) {
+  const { page=1, limit=25 }=input;
+  const safeLimit=Math.min(Math.max(Math.floor(Number(limit)||25),5),200);
+  const safePage=Math.max(Math.floor(Number(page)||1),1);
+  const offset=(safePage-1)*safeLimit;
+  const {where,params}=expenseFilters(input);
+  const {join}=paymentSql();
+  const [[countRow]]=await pool.query(`SELECT COUNT(*) AS total FROM expenses e ${join} ${where}`,params);
 
   const [rows] = await pool.query(
     `
@@ -192,119 +180,45 @@ async function getExpenseRows({ page = 1, limit = 25, search = '', fy = '' }) {
   };
 }
 
-async function getExpenseSummary(fy = '') {
-  const hasFinancialYear = String(fy || '').trim() !== '';
-  const bounds = financialYearBounds(fy);
-  const expenseDateWhere = hasFinancialYear ? 'AND expense_date BETWEEN ? AND ?' : '';
-  const invoiceDateWhere = hasFinancialYear ? 'AND created_at BETWEEN ? AND DATE_ADD(?, INTERVAL 1 DAY)' : '';
-  const expenseDateParams = hasFinancialYear ? [bounds.start, bounds.end] : [];
-  const invoiceDateParams = hasFinancialYear ? [bounds.start, bounds.end] : [];
-
-  const [[expenses]] = await pool.query(
-    `
-    SELECT
-      COALESCE(SUM(total_amount), 0) AS total_expense,
-      COALESCE(SUM(gst_amount), 0) AS gst_paid,
-      COUNT(*) AS expense_count,
-      COALESCE(SUM(
-        GREATEST(e.total_amount - CASE
-          WHEN COALESCE(p.payment_count, 0) > 0 THEN COALESCE(p.payment_total, 0)
-          WHEN LOWER(COALESCE(e.status, '')) IN ('paid','settled','complete','completed','reimbursed','closed') THEN e.total_amount
-          ELSE 0 END, 0)
-      ), 0) AS outstanding_debt,
-      COALESCE(SUM(CASE
-        WHEN COALESCE(p.payment_count, 0) > 0 THEN LEAST(e.total_amount, COALESCE(p.payment_total, 0))
-        WHEN LOWER(COALESCE(e.status, '')) IN ('paid','settled','complete','completed','reimbursed','closed') THEN e.total_amount
-        ELSE 0 END), 0) AS total_paid,
-      COALESCE(SUM(CASE WHEN e.due_date < CURDATE() THEN
-        GREATEST(e.total_amount - CASE
-          WHEN COALESCE(p.payment_count, 0) > 0 THEN COALESCE(p.payment_total, 0)
-          WHEN LOWER(COALESCE(e.status, '')) IN ('paid','settled','complete','completed','reimbursed','closed') THEN e.total_amount
-          ELSE 0 END, 0) ELSE 0 END), 0) AS overdue_debt
-    FROM expenses e
-    LEFT JOIN (
-      SELECT expense_id, COUNT(*) AS payment_count, SUM(amount) AS payment_total
-      FROM expense_payments WHERE voided_at IS NULL GROUP BY expense_id
-    ) p ON p.expense_id = e.id
-    WHERE e.deleted = 0
-    ${expenseDateWhere.replace(/expense_date/g, 'e.expense_date')}
-    `,
-    expenseDateParams
-  );
-
-  const [[invoices]] = await pool.query(
-    `
-    SELECT
-      COALESCE(SUM(total - (total / (1 + (gst_rate / 100)))), 0) AS gst_collected,
-      COALESCE(SUM(total), 0) AS invoice_value
-    FROM invoices
-    WHERE (deleted = 0 OR deleted IS NULL)
-    ${invoiceDateWhere}
-    `,
-    invoiceDateParams
-  ).catch(() => [[{ gst_collected: 0, invoice_value: 0 }]]);
-
-  const [categoryRows] = await pool.query(
-    `
-    SELECT COALESCE(NULLIF(category, ''), 'Uncategorised') AS category,
-           COALESCE(SUM(total_amount), 0) AS total_amount
-    FROM expenses
-    WHERE deleted = 0
-    ${expenseDateWhere}
-    GROUP BY COALESCE(NULLIF(category, ''), 'Uncategorised')
-    ORDER BY total_amount DESC
-    LIMIT 12
-    `,
-    expenseDateParams
-  );
-
-  const [monthRows] = await pool.query(
-    `
-    SELECT DATE_FORMAT(expense_date, '%Y-%m') AS month,
-           COALESCE(SUM(total_amount), 0) AS total_amount
-    FROM expenses
-    WHERE deleted = 0
-    ${expenseDateWhere}
-    GROUP BY DATE_FORMAT(expense_date, '%Y-%m')
-    ORDER BY month ASC
-    `,
-    expenseDateParams
-  );
-
-  return {
-    financial_year: hasFinancialYear ? `${bounds.startYear}-${bounds.startYear + 1}` : 'All years',
-    start: hasFinancialYear ? bounds.start : null,
-    end: hasFinancialYear ? bounds.end : null,
-    expense_count: Number(expenses.expense_count || 0),
-    total_expense: Number(expenses.total_expense || 0),
-    outstanding_debt: Number(expenses.outstanding_debt || 0),
-    overdue_debt: Number(expenses.overdue_debt || 0),
-    total_paid: Number(expenses.total_paid || 0),
-    gst_paid: Number(expenses.gst_paid || 0),
-    gst_collected: Number(invoices.gst_collected || 0),
-    gst_position: Number(invoices.gst_collected || 0) - Number(expenses.gst_paid || 0),
-    invoice_value: Number(invoices.invoice_value || 0),
-    categories: categoryRows,
-    months: monthRows
-  };
+async function getExpenseSummary(input = {}) {
+  if (typeof input==='string') input={fy:input};
+  const {where,params}=expenseFilters(input),{paid,due,join}=paymentSql();
+  const bounds=financialYearBounds(input.fy),hasFinancialYear=Boolean(input.fy);
+  const [[expenses]]=await pool.query(`SELECT COUNT(*) AS expense_count,
+    COALESCE(SUM(e.total_amount),0) AS total_expense,COALESCE(SUM(e.gst_amount),0) AS gst_paid,
+    COALESCE(SUM(${paid}),0) AS total_paid,COALESCE(SUM(${due}),0) AS outstanding_debt,
+    COALESCE(SUM(CASE WHEN e.due_date IS NOT NULL AND e.due_date<CURDATE() THEN ${due} ELSE 0 END),0) AS overdue_debt
+    FROM expenses e ${join} ${where}`,params);
+  // Invoice GST is a separate tax-register metric, explicitly scoped to the period only.
+  const invoiceWhere=hasFinancialYear?'AND created_at>=? AND created_at<DATE_ADD(?,INTERVAL 1 DAY)':'';
+  const [[invoices]]=await pool.query(`SELECT COALESCE(SUM(total-(total/(1+(gst_rate/100)))),0) AS gst_collected,COALESCE(SUM(total),0) AS invoice_value
+    FROM invoices WHERE (deleted=0 OR deleted IS NULL) ${invoiceWhere}`,hasFinancialYear?[bounds.start,bounds.end]:[]);
+  const [categoryRows]=await pool.query(`SELECT COALESCE(NULLIF(TRIM(e.category),''),'Uncategorised') AS category,
+    COUNT(*) AS bill_count,COALESCE(SUM(e.total_amount),0) AS total_amount,COALESCE(SUM(${paid}),0) AS paid_value,COALESCE(SUM(${due}),0) AS pending_value
+    FROM expenses e ${join} ${where} GROUP BY 1 ORDER BY total_amount DESC`,params);
+  const [monthRows]=await pool.query(`SELECT DATE_FORMAT(e.expense_date,'%Y-%m') AS month,COALESCE(SUM(e.total_amount),0) AS total_amount
+    FROM expenses e ${join} ${where} GROUP BY 1 ORDER BY month`,params);
+  return { financial_year:hasFinancialYear?`${bounds.startYear}-${bounds.startYear+1}`:'All years',
+    start:input.from||(hasFinancialYear?bounds.start:null),end:input.to||(hasFinancialYear?bounds.end:null),
+    currency:'AUD',basis:'Recorded supplier bills',filters:input,
+    expense_count:Number(expenses.expense_count||0),total_expense:expenses.total_expense||'0.00',
+    outstanding_debt:expenses.outstanding_debt||'0.00',overdue_debt:expenses.overdue_debt||'0.00',total_paid:expenses.total_paid||'0.00',
+    gst_paid:expenses.gst_paid||'0.00',gst_collected:invoices.gst_collected||'0.00',
+    gst_position:money.subtract(invoices.gst_collected||0,expenses.gst_paid||0),invoice_value:invoices.invoice_value||'0.00',categories:categoryRows,months:monthRows };
 }
 
 exports.getExpenses = async (req, res) => {
   try {
     await ensureExpenseTables();
 
-    const result = await getExpenseRows({
-      page: req.query.page,
-      limit: req.query.limit,
-      search: String(req.query.search || '').trim(),
-      fy: req.query.fy
-    });
-    const summary = await getExpenseSummary(req.query.fy);
+    const filters={...req.query,search:String(req.query.search||'').trim()};
+    const result=await getExpenseRows(filters);
+    const summary=await getExpenseSummary(filters);
 
     res.json({ expenses: result.rows, total: result.total, page: result.page, limit: result.limit, summary });
   } catch (error) {
     console.error('getExpenses error:', error);
-    res.status(500).json({ message: 'Failed to load expenses', error: error.message });
+    res.status(error instanceof TypeError?400:500).json({ message:error instanceof TypeError?error.message:'Failed to load expenses' });
   }
 };
 
@@ -320,18 +234,19 @@ exports.saveExpense = async (req, res) => {
     const description = String(req.body.description || '').trim();
     const invoiceNo = String(req.body.invoice_no || '').trim();
     const paymentMethod = String(req.body.payment_method || '').trim();
-    const amountExGst = cleanMoney(req.body.amount_ex_gst);
+    const amountExGst = money.fromCents(money.toCents(req.body.amount_ex_gst||0));
     const gstRate = cleanMoney(req.body.gst_rate);
-    const gstAmount = cleanMoney(req.body.gst_amount || (amountExGst * (gstRate / 100)));
-    const totalAmount = cleanMoney(req.body.total_amount || (amountExGst + gstAmount));
+    if(gstRate<0||gstRate>100)return res.status(400).json({message:'GST rate must be between 0 and 100'});
+    const gstAmount = money.percentageOf(amountExGst,String(gstRate));
+    const totalAmount = money.add(amountExGst,gstAmount);
     const status = String(req.body.status || 'unpaid').trim().toLowerCase();
     const notes = String(req.body.notes || '').trim();
 
-    if (!expenseDate || !supplierName || !description) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expenseDate) || Number.isNaN(Date.parse(expenseDate)) || (dueDate&&(!/^\d{4}-\d{2}-\d{2}$/.test(dueDate)||Number.isNaN(Date.parse(dueDate)))) || !supplierName || !description) {
       return res.status(400).json({ message: 'Expense date, supplier and description are required' });
     }
 
-    if (totalAmount <= 0) {
+    if (money.toCents(totalAmount) <= 0n) {
       return res.status(400).json({ message: 'Expense amount must be greater than zero' });
     }
 
@@ -367,8 +282,9 @@ exports.saveExpense = async (req, res) => {
 
     res.json({ message: 'Expense saved successfully', expense_id: result.insertId });
   } catch (error) {
+    if(error instanceof TypeError||error instanceof RangeError)return res.status(400).json({message:error.message});
     console.error('saveExpense error:', error);
-    res.status(500).json({ message: 'Failed to save expense', error: error.message });
+    res.status(500).json({ message: 'Failed to save expense' });
   }
 };
 

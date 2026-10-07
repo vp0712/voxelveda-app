@@ -5,7 +5,7 @@ const path=require('path');
 const root=path.join(__dirname,'..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const html=read('public/finance-intelligence.html');
-const css=read('public/finance-master.css');
+const css=read('public/finance-master.css')+read('public/workspace-theme.css');
 const js=read('public/finance-master.js');
 
 assert.match(html,/finance-master\.css\?v=20\d{6}-control-v\d+/,'Master finance stylesheet must use the current canonical versioned cache-busting release id.');
@@ -46,9 +46,11 @@ assert.match(css,/@media\(max-width:700px\)\{[\s\S]*\.fm-vault-editor-row\{grid-
 assert.match(css,/\.fm-vault-editor-actions\{display:grid;grid-template-columns:1fr 1fr/,'Statement Vault mobile actions must fit within the viewport.');
 console.log('Finance Master OS regression contract passed.');
 
-assert.match(html,/id="fmMobileNav"/,'Finance OS must provide a dedicated mobile navigation surface.');
+assert.match(html,/SHARED_WORKSPACE_NAV/,'Finance uses the existing main navigation.');
+assert.doesNotMatch(html,/id="fmMobileNav"/,'Finance must not create a second mobile primary bar.');
+assert.match(css,/\.vv-primary-nav/,'The shared mobile primary bar is styled.');
 assert.doesNotMatch(html,/Frame 1\.png/,'Finance mobile shell must not render the old corner logo image.');
-assert.match(js,/const MOBILE_NAV=.*\['more','☰','More'\]/,'Mobile Finance navigation must include a More control.');
+assert.match(js,/NAV_GROUPS/,'Contextual Finance navigation exposes every supported module.');
 assert.match(js,/function moreView\(\)/,'Mobile More must expose the full Finance module launcher.');
 assert.match(js,/No separate Banking V3\/V4\/V5 screens/,'Unified Finance OS must explicitly keep legacy banking screens out of the active launcher.');
 assert.match(js,/financeCommandCentre\(\)/,'Overview must expose the Finance command centre.');
@@ -80,7 +82,7 @@ assert.match(js,/function renderAccountCategoryChart\(/,'Every Finance account m
 assert.match(js,/data-account-category=/,'Account category chart columns must be clickable.');
 assert.match(js,/openAccountCategory\(/,'Account category columns must drill into filtered transactions.');
 assert.match(js,/accountCategorySpending/,'Accounts page must hydrate per-account category totals for the selected period.');
-assert.match(css,/\.fm-account-category-chart/,'Per-account category chart must be styled.');
+assert.match(css,/\.fm-account-cat-chart/,'Per-account category chart must be styled.');
 assert.match(js,/function financeAccountCardMarkup\(/,'Finance accounts must render an internal account-identification card.');
 assert.match(js,/NOT A PAYMENT CARD/,'Finance account card must not be presented as a payment instrument.');
 assert.match(js,/data-account-card=/,'Accounts page must expose the account card action.');
@@ -173,7 +175,7 @@ assert.match(js,/function advancedControlView\(\)/,'Advanced Finance Control vie
 assert.match(js,/finance-advanced-control\.js\?v=20\d{6}-advanced-control-v\d+/,'Advanced Finance Control must use a canonical versioned asset.');
 
 assert.match(js,/view:'advanced',scope:'ALL'/,'Default Finance landing must be Advanced Control.');
-assert.match(js,/const MOBILE_NAV=\[\['accounts','⌂','Accounts'\],\['transactions','▤','Transactions'\],\['statements','▥','Statements'\],\['more','☰','More'\]\]/,'Mobile Finance navigation must use the clean four-tab Accounts, Transactions, Statements and More layout.');
+assert.match(html,/fm-department-nav/,'Finance subnavigation stays inside the existing shell.');
 
 assert.match(js,/MONTH-END CLOSE & ASSURANCE/,'Finance OS must expose the period Close & Assurance centre.');
 assert.match(js,/close-assurance/,'Finance OS must use the canonical Close Assurance API.');

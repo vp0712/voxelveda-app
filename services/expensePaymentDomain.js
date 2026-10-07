@@ -26,8 +26,15 @@ function paymentState(expense, paymentTotal = '0.00', paymentCount = 0, today = 
   return {
     totalPaid: money.fromCents(paidCents),
     balanceDue: money.fromCents(balanceCents),
+    overpayment: money.fromCents(paidCents > totalCents ? paidCents - totalCents : 0n),
     status
   };
+}
+
+// Shared by the dashboard, the filtered register and its summaries.
+function paymentSql() {
+  const paid = `CASE WHEN COALESCE(p.payment_count,0)>0 THEN LEAST(e.total_amount,COALESCE(p.payment_total,0)) WHEN LOWER(COALESCE(e.status,'')) IN ('paid','settled','complete','completed','reimbursed','closed') THEN e.total_amount ELSE 0 END`;
+  return { paid, due:`GREATEST(e.total_amount-(${paid}),0)`, join:`LEFT JOIN (SELECT expense_id,COUNT(*) AS payment_count,SUM(amount) AS payment_total FROM expense_payments WHERE voided_at IS NULL GROUP BY expense_id) p ON p.expense_id=e.id` };
 }
 
 function validatePaymentAmount(amount, balanceDue) {
@@ -38,4 +45,4 @@ function validatePaymentAmount(amount, balanceDue) {
   return money.fromCents(amountCents);
 }
 
-module.exports = { legacyPaidAmount, paymentState, validatePaymentAmount };
+module.exports = { legacyPaidAmount, paymentState, validatePaymentAmount, paymentSql };

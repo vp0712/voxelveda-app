@@ -22,7 +22,7 @@ const integrationRoutes=read('routes/integrationWebhookRoutes.js');
 const sanitizer=read('middleware/statementPreviewSanitizer.js');
 const ui=read('public/finance-master.js');
 const pdf=ui;
-const css=read('public/finance-master.css');
+const css=read('public/finance-master.css')+read('public/workspace-theme.css');
 const html=read('public/finance-intelligence.html');
 const renderer=read('services/globalBrandRenderer.js');
 const permissions=read('config/permissionCatalog.js');
@@ -73,9 +73,9 @@ assert(financeRoutes.includes("requireStepUp('IMPORT_BANK_TRANSACTIONS')"),'stat
 
 assert(html.includes('/finance-master.js')&&html.includes('FINANCE OPERATING SYSTEM'),'single Finance OS page/client contract missing');
 for(const marker of ['FINANCE COMMAND CENTRE','function openStatementWizard()','Imported statements','SPENDING & COST INTELLIGENCE','BANKING OPERATIONS','Money Spaces','Beneficiaries','Payment workflow','Banking Connections','CURRENT CLASSIFICATION','ORIGINAL BANK DATA'])assert(ui.includes(marker),`unified Finance OS missing ${marker}`);
-assert(ui.includes('const MOBILE_NAV')&&ui.includes("'more','☰','More'"),'unified Finance mobile navigation incomplete');
+assert(ui.includes('NAV_GROUPS')&&html.includes('fm-department-nav'),'unified Finance mobile navigation incomplete');
 assert(ui.includes('External bank payment execution is not enabled')||ui.includes('provider-capability gated'),'external bank execution boundary missing');
-assert(css.includes('.fm-mobile-nav')&&css.includes('.fm-command-centre')&&css.includes('.fm-intelligence-grid'),'unified Finance mobile/intelligence styles missing');
+assert(css.includes('.vv-primary-nav')&&css.includes('.fm-command-centre')&&css.includes('.fm-intelligence-grid'),'unified Finance mobile/intelligence styles missing');
 assert(!ui.includes('window.alert('),'Finance OS must not use blocking browser alerts');
 assert(ui.includes('function notice(')&&ui.includes('fmNotice'),'Finance OS inline feedback missing');
 
@@ -87,7 +87,7 @@ const dateBoundary=buildDatabaseConfig({DB_HOST:'db.example',DB_USER:'app',DB_PA
 assert(Array.isArray(dateBoundary.options.dateStrings)&&dateBoundary.options.dateStrings[0]==='DATE','DATE-only mysql transport guard inactive');
 assert(!dateBoundary.options.dateStrings.includes('DATETIME'),'DATETIME transport must remain unchanged');
 
-assert(adminPage.includes('Finance OS')&&adminPage.includes('Open Finance OS'),'admin shell must point users to the unified Finance OS');
+assert(adminPage.includes('app-banking-nav')&&adminPage.includes('openBankingWorkspace'),'admin primary navigation must open integrated Finance');
 assert(adminClient.includes("'/finance-intelligence?source=app'"),'installed app must open canonical Finance OS');
 assert(staffPage.includes('href="/finance-intelligence#bankops"'),'staff Banking permission entry must open Finance OS Banking Operations');
 assert(appServer.includes("app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'))"),'/banking must be compatibility redirect only');

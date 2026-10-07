@@ -59,42 +59,40 @@ function style(){
  if(document.querySelector('style[data-finance-advanced-control]'))return;
  const s=document.createElement('style');s.dataset.financeAdvancedControl='1';
  s.textContent=`
- .fac{display:grid;gap:14px}.fac-hero{padding:20px;border:1px solid rgba(87,126,255,.26);border-radius:20px;background:linear-gradient(135deg,rgba(30,64,175,.08),rgba(14,116,144,.06));box-shadow:0 16px 40px rgba(0,0,0,.05)}
- .fac-hero h2{margin:4px 0 6px;font-size:clamp(1.35rem,3vw,2rem)}.fac-hero p{margin:0;color:var(--muted,#687386)}.fac-eyebrow{font-size:.72rem;font-weight:900;letter-spacing:.12em;color:#4f6fdf}
- .fac-toolbar,.fac-jumps,.fac-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.fac-toolbar{margin-top:14px}.fac-toolbar button,.fac-jumps button{min-height:40px}.fac-jumps{margin-top:10px}
- .fac-section{scroll-margin-top:110px}.fac-section>header{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;margin-bottom:9px}.fac-section>header h3{margin:0;font-size:1.05rem}.fac-section>header p{margin:3px 0 0;color:var(--muted,#687386);font-size:.84rem}
- .fac-grid{display:grid;gap:10px}.fac-grid.four{grid-template-columns:repeat(4,minmax(0,1fr))}.fac-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.fac-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
- .fac-card{padding:14px;border:1px solid rgba(127,127,127,.16);border-radius:15px;background:var(--panel,#fff);min-width:0}.fac-card small{color:var(--muted,#687386)}.fac-card strong{display:block;font-size:1.18rem;margin-top:5px}.fac-card h4{margin:0 0 7px}
- .fac-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.fac-kpi{padding:13px;border:1px solid rgba(127,127,127,.16);border-radius:14px;background:rgba(127,127,127,.025)}.fac-kpi span{font-size:.72rem;color:var(--muted,#687386);text-transform:uppercase;letter-spacing:.04em}.fac-kpi b{display:block;margin-top:5px;font-size:1.12rem}
- .fac-list{display:grid;gap:8px}.fac-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:11px;border:1px solid rgba(127,127,127,.14);border-radius:12px}.fac-row h4{margin:0 0 3px;font-size:.92rem}.fac-row p{margin:0;color:var(--muted,#687386);font-size:.8rem}.fac-right{text-align:right;display:grid;gap:4px;justify-items:end}
- .fac-chip{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:.68rem;font-weight:850;background:rgba(59,130,246,.1)}.fac-chip.high{background:rgba(239,68,68,.12);color:#b42318}.fac-chip.watch{background:rgba(245,158,11,.14);color:#9a6700}.fac-chip.ok{background:rgba(34,197,94,.12);color:#16794a}
- .fac-table-wrap{overflow:auto}.fac-table{width:100%;border-collapse:collapse;min-width:650px}.fac-table th,.fac-table td{padding:8px;border-bottom:1px solid rgba(127,127,127,.14);text-align:left;font-size:.8rem}.fac-table th{font-size:.7rem;text-transform:uppercase;color:var(--muted,#687386);letter-spacing:.04em}
- .fac-bars{display:grid;gap:7px}.fac-bar{display:grid;grid-template-columns:minmax(110px,1fr) 3fr auto;gap:8px;align-items:center;font-size:.78rem}.fac-bar-track{height:8px;border-radius:999px;background:rgba(127,127,127,.12);overflow:hidden}.fac-bar-track i{display:block;height:100%;background:currentColor}
- .fac-scenario{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.fac-scenario label{display:grid;gap:5px;font-size:.78rem}.fac-scenario input,.fac-scenario select{width:100%}.fac-note{padding:12px;border:1px dashed rgba(127,127,127,.25);border-radius:13px;color:var(--muted,#687386);font-size:.8rem}
- .fac-loading{padding:24px;text-align:center;border:1px dashed rgba(127,127,127,.25);border-radius:16px}.fac-source{font-size:.73rem;color:var(--muted,#687386)}.fac-empty{padding:14px;border:1px dashed rgba(127,127,127,.22);border-radius:12px;color:var(--muted,#687386)}
- .fac-progress{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:1px solid rgba(79,111,223,.2);border-radius:12px;background:rgba(79,111,223,.06);font-size:.8rem}.fac-progress b{white-space:nowrap}.fac-check-actions{display:flex;gap:7px;align-items:center}.fac-check-actions button{min-height:32px;padding:5px 9px}
- .fac-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.fac-check{display:flex;justify-content:space-between;gap:10px;padding:10px;border:1px solid rgba(127,127,127,.14);border-radius:11px;align-items:center}
- .fac-category-account-tabs{display:flex;gap:7px;overflow:auto;padding:2px 0 8px;scrollbar-width:none}.fac-category-account-tabs::-webkit-scrollbar{display:none}.fac-category-account-tabs button{flex:0 0 auto;border:1px solid rgba(127,127,127,.2);background:var(--panel,#fff);border-radius:999px;padding:7px 10px;font-size:.68rem;font-weight:850;cursor:pointer}.fac-category-account-tabs button.active{border-color:#0877ff;background:#eef7ff;color:#0877ff}
- .fac-category-currency{padding:14px;border:1px solid rgba(127,127,127,.16);border-radius:15px;background:var(--panel,#fff)}.fac-category-currency-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end}.fac-category-currency-head h4{margin:0}.fac-category-currency-head span{font-size:.7rem;color:var(--muted,#687386)}
- .fac-category-scroll{display:flex;align-items:flex-end;gap:10px;overflow-x:auto;padding:14px 2px 4px;scrollbar-width:thin}.fac-category-column{flex:0 0 92px;display:grid;grid-template-rows:auto 174px auto auto;gap:5px;align-items:end;border:0;background:transparent;color:inherit;padding:0;cursor:pointer;text-align:center}.fac-category-column:hover .fac-category-bar,.fac-category-column:focus-visible .fac-category-bar{filter:brightness(.93)}.fac-category-value{font-size:.61rem;font-weight:900;white-space:nowrap}.fac-category-bar-area{height:174px;display:flex;align-items:flex-end;justify-content:center}.fac-category-bar{display:block;width:48px;min-height:4px;border-radius:12px 12px 5px 5px;background:linear-gradient(180deg,#1f8fff,#0b62d5);box-shadow:0 8px 20px rgba(8,119,255,.16)}.fac-category-label{font-size:.61rem;font-weight:850;line-height:1.2;overflow-wrap:anywhere}.fac-category-count{font-size:.54rem;color:var(--muted,#687386)}
+ .fac{display:grid;gap:14px;}.fac-hero{padding:20px;border:1px solid var(--border);border-radius:20px;background:var(--hero-bg);box-shadow:var(--shadow);color:var(--nav-text);}
+ .fac-hero h2{margin:4px 0 6px;font-size:clamp(1.35rem,3vw,2rem);}.fac-hero p{margin:0;color:var(--muted,#687386);}.fac-eyebrow{font-size:.72rem;font-weight:900;letter-spacing:.12em;color:var(--text-secondary);}
+ .fac-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}.fac-jumps{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}.fac-inline{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}.fac-toolbar{margin-top:14px;}.fac-toolbar button{min-height:40px;}.fac-jumps button{min-height:40px;}.fac-jumps{margin-top:10px;}
+ .fac-section{scroll-margin-top:110px;}.fac-section>header{display:flex;justify-content:space-between;gap:14px;align-items:flex-end;margin-bottom:9px;}.fac-section>header h3{margin:0;font-size:1.05rem;}.fac-section>header p{margin:3px 0 0;color:var(--muted,#687386);font-size:14px;}
+ .fac-grid{display:grid;gap:10px;}.fac-grid.four{grid-template-columns:repeat(4,minmax(0,1fr));}.fac-grid.three{grid-template-columns:repeat(3,minmax(0,1fr));}.fac-grid.two{grid-template-columns:repeat(2,minmax(0,1fr));}
+ .fac-card{padding:14px;border:1px solid var(--border);border-radius:15px;background:var(--surface);min-width:0;}.fac-card small{color:var(--muted,#687386);}.fac-card strong{display:block;font-size:1.18rem;margin-top:5px;}.fac-card h4{margin:0 0 7px;}
+ .fac-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}.fac-kpi{padding:13px;border:1px solid var(--border);border-radius:14px;background:var(--surface);}.fac-kpi span{font-size:14px;color:var(--muted,#687386);text-transform:uppercase;letter-spacing:.04em;}.fac-kpi b{display:block;margin-top:5px;font-size:1.12rem;}
+ .fac-list{display:grid;gap:8px;}.fac-row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:11px;border:1px solid var(--border);border-radius:12px;}.fac-row h4{margin:0 0 3px;font-size:.92rem;}.fac-row p{margin:0;color:var(--muted,#687386);font-size:14px;}.fac-right{text-align:right;display:grid;gap:4px;justify-items:end;}
+ .fac-chip{display:inline-flex;padding:4px 8px;border-radius:999px;font-size:14px;font-weight:850;background:var(--surface-muted);}.fac-chip.high{background:var(--surface-muted);color:var(--text-primary);}.fac-chip.watch{background:var(--surface-muted);color:var(--text-primary);}.fac-chip.ok{background:var(--success-bg);color:var(--success);}
+ .fac-table-wrap{overflow:auto;}.fac-table{width:100%;border-collapse:collapse;min-width:650px;}.fac-table th{padding:8px;border-bottom:1px solid var(--border);text-align:left;font-size:14px;}.fac-table td{padding:8px;border-bottom:1px solid var(--border);text-align:left;font-size:14px;}.fac-table th{font-size:14px;text-transform:uppercase;color:var(--muted,#687386);letter-spacing:.04em;}
+ .fac-bars{display:grid;gap:7px;}.fac-bar{display:grid;grid-template-columns:minmax(110px,1fr) 3fr auto;gap:8px;align-items:center;font-size:14px;}.fac-bar-track{height:8px;border-radius:999px;background:var(--track);overflow:hidden;}.fac-bar-track i{display:block;height:100%;background:currentColor;}
+ .fac-scenario{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;}.fac-scenario label{display:grid;gap:5px;font-size:14px;}.fac-scenario input{width:100%;}.fac-scenario select{width:100%;}.fac-note{padding:12px;border:1px dashed var(--border);border-radius:13px;color:var(--muted,#687386);font-size:14px;}
+ .fac-loading{padding:24px;text-align:center;border:1px dashed var(--border);border-radius:16px;}.fac-source{font-size:14px;color:var(--muted,#687386);}.fac-empty{padding:14px;border:1px dashed var(--border);border-radius:12px;color:var(--muted,#687386);}
+ .fac-progress{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);font-size:14px;}.fac-progress b{white-space:nowrap;}.fac-check-actions{display:flex;gap:7px;align-items:center;}.fac-check-actions button{min-height:32px;padding:5px 9px;}
+ .fac-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}.fac-check{display:flex;justify-content:space-between;gap:10px;padding:10px;border:1px solid var(--border);border-radius:11px;align-items:center;}
+ .fac-category-account-tabs{display:flex;gap:7px;overflow:auto;padding:2px 0 8px;scrollbar-width:none;}.fac-category-account-tabs::-webkit-scrollbar{display:none;}.fac-category-account-tabs button{flex:0 0 auto;border:1px solid var(--control-border);background:var(--surface-muted);border-radius:999px;padding:7px 10px;font-size:14px;font-weight:850;cursor:pointer;}.fac-category-account-tabs button.active{border-color:var(--control-border);background:var(--primary);color:var(--on-primary);}
+ .fac-category-currency{padding:14px;border:1px solid var(--border);border-radius:15px;background:var(--surface);}.fac-category-currency-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-end;}.fac-category-currency-head h4{margin:0;}.fac-category-currency-head span{font-size:14px;color:var(--muted,#687386);}
 
- @media(max-width:950px){.fac-grid.four,.fac-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.fac-grid.three{grid-template-columns:1fr 1fr}.fac-scenario{grid-template-columns:1fr 1fr}}
- @media(max-width:650px){.fac-grid.four,.fac-grid.three,.fac-grid.two,.fac-kpis,.fac-control-grid,.fac-scenario{grid-template-columns:1fr}.fac-section>header,.fac-row{flex-direction:column}.fac-right{text-align:left;justify-items:start}.fac-toolbar>*{flex:1;min-width:130px}.fac-jumps{display:grid;grid-template-columns:1fr 1fr}.fac-bar{grid-template-columns:1fr}.fac-bar-track{order:3}.fac-category-column{flex-basis:84px;grid-template-rows:auto 148px auto auto}.fac-category-bar-area{height:148px}.fac-category-bar{width:42px}.fac-category-currency{padding:12px}}
+
+ @media(max-width:950px){.fac-grid.four{grid-template-columns:repeat(2,minmax(0,1fr));}.fac-kpis{grid-template-columns:repeat(2,minmax(0,1fr));}.fac-grid.three{grid-template-columns:1fr 1fr;}.fac-scenario{grid-template-columns:1fr 1fr;}}
+ @media(max-width:650px){.fac-grid.four{grid-template-columns:1fr;}.fac-grid.three{grid-template-columns:1fr;}.fac-grid.two{grid-template-columns:1fr;}.fac-kpis{grid-template-columns:1fr;}.fac-control-grid{grid-template-columns:1fr;}.fac-scenario{grid-template-columns:1fr;}.fac-section>header{flex-direction:column;}.fac-row{flex-direction:column;}.fac-right{text-align:left;justify-items:start;}.fac-toolbar>*{flex:1;min-width:130px;}.fac-jumps{display:grid;grid-template-columns:1fr 1fr;}.fac-bar{grid-template-columns:1fr;}.fac-bar-track{order:3;}.fac-category-currency{padding:12px;}}
 
 
  /* Premium command-centre visual layer v15 */
- .fac{gap:18px}
+ .fac{gap:18px;}
  .fac-hero{
    position:relative;
    overflow:hidden;
    padding:26px;
-   border:1px solid rgba(137,187,255,.17);
+   border:1px solid var(--border);
    border-radius:26px;
-   background:
-     radial-gradient(circle at 92% 5%,rgba(60,157,255,.26),transparent 34%),
-     linear-gradient(135deg,#0a1730 0%,#102d50 58%,#124570 100%);
-   color:#fff;
-   box-shadow:0 24px 60px rgba(11,35,67,.20);
+   background:var(--hero-bg);
+   color:var(--nav-text);
+   box-shadow:var(--shadow);
  }
  .fac-hero:after{
    content:"";
@@ -102,14 +100,14 @@ function style(){
    width:260px;height:260px;
    right:-150px;bottom:-170px;
    border-radius:50%;
-   background:rgba(93,181,255,.11);
+   background:var(--hero-bg);
    pointer-events:none;
- }
+ color:var(--nav-text);}
  .fac-hero h2{
    position:relative;z-index:1;
    max-width:760px;
    margin:7px 0 9px;
-   color:#fff;
+   color:var(--nav-text);
    font-size:clamp(1.45rem,3vw,2.2rem);
    line-height:1.08;
    letter-spacing:-.04em;
@@ -117,42 +115,66 @@ function style(){
  .fac-hero p{
    position:relative;z-index:1;
    max-width:850px;
-   color:#c3d2e5;
-   font-size:.84rem;
+   color:var(--nav-text);
+   font-size:14px;
    line-height:1.55;
  }
  .fac-eyebrow{
    position:relative;z-index:1;
-   color:#81c2ff;
+   color:var(--text-secondary);
    font-size:.66rem;
    letter-spacing:.17em;
  }
- .fac-toolbar{position:relative;z-index:1;margin-top:18px;gap:9px}
- .fac-toolbar button,.fac-jumps button,.fac-inline button,.fac-right button{
-   border:1px solid #d8e6f5;
+ .fac-toolbar{position:relative;z-index:1;margin-top:18px;gap:9px;}
+ .fac-toolbar button{
+   border:1px solid var(--control-border);
    border-radius:11px;
-   background:#fff;
-   color:#183453;
+   background:var(--surface);
+   color:var(--text-primary);
    font-weight:850;
    cursor:pointer;
-   box-shadow:0 5px 16px rgba(30,63,100,.05);
+   box-shadow:var(--shadow);
+ }.fac-jumps button{
+   border:1px solid var(--control-border);
+   border-radius:11px;
+   background:var(--surface);
+   color:var(--text-primary);
+   font-weight:850;
+   cursor:pointer;
+   box-shadow:var(--shadow);
+ }.fac-inline button{
+   border:1px solid var(--control-border);
+   border-radius:11px;
+   background:var(--surface);
+   color:var(--text-primary);
+   font-weight:850;
+   cursor:pointer;
+   box-shadow:var(--shadow);
+ }.fac-right button{
+   border:1px solid var(--control-border);
+   border-radius:11px;
+   background:var(--surface);
+   color:var(--text-primary);
+   font-weight:850;
+   cursor:pointer;
+   box-shadow:var(--shadow);
  }
- .fac-toolbar button{padding:8px 12px}
+ .fac-toolbar button{padding:8px 12px;}
  .fac-toolbar button.primary{
-   border-color:#0877ff;
-   background:#0877ff;
-   color:#fff;
-   box-shadow:0 10px 24px rgba(8,119,255,.26);
+   border-color:var(--control-border);
+   background:var(--primary);
+   color:var(--on-primary);
+   box-shadow:var(--shadow);
  }
  .fac-hero .fac-toolbar .fac-source{
    display:inline-flex;
    align-items:center;
    min-height:38px;
    padding:0 11px;
-   border:1px solid rgba(255,255,255,.13);
+   border:1px solid var(--border);
    border-radius:11px;
-   background:rgba(255,255,255,.07);
-   color:#c8d6e8;
+   background:var(--hero-bg);
+   color:var(--nav-text);
  }
  .fac-jumps{
    position:relative;z-index:1;
@@ -166,160 +188,167 @@ function style(){
    scrollbar-width:none;
    -webkit-overflow-scrolling:touch;
  }
- .fac-jumps::-webkit-scrollbar{display:none}
+ .fac-jumps::-webkit-scrollbar{display:none;}
  .fac-jumps button{
    flex:0 0 auto!important;
    min-width:0!important;
    min-height:36px!important;
    padding:7px 11px;
-   border-color:rgba(255,255,255,.13);
-   background:rgba(255,255,255,.08);
-   color:#edf6ff;
-   box-shadow:none;
-   font-size:.72rem;
+   border-color:var(--control-border);
+   background:var(--surface);
+   color:var(--text-primary);
+   box-shadow:var(--shadow);
+   font-size:14px;
    white-space:nowrap;
  }
- .fac-jumps button:hover{background:rgba(255,255,255,.14)}
+ .fac-jumps button:hover{background:var(--surface-muted);}
  .fac-progress{
-   border:1px solid #cfe4ff;
+   border:1px solid var(--border);
    border-radius:15px;
-   background:#eef7ff;
-   color:#385474;
-   box-shadow:0 8px 22px rgba(42,80,122,.05);
+   background:var(--surface);
+   color:var(--text-primary);
+   box-shadow:var(--shadow);
  }
  .fac-section{
    scroll-margin-top:105px;
    padding:19px;
-   border:1px solid #dfe9f4;
+   border:1px solid var(--border);
    border-radius:23px;
-   background:linear-gradient(180deg,#fff 0%,#fbfdff 100%);
-   box-shadow:0 14px 38px rgba(35,72,112,.065);
+   background:var(--surface);
+   box-shadow:var(--shadow);
  }
  .fac-section>header{
    align-items:flex-start;
    margin-bottom:14px;
  }
  .fac-section>header h3{
-   color:#0f1d36;
+   color:var(--text-primary);
    font-size:1.05rem;
    letter-spacing:-.025em;
  }
  .fac-section>header p{
    max-width:760px;
-   color:#70829a;
-   font-size:.72rem;
+   color:var(--text-secondary);
+   font-size:14px;
    line-height:1.45;
  }
  .fac-card{
    padding:15px;
-   border:1px solid #e1eaf3;
+   border:1px solid var(--border);
    border-radius:17px;
-   background:#fff;
-   box-shadow:0 7px 22px rgba(35,72,112,.045);
+   background:var(--surface);
+   box-shadow:var(--shadow);
  }
- .fac-card h4{color:#16243d;letter-spacing:-.015em}
- .fac-card strong{color:#0d1830;letter-spacing:-.03em}
- .fac-kpis{gap:9px}
+ .fac-card h4{color:var(--text-primary);letter-spacing:-.015em;}
+ .fac-card strong{color:var(--text-primary);letter-spacing:-.03em;}
+ .fac-kpis{gap:9px;}
  .fac-kpi{
    padding:14px;
-   border:1px solid #e0eaf4;
+   border:1px solid var(--border);
    border-radius:16px;
-   background:linear-gradient(180deg,#fff 0%,#f8fbff 100%);
-   box-shadow:0 6px 18px rgba(36,74,116,.04);
+   background:var(--surface);
+   box-shadow:var(--shadow);
  }
  .fac-kpi span{
-   color:#73859e;
-   font-size:.61rem;
+   color:var(--text-primary);
+   font-size:14px;
    font-weight:850;
    letter-spacing:.06em;
  }
  .fac-kpi b{
-   color:#0e1931;
+   color:var(--text-primary);
    margin-top:6px;
    font-size:1.08rem;
    letter-spacing:-.025em;
  }
- .fac-kpi small{display:block;margin-top:4px;color:#8a99ad;font-size:.59rem}
+ .fac-kpi small{display:block;margin-top:4px;color:var(--text-secondary);font-size:14px;}
  .fac-row{
    padding:12px;
-   border:1px solid #e5edf5;
+   border:1px solid var(--border);
    border-radius:14px;
-   background:#fff;
+   background:var(--surface);
  }
- .fac-row:hover{border-color:#cfe2f7;background:#fbfdff}
- .fac-row h4{color:#17243b;font-size:.82rem}
- .fac-row p{color:#72849c;font-size:.69rem;line-height:1.4}
- .fac-source{color:#7d8fa6;font-size:.63rem}
+ .fac-row:hover{border-color:var(--border);background:var(--surface-muted);}
+ .fac-row h4{color:var(--text-primary);font-size:14px;}
+ .fac-row p{color:var(--text-secondary);font-size:14px;line-height:1.4;}
+ .fac-source{color:var(--text-primary);font-size:14px;}
  .fac-chip{
    padding:5px 8px;
    border-radius:999px;
-   background:#edf6ff;
-   color:#146bc3;
-   font-size:.58rem;
+   background:var(--surface-muted);
+   color:var(--text-primary);
+   font-size:14px;
    letter-spacing:.02em;
  }
- .fac-chip.high{background:#fff0f2;color:#b63343}
- .fac-chip.watch{background:#fff6df;color:#986500}
- .fac-chip.ok{background:#e7f8f1;color:#0d7e60}
- .fac-control-grid{gap:9px}
+ .fac-chip.high{background:var(--surface-muted);color:var(--text-primary);}
+ .fac-chip.watch{background:var(--surface-muted);color:var(--text-primary);}
+ .fac-chip.ok{background:var(--success-bg);color:var(--success);}
+ .fac-control-grid{gap:9px;}
  .fac-check{
    padding:12px;
-   border:1px solid #e2ebf4;
+   border:1px solid var(--border);
    border-radius:14px;
-   background:#fff;
+   background:var(--surface);
  }
- .fac-check b{color:#17253d;font-size:.73rem}
+ .fac-check b{color:var(--text-primary);font-size:14px;}
  .fac-note{
    padding:12px 14px;
-   border:1px solid #dbe8f5;
+   border:1px solid var(--border);
    border-radius:14px;
-   background:#f7fbff;
-   color:#71849b;
-   font-size:.67rem;
+   background:var(--surface);
+   color:var(--text-secondary);
+   font-size:14px;
    line-height:1.5;
  }
  .fac-empty{
-   border-color:#dbe7f3;
-   background:#f9fbfe;
-   color:#788aa0;
+   border-color:var(--border);
+   background:var(--surface);
+   color:var(--text-primary);
  }
- .fac-scenario input,.fac-scenario select{
+ .fac-scenario input{
    min-height:42px;
-   border:1px solid #dbe6f1;
+   border:1px solid var(--control-border);
    border-radius:11px;
-   background:#fff;
+   background:var(--surface);
    padding:8px 10px;
-   color:#14223b;
+   color:var(--text-primary);
+ }.fac-scenario select{
+   min-height:42px;
+   border:1px solid var(--control-border);
+   border-radius:11px;
+   background:var(--surface);
+   padding:8px 10px;
+   color:var(--text-primary);
  }
- .fac-scenario label{color:#667b96;font-weight:750}
- .fac-table th{color:#74859c}
- .fac-table td{color:#253752}
- .fac-bar-track{background:#eaf0f6}
- .fac-bar-track i{color:#0877ff}
+ .fac-scenario label{color:var(--text-secondary);font-weight:750;}
+ .fac-table th{color:var(--text-primary);}
+ .fac-table td{color:var(--text-primary);}
+ .fac-bar-track{background:var(--track);}
+ .fac-bar-track i{color:var(--text-primary);}
  @media(max-width:650px){
-   .fac{gap:14px}
-   .fac-hero{padding:20px 16px;border-radius:22px}
-   .fac-hero h2{font-size:1.48rem;max-width:310px}
-   .fac-hero p{font-size:.72rem;line-height:1.5}
-   .fac-toolbar{display:flex;flex-wrap:wrap}
-   .fac-toolbar>*{flex:0 0 auto;min-width:0}
-   .fac-hero .fac-toolbar button.primary{width:auto;min-width:148px}
-   .fac-hero .fac-toolbar .fac-source{font-size:.58rem}
-   .fac-jumps{display:flex!important;grid-template-columns:none!important}
-   .fac-jumps button{font-size:.66rem;padding:7px 10px}
-   .fac-section{padding:14px;border-radius:20px}
-   .fac-section>header{gap:9px}
-   .fac-section>header h3{font-size:.94rem}
-   .fac-section>header p{font-size:.66rem}
-   .fac-kpis{grid-template-columns:1fr 1fr!important;gap:8px}
-   .fac-kpi{padding:12px}
-   .fac-kpi b{font-size:.94rem;overflow-wrap:anywhere}
-   .fac-kpi span{font-size:.55rem}
-   .fac-kpi small{font-size:.54rem}
-   .fac-grid.four,.fac-grid.three,.fac-grid.two,.fac-control-grid,.fac-scenario{grid-template-columns:1fr}
-   .fac-row{flex-direction:row;align-items:flex-start}
-   .fac-right{text-align:right;justify-items:end}
-   .fac-card{padding:13px}
+   .fac{gap:14px;}
+   .fac-hero{padding:20px 16px;border-radius:22px;}
+   .fac-hero h2{font-size:1.48rem;max-width:310px;}
+   .fac-hero p{font-size:14px;line-height:1.5;}
+   .fac-toolbar{display:flex;flex-wrap:wrap;}
+   .fac-toolbar>*{flex:0 0 auto;min-width:0;}
+   .fac-hero .fac-toolbar button.primary{width:auto;min-width:148px;}
+   .fac-hero .fac-toolbar .fac-source{font-size:14px;}
+   .fac-jumps{display:flex!important;grid-template-columns:none!important;}
+   .fac-jumps button{font-size:14px;padding:7px 10px;}
+   .fac-section{padding:14px;border-radius:20px;}
+   .fac-section>header{gap:9px;}
+   .fac-section>header h3{font-size:.94rem;}
+   .fac-section>header p{font-size:14px;}
+   .fac-kpis{grid-template-columns:1fr 1fr!important;gap:8px;}
+   .fac-kpi{padding:12px;}
+   .fac-kpi b{font-size:.94rem;overflow-wrap:anywhere;}
+   .fac-kpi span{font-size:14px;}
+   .fac-kpi small{font-size:14px;}
+   .fac-grid.four{grid-template-columns:1fr;}.fac-grid.three{grid-template-columns:1fr;}.fac-grid.two{grid-template-columns:1fr;}.fac-control-grid{grid-template-columns:1fr;}.fac-scenario{grid-template-columns:1fr;}
+   .fac-row{flex-direction:row;align-items:flex-start;}
+   .fac-right{text-align:right;justify-items:end;}
+   .fac-card{padding:13px;}
  }
  `;
  document.head.appendChild(s);
@@ -453,7 +482,7 @@ function executive(){
  const cs=currencies();
  const rows=cs.map(cur=>{
   const f=monthlyFlow(cur),cmd=state.data.command?.summary_by_currency?.[cur]||{};
-  return '<div class="fac-card"><small>'+esc(cur)+' CONTROL POSITION</small><strong>'+money(visibleFunds(cur),cur)+'</strong><div class="fac-source">Visible personal funds</div><div class="fac-kpis" style="grid-template-columns:1fr 1fr;margin-top:10px"><div><span>Safe to spend</span><b>'+money(safeSpend(cur),cur)+'</b></div><div><span>Net worth</span><b>'+money(netWorth(cur),cur)+'</b></div><div><span>90d avg spend/mo</span><b>'+money(f.avgSpend,cur)+'</b></div><div><span>Banking 30d liquidity</span><b>'+money(cmd.projected_liquidity_30d,cur)+'</b></div></div></div>';
+  return '<div class="fac-card"><small>'+esc(cur)+' CONTROL POSITION</small><strong>'+money(visibleFunds(cur),cur)+'</strong><div class="fac-source">Visible personal funds</div><div class="fac-kpis" style="grid-template-columns:1fr 1fr;margin-top:10px;"><div><span>Safe to spend</span><b>'+money(safeSpend(cur),cur)+'</b></div><div><span>Net worth</span><b>'+money(netWorth(cur),cur)+'</b></div><div><span>90d avg spend/mo</span><b>'+money(f.avgSpend,cur)+'</b></div><div><span>Banking 30d liquidity</span><b>'+money(cmd.projected_liquidity_30d,cur)+'</b></div></div></div>';
  }).join('');
  const queue=actionQueue();
  const critical=queue.filter(x=>['URGENT','CRITICAL','HIGH'].includes(String(x.severity).toUpperCase())).length;
@@ -482,14 +511,14 @@ function categorySpendingControl(){
   const cats=[...byCategory.values()].sort((a,b)=>num(b.spent)-num(a.spent)||String(a.category).localeCompare(String(b.category)));
   const max=Math.max(1,...cats.map(x=>num(x.spent))),total=actual.reduce((sum,x)=>sum+num(x.spent),0),count=actual.reduce((sum,x)=>sum+num(x.source_transaction_count),0);
   const columns=cats.map(x=>{
-   const height=Math.max(3,Math.min(100,(num(x.spent)/max)*100));
+   const height=Math.max(0,Math.min(100,(num(x.spent)/max)*100));
    const effectiveAccount=selected==='ALL'?(data.filters?.account_id||''):selected;
-   return '<button type="button" class="fac-category-column" data-fac-category-open="'+esc(x.category||'Unclassified')+'" data-fac-category-currency="'+esc(cur)+'" data-fac-category-account-id="'+esc(effectiveAccount)+'" title="Open '+esc(x.category||'Unclassified')+' transactions"><span class="fac-category-value">'+money(x.spent,cur)+'</span><span class="fac-category-bar-area"><i class="fac-category-bar" style="height:'+height.toFixed(2)+'%"></i></span><span class="fac-category-label">'+esc(x.category||'Unclassified')+'</span><span class="fac-category-count">'+num(x.source_transaction_count)+' tx</span></button>';
+   return '<button type="button" class="fac-category-row" data-fac-category-open="'+esc(x.category||'Unclassified')+'" data-fac-category-currency="'+esc(cur)+'" data-fac-category-account-id="'+esc(effectiveAccount)+'" title="Open '+esc(x.category||'Unclassified')+' transactions"><span class="fac-category-value">'+money(x.spent,cur)+'</span><span class="fac-category-bar-area"><i class="fac-category-bar" style="width:'+height.toFixed(2)+'%"></i></span><span class="fac-category-label">'+esc(x.category||'Unclassified')+'</span><span class="fac-category-count">'+num(x.source_transaction_count)+' tx</span></button>';
   }).join('');
   return '<article class="fac-category-currency"><div class="fac-category-currency-head"><div><h4>'+esc(cur)+' spending by category</h4><span>'+num(count)+' category-linked transaction(s)</span></div><strong>'+money(total,cur)+'</strong></div><div class="fac-category-scroll">'+(columns||'<div class="fac-empty">No category spending for this selection.</div>')+'</div></article>';
  }).join('');
  const period=data.filters?.from||data.filters?.to?(' · '+esc(data.filters?.from||'start')+' to '+esc(data.filters?.to||'today')):' · all available history';
- return '<section id="facCategories" class="fac-section"><header><div><h3>Category Spending Chart</h3><p>Every category is calculated from the canonical ledger'+period+'. Select an account, then tap any column to open every matching transaction and its total.</p></div><span class="fac-source">'+num(categoryNames.length||rows.length)+' configured categories</span></header>'+tabs+'<div class="fac-grid">'+(charts||'<div class="fac-empty">No expense categories are available for the selected filters.</div>')+'</div><div class="fac-note" style="margin-top:10px">Manual transaction/category changes are reflected from the same ledger. Connected-bank categories are only normalised when the bank/provider evidence maps cleanly to a canonical Finance category; uncertain items stay Unclassified instead of being forced into the wrong category.</div></section>';
+ return '<section id="facCategories" class="fac-section"><header><div><h3>Category Spending Chart</h3><p>Every category is calculated from the canonical ledger'+period+'. Select an account, then tap any category row to open every matching transaction and its total.</p></div><span class="fac-source">'+num(categoryNames.length||rows.length)+' configured categories</span></header>'+tabs+'<div class="fac-grid">'+(charts||'<div class="fac-empty">No expense categories are available for the selected filters.</div>')+'</div><div class="fac-note" style="margin-top:10px;">Manual transaction/category changes are reflected from the same ledger. Connected-bank categories are only normalised when the bank/provider evidence maps cleanly to a canonical Finance category; uncertain items stay Unclassified instead of being forced into the wrong category.</div></section>';
 }
 
 function executiveReadinessBoard(){
@@ -510,8 +539,8 @@ function executiveReadinessBoard(){
  const brief=actionQueue().slice(0,6).map(x=>'<div class="fac-row"><div><h4>'+esc(x.title)+'</h4><p>'+esc((x.source?x.source+' · ':'')+(x.detail||'Review current control signal.'))+'</p></div><div class="fac-right">'+statusChip(x.severity||'REVIEW')+'</div></div>').join('');
  return '<section id="facReadiness" class="fac-section"><header><div><h3>Executive Control Readiness Board</h3><p>Independent CFO control dimensions. No fake composite finance score and no cross-currency aggregation.</p></div>'+statusChip(high?'HIGH':watch?'WATCH':'CLEAR')+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>High attention</span><b>'+high+'</b><small>Immediate control review</small></div><div class="fac-kpi"><span>Watch</span><b>'+watch+'</b><small>Needs review or evidence</small></div><div class="fac-kpi"><span>Clear</span><b>'+clear+'</b><small>Current checks clear</small></div><div class="fac-kpi"><span>Dimensions</span><b>'+dims.length+'</b><small>Kept independent</small></div></div>'+
- '<div class="fac-control-grid" style="margin-top:10px">'+rows+'</div>'+
- '<article class="fac-card" style="margin-top:10px"><h4>CFO Daily Brief</h4><div class="fac-list">'+(brief||'<div class="fac-empty">No high-priority current control signal.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="controlactions">Control Actions</button><button data-fac-open="anomaly">Explainability</button><button data-fac-open="performance">Performance</button><button data-fac-open="handover">Handover</button></div></article>'+
+ '<div class="fac-control-grid" style="margin-top:10px;">'+rows+'</div>'+
+ '<article class="fac-card" style="margin-top:10px;"><h4>CFO Daily Brief</h4><div class="fac-list">'+(brief||'<div class="fac-empty">No high-priority current control signal.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="controlactions">Control Actions</button><button data-fac-open="anomaly">Explainability</button><button data-fac-open="performance">Performance</button><button data-fac-open="handover">Handover</button></div></article>'+
  '<div class="fac-note">Readiness dimensions are not averaged into one score. Each uses its own evidence and keeps currencies separate.</div></section>';
 }
 function actions(){
@@ -532,7 +561,7 @@ function scenario(){
  const cur=state.scenario.currency,horizons=[7,30,90,365];
  const cards=horizons.map(d=>{const p=scenarioProjection(cur,d);return '<div class="fac-kpi"><span>'+d+' DAY SCENARIO</span><b>'+money(p.scenario_projected,cur)+'</b><small>Base '+money(p.projected,cur)+' · scenario impact '+money(p.scenario_delta,cur)+'</small></div>'}).join('');
  return '<section id="facScenario" class="fac-section"><header><div><h3>Scenario Lab</h3><p>Change assumptions locally without writing to the ledger.</p></div><span class="fac-chip ok">NO DATA MUTATION</span></header>'+
- '<div class="fac-card"><div class="fac-scenario"><label>Currency<select id="facScenarioCurrency">'+cs.map(c=>'<option '+(c===cur?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label><label>Monthly income change<input id="facIncomeDelta" type="number" step="0.01" value="'+esc(state.scenario.monthlyIncomeDelta)+'"></label><label>Monthly spending change<input id="facSpendDelta" type="number" step="0.01" value="'+esc(state.scenario.monthlySpendingDelta)+'"></label><label>One-time cost<input id="facOneTime" type="number" step="0.01" min="0" value="'+esc(state.scenario.oneTimeCost)+'"></label><label>Monthly savings target<input id="facSavingTarget" type="number" step="0.01" min="0" value="'+esc(state.scenario.monthlySavingTarget)+'"></label></div><div class="fac-kpis" style="margin-top:12px">'+cards+'</div><div class="fac-note" style="margin-top:10px">Scenario values are temporary planning assumptions only. They do not change balances, budgets, goals, repayments, bank transactions or accounting records.</div></div></section>';
+ '<div class="fac-card"><div class="fac-scenario"><label>Currency<select id="facScenarioCurrency">'+cs.map(c=>'<option '+(c===cur?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label><label>Monthly income change<input id="facIncomeDelta" type="number" step="0.01" value="'+esc(state.scenario.monthlyIncomeDelta)+'"></label><label>Monthly spending change<input id="facSpendDelta" type="number" step="0.01" value="'+esc(state.scenario.monthlySpendingDelta)+'"></label><label>One-time cost<input id="facOneTime" type="number" step="0.01" min="0" value="'+esc(state.scenario.oneTimeCost)+'"></label><label>Monthly savings target<input id="facSavingTarget" type="number" step="0.01" min="0" value="'+esc(state.scenario.monthlySavingTarget)+'"></label></div><div class="fac-kpis" style="margin-top:12px;">'+cards+'</div><div class="fac-note" style="margin-top:10px;">Scenario values are temporary planning assumptions only. They do not change balances, budgets, goals, repayments, bank transactions or accounting records.</div></div></section>';
 }
 
 function recurringDebt(){
@@ -548,7 +577,7 @@ function recurringDebt(){
  const gRows=goals.filter(g=>String(g.status||'').toUpperCase()!=='COMPLETED').slice(0,12).map(g=>'<div class="fac-row"><div><h4>'+esc(g.name||'Savings goal')+'</h4><p>'+esc(String(g.goal_type||'OTHER').replaceAll('_',' '))+' · target '+date(g.target_date)+' · recent '+money(g.recent_monthly_pace||0,g.currency||'AUD')+'/mo</p></div><div class="fac-right"><b>'+money(g.current_amount,g.currency||'AUD')+' / '+money(g.target_amount,g.currency||'AUD')+'</b>'+statusChip(g.pace_status||g.status||'REVIEW')+'</div></div>').join('');
  return '<section id="facPersonal" class="fac-section"><header><div><h3>Commitments, Debt & Savings Reserve Intelligence</h3><p>Recurring cost pressure, borrowed/lent exposure and reserve funding pace from owner-only Personal Money controls.</p></div><div class="fac-inline"><button data-fac-open="recurring">Commitments</button><button data-fac-open="debt">Debt</button><button data-fac-open="savings">Savings</button></div></header>'+
  '<div class="fac-kpis">'+(recurringCards+savingCards||'<div class="fac-kpi"><span>Personal controls</span><b>—</b><small>No recurring or savings summary returned.</small></div>')+'<div class="fac-kpi"><span>Savings pace exceptions</span><b>'+num(savingSummary.behind)+'</b><small>'+num(savingSummary.overdue)+' overdue · '+num(savingSummary.emergency_coverage_below_3m)+' emergency coverage under 3.0 months</small></div></div>'+
- '<div class="fac-grid three" style="margin-top:10px"><article class="fac-card"><h4>Recurring commitments</h4><div class="fac-list">'+(rRows||'<div class="fac-empty">No active recurring outgoing item.</div>')+'</div></article><article class="fac-card"><h4>Borrowed / lent money</h4><div class="fac-list">'+(dRows||'<div class="fac-empty">No open debt record.</div>')+'</div></article><article class="fac-card"><h4>Savings & reserves</h4><div class="fac-list">'+(gRows||'<div class="fac-empty">No active savings/reserve goal.</div>')+'</div></article></div>'+
+ '<div class="fac-grid three" style="margin-top:10px;"><article class="fac-card"><h4>Recurring commitments</h4><div class="fac-list">'+(rRows||'<div class="fac-empty">No active recurring outgoing item.</div>')+'</div></article><article class="fac-card"><h4>Borrowed / lent money</h4><div class="fac-list">'+(dRows||'<div class="fac-empty">No open debt record.</div>')+'</div></article><article class="fac-card"><h4>Savings & reserves</h4><div class="fac-list">'+(gRows||'<div class="fac-empty">No active savings/reserve goal.</div>')+'</div></article></div>'+
  '<div class="fac-note">Savings pace and emergency coverage are planning calculations from recorded Personal Money evidence. They do not prove cash is segregated and do not move money automatically.</div></section>';
 }
 
@@ -569,7 +598,7 @@ function riskIntegrity(){
   ['Cash detail',num(s.unclassified_cash_movements)===0,num(s.unclassified_cash_movements)+' incomplete cash record(s)'],
   ['Wallet double-count risk',num(s.wallet_bank_double_count_risks)===0,num(s.wallet_bank_double_count_risks)+' signal(s)']
  ];
- return '<section id="facRisk" class="fac-section"><header><div><h3>Risk, Integrity & Control Readiness</h3><p>Concrete data-quality and operational risk signals—not invented financial advice.</p></div></header><div class="fac-control-grid">'+checks.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div><div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No active risk/control signal returned.</div>')+'</div></section>';
+ return '<section id="facRisk" class="fac-section"><header><div><h3>Risk, Integrity & Control Readiness</h3><p>Concrete data-quality and operational risk signals—not invented financial advice.</p></div></header><div class="fac-control-grid">'+checks.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div><div class="fac-list" style="margin-top:10px;">'+(rows||'<div class="fac-empty">No active risk/control signal returned.</div>')+'</div></section>';
 }
 
 function taxEvidence(){
@@ -587,21 +616,21 @@ function taxEvidence(){
  const max=Math.max(1,...cat.map(x=>num(x.amount)));
  return '<section id="facYearEnd" class="fac-section"><header><div><h3>Tax, Evidence & Year-End Readiness</h3><p>Preparation controls only; this does not calculate tax liability or legal deductibility.</p></div><span class="fac-chip watch">'+esc(fy)+'</span></header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Tax review items</span><b>'+review+'</b><small>'+num(taxCounts.unreviewed)+' unreviewed · '+num(taxCounts.missing_evidence)+' missing evidence</small></div><div class="fac-kpi"><span>Private document refs</span><b>'+docs.length+'</b><small>Owner-only evidence references</small></div><div class="fac-kpi"><span>Evidence due/expired</span><b>'+expiring+'</b><small>Within 30 days</small></div><div class="fac-kpi"><span>Accountant questions</span><b>'+(num(taxCounts.ask_accountant)+num(state.data.company?.open_accountant_queries))+'</b><small>'+num(taxCounts.ask_accountant)+' personal · '+num(state.data.company?.open_accountant_queries)+' company</small></div></div>'+
- '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Year-end control checklist</h4><div class="fac-list">'+checklist.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div></article><article class="fac-card"><h4>Review categories</h4><div class="fac-bars">'+(cat.map(x=>'<div class="fac-bar"><span>'+esc(x.category||'Uncategorised')+'</span><div class="fac-bar-track"><i style="width:'+Math.min(100,num(x.amount)/max*100)+'%"></i></div><b>'+money(x.amount,x.currency||'AUD')+'</b></div>').join('')||'<div class="fac-empty">No tax-preparation category data.</div>')+'</div></article></div><div class="fac-note" style="margin-top:10px">Recorded income is not automatically taxable income. Persistent Personal review states are preparation records, not deduction claims. Currencies remain separate unless verified FX evidence exists.</div></section>';
+ '<div class="fac-grid two" style="margin-top:10px;"><article class="fac-card"><h4>Year-end control checklist</h4><div class="fac-list">'+checklist.map(([n,ok,d])=>'<div class="fac-check"><div><b>'+esc(n)+'</b><div class="fac-source">'+esc(d)+'</div></div>'+statusChip(ok?'CLEAR':'REVIEW')+'</div>').join('')+'</div></article><article class="fac-card"><h4>Review categories</h4><div class="fac-bars">'+(cat.map(x=>'<div class="fac-bar"><span>'+esc(x.category||'Uncategorised')+'</span><div class="fac-bar-track"><i style="width:'+Math.min(100,num(x.amount)/max*100)+'%"></i></div><b>'+money(x.amount,x.currency||'AUD')+'</b></div>').join('')||'<div class="fac-empty">No tax-preparation category data.</div>')+'</div></article></div><div class="fac-note" style="margin-top:10px;">Recorded income is not automatically taxable income. Persistent Personal review states are preparation records, not deduction claims. Currencies remain separate unless verified FX evidence exists.</div></section>';
 }
 
 function companyCfo(){
  const c=state.data.company||{},cmd=state.data.command||{},close=state.data.closeAssurance||{},cur=c.currency||'AUD';
  const by=cmd.summary_by_currency||{};
  const rows=Object.entries(by).map(([cc,x])=>'<div class="fac-row"><div><h4>'+esc(cc)+' liquidity</h4><p>Runway '+(x.runway_days===null||x.runway_days===undefined?'—':esc(x.runway_days)+' days')+' · merchant concentration '+num(x.merchant_concentration_percent).toFixed(1)+'%</p></div><div class="fac-right"><b>'+money(x.projected_liquidity_30d,cc)+'</b><small>projected 30d liquidity</small></div></div>').join('');
- return '<section id="facCompany" class="fac-section"><header><div><h3>Company CFO Control</h3><p>Receivables, payables, approvals, liquidity and accounting attention.</p></div></header><div class="fac-kpis"><div class="fac-kpi"><span>Customer receivables</span><b>'+money(c.customer_receivables,cur)+'</b><small>'+num(c.open_customer_invoice_count)+' open invoice(s)</small></div><div class="fac-kpi"><span>Supplier payables</span><b>'+money(c.supplier_payables,cur)+'</b><small>'+num(c.supplier_bill_count)+' outstanding bill(s)</small></div><div class="fac-kpi"><span>Pending supplier approvals</span><b>'+num(c.pending_supplier_approvals)+'</b><small>Company workflow</small></div><div class="fac-kpi"><span>Open accountant queries</span><b>'+num(c.open_accountant_queries)+'</b><small>Company accounting</small></div><div class="fac-kpi"><span>Month-end close readiness</span><b>'+esc(close.readiness_status||'—')+'</b><small>'+num(close.blocker_count)+' blocker(s) · '+num(close.warning_count)+' warning(s)</small></div></div><div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Banking command metrics</h4><div class="fac-list">'+(rows||'<div class="fac-empty">No banking command metrics available.</div>')+'</div></article><article class="fac-card"><h4>Control notes</h4><div class="fac-list"><div class="fac-row"><div><h4>GST registration</h4><p>'+esc(c.gst_registration||'UNKNOWN')+'</p></div>'+statusChip(c.gst_registration&&c.gst_registration!=='UNKNOWN'?'CONFIGURED':'REVIEW')+'</div><div class="fac-row"><div><h4>Payment approvals waiting</h4><p>'+num(cmd.approval_inbox?.length)+' approval item(s) returned for your role.</p></div>'+statusChip(cmd.approval_inbox?.length?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Close & Assurance</h4><p>'+esc(close.period?.period_key||'Current period')+' · '+esc(close.run?.status||'not certified')+'</p></div><div class="fac-right">'+statusChip(close.blocker_count?'HIGH':close.run?.status==='CERTIFIED'?'CLEAR':'REVIEW')+'<button data-fac-open="closeassurance">Open close</button></div></div><div class="fac-row"><div><h4>Overdue obligations</h4><p>'+num(cmd.obligations?.overdue)+' overdue payment instruction(s).</p></div>'+statusChip(cmd.obligations?.overdue?'HIGH':'CLEAR')+'</div></div></article></div></section>';
+ return '<section id="facCompany" class="fac-section"><header><div><h3>Company CFO Control</h3><p>Receivables, payables, approvals, liquidity and accounting attention.</p></div></header><div class="fac-kpis"><div class="fac-kpi"><span>Customer receivables</span><b>'+money(c.customer_receivables,cur)+'</b><small>'+num(c.open_customer_invoice_count)+' open invoice(s)</small></div><div class="fac-kpi"><span>Supplier payables</span><b>'+money(c.supplier_payables,cur)+'</b><small>'+num(c.supplier_bill_count)+' outstanding bill(s)</small></div><div class="fac-kpi"><span>Pending supplier approvals</span><b>'+num(c.pending_supplier_approvals)+'</b><small>Company workflow</small></div><div class="fac-kpi"><span>Open accountant queries</span><b>'+num(c.open_accountant_queries)+'</b><small>Company accounting</small></div><div class="fac-kpi"><span>Month-end close readiness</span><b>'+esc(close.readiness_status||'—')+'</b><small>'+num(close.blocker_count)+' blocker(s) · '+num(close.warning_count)+' warning(s)</small></div></div><div class="fac-grid two" style="margin-top:10px;"><article class="fac-card"><h4>Banking command metrics</h4><div class="fac-list">'+(rows||'<div class="fac-empty">No banking command metrics available.</div>')+'</div></article><article class="fac-card"><h4>Control notes</h4><div class="fac-list"><div class="fac-row"><div><h4>GST registration</h4><p>'+esc(c.gst_registration||'UNKNOWN')+'</p></div>'+statusChip(c.gst_registration&&c.gst_registration!=='UNKNOWN'?'CONFIGURED':'REVIEW')+'</div><div class="fac-row"><div><h4>Payment approvals waiting</h4><p>'+num(cmd.approval_inbox?.length)+' approval item(s) returned for your role.</p></div>'+statusChip(cmd.approval_inbox?.length?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Close & Assurance</h4><p>'+esc(close.period?.period_key||'Current period')+' · '+esc(close.run?.status||'not certified')+'</p></div><div class="fac-right">'+statusChip(close.blocker_count?'HIGH':close.run?.status==='CERTIFIED'?'CLEAR':'REVIEW')+'<button data-fac-open="closeassurance">Open close</button></div></div><div class="fac-row"><div><h4>Overdue obligations</h4><p>'+num(cmd.obligations?.overdue)+' overdue payment instruction(s).</p></div>'+statusChip(cmd.obligations?.overdue?'HIGH':'CLEAR')+'</div></div></article></div></section>';
 }
 
 function accountantHandoverStatus(){
  const h=state.data.handover||{},g=h.gaps||{},c=h.close||{};
  return '<section id="facHandover" class="fac-section"><header><div><h3>Accountant Handover Readiness</h3><p>Company-only year-end evidence status with versioned handover snapshots.</p></div>'+statusChip(h.handover_status||'REVIEW')+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Blockers</span><b>'+num(h.blocker_count)+'</b><small>Must be resolved before clean handover</small></div><div class="fac-kpi"><span>Warnings</span><b>'+num(h.warning_count)+'</b><small>Review before external delivery</small></div><div class="fac-kpi"><span>Certified periods</span><b>'+num(c.certified)+' / '+num(c.period_count)+'</b><small>'+num(c.snapshots)+' close snapshot(s)</small></div><div class="fac-kpi"><span>Evidence snapshots</span><b>'+((h.exports||[]).length)+'</b><small>Versioned SHA-256 manifests</small></div></div>'+
- '<div class="fac-list" style="margin-top:10px"><div class="fac-row"><div><h4>Bank evidence gaps</h4><p>'+num(g.bank_unreconciled)+' unreconciled · '+num(g.bank_unclassified)+' unclassified · '+num(g.missing_receipts)+' missing receipt(s)</p></div>'+statusChip(num(g.bank_unreconciled)+num(g.bank_unclassified)+num(g.missing_receipts)?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Year-end workflow</h4><p>'+num(g.open_accountant_queries)+' open accountant question(s) · '+num(g.periods_not_certified)+' period(s) not certified</p></div><div class="fac-right"><button data-fac-open="handover">Open handover</button></div></div></div></section>';
+ '<div class="fac-list" style="margin-top:10px;"><div class="fac-row"><div><h4>Bank evidence gaps</h4><p>'+num(g.bank_unreconciled)+' unreconciled · '+num(g.bank_unclassified)+' unclassified · '+num(g.missing_receipts)+' missing receipt(s)</p></div>'+statusChip(num(g.bank_unreconciled)+num(g.bank_unclassified)+num(g.missing_receipts)?'REVIEW':'CLEAR')+'</div><div class="fac-row"><div><h4>Year-end workflow</h4><p>'+num(g.open_accountant_queries)+' open accountant question(s) · '+num(g.periods_not_certified)+' period(s) not certified</p></div><div class="fac-right"><button data-fac-open="handover">Open handover</button></div></div></div></section>';
 }
 function automationApprovalControl(){
  const approvals=state.data.command?.approval_inbox||state.data.bankingOps?.approval_inbox||[];
@@ -614,8 +643,8 @@ function automationApprovalControl(){
  const reviewRows=(Array.isArray(reviews)?reviews:[]).slice(0,10).map(x=>'<div class="fac-row"><div><h4>'+esc(x.title||x.merchant_name||x.description||'Recurring review')+'</h4><p>'+esc(x.message||x.reason||x.status||'Review suggested recurring match')+'</p></div><div class="fac-right">'+statusChip(x.status||'REVIEW')+'</div></div>').join('');
  return '<section id="facAutomation" class="fac-section"><header><div><h3>Automation & Approval Control</h3><p>Rules may suggest or queue work; protected actions still require the canonical review/step-up workflow.</p></div>'+statusChip(capability)+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Payment approvals</span><b>'+((Array.isArray(approvals)?approvals:[]).length)+'</b><small>Role/step-up controlled</small></div><div class="fac-kpi"><span>Categorisation rules</span><b>'+((Array.isArray(rules)?rules:[]).length)+'</b><small>Suggestion automation</small></div><div class="fac-kpi"><span>Recurring reviews</span><b>'+((Array.isArray(reviews)?reviews:[]).length)+'</b><small>Confirm before applying</small></div><div class="fac-kpi"><span>Notifications</span><b>'+((Array.isArray(notices)?notices:[]).length)+'</b><small>Current attention feed</small></div></div>'+
- '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Approval inbox</h4><div class="fac-list">'+(approvalRows||'<div class="fac-empty">No payment approval item is currently returned.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="bankops">Open Banking Operations</button><button data-fac-open="team">Team Access</button></div></article><article class="fac-card"><h4>Automation review</h4><div class="fac-list">'+(reviewRows||'<div class="fac-empty">No recurring-match review item is currently returned.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="rules">Rules</button><button data-fac-open="review">Review Centre</button><button data-fac-open="notifications">Alerts</button></div></article></div>'+
- '<div class="fac-note" style="margin-top:10px">Automation boundary: this control centre never auto-approves payments, auto-reconciles transactions, auto-deletes evidence, or silently changes ownership/category. Sensitive execution remains behind the existing protected workflow.</div></section>';
+ '<div class="fac-grid two" style="margin-top:10px;"><article class="fac-card"><h4>Approval inbox</h4><div class="fac-list">'+(approvalRows||'<div class="fac-empty">No payment approval item is currently returned.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="bankops">Open Banking Operations</button><button data-fac-open="team">Team Access</button></div></article><article class="fac-card"><h4>Automation review</h4><div class="fac-list">'+(reviewRows||'<div class="fac-empty">No recurring-match review item is currently returned.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="rules">Rules</button><button data-fac-open="review">Review Centre</button><button data-fac-open="notifications">Alerts</button></div></article></div>'+
+ '<div class="fac-note" style="margin-top:10px;">Automation boundary: this control centre never auto-approves payments, auto-reconciles transactions, auto-deletes evidence, or silently changes ownership/category. Sensitive execution remains behind the existing protected workflow.</div></section>';
 }
 function planProjection(cur,plan,days){
  const base=knownProjection(cur,days),months=days/30.4375;
@@ -638,7 +667,7 @@ function treasuryControl(){
  const cashRows=Object.entries(cash).map(([c,v])=>'<div class="fac-row"><div><h4>'+esc(c)+' business cash</h4><p>90-day average monthly outflow '+money(flow[c]?.average_monthly_outflow_90d||0,c)+' · runway '+(flow[c]?.runway_days===null||flow[c]?.runway_days===undefined?'—':flow[c].runway_days+' days')+'</p></div><b>'+money(v,c)+'</b></div>').join('');
  return '<section id="facTreasury" class="fac-section"><header><div><h3>Treasury & Working Capital</h3><p>Business cash, supplier obligations and customer receivables without assuming collections or silent FX.</p></div>'+statusChip(num(wc.overdue_payables)>0?'HIGH':'CONTROLLED')+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Receivables</span><b>'+money(wc.receivables||0,wc.currency||'AUD')+'</b><small>Open invoice balances</small></div><div class="fac-kpi"><span>Payables</span><b>'+money(wc.payables||0,wc.currency||'AUD')+'</b><small>Open supplier balances</small></div><div class="fac-kpi"><span>Due ≤30d</span><b>'+money(wc.supplier_obligations_due_30d||0,wc.currency||'AUD')+'</b><small>Coverage '+(wc.due_30_cash_coverage_ratio===null||wc.due_30_cash_coverage_ratio===undefined?'—':num(wc.due_30_cash_coverage_ratio).toFixed(2)+'×')+'</small></div><div class="fac-kpi"><span>Overdue payables</span><b>'+money(wc.overdue_payables||0,wc.currency||'AUD')+'</b><small>Requires review if non-zero</small></div></div>'+
- '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Business cash & runway</h4><div class="fac-list">'+(cashRows||'<div class="fac-empty">No business bank cash returned.</div>')+'</div></article><article class="fac-card"><h4>Control boundary</h4><div class="fac-note">'+esc(t.rules?.receivables||'Receivables are not assumed as forecast inflows.')+'</div><div class="fac-note" style="margin-top:8px">'+esc(t.rules?.payments||'No payment is executed from this view.')+'</div><div class="fac-toolbar"><button data-fac-open="treasury">Open Treasury</button><button data-fac-open="company">Company Finance</button><button data-fac-open="closeassurance">Close Assurance</button></div></article></div></section>';
+ '<div class="fac-grid two" style="margin-top:10px;"><article class="fac-card"><h4>Business cash & runway</h4><div class="fac-list">'+(cashRows||'<div class="fac-empty">No business bank cash returned.</div>')+'</div></article><article class="fac-card"><h4>Control boundary</h4><div class="fac-note">'+esc(t.rules?.receivables||'Receivables are not assumed as forecast inflows.')+'</div><div class="fac-note" style="margin-top:8px;">'+esc(t.rules?.payments||'No payment is executed from this view.')+'</div><div class="fac-toolbar"><button data-fac-open="treasury">Open Treasury</button><button data-fac-open="company">Company Finance</button><button data-fac-open="closeassurance">Close Assurance</button></div></article></div></section>';
 }
 function counterpartyWorkingCapitalControl(){
  const d=state.data.counterparty||{},ar=d.receivables||{},ap=d.payables||{},c=d.currency||'AUD';
@@ -646,7 +675,7 @@ function counterpartyWorkingCapitalControl(){
  const overdue=num(ap.aging?.OVERDUE?.amount),due30=num(ap.aging?.DUE_30?.amount)+num(ap.aging?.DUE_7?.amount);
  return '<section id="facCounterparty" class="fac-section"><header><div><h3>AR / AP Counterparty Control</h3><p>Customer collections, supplier obligations and concentration evidence from Company Finance documents.</p></div>'+statusChip(overdue>0?'HIGH':(num(ar.open_balance)+num(ap.open_balance)>0?'WATCH':'CLEAR'))+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Open receivables</span><b>'+money(ar.open_balance||0,c)+'</b><small>'+num(ar.open_count)+' invoice(s)</small></div><div class="fac-kpi"><span>Open payables</span><b>'+money(ap.open_balance||0,c)+'</b><small>'+num(ap.open_count)+' bill(s)</small></div><div class="fac-kpi"><span>Supplier overdue</span><b>'+money(overdue,c)+'</b><small>Recorded due dates only</small></div><div class="fac-kpi"><span>Supplier due ≤30d</span><b>'+money(due30,c)+'</b><small>Excludes overdue</small></div></div>'+
- '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Largest open counterparties</h4><div class="fac-list">'+(people||'<div class="fac-empty">No open counterparty exposure.</div>')+'</div></article><article class="fac-card"><h4>Concentration visibility</h4><div class="fac-list"><div class="fac-row"><div><h4>Top customer</h4><p>'+esc(ar.concentration?.top_name||'No open customer balance')+'</p></div><b>'+num(ar.concentration?.percent).toFixed(1)+'%</b></div><div class="fac-row"><div><h4>Top supplier</h4><p>'+esc(ap.concentration?.top_name||'No open supplier balance')+'</p></div><b>'+num(ap.concentration?.percent).toFixed(1)+'%</b></div></div><div class="fac-toolbar"><button data-fac-open="counterparties">Open Customers & Suppliers</button><button data-fac-open="treasury">Treasury</button></div></article></div>'+
+ '<div class="fac-grid two" style="margin-top:10px;"><article class="fac-card"><h4>Largest open counterparties</h4><div class="fac-list">'+(people||'<div class="fac-empty">No open counterparty exposure.</div>')+'</div></article><article class="fac-card"><h4>Concentration visibility</h4><div class="fac-list"><div class="fac-row"><div><h4>Top customer</h4><p>'+esc(ar.concentration?.top_name||'No open customer balance')+'</p></div><b>'+num(ar.concentration?.percent).toFixed(1)+'%</b></div><div class="fac-row"><div><h4>Top supplier</h4><p>'+esc(ap.concentration?.top_name||'No open supplier balance')+'</p></div><b>'+num(ap.concentration?.percent).toFixed(1)+'%</b></div></div><div class="fac-toolbar"><button data-fac-open="counterparties">Open Customers & Suppliers</button><button data-fac-open="treasury">Treasury</button></div></article></div>'+
  '<div class="fac-note">'+esc(d.currency_note||'Company document balances use the configured base currency; foreign-currency bank positions remain separate.')+'</div></section>';
 }
 function fpaPlanningControl(){
@@ -654,8 +683,8 @@ function fpaPlanningControl(){
  const rows=signals.slice(0,6).map(x=>'<div class="fac-row"><div><h4>'+esc(String(x.code||'Planning variance').replaceAll('_',' '))+'</h4><p>'+esc(x.message||'')+'</p></div>'+statusChip(x.severity||'REVIEW')+'</div>').join('');
  return '<section id="facPlanning" class="fac-section"><header><div><h3>FP&A · Plan vs Actual</h3><p>Versioned operating plan, actual variance and rolling forecast over canonical bank evidence.</p></div><button data-fac-open="planning">Open FP&A</button></header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Plan</span><b>'+esc(plan.plan_name||'Not created')+'</b><small>'+(plan.plan_uid?'v'+num(plan.version_no)+' · '+esc(plan.status):'Create an operating plan')+'</small></div><div class="fac-kpi"><span>Planned net</span><b>'+money(s.planned_net_total||0,plan.currency||'AUD')+'</b><small>Full plan horizon</small></div><div class="fac-kpi"><span>Rolling forecast net</span><b>'+money(s.forecast_net_total||0,plan.currency||'AUD')+'</b><small>Actual + remaining plan</small></div><div class="fac-kpi"><span>Completed accuracy</span><b>'+(s.completed_plan_accuracy_percent==null?'—':num(s.completed_plan_accuracy_percent).toFixed(1)+'%')+'</b><small>Completed plan months</small></div></div>'+
- '<div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No current FP&A variance signal.</div>')+'</div>'+
- '<div class="fac-note" style="margin-top:10px">FP&A never changes actual bank evidence. Active plans are immutable; planning changes happen through a new draft version.</div></section>';
+ '<div class="fac-list" style="margin-top:10px;">'+(rows||'<div class="fac-empty">No current FP&A variance signal.</div>')+'</div>'+
+ '<div class="fac-note" style="margin-top:10px;">FP&A never changes actual bank evidence. Active plans are immutable; planning changes happen through a new draft version.</div></section>';
 }
 function jobProfitabilityControl(){
  const p=state.data.jobProfitability||{},t=p.totals||{},a=p.allocation||{},jobs=p.jobs||[],c=p.currency||'AUD';
@@ -664,7 +693,7 @@ function jobProfitabilityControl(){
  const unallocated=num(a.unallocated_transaction_count);
  return '<section id="facProfitability" class="fac-section"><header><div><h3>Job Profitability & Cost Allocation</h3><p>Posted Company Finance contribution evidence by job reference, with unallocated overhead kept visible.</p></div>'+statusChip(unallocated?'WATCH':'CLEAR')+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Job-coded revenue</span><b>'+money(t.recognized_revenue,c)+'</b><small>SALE net amount</small></div><div class="fac-kpi"><span>Job-coded direct cost</span><b>'+money(t.direct_cost,c)+'</b><small>Expense · supplier bill · payroll</small></div><div class="fac-kpi"><span>Contribution margin</span><b>'+money(t.contribution_margin,c)+'</b><small>Before unallocated overhead</small></div><div class="fac-kpi"><span>Allocation coverage</span><b>'+num(a.allocation_coverage_percent).toFixed(1)+'%</b><small>'+unallocated+' unallocated economic record(s)</small></div></div>'+
- '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>Largest job positions</h4><div class="fac-list">'+(rows||'<div class="fac-empty">No job-coded posted economic activity.</div>')+'</div></article><article class="fac-card"><h4>Allocation evidence</h4><div class="fac-list"><div class="fac-row"><div><h4>Unallocated revenue</h4><p>Posted SALE evidence without a job reference.</p></div><b>'+money(a.unallocated_revenue,c)+'</b></div><div class="fac-row"><div><h4>Unallocated direct cost</h4><p>Posted direct-cost evidence without a job reference.</p></div><b>'+money(a.unallocated_direct_cost,c)+'</b></div></div><div class="fac-toolbar"><button data-fac-open="profitability">Open Job Profitability</button><button data-fac-open="planning">FP&A Planning</button><button data-fac-open="controlactions">Control Actions</button></div></article></div>'+
+ '<div class="fac-grid two" style="margin-top:10px;"><article class="fac-card"><h4>Largest job positions</h4><div class="fac-list">'+(rows||'<div class="fac-empty">No job-coded posted economic activity.</div>')+'</div></article><article class="fac-card"><h4>Allocation evidence</h4><div class="fac-list"><div class="fac-row"><div><h4>Unallocated revenue</h4><p>Posted SALE evidence without a job reference.</p></div><b>'+money(a.unallocated_revenue,c)+'</b></div><div class="fac-row"><div><h4>Unallocated direct cost</h4><p>Posted direct-cost evidence without a job reference.</p></div><b>'+money(a.unallocated_direct_cost,c)+'</b></div></div><div class="fac-toolbar"><button data-fac-open="profitability">Open Job Profitability</button><button data-fac-open="planning">FP&A Planning</button><button data-fac-open="controlactions">Control Actions</button></div></article></div>'+
  '<div class="fac-note">'+esc(p.overhead_rule||'Unallocated overhead is not silently assigned to jobs.')+' '+esc(p.margin_rule||'Contribution margin uses posted economic evidence.')+'</div></section>';
 }
 function performanceRiskControl(){
@@ -672,12 +701,12 @@ function performanceRiskControl(){
  const rows=positions.slice(0,8).map(x=>'<div class="fac-row"><div><h4>'+esc(x.ownership_scope)+' · '+esc(x.currency)+'</h4><p>Cash '+money(x.cash_balance,x.currency)+' · base 90d '+money(x.projections?.base_90d,x.currency)+' · combined downside '+money(x.projections?.combined_downside_90d,x.currency)+'</p></div><div class="fac-right">'+statusChip(x.risk_level||'STABLE')+'</div></div>').join('');
  return '<section id="facPerformance" class="fac-section"><header><div><h3>Performance & Stress Control</h3><p>Budget pace, operating trend and downside liquidity from the canonical bank ledger.</p></div><button data-fac-open="performance">Open full control</button></header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>High signals</span><b>'+num(sum.high_signal_count)+'</b><small>Calculated exceptions</small></div><div class="fac-kpi"><span>Watch signals</span><b>'+num(sum.watch_signal_count)+'</b><small>Stress / pace</small></div><div class="fac-kpi"><span>Budgets over</span><b>'+num(sum.budgets_over_limit)+'</b><small>Current periods</small></div><div class="fac-kpi"><span>Pace risk</span><b>'+num(sum.budgets_at_pace_risk)+'</b><small>Projected over limit</small></div></div>'+
- '<div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No performance position returned.</div>')+'</div>'+
- '<div class="fac-note" style="margin-top:10px">Stress figures use recent actual cash-flow patterns and remain separated by scope/currency. They do not predict markets, revenues or outcomes and do not execute any financial action.</div></section>';
+ '<div class="fac-list" style="margin-top:10px;">'+(rows||'<div class="fac-empty">No performance position returned.</div>')+'</div>'+
+ '<div class="fac-note" style="margin-top:10px;">Stress figures use recent actual cash-flow patterns and remain separated by scope/currency. They do not predict markets, revenues or outcomes and do not execute any financial action.</div></section>';
 }
 function controlActionsSummary(){
  const p=state.data.issues||{},s=p.summary||{},rows=(p.issues||[]).filter(x=>['OPEN','IN_PROGRESS'].includes(String(x.status||'').toUpperCase())).slice(0,10).map(x=>'<div class="fac-row"><div><h4>'+esc(x.title||'Finance control action')+'</h4><p>'+(x.assignee_name?'Owner '+esc(x.assignee_name):'Unassigned')+(x.due_date?' · due '+date(x.due_date):'')+'</p></div><div class="fac-right">'+statusChip(x.overdue?'OVERDUE':x.severity||x.status)+'</div></div>').join('');
- return '<section id="facControlActions" class="fac-section"><header><div><h3>Control Actions</h3><p>Ownership and due-date control over the existing Finance issue register.</p></div><button data-fac-open="controlactions">Open queue</button></header><div class="fac-kpis"><div class="fac-kpi"><span>Open</span><b>'+num(s.open_count)+'</b></div><div class="fac-kpi"><span>In progress</span><b>'+num(s.in_progress_count)+'</b></div><div class="fac-kpi"><span>Overdue</span><b>'+num(s.overdue_active)+'</b></div><div class="fac-kpi"><span>Unassigned</span><b>'+num(s.unassigned_active)+'</b></div></div><div class="fac-list" style="margin-top:10px">'+(rows||'<div class="fac-empty">No active Finance control action.</div>')+'</div></section>';
+ return '<section id="facControlActions" class="fac-section"><header><div><h3>Control Actions</h3><p>Ownership and due-date control over the existing Finance issue register.</p></div><button data-fac-open="controlactions">Open queue</button></header><div class="fac-kpis"><div class="fac-kpi"><span>Open</span><b>'+num(s.open_count)+'</b></div><div class="fac-kpi"><span>In progress</span><b>'+num(s.in_progress_count)+'</b></div><div class="fac-kpi"><span>Overdue</span><b>'+num(s.overdue_active)+'</b></div><div class="fac-kpi"><span>Unassigned</span><b>'+num(s.unassigned_active)+'</b></div></div><div class="fac-list" style="margin-top:10px;">'+(rows||'<div class="fac-empty">No active Finance control action.</div>')+'</div></section>';
 }
 function anomalyExplainability(){
  const data=state.data.anomalyExplain||{},positions=data.positions||[],cats=data.category_shifts||[],merchants=data.merchant_shifts||[],outliers=data.outliers||[],sum=data.summary||{};
@@ -687,7 +716,7 @@ function anomalyExplainability(){
  const outlierRows=outliers.slice(0,8).map(x=>'<div class="fac-row"><div><h4>'+esc(x.merchant)+'</h4><p>'+date(x.transaction_date)+' · '+num(x.multiple_of_median).toFixed(1)+'× median</p></div><div class="fac-right"><b>'+money(x.amount,x.currency)+'</b><button data-fac-tx="'+x.transaction_id+'">Open</button></div></div>').join('');
  return '<section id="facAnomaly" class="fac-section"><header><div><h3>CFO Anomaly & Explainability</h3><p>What changed, why it changed and which preserved transactions support the signal.</p></div>'+statusChip(num(sum.low_readiness_positions)>0?'REVIEW':'READY')+'</header>'+
  '<div class="fac-kpis"><div class="fac-kpi"><span>Category shifts</span><b>'+num(sum.category_shift_count)+'</b><small>Material period changes</small></div><div class="fac-kpi"><span>Merchant shifts</span><b>'+num(sum.merchant_shift_count)+'</b><small>New / spike / concentration</small></div><div class="fac-kpi"><span>Large outliers</span><b>'+num(sum.outlier_count)+'</b><small>Distribution-based review</small></div><div class="fac-kpi"><span>Low readiness</span><b>'+num(sum.low_readiness_positions)+'</b><small>Coverage or data-quality limitation</small></div></div>'+
- '<div class="fac-grid two" style="margin-top:10px"><article class="fac-card"><h4>30-day movement</h4><div class="fac-list">'+(pos||'<div class="fac-empty">No comparison position available.</div>')+'</div></article><article class="fac-card"><h4>Strongest drivers</h4><div class="fac-list">'+(changeRows||'<div class="fac-empty">No material category/merchant shift.</div>')+'</div></article></div>'+
+ '<div class="fac-grid two" style="margin-top:10px;"><article class="fac-card"><h4>30-day movement</h4><div class="fac-list">'+(pos||'<div class="fac-empty">No comparison position available.</div>')+'</div></article><article class="fac-card"><h4>Strongest drivers</h4><div class="fac-list">'+(changeRows||'<div class="fac-empty">No material category/merchant shift.</div>')+'</div></article></div>'+
  '<article class="fac-card"><h4>Large source transactions</h4><div class="fac-list">'+(outlierRows||'<div class="fac-empty">No current large transaction outlier.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="anomaly">Open full Explainability</button><button data-fac-open="transactions">Transaction Explorer</button></div></article>'+
  '<div class="fac-note">'+esc(data.rules?.anomaly||'Signals are deterministic review prompts.')+' '+esc(data.rules?.currency||'Currencies remain separate.')+'</div></section>';
 }
@@ -698,7 +727,7 @@ function cashCustodyControl(){
  const overdue=open.filter(x=>String(x.display_status||'').toUpperCase()==='OVERDUE');
  const currency=Object.entries(by).map(([c,x])=>'<div class="fac-kpi"><span>'+esc(c)+' custody outstanding</span><b>'+money(x.outstanding_total,c)+'</b><small>'+num(x.open_cases)+' open · '+num(x.overdue_cases)+' overdue</small></div>').join('');
  const list=open.slice(0,12).map(x=>'<div class="fac-row"><div><h4>'+esc(x.custodian||'Custodian')+'</h4><p>'+esc(x.account_name||x.wallet_name||'Cash source')+' · '+esc(x.purpose||'Cash custody')+' · due '+date(x.due_at)+'</p></div><div class="fac-right"><b>'+money(x.outstanding_amount,x.currency)+'</b>'+statusChip(x.display_status||x.status||'OPEN')+'</div></div>').join('');
- return '<section id="facCashCustody" class="fac-section"><header><div><h3>Cash Custody & Petty Cash Control</h3><p>Explains where physical cash is held without treating handover itself as spending.</p></div>'+statusChip(overdue.length?'HIGH':'CONTROLLED')+'</header><div class="fac-kpis">'+(currency||'<div class="fac-kpi"><span>Open custody</span><b>0</b><small>No cash currently held in custody.</small></div>')+'</div><div class="fac-card" style="margin-top:10px"><div class="fac-list">'+(list||'<div class="fac-empty">No active Cash Custody record.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="cash">Open Cash Control</button></div></div><div class="fac-note" style="margin-top:10px">'+esc(data.rule||'Cash custody is a control/location record and does not silently alter the ledger.')+'</div></section>';
+ return '<section id="facCashCustody" class="fac-section"><header><div><h3>Cash Custody & Petty Cash Control</h3><p>Explains where physical cash is held without treating handover itself as spending.</p></div>'+statusChip(overdue.length?'HIGH':'CONTROLLED')+'</header><div class="fac-kpis">'+(currency||'<div class="fac-kpi"><span>Open custody</span><b>0</b><small>No cash currently held in custody.</small></div>')+'</div><div class="fac-card" style="margin-top:10px;"><div class="fac-list">'+(list||'<div class="fac-empty">No active Cash Custody record.</div>')+'</div><div class="fac-toolbar"><button data-fac-open="cash">Open Cash Control</button></div></div><div class="fac-note" style="margin-top:10px;">'+esc(data.rule||'Cash custody is a control/location record and does not silently alter the ledger.')+'</div></section>';
 }
 
 function sourceHealth(){
