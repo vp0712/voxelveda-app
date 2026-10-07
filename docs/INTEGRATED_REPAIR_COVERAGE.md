@@ -120,3 +120,50 @@ titles wrap, and hides only the duplicate corner badge. Original logo bytes,
 shared header branding and the transient branded loader remain unchanged.
 Source contracts guard these component consumers as well as the semantic
 palette; the palette test alone did not catch these inherited surface conflicts.
+
+The live all-history Commonwealth Bank category chart reproduced the reported
+AUD 487,861.68 cash-debit total and AUD 361,093.37 Transfer-labelled amount.
+Its category drill-down returned exactly 136 matching source records and the
+same AUD 361,093.37 total, with third-party descriptions visible. These are
+observed accepted-record sums, not verified own-account ownership or a promise
+that every legacy imported amount has been reconciled to its original file.
+Ambiguous ownership and historical source corruption remain reviewable and are
+not silently recategorised, deleted or rewritten.
+
+The account-detail Statements link was then found to omit the selected account
+and open the root vault. Account detail destinations now retain account,
+workspace and period; Statements opens its actual provider/account folder and
+Transactions clears unrelated old category filters. Folder URLs and browser
+history snapshots preserve the folder through reload and Back. The real
+shipped functions are covered by the navigation behaviour regression fixture.
+
+CSSOM inspection of the deployed 375px page identified the remaining exact
+selectors missed by the class-only source guard: generic `.brand` still had
+important white backgrounds, and `.topbar.vv-topbar` still forced a three-column
+grid. Those origin declarations are removed too; the shared sidebar explicitly
+owns its dark brand surface and the shared flex header owns wrapping. Regression
+guards now include both actual combined/generic selectors.
+
+The failed original `Anz r 24 3.pdf` was downloaded through the existing secure
+document flow after user-provided step-up verification and inspected as an
+actual four-page PDF. It contains a valid no-activity statement covering
+2 January–1 March 2024: deposits and withdrawals are zero and the supplied
+opening/closing balances agree. The previous reader misclassified legal card
+references as the account type, preferred a fee-cycle period, could not align
+the overview's separately printed closing amount, and treated an appended
+visually blank page/zero transaction count as extraction failure.
+
+The originating parser now prioritises the document heading, excludes fee
+cycles from period detection, captures physically aligned summary evidence,
+and records genuinely blank rendered pages without discarding any originals.
+An empty statement is recognised only with explicit zero debit/credit totals,
+equal supplied balances, a valid period, no unresolved transaction rows and
+complete source evidence. It remains pending manual review. Empty acceptance
+requires a completed server-side extraction job and balanced validation;
+client-supplied preview metadata cannot grant this exception. Acceptance saves
+the original and coverage in the same vault without creating transactions or
+overwriting a newer account balance. The source file was not committed to Git.
+Anonymous generated PDF fixtures exercise the same layout, blank-page and
+fee-cycle cases, ambiguous/mismatched rejection, guarded manual acceptance and
+audit provenance. The original itself parsed locally to zero rows, four retained
+pages and BALANCED validation; production reprocessing is verified separately.

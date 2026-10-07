@@ -10,6 +10,19 @@ function abs(value) { return value < 0n ? -value : value; }
 function safeCents(value) { try { return money.toCents(value || 0); } catch { return null; } }
 function isBalanceMarker(row) { return /^(?:opening|closing)\s+balance\b|^balance\s+(?:b\/f|c\/f|brought\s+forward|carried\s+forward)\b/i.test(String(row.description || '').trim()); }
 
+function hasVerifiedNoActivity(classification = {}, rows = []) {
+  const keys = ['opening_balance', 'closing_balance', 'summary_total_credits', 'summary_total_debits'];
+  if (keys.some(key => classification[key] === null || classification[key] === undefined || classification[key] === '')) return false;
+  if (classification.document_type !== 'BANK_STATEMENT' || classification.multiple_accounts || classification.multiple_currencies || classification.appears_incomplete) return false;
+  const start = classification.statement_start_date, end = classification.statement_end_date;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start || '') || !/^\d{4}-\d{2}-\d{2}$/.test(end || '') || start > end) return false;
+  if (rows.some(row => !isBalanceMarker(row))) return false;
+  try {
+    return money.toCents(classification.summary_total_credits) === 0n && money.toCents(classification.summary_total_debits) === 0n
+      && money.toCents(classification.opening_balance) === money.toCents(classification.closing_balance);
+  } catch { return false; }
+}
+
 function checkContinuity(rows, opening, liability) {
   let previous = opening;
   let checked = 0;
@@ -39,6 +52,8 @@ function evaluateStatement({ rows = [], classification = {}, account = {} }) {
   const liabilityConvention = /CREDIT.?CARD|LOAN|LIABILITY/i.test(String(account.account_type || classification.document_type || ''));
   const expectedClosing = opening === null ? null : (liabilityConvention ? opening + debits - credits : opening + credits - debits);
   const difference = expectedClosing === null || closing === null ? null : closing - expectedClosing;
+  const noActivity = hasVerifiedNoActivity(classification, rows);
+  if (!transactionRows.length) validations.push(result('NO_ACTIVITY_STATEMENT', noActivity ? 'PASS' : 'FAIL', 'explicit zero deposits/withdrawals and equal supplied balances', noActivity ? 'Verified no-activity statement' : 'No transaction rows without sufficient source evidence', null, 'A verified no-activity statement retains its original and period, but creates no ledger transactions. Manual acceptance is still required.'));
 
   validations.push(result('SUM_CREDITS', 'PASS', null, money.fromCents(credits), null));
   validations.push(result('SUM_DEBITS', 'PASS', null, money.fromCents(debits), null));
@@ -57,7 +72,7 @@ function evaluateStatement({ rows = [], classification = {}, account = {} }) {
   }
   for (const item of continuity.mismatches) item.row.validation_hint = [item.row.validation_hint, `Running balance differs by ${money.fromCents(item.difference)}`].filter(Boolean).join('; ');
   const continuityFailures = continuity.mismatches.length;
-  validations.push(result('RUNNING_BALANCE_CONTINUITY', continuityFailures ? 'FAIL' : continuity.checked ? 'PASS' : 'REVIEW', 'continuous', continuityFailures ? `${continuityFailures} mismatch(es)` : continuity.checked ? 'continuous' : 'not supplied or insufficient evidence', null, continuityFailures ? 'Each mismatch remains attached to its source row for review.' : `Checked in ${sourceOrder === 'DESC' ? 'reverse source' : 'source'} order without changing the original statement rows.`));
+  validations.push(result('RUNNING_BALANCE_CONTINUITY', continuityFailures ? 'FAIL' : continuity.checked || noActivity ? 'PASS' : 'REVIEW', 'continuous', continuityFailures ? `${continuityFailures} mismatch(es)` : noActivity ? 'No activity; equal supplied balances' : continuity.checked ? 'continuous' : 'not supplied or insufficient evidence', null, continuityFailures ? 'Each mismatch remains attached to its source row for review.' : `Checked in ${sourceOrder === 'DESC' ? 'reverse source' : 'source'} order without changing the original statement rows.`));
 
   const printedTotals = classification.reported_totals || [];
   const pageSum = (page, key) => transactionRows.filter(row => Number(row.source_page || 1) === Number(page)).reduce((sum, row) => sum + (safeCents(row[key]) || 0n), 0n);
@@ -112,4 +127,4 @@ function evaluateStatement({ rows = [], classification = {}, account = {} }) {
   };
 }
 
-module.exports = { evaluateStatement };
+module.exports = { evaluateStatement, hasVerifiedNoActivity };

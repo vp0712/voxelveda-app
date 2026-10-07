@@ -4472,9 +4472,9 @@ body.staff-dialog-open .mobile-menu-btn{
   .brand{
     margin: 0 2px 18px;
     padding: 13px;
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    background:var(--surface);
+
+
+
   }
 
   .brand h1{
@@ -7137,11 +7137,11 @@ color:var(--nav-text);}
 
 .topbar.vv-topbar{
 
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+
+
   align-items: center;
   gap: 14px;
-  min-height: var(--shell-topbar);
+
   padding: 12px clamp(18px, 2.4vw, 32px);
   border-bottom: 1px solid var(--border);
   background:var(--surface);
@@ -7845,8 +7845,8 @@ color:var(--nav-text);}
   }
 
   .topbar.vv-topbar{
-    grid-template-columns: 44px minmax(0, 1fr) auto;
-    min-height: var(--shell-topbar);
+
+
     padding: calc(8px + env(safe-area-inset-top)) 12px 9px;
     margin: 0;
   }
@@ -8165,9 +8165,9 @@ color:var(--nav-text);}
 
   .topbar.vv-topbar{
 
-    grid-template-columns: 40px minmax(0, 1fr) auto !important;
+
     gap: 9px !important;
-    min-height: var(--shell-topbar) !important;
+
     padding: max(8px, env(safe-area-inset-top, 0px)) 10px 8px !important;
     border-radius: 0 !important;
   }
@@ -8583,9 +8583,9 @@ color:var(--nav-text);}
 
   .topbar.vv-topbar{
 
-    min-height: calc(66px + env(safe-area-inset-top, 0px));
-    display: grid !important;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+
+
+
     align-items: center;
     gap: 10px;
     margin: 0;
@@ -9325,7 +9325,7 @@ button:disabled{
   }
 
   .topbar.vv-topbar{
-    min-height: calc(62px + env(safe-area-inset-top, 0px));
+
     gap: 8px;
   }
 
@@ -11053,8 +11053,8 @@ color:var(--nav-text);}
 
 .topbar.vv-topbar{
 
-  min-height: var(--vv-topbar-h);
-  display: flex;
+
+
   align-items: center;
   justify-content: space-between;
   gap: 14px;
@@ -11502,7 +11502,7 @@ color:var(--nav-text);}.public-flow-strip article{
 
   .topbar.vv-topbar{
 
-    min-height: var(--vv-topbar-h);
+
     padding: 10px;
     border-radius: 16px;
   }
@@ -11758,9 +11758,9 @@ body::before{
 .brand{
   margin-bottom: 28px;
   padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background:var(--surface);
+
+
+
 }
 
 .brand-mark{
@@ -12570,9 +12570,9 @@ body::before{
 .brand{
   margin-bottom: 26px !important;
   padding: 10px !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 16px !important;
-  background:var(--surface)!important;
+
+
+
 }
 
 .brand-mark{
@@ -12708,9 +12708,9 @@ body::after{
 
 .brand{
   padding: 8px 10px !important;
-  border-radius: 16px !important;
-  background:var(--surface)!important;
-  border: 1px solid var(--border) !important;
+
+
+
   min-height: 56px !important;
 }
 

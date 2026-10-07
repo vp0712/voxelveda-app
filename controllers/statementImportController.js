@@ -5,7 +5,7 @@ const { ensureFinanceSchema } = require('../services/financeSchema');
 const { logAudit } = require('../services/auditService');
 const { FinanceError, dateOnly } = require('../services/financeDomain');
 const { applyAutoRulesToImport } = require('../services/financeRuleEngine');
-const { evaluateStatement } = require('../services/financeStatementValidation');
+const { evaluateStatement, hasVerifiedNoActivity } = require('../services/financeStatementValidation');
 const { _test: { isStatementSummaryLine } } = require('../services/financeStatementAdapters/generic');
 
 const FORMATS = new Set(['CSV', 'PDF', 'OFX', 'QFX', 'QIF', 'XLSX', 'PNG', 'JPEG']);
@@ -880,7 +880,16 @@ exports.commit = async (req, res) => {
       `SELECT * FROM statement_import_rows
        WHERE import_session_id=? AND selected=1 AND validation_status IN ('VALID','WARNING') ORDER BY row_no`, [session.id]
     );
-    if (!selectedRows.length) {
+    const noActivityCandidate = sourceReviewRows.length === 0 && session.secure_document_id && diagnostics.classification?.no_activity_verified === true
+      && hasVerifiedNoActivity({ ...diagnostics.classification, opening_balance: session.opening_balance, closing_balance: session.closing_balance, statement_start_date: session.statement_start_date, statement_end_date: session.statement_end_date }, sourceReviewRows)
+      && verification.reconciliationStatus === 'BALANCED' && !failedChecks.length;
+    // Only a completed server-side extraction of the durable original can
+    // establish no activity. Client preview metadata cannot grant this exception.
+    const [[noActivityJob]] = noActivityCandidate
+      ? await db.query("SELECT id FROM finance_statement_import_jobs WHERE import_session_id=? AND status='COMPLETED' AND stage='VALID' LIMIT 1", [session.id])
+      : [[]];
+    const noActivityStatement = Boolean(noActivityCandidate && noActivityJob);
+    if (!selectedRows.length && !noActivityStatement) {
       await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_NO_IMPORTABLE_ROWS', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { repaired_balance_markers: repaired.repaired, repaired_future_dates: repaired.future_dates_repaired || 0, parser_version: session.parser_version || null } }));
       await db.commit();
       return res.status(422).json({
@@ -1080,10 +1089,11 @@ exports.commit = async (req, res) => {
       );
     }
     const manualOverrides = rows.filter((row) => Number(row.manual_override || 0)).length;
-    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, duplicates: finalCounts.duplicate, duplicates_at_commit: duplicates, source_validation: verification.reconciliationStatus, validation_mismatch_acknowledged: failedChecks.length > 0 && req.body?.acknowledge_validation_mismatch === true, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, repaired_future_dates: repaired.future_dates_repaired || 0, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
+    await logAudit(db, audit(req, { action: 'STATEMENT_REVIEW_COMMITTED', module: 'finance_intelligence', recordType: 'statement_import_session', recordId: session.import_uid, newValue: { imported, no_activity_statement: Boolean(noActivityStatement), duplicates: finalCounts.duplicate, duplicates_at_commit: duplicates, source_validation: verification.reconciliationStatus, validation_mismatch_acknowledged: failedChecks.length > 0 && req.body?.acknowledge_validation_mismatch === true, manual_overrides: manualOverrides, repaired_balance_markers: repaired.repaired, repaired_future_dates: repaired.future_dates_repaired || 0, batch_uid: batchUid, closing_balance_applied: advancesAccountBalance ? statementClosingBalance : null, auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period } } }));
     await db.commit();
     return res.json({
-      message: `${imported} statement transactions committed after review. ${finalCounts.duplicate} duplicate transaction(s) were excluded from the ledger, totals and reports.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
+      message: noActivityStatement ? 'No-activity statement accepted after review. The original and verified coverage were retained; no ledger transactions or current account balances were changed.' : `${imported} statement transactions committed after review. ${finalCounts.duplicate} duplicate transaction(s) were excluded from the ledger, totals and reports.${repaired.repaired ? ` ${repaired.repaired} stale balance marker row(s) were safely excluded.` : ''}`,
+      no_activity_statement: Boolean(noActivityStatement),
       imported,
       duplicates: finalCounts.duplicate,
       duplicates_at_commit: duplicates,
@@ -1092,7 +1102,7 @@ exports.commit = async (req, res) => {
       excluded_future_dates: repaired.future_dates_repaired || 0,
       auto_rules: { matched: autoRuleResult.matched, applied: autoRuleResult.applied, skipped_period: autoRuleResult.skipped_period },
       batch_uid: batchUid,
-      coverage: { start: minDate, end: maxDate }
+      coverage: { start: session.statement_start_date || minDate, end: session.statement_end_date || maxDate }
     });
   } catch (error) {
     if (db) await db.rollback();

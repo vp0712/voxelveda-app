@@ -314,7 +314,7 @@ async function loadResource(name,path,cycle=null){
  catch(error){if(cycle===null||cycle===loadCycle)setResource(name,error.status===403?'permission':'error',null,error,path);return null}
 }
 function resourceData(name){return state.resources[name]?.status==='loaded'?state.resources[name].data:null}
-const STATEMENT_PARSER_RECOVERY_VERSION='20261002-anz-pdf-v2';
+const STATEMENT_PARSER_RECOVERY_VERSION='20261007-verified-no-activity-v4';
 let statementParserRecoveryRunning=false;
 async function recoverLegacyParserFailuresOnce(){
  if(statementParserRecoveryRunning)return 0;
@@ -664,7 +664,7 @@ function accounts(){
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
  const spending=state.accountCategorySpending||{};
  const accountCategoryRows=Array.isArray(spending.account_categories)?spending.account_categories:[];
- const range=dateRange();const chartPeriod=range.from?date(range.from)+' – '+date(range.to):'All history through '+date(range.to);
+ const range=dateRange();const chartPeriod=range.from?date(range.from)+' – '+date(range.to):range.to?'All history through '+date(range.to):'All history';
  const marketFilter=String(state.accountFilters?.market||'ALL').toUpperCase(),typeFilter=String(state.accountFilters?.type||'ALL').toUpperCase();
  const marketRank={AUSTRALIA:1,INDIA:2,OTHER:3};
  const visibleAccounts=state.accounts.filter(a=>(marketFilter==='ALL'||String(a.bank_market||'OTHER').toUpperCase()===marketFilter)&&(typeFilter==='ALL'||String(a.account_type||'TRANSACTION').toUpperCase()===typeFilter)).sort((a,b)=>(marketRank[String(a.bank_market||'OTHER').toUpperCase()]||9)-(marketRank[String(b.bank_market||'OTHER').toUpperCase()]||9)||String(a.institution||'Manual').localeCompare(String(b.institution||'Manual'))||String(a.ownership_scope||'').localeCompare(String(b.ownership_scope||''))||String(a.account_type||'').localeCompare(String(b.account_type||''))||String(a.nickname||'').localeCompare(String(b.nickname||'')));
@@ -853,6 +853,14 @@ async function openHistoricalImport(accountId=''){
   const target=batch.staged.find(item=>!item.posted)||batch.staged[0];
   showFinancePopup(s.duplicates?'Statements verified — duplicates excluded':'Statements processed securely',s.processed+' file(s) processed. '+(target.posted?'Existing posted statements are ready for source verification.':s.ready+' transaction row(s) are ready for review.'),s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':'')+(s.attention?' · '+s.attention+' need action':''),{tone:s.failed||s.attention?'warning':'success',actionLabel:target.posted?'Verify original':'Open first review',onAction:()=>target.posted?verifyOriginalStatement(target.uid):openStatementReview(target.uid)});
  };
+}
+function applyAccountDestination(account,view){
+ state.account=String(account.id);state.txMeta.page=1;
+ if(view==='transactions')state.txFilters={q:'',type:'',category:'',merchant:'',currency:String(account.currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
+ if(view==='statements'){
+  const file=statementEntries().find(row=>String(row.bank_account_id)===state.account);
+  state.statementBank=file?.folder_key||'';state.statementAccount=state.account;state.statementQuery='';state.statementStatus='ALL';
+ }
 }
 function statementEntries(){
  const entries=new Map();
@@ -2655,8 +2663,9 @@ async function openStatementReview(uid,initialFilter='ALL'){
   const warnings=rows.filter(row=>String(row.validation_status||'').toUpperCase()==='WARNING').length;
   const manualFixes=rows.filter(row=>Number(row.manual_override||0)).length;
   const selectedCount=rows.filter(row=>Number(row.selected||0)&&['VALID','WARNING'].includes(String(row.validation_status||'').toUpperCase())).length;
+  const noActivity=rows.length===0&&validations.some(item=>item.validation_key==='NO_ACTIVITY_STATEMENT'&&item.status==='PASS')&&result.job?.status==='COMPLETED'&&result.job?.stage==='VALID';
   const filters=[['ALL','All',session.total_rows],['VALID','Valid',session.valid_rows],['UNCERTAIN','Uncertain',warnings],['DUPLICATE','Duplicates',session.duplicate_rows],['REJECTED','Rejected',session.rejected_rows]];
-  const evidence=session.secure_document_id?'<a class="fm-evidence-link" href="/api/documents/'+encodeURIComponent(session.secure_document_id)+'/download" target="_blank" rel="noopener">Open original statement</a>':'';
+  const evidence=session.secure_document_id?'<button type="button" class="fm-evidence-link" data-review-original>Open original statement</button>':'';
   const failedValidation=validations.some(item=>item.status==='FAIL');
   const validationHtml=validations.map(item=>'<div class="fm-validation-row"><span>'+esc(String(item.validation_key||'').replace(/_/g,' '))+'</span>'+statusBadge(item.status)+'<small>Expected: '+esc(item.expected_value??'—')+' · Extracted: '+esc(item.actual_value??'—')+(item.difference_value!==null&&item.difference_value!==undefined?' · Difference: '+esc(item.difference_value):'')+'<br>'+esc(item.detail||'')+'</small></div>').join('');
   const duplicateWarning=num(session.duplicate_rows)?'<div class="fm-state fm-state-warning"><strong>Duplicate protection active</strong><p>'+num(session.duplicate_rows)+' repeated transaction(s) are blocked and excluded from the ledger, totals and exports.</p></div>':'';
@@ -2666,7 +2675,8 @@ async function openStatementReview(uid,initialFilter='ALL'){
   const metadata='<div class="fm-statement-meta"><span>Account<b>'+esc(session.account_name||'—')+'</b></span><span>Format<b>'+esc(session.source_format||'—')+'</b></span><span>Parser<b>'+esc(session.parser_version||'—')+'</b></span><span>Reconciliation<b>'+esc(session.reconciliation_status||'INCOMPLETE')+(session.reconciliation_difference!==null&&session.reconciliation_difference!==undefined?' · '+nativeMoney(session.reconciliation_difference,session.statement_currency||session.account_currency):'')+'</b></span></div>';
   const validationPanel=validationHtml?'<details class="fm-validation" '+(failedValidation?'open':'')+'><summary>Validation and reconciliation evidence</summary>'+validationHtml+'</details>'+(failedValidation?'<div class="fm-state fm-state-warning"><strong>The source totals or running balances do not match.</strong><p>Check the original document and correct the highlighted rows before posting.</p><label><input type="checkbox" data-acknowledge-validation> I checked the original document and explicitly approve posting with these differences.</label></div>':''):'';
   const parserUpgrade=session.source_format==='PDF'&&session.secure_document_id&&session.parser_version==='finance-ingestion-v2-bank-aware' ? '<div class="fm-state fm-state-warning"><strong>Corrected statement reader available</strong><p>Re-read the original to fix header rows, totals and repeated purchases before posting. This rebuilds the pending review; check your selections and corrections again.</p><button type="button" data-review-reparse="'+esc(uid)+'">Re-read original</button><div data-review-reparse-progress hidden></div></div>' : '';
-  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+metadata+validationPanel+parserUpgrade+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction & source</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">Approve & post selected rows</button></div></div>';
+  const noActivityPanel=noActivity?'<div class="fm-state"><strong>Verified no-activity statement</strong><p>'+date(session.statement_start_date)+' – '+date(session.statement_end_date)+' · 0 transactions. Supplied deposits and withdrawals are zero, and opening/closing balances reconcile. Acceptance retains this original and coverage without changing the ledger or current account balances.</p></div>':'';
+  const body='<div class="fm-statement-review-sheet">'+brandHeader+statusCards+metadata+noActivityPanel+validationPanel+parserUpgrade+'<div class="fm-review-filter-summary"><b data-review-filter-title>All statement rows</b><span data-review-filter-count>'+rows.length+' shown</span></div>'+duplicateWarning+'<div class="fm-table-wrap fm-review-table-wrap"><table class="fm-table fm-bank-review-table"><thead><tr><th>Use</th><th>Date</th><th>Transaction & source</th><th>Debit</th><th>Credit</th><th>Status</th><th>Validation / action</th></tr></thead><tbody>'+tableRows+'</tbody></table></div><div class="fm-form-actions fm-review-actions"><button type="button" data-review-reject="'+esc(uid)+'">Reject review</button><button class="primary" type="button" data-review-commit="'+esc(uid)+'">'+(noActivity?'Accept statement (no transactions)':'Approve & post selected rows')+'</button></div></div>';
   openDrawer('Review '+(session.original_name||'statement'),body,'STATEMENT REVIEW');
 
   setTimeout(()=>{
@@ -2687,19 +2697,22 @@ async function openStatementReview(uid,initialFilter='ALL'){
    };
 
    document.querySelector('[data-review-reparse]')?.addEventListener('click',async event=>{const button=event.currentTarget;button.disabled=true;try{await api(I+'/statement-imports/'+encodeURIComponent(uid)+'/retry',{method:'POST',body:'{}'});await waitForStatementImport(uid,document.querySelector('[data-review-reparse-progress]'))}catch(error){button.disabled=false;notice(error.message,true)}});
+   document.querySelector('[data-review-original]')?.addEventListener('click',()=>downloadFinanceFile('/api/documents/'+encodeURIComponent(session.secure_document_id)+'/download',session.original_name,'Original file ready','The original statement is ready to save.').catch(error=>notice(error.message,true)));
    document.querySelectorAll('[data-review-filter]').forEach(button=>button.onclick=()=>applyFilter(button.dataset.reviewFilter));
    document.querySelectorAll('[data-review-select]').forEach(box=>box.onchange=async()=>{try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/rows/'+encodeURIComponent(box.dataset.reviewSelect)+'/select',{method:'POST',body:JSON.stringify({selected:box.checked})})}catch(error){box.checked=!box.checked;notice(error.message,true)}});
    document.querySelectorAll('[data-review-override]').forEach(box=>box.onchange=()=>{if(!box.checked)return;const row=rows.find(item=>String(item.id)===String(box.dataset.reviewOverride));if(row)openRejectedRowOverride(uid,row,session,box)});
    document.querySelectorAll('[data-review-fix]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewFix));if(row)openRejectedRowOverride(uid,row,session,null)});
    document.querySelectorAll('[data-review-edit]').forEach(button=>button.onclick=()=>{const row=rows.find(item=>String(item.id)===String(button.dataset.reviewEdit));if(row)openRejectedRowOverride(uid,row,session,null)});
-   document.querySelector('[data-review-commit]')?.addEventListener('click',async()=>{
+   document.querySelector('[data-review-commit]')?.addEventListener('click',async event=>{
+    const button=event.currentTarget;if(button.disabled)return;
+    button.disabled=true;button.setAttribute('aria-busy','true');
     try{
      const acknowledged=Boolean(document.querySelector('[data-acknowledge-validation]')?.checked);
      if(failedValidation&&!acknowledged){notice('Check the original statement and correct the differences before approving.',true);return}
      const x=await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/commit',{method:'POST',body:JSON.stringify({acknowledge_validation_mismatch:acknowledged})});
      closeDrawer();await refresh();
-     showFinancePopup('Statement imported successfully',x.message,num(x.imported)+' imported · '+num(x.duplicates)+' duplicate(s) excluded · '+num(x.excluded_balance_markers)+' balance marker(s) excluded');
-    }catch(error){notice(error.message,true)}
+     showFinancePopup(x.no_activity_statement?'No-activity statement accepted':'Statement imported successfully',x.message,num(x.imported)+' imported · '+num(x.duplicates)+' duplicate(s) excluded · '+num(x.excluded_balance_markers)+' balance marker(s) excluded');
+    }catch(error){notice(error.message,true)}finally{button.disabled=false;button.removeAttribute('aria-busy')}
    });
    document.querySelector('[data-review-reject]')?.addEventListener('click',async()=>{const reason=prompt('Reason for rejecting this statement review:');if(!reason)return;try{await api(I+'/statement-reviews/'+encodeURIComponent(uid)+'/reject',{method:'POST',body:JSON.stringify({reason})});closeDrawer();await refresh()}catch(error){notice(error.message,true)}});
    applyFilter(initialFilter);
@@ -2813,10 +2826,10 @@ function bindDynamic(){
  document.querySelectorAll('[data-fx-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this FX rate? Historical native transactions are not changed.'))return;try{const x=await api(API+'/fx-rates/'+encodeURIComponent(b.dataset.fxArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await loadResource('fxRates',API+'/fx-rates');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
  document.querySelectorAll('[data-import-status]').forEach(b=>b.onclick=()=>openStatementImportStatus(b.dataset.importStatus));
- document.querySelectorAll('[data-statement-bank]').forEach(button=>button.onclick=()=>{state.statementBank=button.dataset.statementBank;state.statementAccount='';render()});
- document.querySelectorAll('[data-statement-account]').forEach(button=>button.onclick=()=>{state.statementAccount=String(button.dataset.statementAccount);render()});
- document.querySelector('[data-statement-root]')?.addEventListener('click',()=>{state.statementBank='';state.statementAccount='';state.statementQuery='';render()});
- document.querySelector('[data-statement-back-bank]')?.addEventListener('click',()=>{state.statementAccount='';render()});
+ document.querySelectorAll('[data-statement-bank]').forEach(button=>button.onclick=()=>{state.statementBank=button.dataset.statementBank;state.statementAccount='';saveFinanceLocation();render()});
+ document.querySelectorAll('[data-statement-account]').forEach(button=>button.onclick=()=>{state.statementAccount=String(button.dataset.statementAccount);saveFinanceLocation();render()});
+ document.querySelector('[data-statement-root]')?.addEventListener('click',()=>{state.statementBank='';state.statementAccount='';state.statementQuery='';saveFinanceLocation();render()});
+ document.querySelector('[data-statement-back-bank]')?.addEventListener('click',()=>{state.statementAccount='';saveFinanceLocation();render()});
  const statementSearch=document.querySelector('[data-statement-search]');if(statementSearch)statementSearch.oninput=event=>{const position=event.currentTarget.selectionStart;state.statementQuery=event.currentTarget.value;render();const input=document.querySelector('[data-statement-search]');input?.focus();input?.setSelectionRange(position,position)};
  const statementStatus=document.querySelector('[data-statement-status]');if(statementStatus)statementStatus.onchange=event=>{state.statementStatus=event.currentTarget.value;render()};
  document.querySelectorAll('[data-statement-original]').forEach(button=>button.onclick=()=>downloadFinanceFile('/api/documents/'+encodeURIComponent(button.dataset.statementOriginal)+'/download',button.dataset.originalName,'Original file ready','The original uploaded file is ready to save.').catch(error=>notice(error.message,true)));
@@ -3118,9 +3131,9 @@ async function accountDetail(id){
    document.querySelector('[data-account-edit]')?.addEventListener('click',()=>{closeDrawer();openAccountForm('',a.id)});
    document.querySelectorAll('[data-tx]').forEach(x=>x.onclick=()=>transactionDetail(x.dataset.tx));
    document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
-   document.querySelector('[data-account-tx]')?.addEventListener('click',()=>{state.account=String(a.id);$('fmAccount').value=state.account;closeDrawer();go('transactions');loadTransactions()});
+   document.querySelector('[data-account-tx]')?.addEventListener('click',()=>{applyAccountDestination(a,'transactions');$('fmAccount').value=state.account;closeDrawer();go('transactions');loadTransactions()});
    document.querySelector('[data-quick-account]')?.addEventListener('click',()=>openNew('expense',a.id));
-   document.querySelectorAll('[data-viewjump]').forEach(x=>x.onclick=()=>{closeDrawer();go(x.dataset.viewjump)});
+   $('fmDrawerBody').querySelectorAll('[data-viewjump]').forEach(x=>x.onclick=()=>{applyAccountDestination(a,x.dataset.viewjump);$('fmAccount').value=state.account;closeDrawer();go(x.dataset.viewjump);refresh()});
   },0);
  }catch(error){notice(error.message,true)}
 }
@@ -3239,16 +3252,17 @@ function runFinanceCommand(input){
  if(command.startsWith('search ')){globalFinanceSearch(q.slice(7).trim());return true}
  return false;
 }
-function financeSnapshot(){return {view:state.view,scope:state.scope,account:state.account,period:state.period,customFrom:state.customFrom,customTo:state.customTo,txFilters:{...state.txFilters},page:state.txMeta.page};}
+function financeSnapshot(){return {view:state.view,scope:state.scope,account:state.account,period:state.period,customFrom:state.customFrom,customTo:state.customTo,txFilters:{...state.txFilters},page:state.txMeta.page,statementBank:state.statementBank,statementAccount:state.statementAccount,statementQuery:state.statementQuery,statementStatus:state.statementStatus};}
 function saveFinanceLocation(replace=false){
  const url=new URL(location.href);url.hash=state.view;
- for(const [key,value] of Object.entries({scope:state.scope,account_id:state.account,period:state.period,from:state.customFrom,to:state.customTo,category:state.txFilters.category,currency:state.txFilters.currency,type:state.txFilters.type})){if(value)url.searchParams.set(key,value);else url.searchParams.delete(key);}
+ for(const [key,value] of Object.entries({scope:state.scope,account_id:state.account,period:state.period,from:state.customFrom,to:state.customTo,category:state.txFilters.category,currency:state.txFilters.currency,type:state.txFilters.type,statement_bank:state.view==='statements'?state.statementBank:'',statement_account:state.view==='statements'?state.statementAccount:''})){if(value)url.searchParams.set(key,value);else url.searchParams.delete(key);}
  if(replace||url.href===location.href)history.replaceState(financeSnapshot(),'',url);else history.pushState(financeSnapshot(),'',url);
 }
 function restoreFinanceLocation(snapshot){
  const query=new URLSearchParams(location.search);
  if(snapshot){for(const key of ['view','scope','account','period','customFrom','customTo'])state[key]=snapshot[key];state.txFilters={...state.txFilters,...snapshot.txFilters};state.txMeta.page=snapshot.page||1;}
  else{state.scope=query.get('scope')||state.scope;state.account=query.get('account_id')||'';state.period=query.get('period')||state.period;state.customFrom=query.get('from')||'';state.customTo=query.get('to')||'';for(const key of ['category','currency','type'])state.txFilters[key]=query.get(key)||'';const view=location.hash.slice(1);if(NAV.some(item=>item[0]===view)||view==='more')state.view=view;}
+ state.statementBank=snapshot?.statementBank??query.get('statement_bank')??'';state.statementAccount=snapshot?.statementAccount??query.get('statement_account')??'';state.statementQuery=snapshot?.statementQuery||'';state.statementStatus=snapshot?.statementStatus||'ALL';
  for(const [id,key] of [['fmScope','scope'],['fmAccount','account'],['fmPeriod','period'],['fmFrom','customFrom'],['fmTo','customTo']])if($(id))$(id).value=state[key];
  $('fmFromWrap').hidden=state.period!=='custom';$('fmToWrap').hidden=state.period!=='custom';
 }
