@@ -1,10 +1,10 @@
-application-release: 20261007-integrated-erp-finance-readable
-source-commit: 13a3a825595a21c5e420d9bf8fd56e77a52f8775
-candidate-commit: 663122edc635c54417246b4c9d793b470fa904bf
-pull-request: 296
-scope: unified-semantic-light-dark-theme; shared-erp-finance-shell; readable-accessible-chart-values; exact-register-drilldowns; payable-settlement-totals; category-allocation-currency-scope; reviewable-statement-overlaps; statement-coverage-balance-provenance; first-party-chart-runtime
+application-release: 20261007-integrated-sidebar-navigation-recovery
+source-commit: b2c42cea294248f74bfab0770881918d69c25560
+candidate-commit: 0cc2bb8fd55e89f40a0a4086e6198d1025609f3d
+pull-requests: 296; 297; 298
+scope: integrated-readable-erp-finance; bounded-sidebar-scrolling; shared-menu-state-focus-dismissal-rotation-back; authoritative-layout-css-ownership; versioned-role-assets; one-finance-primary-destination; explicit-deep-link-and-saved-default-precedence; secure-filtered-report-downloads; pdf-mime-signature-validation
 preserves: original-logo; production-records; historical-statement-provenance; existing-permissions; audit-history; existing-main-app-domain-routing
-ci: candidate-72-check-build-success; security-success; consolidation-success; advanced-banking-success; lifecycle-success; isolated-mysql-regression-success; audit-provenance-success; production-dependency-audit-zero-vulnerabilities
+ci: candidate-73-check-build-success; security-success; consolidation-success; advanced-banking-success; lifecycle-success; isolated-mysql-regression-success; shipped-menu-and-download-behaviour-success; audit-provenance-success; production-dependency-audit-zero-vulnerabilities
 runtime: pending-post-deployment-verification
-rollback-deployment: 82a19d40-1865-4147-8772-2681f211dfe9
+rollback-deployment: 914f8397-487f-445e-abcb-dffc967cd288
 policy: single-marker-controlled-production-deploy
