@@ -1,10 +1,12 @@
-application-release: 20261007-saved-finance-report-viewer
-source-commit: 874b7420389337a0d58118f57ef69c9126ed9be6
+application-release: 20261007-saved-finance-report-viewer-canonical-domain
+source-commit: 9cb5a787423818377b79f5617a92cb56e271e526
 candidate-commits: 7a4999ea52ef9049bae803b55c10758b58358343; 9a6caf807adbfe69c0bdaba9fc2f63016f4563e0
 pull-requests: 301; 302
 scope: encrypted-immutable-report-before-pdf; session-authenticated-integrated-html-viewer; owner-and-current-account-grant-checks; complete-paginated-transactions-and-report-sections; permission-step-up-approval-gated-print-html-csv-pdf-xlsx; parsed-pdf-identity-records-and-totals; truthful-web-view-email-and-actual-provider-outcome; unverified-relay-attachment-fallback; durable-buffer-and-path-queue-preservation; Australian-local-calendar-dates; same-page-finance-sidebar-hash-navigation; header-sidebar-spacing; protected-live-report-viewport-diagnostics
 preserves: original-logo; production-records; historical-statement-provenance; existing-permissions; audit-history; existing-main-app-domain-routing
 ci: original-candidate-10-and-merged-8-checks-success; viewport-candidate-5-checks-success; npm-test-success; 74-check-production-build-success; real-isolated-mysql-snapshot-migration-chunk-restart-and-owner-isolation-success; parsed-multi-page-empty-statement-four-currency-pdf-success; forced-pdf-failure-viewer-email-success; immutable-snapshot-and-format-totals-success; escaped-html-and-spreadsheet-formula-protection-success; decoded-mime-filename-and-binary-integrity-success; queue-content-after-temporary-file-deletion-success; shared-navigation-and-login-return-success; audit-provenance-success
-runtime: post-deployment-verification-required
+runtime: prior-deployment-93c5815d-8813-4c0e-8a39-15b0f5ad9377-success; actual-ready-sha-9cb5a787423818377b79f5617a92cb56e271e526; saved-three-transaction-report-before-pdf-verified
+configuration: PUBLIC_APP_URL=https://app.voxelveda.com; existing-verified-custom-domain; set-with-skipDeploys-and-loaded-through-this-marker-release
+domain-regression: configured-main-app-origin-snapshot-pdf-mime-queue-failure-suite-success
 rollback-deployment: f076c4f4-ec16-444f-926f-86f92bc53563
 policy: single-marker-controlled-production-deploy
