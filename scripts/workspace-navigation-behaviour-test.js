@@ -40,9 +40,17 @@ assert.match(css,/\.sidebar \.sidebar-nav\s*\{[^}]*flex:1 1 0;[^}]*min-height:0;
 assert.match(css,/\.sidebar\.is-open\s*\{[^}]*pointer-events:auto/s);
 assert.match(css,/font-family:var\(--font-body\)/);
 assert.match(css,/\.sidebar \.nav-btn[^}]*min-height:44px/s);
+assert.match(css,/\.topbar-title\s*\{[^}]*flex:1 1 180px/,'Header actions may wrap without squeezing the page title');
+assert.match(css,/\.topbar-title :is\(h2,p\)[^}]*white-space:normal; overflow-wrap:anywhere/,'Long page titles remain readable on phones');
 for(const file of ['public/style.css','public/advanced-theme.css']){
  const legacy=fs.readFileSync(file,'utf8');
  for(const match of legacy.matchAll(/\.sidebar(?:\.vv-sidebar|\.is-open)?\s*\{([^{}]*)\}/g))assert.doesNotMatch(match[1],/(?:overflow|z-index|transform|pointer-events|height)\s*:/,'Shared sidebar layout must not have a competing legacy owner: '+file);
+ for(const match of legacy.matchAll(/([^{}]+)\{([^{}]*)\}/g)){
+  const selector=match[1].replace(/\/\*[\s\S]*?\*\//g,'').trim(),declarations=match[2];
+  if(/^(?:\.topbar-title(?: [hp][12]?)?|\.topbar > div:first-child(?: [hp][12]?)?|\.topbar [hp][12]?)$/.test(selector))assert.doesNotMatch(declarations,/(?:overflow\s*:\s*hidden|white-space\s*:\s*nowrap|text-overflow\s*:\s*ellipsis|max-width\s*:|display\s*:\s*none)/,'Legacy title clipping must not return: '+selector);
+  if(selector==='.shell-brand')assert.doesNotMatch(declarations,/(?:background|display|grid-template-columns)\s*:/,'Sidebar branding inherits its dark shared surface, never a white card');
+  if(/^\.(?:home-command-copy|staff-mission-copy) (?:h1|p)$/.test(selector)&&/\bcolor\s*:/.test(declarations))assert.match(declarations,/color\s*:\s*var\(--hero-text\)/,'A dark hero uses its paired foreground: '+selector);
+ }
 }
 const finance=fs.readFileSync('public/finance-master.js','utf8');
 assert.match(finance,/!requested\.has\('period'\).*state\.period=pref\.default_period/,'An account/category deep link retains its explicit period');

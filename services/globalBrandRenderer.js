@@ -1,8 +1,8 @@
 'use strict';
 
-const BRAND_CSS = '/global-brand.css?v=20260918-global-loader';
+const BRAND_CSS = '/global-brand.css?v=20261007-navigation-final';
 const BRAND_JS = '/global-brand.js?v=20260918-global-loader';
-const WORKSPACE_CSS = '/workspace-theme.css?v=20261007-sidebar-recovery';
+const WORKSPACE_CSS = '/workspace-theme.css?v=20261007-navigation-final';
 const FINANCE_PDF_ENHANCER_JS = '/finance-pdf-import-enhancer.js?v=20260918-pdf-parser2'; // retained as legacy asset reference only
 const CANONICAL_LOGO = '/logo.png';
 
@@ -19,7 +19,7 @@ function injectGlobalBrand(html) {
   if (!rendered) return rendered;
   // All role pages receive the same release of the legacy base assets after
   // ownership of shared navigation layout moves to workspace-theme.css.
-  rendered=rendered.replace(/(["'])(\/?(?:style|advanced-theme)\.css)(?:\?[^"'\s>]*)?\1/g, '$1$2?v=20261007-sidebar-recovery$1');
+  rendered=rendered.replace(/(["'])(\/?(?:style|advanced-theme)\.css)(?:\?[^"'\s>]*)?\1/g, '$1$2?v=20261007-navigation-final$1');
 
   // One appearance contract for every portal, including generated and role pages.
   // Additive metadata never changes role, permission, hidden or workflow attributes.

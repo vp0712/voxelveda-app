@@ -414,35 +414,35 @@ color:var(--nav-text);}
 .topbar-title{ min-width: 0 !important; }.topbar > div:first-child{ min-width: 0 !important; }
 .topbar-title h2{
   margin: 2px 0 !important;
-  overflow: hidden !important;
+
   color: var(--vv-text) !important;
   font-size: 1.15rem !important;
   line-height: 1.2 !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+
+
 }.topbar > div:first-child h2{
   margin: 2px 0 !important;
-  overflow: hidden !important;
+
   color: var(--vv-text) !important;
   font-size: 1.15rem !important;
   line-height: 1.2 !important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+
+
 }
 .topbar-title p{
   margin: 0 !important;
-  overflow: hidden !important;
+
   color: var(--vv-muted) !important;
   font-size:14px!important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+
+
 }.topbar > div:first-child p{
   margin: 0 !important;
-  overflow: hidden !important;
+
   color: var(--vv-muted) !important;
   font-size:14px!important;
-  text-overflow: ellipsis !important;
-  white-space: nowrap !important;
+
+
 }
 .topbar-kicker{
   color: var(--vv-accent) !important;
@@ -659,28 +659,31 @@ color:var(--nav-text);}
 .home-command-copy{ max-width: 800px !important; }
 .home-command-copy h1{
   margin: 6px 0 10px !important;
-  color: var(--vv-text) !important;
+  color: var(--hero-text) !important;
   font-size: 2.25rem !important;
   line-height: 1.06 !important;
 }
 .home-command-copy p{
   max-width: 720px !important;
-  color: var(--vv-muted) !important;
+  color: var(--hero-text) !important;
   font-size: 0.95rem !important;
   line-height: 1.55 !important;
 }
 .panel-kicker{
   color: var(--vv-accent) !important;
-  font-size: 0.66rem !important;
+  font-size: 14px !important;
   font-weight: 850 !important;
   letter-spacing: 0.08em !important;
   text-transform: uppercase !important;
 }.eyebrow{
   color: var(--vv-accent) !important;
-  font-size: 0.66rem !important;
+  font-size: 14px !important;
   font-weight: 850 !important;
   letter-spacing: 0.08em !important;
   text-transform: uppercase !important;
+}
+.home-command-copy .panel-kicker, .staff-mission-copy .eyebrow{
+  color: var(--hero-text) !important;
 }
 .home-command-orb{
   width: 148px !important;
@@ -692,7 +695,7 @@ color:var(--nav-text);}
   box-shadow:var(--shadow)!important;
 color:var(--nav-text);}
 .home-command-orb img{ width: 82px !important; height: 82px !important; object-fit: contain !important; }
-.home-command-orb span{ color: var(--vv-accent) !important; font-size:14px!important; }
+.home-command-orb span{ color: var(--hero-text) !important; font-size:14px!important; }
 .command-ring{ display: none !important; }
 
 .dashboard-action-row{
@@ -1394,8 +1397,8 @@ input:focus{ border-color: var(--vv-accent) !important; }select:focus{ border-co
 }
 .staff-sidebar-profile .staff-avatar.small{ width: 38px !important; height: 38px !important; }
 .staff-sidebar-profile strong{ overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }.staff-sidebar-profile span{ overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }.staff-sidebar-profile small{ overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
-.staff-sidebar-profile strong{ color: var(--vv-text) !important; font-size:14px!important; }
-.staff-sidebar-profile span{ color: var(--vv-muted) !important; font-size:14px!important; }.staff-sidebar-profile small{ color: var(--vv-muted) !important; font-size:14px!important; }
+.staff-sidebar-profile strong{ color:var(--nav-text) !important; font-size:14px!important; }
+.staff-sidebar-profile span{ color:var(--nav-text) !important; font-size:14px!important; }.staff-sidebar-profile small{ color: var(--vv-muted) !important; font-size:14px!important; }
 .staff-profile-shell{ max-width: 840px !important; }
 .staff-profile-hero{
   background: var(--vv-surface) !important;
