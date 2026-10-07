@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "baseline_sha": "03d8b4bf077be8aee8f82596846e7e29c94ebf7f",
-  "source_sha": "03d8b4bf077be8aee8f82596846e7e29c94ebf7f",
-  "generated_at": "2026-10-07T18:30:18+11:00",
+  "baseline_sha": "a85ae6085f878505c25b7bde042ff5d900e92bd7",
+  "source_sha": "a85ae6085f878505c25b7bde042ff5d900e92bd7",
+  "generated_at": "2026-10-07T18:34:48+11:00",
   "generator_version": "2.0.0",
   "scope": [
     "/",
@@ -22,8 +22,8 @@
   "totals": {
     "text_source_files": 832,
     "binary_assets": 50,
-    "text_bytes": 7560040,
-    "text_lines": 129605,
+    "text_bytes": 7564703,
+    "text_lines": 129651,
     "routes": 1043,
     "migrations": 81,
     "worker_timer_sites": 84,
@@ -6442,97 +6442,97 @@
     },
     {
       "file": "public/finance-master.js",
-      "line": 47,
+      "line": 48,
       "evidence": "setTimeout(()=>location.replace(login),0);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 86,
+      "line": 87,
       "evidence": "const timer=setTimeout(()=>controller.abort(),Math.max(1000,Number(timeoutMs)||FINANCE_REQUEST_TIMEOUT_MS));"
     },
     {
       "file": "public/finance-master.js",
-      "line": 142,
+      "line": 151,
       "evidence": "setTimeout(()=>URL.revokeObjectURL(objectUrl),30000);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 335,
+      "line": 352,
       "evidence": "window.setTimeout(()=>refresh(),2500);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 607,
+      "line": 624,
       "evidence": "link.href=url;link.download='Voxel-Veda-Account-Card-'+String(account.id)+'.svg';document.body.appendChild(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),"
     },
     {
       "file": "public/finance-master.js",
-      "line": 736,
+      "line": 753,
       "evidence": "function waitFinance(ms){return new Promise(resolve=>setTimeout(resolve,Math.max(0,Number(ms)||0)))}"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1331,
+      "line": 1348,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1612,
+      "line": 1629,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1739,
+      "line": 1756,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1848,
+      "line": 1865,
       "evidence": "if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1852,
+      "line": 1869,
       "evidence": "setTimeout(ensureAdvancedControlLoaded,0);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2313,
+      "line": 2330,
       "evidence": "const timer=setTimeout(()=>finish(new Error('PDF parser timed out. Use CSV/OFX or try the PDF again.')),10000);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2502,
+      "line": 2519,
       "evidence": "const statementDelay=ms=>new Promise(resolve=>setTimeout(resolve,ms));"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2655,
+      "line": 2672,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2761,
+      "line": 2778,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3067,
+      "line": 3084,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3097,
+      "line": 3114,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3184,
+      "line": 3201,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3202,
+      "line": 3219,
       "evidence": "setTimeout(()=>{document.querySelectorAll('[data-search-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.searchTx));document.querySelectorAll('[data-search-account]').for"
     },
     {
@@ -9460,14 +9460,14 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "public/finance-master.js",
-      "line": 46,
+      "line": 47,
       "evidence": "try{fetch('/api/auth/logout',{method:'POST',credentials:'same-origin',keepalive:true}).catch(()=>{})}catch{}"
     },
     {
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "public/finance-master.js",
-      "line": 2873,
+      "line": 2890,
       "evidence": "document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)"
     },
     {
@@ -11381,7 +11381,7 @@
       "category": "documentation",
       "bytes": 25136,
       "lines": 309,
-      "sha256": "4b6562b4e3de7a0e0f5610f9d5eddf06c8a0fb47b10f1553d37f81648e5f059c"
+      "sha256": "5c80e4e87564b96d1c804f1e4b17471cfb85bccff62622ada624cf14a4838106"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -11456,9 +11456,9 @@
     {
       "file": "docs/INTEGRATED_REPAIR_COVERAGE.md",
       "category": "documentation",
-      "bytes": 8022,
-      "lines": 101,
-      "sha256": "69d5170fee12101cb1f951c634179571ff8fe281623e8746faaa4fcf53672c20"
+      "bytes": 8619,
+      "lines": 110,
+      "sha256": "71029e30101df388d3379103c049ac7e988fca0741a1759aa8f093f13e1443ef"
     },
     {
       "file": "docs/loader-network-stability-note.md",
@@ -12639,9 +12639,9 @@
     {
       "file": "public/finance-master.js",
       "category": "frontend",
-      "bytes": 556529,
-      "lines": 3264,
-      "sha256": "79cb80b6091765381af335c1f99a163203c5716329e57725392153ff252ea07d"
+      "bytes": 558027,
+      "lines": 3281,
+      "sha256": "51b73ff3d783b168452a309ce09083e63649192c6cfd822dda6eb5727805cd3e"
     },
     {
       "file": "public/financial-decision-assistant.js",
@@ -15201,9 +15201,9 @@
     {
       "file": "scripts/workspace-navigation-behaviour-test.js",
       "category": "scripts",
-      "bytes": 5193,
-      "lines": 60,
-      "sha256": "d931ac0eb3ab89e4af5e22b9efd4e0da23dd0836d03fd3a7f782ca722d21d75a"
+      "bytes": 7761,
+      "lines": 80,
+      "sha256": "fd5ed4513599a50f5bf672cf9e175fb7089e6a59fd45702604f95a3e2196b29b"
     },
     {
       "file": "SECURITY-CHECKLIST.md",
