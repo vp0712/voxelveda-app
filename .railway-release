@@ -1,8 +1,10 @@
-database-release: 20261006-integrated-erp-readable-theme
-source-commit: 2d159a6970665f2ae606aefc59d0b366d826b072
-candidate-commit: dd9acdc0dc6e7d00ad014177925d9fa5e46141c6
-scope: integrated-erp; audited-campaign-plans; planning-only-work-orders; machine-conflict-protection; live-supply-register-repair; readable-light-panel-headings; erp-css-20261006-erp-contrast2
-preserves: original-logo; existing-company-finance-qms-procurement-records; bank-source-review; audit-history; permission-boundaries; production-quality-and-safety-gates
-ci: finance-69-check-build-success; security-success; consolidation-success; advanced-banking-success
-runtime: all-live-erp-registers-and-forms-verified; awaiting-live-heading-contrast-recheck
+application-release: 20261007-integrated-erp-finance-readable
+source-commit: 13a3a825595a21c5e420d9bf8fd56e77a52f8775
+candidate-commit: 663122edc635c54417246b4c9d793b470fa904bf
+pull-request: 296
+scope: unified-semantic-light-dark-theme; shared-erp-finance-shell; readable-accessible-chart-values; exact-register-drilldowns; payable-settlement-totals; category-allocation-currency-scope; reviewable-statement-overlaps; statement-coverage-balance-provenance; first-party-chart-runtime
+preserves: original-logo; production-records; historical-statement-provenance; existing-permissions; audit-history; existing-main-app-domain-routing
+ci: candidate-72-check-build-success; security-success; consolidation-success; advanced-banking-success; lifecycle-success; isolated-mysql-regression-success; audit-provenance-success; production-dependency-audit-zero-vulnerabilities
+runtime: pending-post-deployment-verification
+rollback-deployment: 82a19d40-1865-4147-8772-2681f211dfe9
 policy: single-marker-controlled-production-deploy
