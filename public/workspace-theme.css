@@ -83,6 +83,8 @@ body::before, body::after, .chart-card::before, .supplier-payables-shell::before
 .topbar, .vv-topbar { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; position:relative; z-index:10; margin-bottom:20px; padding:14px; background:var(--surface); color:var(--text-primary); border:1px solid var(--border); border-radius:var(--radius); width:100%; }
 .topbar-menu-btn { display:none; }
 .topbar :is(h2,p,span) { color:var(--text-primary); }
+.topbar-title { flex:1 1 180px; min-width:0; }
+.topbar-title :is(h2,p), .topbar > div:first-child :is(h2,p) { white-space:normal; overflow-wrap:anywhere; }
 .vv-theme-toggle { border:1px solid var(--control-border); background:var(--surface); color:var(--text-primary); border-radius:8px; padding:8px 12px; min-height:44px; white-space:nowrap; }
 .card { min-height:0; overflow:visible; }
 .money, .amount, .kpi-value, .fm-kpi strong, td.numeric, .supplier-payables-value { font-variant-numeric:tabular-nums; }

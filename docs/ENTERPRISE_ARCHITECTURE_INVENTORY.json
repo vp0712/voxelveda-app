@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "baseline_sha": "a85ae6085f878505c25b7bde042ff5d900e92bd7",
-  "source_sha": "a85ae6085f878505c25b7bde042ff5d900e92bd7",
-  "generated_at": "2026-10-07T18:34:48+11:00",
+  "baseline_sha": "6e8c2dcbf87dfdbb012c04db8d34fd1e5a1ad0af",
+  "source_sha": "6e8c2dcbf87dfdbb012c04db8d34fd1e5a1ad0af",
+  "generated_at": "2026-10-07T18:58:31+11:00",
   "generator_version": "2.0.0",
   "scope": [
     "/",
@@ -22,8 +22,8 @@
   "totals": {
     "text_source_files": 832,
     "binary_assets": 50,
-    "text_bytes": 7564703,
-    "text_lines": 129651,
+    "text_bytes": 7564979,
+    "text_lines": 129677,
     "routes": 1043,
     "migrations": 81,
     "worker_timer_sites": 84,
@@ -11381,7 +11381,7 @@
       "category": "documentation",
       "bytes": 25136,
       "lines": 309,
-      "sha256": "5c80e4e87564b96d1c804f1e4b17471cfb85bccff62622ada624cf14a4838106"
+      "sha256": "502e1ff5a08a6e3a3414b9fc5742a7b698c116802ad3d91936af570859321422"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -11456,9 +11456,9 @@
     {
       "file": "docs/INTEGRATED_REPAIR_COVERAGE.md",
       "category": "documentation",
-      "bytes": 8619,
-      "lines": 110,
-      "sha256": "71029e30101df388d3379103c049ac7e988fca0741a1759aa8f093f13e1443ef"
+      "bytes": 9546,
+      "lines": 123,
+      "sha256": "59da1f8a8f033724a683b23269456bcce8bdad0f88f1fa85411e06c9cf5c629e"
     },
     {
       "file": "docs/loader-network-stability-note.md",
@@ -12492,9 +12492,9 @@
     {
       "file": "public/advanced-theme.css",
       "category": "frontend",
-      "bytes": 166140,
-      "lines": 5620,
-      "sha256": "4e09297f626ce97f55f54ccfceee26f210d603af90c0a591cb700aab732ab953"
+      "bytes": 165840,
+      "lines": 5623,
+      "sha256": "583dfe671f345c7da42e581b0aaddaf815b47d424c8e37fcb5499128c83f4baf"
     },
     {
       "file": "public/auth-lifecycle.js",
@@ -12660,9 +12660,9 @@
     {
       "file": "public/global-brand.css",
       "category": "frontend",
-      "bytes": 9869,
-      "lines": 36,
-      "sha256": "0198a507d377c095fa2ef0f819a18790c4459e93856a58e919ca41b32837e578"
+      "bytes": 9252,
+      "lines": 35,
+      "sha256": "67fb54ecf810e9202b660a2dc5c6fe6e65c41432f3cf9fbdba9609deb6e8ee04"
     },
     {
       "file": "public/global-brand.js",
@@ -13234,9 +13234,9 @@
     {
       "file": "public/style.css",
       "category": "frontend",
-      "bytes": 353626,
+      "bytes": 352376,
       "lines": 16584,
-      "sha256": "c0fcc9dbf2f0918ae54e60f9417fdd874932df9098d8ed9153476f4d8e4eab36"
+      "sha256": "844a8b9bfc68cdeab60483eab780c45fb39fa151171ed3f930eb9152886013d1"
     },
     {
       "file": "public/support.html",
@@ -13304,9 +13304,9 @@
     {
       "file": "public/workspace-theme.css",
       "category": "frontend",
-      "bytes": 20531,
-      "lines": 204,
-      "sha256": "b9067e35841a886de6f38376c1aed4a508234bde856dd9db8dab9dc9d7f65a62"
+      "bytes": 20687,
+      "lines": 206,
+      "sha256": "1aad12d0aa11450ce6a0a3fe917a84754360f5c51ebae29b94814255b6cb89c9"
     },
     {
       "file": "public/workspace-theme.js",
@@ -14361,9 +14361,9 @@
     {
       "file": "scripts/global-brand-original-logo-test.js",
       "category": "scripts",
-      "bytes": 4142,
-      "lines": 67,
-      "sha256": "95245004d33ca1711495b48d9956063a83d9c3492fcc7b6eb88173daad050e8f"
+      "bytes": 4354,
+      "lines": 68,
+      "sha256": "7f454e2041b140ca5f58d8ede2434e3f43272350ac5e91949f61ea03d7edade5"
     },
     {
       "file": "scripts/high-risk-finance-test.js",
@@ -15201,9 +15201,9 @@
     {
       "file": "scripts/workspace-navigation-behaviour-test.js",
       "category": "scripts",
-      "bytes": 7761,
-      "lines": 80,
-      "sha256": "fd5ed4513599a50f5bf672cf9e175fb7089e6a59fd45702604f95a3e2196b29b"
+      "bytes": 8906,
+      "lines": 88,
+      "sha256": "fd5746bcbbfc3525a092d9daf18342ac6b2c6018c7ae4b29e861d25dc93b0587"
     },
     {
       "file": "SECURITY-CHECKLIST.md",
@@ -15621,9 +15621,9 @@
     {
       "file": "services/globalBrandRenderer.js",
       "category": "services",
-      "bytes": 4205,
+      "bytes": 4208,
       "lines": 51,
-      "sha256": "dad8a039fc4aaadf8b9f0f3e002f66d34189771c7c42b390022baa11076e4827"
+      "sha256": "e12e5034688da6e9e5f34334e561294311018af3c253d65960dd55289ea8dbb5"
     },
     {
       "file": "services/highRiskFinanceSchema.js",

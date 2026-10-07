@@ -1,6 +1,6 @@
 /* Voxel Veda global brand layer. Original logo artwork stays untouched; all motion is outside the image. */
 :root{--vv-brand-overlay-bg:#090e16;--vv-brand-line:#41d7a7;--vv-brand-line-warm:#efb05f;--vv-brand-muted:#a8b3c7;--vv-brand-white:#f8fafc}
-#vvGlobalBrandPresence{position:fixed!important;left:max(12px,env(safe-area-inset-left))!important;bottom:max(12px,env(safe-area-inset-bottom))!important;z-index:980!important;display:flex!important;align-items:center!important;justify-content:center!important;width:48px!important;height:48px!important;padding:6px!important;box-sizing:border-box!important;border:1px solid rgba(65,215,167,.18)!important;border-radius:14px!important;background:#0b111b!important;box-shadow:0 10px 28px rgba(0,0,0,.24)!important;pointer-events:none!important;overflow:hidden!important}
+#vvGlobalBrandPresence{display:none!important}
 #vvGlobalBrandPresence img{display:block!important;width:100%!important;height:100%!important;max-width:100%!important;max-height:100%!important;object-fit:contain!important;object-position:center!important;filter:none!important;transform:none!important;animation:none!important;opacity:1!important;border-radius:0!important;mix-blend-mode:normal!important}
 #vvGlobalBrandLoader{position:fixed!important;inset:0!important;z-index:2147483000!important;display:flex!important;align-items:center!important;justify-content:center!important;padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))!important;box-sizing:border-box!important;background:radial-gradient(circle at 50% 44%,rgba(23,36,52,.34),transparent 34%),var(--vv-brand-overlay-bg)!important;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s linear .18s;overscroll-behavior:contain!important;overflow:hidden!important}
 #vvGlobalBrandLoader.is-visible{opacity:1;visibility:visible;pointer-events:all;transition:opacity .16s ease}
@@ -31,5 +31,4 @@ body.vv-brand-busy{overflow:hidden!important;touch-action:none}
 @media(prefers-reduced-motion:reduce){#vvGlobalBrandLoader,.vv-network-status{transition:none}.vv-brand-orbit-ring,.vv-brand-scan-line,.vv-brand-loader-dot{animation:none!important}}
 @media print{#vvGlobalBrandPresence,#vvGlobalBrandLoader,.vv-network-status{display:none!important}}
 
-/* Finance OS owns its mobile navigation; suppress the persistent global corner badge only on this workspace. */
-body.finance-os-page #vvGlobalBrandPresence{display:none!important}
+/* Branding stays in the shared header and transient loader, never over navigation. */

@@ -107,3 +107,16 @@ validate MIME/nonempty content and the PDF signature, and keep errors inside
 Finance. Independent export approval still fails closed. Shipped-function
 fixtures cover a verification retry, successful PDF, invalid payload/signature,
 independent-approval rejection and duplicate protection.
+
+Post-deployment browser testing confirmed the 375px sidebar's navigation scroll
+position moves from 0 to 1359px and Settings opens with the menu dismissed,
+focus restored and the body scroll lock cleared. That visual check also exposed
+three remaining origin-level conflicts: a white legacy brand card under white
+sidebar text, dark hero headings inheriting ordinary light-surface text, and the
+fixed decorative logo badge covering the mobile Home destination. The final
+follow-up removes the conflicting brand-card/title-clipping declarations,
+pairs hero text explicitly with the dark hero, lets header actions and long
+titles wrap, and hides only the duplicate corner badge. Original logo bytes,
+shared header branding and the transient branded loader remain unchanged.
+Source contracts guard these component consumers as well as the semantic
+palette; the palette test alone did not catch these inherited surface conflicts.

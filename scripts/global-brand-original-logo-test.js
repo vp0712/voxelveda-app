@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { injectGlobalBrand, CANONICAL_LOGO } = require('../services/globalBrandRenderer');
+const { injectGlobalBrand, CANONICAL_LOGO, BRAND_CSS, BRAND_JS } = require('../services/globalBrandRenderer');
 
 const root = path.join(__dirname, '..');
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8');
@@ -18,8 +18,8 @@ for (const alias of ['voxel-veda-logo.png', 'Frame 1.png', 'og-image.png']) {
 const sample = '<!doctype html><html><head><title>x</title></head><body><img src="/voxel-veda-logo.png"><main>OK</main></body></html>';
 const once = injectGlobalBrand(sample);
 const twice = injectGlobalBrand(once);
-assert.match(once, /\/global-brand\.css\?v=20260918-global-loader/);
-assert.match(once, /\/global-brand\.js\?v=20260918-global-loader/);
+assert(once.includes(BRAND_CSS), 'Every rendered page receives the current brand stylesheet');
+assert(once.includes(BRAND_JS), 'Every rendered page receives the current brand controller');
 assert.match(once, /id="vvGlobalBrandLoader"/);
 assert.match(once, /id="vvGlobalBrandPresence"/);
 assert.match(once, /class="vv-brand-loader-logo" src="\/logo\.png"/);
@@ -32,6 +32,7 @@ assert.equal((twice.match(/global-brand\.css/g) || []).length, 1, 'Brand CSS mus
 assert.equal((twice.match(/global-brand\.js/g) || []).length, 1, 'Brand JS must be injected once');
 
 const css = read('public/global-brand.css');
+assert.match(css, /#vvGlobalBrandPresence\{display:none!important\}/, 'The duplicate corner badge must never obscure primary navigation');
 assert.match(css, /\.vv-brand-loader-logo\{[^}]*filter:none!important/i, 'Original logo must not receive visual filters');
 assert.match(css, /\.vv-brand-loader-logo\{[^}]*animation:none!important/i, 'Original logo artwork itself must not animate');
 assert.match(css, /\.vv-brand-orbit-ring-one\{[^}]*animation:vvBrandOrbitOne/i, 'Loading motion must live outside the logo artwork');
