@@ -1,10 +1,10 @@
-application-release: 20261007-integrated-sidebar-navigation-recovery
-source-commit: b2c42cea294248f74bfab0770881918d69c25560
-candidate-commit: 0cc2bb8fd55e89f40a0a4086e6198d1025609f3d
-pull-requests: 296; 297; 298
-scope: integrated-readable-erp-finance; bounded-sidebar-scrolling; shared-menu-state-focus-dismissal-rotation-back; authoritative-layout-css-ownership; versioned-role-assets; one-finance-primary-destination; explicit-deep-link-and-saved-default-precedence; secure-filtered-report-downloads; pdf-mime-signature-validation
+application-release: 20261007-integrated-sidebar-navigation-final
+source-commit: b3faa7470daaca853995ff7d7bc085c0f9591aa2
+candidate-commit: 590dac75292a998febf9621cbaccdf259c8bad4e
+pull-requests: 296; 297; 298; 299
+scope: integrated-readable-erp-finance; bounded-sidebar-scrolling; shared-menu-state-focus-dismissal-rotation-back; authoritative-layout-css-ownership; versioned-role-assets; one-finance-primary-destination; explicit-deep-link-and-saved-default-precedence; secure-filtered-report-downloads; pdf-mime-signature-validation; paired-hero-and-sidebar-brand-contrast; wrapping-mobile-header; unobstructed-primary-navigation
 preserves: original-logo; production-records; historical-statement-provenance; existing-permissions; audit-history; existing-main-app-domain-routing
 ci: candidate-73-check-build-success; security-success; consolidation-success; advanced-banking-success; lifecycle-success; isolated-mysql-regression-success; shipped-menu-and-download-behaviour-success; audit-provenance-success; production-dependency-audit-zero-vulnerabilities
 runtime: pending-post-deployment-verification
-rollback-deployment: 914f8397-487f-445e-abcb-dffc967cd288
+rollback-deployment: 95e53ea7-da8e-4ecf-9d94-f7a40f31daf6
 policy: single-marker-controlled-production-deploy
