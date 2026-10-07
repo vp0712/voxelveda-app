@@ -15,7 +15,7 @@ function renderCheck(req,res){
 }
 function renderFrame(req,res){
   if(!authorised(req,res))return;
-  if(!['admin','finance'].includes(req.params.module))return res.status(404).json({message:'Unknown layout module.'});
+  if(!['admin','finance','finance-report'].includes(req.params.module))return res.status(404).json({message:'Unknown layout module.'});
   // Only these authenticated diagnostic copies allow same-origin framing.
   // Normal ERP/Finance routes retain DENY and frame-ancestors 'none'.
   res.set('X-Frame-Options','SAMEORIGIN');
@@ -23,7 +23,14 @@ function renderFrame(req,res){
     const value=res.get(header);if(value)res.set(header,value.replace("frame-ancestors 'none'","frame-ancestors 'self'"));
   }
   const send=res.send.bind(res);
-  res.send=html=>send(typeof html==='string'?html.replace(/<body([^>]*)>/i,'<body$1 data-vv-layout-check="frame">').replace('</body>','<script src="/workspace-layout-check.js?v=20261007-sidebar-recovery" defer></script></body>'):html);
+  res.send=html=>send(typeof html==='string'?html.replace(/<body([^>]*)>/i,'<body$1 data-vv-layout-check="frame">').replace('</body>','<script src="/workspace-layout-check.js?v=20261007-report-viewer" defer></script></body>'):html);
+  if(req.params.module==='finance-report'){
+    req.params.reportId=String(req.query?.report_id||'');
+    const privacy=require('../middleware/financePrivacyMiddleware');
+    const reports=require('../controllers/financeReportBuilderController');
+    // Same owner/current-grant checks and actual saved HTML as the normal viewer.
+    return privacy.resolveBankingReportPageScope(req,res,()=>reports.viewSnapshot(req,res));
+  }
   return req.params.module==='admin'?renderAdminPage(req,res):renderFinancePage(req,res);
 }
 module.exports={renderCheck,renderFrame};
