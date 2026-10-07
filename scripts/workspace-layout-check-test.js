@@ -7,4 +7,7 @@ const unknown=response();renderFrame({user:{id:1,role:'admin'},params:{module:'u
 const frame=response();renderFrame({user:{id:1,role:'admin'},params:{module:'finance'}},frame);
 assert.equal(frame.headers['X-Frame-Options'],'SAMEORIGIN');assert.match(frame.headers['Content-Security-Policy'],/frame-ancestors 'self'/);assert.match(frame.body,/data-vv-layout-check="frame"/);assert.match(frame.body,/id="primarySidebar"/);assert.match(frame.body,/finance-master.js/);
 const parent=response();renderCheck({user:{id:1,role:'admin'}},parent);assert.equal(parent.headers['X-Frame-Options'],'DENY');assert.match(parent.body,/200% emulation/);
+assert.match(parent.body,/Saved Finance report/);
+const source=require('node:fs').readFileSync(require('node:path').join(__dirname,'../services/workspaceLayoutCheck.js'),'utf8');
+assert.match(source,/resolveBankingReportPageScope/);assert.match(source,/reports\.viewSnapshot\(req,res\)/,'report viewport verification must use the actual owner-authorised saved viewer');
 console.log('Protected layout check passed: real app renderer, denied non-administrators, allowlisted modules, same-origin diagnostic frames only.');

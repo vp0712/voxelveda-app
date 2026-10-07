@@ -5,7 +5,7 @@
   document.querySelectorAll('#primarySidebar a[href]').forEach(link=>link.target='_top');
   window.addEventListener('message',event=>{
    if(event.origin!==location.origin||event.source!==parent||event.data?.type!=='voxel-layout-focus')return;
-   const targets={top:'.main',charts:'#rfqChart',payables:'.supplier-payables-shell',accounts:'.fm-account-cat-chart'};
+   const targets={top:'.main',charts:'#rfqChart',payables:'.supplier-payables-shell',accounts:'.fm-account-cat-chart',transactions:'#transactions'};
    const target=event.data.focus==='end'?document.querySelector('.main')?.lastElementChild:document.querySelector(targets[event.data.focus]||'.main');
    target?.scrollIntoView({block:'start'});
   });return;
@@ -20,7 +20,16 @@
   document.getElementById('qaStatus').textContent=`Deployed ${module.value} · ${w/Number(scale.value)} × ${h/Number(scale.value)} CSS px · ${Number(scale.value)*100}% layout emulation · ${theme.value} theme. Existing session, permissions and database. Not an iPhone/Safari device test.`;
  }
  width.onchange=height.onchange=scale.onchange=resize;focus.onchange=focusApp;
- module.onchange=()=>{focus.value=module.value==='finance'?'accounts':'top';frame.src=module.value==='finance'?'/internal/layout-check/finance?period=all#accounts':'/internal/layout-check/admin?view=dashboard';resize();};
+ function openModule(){
+  focus.value=module.value==='finance'?'accounts':'top';
+  if(module.value==='finance-report')frame.src='/internal/layout-check/finance-report?report_id='+encodeURIComponent(document.getElementById('qaReport').value.trim());
+  else frame.src=module.value==='finance'?'/internal/layout-check/finance?period=all#accounts':'/internal/layout-check/admin?view=dashboard';
+  resize();
+ }
+ module.onchange=openModule;
+ document.getElementById('qaOpenReport').onclick=()=>{module.value='finance-report';openModule();};
+ const initialReport=new URLSearchParams(location.search).get('report_id');
+ if(initialReport){document.getElementById('qaReport').value=initialReport;module.value='finance-report';openModule();}
  frame.onload=focusApp;
  theme.value=window.VoxelTheme.mode;theme.onchange=()=>{window.VoxelTheme.set(theme.value);resize();};
  document.getElementById('qaRotate').onclick=()=>{rotated=!rotated;resize();};
