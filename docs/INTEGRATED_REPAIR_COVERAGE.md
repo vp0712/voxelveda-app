@@ -98,3 +98,12 @@ Accounting still opens the existing ERP ledger. Deep-link period/scope/account
 parameters take precedence over preference defaults. The shipped controller is
 exercised by `workspace-navigation-behaviour-test.js` in the production build and
 isolated CI, with post-deployment browser evidence recorded separately.
+
+The live report-PDF action also navigated directly to an export route instead
+of handling the existing step-up challenge, leaving the framed diagnostic
+blocked and no download. Report PDF/CSV and accounting exports now use the
+existing secured download helper, preserve exact filters, disable repeat clicks,
+validate MIME/nonempty content and the PDF signature, and keep errors inside
+Finance. Independent export approval still fails closed. Shipped-function
+fixtures cover a verification retry, successful PDF, invalid payload/signature,
+independent-approval rejection and duplicate protection.
