@@ -1,10 +1,10 @@
-application-release: 20261007-integrated-sidebar-account-statement-context
-source-commit: 4dd3183f420527bdb0d0492a953f25911a1c459a
-candidate-commit: 51cabe00d5a93bde116e455fe56f836d37ba348c
-pull-requests: 296; 297; 298; 299; 300
-scope: integrated-readable-erp-finance; bounded-sidebar-scrolling; shared-menu-state-focus-dismissal-rotation-back; authoritative-layout-css-ownership-including-generic-and-combined-selectors; versioned-role-assets; one-finance-primary-destination; explicit-deep-link-and-saved-default-precedence; secure-filtered-report-downloads; pdf-mime-signature-validation; paired-hero-and-sidebar-brand-contrast; wrapping-mobile-header; unobstructed-primary-navigation; account-provider-statement-folder-and-history-context; verified-zero-activity-source-retention-with-manual-acceptance-and-no-ledger-or-newer-balance-changes; statement-heading-over-fee-cycle-precedence; rendered-blank-page-provenance
+application-release: 20261007-saved-finance-report-viewer
+source-commit: 874b7420389337a0d58118f57ef69c9126ed9be6
+candidate-commits: 7a4999ea52ef9049bae803b55c10758b58358343; 9a6caf807adbfe69c0bdaba9fc2f63016f4563e0
+pull-requests: 301; 302
+scope: encrypted-immutable-report-before-pdf; session-authenticated-integrated-html-viewer; owner-and-current-account-grant-checks; complete-paginated-transactions-and-report-sections; permission-step-up-approval-gated-print-html-csv-pdf-xlsx; parsed-pdf-identity-records-and-totals; truthful-web-view-email-and-actual-provider-outcome; unverified-relay-attachment-fallback; durable-buffer-and-path-queue-preservation; Australian-local-calendar-dates; same-page-finance-sidebar-hash-navigation; header-sidebar-spacing; protected-live-report-viewport-diagnostics
 preserves: original-logo; production-records; historical-statement-provenance; existing-permissions; audit-history; existing-main-app-domain-routing
-ci: all-10-candidate-and-8-merged-checks-success; candidate-73-check-build-success; security-success; consolidation-success; advanced-banking-success; lifecycle-success; isolated-mysql-regression-success; shipped-menu-account-history-and-download-behaviour-success; real-pdf-zero-activity-and-guarded-commit-fixtures-success; audit-provenance-success; production-dependency-audit-zero-vulnerabilities
-runtime: pending-post-deployment-verification
-rollback-deployment: 24774125-badf-4549-9e33-da856d499395
+ci: original-candidate-10-and-merged-8-checks-success; viewport-candidate-5-checks-success; npm-test-success; 74-check-production-build-success; real-isolated-mysql-snapshot-migration-chunk-restart-and-owner-isolation-success; parsed-multi-page-empty-statement-four-currency-pdf-success; forced-pdf-failure-viewer-email-success; immutable-snapshot-and-format-totals-success; escaped-html-and-spreadsheet-formula-protection-success; decoded-mime-filename-and-binary-integrity-success; queue-content-after-temporary-file-deletion-success; shared-navigation-and-login-return-success; audit-provenance-success
+runtime: post-deployment-verification-required
+rollback-deployment: f076c4f4-ec16-444f-926f-86f92bc53563
 policy: single-marker-controlled-production-deploy
