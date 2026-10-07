@@ -664,7 +664,7 @@ function accounts(){
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
  const spending=state.accountCategorySpending||{};
  const accountCategoryRows=Array.isArray(spending.account_categories)?spending.account_categories:[];
- const range=dateRange();const chartPeriod=range.from?date(range.from)+' – '+date(range.to):'All history through '+date(range.to);
+ const range=dateRange();const chartPeriod=range.from?date(range.from)+' – '+date(range.to):range.to?'All history through '+date(range.to):'All history';
  const marketFilter=String(state.accountFilters?.market||'ALL').toUpperCase(),typeFilter=String(state.accountFilters?.type||'ALL').toUpperCase();
  const marketRank={AUSTRALIA:1,INDIA:2,OTHER:3};
  const visibleAccounts=state.accounts.filter(a=>(marketFilter==='ALL'||String(a.bank_market||'OTHER').toUpperCase()===marketFilter)&&(typeFilter==='ALL'||String(a.account_type||'TRANSACTION').toUpperCase()===typeFilter)).sort((a,b)=>(marketRank[String(a.bank_market||'OTHER').toUpperCase()]||9)-(marketRank[String(b.bank_market||'OTHER').toUpperCase()]||9)||String(a.institution||'Manual').localeCompare(String(b.institution||'Manual'))||String(a.ownership_scope||'').localeCompare(String(b.ownership_scope||''))||String(a.account_type||'').localeCompare(String(b.account_type||''))||String(a.nickname||'').localeCompare(String(b.nickname||'')));
@@ -853,6 +853,14 @@ async function openHistoricalImport(accountId=''){
   const target=batch.staged.find(item=>!item.posted)||batch.staged[0];
   showFinancePopup(s.duplicates?'Statements verified — duplicates excluded':'Statements processed securely',s.processed+' file(s) processed. '+(target.posted?'Existing posted statements are ready for source verification.':s.ready+' transaction row(s) are ready for review.'),s.rows+' extracted · '+s.duplicates+' duplicate(s) excluded · '+s.rejected+' rejected'+(s.failed?' · '+s.failed+' file(s) failed':'')+(s.attention?' · '+s.attention+' need action':''),{tone:s.failed||s.attention?'warning':'success',actionLabel:target.posted?'Verify original':'Open first review',onAction:()=>target.posted?verifyOriginalStatement(target.uid):openStatementReview(target.uid)});
  };
+}
+function applyAccountDestination(account,view){
+ state.account=String(account.id);state.txMeta.page=1;
+ if(view==='transactions')state.txFilters={q:'',type:'',category:'',merchant:'',currency:String(account.currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
+ if(view==='statements'){
+  const file=statementEntries().find(row=>String(row.bank_account_id)===state.account);
+  state.statementBank=file?.folder_key||'';state.statementAccount=state.account;state.statementQuery='';state.statementStatus='ALL';
+ }
 }
 function statementEntries(){
  const entries=new Map();
@@ -2813,10 +2821,10 @@ function bindDynamic(){
  document.querySelectorAll('[data-fx-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this FX rate? Historical native transactions are not changed.'))return;try{const x=await api(API+'/fx-rates/'+encodeURIComponent(b.dataset.fxArchive)+'/archive',{method:'POST',body:'{}'});notice(x.message);await loadResource('fxRates',API+'/fx-rates');render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-import-review]').forEach(b=>b.onclick=()=>openStatementReview(b.dataset.importReview));
  document.querySelectorAll('[data-import-status]').forEach(b=>b.onclick=()=>openStatementImportStatus(b.dataset.importStatus));
- document.querySelectorAll('[data-statement-bank]').forEach(button=>button.onclick=()=>{state.statementBank=button.dataset.statementBank;state.statementAccount='';render()});
- document.querySelectorAll('[data-statement-account]').forEach(button=>button.onclick=()=>{state.statementAccount=String(button.dataset.statementAccount);render()});
- document.querySelector('[data-statement-root]')?.addEventListener('click',()=>{state.statementBank='';state.statementAccount='';state.statementQuery='';render()});
- document.querySelector('[data-statement-back-bank]')?.addEventListener('click',()=>{state.statementAccount='';render()});
+ document.querySelectorAll('[data-statement-bank]').forEach(button=>button.onclick=()=>{state.statementBank=button.dataset.statementBank;state.statementAccount='';saveFinanceLocation();render()});
+ document.querySelectorAll('[data-statement-account]').forEach(button=>button.onclick=()=>{state.statementAccount=String(button.dataset.statementAccount);saveFinanceLocation();render()});
+ document.querySelector('[data-statement-root]')?.addEventListener('click',()=>{state.statementBank='';state.statementAccount='';state.statementQuery='';saveFinanceLocation();render()});
+ document.querySelector('[data-statement-back-bank]')?.addEventListener('click',()=>{state.statementAccount='';saveFinanceLocation();render()});
  const statementSearch=document.querySelector('[data-statement-search]');if(statementSearch)statementSearch.oninput=event=>{const position=event.currentTarget.selectionStart;state.statementQuery=event.currentTarget.value;render();const input=document.querySelector('[data-statement-search]');input?.focus();input?.setSelectionRange(position,position)};
  const statementStatus=document.querySelector('[data-statement-status]');if(statementStatus)statementStatus.onchange=event=>{state.statementStatus=event.currentTarget.value;render()};
  document.querySelectorAll('[data-statement-original]').forEach(button=>button.onclick=()=>downloadFinanceFile('/api/documents/'+encodeURIComponent(button.dataset.statementOriginal)+'/download',button.dataset.originalName,'Original file ready','The original uploaded file is ready to save.').catch(error=>notice(error.message,true)));
@@ -3118,9 +3126,9 @@ async function accountDetail(id){
    document.querySelector('[data-account-edit]')?.addEventListener('click',()=>{closeDrawer();openAccountForm('',a.id)});
    document.querySelectorAll('[data-tx]').forEach(x=>x.onclick=()=>transactionDetail(x.dataset.tx));
    document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
-   document.querySelector('[data-account-tx]')?.addEventListener('click',()=>{state.account=String(a.id);$('fmAccount').value=state.account;closeDrawer();go('transactions');loadTransactions()});
+   document.querySelector('[data-account-tx]')?.addEventListener('click',()=>{applyAccountDestination(a,'transactions');$('fmAccount').value=state.account;closeDrawer();go('transactions');loadTransactions()});
    document.querySelector('[data-quick-account]')?.addEventListener('click',()=>openNew('expense',a.id));
-   document.querySelectorAll('[data-viewjump]').forEach(x=>x.onclick=()=>{closeDrawer();go(x.dataset.viewjump)});
+   $('fmDrawerBody').querySelectorAll('[data-viewjump]').forEach(x=>x.onclick=()=>{applyAccountDestination(a,x.dataset.viewjump);$('fmAccount').value=state.account;closeDrawer();go(x.dataset.viewjump);refresh()});
   },0);
  }catch(error){notice(error.message,true)}
 }
@@ -3239,16 +3247,17 @@ function runFinanceCommand(input){
  if(command.startsWith('search ')){globalFinanceSearch(q.slice(7).trim());return true}
  return false;
 }
-function financeSnapshot(){return {view:state.view,scope:state.scope,account:state.account,period:state.period,customFrom:state.customFrom,customTo:state.customTo,txFilters:{...state.txFilters},page:state.txMeta.page};}
+function financeSnapshot(){return {view:state.view,scope:state.scope,account:state.account,period:state.period,customFrom:state.customFrom,customTo:state.customTo,txFilters:{...state.txFilters},page:state.txMeta.page,statementBank:state.statementBank,statementAccount:state.statementAccount,statementQuery:state.statementQuery,statementStatus:state.statementStatus};}
 function saveFinanceLocation(replace=false){
  const url=new URL(location.href);url.hash=state.view;
- for(const [key,value] of Object.entries({scope:state.scope,account_id:state.account,period:state.period,from:state.customFrom,to:state.customTo,category:state.txFilters.category,currency:state.txFilters.currency,type:state.txFilters.type})){if(value)url.searchParams.set(key,value);else url.searchParams.delete(key);}
+ for(const [key,value] of Object.entries({scope:state.scope,account_id:state.account,period:state.period,from:state.customFrom,to:state.customTo,category:state.txFilters.category,currency:state.txFilters.currency,type:state.txFilters.type,statement_bank:state.view==='statements'?state.statementBank:'',statement_account:state.view==='statements'?state.statementAccount:''})){if(value)url.searchParams.set(key,value);else url.searchParams.delete(key);}
  if(replace||url.href===location.href)history.replaceState(financeSnapshot(),'',url);else history.pushState(financeSnapshot(),'',url);
 }
 function restoreFinanceLocation(snapshot){
  const query=new URLSearchParams(location.search);
  if(snapshot){for(const key of ['view','scope','account','period','customFrom','customTo'])state[key]=snapshot[key];state.txFilters={...state.txFilters,...snapshot.txFilters};state.txMeta.page=snapshot.page||1;}
  else{state.scope=query.get('scope')||state.scope;state.account=query.get('account_id')||'';state.period=query.get('period')||state.period;state.customFrom=query.get('from')||'';state.customTo=query.get('to')||'';for(const key of ['category','currency','type'])state.txFilters[key]=query.get(key)||'';const view=location.hash.slice(1);if(NAV.some(item=>item[0]===view)||view==='more')state.view=view;}
+ state.statementBank=snapshot?.statementBank??query.get('statement_bank')??'';state.statementAccount=snapshot?.statementAccount??query.get('statement_account')??'';state.statementQuery=snapshot?.statementQuery||'';state.statementStatus=snapshot?.statementStatus||'ALL';
  for(const [id,key] of [['fmScope','scope'],['fmAccount','account'],['fmPeriod','period'],['fmFrom','customFrom'],['fmTo','customTo']])if($(id))$(id).value=state[key];
  $('fmFromWrap').hidden=state.period!=='custom';$('fmToWrap').hidden=state.period!=='custom';
 }

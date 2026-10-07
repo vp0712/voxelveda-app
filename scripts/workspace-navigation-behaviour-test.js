@@ -49,6 +49,8 @@ for(const file of ['public/style.css','public/advanced-theme.css']){
   const selector=match[1].replace(/\/\*[\s\S]*?\*\//g,'').trim(),declarations=match[2];
   if(/^(?:\.topbar-title(?: [hp][12]?)?|\.topbar > div:first-child(?: [hp][12]?)?|\.topbar [hp][12]?)$/.test(selector))assert.doesNotMatch(declarations,/(?:overflow\s*:\s*hidden|white-space\s*:\s*nowrap|text-overflow\s*:\s*ellipsis|max-width\s*:|display\s*:\s*none)/,'Legacy title clipping must not return: '+selector);
   if(selector==='.shell-brand')assert.doesNotMatch(declarations,/(?:background|display|grid-template-columns)\s*:/,'Sidebar branding inherits its dark shared surface, never a white card');
+  if(selector==='.brand')assert.doesNotMatch(declarations,/background(?:-color)?\s*:/,'Legacy generic branding cannot override the actual sidebar surface');
+  if(selector==='.topbar.vv-topbar')assert.doesNotMatch(declarations,/(?:display|grid-template-columns)\s*:/,'The actual combined header selector also defers layout to the shared shell');
   if(/^\.(?:home-command-copy|staff-mission-copy) (?:h1|p)$/.test(selector)&&/\bcolor\s*:/.test(declarations))assert.match(declarations,/color\s*:\s*var\(--hero-text\)/,'A dark hero uses its paired foreground: '+selector);
  }
 }
@@ -64,6 +66,23 @@ function preferenceCase(query,initial={scope:'ALL',period:'month',account:''}){
 assert.deepEqual(preferenceCase(''),{scope:'PERSONAL',period:'last7',account:'7'},'Absent navigation filters retain saved preferences');
 assert.deepEqual(preferenceCase('scope=BUSINESS&period=all&account_id=12',{scope:'BUSINESS',period:'all',account:'12'}),{scope:'BUSINESS',period:'all',account:'12'},'Explicit account, period and workspace win over saved defaults');
 assert.equal(preferenceCase('account_id=12',{scope:'ALL',period:'month',account:'12'}).scope,'ALL','An account deep link is not narrowed to a conflicting saved workspace');
+const destinationSource=finance.slice(finance.indexOf('function applyAccountDestination('),finance.indexOf('function statementEntries('));
+const accountState={view:'accounts',scope:'PERSONAL',account:'',period:'all',customFrom:'',customTo:'',txMeta:{page:3},txFilters:{category:'Other account'},statementBank:'wrong',statementAccount:'7',statementQuery:'old search',statementStatus:'ATTENTION'};
+const account={id:12,currency:'AUD'};
+const destinationContext={state:accountState,statementEntries:()=>[{bank_account_id:12,folder_key:'Australia|anz'}],account};
+vm.runInNewContext(destinationSource+'\napplyAccountDestination(account,"statements");',destinationContext);
+assert.equal(accountState.account,'12');assert.equal(accountState.scope,'PERSONAL');assert.equal(accountState.period,'all');assert.equal(accountState.statementBank,'Australia|anz');assert.equal(accountState.statementAccount,'12');assert.equal(accountState.statementQuery,'');assert.equal(accountState.statementStatus,'ALL');
+vm.runInNewContext(destinationSource+'\napplyAccountDestination(account,"transactions");',destinationContext);
+assert.equal(accountState.txFilters.category,'');assert.equal(accountState.txFilters.currency,'AUD');assert.equal(accountState.txMeta.page,1);
+const historySource=finance.slice(finance.indexOf('function financeSnapshot('),finance.indexOf("window.addEventListener('popstate'"));
+const location={href:'https://app.voxelveda.com/finance-intelligence?scope=PERSONAL&period=all#accounts',search:'?scope=PERSONAL&period=all',hash:'#accounts'},elements={};let savedSnapshot;
+const recordHistory=(snapshot,unused,url)=>{savedSnapshot=snapshot;location.href=String(url);location.search=url.search;location.hash=url.hash;};
+const historyContext={state:accountState,location,URL,URLSearchParams,history:{pushState:recordHistory,replaceState:recordHistory},NAV:[['statements']],$:id=>elements[id]||(elements[id]={value:'',hidden:false})};
+accountState.view='statements';vm.runInNewContext(historySource+'\nsaveFinanceLocation();',historyContext);
+assert.equal(new URL(location.href).searchParams.get('account_id'),'12');assert.equal(new URL(location.href).searchParams.get('statement_account'),'12');assert.equal(new URL(location.href).searchParams.get('statement_bank'),'Australia|anz');
+accountState.statementBank='lost';accountState.statementAccount='';historyContext.savedSnapshot=savedSnapshot;vm.runInNewContext(historySource+'\nrestoreFinanceLocation(savedSnapshot);',historyContext);
+assert.equal(accountState.statementBank,'Australia|anz');assert.equal(accountState.statementAccount,'12');
+accountState.statementBank='lost';vm.runInNewContext(historySource+'\nrestoreFinanceLocation(null);',historyContext);assert.equal(accountState.statementBank,'Australia|anz','Reload/deep links restore the actual statement folder');
 async function checkDownloads(){
  const downloadSource=finance.slice(finance.indexOf('async function downloadFinanceFile('),finance.indexOf('function openAccountStatementForm('));
  let calls=[],verifications=0,clicks=0,popups=0;

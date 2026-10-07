@@ -61,7 +61,7 @@ body::before, body::after, .chart-card::before, .supplier-payables-shell::before
 .app-shell { display:block; min-height:100dvh; width:100%; }
 .main { margin-left:var(--vv-sidebar-width); padding:24px; min-height:100dvh; width:auto; }
 .sidebar { position:fixed; inset:0 auto 0 0; z-index:100; display:flex; flex-direction:column; height:100dvh; min-height:0; overflow:hidden; padding:16px 12px; transform:none; background:var(--nav); color:var(--nav-text); width:var(--vv-sidebar-width); }
-.sidebar .brand { display:flex; align-items:center; gap:10px; flex:0 0 auto; min-height:60px; padding:8px 0; }
+.sidebar .brand { display:flex; align-items:center; gap:10px; flex:0 0 auto; min-height:60px; padding:8px 0; background:var(--nav); }
 .sidebar .brand img { width:44px; height:44px; flex:0 0 44px; object-fit:contain; }
 .sidebar .brand h1 { margin:0; font-size:16px; }
 .sidebar .brand p { margin:3px 0 0; font-size:14px; }

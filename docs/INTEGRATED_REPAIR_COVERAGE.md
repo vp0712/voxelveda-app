@@ -120,3 +120,26 @@ titles wrap, and hides only the duplicate corner badge. Original logo bytes,
 shared header branding and the transient branded loader remain unchanged.
 Source contracts guard these component consumers as well as the semantic
 palette; the palette test alone did not catch these inherited surface conflicts.
+
+The live all-history Commonwealth Bank category chart reproduced the reported
+AUD 487,861.68 cash-debit total and AUD 361,093.37 Transfer-labelled amount.
+Its category drill-down returned exactly 136 matching source records and the
+same AUD 361,093.37 total, with third-party descriptions visible. These are
+observed accepted-record sums, not verified own-account ownership or a promise
+that every legacy imported amount has been reconciled to its original file.
+Ambiguous ownership and historical source corruption remain reviewable and are
+not silently recategorised, deleted or rewritten.
+
+The account-detail Statements link was then found to omit the selected account
+and open the root vault. Account detail destinations now retain account,
+workspace and period; Statements opens its actual provider/account folder and
+Transactions clears unrelated old category filters. Folder URLs and browser
+history snapshots preserve the folder through reload and Back. The real
+shipped functions are covered by the navigation behaviour regression fixture.
+
+CSSOM inspection of the deployed 375px page identified the remaining exact
+selectors missed by the class-only source guard: generic `.brand` still had
+important white backgrounds, and `.topbar.vv-topbar` still forced a three-column
+grid. Those origin declarations are removed too; the shared sidebar explicitly
+owns its dark brand surface and the shared flex header owns wrapping. Regression
+guards now include both actual combined/generic selectors.
