@@ -11,7 +11,7 @@ const state={
   dash:null,tx:[],txMeta:{page:1,limit:50,total:0,total_pages:1,summary:{}},statements:[],removedStatements:[],reviews:[],
   os:null,personal:null,personalAttention:null,readiness:null,accounts:[],capabilities:null,
   insights:null,rules:null,quality:null,reconciliation:null,history:null,setup:null,team:null,
-  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,accountCategorySpending:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,cashCustody:null,debtPlanner:null,commitments:null,savingsReserve:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,anomalyExplain:null,controlActions:null,jobProfitability:null,counterpartyControl:null,handover:null,personalIntegrity:null,personalTaxControl:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
+  transferCandidates:null,refundCandidates:null,reimbursements:null,briefing:null,savedViews:null,bankingBudgets:null,notifications:null,notificationPrefs:null,companySettings:null,receiptCenter:null,savedReports:null,reportResult:null,reportDefinition:null,reportSnapshots:null,archivedTransactions:null,cashflowCalendar:null,accountingPeriods:null,categories:null,accountCategorySpending:null,smart:null,health:null,roadmaps:null,netWorth:null,assetLifecycle:null,userPreferences:null,preferencesApplied:false,companySummary:null,openBankProviders:null,openBankSessions:null,bankConnectionData:null,bankSyncJobs:null,personalBankDash:null,businessBankDash:null,bankingOps:null,fxRates:null,cashControl:null,cashCustody:null,debtPlanner:null,commitments:null,savingsReserve:null,closeAssurance:null,treasuryControl:null,performanceRisk:null,anomalyExplain:null,controlActions:null,jobProfitability:null,counterpartyControl:null,handover:null,personalIntegrity:null,personalTaxControl:null,securitySessions:null,mfaStatus:null,stepUpStatus:null,
   statementBank:'',statementAccount:'',statementQuery:'',statementStatus:'ALL',resources:{},accountFilters:{market:'ALL',type:'ALL'},txFilters:{q:'',type:'',category:'',merchant:'',currency:'',source:'',reconciliation_status:'',amount_min:'',amount_max:''},
   receiptFilters:{q:'',account_id:'',merchant:'',category:'',from:'',to:'',amount_min:'',receipt_status:'ALL',tax_relevant:false},
   selectedTransactions:new Set()
@@ -96,7 +96,7 @@ async function api(path,options={}){
    await requestFinanceStepUp();
    return api(path,{...options,_stepUpRetry:true});
   }
-  if(!r.ok){const e=new Error(body.message||'Request failed');e.status=r.status;e.code=body.code;throw e}
+  if(!r.ok){const e=new Error(body.message||'Request failed');e.status=r.status;e.code=body.code;e.data=body;throw e}
   return body;
  }catch(error){
   if(error?.name==='AbortError'){
@@ -133,16 +133,22 @@ async function downloadFinanceFile(url,filename,successTitle='Download ready',su
  try{
  let response;
  for(let attempt=0;attempt<2;attempt++){
-  response=await fetch(url,{credentials:'same-origin'});
+  const timeout=new AbortController(),timer=setTimeout(()=>timeout.abort(),90000);
+  try{response=await fetch(url,{credentials:'same-origin',signal:timeout.signal});}
+  catch(error){if(error.name==='AbortError')throw new Error('The download timed out. Your saved report remains available; retry or open View report.');throw error}
+  finally{clearTimeout(timer)}
   if(response.ok)break;
   let payload={};try{payload=await response.clone().json()}catch{}
   const authError=financeAuthError(response,payload);if(authError)throw authError;
   if(payload.code==='STEP_UP_REQUIRED'&&attempt===0){await requestFinanceStepUp();continue}
-  const error=new Error(payload.message||('Download failed ('+response.status+')'));error.status=response.status;error.code=payload.code;throw error;
+  const error=new Error(payload.message||('Download failed ('+response.status+')'));error.status=response.status;error.code=payload.code;error.data=payload;throw error;
  }
+ const disposition=response.headers.get('Content-Disposition')||'';
+ const returnedName=disposition.match(/filename="([^"]+)"/i)?.[1];
+ if(returnedName)filename=returnedName;
  const blob=await response.blob();
  const extension=String(filename||'').split('.').pop().toLowerCase();
- const types={pdf:['application/pdf'],csv:['text/csv','application/csv','text/plain'],xlsx:['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']};
+ const types={pdf:['application/pdf'],html:['text/html'],csv:['text/csv','application/csv','text/plain'],xlsx:['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']};
  const mime=String(response.headers.get('Content-Type')||'').split(';')[0].toLowerCase();
  if(!blob.size||(types[extension]&&!types[extension].includes(mime)))throw new Error('The server did not return a valid '+extension.toUpperCase()+' file. Please retry.');
  if(extension==='pdf'&&(await blob.slice(0,5).text())!=='%PDF-')throw new Error('The PDF response is invalid. No file was downloaded.');
@@ -247,7 +253,7 @@ function title(v){return ({
  more:['Finance Control Centre','Every Finance module and workflow in one place.']
  })[v]||['Finance','Finance workspace']}
 
-function isoDay(d){return d.toISOString().slice(0,10)}
+function isoDay(d){return localIsoDay(d)}
 function localIsoDay(d=new Date()){const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');return `${y}-${m}-${day}`}
 function dateRange(){
  const now=new Date(); const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
@@ -461,7 +467,7 @@ async function hydrateSupplementary(cycle){
   ['removedStatementPayload',I+'/statements-removed'],['reviewPayload',I+'/statement-reviews'],['briefing',API+'/personal-money/daily-briefing?date='+encodeURIComponent(localIsoDay())],['savedViews',API+'/personal-money/saved-views'],['bankingBudgets',I+'/budgets'],
   ['readiness',I+'/banking-readiness'],['controlActions',API+'/issues'],['rules',I+'/rules'],['reconciliation',I+'/reconciliation'+filterQuery()],['history',I+'/history-coverage'+base],['team',OS+'/team'],
   ['os',OS+'/command-center'],['bankingOps',API+'/banking-os'],['transferCandidates',API+'/relationship-candidates/transfers'],['refundCandidates',API+'/relationship-candidates/refunds'],['reimbursements',API+'/reimbursements'],['notifications','/api/notifications?limit=50'],
-  ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
+  ['notificationPrefs','/api/notifications/preferences'],['companySettings','/api/settings'],['receiptCenter',API+'/receipts'+receiptQuery()],['savedReports',API+'/reports/saved'],['reportSnapshots',API+'/reports/snapshots'],['archivedTransactions',API+'/bank-transactions-archived?scope='+encodeURIComponent(state.scope)],
   ['cashflowCalendar',OS+'/cashflow-calendar?days=90'],['cashControl',API+'/cash-control'],['cashCustody',API+'/cash-control/custody'],['closeAssurance',API+'/close-assurance'],['treasuryControl',API+'/treasury-control'],['performanceRisk',API+'/performance-risk-control'],['jobProfitability',API+'/job-profitability'+filterQuery({scope:'BUSINESS'})],['counterpartyControl',API+'/counterparty-control'],['anomalyExplain',API+'/anomaly-explain-control'],['planningControl',API+'/planning-control'],['handover',API+'/accountant-handover'],['accountingPeriods',API+'/accounting-periods'],['categories',API+'/categories?include_archived=true'],['smart',API+'/personal-money/smart'],['health',API+'/personal-money/health'],['personalTaxControl',API+'/personal-money/tax-control'],
   ['roadmaps',API+'/personal-money/roadmaps'],['debtPlanner',API+'/personal-money/debt-planner'],['commitments',API+'/personal-money/commitments-control'],['savingsReserve',API+'/personal-money/savings-control'],['netWorth',API+'/personal-money/net-worth'],['assetLifecycle',API+'/personal-money/net-worth/lifecycle'],['personalIntegrity',API+'/personal-money/data-quality-integrity'],['securitySessions','/api/auth/sessions'],['mfaStatus','/api/auth/mfa/status'],['stepUpStatus','/api/auth/step-up/status'],['fxRates',API+'/fx-rates'],['personalBankDash',I+'/banking-dashboard'+scopeDashboardQuery('PERSONAL')],['businessBankDash',I+'/banking-dashboard'+scopeDashboardQuery('BUSINESS')],['openBankProviders',I+'/open-banking/providers'],['openBankSessions',I+'/open-banking/sessions'],['bankConnectionData','/api/integrations/webhooks/banking/connections'],['bankSyncJobs','/api/integrations/webhooks/banking/sync-jobs']
  ];
@@ -2047,8 +2053,9 @@ function reportView(){
  const savedRows=saved.map(r=>'<div class="fm-row"><div><h3>'+esc(r.name)+'</h3><p>'+esc(r.report_type)+' · updated '+date(r.updated_at)+'</p></div><div class="fm-row-right"><button data-report-run="'+esc(r.report_uid)+'">Run</button><button data-report-delete="'+esc(r.report_uid)+'">Delete</button></div></div>').join('');
  const summaryRows=(result?.summary_by_currency||[]).map(x=>'<div class="fm-kpi"><span>'+esc(x.currency)+' · Money in</span><strong>'+nativeMoney(x.money_in,x.currency)+'</strong><small>Ordinary '+nativeMoney(x.ordinary_money_in,x.currency)+' · refunds '+nativeMoney(x.linked_refund_inflow,x.currency)+'</small></div><div class="fm-kpi"><span>'+esc(x.currency)+' · Money out</span><strong>'+nativeMoney(x.money_out,x.currency)+'</strong><small>Net cash flow '+nativeMoney(x.net_cash_flow,x.currency)+'</small></div>').join('');
  const txRows=(result?.transactions||[]).slice(0,100).map(t=>'<tr><td>'+date(t.transaction_date)+'</td><td>'+esc(t.account_name||'')+'</td><td>'+esc(t.merchant_name||t.description||'')+'</td><td>'+esc(t.category||'Uncategorised')+'</td><td>'+esc(t.currency||'')+'</td><td>'+(num(t.debit)?nativeMoney(t.debit,t.currency):'')+'</td><td>'+(num(t.credit)?nativeMoney(t.credit,t.currency):'')+'</td><td>'+esc(t.reconciliation_status||'')+'</td><td>'+(Number(t.has_receipt)?'Attached':'Missing')+'</td></tr>').join('');
- const results=result?'<article id="reportResultAnchor" class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Generated Report</h2><p>'+num(result.metadata?.source_transaction_count)+' source transaction(s) · '+esc(result.metadata?.currency_treatment||'Native currencies')+'</p></div></div><div class="fm-grid four">'+(summaryRows||'<div class="fm-kpi"><span>Result</span><strong>—</strong><small>No financial activity for these filters.</small></div>')+'</div><div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Date</th><th>Account</th><th>Merchant / Description</th><th>Category</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Reconciliation</th><th>Receipt</th></tr></thead><tbody>'+txRows+'</tbody></table></div><p class="fm-helper">Preview shows up to 100 rows. CSV/XLSX exports use the complete permission-scoped result returned by the report endpoint.</p></div></article>':'';
- return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Standard Report Catalogue</h2><p>One-click starting points. Every report can still be narrowed by workspace, account, period, category, merchant and evidence status.</p></div></div>'+presetCards+'</div></article><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Advanced Report Centre</h2><p>Uses the same Trusted Totals and permission-scoped bank ledger as the dashboard.</p></div></div><form id="reportBuilderForm" class="fm-form"><div class="fm-form-grid"><label>Workspace<select name="scope"><option value="ALL" '+(state.scope==='ALL'?'selected':'')+'>Consolidated</option><option value="PERSONAL" '+(state.scope==='PERSONAL'?'selected':'')+'>Personal</option><option value="BUSINESS" '+(state.scope==='BUSINESS'?'selected':'')+'>Company</option></select></label><label>Report type<select name="report_type"><option>TRANSACTION_REGISTER</option><option>INCOME</option><option>EXPENSE</option><option>INCOME_VS_EXPENSE</option><option>CASH_FLOW</option><option>ACCOUNT_ACTIVITY</option><option>ACCOUNT_STATEMENT</option><option>CATEGORY</option><option>MERCHANT</option><option>CASH</option><option>TRANSFER</option><option>REFUND</option><option>REIMBURSEMENT</option><option>GST_SUMMARY</option><option>RECONCILIATION</option><option>DATA_QUALITY</option><option>PERSONAL_MONTHLY_SUMMARY</option><option>COMPANY_MONTHLY_SUMMARY</option></select></label></div><label>Accounts<select id="reportAccounts" name="account_ids" multiple size="5">'+accountOptions+'</select><small>Select none for all permitted accounts. Use Ctrl/Cmd to select multiple.</small></label><div class="fm-form-grid"><label>From<input name="from" type="date" value="'+esc(range.from||'')+'"></label><label>To<input name="to" type="date" value="'+esc(range.to||'')+'"></label></div><div class="fm-form-grid"><label>Native currency filter<select name="currency"><option value="">All native currencies</option>'+currencies.map(c=>'<option>'+esc(c)+'</option>').join('')+'</select></label><label>Transaction type<select name="transaction_type"><option value="">All</option><option>INCOME</option><option>EXPENSE</option><option>TRANSFER</option><option>REFUND</option></select></label></div><div class="fm-form-grid"><label>Category<input name="category" placeholder="e.g. Office Supplies"></label><label>Merchant<input name="merchant" placeholder="e.g. Officeworks"></label></div><div class="fm-form-grid"><label>Source<select name="source"><option value="">All</option><option>STATEMENT_IMPORT</option><option>MANUAL</option><option>OPEN_BANKING</option><option>API_IMPORT</option></select></label><label>Reconciliation<select name="reconciliation_status"><option value="">All active</option><option>UNRECONCILED</option><option>RECONCILED</option><option>IGNORED</option></select></label></div><div class="fm-form-grid"><label>Receipt status<select name="receipt_status"><option value="">All</option><option>ATTACHED</option><option>MISSING</option></select></label><label>Search<input name="q" placeholder="Description, reference, account"></label></div><div class="fm-form-actions"><button class="primary" type="submit">Generate</button><button type="button" id="reportPdf">PDF</button><button type="button" id="reportEmailPdf">Email PDF</button><button type="button" id="reportCsv">CSV</button><button type="button" id="reportXlsx">XLSX</button><button type="button" id="reportSave">Save report</button></div></form><p class="fm-helper">Currencies are never converted or relabelled. Selecting a currency filters to that native currency; mixed currencies remain separate. PDF exports use separate Description, Reference and Category columns. Email PDF sends the same document through the configured Voxel Veda company mailbox.</p></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Saved Reports</h2><p>Definitions are private to the signed-in user and can be rerun against current data.</p></div></div><div class="fm-list">'+(savedRows||emptyState('No saved reports','Build a report and save its filter definition for later.'))+'</div><hr><div class="fm-card-head"><div><h2>Company Accounting Exports</h2><p>Accounting-period outputs remain separate from filtered bank-ledger reports.</p></div></div><div class="fm-quick-grid"><button class="fm-quick" data-export="/api/finance/exports/accountant-review.pdf"><span>PDF</span><b>Accountant Review</b><small>Branded every page</small></button><button class="fm-quick" data-export="/api/finance/exports/trial-balance.csv"><span>CSV</span><b>Trial Balance</b><small>Canonical accounting ledger</small></button></div></div></article></div>'+reportSpecificPreview(result)+results;
+ const snapshotRows=(state.reportSnapshots?.snapshots||[]).map(r=>'<div class="fm-row"><div><h3>'+esc(r.report_type.replaceAll('_',' '))+'</h3><p>'+esc(r.report_id)+' · '+date(r.created_at)+'</p></div><a href="'+esc(r.view_url)+'">View report</a></div>').join('');
+ const results=result?'<article id="reportResultAnchor" class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Saved Report</h2><p>'+num(result.metadata?.source_transaction_count)+' source transaction(s) · '+esc(result.metadata?.currency_treatment||'Native currencies')+'</p><a href="'+esc(result.view_url)+'">View complete saved report</a></div></div><div class="fm-grid four">'+(summaryRows||'<div class="fm-kpi"><span>Result</span><strong>—</strong><small>No financial activity for these filters.</small></div>')+'</div><div class="fm-table-wrap"><table class="fm-table"><thead><tr><th>Date</th><th>Account</th><th>Merchant / Description</th><th>Category</th><th>Currency</th><th>Debit</th><th>Credit</th><th>Reconciliation</th><th>Receipt</th></tr></thead><tbody>'+txRows+'</tbody></table></div><p class="fm-helper">Preview shows up to 100 rows. View complete saved report to browse every row. Downloads use the complete immutable snapshot.</p></div></article>':'';
+ return '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Standard Report Catalogue</h2><p>One-click starting points. Every report can still be narrowed by workspace, account, period, category, merchant and evidence status.</p></div></div>'+presetCards+'</div></article><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Advanced Report Centre</h2><p>Uses the same Trusted Totals and permission-scoped bank ledger as the dashboard.</p></div></div><form id="reportBuilderForm" class="fm-form"><div class="fm-form-grid"><label>Workspace<select name="scope"><option value="ALL" '+(state.scope==='ALL'?'selected':'')+'>Consolidated</option><option value="PERSONAL" '+(state.scope==='PERSONAL'?'selected':'')+'>Personal</option><option value="BUSINESS" '+(state.scope==='BUSINESS'?'selected':'')+'>Company</option></select></label><label>Report type<select name="report_type"><option>TRANSACTION_REGISTER</option><option>INCOME</option><option>EXPENSE</option><option>INCOME_VS_EXPENSE</option><option>CASH_FLOW</option><option>ACCOUNT_ACTIVITY</option><option>ACCOUNT_STATEMENT</option><option>CATEGORY</option><option>MERCHANT</option><option>CASH</option><option>TRANSFER</option><option>REFUND</option><option>REIMBURSEMENT</option><option>GST_SUMMARY</option><option>RECONCILIATION</option><option>DATA_QUALITY</option><option>PERSONAL_MONTHLY_SUMMARY</option><option>COMPANY_MONTHLY_SUMMARY</option></select></label></div><label>Accounts<select id="reportAccounts" name="account_ids" multiple size="5">'+accountOptions+'</select><small>Select none for all permitted accounts. Use Ctrl/Cmd to select multiple.</small></label><div class="fm-form-grid"><label>From<input name="from" type="date" value="'+esc(range.from||'')+'"></label><label>To<input name="to" type="date" value="'+esc(range.to||'')+'"></label></div><div class="fm-form-grid"><label>Native currency filter<select name="currency"><option value="">All native currencies</option>'+currencies.map(c=>'<option>'+esc(c)+'</option>').join('')+'</select></label><label>Transaction type<select name="transaction_type"><option value="">All</option><option>INCOME</option><option>EXPENSE</option><option>TRANSFER</option><option>REFUND</option></select></label></div><div class="fm-form-grid"><label>Category<input name="category" placeholder="e.g. Office Supplies"></label><label>Merchant<input name="merchant" placeholder="e.g. Officeworks"></label></div><div class="fm-form-grid"><label>Source<select name="source"><option value="">All</option><option>STATEMENT_IMPORT</option><option>MANUAL</option><option>OPEN_BANKING</option><option>API_IMPORT</option></select></label><label>Reconciliation<select name="reconciliation_status"><option value="">All active</option><option>UNRECONCILED</option><option>RECONCILED</option><option>IGNORED</option></select></label></div><div class="fm-form-grid"><label>Receipt status<select name="receipt_status"><option value="">All</option><option>ATTACHED</option><option>MISSING</option></select></label><label>Search<input name="q" placeholder="Description, reference, account"></label></div><div class="fm-form-actions"><button class="primary" type="submit">Generate</button><button type="button" id="reportView">View report</button><button type="button" id="reportPrint">Print / Save as PDF</button><button type="button" id="reportHtml">HTML</button><button type="button" id="reportPdf">PDF</button><button type="button" id="reportEmailPdf">Email report</button><button type="button" id="reportCsv">CSV</button><button type="button" id="reportXlsx">XLSX</button><button type="button" id="reportSave">Save report</button></div></form><p class="fm-helper">Currencies are never converted or relabelled. Selecting a currency filters to that native currency; mixed currencies remain separate. PDF exports use separate Description, Reference and Category columns. Every generated report is saved before PDF generation. View, print, HTML, CSV, XLSX and email use the same snapshot. PDF failure does not prevent online viewing.</p></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Saved Report Definitions</h2><p>Definitions are private to the signed-in user and can be rerun against current data.</p></div></div><div class="fm-list">'+(savedRows||emptyState('No saved reports','Build a report and save its filter definition for later.'))+'</div><hr><h2>Saved report snapshots</h2><p>Latest 100 snapshots. Open an existing report without resending email. Reports created before snapshots were introduced may need regeneration from their original filters; regenerated data is current data.</p><div class="fm-list">'+(snapshotRows||emptyState('No saved snapshots','Generate a report to save its data and working view link.'))+'</div><hr><div class="fm-card-head"><div><h2>Company Accounting Exports</h2><p>Accounting-period outputs remain separate from filtered bank-ledger reports.</p></div></div><div class="fm-quick-grid"><button class="fm-quick" data-export="/api/finance/exports/accountant-review.pdf"><span>PDF</span><b>Accountant Review</b><small>Branded every page</small></button><button class="fm-quick" data-export="/api/finance/exports/trial-balance.csv"><span>CSV</span><b>Trial Balance</b><small>Canonical accounting ledger</small></button></div></div></article></div>'+reportSpecificPreview(result)+results;
 }
 function reportDefinitionFromUi(){
  const form=$('reportBuilderForm');if(!form)return null;
@@ -2066,9 +2073,51 @@ function reportQuery(def){
  const p=new URLSearchParams();Object.entries(def||{}).forEach(([k,v])=>{if(Array.isArray(v)){if(v.length)p.set(k,v.join(','))}else if(v!==undefined&&v!==null&&v!=='')p.set(k,v)});
  return p.toString();
 }
-async function generateBuiltReport(){
- const def=reportDefinitionFromUi();if(!def)return null;
- const result=await api(API+'/reports/builder?'+reportQuery(def));state.reportResult=result;render();return result;
+function restoreReportDefinition(){
+ const form=$('reportBuilderForm'),def=state.reportDefinition;if(!form||!def)return;
+ Object.entries(def).forEach(([name,value])=>{
+  const field=form.elements.namedItem(name);if(!field)return;
+  if(name==='account_ids')Array.from(field.options).forEach(o=>o.selected=(value||[]).map(String).includes(o.value));
+  else field.value=value??'';
+ });
+}
+async function generateBuiltReport(definition){
+ const def=definition||reportDefinitionFromUi();if(!def)return null;
+ notice('Saving a report snapshot…');
+ const result=await api(API+'/reports/snapshots',{method:'POST',body:JSON.stringify({definition:def}),timeoutMs:90000});
+ state.reportDefinition=def;state.reportResult=result;render();notice('Report saved. View and exports use this snapshot.');return result;
+}
+async function ensureBuiltReport(){
+ const def=reportDefinitionFromUi();if(!def)throw new Error('Choose report filters first.');
+ if(state.reportResult?.report_id&&reportQuery(def)===reportQuery(state.reportDefinition))return state.reportResult;
+ return generateBuiltReport(def);
+}
+function snapshotDownloadUrl(report,format){return API+'/reports/snapshots/'+encodeURIComponent(report.report_id)+'/download/'+format}
+async function downloadBuiltReport(format,button){
+ if(button?.disabled)return;
+ if(button){button.disabled=true;button.setAttribute('aria-busy','true')}
+ try{const report=await ensureBuiltReport();await downloadFinanceFile(snapshotDownloadUrl(report,format),'VoxelVeda-Report.'+format,'Export ready','The saved report was exported successfully.');notice('Saved report downloaded.');}
+ catch(error){notice(error.message,true);if(error.data?.view_url)showFinancePopup('Report remains available',error.message,'',{tone:'warning',actionLabel:'View report',onAction:()=>location.assign(error.data.view_url)});}
+ finally{if(button){button.disabled=false;button.removeAttribute('aria-busy')}}
+}
+async function viewBuiltReport(){try{const report=await ensureBuiltReport();location.assign(report.view_url)}catch(error){notice(error.message,true)}}
+async function printBuiltReport(){
+ const target=window.open('about:blank','_blank');
+ if(target)target.document.body.textContent='Preparing your saved report for printing…';
+ try{
+  const report=await ensureBuiltReport();
+  if(!target){notice('Your browser blocked the print window. Open View report, then use Print / Save as PDF.',true);return}
+  let response;
+  for(let attempt=0;attempt<2;attempt++){
+   response=await fetch(snapshotDownloadUrl(report,'print'),{credentials:'same-origin',signal:AbortSignal.timeout(60000)});
+   if(response.ok)break;
+   let payload={};try{payload=await response.json()}catch{}
+   if(payload.code==='STEP_UP_REQUIRED'&&attempt===0){await requestFinanceStepUp();continue}
+   throw new Error(payload.message||'The print report could not be loaded.');
+  }
+  if(!String(response.headers.get('Content-Type')).includes('text/html'))throw new Error('The print report is unavailable.');
+  const objectUrl=URL.createObjectURL(await response.blob());target.location=objectUrl;target.onload=()=>target.print();setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);
+ }catch(error){if(target)target.close();notice(error.message,true)}
 }
 async function runReportPreset(type,button){
  const form=$('reportBuilderForm');if(!form)return;
@@ -2113,19 +2162,18 @@ async function saveBuiltReport(){
  const x=await api(API+'/reports/saved',{method:'POST',body:JSON.stringify({name,report_type:type,definition:def})});notice(x.message);await refresh();state.view='reports';render();
 }
 async function exportBuiltReportXlsx(){
- const def=reportDefinitionFromUi();if(!def)return;
- location.href=API+'/reports/builder.xlsx?'+reportQuery(def);
+ return downloadBuiltReport('xlsx',$('reportXlsx'));
 }
 
 function openReportEmailDialog(){
  const def=reportDefinitionFromUi();if(!def)return;
  $('fmModalEyebrow').textContent='FINANCE REPORT DELIVERY';
- $('fmModalTitle').textContent='Email PDF report';
+ $('fmModalTitle').textContent='Email saved report';
  $('fmModalBody').innerHTML=`<form id="reportEmailForm" class="fm-form">
-  <div class="fm-state"><strong>PDF attachment</strong><p>The generated report will be attached as a real .pdf document with its original filename and application/pdf MIME type.</p></div>
+  <div class="fm-state"><strong>View report online</strong><p>The email includes a link to the saved report. The recipient must sign in with the report owner's authorised account. A PDF is attached only when it can be generated and parsed.</p></div>
   <label>Recipient email<input name="to" type="email" autocomplete="email" placeholder="name@example.com" required></label>
   <label>Delivery note<textarea name="note" rows="3" maxlength="500" placeholder="Optional note for the recipient"></textarea></label>
-  <div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Send PDF</button></div>
+  <div class="fm-form-actions"><button type="button" data-modal-cancel="1">Cancel</button><button class="primary" type="submit">Send report</button></div>
  </form>`;
  $('fmModal').showModal();
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=>$('fmModal').close());
@@ -2135,13 +2183,14 @@ function openReportEmailDialog(){
   const fd=new FormData(form),to=String(fd.get('to')||'').trim(),note=String(fd.get('note')||'').trim();
   const button=form.querySelector('button[type="submit"]');button.disabled=true;button.textContent='Sending…';
   try{
-   const x=await api(API+'/reports/builder/email-pdf',{method:'POST',body:JSON.stringify({to,note,definition:def}),timeoutMs:90000});
+   const report=await ensureBuiltReport();
+   const x=await api(API+'/reports/builder/email-pdf',{method:'POST',body:JSON.stringify({to,note,report_id:report.report_id}),timeoutMs:90000});
    $('fmModal').close();
-   const filename=x.filename||'Finance report.pdf';
-   const integrity=x.attachment_filename_verified?'Filename verified':'Delivery accepted';
-   showFinancePopup('Finance PDF sent',x.message||'Finance PDF sent successfully.',filename+' · '+integrity+(x.delivery_transport?' · '+String(x.delivery_transport).replaceAll('_',' ').toUpperCase():''));
+   Object.assign(state.reportResult,x);
+   showFinancePopup('Report email outcome',x.message||'Email outcome received.',(x.email_outcome?.pdf_attached?'Parsed PDF submitted: '+x.filename:x.pdf_status==='READY'?'PDF attachment delivery is unavailable. The PDF can be downloaded from the saved report.':'PDF is unavailable. The saved HTML report remains available.')+' · '+(x.email_outcome?.status||'Outcome unknown'),{actionLabel:'View report',onAction:()=>location.assign(x.view_url)});
   }catch(error){
-   button.disabled=false;button.textContent='Send PDF';notice(error.message,true);
+   button.disabled=false;button.textContent='Send report';notice(error.message,true);
+   if(error.data?.view_url){$('fmModal').close();showFinancePopup('Report saved; email failed',error.message,'You can view this report without resending email.',{tone:'warning',actionLabel:'View report',onAction:()=>location.assign(error.data.view_url)});}
   }
  };
 }
@@ -2950,13 +2999,20 @@ function bindDynamic(){
  if($('txPrev'))$('txPrev').onclick=()=>{if(state.txMeta.page>1){state.txMeta.page-=1;loadTransactions()}};
  if($('txNext'))$('txNext').onclick=()=>{if(state.txMeta.page<state.txMeta.total_pages){state.txMeta.page+=1;loadTransactions()}};
  document.querySelectorAll('[data-show-all-history]').forEach(b=>b.onclick=()=>{state.period='all';state.txMeta.page=1;if($('fmPeriod'))$('fmPeriod').value='all';refresh()});
- if($('reportBuilderForm'))$('reportBuilderForm').onsubmit=async e=>{e.preventDefault();try{await generateBuiltReport()}catch(error){notice(error.message,true)}};
- if($('reportPdf'))$('reportPdf').onclick=()=>{const def=reportDefinitionFromUi();if(def)runFinanceDownload($('reportPdf'),API+'/reports/builder.pdf?'+reportQuery(def),'Voxel-Veda-Report.pdf')};
+ restoreReportDefinition();
+ if($('reportBuilderForm')){
+  $('reportBuilderForm').oninput=()=>{state.reportDefinition=reportDefinitionFromUi();state.reportResult=null};
+  $('reportBuilderForm').onsubmit=async e=>{e.preventDefault();try{await generateBuiltReport()}catch(error){notice(error.message,true)}};
+ }
+ if($('reportView'))$('reportView').onclick=viewBuiltReport;
+ if($('reportPrint'))$('reportPrint').onclick=printBuiltReport;
+ if($('reportHtml'))$('reportHtml').onclick=()=>downloadBuiltReport('html',$('reportHtml'));
+ if($('reportPdf'))$('reportPdf').onclick=()=>downloadBuiltReport('pdf',$('reportPdf'));
  if($('reportEmailPdf'))$('reportEmailPdf').onclick=()=>openReportEmailDialog();
- if($('reportCsv'))$('reportCsv').onclick=()=>{const def=reportDefinitionFromUi();if(def)runFinanceDownload($('reportCsv'),API+'/reports/builder.csv?'+reportQuery(def),'Voxel-Veda-Report.csv')};
+ if($('reportCsv'))$('reportCsv').onclick=()=>downloadBuiltReport('csv',$('reportCsv'));
  if($('reportXlsx'))$('reportXlsx').onclick=()=>exportBuiltReportXlsx().catch(error=>notice(error.message,true));
  if($('reportSave'))$('reportSave').onclick=()=>saveBuiltReport().catch(error=>notice(error.message,true));
- document.querySelectorAll('[data-report-run]').forEach(b=>b.onclick=async()=>{try{state.reportResult=await api(API+'/reports/saved/'+encodeURIComponent(b.dataset.reportRun)+'/run');render()}catch(error){notice(error.message,true)}});
+ document.querySelectorAll('[data-report-run]').forEach(b=>b.onclick=async()=>{try{const saved=(state.savedReports?.saved_reports||[]).find(x=>x.report_uid===b.dataset.reportRun);state.reportResult=await api(API+'/reports/saved/'+encodeURIComponent(b.dataset.reportRun)+'/run');state.reportDefinition=saved?.definition||saved?.definition_json||state.reportResult.filters;render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-report-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this saved report definition?'))return;try{const x=await api(API+'/reports/saved/'+encodeURIComponent(b.dataset.reportDelete),{method:'DELETE'});notice(x.message);await refresh();state.view='reports';render()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-period-apply]').forEach(button=>button.onclick=async()=>{
   const id=button.dataset.periodApply;
@@ -3266,7 +3322,9 @@ function restoreFinanceLocation(snapshot){
  for(const [id,key] of [['fmScope','scope'],['fmAccount','account'],['fmPeriod','period'],['fmFrom','customFrom'],['fmTo','customTo']])if($(id))$(id).value=state[key];
  $('fmFromWrap').hidden=state.period!=='custom';$('fmToWrap').hidden=state.period!=='custom';
 }
-window.addEventListener('popstate',async event=>{closeDrawer();restoreFinanceLocation(event.state);await refresh();});
+window.addEventListener('popstate',async event=>{closeDrawer();$('fmModal')?.close();restoreFinanceLocation(event.state);render();await refresh();});
+// Shared sidebar links can change only the fragment while already inside Finance.
+window.addEventListener('hashchange',()=>{const view=location.hash.slice(1);if(view!==state.view&&(NAV.some(item=>item[0]===view)||view==='more')){closeDrawer();$('fmModal')?.close();restoreFinanceLocation();render();}});
 function bind(){
  document.addEventListener('click',event=>{const button=event.target.closest('[data-flow-type]');if(button)openCashFlowRecords(button);});
  $('fmScope').onchange=e=>{state.scope=e.target.value;state.txMeta.page=1;saveFinanceLocation();refresh()};

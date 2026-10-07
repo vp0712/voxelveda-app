@@ -17,6 +17,11 @@ const { companyProfile } = require('../config/companyProfile');
 const { buildFinancePdfArtifact } = require('../services/financeReportPdfService');
 const { sendMail, isEmailTransportError, emailFailureDetails, isHostingerMailApiConfigured, isRelayConfigured } = require('../services/emailService');
 const { brandedLayout } = require('../services/emailTemplates');
+const snapshots = require('../services/financeReportSnapshotService');
+const reportHtml = require('../services/financeReportHtmlService');
+const { validateReportPdf } = require('../services/financePdfValidationService');
+const { renderFinanceDocument } = require('../services/workspaceShellRenderer');
+const { hasPermission, hasAnyPermission } = require('../services/authorizationService');
 
 const VALID_SCOPES = new Set(['ALL','PERSONAL','BUSINESS','MIXED','UNCLASSIFIED']);
 const VALID_TYPES = new Set(['TRANSACTION_REGISTER','INCOME','EXPENSE','INCOME_VS_EXPENSE','CASH_FLOW','ACCOUNT_ACTIVITY','ACCOUNT_STATEMENT','CATEGORY','MERCHANT','CASH','TRANSFER','REFUND','REIMBURSEMENT','GST_SUMMARY','RECONCILIATION','DATA_QUALITY','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY']);
@@ -39,7 +44,7 @@ function parseIds(value) {
 function safeText(value,max=120){return String(value||'').trim().slice(0,max)}
 function csvCell(value) {
   const raw=String(value??'');
-  const safe=/^[=+@]/.test(raw) || /^-\D/.test(raw) ? `'${raw}` : raw;
+  const safe=(/^[\s\u0000-\u001f]*[=+@-]/.test(raw)&&!/^\-\d+(?:\.\d+)?$/.test(raw)) || /^[\t\r\n]/.test(raw) ? `'${raw}` : raw;
   return `"${safe.replace(/"/g,'""')}"`;
 }
 function definitionFrom(input={}) {
@@ -100,12 +105,13 @@ function buildFilters(req,definition=null){
   return {report_type:reportType,scope,from,to,account_ids:accountIds,currency:core.currency,transaction_type:transactionType||null,category:category||null,merchant:merchant||null,source:source||null,reconciliation_status:recon||null,receipt_status:receipt||null,q:q||null,where:clauses.join(' AND '),params};
 }
 
-async function reportCoverage(req,filters){
+async function reportCoverage(req,filters,db=pool){
   const clauses=[privacy.visibilitySql('ba',req)];
   const params=[...privacy.visibilityParams(req)];
   if(filters.scope!=='ALL'){clauses.push('ba.ownership_scope=?');params.push(filters.scope)}
   if(filters.account_ids.length){clauses.push(`ba.id IN (${filters.account_ids.map(()=>'?').join(',')})`);params.push(...filters.account_ids)}
-  const [rows]=await pool.query(
+  if(filters.currency){clauses.push('ba.currency=?');params.push(filters.currency)}
+  const [rows]=await db.query(
     `SELECT ba.id,ba.nickname,ba.currency,ba.history_start_date,ba.history_end_date,
             MIN(bt.transaction_date) AS earliest_transaction,MAX(bt.transaction_date) AS latest_transaction,
             MAX(sif.statement_end_date) AS last_statement_date
@@ -128,24 +134,28 @@ async function reportCoverage(req,filters){
 
 async function buildReport(req,definition=null){
   await ensureFinanceSchema();
+  const db=await pool.getConnection();
+  try{
+  await db.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+  await db.query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
   const f=buildFilters(req,definition);
   const needMonthly=['CASH_FLOW','INCOME_VS_EXPENSE','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY'].includes(f.report_type);
   const needGst=f.report_type==='GST_SUMMARY';
   const needReimbursements=f.report_type==='REIMBURSEMENT';
 
   const [summaryByCurrency,categories,transactions,merchants,coverage,monthly,gstSummary,reimbursements]=await Promise.all([
-    trustedTotals.cashTotalsByCurrency(pool,f.where,f.params),
-    trustedTotals.categorySpendByCurrency(pool,f.where,f.params,200),
-    pool.query(
+    trustedTotals.cashTotalsByCurrency(db,f.where,f.params),
+    trustedTotals.categorySpendByCurrency(db,f.where,f.params,null),
+    db.query(
       `SELECT bt.id,bt.bank_account_id,bt.transaction_date,bt.posting_date,bt.description,bt.reference,bt.merchant_name,bt.merchant_normalized,bt.category,
               bt.debit,bt.credit,bt.running_balance,bt.currency,bt.ownership_scope,bt.reconciliation_status,bt.source_type,
               bt.is_internal_transfer,bt.project_ref,bt.gst_treatment,bt.reviewed_at,ba.nickname AS account_name,ba.institution,ba.account_type,
               EXISTS(SELECT 1 FROM secure_documents sd WHERE sd.module='finance' AND sd.record_type='bank_transaction' AND CAST(sd.record_id AS UNSIGNED)=bt.id AND sd.deleted_at IS NULL) AS has_receipt
          FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
         WHERE ${f.where}
-        ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 20000`,f.params
+        ORDER BY bt.transaction_date DESC,bt.id DESC LIMIT 100001`,f.params
     ).then(([rows])=>rows),
-    pool.query(
+    db.query(
       `SELECT bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown') AS merchant,
               COUNT(*) AS transaction_count,
               COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS spent,
@@ -153,10 +163,10 @@ async function buildReport(req,definition=null){
          FROM bank_transactions bt JOIN bank_accounts ba ON ba.id=bt.bank_account_id
         WHERE ${f.where}
         GROUP BY bt.currency,COALESCE(NULLIF(bt.merchant_name,''),NULLIF(bt.description,''),'Unknown')
-        ORDER BY bt.currency,spent DESC LIMIT 500`,f.params
+        ORDER BY bt.currency,spent DESC`,f.params
     ).then(([rows])=>rows),
-    reportCoverage(req,f),
-    needMonthly?pool.query(
+    reportCoverage(req,f,db),
+    needMonthly?db.query(
       `SELECT bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m') AS month,COUNT(*) AS transaction_count,
               COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
               COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
@@ -167,7 +177,7 @@ async function buildReport(req,definition=null){
         GROUP BY bt.currency,DATE_FORMAT(bt.transaction_date,'%Y-%m')
         ORDER BY bt.currency,month`,f.params
     ).then(([rows])=>rows.map(row=>({...row,net_cash_flow:Number(row.money_in||0)-Number(row.money_out||0)}))):Promise.resolve([]),
-    needGst?pool.query(
+    needGst?db.query(
       `SELECT bt.currency,COALESCE(NULLIF(bt.gst_treatment,''),'UNREVIEWED') AS gst_treatment,
               COUNT(DISTINCT bt.id) AS transaction_count,
               COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS gross_expense,
@@ -178,7 +188,7 @@ async function buildReport(req,definition=null){
         GROUP BY bt.currency,COALESCE(NULLIF(bt.gst_treatment,''),'UNREVIEWED')
         ORDER BY bt.currency,gst_treatment`,f.params
     ).then(([rows])=>rows):Promise.resolve([]),
-    needReimbursements?pool.query(
+    needReimbursements?db.query(
       `SELECT fr.id,fr.reimbursement_uid,fr.expense_bank_transaction_id,fr.claimant_user_id,fr.requested_amount,fr.currency,fr.status,
               fr.created_at,fr.submitted_at,fr.approved_at,fr.rejected_at,fr.rejection_reason,
               bt.transaction_date,bt.merchant_name,bt.description,ba.nickname AS account_name,
@@ -189,9 +199,11 @@ async function buildReport(req,definition=null){
          LEFT JOIN finance_reimbursement_payments frp ON frp.reimbursement_id=fr.id
         WHERE ${f.where}
         GROUP BY fr.id
-        ORDER BY fr.created_at DESC LIMIT 5000`,f.params
+        ORDER BY fr.created_at DESC`,f.params
     ).then(([rows])=>rows.map(row=>({...row,remaining_amount:Math.max(0,Number(row.requested_amount||0)-Number(row.paid_amount||0))}))):Promise.resolve([])
   ]);
+  if(transactions.length>100000||summaryByCurrency.reduce((sum,row)=>sum+Number(row.source_transaction_count||0),0)>100000)
+    throw new FinanceError('This report exceeds 100,000 transactions. Choose a shorter period. No partial report has been saved.',413,'REPORT_TOO_LARGE');
 
   const reconciliationSummary={};
   for(const row of transactions){
@@ -212,7 +224,7 @@ async function buildReport(req,definition=null){
     const ordered=[...transactions].sort((a,b)=>String(a.transaction_date).localeCompare(String(b.transaction_date))||Number(a.id)-Number(b.id));
     const first=ordered[0]||null,last=ordered[ordered.length-1]||null;
     const accountId=f.account_ids[0];
-    const [[accountMeta]]=await pool.query(
+    const [[accountMeta]]=await db.query(
       `SELECT ba.id,ba.nickname,ba.institution,ba.bsb_masked,ba.account_number_masked,ba.currency,
               ba.account_type,ba.ownership_scope,ba.entity_name,ba.opening_balance,ba.current_ledger_balance,
               ba.available_balance,ba.created_by,u.name AS created_by_name
@@ -270,9 +282,10 @@ async function buildReport(req,definition=null){
     categories,merchants,transactions:reportTransactions,coverage,monthly,gst_summary:gstSummary,reimbursements,
     reconciliation_summary:reconciliationSummary,data_quality:dataQuality,account_statement:accountStatement
   };
+  }finally{await db.rollback().catch(()=>{});db.release()}
 }
 exports.generate=async(req,res)=>{
-  try{return res.json(await buildReport(req))}catch(error){return fail(res,error,'Failed to build filtered Finance report.')}
+  try{const saved=await captureReport(req,req.body?.definition?definitionFrom(req.body.definition):null);return res.json({...saved.report,...snapshots.descriptor(saved.row)})}catch(error){return fail(res,error,'Failed to build filtered Finance report.')}
 };
 
 function csvDataset(report){
@@ -295,14 +308,17 @@ function csvDataset(report){
 }
 exports.csv=async(req,res)=>{
   try{
-    const report=await buildReport(req),dataset=csvDataset(report);
+    const saved=await requestedSnapshot(req),report=saved.report,dataset=csvDataset(report);
     const meta=[
       ['Report Type',report.metadata.report_type],['Report Scope',report.metadata.scope],['Period From',report.metadata.from||''],['Period To',report.metadata.to||''],
-      ['History Completeness',report.metadata.history_completeness],['Currency Treatment',report.metadata.currency_treatment],['Generated At',report.metadata.generated_at],['Source Transaction Count',report.metadata.source_transaction_count]
+      ['Report ID',report.metadata.report_id],['Currency',report.metadata.currency||'Native currencies'],
+      ['History Completeness',report.metadata.history_completeness],['Currency Treatment',report.metadata.currency_treatment],['Generated At',report.metadata.generated_at],['Source Transaction Count',report.metadata.source_transaction_count],
+      ...(report.summary_by_currency||[]).flatMap(row=>[['Currency Summary',row.currency],['Transactions',row.source_transaction_count],['Money In',row.money_in],['Money Out',row.money_out],['Net Cash Flow',row.net_cash_flow]])
     ];
     const csv=[...meta.map(r=>r.map(csvCell).join(',')), '', dataset.header.map(csvCell).join(','), ...dataset.rows.map(r=>r.map(csvCell).join(','))].join('\r\n');
     res.setHeader('Content-Type','text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition','attachment; filename="voxel-veda-finance-report.csv"');
+    res.setHeader('Content-Disposition',`attachment; filename="${snapshots.filename(report,'csv')}"`);
+    res.setHeader('Cache-Control','private, no-store');
     await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report','CSV',{filters:report.metadata,format:'CSV'}));
     return res.send('\uFEFF'+csv);
   }catch(error){return fail(res,error,'Failed to export filtered Finance CSV.')}
@@ -400,6 +416,18 @@ async function createReportWorkbook(report,profile,title){
     for(let row=coverageHeader.number+1;row<=coverage.rowCount;row+=1)for(let col=5;col<=7;col+=1)coverage.getCell(row,col).numFmt='dd/mm/yyyy';
     styleTable(coverage,coverageHeader.number,7,coverage.rowCount);
 
+    if(report.account_statement){
+      const statement=workbook.addWorksheet('Account Statement'),s=report.account_statement;
+      addWorkbookMetadata(statement,report,profile,title);
+      statement.addRow(['Account holder',s.account_holder,'Masked account',s.account_number_masked]);
+      statement.addRow(['Opening balance',Number(s.opening_running_balance||0),'Closing balance',Number(s.closing_running_balance||0),'Currency',s.currency]);
+      statement.addRow(['Total debits',Number(s.total_debits||0),'Total credits',Number(s.total_credits||0),'Transactions',s.transaction_count]);
+      const h=statement.addRow(['Date','Posting Date','Description','Reference','Category','Currency','Debit','Credit','Running Balance']);
+      for(const row of report.transactions)statement.addRow([excelDate(row.transaction_date),excelDate(row.posting_date),row.description||row.merchant_name||'',row.reference||'',row.category||'',row.currency,Number(row.debit||0),Number(row.credit||0),row.running_balance==null?null:Number(row.running_balance)]);
+      statement.columns=[14,14,40,24,24,12,16,16,18].map(width=>({width}));
+      for(let row=h.number+1;row<=statement.rowCount;row++){for(let col=1;col<=2;col++)statement.getCell(row,col).numFmt='yyyy-mm-dd';for(let col=7;col<=9;col++)statement.getCell(row,col).numFmt='#,##0.00;[Red]-#,##0.00'}
+      styleTable(statement,h.number,9,statement.rowCount);
+    }
     if(report.monthly?.length){
       const monthly=workbook.addWorksheet('Monthly');
       addWorkbookMetadata(monthly,report,profile,title);
@@ -446,13 +474,14 @@ async function createReportWorkbook(report,profile,title){
 
 exports.xlsx=async(req,res)=>{
   try{
-    const report=await buildReport(req),profile=await reportCompanyProfile(),title=reportTitle(report.metadata.report_type);
+    const saved=await requestedSnapshot(req),report=saved.report,profile=saved.profile,title=reportTitle(report.metadata.report_type);
     const workbook=await createReportWorkbook(report,profile,title);
     const buffer=await workbook.xlsx.writeBuffer();
     const safeName=title.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'');
     await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report',report.metadata.report_id,{filters:report.metadata,format:'XLSX',worksheets:workbook.worksheets.length}));
     res.setHeader('Content-Type','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition',`attachment; filename="Voxel-Veda-${safeName}.xlsx"`);
+    res.setHeader('Content-Disposition',`attachment; filename="${snapshots.filename(report,'xlsx')}"`);
+    res.setHeader('Cache-Control','private, no-store');
     res.setHeader('Content-Length',buffer.length);
     return res.send(buffer);
   }catch(error){return fail(res,error,'Failed to export filtered Finance XLSX.')}
@@ -608,7 +637,7 @@ function renderBankStyleAccountStatement(doc,report,profile,reportId){
 }
 
 function buildBankStatementPdfArtifact(report,profile,title){
-  const reportId='FIN-' + Date.now() + '-' + crypto.randomBytes(3).toString('hex').toUpperCase();
+  const reportId=report.metadata.report_id;
   const filename='Voxel-Veda-' + title.replace(/[^A-Za-z0-9]+/g,'-').replace(/^-|-$/g,'') + '.pdf';
   return new Promise((resolve,reject)=>{
     const chunks=[];
@@ -662,111 +691,125 @@ function assertPdfArtifact(artifact){
 
 exports.pdf=async(req,res)=>{
   try{
-    const report=await buildReport(req);
-    const profile=await reportCompanyProfile();
-    const title=reportTitle(report.metadata.report_type);
-    const artifact=await buildReportPdfArtifact(report,profile,title);
+    const saved=await requestedSnapshot(req),report=saved.report;
+    const artifact=await ensureSnapshotPdf(saved);
+    if(!artifact)return res.status(503).json({...snapshots.descriptor(saved.row),message:'PDF is currently unavailable. View, Print, HTML, CSV and XLSX remain available.',code:'REPORT_PDF_UNAVAILABLE'});
     await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report',artifact.reportId,{
       filters:report.metadata,format:'PDF',pages:artifact.pages
     }));
     res.setHeader('Content-Type','application/pdf');
     res.setHeader('Content-Disposition','attachment; filename="' + artifact.filename + '"');
     res.setHeader('Content-Length',artifact.buffer.length);
+    res.setHeader('Cache-Control','private, no-store');
     return res.send(artifact.buffer);
   }catch(error){
     return fail(res,error,'Failed to export filtered Finance PDF.');
   }
 };
 
-exports.emailPdf=async(req,res)=>{
-  try{
-    const definition=definitionFrom(req.body && req.body.definition ? req.body.definition : (req.body||{}));
-    const recipient=safeText(req.body && req.body.to,254);
-    const deliveryNote=safeText(req.body && req.body.note,500);
-    if(!recipient) throw new FinanceError('Recipient email is required.',400,'REPORT_EMAIL_RECIPIENT_REQUIRED');
-
-    const report=await buildReport(req,definition);
-    const profile=await reportCompanyProfile();
-    const title=reportTitle(report.metadata.report_type);
-    const artifact=assertPdfArtifact(await buildReportPdfArtifact(report,profile,title));
-    const period=(report.metadata.from||'All history') + ' to ' + (report.metadata.to||'Now');
-    const companyName=profile.tradingName||profile.legalName||'Voxel Veda';
-
-    const textBody=[
-      companyName + ' Finance',
-      '',
-      'Attached PDF: ' + artifact.filename,
-      'Report: ' + title,
-      'Period: ' + period,
-      'Report ID: ' + artifact.reportId,
-      deliveryNote ? 'Note: ' + deliveryNote : null,
-      '',
-      'The attached file is the requested Finance report in PDF format.'
-    ].filter((line)=>line!==null).join('\n');
-
-    const htmlBody=brandedLayout(
-      '<h2 style="margin-top:0">' + title + '</h2>' +
-      '<p>Your requested Finance report is attached as a PDF document.</p>' +
-      '<table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;margin:18px 0">' +
-      '<tr><td style="padding:8px 0;color:#607080">File</td><td style="padding:8px 0"><strong>' + artifact.filename.replace(/[<>&"]/g,'') + '</strong></td></tr>' +
-      '<tr><td style="padding:8px 0;color:#607080">Period</td><td style="padding:8px 0">' + period.replace(/[<>&"]/g,'') + '</td></tr>' +
-      '<tr><td style="padding:8px 0;color:#607080">Report ID</td><td style="padding:8px 0">' + artifact.reportId.replace(/[<>&"]/g,'') + '</td></tr>' +
-      '</table>' +
-      (deliveryNote ? '<p><strong>Note:</strong> ' + deliveryNote.replace(/[<>&"]/g,'') + '</p>' : '') +
-      '<p style="font-size:12px;color:#607080">Attachment type: application/pdf. Filename ends in .pdf.</p>',
-      title + ' PDF attached'
-    );
-
-    const result=await sendMail({
-      to:recipient,
-      subject:companyName + ' | ' + title + ' | ' + period,
-      text:textBody,
-      html:htmlBody,
-      replyTo:profile.email,
-      attachments:[{
-        filename:artifact.filename,
-        content:artifact.buffer,
-        contentType:'application/pdf',
-        contentDisposition:'attachment'
-      }]
-    });
-
-    if(!result?.attachmentFilenameGuaranteed){
-      const error=new Error('Email provider did not verify the PDF attachment filename.');
-      error.code='PDF_ATTACHMENT_FILENAME_UNVERIFIED';
-      throw error;
-    }
-
-    await logAudit(pool,audit(req,'FILTERED_REPORT_EMAILED','finance_report',artifact.reportId,{
-      filters:report.metadata,
-      format:'PDF',
-      pages:artifact.pages,
-      recipient_count:1,
-      provider_message_id:result && result.messageId ? result.messageId : null,
-      delivery_mode:'pdf_attachment',
-      filename:artifact.filename
-    }));
-
-    return res.json({
-      message:'PDF report sent successfully to ' + recipient + '.',
-      report_id:artifact.reportId,
-      filename:artifact.filename,
-      message_id:result && result.messageId ? result.messageId : null,
-      sender:profile.email,
-      attachment_content_type:'application/pdf',
-      attachment_bytes:artifact.buffer.length,
-      delivery_transport:result?.transport||null,
-      delivery_mode:'pdf_attachment',
-      attachment_filename_verified:true,
-      attachment_contract_version:4
-    });
-  }catch(error){
-    if(isEmailTransportError(error)){
-      const details=emailFailureDetails(error);
-      return res.status(details.status).json(details);
-    }
-    return fail(res,error,'Failed to email filtered Finance PDF.');
+async function captureReport(req,definition=null){
+  const report=await buildReport(req,definition),profile=await reportCompanyProfile();
+  profile.logo_data_uri=reportHtml.originalLogoData();
+  return snapshots.capture(req,report,profile);
+}
+async function requestedSnapshot(req){
+  const id=req.params?.reportId||req.query?.report_id||req.body?.report_id;
+  return id?snapshots.load(req,id):captureReport(req,req.body?.definition?definitionFrom(req.body.definition):null);
+}
+async function ensureSnapshotPdf(saved,{buildPdf=buildReportPdfArtifact,validatePdf=validateReportPdf}={}){
+  if(saved.row.pdf_status==='READY'){
+    const meta=typeof saved.row.pdf_metadata_json==='string'?JSON.parse(saved.row.pdf_metadata_json):saved.row.pdf_metadata_json;
+    return {buffer:await snapshots.pdfBytes(saved.row),filename:meta.filename,pages:meta.pages,reportId:saved.report.metadata.report_id};
   }
+  try{
+    const artifact=assertPdfArtifact(await buildPdf(saved.report,saved.profile,reportTitle(saved.report.metadata.report_type)));
+    artifact.filename=snapshots.filename(saved.report,'pdf');
+    const validation=await validatePdf(artifact,saved.report);
+    const meta=await snapshots.storePdf(saved.report.metadata.report_id,artifact,validation);
+    saved.row.pdf_status='READY';saved.row.pdf_metadata_json=meta;
+    return {...artifact,pages:validation.pages};
+  }catch(error){
+    console.warn('FINANCE_REPORT_PDF_UNAVAILABLE',saved.report.metadata.report_id,String(error.code||'PDF_GENERATION_FAILED'));
+    saved.row.pdf_metadata_json=await snapshots.pdfUnavailable(saved.report.metadata.report_id,error);
+    saved.row.pdf_status='UNAVAILABLE';
+    return null;
+  }
+}
+function emailReportBodies(saved,artifact,note='',{attachmentUnavailable=false}={}){
+  const r=saved.report,m=r.metadata,title=reportTitle(m.report_type),profile=saved.profile;
+  const period=(m.from||'All history')+' to '+(m.to||'Latest recorded');
+  const view=snapshots.viewUrl(m.report_id),esc=reportHtml.esc;
+  const wording=attachmentUnavailable?'Your report is ready to view online. PDF attachment delivery is currently unavailable; download the PDF from your saved report.':artifact?'Your report is ready to view online. A generated and parsed PDF is attached.':'Your report is ready to view online; PDF is currently unavailable.';
+  const summary=(r.summary_by_currency||[]).map(x=>`${x.currency}: ${x.source_transaction_count} transactions; money in ${reportHtml.amount(x.money_in,x.currency)}; money out ${reportHtml.amount(x.money_out,x.currency)}; net ${reportHtml.amount(x.net_cash_flow,x.currency)}`);
+  const text=[profile.legalName,title,wording,'View report: '+view,'Report ID: '+m.report_id,'Period: '+period,
+    'Workspace: '+m.scope,'Currency: '+(m.currency||'Native currencies kept separate'),'Transaction count: '+m.source_transaction_count,
+    ...summary,artifact?'PDF file: '+artifact.filename:null,note?'Note: '+note:null,
+    'The online report requires sign-in to the authorised Voxel Veda account. Provider acceptance does not verify recipient receipt.'].filter(x=>x!==null).join('\n');
+  const html=brandedLayout(`<h2>${esc(title)}</h2><p>${esc(wording)}</p><p><a href="${esc(view)}" style="display:inline-block;padding:14px 22px;background:#185faa;color:#fff;border-radius:8px;text-decoration:none;font-weight:700">View report</a></p><p style="overflow-wrap:anywhere">${esc(view)}</p><p>Period: ${esc(period)}<br>Workspace: ${esc(m.scope)}<br>Currency: ${esc(m.currency||'Native currencies kept separate')}<br>Transactions: ${esc(m.source_transaction_count)}<br>Report ID: ${esc(m.report_id)}</p>${summary.map(x=>'<p>'+esc(x)+'</p>').join('')}${artifact?'<p>PDF file: '+esc(artifact.filename)+'</p>':''}${note?'<p>Note: '+esc(note)+'</p>':''}<p>Sign in to your authorised Voxel Veda account to open the saved report. The link does not grant public access.</p>`,title+' — saved report ready');
+  return {text,html};
+}
+exports.emailPdf=async(req,res)=>{
+  let saved;
+  try{
+    const recipient=safeText(req.body?.to,254),note=safeText(req.body?.note,500);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient))throw new FinanceError('A valid recipient email is required.',400,'REPORT_EMAIL_RECIPIENT_REQUIRED');
+    const definition=definitionFrom(req.body?.definition||req.body||{});
+    saved=req.body?.report_id?await snapshots.load(req,req.body.report_id):await captureReport(req,definition);
+    const artifact=await ensureSnapshotPdf(saved),bodies=emailReportBodies(saved,artifact,note);
+    const attachmentFallback=emailReportBodies(saved,null,note,{attachmentUnavailable:!!artifact});
+    const result=await sendMail({to:recipient,subject:saved.profile.legalName+' | '+reportTitle(saved.report.metadata.report_type)+' | '+(saved.report.metadata.from||'All history')+' to '+(saved.report.metadata.to||'Latest recorded'),
+      ...bodies,attachmentFallback,replyTo:saved.profile.email,attachments:artifact?[{filename:artifact.filename,content:artifact.buffer,contentType:'application/pdf',contentDisposition:'attachment'}]:[]});
+    const accepted=Array.isArray(result?.accepted)&&result.accepted.some(address=>String(address).toLowerCase()===recipient.toLowerCase());
+    const outcome={status:accepted?'PROVIDER_ACCEPTED':'PROVIDER_REJECTED',transport:result?.transport||null,message_id:result?.messageId||null,
+      recipient_count:1,pdf_attached:Boolean(artifact)&&!result?.attachmentOmitted,pdf_attachment_status:result?.attachmentOmitted?'UNAVAILABLE':artifact?'PROVIDER_ACCEPTED':'NOT_ATTACHED',attachment_omission_reason:result?.attachmentOmissionReason||null,attachment_filename_contract:artifact&&!result?.attachmentOmitted?(result?.attachmentFilenameGuaranteed?'PROVIDER_CLAIM':'UNVERIFIED'):null,
+      received_verified:false,open_tested:false,attempted_at:new Date().toISOString()};
+    saved.row.email_outcome_json=outcome;
+    // Once accepted, persistence/audit trouble must not invite a duplicate resend.
+    try{await snapshots.recordEmail(saved.report.metadata.report_id,outcome);await logAudit(pool,audit(req,'FILTERED_REPORT_EMAILED','finance_report',saved.report.metadata.report_id,{format:outcome.pdf_attached?'PDF_AND_WEB':'WEB',provider_message_id:outcome.message_id,transport:outcome.transport,recipient_count:1,pdf_bytes:outcome.pdf_attached?artifact.buffer.length:0,pages:artifact?.pages||0}));}
+    catch(error){outcome.persistence_warning=true;console.warn('FINANCE_REPORT_EMAIL_OUTCOME_PERSISTENCE_FAILED',saved.report.metadata.report_id,String(error.code||'PERSISTENCE_FAILED'));}
+    console.log('FINANCE_REPORT_EMAIL_OUTCOME',JSON.stringify({report_id:saved.report.metadata.report_id,status:outcome.status,transport:outcome.transport,pdf_attached:outcome.pdf_attached,filename:outcome.pdf_attached?artifact.filename:null,bytes:outcome.pdf_attached?artifact.buffer.length:0}));
+    return res.status(accepted?200:502).json({...snapshots.descriptor(saved.row),message:accepted?'Email provider accepted the report message. Recipient receipt has not been verified.':'The email provider rejected the report message.',
+      filename:outcome.pdf_attached?artifact.filename:null,attachment_bytes:outcome.pdf_attached?artifact.buffer.length:0,attachment_content_type:outcome.pdf_attached?'application/pdf':null,
+      delivery_transport:outcome.transport,delivery_mode:outcome.pdf_attached?'pdf_attachment':'web_report',attachment_filename_verified:false});
+  }catch(error){
+    if(saved){const outcome={status:'FAILED',code:String(error.code||'EMAIL_DELIVERY_FAILED'),received_verified:false,open_tested:false,attempted_at:new Date().toISOString()};
+      await snapshots.recordEmail(saved.report.metadata.report_id,outcome);saved.row.email_outcome_json=outcome;
+      const details=emailFailureDetails(error);return res.status(details.status||502).json({...snapshots.descriptor(saved.row),...details});}
+    return fail(res,error,'Failed to email the Finance report.');
+  }
+};
+exports.viewSnapshot=async(req,res)=>{
+  res.set('Cache-Control','private, no-store').set('Referrer-Policy','no-referrer').set('X-Robots-Tag','noindex, nofollow, noarchive');
+  try{
+    if(!hasAnyPermission(req.user,['VIEW_FINANCE','VIEW_BANKING']))throw new FinanceError('You do not have permission to view Finance reports.',403,'PERMISSION_DENIED');
+    const saved=await snapshots.load(req,req.params.reportId);
+    return res.type('html').send(renderFinanceDocument(req,reportHtml.viewerDocument(saved,{query:req.query,canExport:hasPermission(req.user,'EXPORT_FINANCIAL_DATA')})));
+  }catch(error){
+    return res.status(error.statusCode||503).type('html').send(renderFinanceDocument(req,reportHtml.errorDocument(error instanceof FinanceError?error.message:'The saved report could not be loaded. Retry or contact support.',error.code)));
+  }
+};
+exports.listSnapshots=async(req,res)=>{
+  try{return res.json({snapshots:await snapshots.list(req)})}catch(error){return fail(res,error,'Failed to load report snapshots.')}
+};
+exports.snapshotStatus=async(req,res)=>{
+  try{const saved=await snapshots.load(req,req.params.reportId);return res.json(snapshots.descriptor(saved.row))}catch(error){return fail(res,error,'Failed to load saved report status.')}
+};
+exports.revokeSnapshot=async(req,res)=>{
+  try{await snapshots.revoke(req,req.params.reportId);await logAudit(pool,audit(req,'REPORT_SNAPSHOT_REVOKED','finance_report',req.params.reportId));return res.json({message:'Saved report revoked.'})}catch(error){return fail(res,error,'Failed to revoke report.')}
+};
+exports.downloadSnapshot=async(req,res)=>{
+  const format=String(req.params.format||'').toLowerCase();
+  if(format==='pdf')return exports.pdf(req,res);
+  if(format==='csv')return exports.csv(req,res);
+  if(format==='xlsx')return exports.xlsx(req,res);
+  try{
+    if(!['html','print'].includes(format))throw new FinanceError('Unsupported report format.',400,'INVALID_REPORT_FORMAT');
+    const saved=await snapshots.load(req,req.params.reportId),html=reportHtml.standaloneHtml(saved);
+    await logAudit(pool,audit(req,'FILTERED_REPORT_EXPORTED','finance_report',saved.report.metadata.report_id,{format:format.toUpperCase()}));
+    res.set('Cache-Control','private, no-store').set('Content-Type','text/html; charset=utf-8');
+    res.set('Content-Disposition',`${format==='print'?'inline':'attachment'}; filename="${snapshots.filename(saved.report,'html')}"`);
+    return res.send(html);
+  }catch(error){return fail(res,error,'Failed to download saved report.')}
 };
 
 exports.listSaved=async(req,res)=>{
@@ -812,8 +855,9 @@ exports.runSaved=async(req,res)=>{
     const stored=typeof row.definition_json==='string'?JSON.parse(row.definition_json):row.definition_json;
     const overrides=definitionFrom(req.query||{});
     const definition={...stored,...overrides};
-    return res.json(await buildReport(req,definition));
+    const saved=await captureReport(req,definition);
+    return res.json({...saved.report,...snapshots.descriptor(saved.row)});
   }catch(error){return fail(res,error,'Failed to run saved Finance report.')}
 };
 
-module.exports._test={buildFilters,definitionFrom,createReportWorkbook,assertPdfArtifact};
+module.exports._test={buildFilters,definitionFrom,createReportWorkbook,assertPdfArtifact,csvDataset,csvCell,buildReportPdfArtifact,captureReport,ensureSnapshotPdf,emailReportBodies};

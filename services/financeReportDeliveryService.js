@@ -98,7 +98,7 @@ function publicAppUrl() {
     process.env.FINANCE_REPORT_PUBLIC_BASE_URL
     || process.env.PUBLIC_APP_URL
     || process.env.APP_URL
-    || 'https://voxelveda-app-production.up.railway.app'
+    || require('../config/urls').app
   ).trim();
   return value.replace(/\/+$/, '');
 }

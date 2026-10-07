@@ -106,6 +106,11 @@ router.post('/categories/:id/archive', requireAnyPermission('EDIT_FINANCE'), fin
 router.post('/categories/:id/restore', requireAnyPermission('EDIT_FINANCE'), financeCategories.restore);
 router.get('/reports', controller.getReports);
 router.get('/reports/builder', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.generate);
+router.post('/reports/snapshots', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.generate);
+router.get('/reports/snapshots', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.listSnapshots);
+router.get('/reports/snapshots/:reportId', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.snapshotStatus);
+router.post('/reports/snapshots/:reportId/revoke', requireAnyPermission('VIEW_BANKING'), financeReportBuilder.revokeSnapshot);
+router.get('/reports/snapshots/:reportId/download/:format', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.downloadSnapshot);
 router.get('/reports/builder.csv', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.csv);
 router.get('/reports/builder.pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.pdf);
 router.post('/reports/builder/email-pdf', requirePermission('EXPORT_FINANCIAL_DATA'), requireStepUp('EXPORT_FINANCIAL_DATA'), requireSensitiveExportApproval('FINANCE'), financeReportBuilder.emailPdf);

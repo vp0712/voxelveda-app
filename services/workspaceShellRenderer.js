@@ -29,12 +29,15 @@ function sharedSidebar(user, template) {
   return aside;
 }
 function renderFinancePage(req, res) {
+  return res.type('html').set('Cache-Control','private, no-store').send(renderFinanceDocument(req));
+}
+function renderFinanceDocument(req, document = null) {
   const dir = path.join(__dirname,'..','public');
   const template = fs.readFileSync(path.join(dir,'admin-dashboard.html'),'utf8');
-  let html = fs.readFileSync(path.join(dir,'finance-intelligence.html'),'utf8');
+  let html = document || fs.readFileSync(path.join(dir,'finance-intelligence.html'),'utf8');
   const header = `<header class="topbar vv-topbar"><button class="topbar-menu-btn" type="button" aria-label="Open menu" aria-controls="primarySidebar" aria-expanded="false" data-mobile-menu-action="toggle"><span></span><span></span><span></span></button><div class="topbar-title"><span class="topbar-kicker">Voxel Veda Workspace</span><h2>Finance</h2><p>${escape(req.user?.username || req.user?.name || req.user?.email)} · ${escape(req.user?.role)}</p></div><div class="topbar-actions"><a class="secondary-btn" href="/dashboard">Main dashboard</a><a class="secondary-btn" href="/admin?view=expenses">Expenses & Payables</a></div></header>`;
   html = html.replace('<!-- SHARED_WORKSPACE_NAV -->', '<div class="mobile-sidebar-backdrop" data-mobile-menu-action="close" aria-hidden="true"></div>'+sharedSidebar(req.user,template));
   html = html.replace('<!-- SHARED_WORKSPACE_HEADER -->',header);
-  res.type('html').set('Cache-Control','private, no-store').send(injectGlobalBrand(html));
+  return injectGlobalBrand(html);
 }
-module.exports = { renderFinancePage, sharedSidebar, sectionAccess };
+module.exports = { renderFinancePage, renderFinanceDocument, sharedSidebar, sectionAccess };

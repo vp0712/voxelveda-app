@@ -22,7 +22,7 @@ assert(controller.includes("secure_documents"),'receipt status filter is missing
 assert(controller.includes('CAST(sd.record_id AS UNSIGNED)=bt.id'),'receipt report filters must use a collation-independent numeric document link');
 assert(!controller.includes('sd.record_id=CAST(bt.id AS CHAR)'),'receipt report filters must not compare differently collated text identifiers');
 assert(controller.includes("Mixed currencies") || controller.includes("Currency"),'currency handling contract is missing');
-assert(controller.includes("LIMIT 20000"),'filtered report must use a bounded server query');
+assert(controller.includes("LIMIT 100001")&&controller.includes("No partial report has been saved"),'oversized reports must fail explicitly instead of silently losing records');
 assert(controller.includes("csvCell"),'CSV escaping is missing');
 assert(controller.includes("FILTERED_REPORT_EXPORTED"),'filtered export audit logging is missing');
 assert(controller.includes('exports.pdf'),'filtered branded PDF export is missing');
@@ -31,7 +31,7 @@ assert(controller.includes('reportCompanyProfile'),'filtered PDF must consume co
 assert(controller.includes('profile.footer'),'filtered PDF must repeat the configured confidential footer');
 assert(controller.includes('assertPdfArtifact'),'emailed Finance PDFs must be validated before delivery');
 assert(controller.includes("contentDisposition:'attachment'"),'emailed Finance PDFs must force MIME attachment disposition');
-assert(controller.includes("attachment_content_type:'application/pdf'"),'email response must confirm PDF MIME type');
+assert(controller.includes("attachment_content_type:outcome.pdf_attached?'application/pdf':null"),'email response must confirm PDF MIME type');
 assert(emailService.includes('assertAttachmentIntegrity'),'email service must validate attachment bytes');
 assert(emailService.includes("buffer.subarray(0, 5).toString('ascii') !== '%PDF-'"),'email service must verify the PDF magic header');
 assert(emailService.includes('if (hasPdf)'),'PDF delivery must use the dedicated attachment-safe transport path');
@@ -71,13 +71,13 @@ assert(client.includes('type="button" class="fm-report-preset"'),'report preset 
 assert(client.includes('reportResultAnchor'),'generated report must expose a deterministic mobile scroll target.');
 
 assert(client.includes('exportBuiltReportXlsx'),'XLSX report export is missing');
-assert(client.includes("API+'/reports/builder.xlsx?'"),'XLSX action must use the protected server export route');
-assert(client.includes("API+'/reports/builder.csv?'"),'CSV report export is missing');
+assert(client.includes("downloadBuiltReport('xlsx'"),'XLSX action must use the protected saved-snapshot route');
+assert(client.includes("downloadBuiltReport('csv'"),'CSV report export is missing');
 assert(client.includes("API+'/reports/builder.pdf?'"),'PDF report export is missing');
 assert(client.includes('id="reportPdf"'),'Report Builder PDF action is missing');
 assert(client.includes('openReportEmailDialog'),'Report Builder must use a validated email delivery modal');
 assert(!client.includes("prompt('Send this Finance PDF to which email address?')"),'Report Builder must not use a raw browser prompt for PDF delivery');
-assert(client.includes('attachment_filename_verified'),'Report Builder must show attachment filename integrity evidence');
+assert(client.includes('email_outcome?.status'),'Report Builder must show the actual provider outcome');
 assert(client.includes("API+'/reports/saved'"),'saved report UI is missing');
 assert(client.includes('Currencies are never converted or relabelled'),'currency safety disclosure is missing');
 
