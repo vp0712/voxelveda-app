@@ -18,8 +18,8 @@ function showStartupFailure(message){
   if(notice){
     notice.hidden=false;
     notice.textContent=message||'Finance startup did not complete.';
-    notice.style.background='#fde9eb';
-    notice.style.color='#8f2732';
+    notice.style.background='var(--danger-bg)';
+    notice.style.color='var(--danger)';
   }
   if(content){
     content.innerHTML='<div class="fm-state fm-state-error"><strong>Finance startup stopped safely</strong><p>The workspace did not finish loading, so the permanent spinner was stopped. Reload Finance to try again.</p><button type="button" data-finance-hard-retry="1">Reload Finance</button></div>';

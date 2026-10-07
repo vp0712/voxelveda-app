@@ -1,6 +1,6 @@
 (function () {
   const status = document.getElementById('status');
-  const setStatus = (message, ok = false) => { if (status) { status.textContent = message; status.style.color = ok ? '#22c55e' : '#f87171'; } };
+  const setStatus = (message, ok = false) => { if (status) { status.textContent = message; status.style.color = ok ? 'var(--success)' : 'var(--danger)'; } };
   document.getElementById('recoveryForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const email = document.getElementById('recoveryEmail').value.trim();

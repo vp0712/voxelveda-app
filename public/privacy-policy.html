@@ -7,28 +7,28 @@
 <link rel="stylesheet" href="/style.css?v=20260704-aurora-graphite" />
   <link rel="stylesheet" href="/advanced-theme.css?v=20260824-mobile-shell-v4" />
   <style>
-    body { padding: 28px; }
-    .policy-shell { max-width: 980px; margin: 0 auto; }
-    .policy-card { background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(45, 212, 191, 0.35); border-radius: 22px; padding: 34px; box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35); }
-    .policy-head { display: grid; grid-template-columns: 96px 1fr auto; gap: 18px; align-items: center; margin-bottom: 24px; }
-    .policy-head img { width: 96px; height: 96px; object-fit: contain; }
-    .policy-head h1 { margin: 0; font-size: 32px; line-height: 1.08; }
-    .policy-head p, .policy-card p, .policy-card li { color: #dbeafe; }
-    .policy-meta { text-align: right; color: #9fb4ca; font-size: 13px; }
-    .policy-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-    .policy-section { border: 1px solid rgba(45, 212, 191, 0.22); border-radius: 16px; padding: 18px; background: rgba(2, 6, 23, 0.45); }
-    .policy-section h2 { margin: 0 0 10px; color: #2dd4bf; font-size: 18px; }
-    .policy-section ul { margin: 10px 0 0; padding-left: 20px; }
-    .policy-full { grid-column: 1 / -1; }
-    .policy-qr { display: flex; gap: 14px; align-items: center; margin-top: 18px; padding: 16px; border-radius: 16px; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.35); }
-    .policy-qr img { width: 86px; height: 86px; background: white; border-radius: 10px; padding: 6px; }
+    body{ padding: 28px; }
+    .policy-shell{ max-width: 980px; margin: 0 auto; }
+    .policy-card{ background:var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 34px; box-shadow:var(--shadow); }
+    .policy-head{ display: grid; grid-template-columns: 96px 1fr auto; gap: 18px; align-items: center; margin-bottom: 24px; }
+    .policy-head img{ width: 96px; height: 96px; object-fit: contain; }
+    .policy-head h1{ margin: 0; font-size: 32px; line-height: 1.08; }
+    .policy-head p{ color: var(--text-secondary); }.policy-card p{ color: var(--text-secondary); }.policy-card li{ color: var(--text-primary); }
+    .policy-meta{ text-align: right; color: var(--text-primary); font-size:14px; }
+    .policy-grid{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .policy-section{ border: 1px solid var(--border); border-radius: 16px; padding: 18px; background:var(--surface); }
+    .policy-section h2{ margin: 0 0 10px; color: var(--text-primary); font-size: 18px; }
+    .policy-section ul{ margin: 10px 0 0; padding-left: 20px; }
+    .policy-full{ grid-column: 1 / -1; }
+    .policy-qr{ display: flex; gap: 14px; align-items: center; margin-top: 18px; padding: 16px; border-radius: 16px; background:var(--surface); border: 1px solid var(--border); }
+    .policy-qr img{ width: 86px; height: 86px; background:var(--surface); border-radius: 10px; padding: 6px; }
     @media (max-width: 760px) {
-      body { padding: 14px; }
-      .policy-card { padding: 22px; }
-      .policy-head { grid-template-columns: 76px 1fr; }
-      .policy-head img { width: 76px; height: 76px; }
-      .policy-meta { grid-column: 1 / -1; text-align: left; }
-      .policy-grid { grid-template-columns: 1fr; }
+      body{ padding: 14px; }
+      .policy-card{ padding: 22px; }
+      .policy-head{ grid-template-columns: 76px 1fr; }
+      .policy-head img{ width: 76px; height: 76px; }
+      .policy-meta{ grid-column: 1 / -1; text-align: left; }
+      .policy-grid{ grid-template-columns: 1fr; }
     }
   </style>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />

@@ -11,17 +11,24 @@ const money = require('../utils/money');
  * - linked refunds are cash inflow, but are exposed separately so callers never present them as ordinary revenue;
  * - currencies are always grouped independently.
  */
-async function cashTotalsByCurrency(db, whereSql, params) {
+function categoryDebit(category) {
+  if (!category) return {sql:'bt.debit',params:[]};
+  return {sql:`CASE WHEN EXISTS (SELECT 1 FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id)
+    THEN COALESCE((SELECT SUM(sx.amount) FROM bank_transaction_splits sx WHERE sx.parent_bank_transaction_id=bt.id
+      AND LOWER(COALESCE(NULLIF(sx.category,''),'Unclassified'))=LOWER(?)),0) ELSE bt.debit END`,params:[category]};
+}
+async function cashTotalsByCurrency(db, whereSql, params, options = {}) {
+  const allocated=categoryDebit(options.category);
   const [rows] = await db.query(
     `SELECT bt.currency,
             COUNT(*) AS source_transaction_count,
             SUM(CASE WHEN bt.is_internal_transfer=1 THEN 1 ELSE 0 END) AS transfer_transaction_count,
             COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.credit ELSE 0 END),0) AS money_in,
-            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN bt.debit ELSE 0 END),0) AS money_out,
+            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 THEN ${allocated.sql} ELSE 0 END),0) AS money_out,
             COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0
               THEN LEAST(COALESCE(bt.credit,0),COALESCE(rf.linked_refund_amount,0)) ELSE 0 END),0) AS linked_refund_inflow,
             COALESCE(SUM(CASE WHEN bt.is_internal_transfer=1 THEN GREATEST(COALESCE(bt.debit,0),COALESCE(bt.credit,0)) ELSE 0 END),0) AS transfer_movement,
-            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 AND bt.category='Cash' THEN bt.debit ELSE 0 END),0) AS cash_out,
+            COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 AND bt.category='Cash' THEN ${allocated.sql} ELSE 0 END),0) AS cash_out,
             COALESCE(SUM(CASE WHEN bt.is_internal_transfer=0 AND bt.category='Cash' THEN bt.credit ELSE 0 END),0) AS cash_in,
             SUM(CASE WHEN bt.classification_status='UNCLASSIFIED' THEN 1 ELSE 0 END) AS unclassified
        FROM bank_transactions bt
@@ -35,7 +42,7 @@ async function cashTotalsByCurrency(db, whereSql, params) {
       WHERE ${whereSql}
       GROUP BY bt.currency
       ORDER BY bt.currency`,
-    params
+    [...allocated.params,...allocated.params,...params]
   );
   return rows.map((row) => {
     const moneyIn = money.fromCents(money.toCents(row.money_in || 0));
@@ -67,7 +74,7 @@ async function cashTotalsByCurrency(db, whereSql, params) {
 async function categorySpendByCurrency(db, whereSql, params, limit = 120) {
   const [rows] = await db.query(
     `SELECT bt.currency,
-            COALESCE(NULLIF(s.category,''),NULLIF(bt.category,''),'Unclassified') AS category,
+            CASE WHEN s.id IS NOT NULL THEN COALESCE(NULLIF(s.category,''),'Unclassified') ELSE COALESCE(NULLIF(bt.category,''),'Unclassified') END AS category,
             COUNT(DISTINCT bt.id) AS source_transaction_count,
             COUNT(s.id) AS split_line_count,
             COALESCE(SUM(CASE WHEN s.id IS NOT NULL THEN s.amount ELSE bt.debit END),0) AS spent
@@ -75,7 +82,7 @@ async function categorySpendByCurrency(db, whereSql, params, limit = 120) {
        JOIN bank_accounts ba ON ba.id=bt.bank_account_id
        LEFT JOIN bank_transaction_splits s ON s.parent_bank_transaction_id=bt.id
       WHERE bt.debit>0 AND bt.is_internal_transfer=0 AND ${whereSql}
-      GROUP BY bt.currency,COALESCE(NULLIF(s.category,''),NULLIF(bt.category,''),'Unclassified')
+      GROUP BY bt.currency,CASE WHEN s.id IS NOT NULL THEN COALESCE(NULLIF(s.category,''),'Unclassified') ELSE COALESCE(NULLIF(bt.category,''),'Unclassified') END
       ORDER BY bt.currency,spent DESC
       LIMIT ?`,
     [...params, Math.max(1, Math.min(500, Number(limit) || 120))]
@@ -102,4 +109,4 @@ function singleCurrencySummary(rows) {
   return { consolidated_available: true, mixed_currencies: false, ...rows[0] };
 }
 
-module.exports = { cashTotalsByCurrency, categorySpendByCurrency, singleCurrencySummary };
+module.exports = { cashTotalsByCurrency, categorySpendByCurrency, singleCurrencySummary, categoryDebit };

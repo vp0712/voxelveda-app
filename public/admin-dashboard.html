@@ -9,7 +9,8 @@
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
 <link rel="stylesheet" href="/step-up.css?v=20260905"/>
   <link rel="stylesheet" href="/advanced-theme.css?v=20260909-erp-wave1" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="/vendor/chart.umd.js?v=4.5.1"></script>
+  <script src="/workspace-charts.js?v=20261007-readable-integrated"></script>
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -70,7 +71,7 @@
         <button class="nav-btn" data-icon="MI" data-title="Meetings & Inspections" data-section="meetingSection">Meetings & Inspections</button>
 
         <span class="nav-section-label">Finance</span>
-        <button class="nav-btn app-banking-nav" data-icon="BK" data-title="Finance OS" type="button" onclick="openBankingWorkspace()">Finance OS <span id="appBankingAlertBadge" class="app-banking-badge" hidden>0</span></button>
+        <button class="nav-btn app-banking-nav" data-icon="BK" data-title="Finance" type="button" onclick="openBankingWorkspace()">Finance <span id="appBankingAlertBadge" class="app-banking-badge" hidden>0</span></button>
         <button class="nav-btn" data-icon="FN" data-title="Finance" data-section="financeSection">Finance</button>
         <button class="nav-btn" data-icon="$" data-title="Expenses" data-section="expenseSection">Expenses</button>
 
@@ -182,7 +183,7 @@
               <button class="primary-btn" onclick="goSection('invoiceSection')">Create / Review Invoice</button>
               <button class="secondary-btn" onclick="goSection('expenseSection')">Supplier Payments</button>
               <button class="secondary-btn" onclick="goSection('stockSection')">Inventory Control</button>
-              <button class="secondary-btn" onclick="openBankingWorkspace()">Finance OS</button>
+              <button class="secondary-btn" onclick="openBankingWorkspace()">Finance</button>
             </div>
           </div>
           <div class="home-command-orb">
@@ -199,7 +200,7 @@
           <button class="quick-pill command-pill" onclick="goSection('customerSection')"><span>05</span>Customers</button>
           <button class="quick-pill command-pill" onclick="goSection('supplierSection')"><span>06</span>Suppliers</button>
           <button class="quick-pill command-pill" onclick="goSection('expenseSection')"><span>07</span>Expenses</button>
-          <button class="quick-pill command-pill" onclick="openBankingWorkspace()"><span>08</span>Finance OS</button>
+          <button class="quick-pill command-pill" onclick="openBankingWorkspace()"><span>08</span>Finance</button>
           <button class="quick-pill command-pill" onclick="goSection('competitorSection')"><span>08</span>Competitors</button>
         </div>
 
@@ -248,8 +249,8 @@
         <div class="metric-grid dashboard-kpis">
           <div class="card kpi-teal">
             <h3>Invoice Value</h3>
-            <p><strong id="dashboardInvoiceValue">$0.00</strong></p>
-            <span>This month / register value</span>
+            <p><button type="button" class="vv-summary-link" onclick="openRecordRegister('invoices',{})"><strong id="dashboardInvoiceValue">$0.00</strong></button></p>
+            <span>All active invoices · gross AUD</span>
           </div>
           <div class="card kpi-blue">
             <h3>Stock Worth</h3>
@@ -263,17 +264,17 @@
           </div>
           <div class="card kpi-blue">
             <h3>Revenue</h3>
-            <p><strong id="dashboardRevenueValue">$0.00</strong></p>
-            <span>Collected this financial year</span>
+            <p><button type="button" class="vv-summary-link" onclick="openDashboardRegister('invoices','issued')"><strong id="dashboardRevenueValue">$0.00</strong></button></p>
+            <span>Issued invoices · gross AUD this FY</span>
           </div>
           <div class="card kpi-teal">
             <h3>Expenses</h3>
-            <p><strong id="dashboardExpenseValue">$0.00</strong></p>
-            <span>Paid / recorded this financial year</span>
+            <p><button type="button" class="vv-summary-link" onclick="openDashboardRegister('expenses')"><strong id="dashboardExpenseValue">$0.00</strong></button></p>
+            <span>Recorded bills · gross AUD this FY</span>
           </div>
           <div class="card kpi-green">
-            <h3>Net Worth</h3>
-            <p><strong id="dashboardNetWorthValue">$0.00</strong></p>
+            <h3>Net Result</h3>
+            <p><button type="button" class="vv-summary-link" onclick="openFinancialResult()"><strong id="dashboardNetWorthValue">$0.00</strong></button></p>
             <span>Revenue minus expenses</span>
           </div>
         </div>
@@ -330,7 +331,7 @@
           <div class="supplier-intelligence-head">
             <div>
               <span class="panel-kicker">Supplier Payables</span>
-              <h3>Debt Command Centre</h3>
+              <h3>Supplier Payments</h3>
               <p>Pending bills, paid supplier value and upcoming payment pressure across raw material, packaging and operating suppliers.</p>
             </div>
             <div class="supplier-head-actions">
@@ -341,22 +342,23 @@
 
           <div class="supplier-intelligence-grid">
             <div class="supplier-orbit-card">
-              <div class="supplier-orbit-canvas">
-                <canvas id="supplierDebtChart"></canvas>
-                <div class="supplier-orbit-core">
+                <div class="supplier-orbit-core vv-payable-summary">
                   <span>Pending</span>
-                  <strong id="supplierPendingValue">$0.00</strong>
+                  <button type="button" class="vv-summary-link" onclick="openDashboardRegister('expenses','pending')"><strong id="supplierPendingValue">$0.00</strong></button>
                   <small id="supplierPendingCount">0 bills</small>
                 </div>
+              <div class="supplier-orbit-canvas">
+                <canvas id="supplierDebtChart"></canvas>
+
               </div>
               <div class="supplier-orbit-stats">
                 <div>
                   <span>Paid</span>
-                  <strong id="supplierPaidValue">$0.00</strong>
+                  <button type="button" class="vv-summary-link" onclick="openDashboardRegister('expenses','settled')"><strong id="supplierPaidValue">$0.00</strong></button>
                 </div>
                 <div>
                   <span>Overdue</span>
-                  <strong id="supplierOverdueValue">$0.00</strong>
+                  <button type="button" class="vv-summary-link" onclick="openDashboardRegister('expenses','overdue')"><strong id="supplierOverdueValue">$0.00</strong></button>
                 </div>
                 <div>
                   <span>Next Payment</span>
@@ -367,7 +369,7 @@
 
             <div class="supplier-flow-card">
               <div class="mini-head">
-                <h4>Material Payment Flow</h4>
+                <h4>Category payments</h4>
                 <span id="supplierFyLabel">FY</span>
               </div>
               <div id="supplierCategoryFlows" class="supplier-flow-list"></div>
@@ -1155,7 +1157,7 @@
             <p>Review recorded activity, post balanced transactions, resolve exceptions and prepare accountant-ready reports.</p>
           </div>
           <div class="card-actions finance-head-actions">
-            <button type="button" class="primary-btn" onclick="openBankingWorkspace()">Open Finance OS</button>
+            <button type="button" class="primary-btn" onclick="openBankingWorkspace()">Open Finance</button>
             <button type="button" class="secondary-btn" onclick="runFinanceHealthCheck()">Run Health Check</button>
             <button type="button" class="secondary-btn" onclick="openFinanceSetupDialog()">Finance Setup</button>
             <button type="button" class="primary-btn" onclick="openFinanceTransactionDialog()">Add Transaction</button>

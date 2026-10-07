@@ -7,24 +7,24 @@ async function createCustomerAccount() {
 
   if (!name || !email || !password) {
     status.innerText = 'Name, email and password are required.';
-    status.style.color = '#f87171';
+    status.style.color = 'var(--danger)';
     return;
   }
 
   if (password.length < 14) {
     status.innerText = 'Password must contain at least 14 characters.';
-    status.style.color = '#f87171';
+    status.style.color = 'var(--danger)';
     return;
   }
 
   if (!confirmPrivacy) {
     status.innerText = 'Please accept the privacy policy first.';
-    status.style.color = '#f87171';
+    status.style.color = 'var(--danger)';
     return;
   }
 
   status.innerText = 'Creating customer account...';
-  status.style.color = '#00d5ff';
+  status.style.color = 'var(--danger)';
 
   try {
     const res = await fetch('/api/auth/customer-register', {
@@ -42,19 +42,19 @@ async function createCustomerAccount() {
 
     if (!res.ok) {
       status.innerText = data.message || 'Account creation failed.';
-      status.style.color = '#f87171';
+      status.style.color = 'var(--danger)';
       return;
     }
 
     status.innerText = data.message || 'Account created. You can login now.';
-    status.style.color = '#22c55e';
+    status.style.color = 'var(--danger)';
     setTimeout(() => {
       window.location.href = `/login?message=${encodeURIComponent('Customer account created. Please login.')}`;
     }, 1200);
   } catch (error) {
     console.error('Customer account creation error:', error);
     status.innerText = 'Server error creating account.';
-    status.style.color = '#f87171';
+    status.style.color = 'var(--danger)';
   }
 }
 

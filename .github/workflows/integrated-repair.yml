@@ -1,0 +1,42 @@
+name: Integrated Repair Regression
+on:
+  pull_request:
+  push:
+    branches: [main, 'finance-release-*']
+permissions:
+  contents: read
+jobs:
+  mysql-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: disposable-ci-password
+          MYSQL_DATABASE: voxelveda_repair_test
+          MYSQL_USER: repair_test
+          MYSQL_PASSWORD: disposable-ci-password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      NODE_ENV: test
+      REPAIR_DB_TEST: 'true'
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: repair_test
+      DB_PASSWORD: disposable-ci-password
+      DB_NAME: voxelveda_repair_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: node scripts/integrated-repair-regression-test.js
+      - run: node scripts/integrated-repair-mysql-test.js

@@ -22,10 +22,10 @@ function setLoginStatus(message, tone = 'error') {
   const loginStatus = document.getElementById('loginStatus');
   if (!loginStatus) return;
   const colours = {
-    error: '#f87171',
-    info: '#38bdf8',
-    success: '#22c55e',
-    warning: '#facc15'
+    error: 'var(--danger)',
+    info: 'var(--primary)',
+    success: 'var(--success)',
+    warning: 'var(--warning)'
   };
   loginStatus.innerText = message;
   loginStatus.style.color = colours[tone] || colours.error;

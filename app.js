@@ -52,6 +52,7 @@ const { hasAnyPermission } = require('./services/authorizationService');
 const pageAuth = require('./middleware/pageAuth');
 const urls = require('./config/urls');
 const { renderAdminPage } = require('./services/adminPageRenderer');
+const { renderFinancePage } = require('./services/workspaceShellRenderer');
 const { injectGlobalBrand } = require('./services/globalBrandRenderer');
 const { corsOptions, csrfProtection, enforceHttps, rateLimitPolicy, safeApiResponses, securityHeaders, safeErrorHandler } = require('./middleware/securityMiddleware');
 const {
@@ -92,7 +93,7 @@ function isRetiredFinanceUiAsset(asset){
 }
 const noStorePublicAssets = new Set([
   'erp-workspace.js', 'erp-workspace.css',
-  'workspace-theme.css',
+  'workspace-theme.css', 'workspace-theme.js', 'workspace-shell.js', 'workspace-charts.js',
   'login.js','admin-dashboard.js','staff.js','profile.js','procurement-ui.js','auth-lifecycle.js','mfa.js','security-page.js','step-up.js','step-up.css','style.css','advanced-theme.css','mobile-shell.js','quality.js','quality.css','shop-floor.js','shop-floor.css','service-worker.js','finance-bootstrap-guard.js','finance-master.js','finance-master.css','finance-advanced-control.js','finance-statement-parsers.js','global-brand.css','global-brand.js',
   'recovery-assurance.css','recovery-assurance.js','recovery-drill.css','recovery-drill.js','recovery-drill-ledger.css','recovery-drill-ledger.js','recovery-drill-governance.css','recovery-drill-governance.js','recovery-remediation.css','recovery-remediation.js','recovery-executive.css','recovery-executive.js','role-portal.css','role-portal.js','client-portal.html','client-portal.js','visitor-portal.html'
 ]);
@@ -102,7 +103,14 @@ app.set('query parser', 'simple');
 app.use(enforceHttps);
 app.use(securityHeaders);
 app.use(safeApiResponses);
-app.use(cors(corsOptions()));
+const applicationCors = cors(corsOptions());
+app.use((req,res,next) => {
+  // Browsers can submit CSP reports with an opaque ("null") Origin. This
+  // write-only, sanitised telemetry endpoint exposes no response data and needs
+  // no credentialed CORS grant. Keep the allow-list on every application API.
+  if(req.method === 'POST' && req.path === '/api/security/csp-report' && req.headers.origin === 'null') return next();
+  return applicationCors(req,res,next);
+});
 app.use(rateLimitPolicy('authenticated_api'));
 app.use('/api/auth', boundedJson('8kb'));
 app.use('/api/public/rfq', boundedJson('16kb'));
@@ -141,7 +149,7 @@ function serveRolePortal(req,res){
   res.type('html');return res.send(brandedPage('staff-dashboard.html'));
 }
 app.get('/',sendPage('index.html'));app.get('/login',noIndex,sendPage('login.html'));app.get('/register',noIndex,sendPage('register.html'));app.get('/request-quote',sendPage('customer.html'));app.get('/privacy',sendPage('privacy-policy.html'));app.get('/terms',sendPage('terms.html'));app.get('/support',sendPage('support.html'));app.get('/careers',sendPage('careers.html'));app.get('/employee/verify/:token',noIndex,sendPage('employee-verify.html'));app.get('/careers-admin',noIndex,pageAuth(),sendPage('careers-admin.html'));app.get('/forgot-password',noIndex,sendPage('forgot-password.html'));app.get('/reset-password',noIndex,sendPage('reset-password.html'));app.get('/accept-invite',noIndex,sendPage('accept-invite.html'));app.get('/mfa',noIndex,sendPage('mfa.html'));app.get('/security',noIndex,pageAuth({allowMfaSetup:true}),sendPage('security.html'));app.get('/attendance-terminal',noIndex,sendPage('shift-qr.html'));app.get('/401',noIndex,sendPage('401.html',401));app.get('/403',noIndex,sendPage('403.html',403));app.get('/404',noIndex,sendPage('404.html',404));app.get('/429',noIndex,sendPage('429.html',429));app.get('/500',noIndex,sendPage('500.html',500));app.get('/maintenance',noIndex,sendPage('maintenance.html',503));
-app.get('/admin',noIndex,pageAuth({workspaceOnly:true}),renderAdminPage);app.get('/finance-intelligence',noIndex,pageAuth({workspaceOnly:true}),sendPage('finance-intelligence.html'));app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'));app.get('/finance-reconciliation',noIndex,pageAuth(),(req,res)=>res.redirect(302,'/finance-intelligence#reconciliation'));app.get('/dashboard',noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPathForRequestUser(req.user)));app.get('/portal/:role',noIndex,pageAuth(),serveRolePortal);app.get('/client',noIndex,pageAuth(),(req,res)=>{const target=portalPathForRequestUser(req.user);if(target!=='/client')return res.redirect(302,target);res.type('html');return res.send(brandedPage('client-portal.html'))});app.get('/profile',noIndex,pageAuth(),sendPage('profile.html'));app.get('/employee-id',noIndex,pageAuth({workspaceOnly:true}),sendPage('employee-id.html'));app.get('/quality',noIndex,pageAuth({workspaceOnly:true}),sendPage('quality.html'));app.get('/shop-floor',noIndex,pageAuth(),sendPage('shop-floor.html'));app.get('/invoice/view',noIndex,pageAuth(),sendPage('invoice-pdf.html'));
+app.get('/admin',noIndex,pageAuth({workspaceOnly:true}),renderAdminPage);app.get('/finance-intelligence',noIndex,pageAuth({workspaceOnly:true}),renderFinancePage);app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'));app.get('/finance-reconciliation',noIndex,pageAuth(),(req,res)=>res.redirect(302,'/finance-intelligence#reconciliation'));app.get('/dashboard',noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPathForRequestUser(req.user)));app.get('/portal/:role',noIndex,pageAuth(),serveRolePortal);app.get('/client',noIndex,pageAuth(),(req,res)=>{const target=portalPathForRequestUser(req.user);if(target!=='/client')return res.redirect(302,target);res.type('html');return res.send(brandedPage('client-portal.html'))});app.get('/profile',noIndex,pageAuth(),sendPage('profile.html'));app.get('/employee-id',noIndex,pageAuth({workspaceOnly:true}),sendPage('employee-id.html'));app.get('/quality',noIndex,pageAuth({workspaceOnly:true}),sendPage('quality.html'));app.get('/shop-floor',noIndex,pageAuth(),sendPage('shop-floor.html'));app.get('/invoice/view',noIndex,pageAuth(),sendPage('invoice-pdf.html'));
 app.get('/index.html',redirectPreservingQuery('/'));app.get('/login.html',redirectPreservingQuery('/login'));app.get('/register.html',redirectPreservingQuery('/register'));app.get('/customer.html',redirectPreservingQuery('/request-quote'));app.get('/privacy-policy.html',redirectPreservingQuery('/privacy'));app.get('/admin-dashboard.html',redirectPreservingQuery('/admin'));app.get('/finance-intelligence.html',redirectPreservingQuery('/finance-intelligence'));app.get('/finance-reconciliation.html',redirectPreservingQuery('/finance-intelligence#reconciliation'));app.get('/staff-dashboard.html',redirectPreservingQuery('/dashboard'));app.get('/profile.html',redirectPreservingQuery('/profile'));app.get('/quality.html',redirectPreservingQuery('/quality'));app.get('/shop-floor.html',redirectPreservingQuery('/shop-floor'));app.get('/dashboard.html',redirectPreservingQuery('/dashboard'));app.get('/invoice-pdf.html',redirectPreservingQuery('/invoice/view'));app.get('/shift-qr.html',redirectPreservingQuery('/attendance-terminal'));app.get('/careers-admin.html',redirectPreservingQuery('/careers-admin'));
 app.get('/approvals',noIndex,pageAuth(),(req,res)=>{const portal=portalPathForRequestUser(req.user);return res.redirect(302,`${portal}?view=approvals`)});
 const protectedModuleRoutes=['/rfqs','/invoices','/customers','/suppliers','/procurement','/stock','/raw-material','/packaging','/expenses','/workforce','/timesheets','/roster','/staff','/finance','/financial-years','/compliance','/forms','/settings','/meetings','/tasks','/trash'];
@@ -153,6 +161,7 @@ app.use((req,res,next)=>{
   res.setHeader('Cache-Control','no-store, max-age=0');
   return res.status(410).type('text/plain').send('This legacy Finance interface has been retired. Use /finance-intelligence.');
 });
+app.get('/vendor/chart.umd.js', (req,res) => { res.set('Cache-Control','public, max-age=86400').type('application/javascript').sendFile(path.join(__dirname,'node_modules','chart.js','dist','chart.umd.js')); });
 app.use(express.static(publicDir,{dotfiles:'deny',index:false,setHeaders(res,filePath){res.setHeader('X-Content-Type-Options','nosniff');if(noStorePublicAssets.has(path.basename(filePath)))res.setHeader('Cache-Control','no-store, max-age=0')}}));
 app.use('/invoices',noIndex,auth,requirePermission('VIEW_FINANCE'),express.static(path.join(__dirname,'invoices'),{dotfiles:'deny',index:false,setHeaders(res){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive')}}));
 app.use('/api/public/careers',publicCareersRoutes);app.get('/api/public/employee-id/:token/verify',rateLimitPolicy('coc_verification'),employeeIdentityController.verify);app.get('/api/public/finance-report/:token/:filename',rateLimitPolicy('coc_verification'),servePdfDelivery);app.get('/api/public/finance-report/:token',rateLimitPolicy('coc_verification'),servePdfDelivery);

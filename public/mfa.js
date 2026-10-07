@@ -2,7 +2,7 @@
   const challenge = sessionStorage.getItem('vv_mfa_challenge') || '';
   const setup = sessionStorage.getItem('vv_mfa_setup') === '1';
   const status = document.getElementById('status');
-  const setStatus = (message, ok = false) => { status.textContent = message; status.style.color = ok ? '#22c55e' : '#f87171'; };
+  const setStatus = (message, ok = false) => { status.textContent = message; status.style.color = ok ? 'var(--success)' : 'var(--danger)'; };
   function destination(user) {
     const role = String(user?.role || '').trim().toLowerCase();
     let home = '/portal/staff';

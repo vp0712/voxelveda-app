@@ -9,7 +9,7 @@ const assert=(ok,message)=>{if(!ok)throw new Error(message)};
 const app=read('app.js');
 const html=read('public/finance-intelligence.html');
 const ui=read('public/finance-master.js');
-const css=read('public/finance-master.css');
+const css=read('public/finance-master.css')+read('public/workspace-theme.css');
 const financeRoutes=read('routes/financeRoutes.js');
 const report=read('controllers/financeReportBuilderController.js');
 const reportPdf=read('services/financeReportPdfService.js');
@@ -52,8 +52,8 @@ assert(ui.includes('Personal wallet')||ui.includes('Personal planning & cash'),'
 
 assert(ui.includes('Finance will not invent an exchange rate.'),'missing FX must fail closed');
 assert(ui.includes('Never enter a bank password, bank PIN or bank OTP'),'Open Banking/security boundary must be visible');
-assert(ui.includes('const MOBILE_NAV')&&ui.includes("'more','☰','More'"),'mobile must expose the complete module launcher');
-assert(css.includes('.fm-mobile-nav')&&css.includes('@media(max-width:700px)'),'Finance OS must have a mobile layout');
+assert(ui.includes('NAV_GROUPS')&&html.includes('fm-department-nav'),'mobile must expose the complete module launcher');
+assert(css.includes('.vv-primary-nav')&&css.includes('@media(max-width:700px)'),'Finance OS must have a mobile layout');
 
 for(const type of ['TRANSACTION_REGISTER','INCOME_VS_EXPENSE','CASH_FLOW','ACCOUNT_STATEMENT','CATEGORY','MERCHANT','CASH','TRANSFER','REFUND','REIMBURSEMENT','GST_SUMMARY','RECONCILIATION','DATA_QUALITY','PERSONAL_MONTHLY_SUMMARY','COMPANY_MONTHLY_SUMMARY']){
   assert(report.includes(type),'report backend missing '+type);

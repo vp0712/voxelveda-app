@@ -57,7 +57,9 @@ function pageAuth({ adminOnly = false, workspaceOnly = false, allowMfaSetup = fa
       const canUseOperationsWorkspace = hasAnyPermission(authorizationUser, [
         'VIEW_FINANCE', 'MANAGE_JOBS', 'MANAGE_TEAM_JOBS', 'VIEW_CUSTOMERS',
         'VIEW_INVENTORY', 'VIEW_SUPPLIERS', 'VIEW_RFQS'
-      ]);
+      ]) || (req.path === '/finance-intelligence' && hasAnyPermission(authorizationUser, [
+        'VIEW_BANKING', 'VIEW_PERSONAL_BANKING', 'VIEW_BUSINESS_BANKING'
+      ]));
 
       if ((adminOnly && !canAdminister) || (workspaceOnly && !canUseOperationsWorkspace)) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');

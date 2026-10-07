@@ -20,19 +20,19 @@ function run() {
   assert.equal(money.percentageOf('1000.00', '10'), '100.00');
 
   assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid', due_date: '2099-01-01' }), {
-    totalPaid: '0.00', balanceDue: '5000.00', status: 'unpaid'
+    totalPaid: '0.00', balanceDue: '5000.00', overpayment: '0.00', status: 'unpaid'
   });
   assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'paid' }), {
-    totalPaid: '5000.00', balanceDue: '0.00', status: 'paid'
+    totalPaid: '5000.00', balanceDue: '0.00', overpayment: '0.00', status: 'paid'
   });
   assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid', due_date: '2099-01-01' }, '2000.00', 1), {
-    totalPaid: '2000.00', balanceDue: '3000.00', status: 'partially_paid'
+    totalPaid: '2000.00', balanceDue: '3000.00', overpayment: '0.00', status: 'partially_paid'
   });
   assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid', due_date: '2020-01-01' }, '2000.00', 1, '2026-01-01'), {
-    totalPaid: '2000.00', balanceDue: '3000.00', status: 'overdue'
+    totalPaid: '2000.00', balanceDue: '3000.00', overpayment: '0.00', status: 'overdue'
   });
   assert.deepEqual(paymentState({ total_amount: '5000.00', status: 'unpaid' }, '5000.00', 2), {
-    totalPaid: '5000.00', balanceDue: '0.00', status: 'paid'
+    totalPaid: '5000.00', balanceDue: '0.00', overpayment: '0.00', status: 'paid'
   });
   assert.equal(validatePaymentAmount('3000', '3000'), '3000.00');
   assert.throws(() => validatePaymentAmount('3000.01', '3000'), /cannot exceed/);

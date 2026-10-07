@@ -737,8 +737,67 @@ function setRegisterLoading(tbody, colspan, message = 'Loading data...') {
   tbody.innerHTML = `<tr><td colspan="${colspan}"><span class="table-loading-state">${escapeHtml(message)}</span></td></tr>`;
 }
 
+const registerFilters={rfqs:{},invoices:{},expenses:{}};
+let restoringAdminNavigation=false;
+const registerSections={rfqs:'rfqSection',invoices:'invoiceSection',expenses:'expenseSection'};
+function openRecordRegister(kind,filters={}) {
+  if(!registerSections[kind])return;
+  registerFilters[kind]={...filters};
+  if(kind==='expenses') {
+    setExpenseFinancialYearOptions();
+    const fy=document.getElementById('expenseFinancialYear'),search=document.getElementById('expenseSearch');
+    if(fy)fy.value=filters.fy||'';if(search)search.value=filters.search||'';expensePage=1;
+  }
+  if(registerPagerState[kind])registerPagerState[kind].page=1;
+  goSection(registerSections[kind]);
+}
+function dashboardPeriodFilters(kind,status) {
+  const fy=String(dashboardStatsCache?.finance?.financial_year||'').slice(0,4);
+  const filters=fy?(kind==='expenses'?{fy}:{from:fy+'-07-01',to:(Number(fy)+1)+'-06-30'}):{};
+  return {...filters,...(status?{status}:{})};
+}
+function openDashboardRegister(kind,status) { openRecordRegister(kind,dashboardPeriodFilters(kind,status)); }
+function openFinancialResult(month) {
+  const filters=month?{from:month+'-01',to:new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).toISOString().slice(0,10)}:dashboardPeriodFilters('invoices');
+  const label=month||('FY '+(dashboardStatsCache?.finance?.financial_year||''));
+  showDialog('Net result · '+label,'<p>Gross issued invoices minus recorded bills · AUD. Open each source register to reconcile this result.</p><div class="vv-result-actions"><button type="button" id="vvResultRevenue">Issued invoices</button><button type="button" id="vvResultExpenses">Recorded bills</button></div>',()=>hideDialog(),'Close');
+  document.getElementById('vvResultRevenue').onclick=()=>{hideDialog();openRecordRegister('invoices',{...filters,status:'issued'});};
+  document.getElementById('vvResultExpenses').onclick=()=>{hideDialog();openRecordRegister('expenses',filters);};
+}
+function registerFilterBanner(kind,counts='') {
+  const section=document.getElementById(registerSections[kind]);if(!section)return;
+  section.querySelector('.vv-filter-context')?.remove();
+  const filters=registerFilters[kind],entries=Object.entries(filters).filter(([,value])=>value!==''&&value!=null);
+  if(!entries.length)return;
+  const banner=document.createElement('div');banner.className='vv-filter-context';
+  const label=document.createElement('span');label.textContent=entries.map(([key,value])=>key+': '+value).join(' · ')+(counts?' · '+counts:'');
+  const clear=document.createElement('button');clear.type='button';clear.textContent='Clear filters';clear.onclick=()=>openRecordRegister(kind,{});banner.append(label,clear);
+  section.querySelector('.section-head')?.after(banner);
+}
+function trackAdminNavigation(section) {
+  if(restoringAdminNavigation)return;
+  const url=new URL(location.href);const view=section==='dashboardSection'?'dashboard':section==='erpSection'?'erp':Object.entries(registerSections).find(([,value])=>value===section)?.[0]||section.replace(/Section$/,'');
+  url.searchParams.set('view',view);const kind=Object.keys(registerSections).find(key=>registerSections[key]===section);
+  url.searchParams.delete('filters');if(kind&&Object.keys(registerFilters[kind]).length)url.searchParams.set('filters',JSON.stringify(registerFilters[kind]));
+  if(url.href!==location.href)history.pushState({section,filters:structuredClone(registerFilters)},'',url);
+}
+function restoreAdminFilters() {
+  const query=new URLSearchParams(location.search),kind=query.get('view');
+  if(registerSections[kind]){try{const parsed=JSON.parse(query.get('filters')||'{}');if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))registerFilters[kind]=parsed;}catch{} }
+}
+restoreAdminFilters();
+window.addEventListener('popstate',event=>{restoringAdminNavigation=true;Object.keys(registerFilters).forEach(key=>registerFilters[key]=event.state?.filters?.[key]||{});restoreAdminFilters();const section=event.state?.section||requestedAdminSection();if(section)goSection(section);restoringAdminNavigation=false;});
+
 function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRenderer, onChange }) {
-  const orderedRows = chronologicalRows(rows || []);
+  const filters=registerFilters[key]||{};
+  const filteredRows=(rows||[]).filter(row=>{
+    const status=String(row.status||'unknown').toLowerCase(),day=String(row.created_at||'').slice(0,10);
+    if(filters.status==='issued'&&!['approved','sent','paid','partially_paid','overdue'].includes(status))return false;
+    if(filters.status&&filters.status!=='issued'&&status!==filters.status)return false;
+    return (!filters.from||day>=filters.from)&&(!filters.to||day<=filters.to);
+  });
+  const orderedRows=chronologicalRows(filteredRows);
+  if(registerSections[key])registerFilterBanner(key,`${orderedRows.length} records`);
   registerPagerState[key] = {
     page: Number(registerPagerState[key]?.page || 1),
     pageSize: Number(registerPagerState[key]?.pageSize || 25)
@@ -970,6 +1029,7 @@ function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach((btn) => {
     if (!btn.dataset.section) return;
     btn.onclick = () => {
+      if(currentUser&&!canAccessAdminSection(btn.dataset.section))return showToast('You do not have access to this section');
       const targetSection = document.getElementById(btn.dataset.section);
       if (!targetSection) {
         showToast('Section is not available yet');
@@ -983,6 +1043,8 @@ function setupNavigation() {
 
       document.querySelectorAll('.page-section').forEach((s) => s.classList.add('hidden-section'));
       targetSection.classList.remove('hidden-section');
+      trackAdminNavigation(btn.dataset.section);
+      requestAnimationFrame(()=>window.VoxelCharts?.resize());
 
       if (btn.dataset.section === 'customerSection') loadCustomers();
       if (btn.dataset.section === 'supplierSection') loadSuppliers();
@@ -1385,15 +1447,15 @@ function previewCompanyFormRecord(recordId) {
       <head>
         <title>${escapeHtml(record.formTitle)}</title>
         <style>
-          body { font-family: Arial, sans-serif; margin: 36px; color: #0f172a; }
-          header { display: flex; align-items: center; gap: 16px; border-bottom: 3px solid #0ea5e9; padding-bottom: 16px; margin-bottom: 24px; }
-          img { width: 86px; height: 86px; object-fit: contain; border-radius: 18px; }
-          h1 { margin: 0; font-size: 26px; }
-          p { margin: 4px 0 0; color: #475569; }
-          table { width: 100%; border-collapse: collapse; margin-top: 18px; }
-          th, td { text-align: left; vertical-align: top; border: 1px solid #cbd5e1; padding: 12px; }
-          th { width: 34%; background: #f1f5f9; }
-          footer { margin-top: 28px; font-size: 12px; color: #64748b; }
+          body{ font-family: Arial, sans-serif; margin: 36px; color: var(--text-primary); }
+          header{ display: flex; align-items: center; gap: 16px; border-bottom: 3px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+          img{ width: 86px; height: 86px; object-fit: contain; border-radius: 18px; }
+          h1{ margin: 0; font-size: 26px; }
+          p{ margin: 4px 0 0; color: var(--text-secondary); }
+          table{ width: 100%; border-collapse: collapse; margin-top: 18px; }
+          th{ text-align: left; vertical-align: top; border: 1px solid var(--border); padding: 12px; }td{ text-align: left; vertical-align: top; border: 1px solid var(--border); padding: 12px; }
+          th{ width: 34%; background:var(--surface-muted); }
+          footer{ margin-top: 28px; font-size:14px; color: var(--text-primary); }
           @media print { body { margin: 16mm; } button { display: none; } }
         </style>
       </head>
@@ -1600,7 +1662,7 @@ function canAccessAdminSection(sectionId) {
 function requestedAdminSection() {
   const view = new URLSearchParams(window.location.search).get('view');
   const sections = {
-    erp: 'erpSection', marketing: 'erpSection', planning: 'erpSection', 'supply-chain': 'erpSection',
+    dashboard: 'dashboardSection', 'stock-out': 'stockUsageSection', erp: 'erpSection', marketing: 'erpSection', planning: 'erpSection', 'supply-chain': 'erpSection',
     rfqs: 'rfqSection', invoices: 'invoiceSection', customers: 'customerSection',
     suppliers: 'supplierSection', procurement: 'procurementSection', stock: 'stockSection', 'raw-material': 'rawMaterialSection',
     packaging: 'packagingSection', finance: 'financeSection', expenses: 'expenseSection', workforce: 'attendanceSection',
@@ -1608,7 +1670,7 @@ function requestedAdminSection() {
     compliance: 'complianceSection', forms: 'companyFormsSection', settings: 'settingsSection', security: 'securitySection',
     meetings: 'meetingSection', tasks: 'taskSection', approvals: 'approvalsSection', trash: 'trashSection'
   };
-  return sections[view] || (!view ? 'erpSection' : '');
+  return sections[view] || (document.getElementById(view+'Section')?.classList.contains('page-section')?view+'Section':(!view?'erpSection':''));
 }
 
 function configureRestrictedWorkspaceView() {
@@ -2070,7 +2132,7 @@ async function loadDashboardStats() {
   setText('dashboardRevenueValue', formatMoney(data.finance?.revenue));
   setText('dashboardExpenseValue', formatMoney(data.finance?.expenses));
   setText('dashboardNetWorthValue', formatMoney(data.finance?.net_worth));
-  setText('homeCashPulse', formatMoney(data.finance?.revenue));
+  setText('homeCashPulse', formatMoney(data.finance?.collected_revenue));
 
   renderCharts(data);
   renderSupplierPayables(data.supplier_payables || {});
@@ -2163,259 +2225,31 @@ function renderLastOrders(invoices) {
 }
 
 function renderCharts(data) {
-  const rfqCanvas = document.getElementById('rfqChart');
-  const invoiceCanvas = document.getElementById('invoiceChart');
-  const financeCanvas = document.getElementById('financeChart');
-
-  if (!rfqCanvas || !invoiceCanvas || typeof Chart === 'undefined') return;
-
-  if (rfqChartInstance) rfqChartInstance.destroy();
-  if (invoiceChartInstance) invoiceChartInstance.destroy();
-  if (financeChartInstance) financeChartInstance.destroy();
-
-  const chartGridColor = 'rgba(148, 163, 184, 0.11)';
-  const chartTickColor = '#cbd5e1';
-  const chartTooltip = {
-    backgroundColor: 'rgba(2, 6, 23, 0.94)',
-    borderColor: 'rgba(45, 212, 191, 0.42)',
-    borderWidth: 1,
-    titleColor: '#e0f2fe',
-    bodyColor: '#f8fafc',
-    padding: 12,
-    displayColors: true
+  const chart=window.VoxelCharts; if(!chart)return;
+  const statuses=(stats,kind)=>{
+    const rows=(stats.statuses||[]).map(row=>({label:String(row.status||'unknown').replace(/_/g,' '),status:row.status,value:Number(row.count||0)}));
+    chart.render(kind==='rfqs'?'rfqChart':'invoiceChart',{title:kind==='rfqs'?'RFQ status':'Invoice status',context:`All active records · ${rows.reduce((sum,row)=>sum+row.value,0)} ${kind} · count`,type:kind==='rfqs'?'doughnut':'bar',horizontal:kind==='invoices',legend:false,
+      labels:rows.map(row=>row.label),datasets:[{label:'Records',data:rows.map(row=>row.value),colourByValue:true}],rows,
+      center:kind==='rfqs'?{value:stats.total_rfqs||0,label:'RFQs'}:null,
+      open:row=>openRecordRegister(kind,{status:row.status}),chartOpen:index=>openRecordRegister(kind,{status:rows[index].status})});
   };
-  const verticalGradient = (context, top, bottom) => {
-    const { chart } = context;
-    const area = chart.chartArea;
-    if (!area) return top;
-    const gradient = chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-    gradient.addColorStop(0, top);
-    gradient.addColorStop(1, bottom);
-    return gradient;
-  };
-  const centerTextPlugin = {
-    id: 'rfqCenterText',
-    afterDraw(chart) {
-      const dataset = chart.data.datasets?.[0];
-      const meta = chart.getDatasetMeta(0);
-      if (!dataset || !meta?.data?.[0]) return;
-      const total = dataset.data.reduce((sum, value) => sum + Number(value || 0), 0);
-      const { x, y } = meta.data[0];
-      const ctx = chart.ctx;
-      ctx.save();
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = '#67e8f9';
-      ctx.font = '900 22px Inter, Arial, sans-serif';
-      ctx.fillText(String(total), x, y - 8);
-      ctx.fillStyle = 'rgba(226, 232, 240, 0.72)';
-      ctx.font = '800 11px Inter, Arial, sans-serif';
-      ctx.fillText('RFQs', x, y + 16);
-      ctx.restore();
-    }
-  };
-
-  rfqChartInstance = new Chart(rfqCanvas, {
-    type: 'doughnut',
-    data: {
-      labels: ['Pending', 'Approved', 'Quoted'],
-      datasets: [{
-        data: [
-          Number(data.rfqs.pending_rfqs || 0),
-          Number(data.rfqs.approved_rfqs || 0),
-          Number(data.rfqs.quoted_rfqs || 0)
-        ],
-        backgroundColor: ['#38bdf8', '#fb7185', '#f59e0b'],
-        borderColor: 'rgba(2, 6, 23, 0.92)',
-        borderWidth: 5,
-        borderRadius: 8,
-        hoverBorderColor: '#e0f2fe',
-        hoverOffset: 10,
-        spacing: 3
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '68%',
-      animation: { animateRotate: true, duration: 900 },
-      plugins: {
-        tooltip: chartTooltip,
-        legend: {
-          position: 'bottom',
-          labels: {
-            color: '#f8fafc',
-            usePointStyle: true,
-            pointStyle: 'circle',
-            boxWidth: 8,
-            padding: 14
-          }
-        }
-      }
-    },
-    plugins: [centerTextPlugin]
-  });
-
-  invoiceChartInstance = new Chart(invoiceCanvas, {
-    type: 'bar',
-    data: {
-      labels: ['Draft', 'Approved', 'Sent', 'Paid'],
-      datasets: [{
-        label: 'Invoices',
-        data: [
-          Number(data.invoices.draft_invoices || 0),
-          Number(data.invoices.approved_invoices || 0),
-          Number(data.invoices.sent_invoices || 0),
-          Number(data.invoices.paid_invoices || 0)
-        ],
-        backgroundColor: (context) => {
-          const colors = [
-            ['rgba(37, 99, 235, 0.95)', 'rgba(37, 99, 235, 0.22)'],
-            ['rgba(45, 212, 191, 0.95)', 'rgba(45, 212, 191, 0.18)'],
-            ['rgba(56, 189, 248, 0.95)', 'rgba(56, 189, 248, 0.18)'],
-            ['rgba(34, 197, 94, 0.95)', 'rgba(34, 197, 94, 0.18)']
-          ];
-          const color = colors[context.dataIndex] || colors[0];
-          return verticalGradient(context, color[0], color[1]);
-        },
-        borderColor: 'rgba(125, 211, 252, 0.26)',
-        borderWidth: 1,
-        borderRadius: 16,
-        borderSkipped: false,
-        maxBarThickness: 42
-      }, {
-        type: 'line',
-        label: 'Flow line',
-        data: [
-          Number(data.invoices.draft_invoices || 0),
-          Number(data.invoices.approved_invoices || 0),
-          Number(data.invoices.sent_invoices || 0),
-          Number(data.invoices.paid_invoices || 0)
-        ],
-        borderColor: '#67e8f9',
-        backgroundColor: 'rgba(103, 232, 249, 0.15)',
-        pointBackgroundColor: '#e0f2fe',
-        pointBorderColor: '#0891b2',
-        pointBorderWidth: 2,
-        pointRadius: 4,
-        tension: 0.42,
-        fill: false
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        tooltip: chartTooltip,
-        legend: {
-          position: 'top',
-          align: 'end',
-          labels: {
-            color: '#f8fafc',
-            usePointStyle: true,
-            pointStyle: 'circle',
-            boxWidth: 8,
-            padding: 14
-          }
-        }
-      },
-      scales: {
-        x: { ticks: { color: chartTickColor, font: { weight: 800 } }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: chartTickColor, precision: 0 }, grid: { color: chartGridColor } }
-      }
-    }
-  });
-
-  if (financeCanvas) {
-    const months = data.finance?.months || [];
-    financeChartInstance = new Chart(financeCanvas, {
-      type: 'bar',
-      data: {
-        labels: months.map((row) => row.month_key),
-        datasets: [
-          {
-            label: 'Revenue',
-            data: months.map((row) => Number(row.revenue || 0)),
-            backgroundColor: (context) => verticalGradient(context, 'rgba(45, 212, 191, 0.98)', 'rgba(45, 212, 191, 0.2)'),
-            borderColor: 'rgba(45, 212, 191, 0.35)',
-            borderWidth: 1,
-            borderRadius: 16,
-            borderSkipped: false,
-            maxBarThickness: 46
-          },
-          {
-            label: 'Expenses',
-            data: months.map((row) => Number(row.expenses || 0)),
-            backgroundColor: (context) => verticalGradient(context, 'rgba(251, 113, 133, 0.96)', 'rgba(251, 113, 133, 0.18)'),
-            borderColor: 'rgba(251, 113, 133, 0.35)',
-            borderWidth: 1,
-            borderRadius: 16,
-            borderSkipped: false,
-            maxBarThickness: 46
-          },
-          {
-            type: 'line',
-            label: 'Net',
-            data: months.map((row) => Number(row.revenue || 0) - Number(row.expenses || 0)),
-            borderColor: '#facc15',
-            backgroundColor: 'rgba(250, 204, 21, 0.14)',
-            pointBackgroundColor: '#fef3c7',
-            pointBorderColor: '#ca8a04',
-            pointBorderWidth: 2,
-            pointRadius: 4,
-            tension: 0.4,
-            fill: false
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        interaction: { mode: 'index', intersect: false },
-        plugins: {
-          tooltip: {
-            ...chartTooltip,
-            callbacks: {
-              label(context) {
-                return `${context.dataset.label}: ${formatMoney(context.parsed.y)}`;
-              }
-            }
-          },
-          legend: {
-            position: 'bottom',
-            labels: {
-              color: '#f8fafc',
-              usePointStyle: true,
-              pointStyle: 'circle',
-              boxWidth: 8,
-              padding: 12
-            }
-          }
-        },
-        scales: {
-          x: { ticks: { color: chartTickColor, font: { weight: 800 } }, grid: { display: false } },
-          y: {
-            beginAtZero: true,
-            ticks: {
-              color: chartTickColor,
-              callback(value) {
-                return formatMoney(value).replace('.00', '');
-              }
-            },
-            grid: { color: chartGridColor }
-          }
-        }
-      }
-    });
-  }
+  statuses(data.rfqs||{},'rfqs');statuses(data.invoices||{},'invoices');
+  const finance=data.finance||{},months=finance.months||[];
+  const open=(index,dataset)=>{const month=months[index]?.month_key;if(!month)return;const start=month+'-01',end=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).toISOString().slice(0,10);
+    if(dataset===2)return openFinancialResult(month);
+    openRecordRegister(dataset===1?'expenses':'invoices',{from:start,to:end,...(dataset===1?{}:{status:'issued'})});};
+  chart.render('financeChart',{title:'Revenue, expenses and net result',context:`FY ${finance.financial_year||'—'} · ${finance.currency||'AUD'} · ${finance.basis||'Issued invoices and recorded bills'} · Revenue ${formatMoney(finance.revenue)}, expenses ${formatMoney(finance.expenses)}, net ${formatMoney(finance.net_result)}`,
+    labels:months.map(row=>row.month_key),type:'bar',currency:true,format:formatMoney,collapsible:true,
+    datasets:[{label:'Revenue',data:months.map(row=>row.revenue)},{label:'Expenses',data:months.map(row=>row.expenses)},{type:'line',label:'Net result',data:months.map(row=>Number(row.revenue)-Number(row.expenses))}],
+    rows:months.flatMap((row,index)=>[{label:row.month_key+' revenue',display:formatMoney(row.revenue),index,dataset:0},{label:row.month_key+' expenses',display:formatMoney(row.expenses),index,dataset:1},{label:row.month_key+' net result',display:formatMoney(Number(row.revenue)-Number(row.expenses)),index,dataset:2}]),
+    open:row=>open(row.index,row.dataset),chartOpen:open});
 }
 
 function renderSupplierPayables(payables) {
   const pendingValue = Number(payables.pending_value || 0);
   const paidValue = Number(payables.paid_value || 0);
   const overdueValue = Number(payables.overdue_value || 0);
-  const nextPaymentValue = Number(payables.next_payment?.total_amount || 0);
+  const nextPaymentValue = Number(payables.next_payment?.balance_due || 0);
   const supplierCount = Number(payables.supplier_count || 0);
   const pendingCount = Number(payables.pending_count || 0);
 
@@ -2430,46 +2264,9 @@ function renderSupplierPayables(payables) {
   setText('homeSupplierRiskNote', pendingCount > 0 ? `${pendingCount} payable item${pendingCount === 1 ? '' : 's'} open` : 'No pending supplier debt');
   setText('supplierPressurePill', pendingValue > 0 ? `${formatMoney(pendingValue)} pending` : 'Ledger clean');
 
-  const canvas = document.getElementById('supplierDebtChart');
-  if (canvas && typeof Chart !== 'undefined') {
-    if (supplierDebtChartInstance) supplierDebtChartInstance.destroy();
-
-    const chartValues = [
-      Math.max(paidValue, 0),
-      Math.max(pendingValue - overdueValue, 0),
-      Math.max(overdueValue, 0)
-    ];
-    const hasAnyValue = chartValues.some((value) => value > 0);
-
-    supplierDebtChartInstance = new Chart(canvas, {
-      type: 'doughnut',
-      data: {
-        labels: ['Paid', 'Pending', 'Overdue'],
-        datasets: [{
-          data: hasAnyValue ? chartValues : [1, 1, 1],
-          backgroundColor: hasAnyValue
-            ? ['#2dd4bf', '#38bdf8', '#fb7185']
-            : ['rgba(45,212,191,0.18)', 'rgba(56,189,248,0.16)', 'rgba(251,113,133,0.14)'],
-          borderColor: ['rgba(255,255,255,0.88)', 'rgba(255,255,255,0.75)', 'rgba(255,255,255,0.68)'],
-          borderWidth: 2,
-          hoverOffset: 9
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '72%',
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: (context) => `${context.label}: ${formatMoney(context.raw)}`
-            }
-          }
-        }
-      }
-    });
-  }
+  const rows=[{label:'Paid',value:paidValue,status:'settled'},{label:'Pending (not overdue)',value:Math.max(0,pendingValue-overdueValue),status:'upcoming'},{label:'Overdue',value:overdueValue,status:'overdue'}];
+  window.VoxelCharts?.render('supplierDebtChart',{title:'Supplier payments',context:`FY ${payables.financial_year||'—'} · AUD · settled payments and remaining bills`,type:'doughnut',legend:false,labels:rows.map(row=>row.label),datasets:[{label:'Supplier payments',data:rows.map(row=>row.value),colourByValue:true}],format:formatMoney,
+    rows:rows.map(row=>({...row,display:formatMoney(row.value)})),open:row=>openRecordRegister('expenses',{status:row.status,fy:String(payables.financial_year||'').slice(0,4)}),chartOpen:index=>openRecordRegister('expenses',{status:rows[index].status,fy:String(payables.financial_year||'').slice(0,4)})});
 
   renderSupplierCategoryFlows(payables.categories || []);
   renderSupplierUpcoming(payables.upcoming || []);
@@ -2485,32 +2282,13 @@ function renderSupplierCategoryFlows(categories) {
     return;
   }
 
-  const maxValue = Math.max(...categories.map((row) => Number(row.paid_value || 0) + Number(row.pending_value || 0)), 1);
-  container.innerHTML = categories.map((row) => {
-    const paid = Number(row.paid_value || 0);
-    const pending = Number(row.pending_value || 0);
-    const total = paid + pending;
-    const width = Math.max(5, Math.round((total / maxValue) * 100));
-    const pendingWidth = total ? Math.round((pending / total) * 100) : 0;
-
-    return `
-      <div class="supplier-flow-row">
-        <div class="supplier-flow-label">
-          <strong>${escapeHtml(row.category || 'Other')}</strong>
-          <span>${escapeHtml(row.bill_count || 0)} bill${Number(row.bill_count || 0) === 1 ? '' : 's'} | ${escapeHtml(formatMoney(total))}</span>
-        </div>
-        <div class="supplier-flow-track" title="${escapeHtml(formatMoney(total))}">
-          <span class="supplier-flow-fill" style="width:${width}%">
-            <i style="width:${pendingWidth}%"></i>
-          </span>
-        </div>
-        <div class="supplier-flow-money">
-          <span>Paid ${escapeHtml(formatMoney(paid))}</span>
-          <strong>Due ${escapeHtml(formatMoney(pending))}</strong>
-        </div>
-      </div>
-    `;
+  container.innerHTML=categories.map(row=>{
+    const paid=Number(row.paid_value||0),pending=Number(row.pending_value||0),total=paid+pending;
+    const ratio=total>0?Math.max(0,Math.min(100,paid/total*100)):0;
+    return `<button type="button" class="supplier-flow-row" data-payable-category="${escapeHtml(row.category||'Uncategorised')}"><span class="supplier-flow-label"><strong>${escapeHtml(row.category||'Uncategorised')}</strong><span>${Number(row.bill_count||0)} bills · Total ${formatMoney(total)}</span></span><span class="supplier-flow-track" role="img" aria-label="${ratio.toFixed(1)} percent settled"><span class="supplier-flow-fill" style="width:${ratio.toFixed(2)}%"></span></span><span class="supplier-flow-money"><span>Paid ${formatMoney(paid)}</span><strong>Outstanding ${formatMoney(pending)}</strong></span></button>`;
   }).join('');
+  container.querySelectorAll('[data-payable-category]').forEach(button=>button.onclick=()=>openRecordRegister('expenses',{category:button.dataset.payableCategory,fy:String(dashboardStatsCache?.finance?.financial_year||'').slice(0,4)}));
+
 }
 
 function renderSupplierUpcoming(upcoming) {
@@ -2523,21 +2301,22 @@ function renderSupplierUpcoming(upcoming) {
   }
 
   container.innerHTML = upcoming.map((row, index) => {
-    const due = row.due_date ? formatDate(row.due_date) : '-';
+    const due = row.due_date ? formatDate(row.due_date) : 'not supplied';
     return `
-      <div class="supplier-upcoming-item">
+      <button type="button" class="supplier-upcoming-item" data-payable-id="${Number(row.id)}">
         <span class="supplier-payment-rank">${index + 1}</span>
         <div>
           <strong>${escapeHtml(row.supplier_name || 'Supplier')}</strong>
           <span>${escapeHtml(row.category || 'Other')} | ${escapeHtml(row.invoice_no || 'No invoice ref')}</span>
         </div>
         <div>
-          <strong>${escapeHtml(formatMoney(row.total_amount))}</strong>
+          <strong>${escapeHtml(formatMoney(row.balance_due))}</strong>
           <span>Due ${escapeHtml(due)}</span>
         </div>
-      </div>
+      </button>
     `;
   }).join('');
+  container.querySelectorAll('[data-payable-id]').forEach(button=>button.onclick=()=>openRecordRegister('expenses',{id:button.dataset.payableId}));
 }
 
 function renderSupplierExposure(suppliers) {
@@ -2549,7 +2328,7 @@ function renderSupplierExposure(suppliers) {
       <div class="supplier-exposure-card">
         <span>No supplier exposure yet</span>
         <strong>Add supplier bills in Expenses</strong>
-      </div>
+      </button>
     `;
     return;
   }
@@ -2559,13 +2338,14 @@ function renderSupplierExposure(suppliers) {
     const paid = Number(supplier.paid_value || 0);
     const dueDate = supplier.next_due_date ? formatDate(supplier.next_due_date) : 'No due bill';
     return `
-      <div class="supplier-exposure-card">
+      <button type="button" class="supplier-exposure-card" data-payable-supplier="${escapeHtml(supplier.supplier_name)}">
         <span>${escapeHtml(supplier.supplier_name || 'Supplier')}</span>
         <strong>${escapeHtml(formatMoney(pending))}</strong>
         <small>Paid ${escapeHtml(formatMoney(paid))} | Next ${escapeHtml(dueDate)}</small>
-      </div>
+      </button>
     `;
   }).join('');
+  container.querySelectorAll('[data-payable-supplier]').forEach(button=>button.onclick=()=>openRecordRegister('expenses',{supplier:button.dataset.payableSupplier,fy:String(dashboardStatsCache?.finance?.financial_year||'').slice(0,4)}));
 }
 
 function todayISO(offsetDays = 0) {
@@ -4266,8 +4046,10 @@ async function loadExpenses(page = expensePage) {
     page: expensePage,
     limit: expenseLimit,
     fy: document.getElementById('expenseFinancialYear')?.value || '',
-    search: document.getElementById('expenseSearch')?.value.trim() || ''
+    search: document.getElementById('expenseSearch')?.value.trim() || '',
+    ...registerFilters.expenses
   });
+  registerFilterBanner('expenses');
 
   const res = await fetch(`/api/expenses?${params.toString()}`, {
     headers: { Authorization: `Bearer ${token}` }
@@ -4280,6 +4062,7 @@ async function loadExpenses(page = expensePage) {
   }
 
   expenseCache = data.expenses || [];
+  registerFilterBanner('expenses',`${data.total||0} bills · ${formatMoney(data.summary?.total_expense)} total · ${formatMoney(data.summary?.outstanding_debt)} outstanding`);
   renderNotificationDropdown();
   renderExpenseSummary(data.summary || {}, data.total || 0, data.page || 1, data.limit || expenseLimit);
   renderExpenseCharts(data.summary || {});
@@ -4331,52 +4114,14 @@ function renderExpenseSummary(summary, totalRows, page, limit) {
 }
 
 function renderExpenseCharts(summary) {
-  if (typeof Chart === 'undefined') return;
-
-  const categoryCanvas = document.getElementById('expenseCategoryChart');
-  const monthCanvas = document.getElementById('expenseMonthChart');
-  if (!categoryCanvas || !monthCanvas) return;
-
-  if (expenseCategoryChartInstance) expenseCategoryChartInstance.destroy();
-  if (expenseMonthChartInstance) expenseMonthChartInstance.destroy();
-
-  const categories = summary.categories || [];
-  const months = summary.months || [];
-
-  expenseCategoryChartInstance = new Chart(categoryCanvas, {
-    type: 'doughnut',
-    data: {
-      labels: categories.map((row) => row.category),
-      datasets: [{
-        data: categories.map((row) => Number(row.total_amount || 0)),
-        backgroundColor: ['#2dd4bf', '#38bdf8', '#818cf8', '#f59e0b', '#ef4444', '#22c55e', '#a78bfa', '#14b8a6']
-      }]
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#f8fafc' } } }
-    }
-  });
-
-  expenseMonthChartInstance = new Chart(monthCanvas, {
-    type: 'bar',
-    data: {
-      labels: months.map((row) => row.month),
-      datasets: [{
-        label: 'Expenses',
-        data: months.map((row) => Number(row.total_amount || 0)),
-        backgroundColor: '#38bdf8'
-      }]
-    },
-    options: {
-      maintainAspectRatio: false,
-      plugins: { legend: { labels: { color: '#f8fafc' } } },
-      scales: {
-        x: { ticks: { color: '#f8fafc' } },
-        y: { beginAtZero: true, ticks: { color: '#f8fafc' } }
-      }
-    }
-  });
+  const categories=summary.categories||[],months=summary.months||[];
+  const context=`${summary.financial_year||'All years'} · AUD · recorded bills · Total ${formatMoney(summary.total_expense)}`;
+  window.VoxelCharts?.render('expenseCategoryChart',{title:'Expenses by category',context,type:'bar',horizontal:true,legend:false,labels:categories.map(row=>row.category),currency:true,format:formatMoney,collapsible:categories.length>6,
+    datasets:[{label:'Recorded bills',data:categories.map(row=>row.total_amount),colourByValue:true}],rows:categories.map(row=>({label:row.category,value:row.total_amount,display:formatMoney(row.total_amount)})),
+    open:row=>openRecordRegister('expenses',{...registerFilters.expenses,category:row.label}),chartOpen:index=>openRecordRegister('expenses',{...registerFilters.expenses,category:categories[index].category})});
+  const openMonth=month=>{const end=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).toISOString().slice(0,10);openRecordRegister('expenses',{...registerFilters.expenses,from:month+'-01',to:end});};
+  window.VoxelCharts?.render('expenseMonthChart',{title:'Monthly expenses',context,type:'bar',labels:months.map(row=>row.month),currency:true,format:formatMoney,collapsible:true,
+    datasets:[{label:'Recorded bills',data:months.map(row=>row.total_amount)}],rows:months.map(row=>({label:row.month,display:formatMoney(row.total_amount)})),open:row=>openMonth(row.label),chartOpen:index=>openMonth(months[index].month)});
 }
 
 function openExpenseDialog(id = null) {
@@ -6788,11 +6533,7 @@ function openBankingWorkspace() {
   toggleMobileMenu(false);
   closeNotificationPanel();
   const path = '/finance-intelligence?source=app';
-  if (isNativeVoxelVedaApp() || isMobileShellViewport()) {
-    window.location.assign(path);
-    return;
-  }
-  openSystemPage(path);
+  window.location.assign(path);
 }
 
 function notifyNativeBanking(title, body, dedupeKey) {
@@ -9598,10 +9339,10 @@ function populateTimesheetSendStaffSelect() { var select = document.getElementBy
 async function generateRoster() { var body = { user_ids: selectedRosterStaffIds(), from_date: document.getElementById('rosterFromDate')?.value, to_date: document.getElementById('rosterToDate')?.value, start_time: document.getElementById('rosterStartTime')?.value, end_time: document.getElementById('rosterEndTime')?.value, role_label: document.getElementById('rosterRoleLabel')?.value.trim(), location: document.getElementById('rosterLocation')?.value.trim(), notes: document.getElementById('rosterNotes')?.value.trim(), break_minutes: Number(document.getElementById('rosterBreakMinutes')?.value || 0), hourly_rate: Number(document.getElementById('rosterHourlyRate')?.value || 0), wage_budget: Number(document.getElementById('rosterWeeklyBudget')?.value || 0) }; var res = await fetch('/api/roster/generate', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }); var data = await safeJson(res); if (!res.ok) { showToast(data.message || 'Roster generation failed'); return; } showToast(data.message || 'Roster generated'); await loadRoster(); }
 async function publishRoster() { var fromDate = document.getElementById('rosterFromDate')?.value || todayISO(); var toDate = document.getElementById('rosterToDate')?.value || fromDate; var res = await fetch('/api/roster/publish', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ from_date: fromDate, to_date: toDate }) }); var data = await safeJson(res); if (!res.ok) { showToast(data.message || 'Roster publish failed'); return; } showToast(String(data.published || 0) + ' roster shifts published' + (data.email_status === 'setup_required' ? ' - email setup required' : '')); await loadRoster(); }
 function exportRosterCsv() { var rows = rosterCache.map(function(shift) { return { staff: shift.staff_name || '', email: shift.staff_email || '', date: formatDate(shift.shift_date), start: String(shift.start_time || '').slice(0, 5), end: String(shift.end_time || '').slice(0, 5), break_minutes: Number(shift.break_minutes || 0), net_hours: rosterNetHours(shift).toFixed(2), hourly_rate: Number(shift.hourly_rate || 0).toFixed(2), estimated_cost: rosterShiftCost(shift).toFixed(2), role: shift.role_label || '', location: shift.location || '', status: shift.status || '' }; }); if (!rows.length) { showToast('No roster data to export'); return; } saveCsv('voxel-veda-roster-' + todayISO() + '.csv', rows); }
-function exportRosterPrint() { var rows = rosterCache.map(function(shift) { return '<tr><td>' + escapeHtml(shift.staff_name || '-') + '</td><td>' + escapeHtml(formatDate(shift.shift_date)) + '</td><td>' + escapeHtml(String(shift.start_time || '').slice(0,5)) + ' - ' + escapeHtml(String(shift.end_time || '').slice(0,5)) + '</td><td>' + rosterNetHours(shift).toFixed(2) + '</td><td>' + formatMoney(rosterShiftCost(shift)) + '</td><td>' + escapeHtml(shift.role_label || '-') + '</td><td>' + escapeHtml(shift.status || '-') + '</td></tr>'; }).join('') || '<tr><td colspan="7">No roster shifts available.</td></tr>'; var win = window.open('', '_blank'); if (!win) { showToast('Allow popup to preview roster'); return; } win.document.write('<!doctype html><html><head><title>Voxel Veda Roster</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}table{width:100%;border-collapse:collapse}th{background:#061525;color:#fff}td,th{border:1px solid #cbd5e1;padding:8px;text-align:left}</style></head><body><h1>Voxel Veda Roster</h1><p>Generated ' + new Date().toLocaleString() + '</p><table><thead><tr><th>Staff</th><th>Date</th><th>Shift</th><th>Net Hours</th><th>Cost</th><th>Role</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>'); win.document.close(); win.focus(); }
+function exportRosterPrint() { var rows = rosterCache.map(function(shift) { return '<tr><td>' + escapeHtml(shift.staff_name || '-') + '</td><td>' + escapeHtml(formatDate(shift.shift_date)) + '</td><td>' + escapeHtml(String(shift.start_time || '').slice(0,5)) + ' - ' + escapeHtml(String(shift.end_time || '').slice(0,5)) + '</td><td>' + rosterNetHours(shift).toFixed(2) + '</td><td>' + formatMoney(rosterShiftCost(shift)) + '</td><td>' + escapeHtml(shift.role_label || '-') + '</td><td>' + escapeHtml(shift.status || '-') + '</td></tr>'; }).join('') || '<tr><td colspan="7">No roster shifts available.</td></tr>'; var win = window.open('', '_blank'); if (!win) { showToast('Allow popup to preview roster'); return; } win.document.write('<!doctype html><html><head><title>Voxel Veda Roster</title><style>body{font-family:Arial,sans-serif;padding:24px;color:var(--text-primary);}table{width:100%;border-collapse:collapse;}th{background:var(--surface-muted);color:var(--text-primary);}td{border:1px solid var(--border);padding:8px;text-align:left;}th{border:1px solid var(--border);padding:8px;text-align:left;}</style></head><body><h1>Voxel Veda Roster</h1><p>Generated ' + new Date().toLocaleString() + '</p><table><thead><tr><th>Staff</th><th>Date</th><th>Shift</th><th>Net Hours</th><th>Cost</th><th>Role</th><th>Status</th></tr></thead><tbody>' + rows + '</tbody></table></body></html>'); win.document.close(); win.focus(); }
 function filteredTimesheetAttendanceRows() { var userId = Number(document.getElementById('timesheetSendStaffSelect')?.value || 0); var fromDate = document.getElementById('timesheetSendFrom')?.value || '0000-01-01'; var toDate = document.getElementById('timesheetSendTo')?.value || '9999-12-31'; return attendanceCache.filter(function(row) { var workDate = String(row.work_date || row.clock_in || '').slice(0, 10); return (!userId || Number(row.user_id) === userId) && workDate >= fromDate && workDate <= toDate; }); }
 function exportTimesheetCsv() { var rows = filteredTimesheetAttendanceRows().map(function(row) { return { staff: row.name || '', email: row.email || '', date: formatDate(row.work_date || row.clock_in), clock_in: row.clock_in || '', clock_out: row.clock_out || '', total_hours: Number(row.total_hours || 0).toFixed(2), notes: row.notes || '' }; }); if (!rows.length) { showToast('No timesheet data to export'); return; } saveCsv('voxel-veda-timesheet-' + todayISO() + '.csv', rows); }
-function exportTimesheetHtml() { var rows = filteredTimesheetAttendanceRows(); var total = rows.reduce(function(sum, row) { return sum + Number(row.total_hours || 0); }, 0); var tableRows = rows.map(function(row) { return '<tr><td>' + escapeHtml(row.name || '-') + '</td><td>' + escapeHtml(formatDate(row.work_date || row.clock_in)) + '</td><td>' + escapeHtml(formatClockTime(row.clock_in)) + '</td><td>' + escapeHtml(formatClockTime(row.clock_out)) + '</td><td>' + Number(row.total_hours || 0).toFixed(2) + '</td><td>' + escapeHtml(row.notes || '-') + '</td></tr>'; }).join('') || '<tr><td colspan="6">No records for this period.</td></tr>'; var win = window.open('', '_blank'); if (!win) { showToast('Allow popup to preview timesheet'); return; } win.document.write('<!doctype html><html><head><title>Voxel Veda Timesheet</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#0f172a}table{width:100%;border-collapse:collapse}th{background:#061525;color:#fff}td,th{border:1px solid #cbd5e1;padding:8px;text-align:left}</style></head><body><h1>Voxel Veda Timesheet Summary</h1><p>Total hours: <strong>' + total.toFixed(2) + '</strong></p><table><thead><tr><th>Staff</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Notes</th></tr></thead><tbody>' + tableRows + '</tbody></table></body></html>'); win.document.close(); }
+function exportTimesheetHtml() { var rows = filteredTimesheetAttendanceRows(); var total = rows.reduce(function(sum, row) { return sum + Number(row.total_hours || 0); }, 0); var tableRows = rows.map(function(row) { return '<tr><td>' + escapeHtml(row.name || '-') + '</td><td>' + escapeHtml(formatDate(row.work_date || row.clock_in)) + '</td><td>' + escapeHtml(formatClockTime(row.clock_in)) + '</td><td>' + escapeHtml(formatClockTime(row.clock_out)) + '</td><td>' + Number(row.total_hours || 0).toFixed(2) + '</td><td>' + escapeHtml(row.notes || '-') + '</td></tr>'; }).join('') || '<tr><td colspan="6">No records for this period.</td></tr>'; var win = window.open('', '_blank'); if (!win) { showToast('Allow popup to preview timesheet'); return; } win.document.write('<!doctype html><html><head><title>Voxel Veda Timesheet</title><style>body{font-family:Arial,sans-serif;padding:24px;color:var(--text-primary);}table{width:100%;border-collapse:collapse;}th{background:var(--surface-muted);color:var(--text-primary);}td{border:1px solid var(--border);padding:8px;text-align:left;}th{border:1px solid var(--border);padding:8px;text-align:left;}</style></head><body><h1>Voxel Veda Timesheet Summary</h1><p>Total hours: <strong>' + total.toFixed(2) + '</strong></p><table><thead><tr><th>Staff</th><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Notes</th></tr></thead><tbody>' + tableRows + '</tbody></table></body></html>'); win.document.close(); }
 async function sendTimesheetEmail() { var body = { user_id: Number(document.getElementById('timesheetSendStaffSelect')?.value || 0) || null, from_date: document.getElementById('timesheetSendFrom')?.value || todayISO(-7), to_date: document.getElementById('timesheetSendTo')?.value || todayISO(), recipient: document.getElementById('timesheetSendRecipient')?.value.trim(), include_employee: true }; var log = document.getElementById('timesheetEmailLogBody'); if (log) log.textContent = 'Sending timesheet summary...'; var res = await fetch('/api/attendance/timesheets/send', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }); var data = await safeJson(res); if (!res.ok) { var msg = data.missing ? data.message + ': ' + data.missing.join(', ') : (data.message || 'Timesheet email failed'); if (log) log.textContent = msg; showToast(msg); return; } if (log) log.textContent = data.message + '. Records: ' + data.records + ', hours: ' + data.total_hours; showToast(data.message || 'Timesheet sent'); }
 async function loadTimesheets() { var tbody = document.getElementById('timesheetAdminBody'); if (!tbody) return; populateTimesheetSendStaffSelect(); var res = await fetch('/api/attendance/timesheets', { headers: { Authorization: 'Bearer ' + token } }); var data = await safeJson(res); if (!res.ok) { tbody.innerHTML = '<tr><td colspan="5">Failed to load timesheets</td></tr>'; return; } window.vvTimesheetCache = data.timesheets || []; updateWorkforceDashboardMetrics(); renderRegisterPage({ key: 'timesheets', tbody: tbody, rows: window.vvTimesheetCache, colspan: 5, emptyMessage: 'No weekly timesheets yet.', onChange: loadTimesheets, rowRenderer: function(t) { return '<tr><td>' + escapeHtml(t.name || '-') + '</td><td>' + escapeHtml(String(t.week_start || '').slice(0, 10)) + '</td><td>' + escapeHtml(String(t.week_end || '').slice(0, 10)) + '</td><td>' + escapeHtml(Number(t.total_hours || 0).toFixed(2)) + '</td><td>' + escapeHtml(t.status || 'open') + '</td></tr>'; } }); }
 
@@ -9691,13 +9432,13 @@ function buildTimesheetEmailDraft(rows, fromDate, toDate) {
       <meta charset="utf-8">
       <title>Voxel Veda Timesheet ${escapeHtml(fromDate)} to ${escapeHtml(toDate)}</title>
       <style>
-        body{margin:0;background:#eef5f9;color:#0b1725;font-family:Arial,Helvetica,sans-serif}
-        .sheet{max-width:1120px;margin:24px auto;background:#fff;border:1px solid #d7e3ec;border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(15,23,42,.16)}
-        .hero{background:linear-gradient(135deg,#061324,#0c3148 58%,#11cdd4);color:#fff;padding:30px 34px;display:flex;justify-content:space-between;gap:20px;align-items:center}
-        .brand{font-size:24px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.muted{color:#bcd6e6}.pill{display:inline-flex;border:1px solid rgba(255,255,255,.28);border-radius:999px;padding:8px 12px;color:#dffbff;font-weight:800}
-        .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:22px 34px;background:#f8fbfd}.card{border:1px solid #dce8f0;border-radius:14px;padding:14px}.label{font-size:11px;text-transform:uppercase;color:#5e7182;font-weight:800;letter-spacing:.08em}.value{font-size:21px;font-weight:900;margin-top:5px}
-        .content{padding:26px 34px}.section-title{font-size:18px;font-weight:900;margin-bottom:12px}table{width:100%;border-collapse:collapse;font-size:13px}th{background:#071827;color:#dffbff;text-align:left;padding:12px;border-bottom:1px solid #1a3950}td{padding:11px;border-bottom:1px solid #e4edf3;vertical-align:top}tr:nth-child(even) td{background:#f9fcfe}.footer{display:flex;justify-content:space-between;gap:16px;padding:20px 34px 30px;color:#637588;font-size:12px}.stamp{font-weight:900;color:#0b1725}
-        @media(max-width:720px){.sheet{margin:0;border-radius:0}.hero,.footer{display:block}.summary{grid-template-columns:1fr}.content{padding:18px;overflow-x:auto}.hero,.summary,.footer{padding-left:18px;padding-right:18px}table{min-width:760px}}
+        body{margin:0;background:var(--page);color:var(--text-primary);font-family:Arial,Helvetica,sans-serif;}
+        .sheet{max-width:1120px;margin:24px auto;background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden;box-shadow:var(--shadow);}
+        .hero{background:var(--hero-bg);color:var(--nav-text);padding:30px 34px;display:flex;justify-content:space-between;gap:20px;align-items:center;}
+        .brand{font-size:24px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;}.muted{color:var(--text-secondary);}.pill{display:inline-flex;border:1px solid var(--border);border-radius:999px;padding:8px 12px;color:var(--text-primary);font-weight:800;}
+        .summary{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:22px 34px;background:var(--surface);}.card{border:1px solid var(--border);border-radius:14px;padding:14px;}.label{font-size:14px;text-transform:uppercase;color:var(--text-secondary);font-weight:800;letter-spacing:.08em;}.value{font-size:21px;font-weight:900;margin-top:5px;}
+        .content{padding:26px 34px;}.section-title{font-size:18px;font-weight:900;margin-bottom:12px;}table{width:100%;border-collapse:collapse;font-size:14px;}th{background:var(--surface-muted);color:var(--text-primary);text-align:left;padding:12px;border-bottom:1px solid var(--border);}td{padding:11px;border-bottom:1px solid var(--border);vertical-align:top;}tr:nth-child(even) td{background:var(--surface);}.footer{display:flex;justify-content:space-between;gap:16px;padding:20px 34px 30px;color:var(--text-primary);font-size:14px;}.stamp{font-weight:900;color:var(--text-primary);}
+        @media(max-width:720px){.sheet{margin:0;border-radius:0;}.hero{display:block;}.footer{display:block;}.summary{grid-template-columns:1fr;}.content{padding:18px;overflow-x:auto;}.hero{padding-left:18px;padding-right:18px;}.summary{padding-left:18px;padding-right:18px;}.footer{padding-left:18px;padding-right:18px;}table{min-width:760px;}}
         @media print{body{background:#fff}.sheet{box-shadow:none;margin:0;border-radius:0;border:0}.no-print{display:none!important}}
       </style>
     </head>
@@ -9768,7 +9509,7 @@ function showTimesheetEmailSetupDialog(data, draft) {
   const deliveryStatus = setupIncomplete ? 'Setup required' : 'Connection unavailable';
   const html = `
     <style>
-      .email-setup-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.65fr);gap:18px;max-width:100%}.email-setup-grid>*{min-width:0}.email-preview-card{border:1px solid rgba(56,189,248,.38);border-radius:14px;background:linear-gradient(145deg,rgba(15,23,42,.96),rgba(8,32,48,.94));padding:18px;box-shadow:0 18px 50px rgba(0,0,0,.28)}.email-preview-card h3{margin:0 0 8px;overflow-wrap:anywhere}.email-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}.smtp-chip{display:inline-flex;margin:4px 6px 4px 0;padding:7px 10px;border-radius:999px;background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.28);color:#9ff7ff;font-weight:800;font-size:12px}.smtp-note{color:#b7c7d6;line-height:1.55;overflow-wrap:anywhere}.smtp-box{border:1px solid rgba(56,189,248,.25);border-radius:14px;padding:14px;background:rgba(2,6,23,.45);overflow:hidden}.email-mini-table{width:100%;border-collapse:collapse;font-size:12px}.email-mini-table th,.email-mini-table td{padding:8px;border-bottom:1px solid rgba(148,163,184,.2);text-align:left;overflow-wrap:anywhere}.email-mini-table th{color:#49f4e7;text-transform:uppercase;font-size:10px}@media(max-width:760px){.email-setup-grid{grid-template-columns:1fr}.email-actions{display:grid;grid-template-columns:1fr 1fr}.email-actions .btn{width:100%;justify-content:center}.smtp-box{order:-1}}@media(max-width:460px){.email-actions{grid-template-columns:1fr}}
+      .email-setup-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,.65fr);gap:18px;max-width:100%;}.email-setup-grid>*{min-width:0;}.email-preview-card{border:1px solid var(--border);border-radius:14px;background:var(--surface);padding:18px;box-shadow:var(--shadow);}.email-preview-card h3{margin:0 0 8px;overflow-wrap:anywhere;}.email-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;}.smtp-chip{display:inline-flex;margin:4px 6px 4px 0;padding:7px 10px;border-radius:999px;background:var(--surface-muted);border:1px solid var(--border);color:var(--text-primary);font-weight:800;font-size:14px;}.smtp-note{color:var(--text-secondary);line-height:1.55;overflow-wrap:anywhere;}.smtp-box{border:1px solid var(--border);border-radius:14px;padding:14px;background:var(--surface);overflow:hidden;}.email-mini-table{width:100%;border-collapse:collapse;font-size:14px;}.email-mini-table th{padding:8px;border-bottom:1px solid var(--border);text-align:left;overflow-wrap:anywhere;}.email-mini-table td{padding:8px;border-bottom:1px solid var(--border);text-align:left;overflow-wrap:anywhere;}.email-mini-table th{color:var(--text-primary);text-transform:uppercase;font-size:14px;}@media(max-width:760px){.email-setup-grid{grid-template-columns:1fr;}.email-actions{display:grid;grid-template-columns:1fr 1fr;}.email-actions .btn{width:100%;justify-content:center;}.smtp-box{order:-1;}}@media(max-width:460px){.email-actions{grid-template-columns:1fr;}}
     </style>
     <div class="email-setup-grid">
       <div class="email-preview-card">

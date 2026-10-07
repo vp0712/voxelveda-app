@@ -21,7 +21,7 @@ assert(bankingRoutes.includes("'/intelligence/statement-warehouse'"),'standalone
 
 assert(html.includes('FINANCE OPERATING SYSTEM'),'primary UI is the unified Finance OS');
 assert(html.includes('id="fmAccount"'),'statement workflows share the Finance account selector');
-assert(html.includes('Personal · Company · Consolidated'),'UI keeps ownership workspaces visibly separated');
+assert(html.includes('id="fmScope"')&&['ALL','PERSONAL','BUSINESS'].every(scope=>html.includes('value="'+scope+'"')),'UI keeps ownership workspaces visibly separated');
 assert(!html.includes('id="bankAppV5"'),'retired Banking V5 root is not reintroduced');
 
 assert(js.includes('function openStatementWizard()'),'master Finance OS contains the statement import wizard');

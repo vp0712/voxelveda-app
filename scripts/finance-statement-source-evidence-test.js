@@ -64,8 +64,8 @@ async function run() {
   assert.equal(prepared.counts.duplicate,0,'two physical purchases without a reference/balance remain two transactions');
   const originalHash=ingestion.statementRowHash(account.id,parsed.rows[1]);
   assert.equal(prepared.normalized[1].row_hash,originalHash,'first occurrence keeps existing ledger identity');
-  const repeatDb={query:async(sql,params)=> sql.includes('SELECT row_hash FROM bank_transactions') ? [prepared.normalized.filter(row=>params.includes(row.row_hash)).map(row=>({row_hash:row.row_hash}))] : [[]]};
-  const reimport=await ingestion.normalizeAndDedupe(repeatDb,account,parsed.rows);
+  const repeatDb={query:async(sql,params)=> sql.includes('SELECT row_hash,') ? [prepared.normalized.filter(row=>params.includes(row.row_hash)).map(row=>({row_hash:row.row_hash,source_content_hash:parsed.fileHash}))] : [[]]};
+  const reimport=await ingestion.normalizeAndDedupe(repeatDb,account,parsed.rows,{contentHash:parsed.fileHash});
   assert.equal(reimport.counts.duplicate,4,'same file/overlapping source occurrences cannot double-post');
   const strong={...parsed.rows[1],reference:'bank-unique-reference-1'};
   const strongPrepared=await ingestion.normalizeAndDedupe(emptyDb,account,[strong,strong]);

@@ -22,12 +22,12 @@ const NAV_GROUPS=[
  ['MONEY',[['accounts','▣','Accounts'],['transactions','↕','Transactions'],['bankops','⌁','Banking Operations'],['cash','¤','Cash'],['currency','FX','Currency Centre'],['transfers','⇆','Transfers'],['refunds','↩','Refunds'],['reimbursements','⌁','Reimbursements'],['counterparties','♧','Customers & Suppliers'],['debt','⇄','Borrow & Lend'],['recurring','⟳','Recurring']]],
  ['DOCUMENTS',[['history','⇩','History Import'],['statements','▤','Statements'],['receipts','▧','Receipts']]],
  ['PLANNING',[['planning','▦','FP&A Planning'],['budgets','◫','Budgets'],['savings','◎','Savings Goals'],['networth','◇','Net Worth'],['forecast','◷','Forecast'],['calendar','▦','Cash Flow Calendar'],['treasury','▥','Treasury'],['performance','▤','Performance & Stress'],['profitability','◈','Job Profitability']]],
- ['INTELLIGENCE',[['insights','✦','Insights'],['anomaly','≈','Anomaly & Explain'],['rules','⌁','Rules'],['review','!','Review Centre'],['controlactions','!','Control Actions'],['reconciliation','✓','Reconciliation']]],
+ ['INTELLIGENCE',[['insights','✦','Insights'],['anomaly','≈','Anomaly & Explain'],['rules','⌁','Categories'],['review','!','Review Centre'],['controlactions','!','Control Actions'],['reconciliation','✓','Reconciliation']]],
  ['REPORTING',[['reports','▧','Reports'],['handover','▣','Accountant Handover'],['taxcontrol','§','Tax & Evidence'],['evidenceaudit','⌘','Evidence & Audit']]],
  ['CONTROL',[['closeassurance','✓','Close & Assurance'],['protection','◇','Protection Register'],['securityprivacy','⌾','Security & Privacy'],['setupcentre','✓','Setup Centre'],['notifications','●','Notifications'],['team','♙','Team Access'],['connections','◌','Banking Connections'],['settings','⚙','Finance Settings']]]
 ];
 const NAV=NAV_GROUPS.flatMap(([,items])=>items);
-const MOBILE_NAV=[['accounts','⌂','Accounts'],['transactions','▤','Transactions'],['statements','▥','Statements'],['more','☰','More']];
+
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const num=v=>Number(v||0);
 const money=(v,c='AUD')=>{try{return new Intl.NumberFormat(state.userPreferences?.number_format||'en-AU',{style:'currency',currency:c||'AUD'}).format(num(v))}catch{return Number(v||0).toFixed(2)}};
@@ -103,7 +103,7 @@ async function api(path,options={}){
   throw error;
  }finally{clearTimeout(timer)}
 }
-function notice(m,bad=false){if(financeAuthExpiryHandled&&bad)return;const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.style.background=bad?'#fde9eb':'#fff8dc';n.style.color=bad?'#8f2732':'#725600'}
+function notice(m,bad=false){if(financeAuthExpiryHandled&&bad)return;const n=$('fmNotice');n.hidden=!m;n.textContent=m||'';n.className='fm-notice '+(bad?'error':'success')}
 function financeDataChanged(){window.__financeDataRevision=Date.now();try{window.dispatchEvent(new CustomEvent('finance:data-changed'))}catch{}}
 function showFinancePopup(title,message,detail='',options={}){
  document.querySelector('.fm-centre-popup')?.remove();
@@ -174,16 +174,12 @@ function renderFinanceFatal(error,title='Finance could not start'){
  try{window.dispatchEvent(new CustomEvent('finance:fatal',{detail:{message}}))}catch{}
 }
 function navButtons(){
- $('fmNav').innerHTML=NAV_GROUPS.map(([group,items])=>`<div class="fm-nav-group"><small>${esc(group)}</small>${items.map(([v,i,l])=>`<button type="button" data-view="${v}" class="${state.view===v?'active':''}"><span>${i}</span>${l}</button>`).join('')}</div>`).join('');
- $('fmNav').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>go(b.dataset.view));
+ $('fmNav').innerHTML=NAV_GROUPS.map(([group,items])=>`<details class="fm-nav-group"><summary>${esc(group)}</summary><div class="fm-nav-items">${items.map(([v,i,l])=>`<button type="button" data-view="${v}" class="fm-nav-btn ${state.view===v?'active':''}" ${state.view===v?'aria-current="page"':''}><span aria-hidden="true">${i}</span>${l}</button>`).join('')}</div></details>`).join('');
+ $('fmNav').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{b.closest('details')?.removeAttribute('open');go(b.dataset.view)});
  const navSearch=$('fmNavSearch');
- const filterNavigation=()=>{const query=String(navSearch?.value||'').toLowerCase().trim();$('fmNav').querySelectorAll('[data-view]').forEach(button=>button.hidden=Boolean(query)&&!button.textContent.toLowerCase().includes(query));$('fmNav').querySelectorAll('.fm-nav-group').forEach(group=>group.hidden=![...group.querySelectorAll('[data-view]')].some(button=>!button.hidden))};
+ const filterNavigation=()=>{const query=String(navSearch?.value||'').toLowerCase().trim();$('fmNav').querySelectorAll('[data-view]').forEach(button=>button.hidden=Boolean(query)&&!button.textContent.toLowerCase().includes(query));$('fmNav').querySelectorAll('.fm-nav-group').forEach(group=>{group.hidden=![...group.querySelectorAll('[data-view]')].some(button=>!button.hidden);if(query&&!group.hidden)group.open=true;else group.open=false})};
  if(navSearch)navSearch.oninput=filterNavigation;filterNavigation();
- const mobile=$('fmMobileNav');
- if(mobile){
-  mobile.innerHTML=MOBILE_NAV.map(([v,i,l])=>{const isPrimary=MOBILE_NAV.some(([key])=>key===state.view),active=state.view===v||(v==='more'&&!isPrimary);return `<button type="button" data-mobile-view="${v}" class="${active?'active':''}"><span>${i}</span><b>${l}</b></button>`}).join('');
-  mobile.querySelectorAll('[data-mobile-view]').forEach(b=>b.onclick=()=>go(b.dataset.mobileView));
- }
+
 }
 function title(v){return ({
  overview:['Finance Overview','Balances and selected-period cash flow are deliberately separated.'],
@@ -266,20 +262,16 @@ function filterQuery(extra={}){
  return '?'+p.toString();
 }
 function accountChartsQuery(){
- const p=new URLSearchParams({scope:state.scope});
- p.set('include_transactions','0');
- return '?'+p.toString();
+ return filterQuery({include_transactions:'0'});
 }
 window.__financeFilterQuery=(extra={})=>filterQuery(extra);
 window.__financeOpenCategory=async({category='',accountId='',currency=''}={})=>{
  state.account=accountId?String(accountId):'';
- state.period='all';state.customFrom='';state.customTo='';
  if($('fmAccount'))$('fmAccount').value=state.account;
- if($('fmPeriod'))$('fmPeriod').value='all';
- state.txFilters={...state.txFilters,q:'',type:'',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
+ state.txFilters={...state.txFilters,q:'',type:'EXPENSE',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
  state.txMeta.page=1;
  state.view='transactions';
- history.replaceState(null,'','#transactions');
+ saveFinanceLocation();
  await loadTransactions();
 };
 function scopeDashboardQuery(scope){
@@ -487,11 +479,22 @@ function financeCommandCentre(){
  const healthButtons=health.map(([label,value,view])=>`<button class="fm-health-chip" data-viewjump="${view}"><span>${esc(label)}</span><b>${num(value)}</b></button>`).join('');
  return `<section class="fm-command-centre"><div class="fm-command-head"><div><p>FINANCE COMMAND CENTRE</p><h2>Run the whole money system from one workspace</h2><span>Company, Personal and Consolidated views share one canonical transaction ledger while ownership stays separate.</span></div><div class="fm-inline-actions"><button data-viewjump="setupcentre">Setup</button><button data-viewjump="more">All modules</button></div></div><div class="fm-command-actions">${workflowButtons}</div><div class="fm-health-strip">${healthButtons}</div></section>`;
 }
+function cashFlowRows(rows,accountId='') {
+ const max=Math.max(1,...rows.flatMap(row=>[Math.abs(num(row.money_in)),Math.abs(num(row.money_out))]));
+ return rows.length?rows.map(row=>`<div class="fm-chart-row"><span>${esc(row.month)} · ${esc(row.currency||'AUD')}</span><div class="fm-bars" aria-hidden="true"><i class="in" style="width:${Math.abs(num(row.money_in))/max*100}%"></i><i class="out" style="width:${Math.abs(num(row.money_out))/max*100}%"></i></div><div class="vv-cash-values"><button type="button" data-flow-type="INCOME" data-flow-month="${esc(row.month)}" data-flow-account="${esc(accountId)}" data-flow-currency="${esc(row.currency||'AUD')}">In ${nativeMoney(row.money_in,row.currency)}</button><button type="button" data-flow-type="EXPENSE" data-flow-month="${esc(row.month)}" data-flow-account="${esc(accountId)}" data-flow-currency="${esc(row.currency||'AUD')}">Out ${nativeMoney(row.money_out,row.currency)}</button><strong>Net ${nativeMoney(sumMoney([row.money_in,-num(row.money_out)]),row.currency)}</strong></div></div>`).join(''):emptyState('No cash-flow trend','No accepted transactions for the selected period.');
+}
+function openCashFlowRecords(button) {
+ const month=button.dataset.flowMonth;if(!/^\d{4}-\d{2}$/.test(month))return;
+ const start=month+'-01',finish=new Date(Number(month.slice(0,4)),Number(month.slice(5,7)),0).toISOString().slice(0,10),selected=dateRange();
+ state.from=selected.from&&selected.from>start?selected.from:start;state.to=selected.to&&selected.to<finish?selected.to:finish;state.period='custom';
+ state.account=button.dataset.flowAccount||state.account;state.txFilters={...state.txFilters,q:'',type:button.dataset.flowType,currency:button.dataset.flowCurrency,category:'',merchant:''};state.txMeta.page=1;
+ closeDrawer();go('transactions');
+}
 function overview(){
  const err=resourceError('dash','Finance dashboard');if(err)return err;
  const accountRows=state.accounts.slice(0,6).map(a=>`<div class="fm-row" data-account="${a.id}"><div><h3>${esc(a.nickname||a.account_name||'Account')}</h3><p>${esc(a.institution||'Financial account')} · ${esc(a.ownership_scope||'')}</p></div><div class="fm-row-right"><b>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</b><small>${esc(a.currency||'AUD')}</small></div></div>`).join('');
  const monthly=Array.isArray(state.dash?.monthly)?state.dash.monthly:[];const max=Math.max(1,...monthly.flatMap(x=>[num(x.money_in),num(x.money_out)]));
- const chart=monthly.length?monthly.slice(-12).map(x=>`<div class="fm-chart-row"><span>${esc(x.month)} · ${esc(x.currency)}</span><div class="fm-bars"><i class="in" style="width:${Math.max(2,num(x.money_in)/max*100)}%" title="Money in ${nativeMoney(x.money_in,x.currency)}"></i><i class="out" style="width:${Math.max(2,num(x.money_out)/max*100)}%" title="Money out ${nativeMoney(x.money_out,x.currency)}"></i></div><b>${nativeMoney(num(x.money_in)-num(x.money_out),x.currency)}</b></div>`).join(''):emptyState('No cash-flow trend','No transactions exist in the selected period.');
+ const chart=cashFlowRows(monthly,state.account);
  const cats=Array.isArray(state.dash?.categories)?state.dash.categories:[];const catList=cats.slice(0,8).map(x=>`<button class="fm-distribution" data-category="${esc(x.category)}"><span>${esc(x.category)} · ${esc(x.currency)}</span><b>${nativeMoney(x.spent,x.currency)}</b></button>`).join('')||emptyState('No expense distribution','No expenses exist in the selected period.');
  const q=state.quality||{};const ins=state.insights?.summary||{};const attention=[['Uncategorised',q.unclassified_transactions??q.unclassified,'transactions'],['Unreconciled',q.unreconciled_transactions??q.unreconciled,'reconciliation'],['Ownership missing',q.ownership_missing,'review'],['History coverage unknown',q.unknown_history_coverage,'accounts'],['Transfer candidates',ins.transfer_candidates,'insights'],['Anomalies',ins.anomalies,'insights']].filter(x=>num(x[1])>0);
  const attentionHtml=attention.length?attention.map(([l,n,v])=>`<button class="fm-attention" data-viewjump="${v}"><b>${num(n)}</b><span>${esc(l)}</span></button>`).join(''):emptyState('No current attention items','No review counts were returned for the selected scope.');
@@ -516,26 +519,38 @@ function accountCategoryDefinitions(account,definitions=null){
 function renderAccountCategoryChart(account,rows=[],definitions=null,{compact=false,label='Selected period'}={}){
  const currency=String(account?.currency||'AUD').toUpperCase();
  const source=(Array.isArray(rows)?rows:[]).filter(row=>String(row.currency||currency).toUpperCase()===currency);
- const byCategory=new Map(source.map(row=>[String(row.category||'Unclassified'),{...row,spent:num(row.spent),source_transaction_count:num(row.source_transaction_count||row.transaction_count)}]));
- for(const name of accountCategoryDefinitions(account,definitions))if(!byCategory.has(name))byCategory.set(name,{category:name,currency,spent:0,source_transaction_count:0});
+ const byCategory=new Map(source.map(row=>[String(row.category||'Unclassified'),{...row,source_transaction_count:num(row.source_transaction_count||row.transaction_count)}]));
+ for(const name of accountCategoryDefinitions(account,definitions))if(!byCategory.has(name))byCategory.set(name,{category:name,currency,spent:'0.00',source_transaction_count:0});
  const items=[...byCategory.values()].sort((a,b)=>num(b.spent)-num(a.spent)||String(a.category).localeCompare(String(b.category)));
- const max=Math.max(1,...items.map(item=>num(item.spent))),total=items.reduce((sum,item)=>sum+num(item.spent),0);
+ const max=Math.max(1,...items.map(item=>Math.abs(num(item.spent)))),total=sumMoney(items.map(item=>item.spent));
  const bars=items.map(item=>{
-  const height=num(item.spent)>0?Math.max(5,Math.min(100,(num(item.spent)/max)*100)):2;
-  return `<button type="button" class="fm-account-category-column" data-account-category="${esc(item.category||'Unclassified')}" data-account-category-account="${esc(account.id)}" data-account-category-currency="${esc(currency)}" title="Open ${esc(item.category||'Unclassified')} transactions"><span class="fm-account-category-value">${nativeMoney(item.spent,currency)}</span><span class="fm-account-category-barbox"><i style="height:${height.toFixed(2)}%"></i></span><span class="fm-account-category-name">${esc(item.category||'Unclassified')}</span><small>${num(item.source_transaction_count)} tx</small></button>`;
+  const width=Math.min(100,Math.abs(num(item.spent))/max*100);
+  const note=item.category==='Transfer'?' · ownership review':item.category==='Cash'?' · cash movement review':'';
+  return `<button type="button" class="fm-account-cat-bar" data-account-category="${esc(item.category||'Unclassified')}" data-account-category-account="${esc(account.id)}" data-account-category-currency="${esc(currency)}" aria-label="${esc(item.category)}: ${esc(nativeMoney(item.spent,currency))}, ${num(item.source_transaction_count)} transactions"><span>${esc(item.category||'Unclassified')}${note}</span><strong>${nativeMoney(item.spent,currency)}</strong><span class="fm-account-cat-barbox" aria-hidden="true"><i style="width:${width.toFixed(2)}%"></i></span><small>${num(item.source_transaction_count)} transactions</small></button>`;
  }).join('');
- return `<section class="fm-account-category-chart ${compact?'compact':''}"><div class="fm-account-category-head"><div><span class="fm-section-kicker">SPENDING BY CATEGORY</span><h4>Category chart</h4><small>${esc(label)} · tap a column to open its transactions</small></div><div><b>${nativeMoney(total,currency)}</b><small>Total spend</small></div></div><div class="fm-account-category-scroll">${bars||emptyState('No categories','No category activity is available for this account.')}</div></section>`;
+ const transfer=byCategory.get('Transfer');
+ return `<section class="fm-account-cat-chart ${compact?'compact':'full'}"><div class="fm-account-cat-head"><div><h4>Cash debits by category</h4><small>${esc(label)} · ${esc(currency)} · confirmed own-account transfers excluded</small></div><strong>${nativeMoney(total,currency)}</strong></div>${transfer&&num(transfer.spent)>0?`<p class="fm-helper">${nativeMoney(transfer.spent,currency)} has a transfer description with unconfirmed ownership. Review the exact transactions before excluding it. Third-party payments remain included.</p>`:''}<div class="fm-account-cat-bars">${bars||emptyState('No categories','No activity for this period.')}</div><button type="button" data-account="${esc(account.id)}">All categories & account insights</button></section>`;
 }
+function sumMoney(values){
+ const cents=values.reduce((sum,value)=>{const raw=String(value||0),negative=raw.startsWith('-'),[whole,fraction='']=raw.replace(/^-/, '').split('.');return sum+(negative?-1n:1n)*(BigInt(whole||0)*100n+BigInt((fraction+'00').slice(0,2)));},0n);
+ const absolute=cents<0n?-cents:cents;return (cents<0n?'-':'')+String(absolute/100n)+'.'+String(absolute%100n).padStart(2,'0');
+}
+function maskedAccount(value){const digits=String(value||'').replace(/\D/g,'');return digits?'•••• '+digits.slice(-4):'Identifier not supplied';}
+function balanceLabel(account){
+ const basis=String(account.balance_basis||account.profile_balance_basis||'').toUpperCase();
+ if(basis.includes('LIVE')&&account.last_synced_at)return 'Verified live available balance';
+ if(basis.includes('STATEMENT')||basis.includes('CLOSING'))return 'Imported closing balance';
+ return 'Calculated ledger balance';
+}
+
 async function openAccountCategory(accountId,category,currency){
  state.account=String(accountId||'');
- state.period='all';state.customFrom='';state.customTo='';
  if($('fmAccount'))$('fmAccount').value=state.account;
- if($('fmPeriod'))$('fmPeriod').value='all';
- state.txFilters={...state.txFilters,q:'',type:'',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
+ state.txFilters={...state.txFilters,q:'',type:'EXPENSE',merchant:'',category:String(category||''),currency:String(currency||'').toUpperCase(),source:'',reconciliation_status:'',amount_min:'',amount_max:''};
  state.txMeta.page=1;
  closeDrawer();
  state.view='transactions';
- history.replaceState(null,'','#transactions');
+ saveFinanceLocation();
  await loadTransactions();
 }
 function financeAccountCardReference(account){
@@ -551,7 +566,7 @@ function financeAccountCardMarkup(account,options={}){
  const masked=a.account_number_masked||('Account '+String(a.id||''));
  const bsb=a.bsb_masked?('BSB '+a.bsb_masked):'Voxel Veda Finance';
  return `<section class="fm-finance-account-card ${compact?'compact':''}" aria-label="Voxel Veda Finance internal account card">
-  <div class="fm-finance-card-head"><div class="fm-finance-card-brand"><img src="/Frame%201.png" alt="Voxel Veda" style="width:108px;max-height:54px;object-fit:contain;object-position:left center;background:#fff;border-radius:10px;padding:4px 8px"><div><b>Voxel Veda</b><small>Finance Account</small></div></div><span class="fm-finance-card-chip" aria-hidden="true"></span></div>
+  <div class="fm-finance-card-head"><div class="fm-finance-card-brand"><img src="/Frame%201.png" alt="Voxel Veda" style="width:108px;max-height:54px;object-fit:contain;object-position:left center;background:var(--surface);border-radius:10px;padding:4px 8px;"><div><b>Voxel Veda</b><small>Finance Account</small></div></div><span class="fm-finance-card-chip" aria-hidden="true"></span></div>
   <div class="fm-finance-card-name">${esc(a.nickname||'Finance Account')}</div>
   <div class="fm-finance-card-number">${esc(masked)}</div>
   <div class="fm-finance-card-meta"><span><small>ACCOUNT HOLDER</small><b>${esc(holder)}</b></span><span><small>CURRENCY</small><b>${esc(a.currency||'AUD')}</b></span></div>
@@ -627,7 +642,7 @@ function accounts(){
  const coverage=Array.isArray(state.history?.accounts)?state.history.accounts:[];
  const spending=state.accountCategorySpending||{};
  const accountCategoryRows=Array.isArray(spending.account_categories)?spending.account_categories:[];
- const chartPeriod='All imported history';
+ const range=dateRange();const chartPeriod=range.from?date(range.from)+' – '+date(range.to):'All history through '+date(range.to);
  const marketFilter=String(state.accountFilters?.market||'ALL').toUpperCase(),typeFilter=String(state.accountFilters?.type||'ALL').toUpperCase();
  const marketRank={AUSTRALIA:1,INDIA:2,OTHER:3};
  const visibleAccounts=state.accounts.filter(a=>(marketFilter==='ALL'||String(a.bank_market||'OTHER').toUpperCase()===marketFilter)&&(typeFilter==='ALL'||String(a.account_type||'TRANSACTION').toUpperCase()===typeFilter)).sort((a,b)=>(marketRank[String(a.bank_market||'OTHER').toUpperCase()]||9)-(marketRank[String(b.bank_market||'OTHER').toUpperCase()]||9)||String(a.institution||'Manual').localeCompare(String(b.institution||'Manual'))||String(a.ownership_scope||'').localeCompare(String(b.ownership_scope||''))||String(a.account_type||'').localeCompare(String(b.account_type||''))||String(a.nickname||'').localeCompare(String(b.nickname||'')));
@@ -635,7 +650,7 @@ function accounts(){
   const history=coverage.find(x=>String(x.id||x.bank_account_id)===String(a.id))||{};
   const accountName=esc(a.nickname||'Account');
   const institution=esc(a.institution||'Manual');
-  const accountNumber=esc(a.account_number_masked||'number masked');
+  const accountNumber=esc(maskedAccount(a.account_number_masked));
   const scope=esc(a.ownership_scope||'UNCLASSIFIED');
   const connection=esc(a.connection_status||'MANUAL');
   const searchText=esc([a.nickname,a.institution,a.account_number_masked,a.ownership_scope,a.account_type,a.bank_market,a.bank_country_code,a.currency].filter(Boolean).join(' ').toLowerCase());
@@ -657,13 +672,13 @@ function accounts(){
      <button class="fm-account-more" type="button" data-account="${a.id}" aria-label="Open account controls">•••</button>
     </div>
     <div class="fm-account-balance-row">
-     <div class="fm-account-balance"><span>Available balance</span><strong>${nativeMoney(profileBalance,a.currency||'AUD')}</strong><small>${scope} · ${esc(accountMarketLabel(a))} · ${connection}</small></div>
-     <div class="fm-account-main-actions"><button type="button" class="soft" data-account="${a.id}">View</button><button type="button" class="primary" data-account-transactions="${a.id}">Transactions</button></div>
+     <div class="fm-account-balance"><span>${esc(balanceLabel(a))}</span><strong>${nativeMoney(profileBalance,a.currency||'AUD')}</strong><small>${scope} · ${esc(accountMarketLabel(a))} · ${connection} · Updated ${date(a.balance_updated_at||a.last_synced_at||a.updated_at)}</small>${a.statement_closing_balance!=null?`<small>Imported closing balance: ${nativeMoney(a.statement_closing_balance,a.currency)} · ${date(a.statement_balance_date)}</small>`:''}</div>
+     <div class="fm-account-main-actions"><button type="button" class="primary" data-account="${a.id}">Open account</button><button type="button" data-history-import="${a.id}">Import statement</button></div>
     </div>
     ${renderAccountCategoryChart(a,accountCategoryRows.filter(row=>String(row.bank_account_id)===String(a.id)),null,{compact:true,label:chartPeriod})}
     <div class="fm-account-card-footer">
-     <div class="fm-account-coverage"><span>✓</span><div><b>Coverage</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)} · ${transactionCount.toLocaleString('en-AU')} tx</small></div></div>
-     <div class="fm-account-footer-actions"><button type="button" data-account-card="${a.id}">Account card</button><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button><button type="button" class="details" data-account="${a.id}">View details ›</button></div>
+     <div class="fm-account-coverage"><span aria-hidden="true">▤</span><div><b>${esc(history.coverage_label||'Imported record range · continuity unverified')}</b><small>${date(history.transaction_start||a.history_start_date)} → ${date(history.transaction_end||a.history_end_date)} · ${transactionCount.toLocaleString('en-AU')} tx</small>${(history.statement_gaps||a.statement_gaps||[]).length?`<details><summary>Show statement gaps</summary>${(history.statement_gaps||a.statement_gaps).map(gap=>`<small>${date(gap.from)} → ${date(gap.to)}</small>`).join('')}</details>`:''}</div></div>
+     <details class="fm-secondary-actions"><summary>Account actions</summary><div class="fm-account-footer-actions"><button type="button" data-account-card="${a.id}">Account card</button><button type="button" data-account-statement="${a.id}">Statement PDF</button><button type="button" data-account-edit="${a.id}">Edit</button><button type="button" class="bad" data-account-purge="${a.id}">Delete</button></div></details>
     </div>
    </div>
   </article>`;
@@ -686,7 +701,7 @@ function transactions(){
  const selectedCount=state.selectedTransactions.size;
  const hasRows=Array.isArray(state.tx)&&state.tx.length>0;
  const bulkBar=hasRows?'<div class="fm-bulk-bar"><label class="fm-check"><input id="txSelectAll" type="checkbox" '+(selectedCount===state.tx.length?'checked':'')+'> Select this page</label><span id="txSelectedCount">'+selectedCount+' selected</span><button id="txBulkReview" class="fm-primary" type="button" '+(selectedCount?'':'disabled')+'>Bulk review</button><small>Maximum 200 per confirmed batch</small></div>':'';
- const rows=(state.tx||[]).map(r=>'<tr data-tx="'+r.id+'"><td class="fm-select-cell"><input type="checkbox" data-tx-select="'+r.id+'" aria-label="Select transaction '+r.id+'" '+(state.selectedTransactions.has(Number(r.id))?'checked':'')+'></td><td>'+date(r.transaction_date)+'</td><td>'+esc(r.account_name||'')+'</td><td>'+esc(r.institution||'')+'</td><td><b>'+esc(r.merchant_normalized||r.merchant_name||'')+'</b><small>'+esc(r.description||'')+'</small></td><td>'+esc(r.category||'Uncategorised')+'</td><td>'+(Number(r.is_internal_transfer)?'Transfer':num(r.debit)>0?'Expense':'Income')+'</td><td>'+esc(r.ownership_scope||'')+'</td><td>'+esc(r.currency||'')+'</td><td>'+(num(r.debit)?nativeMoney(r.debit,r.currency):'')+'</td><td>'+(num(r.credit)?nativeMoney(r.credit,r.currency):'')+'</td><td>'+esc(r.project_ref||r.source_type||'')+'</td><td>'+statusBadge(r.reviewed_at?'REVIEWED':r.reconciliation_status)+'</td></tr>').join('');
+ const rows=(state.tx||[]).map(r=>'<tr data-tx="'+r.id+'"><td class="fm-select-cell"><input type="checkbox" data-tx-select="'+r.id+'" aria-label="Select transaction '+r.id+'" '+(state.selectedTransactions.has(Number(r.id))?'checked':'')+'></td><td>'+date(r.transaction_date)+'</td><td>'+esc(r.account_name||'')+'</td><td>'+esc(r.institution||'')+'</td><td><b>'+esc(r.merchant_normalized||r.merchant_name||'')+'</b><small>'+esc(r.description||'')+'</small></td><td>'+esc(r.category||'Uncategorised')+'</td><td>'+(Number(r.is_internal_transfer)?'Transfer':num(r.debit)>0?'Expense':'Income')+'</td><td>'+esc(r.ownership_scope||'')+'</td><td>'+esc(r.currency||'')+'</td><td>'+(num(r.debit)?nativeMoney(r.category_allocated_debit??r.debit,r.currency):'')+'</td><td>'+(num(r.credit)?nativeMoney(r.credit,r.currency):'')+'</td><td>'+esc(r.project_ref||r.source_type||'')+'</td><td>'+statusBadge(r.reviewed_at?'REVIEWED':r.reconciliation_status)+'</td></tr>').join('');
  const filtered=Object.values(f||{}).some(v=>String(v||'').trim());
  const periodLabels={all:'All History',today:'Today',yesterday:'Yesterday',week:'This Week',last7:'Last 7 Days',month:'This Month',last_month:'Last Month',last30:'Last 30 Days',quarter:'This Quarter',previous_quarter:'Previous Quarter',fy:'Current Financial Year',previous_fy:'Previous Financial Year',year:'Calendar Year',custom:'Custom Range'};
  const periodName=periodLabels[state.period]||'Selected period';
@@ -810,7 +825,7 @@ async function openHistoricalImport(accountId=''){
   submit.disabled=false;submit.textContent='Upload all securely';
   if(!batch.staged.length){notice(batch.summary.attention?'Some files need your action before review.':'No statement file could be staged. Review the file errors shown above.',true);return}
   await refresh();
-  state.view='history';history.replaceState(null,'','#history');render();
+  state.view='history';saveFinanceLocation();render();
   $('fmModal').close();
   const s=batch.summary;
   const target=batch.staged.find(item=>!item.posted)||batch.staged[0];
@@ -967,7 +982,7 @@ function accountantHandoverView(){
  const exportRows=(h.exports||[]).slice(0,12).map(x=>'<div class="fm-row"><div><h3>Version '+esc(x.version_no)+' · '+esc(x.export_uid)+'</h3><p>'+date(x.generated_at)+' · SHA-256 '+esc(String(x.checksum_sha256||'').slice(0,20))+'…</p></div>'+statusBadge(x.export_status||'SNAPSHOT')+'</div>').join('');
  return resourceError('handover','Accountant Handover')+
  '<div class="fm-control-intro"><p>ACCOUNTANT HANDOVER & AUDIT PACK</p><h2>One company-only year-end evidence workspace</h2><span>Build a versioned handover from canonical Company Finance evidence. Personal Money, personal cash wallets, personal debts and Personal bank transaction detail are excluded.</span><div class="fm-control-quick"><button id="handoverRunCheck">Run FY readiness check</button><button id="handoverSnapshot">Capture evidence snapshot</button><button id="handoverPdf">Download branded PDF</button><button data-viewjump="closeassurance">Close & Assurance</button></div></div>'+
- '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial year</h2><p>Select the handover period.</p></div>'+statusBadge(h.handover_status||'UNKNOWN')+'</div><label>Financial year<select id="handoverYear">'+options+'</select></label><div class="fm-grid four" style="margin-top:12px"><div class="fm-kpi"><span>Handover status</span><strong>'+esc(h.handover_status||'—')+'</strong><small>'+num(h.blocker_count)+' blocker(s) · '+num(h.warning_count)+' warning(s)</small></div><div class="fm-kpi"><span>Close certification</span><strong>'+num(c.certified)+' / '+num(c.period_count)+'</strong><small>'+num(c.snapshots)+' immutable snapshot(s)</small></div><div class="fm-kpi"><span>Supplier payables</span><strong>'+nativeMoney(ap.balance||0,ap.currency||'AUD')+'</strong><small>'+num(ap.count)+' open at year end</small></div><div class="fm-kpi"><span>Customer receivables</span><strong>'+nativeMoney(ar.balance||0,ar.currency||'AUD')+'</strong><small>'+num(ar.count)+' open at year end</small></div></div></div></article>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Financial year</h2><p>Select the handover period.</p></div>'+statusBadge(h.handover_status||'UNKNOWN')+'</div><label>Financial year<select id="handoverYear">'+options+'</select></label><div class="fm-grid four" style="margin-top:12px;"><div class="fm-kpi"><span>Handover status</span><strong>'+esc(h.handover_status||'—')+'</strong><small>'+num(h.blocker_count)+' blocker(s) · '+num(h.warning_count)+' warning(s)</small></div><div class="fm-kpi"><span>Close certification</span><strong>'+num(c.certified)+' / '+num(c.period_count)+'</strong><small>'+num(c.snapshots)+' immutable snapshot(s)</small></div><div class="fm-kpi"><span>Supplier payables</span><strong>'+nativeMoney(ap.balance||0,ap.currency||'AUD')+'</strong><small>'+num(ap.count)+' open at year end</small></div><div class="fm-kpi"><span>Customer receivables</span><strong>'+nativeMoney(ar.balance||0,ar.currency||'AUD')+'</strong><small>'+num(ar.count)+' open at year end</small></div></div></div></article>'+
  '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Evidence gaps</h2><p>Concrete items to resolve before external handover.</p></div></div><div class="fm-list">'+Object.entries(g).map(([k,v])=>'<div class="fm-row"><div><h3>'+esc(k.replaceAll('_',' '))+'</h3></div><b>'+num(v)+'</b></div>').join('')+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Versioned evidence history</h2><p>Each snapshot stores a SHA-256 manifest checksum without changing finance records.</p></div></div><div class="fm-list">'+(exportRows||emptyState('No handover snapshot','Capture a snapshot before sending data externally.'))+'</div></div></article></div>'+
  '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Business bank coverage</h2><p>Only BUSINESS-classified transaction evidence is measured.</p></div><button data-viewjump="history">Import missing history</button></div><div class="fm-list">'+(accountRows||emptyState('No business bank evidence','Classify Company bank accounts and import complete history.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Period close evidence</h2><p>Every period should be reviewed/certified before year-end handover.</p></div><button data-viewjump="closeassurance">Open close controls</button></div><div class="fm-list">'+(periodRows||emptyState('No accounting periods','Finance Setup must create accounting periods.'))+'</div></div></article></div>'+
  '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Open accountant questions</h2><p>Unresolved questions remain visible in the handover evidence.</p></div><button id="handoverNewQuery">+ Question</button></div><div class="fm-list">'+(queryRows||emptyState('No open accountant questions','No unresolved accountant query is recorded for this year.'))+'</div></div></article>'+
@@ -1034,7 +1049,7 @@ function counterpartyControlView(){
 function jobProfitabilityView(){
  const data=state.jobProfitability||{},jobs=data.jobs||[],a=data.allocation||{},t=data.totals||{},c=data.currency||state.setup?.default_currency||'AUD';
  const maxValue=Math.max(1,...jobs.map(x=>num(x.direct_cost)),...jobs.map(x=>num(x.recognized_revenue)));
- const rows=jobs.map(j=>'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>'+esc(j.job_reference)+'</h3><p>'+date(j.first_activity_date)+' → '+date(j.last_activity_date)+' · '+num(j.economic_transaction_count)+' economic record(s) · '+num(j.party_count)+' party/parties</p></div>'+statusBadge(num(j.contribution_margin)>=0?'POSITIVE':'NEGATIVE')+'</div><div class="fm-grid four"><div class="fm-kpi"><span>Recognized revenue</span><strong>'+nativeMoney(j.recognized_revenue,c)+'</strong><small>SALE net amounts only</small></div><div class="fm-kpi"><span>Direct cost</span><strong>'+nativeMoney(j.direct_cost,c)+'</strong><small>Expense · supplier bill · payroll</small></div><div class="fm-kpi"><span>Contribution margin</span><strong class="'+(num(j.contribution_margin)<0?'bad':'good')+'">'+nativeMoney(j.contribution_margin,c)+'</strong><small>'+(j.contribution_margin_percent===null?'No revenue baseline':num(j.contribution_margin_percent).toFixed(1)+'%')+'</small></div><div class="fm-kpi"><span>Needs review</span><strong>'+nativeMoney(j.refund_review_amount,c)+'</strong><small>Refund amount kept outside margin</small></div></div><div class="fm-chart-row"><span>Revenue</span><div class="fm-bars"><i class="in" style="width:'+Math.max(2,num(j.recognized_revenue)/maxValue*100)+'%"></i></div><b>'+nativeMoney(j.recognized_revenue,c)+'</b></div><div class="fm-chart-row"><span>Direct cost</span><div class="fm-bars"><i class="out" style="width:'+Math.max(2,num(j.direct_cost)/maxValue*100)+'%"></i></div><b>'+nativeMoney(j.direct_cost,c)+'</b></div><details class="fm-recovery"><summary>Category evidence · '+num((j.categories||[]).length)+'</summary><div class="fm-list">'+((j.categories||[]).map(x=>'<div class="fm-row"><div><h3>'+esc(x.category)+'</h3><p>'+num(x.transaction_count)+' posted economic record(s)</p></div><div class="fm-row-right"><b>'+nativeMoney(x.recognized_revenue,c)+' revenue</b><small>'+nativeMoney(x.direct_cost,c)+' cost</small></div></div>').join('')||emptyState('No category detail','No economic category evidence for this job.'))+'</div></details></div></article>').join('');
+ const rows=jobs.map(j=>'<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h3>'+esc(j.job_reference)+'</h3><p>'+date(j.first_activity_date)+' → '+date(j.last_activity_date)+' · '+num(j.economic_transaction_count)+' economic record(s) · '+num(j.party_count)+' party/parties</p></div>'+statusBadge(num(j.contribution_margin)>=0?'POSITIVE':'NEGATIVE')+'</div><div class="fm-grid four"><div class="fm-kpi"><span>Recognized revenue</span><strong>'+nativeMoney(j.recognized_revenue,c)+'</strong><small>SALE net amounts only</small></div><div class="fm-kpi"><span>Direct cost</span><strong>'+nativeMoney(j.direct_cost,c)+'</strong><small>Expense · supplier bill · payroll</small></div><div class="fm-kpi"><span>Contribution margin</span><strong class="'+(num(j.contribution_margin)<0?'bad':'good')+'">'+nativeMoney(j.contribution_margin,c)+'</strong><small>'+(j.contribution_margin_percent===null?'No revenue baseline':num(j.contribution_margin_percent).toFixed(1)+'%')+'</small></div><div class="fm-kpi"><span>Needs review</span><strong>'+nativeMoney(j.refund_review_amount,c)+'</strong><small>Refund amount kept outside margin</small></div></div><div class="fm-chart-row"><span>Revenue</span><div class="fm-bars"><i class="in" style="width:'+Math.max(0,num(j.recognized_revenue)/maxValue*100)+'%"></i></div><b>'+nativeMoney(j.recognized_revenue,c)+'</b></div><div class="fm-chart-row"><span>Direct cost</span><div class="fm-bars"><i class="out" style="width:'+Math.max(0,num(j.direct_cost)/maxValue*100)+'%"></i></div><b>'+nativeMoney(j.direct_cost,c)+'</b></div><details class="fm-recovery"><summary>Category evidence · '+num((j.categories||[]).length)+'</summary><div class="fm-list">'+((j.categories||[]).map(x=>'<div class="fm-row"><div><h3>'+esc(x.category)+'</h3><p>'+num(x.transaction_count)+' posted economic record(s)</p></div><div class="fm-row-right"><b>'+nativeMoney(x.recognized_revenue,c)+' revenue</b><small>'+nativeMoney(x.direct_cost,c)+' cost</small></div></div>').join('')||emptyState('No category detail','No economic category evidence for this job.'))+'</div></details></div></article>').join('');
  const unallocated=(data.unallocated_evidence||[]).slice(0,30).map(x=>'<div class="fm-row"><div><h3>'+esc(x.description||x.transaction_uid||'Unallocated transaction')+'</h3><p>'+date(x.effective_date)+' · '+esc(x.transaction_type)+' · '+esc(x.party_name||'No party')+' · '+esc(x.category||'Uncategorised')+'</p></div><div class="fm-row-right"><b>'+nativeMoney(x.net_amount,c)+'</b><small>No job reference</small></div></div>').join('');
  return resourceError('jobProfitability','Job Profitability')+
  '<div class="fm-control-intro"><p>JOB PROFITABILITY & COST ALLOCATION</p><h2>See which jobs actually contribute margin—and what is still unallocated</h2><span>'+esc(data.accounting_basis||'Posted Company Finance evidence only.')+' This is contribution analysis, not statutory net profit.</span><div class="fm-control-quick"><button data-viewjump="transactions">Transactions</button><button data-viewjump="planning">FP&A Planning</button><button data-viewjump="reports">Reports</button><button data-viewjump="controlactions">Control Actions</button></div></div>'+
@@ -1085,7 +1100,7 @@ function closeAssuranceView(){
  const canReopen=period.id&&period.status!=='LOCKED'&&run.status==='CERTIFIED';
  return resourceError('closeAssurance','Close & Assurance')+
  '<div class="fm-control-intro"><p>MONTH-END CLOSE & ASSURANCE</p><h2>Prove the period is clean before you lock it</h2><span>Close certification fingerprints live financial evidence. If measured evidence changes after sign-off, period locking fails until you certify again.</span><div class="fm-control-quick"><button id="closeRefresh">Refresh evidence</button><button id="closeSnapshot">Capture snapshot</button>'+(canCertify?'<button id="closeCertify">Certify close</button>':'')+(canLock?'<button id="closeLock">Lock period</button>':'')+(canReopen?'<button id="closeReopen">Reopen certification</button>':'')+'</div></div>'+
- '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounting period</h2><p>Select the month/period whose evidence must be closed.</p></div>'+statusBadge(period.status||'UNKNOWN')+'</div><label>Period<select id="closePeriod">'+periodOptions+'</select></label><div class="fm-grid four" style="margin-top:12px"><div class="fm-kpi"><span>Close readiness</span><strong>'+esc(c.readiness_status||'—')+'</strong><small>'+esc(period.period_key||'No period')+'</small></div><div class="fm-kpi"><span>Blocking controls</span><strong>'+num(c.blocker_count)+'</strong><small>Must be zero to certify</small></div><div class="fm-kpi"><span>Warnings</span><strong>'+num(c.warning_count)+'</strong><small>Visible but not lock blockers</small></div><div class="fm-kpi"><span>Certification</span><strong>'+esc(run.status||'NOT STARTED')+'</strong><small>'+(run.certified_at?'Certified '+date(run.certified_at):'Evidence fingerprint required')+'</small></div></div></div></article>'+
+ '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Accounting period</h2><p>Select the month/period whose evidence must be closed.</p></div>'+statusBadge(period.status||'UNKNOWN')+'</div><label>Period<select id="closePeriod">'+periodOptions+'</select></label><div class="fm-grid four" style="margin-top:12px;"><div class="fm-kpi"><span>Close readiness</span><strong>'+esc(c.readiness_status||'—')+'</strong><small>'+esc(period.period_key||'No period')+'</small></div><div class="fm-kpi"><span>Blocking controls</span><strong>'+num(c.blocker_count)+'</strong><small>Must be zero to certify</small></div><div class="fm-kpi"><span>Warnings</span><strong>'+num(c.warning_count)+'</strong><small>Visible but not lock blockers</small></div><div class="fm-kpi"><span>Certification</span><strong>'+esc(run.status||'NOT STARTED')+'</strong><small>'+(run.certified_at?'Certified '+date(run.certified_at):'Evidence fingerprint required')+'</small></div></div></div></article>'+
  '<div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Close controls</h2><p>Hard blockers and warnings are calculated from the canonical ledgers.</p></div></div><div class="fm-list">'+(checkRows||emptyState('No close controls loaded','Refresh close evidence.'))+'</div></div></article><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Balance-sheet context</h2><p>Open balances are context, not automatic blockers.</p></div></div><div class="fm-list"><div class="fm-row"><div><h3>Open supplier payables</h3><p>'+num(pay.count)+' outstanding bill(s) as of period end</p></div><b>'+money(pay.amount||0,state.companySummary?.currency||'AUD')+'</b></div><div class="fm-row"><div><h3>Open customer receivables</h3><p>'+num(rec.count)+' outstanding invoice(s) as of period end</p></div><b>'+money(rec.amount||0,state.companySummary?.currency||'AUD')+'</b></div><div class="fm-state"><strong>Lock boundary</strong><p>A certified fingerprint is mandatory. Any measured evidence change after certification makes the sign-off stale and the lock endpoint rejects it.</p></div></div></div></article></div>'+
  '<article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><div><h2>Immutable close evidence history</h2><p>Snapshots are retained even when certification is reopened.</p></div><small>'+snaps.length+' snapshot(s)</small></div><div class="fm-list">'+(snapRows||emptyState('No close snapshots','Capture evidence before certification or major close review.'))+'</div></div></article>'+
  (blockers.length?'<div class="fm-state fm-state-error"><strong>Period cannot be certified yet</strong><p>'+blockers.map(x=>esc(x.title)+' ('+num(x.actual)+')').join(' · ')+'</p></div>':warnings.length?'<div class="fm-state"><strong>Ready to certify with warnings</strong><p>'+warnings.map(x=>esc(x.title)+' ('+num(x.actual)+')').join(' · ')+'</p></div>':'<div class="fm-state"><strong>All measured close controls are clear</strong><p>You may capture evidence and certify. Certification still does not lock the period automatically.</p></div>');
@@ -1120,7 +1135,7 @@ function savingsControlView(){
    const required=g.required_monthly_to_target===null||g.required_monthly_to_target===undefined?'—':nativeMoney(g.required_monthly_to_target,g.currency||'AUD')+'/mo';
    const emergency=g.goal_type==='EMERGENCY_FUND'?(g.emergency_coverage_months===null||g.emergency_coverage_months===undefined?' · coverage unavailable':' · '+num(g.emergency_coverage_months).toFixed(1)+' months coverage'):'';
    const actions='<button data-savings-control="'+esc(g.id)+'">Control</button><button data-savings-statement="'+esc(g.id)+'">Statement</button>'+(g.status==='ACTIVE'?'<button data-goal-contribute="'+esc(g.id)+'">Add progress</button><button data-goal-status="PAUSED" data-goal-id="'+esc(g.id)+'">Pause</button>':g.status==='PAUSED'?'<button data-goal-status="ACTIVE" data-goal-id="'+esc(g.id)+'">Resume</button>':'');
-   return '<div class="fm-row"><div style="min-width:0;flex:1"><h3>'+esc(g.name||'Savings goal')+'</h3><p>'+esc(g.goal_type||'OTHER').replaceAll('_',' ')+' · '+esc(g.liquidity_priority||g.priority||'MEDIUM')+' priority · target '+date(g.target_date)+emergency+'</p><div class="fm-progress"><i style="width:'+pct.toFixed(1)+'%"></i></div><small>'+pct.toFixed(1)+'% complete · required '+required+' · recent '+nativeMoney(g.recent_monthly_pace||0,g.currency||'AUD')+'/mo · forecast '+date(g.forecast_completion_date)+'</small></div><div class="fm-row-right"><b>'+nativeMoney(current,g.currency||'AUD')+' / '+nativeMoney(target,g.currency||'AUD')+'</b>'+statusBadge(g.pace_status||g.status)+'<small>'+nativeMoney(remaining,g.currency||'AUD')+' remaining · '+num(g.contribution_count||0)+' contribution(s)</small><div class="fm-inline-actions">'+actions+'</div></div></div>';
+   return '<div class="fm-row"><div style="min-width:0;flex:1;"><h3>'+esc(g.name||'Savings goal')+'</h3><p>'+esc(g.goal_type||'OTHER').replaceAll('_',' ')+' · '+esc(g.liquidity_priority||g.priority||'MEDIUM')+' priority · target '+date(g.target_date)+emergency+'</p><div class="fm-progress"><i style="width:'+pct.toFixed(1)+'%"></i></div><small>'+pct.toFixed(1)+'% complete · required '+required+' · recent '+nativeMoney(g.recent_monthly_pace||0,g.currency||'AUD')+'/mo · forecast '+date(g.forecast_completion_date)+'</small></div><div class="fm-row-right"><b>'+nativeMoney(current,g.currency||'AUD')+' / '+nativeMoney(target,g.currency||'AUD')+'</b>'+statusBadge(g.pace_status||g.status)+'<small>'+nativeMoney(remaining,g.currency||'AUD')+' remaining · '+num(g.contribution_count||0)+' contribution(s)</small><div class="fm-inline-actions">'+actions+'</div></div></div>';
  }).join('');
  return resourceError('savingsReserve','Savings & Reserve Control')+
  '<div class="fm-control-intro"><p>SAVINGS & RESERVE CONTROL</p><h2>Emergency funds, sinking funds and goals with real funding pace</h2><span>Goal progress is planning evidence only. Control settings, forecasts and progress updates never move money from a bank account or wallet automatically.</span><div class="fm-control-quick"><button data-personal-new="savings">+ Savings goal</button><button data-viewjump="forecast">Forecast</button><button data-viewjump="networth">Net worth</button></div></div>'+
@@ -2542,7 +2557,7 @@ async function openStatementWizard(){
   submit.disabled=false;submit.textContent='Upload & verify files';
   if(!batch.staged.length){progress.className='fm-state fm-state-error';progress.textContent=batch.summary.attention?'Complete the requested password or mapping action shown below.':'No statement file could be staged. Fix the file errors shown below and retry.';return}
   await refresh();
-  state.view='statements';history.replaceState(null,'','#statements');render();
+  state.view='statements';saveFinanceLocation();render();
   if(batch.summary.attention){progress.className='fm-state fm-state-warn';progress.textContent='Some files are ready for review and others still need the action shown below.';return}
   $('fmModal').close();
   const s=batch.summary;
@@ -2712,7 +2727,7 @@ function saveCurrentView(){
  api(API+'/personal-money/saved-views',{method:'POST',body:JSON.stringify({name,query_text:query,pinned:true})}).then(async x=>{notice(x.message);await refresh()}).catch(error=>notice(error.message,true));
 }
 function openSavedView(query){
- state.txFilters.q=String(query||'');state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions();
+ state.txFilters.q=String(query||'');state.txMeta.page=1;state.view='transactions';saveFinanceLocation();loadTransactions();
 }
 async function openSplitEditor(transactionId,amount,currency){
  try{
@@ -2753,7 +2768,7 @@ function render(){
  ensureReportPresetDelegation();
  bindDynamic();
 }
-async function go(v){state.view=v;history.replaceState(null,'','#'+v);render()}
+async function go(v){closeDrawer();state.view=v==='categories'?'rules':v;saveFinanceLocation();render()}
 function bindDynamic(){
  document.querySelectorAll('[data-control-take]').forEach(b=>b.onclick=()=>updateControlAction(b.dataset.controlTake,{assign_to_me:true,status:'IN_PROGRESS',progress_note:'Ownership accepted.'}));
  document.querySelectorAll('[data-control-start]').forEach(b=>b.onclick=()=>updateControlAction(b.dataset.controlStart,{status:'IN_PROGRESS',assign_to_me:true,progress_note:'Control action started.'}));
@@ -2766,7 +2781,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-account-new]').forEach(b=>b.onclick=()=>openAccountForm(b.dataset.accountNew));
  document.querySelectorAll('[data-account-statement]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountStatementForm(b.dataset.accountStatement)});
  document.querySelectorAll('[data-account-edit]').forEach(b=>b.onclick=()=>openAccountForm('',b.dataset.accountEdit));
- document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');state.period='all';state.customFrom='';state.customTo='';if($('fmAccount'))$('fmAccount').value=state.account;if($('fmPeriod'))$('fmPeriod').value='all';state.txMeta.page=1;go('transactions');loadTransactions()});
+ document.querySelectorAll('[data-account-transactions]').forEach(b=>b.onclick=()=>{state.account=String(b.dataset.accountTransactions||'');if($('fmAccount'))$('fmAccount').value=state.account;state.txMeta.page=1;go('transactions');loadTransactions()});
  document.querySelectorAll('[data-account-category]').forEach(b=>b.onclick=e=>{e.stopPropagation();openAccountCategory(b.dataset.accountCategoryAccount,b.dataset.accountCategory,b.dataset.accountCategoryCurrency)});
  const accountSearch=document.querySelector('[data-account-search]');
  if(accountSearch)accountSearch.oninput=e=>{const q=String(e.currentTarget.value||'').trim().toLowerCase();document.querySelectorAll('[data-account-card-shell]').forEach(card=>{card.hidden=Boolean(q)&&!String(card.dataset.searchText||'').includes(q)})};
@@ -2850,7 +2865,7 @@ function bindDynamic(){
  document.querySelectorAll('[data-bank-budget-archive]').forEach(b=>b.onclick=async()=>{if(!confirm('Archive this active banking budget?'))return;try{const x=await api(I+'/budgets/'+encodeURIComponent(b.dataset.bankBudgetArchive),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  if($('addBankBudget'))$('addBankBudget').onclick=openBankingBudgetForm;
  document.querySelectorAll('[data-saved-query]').forEach(b=>b.onclick=()=>openSavedView(b.dataset.savedQuery));
- document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)+'/opened',{method:'POST',body:'{}'}).catch(()=>{});state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()});
+ document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)+'/opened',{method:'POST',body:'{}'}).catch(()=>{});state.view='transactions';saveFinanceLocation();loadTransactions()});
  document.querySelectorAll('[data-saved-delete]').forEach(b=>b.onclick=async()=>{if(!confirm('Delete this saved view?'))return;try{const x=await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedDelete),{method:'DELETE'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  if($('saveCurrentView'))$('saveCurrentView').onclick=saveCurrentView;
  document.querySelectorAll('[data-notification-read]').forEach(b=>b.onclick=async()=>{try{await api('/api/notifications/'+encodeURIComponent(b.dataset.notificationRead)+'/read',{method:'PATCH',body:'{}'});await refresh()}catch(error){notice(error.message,true)}});
@@ -2877,12 +2892,12 @@ function bindDynamic(){
  document.querySelectorAll('[data-statement-remove]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this statement from active reports and analysis? You can restore it later.'))return;try{const x=await api(I+'/statements/'+encodeURIComponent(b.dataset.statementRemove)+'/remove',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-statement-restore]').forEach(b=>b.onclick=async()=>{try{const x=await api(I+'/statements/'+encodeURIComponent(b.dataset.statementRestore)+'/restore',{method:'POST',body:'{}'});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
  document.querySelectorAll('[data-statement-purge]').forEach(b=>b.onclick=async()=>{const uid=b.dataset.statementPurge;const typed=prompt('Permanent deletion cannot be undone. Type exactly: PURGE '+uid);if(typed!=='PURGE '+uid)return;try{const x=await api(I+'/statements/'+encodeURIComponent(uid)+'/purge',{method:'DELETE',body:JSON.stringify({confirmation:typed})});notice(x.message);await refresh()}catch(error){notice(error.message,true)}});
- document.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{state.txFilters.category=b.dataset.category;state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()});
- document.querySelectorAll('[data-merchant-filter]').forEach(b=>b.onclick=()=>{state.txFilters.merchant=b.dataset.merchantFilter||'';state.txMeta.page=1;state.view='transactions';history.replaceState(null,'','#transactions');loadTransactions()});
+ document.querySelectorAll('[data-category]').forEach(b=>b.onclick=()=>{state.txFilters.category=b.dataset.category;state.txFilters.type='EXPENSE';state.txMeta.page=1;state.view='transactions';saveFinanceLocation();loadTransactions()});
+ document.querySelectorAll('[data-merchant-filter]').forEach(b=>b.onclick=()=>{state.txFilters.merchant=b.dataset.merchantFilter||'';state.txMeta.page=1;state.view='transactions';saveFinanceLocation();loadTransactions()});
  document.querySelectorAll('[data-scope-jump]').forEach(b=>b.onclick=()=>{state.scope=b.dataset.scopeJump;$('fmScope').value=state.scope;refresh()});
  document.querySelectorAll('[data-scope-view]').forEach(b=>b.onclick=async()=>{
   state.scope=b.dataset.scopeView;state.account='';if($('fmScope'))$('fmScope').value=state.scope;
-  state.view=b.dataset.scopeTarget||'overview';history.replaceState(null,'','#'+state.view);await refresh();
+  state.view=b.dataset.scopeTarget||'overview';saveFinanceLocation();await refresh();
  });
  document.querySelectorAll('[data-export]').forEach(b=>b.onclick=()=>{location.href=b.dataset.export});
  document.querySelectorAll('[data-retry]').forEach(b=>b.onclick=refresh);
@@ -3063,17 +3078,17 @@ async function accountDetail(id){
  try{
   const [detailResult,lifecycleResult,spendingResult,categoryResult]=await Promise.allSettled([api(OS+'/accounts/'+id),api(I+'/accounts/'+id+'/lifecycle'),api(I+'/reports/spending'+filterQuery({account_id:id,include_transactions:0})),api(API+'/categories?include_archived=false')]);
   if(detailResult.status==='rejected')throw detailResult.reason;
-  const d=detailResult.value,a=d.account||state.accounts.find(x=>String(x.id)===String(id))||{},life=lifecycleResult.status==='fulfilled'?lifecycleResult.value?.lifecycle:null;
+  const d=detailResult.value,a={...(state.accounts.find(x=>String(x.id)===String(id))||{}),...(d.account||{})},life=lifecycleResult.status==='fulfilled'?lifecycleResult.value?.lifecycle:null;
   const spending=spendingResult.status==='fulfilled'?spendingResult.value:null;
   const categoryDefs=categoryResult.status==='fulfilled'?(categoryResult.value?.categories||[]):(state.categories?.categories||[]);
   const periodLabels={all:'All history',today:'Today',yesterday:'Yesterday',week:'This week',last7:'Last 7 days',month:'This month',last_month:'Last month',last30:'Last 30 days',quarter:'This quarter',previous_quarter:'Previous quarter',fy:'Current financial year',previous_fy:'Previous financial year',year:'Calendar year',custom:'Custom range'};
   const categoryChart=renderAccountCategoryChart(a,spending?.categories||[],categoryDefs,{compact:false,label:periodLabels[state.period]||'Selected period'});
-  const monthly=d.monthly||[],max=Math.max(1,...monthly.flatMap(x=>[num(x.money_in),num(x.money_out)]));
-  const chart=monthly.length?monthly.map(x=>`<div class="fm-chart-row"><span>${esc(x.month)}</span><div class="fm-bars"><i class="in" style="width:${Math.max(2,num(x.money_in)/max*100)}%"></i><i class="out" style="width:${Math.max(2,num(x.money_out)/max*100)}%"></i></div><b>${nativeMoney(num(x.money_in)-num(x.money_out),a.currency||'AUD')}</b></div>`).join(''):emptyState('No account trend','No recent monthly activity.');
+  const monthly=(spending?.monthly||[]).map(row=>({...row,money_in:row.received,money_out:row.spent}));
+  const chart=cashFlowRows(monthly,a.id);
 
   const tx=(d.transactions||[]).slice(0,20).map(x=>`<div class="fm-row" data-tx="${x.id}"><div><h3>${esc(x.merchant_name||x.description)}</h3><p>${date(x.transaction_date)} · ${esc(x.category||'Uncategorised')}</p></div><b>${nativeMoney(Math.abs(num(x.credit)-num(x.debit)),x.currency||a.currency||'AUD')}</b></div>`).join('');
   const purgeButton=`<button class="bad" data-account-purge="${a.id}">Delete account & all data</button>`;
-  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-card="${a.id}">Account card</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-account-card-drawer">${financeAccountCardMarkup(a,{compact:true})}</div><div class="fm-grid four"><div class="fm-kpi"><span>Current / available balance</span><strong>${nativeMoney(a.available_balance??a.current_ledger_balance,a.currency||'AUD')}</strong><small>Current position</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(a.account_number_masked||'—')}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Balance / cash-flow trend</h3><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad">${categoryChart}</div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
+  openDrawer(a.nickname||'Account',`<div class="fm-account-tabs"><button class="active">Overview</button><button data-account-card="${a.id}">Account card</button><button data-account-edit="${a.id}">Edit account</button><button data-account-tx="${a.id}">Transactions</button><button data-viewjump="history">Import history</button><button data-viewjump="statements">Statements</button><button data-viewjump="reconciliation">Reconciliation</button></div><div class="fm-account-card-drawer">${financeAccountCardMarkup(a,{compact:true})}</div><div class="fm-grid four"><div class="fm-kpi"><span>${esc(balanceLabel(a))}</span><strong>${nativeMoney(a.profile_balance??a.current_ledger_balance??a.available_balance,a.currency||'AUD')}</strong><small>${date(a.balance_updated_at||a.last_synced_at||a.updated_at)}</small></div><div class="fm-kpi"><span>90-day money in</span><strong class="good">${nativeMoney(d.metrics?.income_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day money out</span><strong class="bad">${nativeMoney(d.metrics?.spend_90d||0,a.currency||'AUD')}</strong></div><div class="fm-kpi"><span>90-day net</span><strong>${nativeMoney(d.metrics?.net_90d||0,a.currency||'AUD')}</strong></div></div><div class="fm-card"><div class="fm-pad"><div class="fm-detail-grid"><span>Institution<b>${esc(a.institution||'—')}</b></span><span>Type<b>${esc(a.account_type||'—')}</b></span><span>Masked number<b>${esc(maskedAccount(a.account_number_masked))}</b></span><span>Ownership<b>${esc(a.ownership_scope||'—')}</b></span><span>Currency<b>${esc(a.currency||'—')}</b></span><span>Connection<b>${esc(a.connection_status||a.connection_type||'MANUAL')}</b></span><span>Last sync<b>${date(a.last_synced_at)}</b></span><span>History<b>${date(a.history_start_date)} → ${date(a.history_end_date)}</b></span></div></div></div><div class="fm-grid two"><article class="fm-card"><div class="fm-pad"><h3>Cash flow · selected period</h3><p>Native currency, confirmed internal transfers excluded. Tap In or Out for source transactions.</p><div class="fm-chart">${chart}</div></div></article><article class="fm-card"><div class="fm-pad">${categoryChart}</div></article></div><article class="fm-card"><div class="fm-pad"><div class="fm-card-head"><h3>Recent transactions</h3><button data-quick-account="${a.id}">+ Transaction</button></div><div class="fm-list">${tx||emptyState('No transactions','No visible activity for this account.')}</div></div></article><details class="fm-danger"><summary>Danger Zone</summary><p>Archive keeps history. Delete account & all data is permanent and removes the account's linked Finance records after typed confirmation and security step-up.</p><div class="fm-hero-actions"><button data-account-action="inactive" data-id="${a.id}">Set inactive</button><button data-account-action="archive" data-id="${a.id}">Archive</button><button data-account-action="restore" data-id="${a.id}">Restore</button>${purgeButton}</div></details>`,'ACCOUNT WORKSPACE');
   setTimeout(()=>{
    document.querySelectorAll('[data-account-action]').forEach(b=>b.onclick=()=>accountLifecycle(b.dataset.id,b.dataset.accountAction));
    document.querySelectorAll('[data-account-purge]').forEach(b=>b.onclick=()=>purgeAccount(b.dataset.accountPurge));
@@ -3115,7 +3130,7 @@ function openAccountForm(presetType='',accountId=''){
  const marketChanged=()=>{const market=String(form.elements.bank_market.value||'OTHER').toUpperCase();if(!accountId){if(market==='INDIA'&&String(form.elements.currency.value||'').toUpperCase()==='AUD')form.elements.currency.value='INR';if(market==='AUSTRALIA'&&String(form.elements.currency.value||'').toUpperCase()==='INR')form.elements.currency.value='AUD'}if(market==='INDIA'&&['AU','XX',''].includes(String(form.elements.bank_country_code.value||'').toUpperCase()))form.elements.bank_country_code.value='IN';if(market==='AUSTRALIA'&&['IN','XX',''].includes(String(form.elements.bank_country_code.value||'').toUpperCase()))form.elements.bank_country_code.value='AU';};
  form.elements.bank_market.addEventListener('change',marketChanged);
  document.querySelector('[data-modal-cancel]')?.addEventListener('click',()=> $('fmModal').close());
- form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),body=Object.fromEntries(fd.entries());body.id=body.id?Number(body.id):undefined;body.currency=String(body.currency||'AUD').toUpperCase();body.bank_country_code=String(body.bank_country_code||'').toUpperCase();try{const x=await api(I+'/accounts',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh();if(x.bank_account_id){state.view='accounts';history.replaceState(null,'','#accounts');render()}}catch(error){notice(error.message,true)}};
+ form.onsubmit=async e=>{e.preventDefault();const fd=new FormData(e.currentTarget),body=Object.fromEntries(fd.entries());body.id=body.id?Number(body.id):undefined;body.currency=String(body.currency||'AUD').toUpperCase();body.bank_country_code=String(body.bank_country_code||'').toUpperCase();try{const x=await api(I+'/accounts',{method:'POST',body:JSON.stringify(body)});$('fmModal').close();notice(x.message);await refresh();if(x.bank_account_id){state.view='accounts';saveFinanceLocation();render()}}catch(error){notice(error.message,true)}};
 }
 function openNew(kind='expense',presetAccount=''){
  if(kind==='statement'){openStatementWizard();return}
@@ -3176,7 +3191,7 @@ async function globalFinanceSearch(input){
    section('Accounts',g.accounts,r=>'<button class="fm-row fm-row-button" data-search-account="'+r.id+'"><div><h3>'+esc(r.nickname)+'</h3><p>'+esc(r.institution||'')+' · '+esc(r.account_type||'')+' · '+esc(r.ownership_scope||'')+'</p></div><b>'+esc(r.currency||'')+'</b></button>')+
    section('Statements',g.statements,r=>'<button class="fm-row fm-row-button" data-search-view="statements"><div><h3>'+esc(r.original_name)+'</h3><p>'+esc(r.account_name||'')+' · '+date(r.statement_start_date)+' – '+date(r.statement_end_date)+'</p></div><b>'+esc(r.source_format||'')+'</b></button>')+
    section('Receipts',g.receipts,r=>'<button class="fm-row fm-row-button" data-search-tx="'+r.bank_transaction_id+'"><div><h3>'+esc(r.original_name)+'</h3><p>'+esc(r.merchant_name||r.description||'')+' · '+esc(r.account_name||'')+'</p></div><small>'+date(r.created_at)+'</small></button>')+
-   section('Categories',g.categories,r=>'<button class="fm-row fm-row-button" data-search-view="categories"><div><h3>'+esc(r.name)+'</h3><p>'+esc(r.scope||'')+' · GST '+esc(r.gst_default||'REVIEW')+'</p></div></button>')+
+   section('Categories',g.categories,r=>'<button class="fm-row fm-row-button" data-search-view="rules"><div><h3>'+esc(r.name)+'</h3><p>'+esc(r.scope||'')+' · GST '+esc(r.gst_default||'REVIEW')+'</p></div></button>')+
    section('Supplier Bills',g.supplier_bills,r=>'<button class="fm-row fm-row-button" data-search-bill="'+r.id+'"><div><h3>'+esc(r.supplier_name||r.bill_uid)+'</h3><p>'+esc(r.supplier_invoice_no||'')+' · '+esc(r.status||'')+'</p></div><b>'+nativeMoney(r.balance,state.companySummary?.currency||'AUD')+'</b></button>');
   openDrawer('Search: '+q,html||emptyState('No Finance results','No permitted Finance records matched this search.'),'GLOBAL SEARCH');
   setTimeout(()=>{document.querySelectorAll('[data-search-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.searchTx));document.querySelectorAll('[data-search-account]').forEach(b=>b.onclick=()=>accountDetail(b.dataset.searchAccount));document.querySelectorAll('[data-search-bill]').forEach(b=>b.onclick=()=>supplierBillDetail(b.dataset.searchBill));document.querySelectorAll('[data-search-view]').forEach(b=>b.onclick=()=>{closeDrawer();go(b.dataset.searchView)})},0);
@@ -3202,19 +3217,36 @@ function runFinanceCommand(input){
  if(command.startsWith('search ')){globalFinanceSearch(q.slice(7).trim());return true}
  return false;
 }
+function financeSnapshot(){return {view:state.view,scope:state.scope,account:state.account,period:state.period,customFrom:state.customFrom,customTo:state.customTo,txFilters:{...state.txFilters},page:state.txMeta.page};}
+function saveFinanceLocation(replace=false){
+ const url=new URL(location.href);url.hash=state.view;
+ for(const [key,value] of Object.entries({scope:state.scope,account_id:state.account,period:state.period,from:state.customFrom,to:state.customTo,category:state.txFilters.category,currency:state.txFilters.currency,type:state.txFilters.type})){if(value)url.searchParams.set(key,value);else url.searchParams.delete(key);}
+ if(replace||url.href===location.href)history.replaceState(financeSnapshot(),'',url);else history.pushState(financeSnapshot(),'',url);
+}
+function restoreFinanceLocation(snapshot){
+ const query=new URLSearchParams(location.search);
+ if(snapshot){for(const key of ['view','scope','account','period','customFrom','customTo'])state[key]=snapshot[key];state.txFilters={...state.txFilters,...snapshot.txFilters};state.txMeta.page=snapshot.page||1;}
+ else{state.scope=query.get('scope')||state.scope;state.account=query.get('account_id')||'';state.period=query.get('period')||state.period;state.customFrom=query.get('from')||'';state.customTo=query.get('to')||'';for(const key of ['category','currency','type'])state.txFilters[key]=query.get(key)||'';const view=location.hash.slice(1);if(NAV.some(item=>item[0]===view)||view==='more')state.view=view;}
+ for(const [id,key] of [['fmScope','scope'],['fmAccount','account'],['fmPeriod','period'],['fmFrom','customFrom'],['fmTo','customTo']])if($(id))$(id).value=state[key];
+ $('fmFromWrap').hidden=state.period!=='custom';$('fmToWrap').hidden=state.period!=='custom';
+}
+window.addEventListener('popstate',async event=>{closeDrawer();restoreFinanceLocation(event.state);await refresh();});
 function bind(){
- $('fmScope').onchange=e=>{state.scope=e.target.value;state.txMeta.page=1;refresh()};
- $('fmAccount').onchange=e=>{state.account=e.target.value;state.txMeta.page=1;refresh()};
- $('fmPeriod').onchange=e=>{state.period=e.target.value;const custom=state.period==='custom';$('fmFromWrap').hidden=!custom;$('fmToWrap').hidden=!custom;if(!custom)refresh()};
- $('fmFrom').onchange=e=>{state.customFrom=e.target.value;if(state.period==='custom'&&state.customTo)refresh()};
- $('fmTo').onchange=e=>{state.customTo=e.target.value;if(state.period==='custom'&&state.customFrom)refresh()};
+ document.addEventListener('click',event=>{const button=event.target.closest('[data-flow-type]');if(button)openCashFlowRecords(button);});
+ $('fmScope').onchange=e=>{state.scope=e.target.value;state.txMeta.page=1;saveFinanceLocation();refresh()};
+ $('fmAccount').onchange=e=>{state.account=e.target.value;state.txMeta.page=1;saveFinanceLocation();refresh()};
+ $('fmPeriod').onchange=e=>{state.period=e.target.value;const custom=state.period==='custom';$('fmFromWrap').hidden=!custom;$('fmToWrap').hidden=!custom;saveFinanceLocation();if(!custom)refresh()};
+ $('fmFrom').onchange=e=>{state.customFrom=e.target.value;if(state.period==='custom'&&state.customTo){saveFinanceLocation();refresh()}};
+ $('fmTo').onchange=e=>{state.customTo=e.target.value;if(state.period==='custom'&&state.customFrom){saveFinanceLocation();refresh()}};
  $('fmCurrencyMode').onchange=e=>{if(e.target.value==='MANAGEMENT'){e.target.value='NATIVE';go('currency');notice('Management conversion uses only your saved FX evidence. Native bank amounts remain unchanged.')}else notice('Native currency mode keeps every bank amount in its original currency.');};
  $('fmRefresh').onclick=refresh;$('fmNew').onclick=()=>openNew('expense');$('fmDrawerClose').onclick=closeDrawer;$('fmBackdrop').onclick=closeDrawer;$('fmModalClose').onclick=()=> $('fmModal').close();
+ document.addEventListener('keydown',event=>{if(event.key==='Escape')closeDrawer();});
+ $('fmModal').addEventListener('click',event=>{if(event.target===$('fmModal')){const rect=$('fmModal').getBoundingClientRect();if(event.clientX<rect.left||event.clientX>rect.right||event.clientY<rect.top||event.clientY>rect.bottom)$('fmModal').close();}});
  $('fmSearch').placeholder='Search finance or type a command: add expense, upload statement, create report';
  $('fmSearch').onkeydown=e=>{if(e.key==='Enter'){const value=e.currentTarget.value.trim();if(runFinanceCommand(value))return;globalFinanceSearch(value)}};
 }
 document.addEventListener('DOMContentLoaded',async()=>{
- bind();const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h)||h==='more')state.view=h;navButtons();
+ bind();restoreFinanceLocation();saveFinanceLocation(true);const h=location.hash.slice(1);if(NAV.some(x=>x[0]===h)||h==='more')state.view=h;navButtons();
  primeFinanceCoreLoading();render();signalFinanceReady();
  try{
   const cycle=await loadBase();render();
