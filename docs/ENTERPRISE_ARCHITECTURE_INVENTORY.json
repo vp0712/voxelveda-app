@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
-  "baseline_sha": "6e8c2dcbf87dfdbb012c04db8d34fd1e5a1ad0af",
-  "source_sha": "6e8c2dcbf87dfdbb012c04db8d34fd1e5a1ad0af",
-  "generated_at": "2026-10-07T18:58:31+11:00",
+  "baseline_sha": "1ef2e82394a474ad27e7ac64dbe8b9b01891a0da",
+  "source_sha": "1ef2e82394a474ad27e7ac64dbe8b9b01891a0da",
+  "generated_at": "2026-10-07T19:13:25+11:00",
   "generator_version": "2.0.0",
   "scope": [
     "/",
@@ -22,8 +22,8 @@
   "totals": {
     "text_source_files": 832,
     "binary_assets": 50,
-    "text_bytes": 7564979,
-    "text_lines": 129677,
+    "text_bytes": 7570019,
+    "text_lines": 129728,
     "routes": 1043,
     "migrations": 81,
     "worker_timer_sites": 84,
@@ -6472,67 +6472,67 @@
     },
     {
       "file": "public/finance-master.js",
-      "line": 1348,
+      "line": 1356,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1629,
+      "line": 1637,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1756,
+      "line": 1764,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1865,
+      "line": 1873,
       "evidence": "if(existing){existing.addEventListener('load',mount,{once:true});setTimeout(mount,0);return}"
     },
     {
       "file": "public/finance-master.js",
-      "line": 1869,
+      "line": 1877,
       "evidence": "setTimeout(ensureAdvancedControlLoaded,0);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2330,
+      "line": 2338,
       "evidence": "const timer=setTimeout(()=>finish(new Error('PDF parser timed out. Use CSV/OFX or try the PDF again.')),10000);"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2519,
+      "line": 2527,
       "evidence": "const statementDelay=ms=>new Promise(resolve=>setTimeout(resolve,ms));"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2672,
+      "line": 2680,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 2778,
+      "line": 2786,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3084,
+      "line": 3092,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3114,
+      "line": 3122,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3201,
+      "line": 3209,
       "evidence": "setTimeout(()=>{"
     },
     {
       "file": "public/finance-master.js",
-      "line": 3219,
+      "line": 3227,
       "evidence": "setTimeout(()=>{document.querySelectorAll('[data-search-tx]').forEach(b=>b.onclick=()=>transactionDetail(b.dataset.searchTx));document.querySelectorAll('[data-search-account]').for"
     },
     {
@@ -9467,7 +9467,7 @@
       "kind": "swallowed_error",
       "severity": "MEDIUM",
       "file": "public/finance-master.js",
-      "line": 2890,
+      "line": 2898,
       "evidence": "document.querySelectorAll('[data-saved-open]').forEach(b=>b.onclick=async()=>{state.txFilters.q=b.dataset.query||'';state.txMeta.page=1;await api(API+'/personal-money/saved-views/'+encodeURIComponent(b.dataset.savedOpen)"
     },
     {
@@ -11381,7 +11381,7 @@
       "category": "documentation",
       "bytes": 25136,
       "lines": 309,
-      "sha256": "502e1ff5a08a6e3a3414b9fc5742a7b698c116802ad3d91936af570859321422"
+      "sha256": "bc1afc5d5e33350a721cd7db44a3b225f9b4ecf39941cf8cb09efb6928cd2134"
     },
     {
       "file": "docs/ERP_WAVE_1_TRASH_NOTIFICATIONS.md",
@@ -11456,9 +11456,9 @@
     {
       "file": "docs/INTEGRATED_REPAIR_COVERAGE.md",
       "category": "documentation",
-      "bytes": 9546,
-      "lines": 123,
-      "sha256": "59da1f8a8f033724a683b23269456bcce8bdad0f88f1fa85411e06c9cf5c629e"
+      "bytes": 11048,
+      "lines": 146,
+      "sha256": "c756b49d53abb2b122ef02690cd03c3c472277152f4c7ac6e3311c0c0bcf3e75"
     },
     {
       "file": "docs/loader-network-stability-note.md",
@@ -12627,7 +12627,7 @@
       "category": "frontend",
       "bytes": 4715,
       "lines": 75,
-      "sha256": "2c3f0b6681252a9331f732e66f2bda6169395b9676e77a729671f9806f639623"
+      "sha256": "c1ba91ca9ac2522a150380558921977155b78f8975e308140286bb197bdb4cf4"
     },
     {
       "file": "public/finance-master.css",
@@ -12639,9 +12639,9 @@
     {
       "file": "public/finance-master.js",
       "category": "frontend",
-      "bytes": 558027,
-      "lines": 3281,
-      "sha256": "51b73ff3d783b168452a309ce09083e63649192c6cfd822dda6eb5727805cd3e"
+      "bytes": 559357,
+      "lines": 3290,
+      "sha256": "96399127a60246b62eb981c05e39fa14ae3f1d8ab1852b35b463f312f0ff4b03"
     },
     {
       "file": "public/financial-decision-assistant.js",
@@ -13234,9 +13234,9 @@
     {
       "file": "public/style.css",
       "category": "frontend",
-      "bytes": 352376,
+      "bytes": 351389,
       "lines": 16584,
-      "sha256": "844a8b9bfc68cdeab60483eab780c45fb39fa151171ed3f930eb9152886013d1"
+      "sha256": "ca9db0bc07f708c03f7240d5ceaaa29690ef9e20c6d3ec092da3308f3e350ed3"
     },
     {
       "file": "public/support.html",
@@ -13304,9 +13304,9 @@
     {
       "file": "public/workspace-theme.css",
       "category": "frontend",
-      "bytes": 20687,
+      "bytes": 20710,
       "lines": 206,
-      "sha256": "1aad12d0aa11450ce6a0a3fe917a84754360f5c51ebae29b94814255b6cb89c9"
+      "sha256": "3ba2ee8f64a2949d39bb3cf3c767aa45284d4857b6a1656edcb4b5c6bf0a9831"
     },
     {
       "file": "public/workspace-theme.js",
@@ -15201,9 +15201,9 @@
     {
       "file": "scripts/workspace-navigation-behaviour-test.js",
       "category": "scripts",
-      "bytes": 8906,
-      "lines": 88,
-      "sha256": "fd5746bcbbfc3525a092d9daf18342ac6b2c6018c7ae4b29e861d25dc93b0587"
+      "bytes": 12074,
+      "lines": 107,
+      "sha256": "1209d9d036b8f17b973fc106982ae5987dee541358e291cec0f41e477b8ff565"
     },
     {
       "file": "SECURITY-CHECKLIST.md",
@@ -15621,9 +15621,9 @@
     {
       "file": "services/globalBrandRenderer.js",
       "category": "services",
-      "bytes": 4208,
+      "bytes": 4212,
       "lines": 51,
-      "sha256": "e12e5034688da6e9e5f34334e561294311018af3c253d65960dd55289ea8dbb5"
+      "sha256": "691842f209d03362f40b772c8fdf29c7a660ef617ad3d206c25702045a5aa264"
     },
     {
       "file": "services/highRiskFinanceSchema.js",
