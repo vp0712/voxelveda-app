@@ -1,12 +1,11 @@
-application-release: 20261008-saved-finance-report-delivery-validation
-candidate-commit: 7e5b293edd32d8f3fb1f230663f9202b74705fd9
-merged-commit: f487c7348e3b77817cc80a98224b520d637a41a1
+application-release: 20261008-customer-registration-and-login-footer
+candidate-commit: 3a9ff4b882d9cab5f57625fd292113a6a64f47f5
+merged-commit: e31cc24a0bf5e74811963a7ff25a16cc382154cf
 production-branch: main
-scope: parsed-stored-pdf-validation-and-immutable-recovery; statement-record-count-amount-balance-totals-validation; exact-binary-relay-and-queue-preservation; provider-acceptance-distinct-from-receipt; Safari-WebView-print-deadlines-and-popup-fallback; same-report-login-return-and-body-read-timeouts
-preserved: encrypted-durable-snapshot-before-pdf; independent-authenticated-integrated-html-viewer; original-company-logo; financial-records-and-permissions; existing-main-app-service
-ci: candidate-and-pr-eight-checks-success; 77-check-production-build-success; full-application-regression-success-in-CI; isolated-mysql-snapshot-chunk-restart-owner-isolation-success; security-audit-zero-vulnerabilities
-configuration: existing-PUBLIC_APP_URL=https://app.voxelveda.com; unchanged-service-and-domain
-transport-evidence: historical-direct-send-wordpress-https-relay; no-queue-on-incident-flow; original-Gmail-MIME-and-relay-PHP-unavailable; no-recipient-verification-claim
-verification: live-revision-health-viewer-login-return-and-public-assets-to-be-checked-after-rollout; authenticated-report-download-screenshots-require-permitted-session; native-device-checks-not-claimed
-rollback-deployment: 888d18ea-3bd2-4260-aea7-b4bf7d5f86be
+scope: register-create-account-entry; small-bottom-line-customer-rfq-and-privacy-links; native-registration-form-with-consent-progress-timeout-and-duplicate-submit-protection; compact-checkbox-and-scrollable-form
+preserved: original-company-logo; financial-records-and-permissions; existing-integrated-finance-snapshot-viewer-delivery-repair; customer-only-viewer-with-no-extra-permissions
+ci: candidate-and-pr-eight-checks-success; 77-check-production-build-success; full-application-and-isolated-customer-registration-regression-success-in-CI; actual-Chromium-phone-tablet-desktop-entry-navigation-footer-and-Enter-submission-success
+configuration: existing-PUBLIC_APP_URL=https://app.voxelveda.com; ALLOW_PUBLIC_CUSTOMER_REGISTRATION=true-set-with-skipDeploys-and-loaded-through-this-marker
+verification: production-revision-pages-footer-links-and-registration-validation-to-be-checked-after-rollout; prior-authenticated-finance-viewer-proof-still-requires-permitted-session
+rollback-deployment: 8eb0cdfb-c888-487a-b4cc-273e2b0f0f35
 policy: single-marker-controlled-production-deploy
