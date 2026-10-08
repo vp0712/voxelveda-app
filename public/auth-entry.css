@@ -1,3 +1,24 @@
+.login-page {
+  height: auto;
+  min-height: 100vh;
+}
+.login-page .login-card .register-privacy {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 8px 0 6px;
+  text-align: left;
+}
+.login-page .login-card .register-privacy input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  margin: 2px 0 0;
+  padding: 0;
+  border-radius: 4px !important;
+  box-shadow: none;
+}
 .login-page .login-register-prompt {
   position: relative;
   z-index: 1;
