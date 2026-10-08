@@ -1,0 +1,39 @@
+.login-page .login-register-prompt {
+  position: relative;
+  z-index: 1;
+  margin: 20px 0 12px;
+  color: var(--text-secondary);
+  text-align: center;
+  font-size: .9rem;
+  line-height: 1.6;
+}
+.login-page .login-register-prompt a {
+  display: inline-block;
+  color: var(--primary);
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+.login-page .login-footer-links {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 10px;
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 8px;
+  color: var(--text-secondary);
+  font-size: .75rem;
+  line-height: 1.4;
+}
+.login-page .login-footer-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  color: inherit;
+  font-size: inherit;
+  font-weight: 400;
+  text-underline-offset: 3px;
+}
