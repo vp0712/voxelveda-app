@@ -6,6 +6,7 @@
   <title>Create Customer Account | Voxel Veda</title>
 <link rel="stylesheet" href="/style.css?v=20260704-aurora-graphite" />
   <link rel="stylesheet" href="/advanced-theme.css?v=20260824-mobile-shell-v4" />
+  <link rel="stylesheet" href="/auth-entry.css?v=20261008-registration" />
   <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
   <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
   <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
@@ -29,16 +30,17 @@
       <h1>Create Customer Account</h1>
       <p class="login-footnote">Create a basic customer login. Admin controls any extra access such as invoices, forms, stock, tasks or input/edit rights.</p>
 
-      <div id="registerStatus" class="status"></div>
+      <div id="registerStatus" class="status" role="status" aria-live="polite"></div>
 
+      <form id="registerForm">
       <div class="login-field">
         <label for="name">Full Name / Company Contact</label>
-        <input id="name" type="text" placeholder="Enter your name" autocomplete="name" />
+        <input id="name" type="text" placeholder="Enter your name" autocomplete="name" required />
       </div>
 
       <div class="login-field">
         <label for="email">Email Address</label>
-        <input id="email" type="email" placeholder="Enter your email" autocomplete="email" />
+        <input id="email" type="email" placeholder="Enter your email" autocomplete="email" autocapitalize="none" spellcheck="false" required />
       </div>
 
       <div class="login-field">
@@ -47,19 +49,22 @@
       </div>
 
       <label class="privacy-check register-privacy">
-        <input id="privacyAccepted" type="checkbox" />
+        <input id="privacyAccepted" type="checkbox" required />
         <span>I have read and accept the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span>
       </label>
 
-      <button type="button" class="login-btn" onclick="createCustomerAccount()">Create Account</button>
+      <button type="submit" id="registerButton" class="login-btn">Create Account</button>
+      </form>
 
       <div class="portal-links">
         <a href="/login">Back to Login</a>
-        <a href="/request-quote">Customer RFQ</a>
       </div>
+      <footer class="login-footer-links" aria-label="Customer and privacy links">
+        <a href="/request-quote">Customer RFQ</a><span aria-hidden="true">·</span><a href="/privacy">Privacy Policy</a>
+      </footer>
     </section>
   </main>
 
-  <script src="/register.js?v=20260603-customer-register"></script>
+  <script src="/register.js?v=20261008-customer-form"></script>
 </body>
 </html>
