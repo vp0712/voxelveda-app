@@ -1,5 +1,6 @@
 const nodemailer = require('nodemailer');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const { companyProfile } = require('../config/companyProfile');
 
 const SMTP_FIELDS = {
@@ -216,10 +217,25 @@ function attachmentBuffer(attachment) {
   if (!attachment) return null;
   if (Buffer.isBuffer(attachment.content)) return attachment.content;
   if (attachment.content?.type === 'Buffer' && Array.isArray(attachment.content.data)) return Buffer.from(attachment.content.data);
+  if (ArrayBuffer.isView(attachment.content)) {
+    return Buffer.from(attachment.content.buffer, attachment.content.byteOffset, attachment.content.byteLength);
+  }
+  if (attachment.content instanceof ArrayBuffer) return Buffer.from(attachment.content);
   if (attachment.content !== undefined && attachment.content !== null) {
+    if (typeof attachment.content !== 'string') {
+      const error = new Error('Email attachment content must contain binary bytes or encoded text.');
+      error.code = 'EMAIL_ATTACHMENT_CONTENT_INVALID';
+      throw error;
+    }
+    const encoding = String(attachment.encoding || 'utf8').toLowerCase();
+    if (!Buffer.isEncoding(encoding)) {
+      const error = new Error('Email attachment encoding is unsupported.');
+      error.code = 'EMAIL_ATTACHMENT_ENCODING_INVALID';
+      throw error;
+    }
     return Buffer.from(
-      String(attachment.content),
-      String(attachment.encoding || '').toLowerCase() === 'base64' ? 'base64' : 'utf8'
+      attachment.content,
+      encoding
     );
   }
   return null;
@@ -269,7 +285,7 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
       replyTo: replyTo || config.replyTo || undefined,
       attachments
     });
-    return { ...result, transport: 'smtp', attachmentFilenameGuaranteed: true };
+    return { ...result, transport: 'smtp', attachmentFilenameGuaranteed: true, receivedVerified: false };
   } finally {
     transporter.close();
   }
@@ -345,18 +361,17 @@ async function relayAttachments(attachments = []) {
   let totalBytes = 0;
   const encoded = [];
   for (const attachment of attachments) {
-    let content = null;
+    let content;
     if (attachment?.path) {
       content = await fs.promises.readFile(attachment.path);
-    } else if (Buffer.isBuffer(attachment?.content)) {
-      content = attachment.content;
-    } else if (attachment?.content !== undefined && attachment?.content !== null) {
-      content = Buffer.from(
-        String(attachment.content),
-        String(attachment.encoding || '').toLowerCase() === 'base64' ? 'base64' : 'utf8'
-      );
+    } else {
+      content = attachmentBuffer(attachment);
     }
-    if (!content) continue;
+    if (!content) {
+      const error = new Error('Email attachment has no readable content.');
+      error.code = 'EMAIL_ATTACHMENT_CONTENT_MISSING';
+      throw error;
+    }
     totalBytes += content.length;
     if (totalBytes > 20 * 1024 * 1024) {
       const error = new Error('Email relay attachments exceed the 20 MB limit.');
@@ -377,7 +392,9 @@ async function relayAttachments(attachments = []) {
       mime_type: contentType,
       contentDisposition: String(attachment.contentDisposition || 'attachment'),
       content_type: contentType,
-      content_base64: contentBase64
+      content_base64: contentBase64,
+      byte_length: content.length,
+      sha256: crypto.createHash('sha256').update(content).digest('hex')
     });
   }
   return encoded;
@@ -429,7 +446,7 @@ async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attac
       error.responseCode = response.status;
       throw error;
     }
-    return { messageId: null, accepted: to, transport: 'hostinger_mail_api', attachmentFilenameGuaranteed: true };
+    return { messageId: null, accepted: to, transport: 'hostinger_mail_api', attachmentFilenameGuaranteed: true, receivedVerified: false };
   } catch (error) {
     if (error.name === 'AbortError') {
       error.code = 'HOSTINGER_MAIL_API_TIMEOUT';
@@ -577,6 +594,7 @@ module.exports = {
   isEmailTransportError,
   emailFailureDetails,
   assertAttachmentIntegrity,
+  attachmentBuffer,
   isPdfAttachment,
   sendViaSmtp
 };

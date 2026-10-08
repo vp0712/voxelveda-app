@@ -6,6 +6,7 @@ const path=require('node:path');
 
 const statementReview=require('../controllers/statementImportController');
 const { buildFinancePdfArtifact }=require('../services/financeReportPdfService');
+const { relayAttachments }=require('../services/emailService');
 
 function transaction(overrides){
   return {
@@ -100,8 +101,15 @@ async function main(){
   assert(ui.includes('reportEmailPdf'),'Finance report UI must expose Email PDF');
   assert(ui.includes('Description, Reference and Category columns'),'Finance report UI must explain separated audit columns');
 
-  const mail=fs.readFileSync(path.join(__dirname,'..','services','emailService.js'),'utf8');
-  assert(mail.includes('Buffer.isBuffer(attachment?.content)'),'email relay must support in-memory PDF attachments');
+  for(const content of [artifact.buffer,JSON.parse(JSON.stringify(artifact.buffer))]){
+    const attachments=await relayAttachments([{filename:artifact.filename,content,contentType:'application/pdf',contentDisposition:'attachment'}]);
+    assert.equal(attachments.length,1,'email relay must preserve the in-memory PDF attachment');
+    assert.equal(attachments[0].filename,artifact.filename,'relay must preserve the meaningful PDF filename');
+    assert.equal(attachments[0].contentType,'application/pdf');
+    assert.equal(attachments[0].contentDisposition,'attachment');
+    assert.equal(attachments[0].byte_length,artifact.buffer.length);
+    assert.deepEqual(Buffer.from(attachments[0].content,'base64'),artifact.buffer,'relay JSON/base64 boundaries must preserve every PDF byte');
+  }
 
   console.log('FINANCE_STATEMENT_DEDUPE_REPORT_TEST_OK');
 }

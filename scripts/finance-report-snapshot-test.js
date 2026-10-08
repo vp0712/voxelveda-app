@@ -27,7 +27,7 @@ async function query(sql,p=[]){
   if(sql.includes('SELECT report_uid FROM finance_report_snapshots'))return [[rows.get(p[0])].filter(Boolean)];
   if(sql.includes('DELETE FROM finance_report_snapshot_chunks')){for(const [key,value] of chunks)if(value.report_uid===p[0]&&value.artifact_kind==='PDF')chunks.delete(key);return [{affectedRows:1}];}
   if(sql.includes("SET pdf_status='READY'")){Object.assign(rows.get(p[1]),{pdf_status:'READY',pdf_metadata_json:p[0]});return [{affectedRows:1}];}
-  if(sql.includes("SET pdf_status='UNAVAILABLE'")){const row=rows.get(p[1]);if(row.pdf_status!=='READY')Object.assign(row,{pdf_status:'UNAVAILABLE',pdf_metadata_json:p[0]});return [{affectedRows:1}];}
+  if(sql.includes("SET pdf_status='UNAVAILABLE'")){const row=rows.get(p[1]);if(row.pdf_status!=='READY'||(p[2]&&JSON.parse(row.pdf_metadata_json).sha256===p[2]))Object.assign(row,{pdf_status:'UNAVAILABLE',pdf_metadata_json:p[0]});return [{affectedRows:1}];}
   if(sql.includes('SET email_outcome_json')){rows.get(p[1]).email_outcome_json=p[0];return [{affectedRows:1}];}
   if(sql.includes('SET revoked_at')){rows.get(p[0]).revoked_at=new Date();return [{affectedRows:1}];}
   throw new Error('Unexpected fixture query: '+sql);
@@ -92,6 +92,32 @@ async function run(){
   const validation=await validateReportPdf(artifact,loaded.report);assert(validation.pages>1);
   assert.deepEqual(await snapshots.pdfBytes(await snapshots.authorise(owner,id)),artifact.buffer);
   const unrelated=structuredClone(loaded.report);unrelated.transactions[0].description='Missing expected record';await assert.rejects(()=>validateReportPdf(artifact,unrelated),e=>e.code==='PDF_CONTENT_INVALID');
+  for(const count of [1,5,10]){
+    const wrongCount=structuredClone(loaded.report);wrongCount.metadata.source_transaction_count=count;
+    await assert.rejects(()=>validateReportPdf(artifact,wrongCount),e=>e.code==='PDF_CONTENT_INVALID','a count occurring elsewhere in the PDF cannot validate the saved transaction count');
+  }
+  const repeated=fixture(2);repeated.transactions.forEach(t=>t.description='Recurring utility debit');
+  const truncated=structuredClone(repeated);truncated.transactions.pop();
+  const incompletePdf=await controller._test.buildReportPdfArtifact(truncated,profile,'Transaction Register');
+  await assert.rejects(()=>validateReportPdf(incompletePdf,repeated),e=>e.code==='PDF_CONTENT_INVALID','repeated descriptions must occur once for every saved record');
+  const wrongAmount=structuredClone(loaded.report);wrongAmount.transactions[0].debit='76543.21';
+  await assert.rejects(()=>validateReportPdf(artifact,wrongAmount),e=>e.code==='PDF_CONTENT_INVALID','parsed PDF must contain saved transaction amounts');
+  let storedParseCalls=0;
+  const reusedPdf=await controller._test.ensureSnapshotPdf(await snapshots.load(owner,id),{validatePdf:async(...args)=>{storedParseCalls+=1;return validateReportPdf(...args)}});
+  assert.equal(storedParseCalls,1,'saved PDF must be parsed before attachment/download reuse');assert.deepEqual(reusedPdf.buffer,artifact.buffer);
+  const oldPdfSaved=await snapshots.capture(owner,fixture(1),profile),oldPdfId=oldPdfSaved.report.metadata.report_id;
+  const oldPdf=await controller._test.buildReportPdfArtifact(loaded.report,profile,'Transaction Register');
+  await snapshots.storePdf(oldPdfId,oldPdf,{pages:1});
+  const repairedSaved=await snapshots.load(owner,oldPdfId),repairedPdf=await controller._test.ensureSnapshotPdf(repairedSaved);
+  assert(repairedPdf&&await validateReportPdf(repairedPdf,repairedSaved.report),'invalid legacy stored artifact must be rebuilt from its saved snapshot');
+  const corruptSaved=await snapshots.capture(owner,fixture(1),profile),corruptId=corruptSaved.report.metadata.report_id;
+  await snapshots.storePdf(corruptId,oldPdf,{pages:1});
+  const corruptLoaded=await snapshots.load(owner,corruptId);
+  const failedRepair=await controller._test.ensureSnapshotPdf(corruptLoaded,{buildPdf:()=>{throw new Error('Forced recovery failure')}});
+  assert.equal(failedRepair,null);assert.equal((await snapshots.load(owner,corruptId)).pdf_status,'UNAVAILABLE');
+  assert.equal((await snapshots.load(owner,corruptId)).report.transactions.length,1,'failed stored-PDF recovery preserves independent saved viewer');
+  await snapshots.pdfUnavailable(oldPdfId,{code:'STALE_PDF_FAILURE'},{invalidStoredSha256:'stale-artifact-sha'});
+  assert.equal((await snapshots.load(owner,oldPdfId)).pdf_status,'READY','stale failed artifact cannot invalidate a concurrent replacement');
   await assert.rejects(()=>validateReportPdf({buffer:Buffer.from('%PDF-'+'.'.repeat(200)),filename:'fake.pdf'},loaded.report));
   const dataset=controller._test.csvDataset(loaded.report);assert.equal(dataset.rows.length,105);
   assert.equal(dataset.rows.reduce((sum,r)=>sum+Number(r[dataset.header.indexOf('Debit')]||0),0).toFixed(2),(105*123.45).toFixed(2));
@@ -112,6 +138,10 @@ async function run(){
   const emptyPdf=await controller._test.ensureSnapshotPdf(empty);assert(emptyPdf&&await validateReportPdf(emptyPdf,empty.report));
   const statement=fixture(1);statement.metadata.report_type='ACCOUNT_STATEMENT';statement.account_statement={account_id:42,account_holder:'Voxel Veda',account_name:'Operating',account_type:'Savings',account_number_masked:'***1234',currency:'AUD',statement_from:'2026-09-30',statement_to:'2026-10-06',opening_running_balance:100000,closing_running_balance:99876.55,total_debits:123.45,total_credits:0,transaction_count:1};
   const statementSaved=await snapshots.capture(owner,statement,profile),statementPdf=await controller._test.ensureSnapshotPdf(statementSaved);assert(statementPdf&&await validateReportPdf(statementPdf,statementSaved.report));
+  for(const field of ['opening_running_balance','closing_running_balance','total_debits','total_credits']){
+    const wrongStatement=structuredClone(statementSaved.report);wrongStatement.account_statement[field]=123456.78;
+    await assert.rejects(()=>validateReportPdf(statementPdf,wrongStatement),e=>e.code==='PDF_CONTENT_INVALID',`account statement ${field} must reconcile with parsed PDF`);
+  }
   assert(html.standaloneHtml(statementSaved).includes('Opening balance'));assert(controller._test.csvDataset(statementSaved.report).header.includes('Running Balance'));
   const statementWorkbook=await controller._test.createReportWorkbook(statementSaved.report,profile,'Account Statement');assert(statementWorkbook.getWorksheet('Account Statement').getColumn(9).values.includes(99876.55),'XLSX statement retains recorded running balances');
   const multi=fixture(4),currencies=['AUD','USD','INR','EUR'];multi.metadata.currency=null;

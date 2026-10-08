@@ -2102,22 +2102,34 @@ async function downloadBuiltReport(format,button){
 }
 async function viewBuiltReport(){try{const report=await ensureBuiltReport();location.assign(report.view_url)}catch(error){notice(error.message,true)}}
 async function printBuiltReport(){
- const target=window.open('about:blank','_blank');
+ let target=null;try{target=window.open('about:blank','_blank')}catch{}
  if(target)target.document.body.textContent='Preparing your saved report for printing…';
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),90000);
  try{
   const report=await ensureBuiltReport();
-  if(!target){notice('Your browser blocked the print window. Open View report, then use Print / Save as PDF.',true);return}
   let response;
   for(let attempt=0;attempt<2;attempt++){
-   response=await fetch(snapshotDownloadUrl(report,'print'),{credentials:'same-origin',signal:AbortSignal.timeout(60000)});
+   response=await fetch(snapshotDownloadUrl(report,'print'),{credentials:'same-origin',signal:controller.signal});
    if(response.ok)break;
    let payload={};try{payload=await response.json()}catch{}
+   const authError=financeAuthError(response,payload);if(authError)throw authError;
    if(payload.code==='STEP_UP_REQUIRED'&&attempt===0){await requestFinanceStepUp();continue}
    throw new Error(payload.message||'The print report could not be loaded.');
   }
   if(!String(response.headers.get('Content-Type')).includes('text/html'))throw new Error('The print report is unavailable.');
-  const objectUrl=URL.createObjectURL(await response.blob());target.location=objectUrl;target.onload=()=>target.print();setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);
- }catch(error){if(target)target.close();notice(error.message,true)}
+  const blob=await response.blob();if(!blob.size)throw new Error('The print report is empty.');
+  const objectUrl=URL.createObjectURL(blob);
+  if(target&&!target.closed){
+   target.onload=()=>{try{target.focus();target.print()}catch{notice('Print view opened. Use your browser’s Print / Save as PDF command.')}};
+   target.location.href=objectUrl;notice('The complete saved report opened for printing.');
+  }else{
+   const link=document.createElement('a');link.href=objectUrl;
+   link.download=response.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/i)?.[1]||'Voxel-Veda-Print-Report.html';
+   document.body.appendChild(link);link.click();link.remove();notice('A print window is unavailable. Open the downloaded HTML and use Print / Save as PDF.');
+  }
+  setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);
+ }catch(error){if(target)target.close();notice(error.name==='AbortError'?'Printing timed out. Your saved report remains available; retry or open View report.':error.message,true)}
+ finally{clearTimeout(timer)}
 }
 async function runReportPreset(type,button){
  const form=$('reportBuilderForm');if(!form)return;

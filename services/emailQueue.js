@@ -2,7 +2,7 @@ const pool = require('../config/db');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { ensureWorkforceSchema } = require('./workforceSchema');
-const { sendMail, normalizeAddressList, isEmailTransportError, classifySmtpFailure } = require('./emailService');
+const { sendMail, normalizeAddressList, isEmailTransportError, classifySmtpFailure, attachmentBuffer } = require('./emailService');
 
 function parseJson(value, fallback) {
   try {
@@ -19,10 +19,8 @@ async function serializableAttachments(attachments = []) {
     if(!item)continue;
     let bytes;
     if(item.path)bytes=await fs.promises.readFile(item.path);
-    else if(Buffer.isBuffer(item.content))bytes=item.content;
-    else if(item.content?.type==='Buffer'&&Array.isArray(item.content.data))bytes=Buffer.from(item.content.data);
-    else if(item.content!==undefined&&item.content!==null)bytes=Buffer.from(String(item.content),item.encoding==='base64'?'base64':'utf8');
-    else throw new Error('Queued attachment has no durable content.');
+    else bytes=attachmentBuffer(item);
+    if(!bytes)throw new Error('Queued attachment has no durable content.');
     total+=bytes.length;
     if(total>20*1024*1024)throw new Error('Queued attachments exceed the 20 MB limit.');
     saved.push({filename:item.filename,contentType:item.contentType||'application/octet-stream',contentDisposition:item.contentDisposition||'attachment',
