@@ -1,14 +1,12 @@
-application-release: 20261007-saved-finance-report-viewer-live-integration
-source-commit: 9ceb9d3a272ccfcc52385475bf8eed9d5bbcbf65
-candidate-commits: 7a4999ea52ef9049bae803b55c10758b58358343; 9a6caf807adbfe69c0bdaba9fc2f63016f4563e0
-pull-requests: 301; 302; 303
-scope: encrypted-immutable-report-before-pdf; session-authenticated-integrated-html-viewer; owner-and-current-account-grant-checks; complete-paginated-transactions-and-report-sections; permission-step-up-approval-gated-print-html-csv-pdf-xlsx; parsed-pdf-identity-records-and-totals; truthful-web-view-email-and-actual-provider-outcome; unverified-relay-attachment-fallback; durable-buffer-and-path-queue-preservation; Australian-local-calendar-dates; same-page-finance-sidebar-hash-navigation; header-sidebar-spacing; protected-live-report-viewport-diagnostics
-preserves: original-logo; production-records; historical-statement-provenance; existing-permissions; audit-history; existing-main-app-domain-routing
-ci: original-candidate-10-and-merged-8-checks-success; viewport-candidate-5-checks-success; npm-test-success; 74-check-production-build-success; real-isolated-mysql-snapshot-migration-chunk-restart-and-owner-isolation-success; parsed-multi-page-empty-statement-four-currency-pdf-success; forced-pdf-failure-viewer-email-success; immutable-snapshot-and-format-totals-success; escaped-html-and-spreadsheet-formula-protection-success; decoded-mime-filename-and-binary-integrity-success; queue-content-after-temporary-file-deletion-success; shared-navigation-and-login-return-success; audit-provenance-success
-runtime: prior-deployment-93c5815d-8813-4c0e-8a39-15b0f5ad9377-success; actual-ready-sha-9cb5a787423818377b79f5617a92cb56e271e526; saved-three-transaction-report-before-pdf-verified
-configuration: PUBLIC_APP_URL=https://app.voxelveda.com; existing-verified-custom-domain; set-with-skipDeploys-and-loaded-through-this-marker-release
-domain-regression: configured-main-app-origin-snapshot-pdf-mime-queue-failure-suite-success
-live-integration: relative-protected-download-path-prompts-and-retries-existing-step-up; phone-transaction-cards-release-shared-680px-table-minimum; identifiable-account-labels
-follow-up-ci: candidate-7cce4c827f519186bc16bfa214345cf245588180-all-7-checks-success; merged-9ceb9d3a272ccfcc52385475bf8eed9d5bbcbf65-all-5-checks-success; npm-test-and-75-check-production-build-success
-rollback-deployment: f076c4f4-ec16-444f-926f-86f92bc53563
+application-release: 20261008-saved-finance-report-delivery-validation
+candidate-commit: 7e5b293edd32d8f3fb1f230663f9202b74705fd9
+merged-commit: f487c7348e3b77817cc80a98224b520d637a41a1
+production-branch: main
+scope: parsed-stored-pdf-validation-and-immutable-recovery; statement-record-count-amount-balance-totals-validation; exact-binary-relay-and-queue-preservation; provider-acceptance-distinct-from-receipt; Safari-WebView-print-deadlines-and-popup-fallback; same-report-login-return-and-body-read-timeouts
+preserved: encrypted-durable-snapshot-before-pdf; independent-authenticated-integrated-html-viewer; original-company-logo; financial-records-and-permissions; existing-main-app-service
+ci: candidate-and-pr-eight-checks-success; 77-check-production-build-success; full-application-regression-success-in-CI; isolated-mysql-snapshot-chunk-restart-owner-isolation-success; security-audit-zero-vulnerabilities
+configuration: existing-PUBLIC_APP_URL=https://app.voxelveda.com; unchanged-service-and-domain
+transport-evidence: historical-direct-send-wordpress-https-relay; no-queue-on-incident-flow; original-Gmail-MIME-and-relay-PHP-unavailable; no-recipient-verification-claim
+verification: live-revision-health-viewer-login-return-and-public-assets-to-be-checked-after-rollout; authenticated-report-download-screenshots-require-permitted-session; native-device-checks-not-claimed
+rollback-deployment: 888d18ea-3bd2-4260-aea7-b4bf7d5f86be
 policy: single-marker-controlled-production-deploy
