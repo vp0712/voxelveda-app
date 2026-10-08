@@ -717,9 +717,18 @@ async function requestedSnapshot(req){
   return id?snapshots.load(req,id):captureReport(req,req.body?.definition?definitionFrom(req.body.definition):null);
 }
 async function ensureSnapshotPdf(saved,{buildPdf=buildReportPdfArtifact,validatePdf=validateReportPdf}={}){
+  let invalidStoredSha256=null;
   if(saved.row.pdf_status==='READY'){
     const meta=typeof saved.row.pdf_metadata_json==='string'?JSON.parse(saved.row.pdf_metadata_json):saved.row.pdf_metadata_json;
-    return {buffer:await snapshots.pdfBytes(saved.row),filename:meta.filename,pages:meta.pages,reportId:saved.report.metadata.report_id};
+    try{
+      const artifact={buffer:await snapshots.pdfBytes(saved.row),filename:meta.filename,pages:meta.pages,reportId:saved.report.metadata.report_id};
+      const validation=await validatePdf(artifact,saved.report);
+      return {...artifact,pages:validation.pages};
+    }catch(error){
+      invalidStoredSha256=meta.sha256;
+      console.warn('FINANCE_REPORT_STORED_PDF_INVALID',saved.report.metadata.report_id,String(error.code||'PDF_VALIDATION_FAILED'));
+      // Regenerate from immutable report bytes, never rerun current transactions.
+    }
   }
   try{
     const artifact=assertPdfArtifact(await buildPdf(saved.report,saved.profile,reportTitle(saved.report.metadata.report_type)));
@@ -730,7 +739,7 @@ async function ensureSnapshotPdf(saved,{buildPdf=buildReportPdfArtifact,validate
     return {...artifact,pages:validation.pages};
   }catch(error){
     console.warn('FINANCE_REPORT_PDF_UNAVAILABLE',saved.report.metadata.report_id,String(error.code||'PDF_GENERATION_FAILED'));
-    saved.row.pdf_metadata_json=await snapshots.pdfUnavailable(saved.report.metadata.report_id,error);
+    saved.row.pdf_metadata_json=await snapshots.pdfUnavailable(saved.report.metadata.report_id,error,{invalidStoredSha256});
     saved.row.pdf_status='UNAVAILABLE';
     return null;
   }

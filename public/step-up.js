@@ -78,7 +78,8 @@
           });
           const data = await response.json().catch(() => ({}));
           if (response.status === 401) {
-            window.location.assign('/login?message=Your%20session%20has%20ended');
+            const returnTo=window.location.pathname+window.location.search+window.location.hash;
+            window.location.assign('/login?returnTo='+encodeURIComponent(returnTo)+'&message=Your%20session%20has%20ended');
             return;
           }
           if (data.code === 'MFA_SETUP_REQUIRED') {

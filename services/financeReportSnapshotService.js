@@ -134,9 +134,11 @@ async function pdfBytes(row) {
   if(bytes.length!==meta.byte_length||hash(bytes)!==meta.sha256)throw new FinanceError('Saved PDF integrity check failed.',503,'REPORT_CONTENT_UNAVAILABLE');
   return bytes;
 }
-async function pdfUnavailable(id,error) {
+async function pdfUnavailable(id,error,{invalidStoredSha256=null}={}) {
   const meta = {reason:String(error?.code||'PDF_GENERATION_FAILED'),message:'PDF is currently unavailable. View, Print, HTML, CSV and XLSX remain available.'};
-  await pool.query("UPDATE finance_report_snapshots SET pdf_status='UNAVAILABLE',pdf_metadata_json=? WHERE report_uid=? AND pdf_status<>'READY'",[JSON.stringify(meta),id]);
+  // Reject only the failed stored revision. A concurrent valid PDF replacement
+  // must remain available even when an older request fails its validation.
+  await pool.query("UPDATE finance_report_snapshots SET pdf_status='UNAVAILABLE',pdf_metadata_json=? WHERE report_uid=? AND (pdf_status<>'READY' OR JSON_UNQUOTE(JSON_EXTRACT(pdf_metadata_json,'$.sha256'))=?)",[JSON.stringify(meta),id,invalidStoredSha256]);
   return meta;
 }
 async function recordEmail(id,outcome) {
