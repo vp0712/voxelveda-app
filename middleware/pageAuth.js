@@ -6,7 +6,7 @@ const { ensureUserLifecycleSchema } = require('../services/userLifecycleService'
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { validateSession } = require('../services/sessionService');
 const { requiresMfa } = require('../services/mfaService');
-const { hasAnyPermission, hasPermission } = require('../services/authorizationService');
+const { hasPermission } = require('../services/authorizationService');
 
 function parsePermissions(value) {
   if (!value) return [];
@@ -25,7 +25,7 @@ function redirectToLogin(req, res) {
   return res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo)}`);
 }
 
-function pageAuth({ adminOnly = false, workspaceOnly = false, allowMfaSetup = false } = {}) {
+function pageAuth({ adminOnly = false, allowMfaSetup = false } = {}) {
   return async (req, res, next) => {
     try {
       const token = getRequestToken(req);
@@ -55,14 +55,8 @@ function pageAuth({ adminOnly = false, workspaceOnly = false, allowMfaSetup = fa
       const permissions = parsePermissions(user.permissions);
       const authorizationUser = { ...user, role, permissions };
       const canAdminister = hasPermission(authorizationUser, 'MANAGE_USERS');
-      const canUseOperationsWorkspace = hasAnyPermission(authorizationUser, [
-        'VIEW_FINANCE', 'MANAGE_JOBS', 'MANAGE_TEAM_JOBS', 'VIEW_CUSTOMERS',
-        'VIEW_INVENTORY', 'VIEW_SUPPLIERS', 'VIEW_RFQS'
-      ]) || (req.path === '/finance-intelligence' && hasAnyPermission(authorizationUser, [
-        'VIEW_BANKING', 'VIEW_PERSONAL_BANKING', 'VIEW_BUSINESS_BANKING'
-      ]));
 
-      if ((adminOnly && !canAdminister) || (workspaceOnly && !canUseOperationsWorkspace)) {
+      if ((adminOnly && !canAdminister)) {
         res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive');
         return res.status(403).sendFile(path.join(__dirname, '..', 'public', '403.html'));
       }

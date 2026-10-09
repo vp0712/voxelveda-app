@@ -8,14 +8,25 @@ const { currentScanStatus, queueDocumentScan } = require('./malwareScanService')
 const { deleteObject, getObject, isConfigured: objectStorageConfigured, keyFromStorageUri, putObject, storageUri } = require('./objectStorageService');
 const { logSecurityEvent } = require('./sessionService');
 const { isStepUpFresh, stepUpTtlMinutes } = require('./stepUpService');
+const { documentModuleAvailable } = require('./applicationRetirement');
 
 const UPLOAD_ROOT = path.resolve(__dirname, '..', 'uploads');
-const MODULE_PERMISSION = Object.freeze({ rfq: 'VIEW_RFQS', careers: 'VIEW_STAFF_HR', finance: 'VIEW_BANKING' });
+const MODULE_PERMISSION = Object.freeze({ rfq: 'VIEW_RFQS' });
 const CLASSIFICATIONS = new Set(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']);
 const ACCESS_POLICIES = Object.freeze({
   PUBLIC: 'AUTHENTICATED', INTERNAL: 'MODULE_OR_OWNER',
   CONFIDENTIAL: 'MODULE_OR_OWNER', RESTRICTED: 'MODULE_AND_STEP_UP'
 });
+
+function requireAvailableDocumentModule(module) {
+  if (!documentModuleAvailable(module)) {
+    throw Object.assign(new Error('This document belongs to a module that has been removed.'), { status: 410, code: 'MODULE_RETIRED' });
+  }
+}
+
+function retiredDocumentResponse(res) {
+  return res.status(410).json({ code: 'MODULE_RETIRED', message: 'This document belongs to a module that has been removed.' });
+}
 
 function safeStoredPath(filePath) {
   const resolved = path.resolve(filePath);
@@ -39,6 +50,8 @@ function scanStatusForFile(file) {
 }
 
 async function registerDocument({ module, recordType, recordId, ownerUserId, uploadedBy, file, classification = 'CONFIDENTIAL' }) {
+  requireAvailableDocumentModule(module);
+  const normalizedModule = String(module).toLowerCase();
   await ensureSecurityOperationsSchema();
   const id = crypto.randomUUID();
   const safePath = safeStoredPath(file.path);
@@ -64,7 +77,7 @@ async function registerDocument({ module, recordType, recordId, ownerUserId, upl
        (id, module, record_type, record_id, owner_user_id, uploaded_by, original_name, stored_name,
         storage_path, mime_type, size_bytes, content_sha256, classification, access_policy, scan_status)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, module, recordType, String(recordId), ownerUserId || null, uploadedBy, safeDispositionName(file.originalname),
+      [id, normalizedModule, recordType, String(recordId), ownerUserId || null, uploadedBy, safeDispositionName(file.originalname),
         file.filename, storagePath, file.mimetype, Number(file.size || body.length), contentSha256, normalClassification,
         ACCESS_POLICIES[normalClassification], scanStatus]
     );
@@ -86,12 +99,13 @@ async function registerDocument({ module, recordType, recordId, ownerUserId, upl
   };
 }
 
-async function getAuthorisedDocument(user, id) {
+async function getAuthorisedDocument(user, id, db = pool) {
   await ensureSecurityOperationsSchema();
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id || ''))) return { status: 404 };
-  const [[document]] = await pool.query('SELECT * FROM secure_documents WHERE id = ? AND deleted_at IS NULL LIMIT 1', [id]);
+  const [[document]] = await db.query(`SELECT * FROM secure_documents WHERE id = ? AND deleted_at IS NULL LIMIT 1${db === pool ? '' : ' FOR UPDATE'}`, [id]);
   if (!document) return { status: 404 };
-  const permission = MODULE_PERMISSION[document.module] || 'VIEW_CONFIDENTIAL_FILES';
+  if (!documentModuleAvailable(document.module)) return { status: 410, code: 'MODULE_RETIRED' };
+  const permission = MODULE_PERMISSION[String(document.module).toLowerCase()] || 'VIEW_CONFIDENTIAL_FILES';
   const ownsDocument = document.owner_user_id && Number(document.owner_user_id) === Number(user.id);
   const authenticatedOnly = document.access_policy === 'AUTHENTICATED' && document.classification === 'PUBLIC';
   if (!authenticatedOnly && !ownsDocument && !hasPermission(user, permission)) return { status: 403 };
@@ -109,6 +123,7 @@ async function readDocumentBodyInternal(id) {
   await ensureSecurityOperationsSchema();
   const [[document]] = await pool.query('SELECT * FROM secure_documents WHERE id=? AND deleted_at IS NULL LIMIT 1', [id]);
   if (!document) throw Object.assign(new Error('Stored document was not found.'), { code: 'STORED_DOCUMENT_NOT_FOUND', status: 404 });
+  requireAvailableDocumentModule(document.module);
   if (['QUARANTINED', 'PENDING_SCAN'].includes(String(document.scan_status || '').toUpperCase())) {
     throw Object.assign(new Error('Stored document is not available while security scanning is pending.'), { code: 'STORED_DOCUMENT_SECURITY_PENDING', status: 423 });
   }
@@ -130,6 +145,7 @@ async function readDocumentBodyInternal(id) {
 async function removeDocumentInternal(id) {
   const [[document]] = await pool.query('SELECT * FROM secure_documents WHERE id=? LIMIT 1', [id]);
   if (!document) return false;
+  requireAvailableDocumentModule(document.module);
   const objectKey = keyFromStorageUri(document.storage_path);
   if (objectKey) await deleteObject(objectKey).catch(() => {});
   else {
@@ -146,6 +162,7 @@ function safeDispositionName(value) {
 
 async function sendDocument(req, res) {
   const result = await getAuthorisedDocument(req.user, req.params.id);
+  if (result.status === 410) return retiredDocumentResponse(res);
   if (result.status === 403) return res.status(403).json({ message: 'Access denied: document is outside your authorised scope' });
   if (result.status === 423) return res.status(423).json({ message: 'Document is not available while security scanning is pending' });
   if (result.status !== 200) return res.status(404).json({ message: 'Document not found' });
@@ -156,6 +173,7 @@ async function sendDocument(req, res) {
 }
 
 async function streamDocument(req, res, result) {
+  requireAvailableDocumentModule(result.document.module);
   res.setHeader('Content-Type', result.document.mime_type || 'application/octet-stream');
   res.setHeader('Content-Disposition', `inline; filename="${safeDispositionName(result.document.original_name)}"`);
   res.setHeader('Cache-Control', 'private, no-store');
@@ -186,6 +204,7 @@ function tokenHash(token) {
 
 async function createDocumentGrant(req, res) {
   const result = await getAuthorisedDocument(req.user, req.params.id);
+  if (result.status === 410) return retiredDocumentResponse(res);
   if (result.status !== 200) return res.status(result.status === 403 ? 403 : result.status === 423 ? 423 : 404).json({ message: result.status === 403 ? 'Access denied' : result.status === 423 ? 'Document is not available while security scanning is pending' : 'Document not found' });
   const token = crypto.randomBytes(32).toString('base64url');
   const id = crypto.randomUUID();
@@ -201,6 +220,7 @@ async function createDocumentGrant(req, res) {
 }
 
 async function sendGrantedDocument(req, res) {
+  await ensureSecurityOperationsSchema();
   const hash = tokenHash(req.params.token);
   const db = await pool.getConnection();
   try {
@@ -213,10 +233,20 @@ async function sendGrantedDocument(req, res) {
       await db.rollback();
       return res.status(404).json({ message: 'Download grant is invalid or expired' });
     }
+    // Check the locked document and current authorization before consuming a
+    // historical grant. Retired documents and their grants remain untouched.
+    const result = await getAuthorisedDocument(req.user, grant.document_id, db);
+    if (result.status !== 200) {
+      await db.rollback();
+      if (result.status === 410) return retiredDocumentResponse(res);
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    if (result.document.classification === 'RESTRICTED' && !isStepUpFresh(req.session)) {
+      await db.rollback();
+      return res.status(403).json({ message: 'Security verification is required to download this restricted document.', code: 'STEP_UP_REQUIRED', assurance_required: 3, verification_valid_minutes: stepUpTtlMinutes() });
+    }
     await db.query('UPDATE document_download_grants SET used_at = NOW() WHERE id = ? AND used_at IS NULL', [grant.id]);
     await db.commit();
-    const result = await getAuthorisedDocument(req.user, grant.document_id);
-    if (result.status !== 200) return res.status(404).json({ message: 'Document not found' });
     return streamDocument(req, res, result);
   } catch (error) {
     await db.rollback().catch(() => {});

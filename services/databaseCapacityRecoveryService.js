@@ -73,36 +73,6 @@ async function deleteBatches({ table, where, params = [], orderBy, maxRows = 100
   return deleted;
 }
 
-async function clearImportedPageText(maxRows = 5000) {
-  if (!await tableExists('statement_import_pages') || !await tableExists('statement_import_sessions')) return 0;
-  const batchSize = boundedInteger(process.env.DB_CAPACITY_PRUNE_BATCH_SIZE, 1000, 100, 5000);
-  const maxBatches = boundedInteger(process.env.DB_CAPACITY_PRUNE_MAX_BATCHES, 50, 1, 200);
-  let cleared = 0;
-  for (let batch = 0; batch < maxBatches && cleared < maxRows; batch += 1) {
-    const limit = Math.min(batchSize, maxRows - cleared);
-    const [result] = await pool.query(
-      `UPDATE statement_import_pages
-          SET text_content=NULL
-        WHERE id IN (
-          SELECT id FROM (
-            SELECT p.id
-              FROM statement_import_pages p
-              JOIN statement_import_sessions s ON s.id=p.import_session_id
-             WHERE p.text_content IS NOT NULL
-               AND s.status='IMPORTED'
-               AND COALESCE(s.posted_at,s.committed_at,s.created_at) < DATE_SUB(NOW(), INTERVAL 7 DAY)
-             ORDER BY p.id ASC
-             LIMIT ${limit}
-          ) vv_pages
-        )`
-    );
-    const affected = Number(result?.affectedRows || 0);
-    cleared += affected;
-    if (affected < limit) break;
-  }
-  return cleared;
-}
-
 async function capacityProbe() {
   const connection = await pool.getConnection();
   try {
@@ -174,13 +144,6 @@ async function normalRecovery() {
     orderBy: 'id ASC',
     maxRows: 50000
   });
-  deleted.processing_errors = await deleteBatches({
-    table: 'processing_errors',
-    where: 'resolved_at IS NOT NULL AND resolved_at < DATE_SUB(NOW(), INTERVAL 30 DAY)',
-    orderBy: 'id ASC',
-    maxRows: 50000
-  });
-  deleted.imported_page_text = await clearImportedPageText(10000);
   return deleted;
 }
 

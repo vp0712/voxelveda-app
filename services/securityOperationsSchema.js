@@ -76,18 +76,6 @@ async function createSecurityOperationsSchema() {
     INDEX idx_policy_violation_time (created_at, violated_directive)
   ) ENGINE=InnoDB`);
 
-  for (const table of ['supplier_files', 'expense_files', 'compliance_files']) {
-    const [[exists]] = await pool.query(
-      'SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?',
-      [table]
-    );
-    if (!Number(exists.count)) continue;
-    await tolerateDuplicate(`ALTER TABLE ${table} ADD COLUMN classification VARCHAR(20) NOT NULL DEFAULT 'CONFIDENTIAL'`);
-    await tolerateDuplicate(`ALTER TABLE ${table} ADD COLUMN scan_status VARCHAR(20) NOT NULL DEFAULT 'UNAVAILABLE'`);
-    await tolerateDuplicate(`ALTER TABLE ${table} ADD COLUMN size_bytes BIGINT NULL`);
-  }
-  await pool.query("UPDATE expense_files SET classification = 'RESTRICTED' WHERE classification IS NULL OR classification = 'CONFIDENTIAL'").catch(() => {});
-
   await pool.query(`CREATE TABLE IF NOT EXISTS security_issue_acknowledgements (
     issue_key VARCHAR(160) PRIMARY KEY,
     acknowledged_by INT NOT NULL,

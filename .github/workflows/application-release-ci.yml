@@ -1,0 +1,37 @@
+name: Application Release Candidate CI
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'simplify-*']
+permissions:
+  contents: read
+concurrency:
+  group: application-release-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  application-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Production application build and retained regression gate
+        run: npm run build
+      - name: Verify release marker is separate from candidate changes
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}" "${{ github.sha }}" | grep -qx '.railway-release'; then
+            echo "::error::.railway-release must only be changed after the candidate has passed CI and merged."
+            exit 1
+          fi
+          echo "Application candidate passed without prematurely triggering Railway production."

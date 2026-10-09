@@ -14,7 +14,6 @@ const routes = read('routes/userRoutes.js');
 const controller = read('controllers/userController.js');
 const service = read('services/userSecurityService.js');
 const schema = read('services/securitySchema.js');
-const ui = read('public/admin-dashboard.js');
 
 assert.match(routes, /account-state.*requireStepUp\('TERMINATE_USER_ACCESS'\)/);
 assert.match(routes, /compromised.*requireStepUp\('MARK_ACCOUNT_COMPROMISED'\)/);
@@ -35,8 +34,5 @@ assert.match(service, /DELETE FROM mfa_recovery_codes/);
 assert.match(service, /controlled password-reset recovery/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS user_security_actions/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS privileged_access_reviews/);
-assert.match(ui, /Permission difference/);
-assert.match(ui, /Mark Compromised/);
-assert.match(ui, /Terminate Access/);
 
 console.log('Secure user-management tests passed.');

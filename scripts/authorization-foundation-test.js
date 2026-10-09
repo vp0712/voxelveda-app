@@ -30,32 +30,17 @@ assert.equal(hasPermission(user('staff', ['settings']), 'MANAGE_USERS'), true);
 assert.equal(effectivePermissions(user('super_admin')).has('MANAGE_SECURITY'), true);
 
 const root = path.join(__dirname, '..');
-const permissionMiddleware = fs.readFileSync(path.join(root, 'middleware/permissionMiddleware.js'), 'utf8');
-const inputPermissionMiddleware = fs.readFileSync(path.join(root, 'middleware/inputPermissionMiddleware.js'), 'utf8');
+const authorizationMiddleware = fs.readFileSync(path.join(root, 'middleware/authorizationMiddleware.js'), 'utf8');
 const userController = fs.readFileSync(path.join(root, 'controllers/userController.js'), 'utf8');
-const timesheetService = fs.readFileSync(path.join(root, 'services/timesheetWorkflowService.js'), 'utf8');
-const taskController = fs.readFileSync(path.join(root, 'controllers/taskController.js'), 'utf8');
-const expenseRoutes = fs.readFileSync(path.join(root, 'routes/expenseRoutes.js'), 'utf8');
-const invoiceRoutes = fs.readFileSync(path.join(root, 'routes/invoiceRoutes.js'), 'utf8');
 const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
-const uploadRoutes = fs.readFileSync(path.join(root, 'routes/uploadRoutes.js'), 'utf8');
 const authController = fs.readFileSync(path.join(root, 'controllers/authController.js'), 'utf8');
 
-assert.equal(permissionMiddleware.includes("['admin', 'super_admin']"), false);
-assert.equal(inputPermissionMiddleware.includes("['admin', 'super_admin']"), false);
+assert.match(authorizationMiddleware, /hasAnyPermission/);
+assert.match(authorizationMiddleware, /PERMISSION_DENIED/);
 assert.match(userController, /You cannot modify your own role or permissions/);
 assert.match(userController, /USER_ACCESS_CHANGED/);
-assert.match(timesheetService, /u\.manager_id = \?/);
-assert.match(timesheetService, /canApproveTimesheet/);
-assert.match(taskController, /canManageTaskTarget/);
-assert.match(taskController, /MANAGE_TEAM_JOBS/);
-assert.match(expenseRoutes, /POST_TRANSACTION/);
-assert.match(expenseRoutes, /VOID_TRANSACTION/);
-assert.match(invoiceRoutes, /SEND_COMPANY_EMAIL/);
 assert.match(app, /app\.use\('\/api\/documents',\s*auth,\s*documentSecurityRoutes\)/);
 assert(!app.includes("app.use('/uploads'"));
-assert.match(app, /requirePermission\('VIEW_FINANCE'\).*express\.static/);
-assert.match(uploadRoutes, /requireAnyPermission\('EDIT_RFQS'\)/);
 assert.match(authController, /exports\.me[\s\S]*const permissions = parsePermissions\(user\.permissions\);[\s\S]*effective_permissions/);
 
 async function runRecordScopeTests() {

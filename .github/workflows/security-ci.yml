@@ -34,12 +34,12 @@ jobs:
           cache: npm
 
       - name: Install locked dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
 
       - name: Run syntax checks
         run: npm run check
 
-      - name: Verify enterprise audit provenance
+      - name: Verify application audit provenance
         run: npm run audit:inventory:check
 
       - name: Run automated tests

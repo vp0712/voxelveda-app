@@ -1,31 +1,21 @@
-# Voxel Veda Operations Platform
+# Voxel Veda customer app
 
-Voxel Veda is a Node.js and Express operations platform for RFQs, invoices, customers, suppliers, inventory, workforce, attendance, rostering, expenses and controlled company records.
+The application provides a focused customer workspace, RFQ intake, registration, profile and account security. The original company logo is retained, with a white, charcoal and teal theme and an accessible dark option.
 
-## Local development
+Banking and ERP runtime code, pages and scheduled jobs have been removed. Their existing database records, document bytes, identity permissions and historical migration checksums remain intact. Old module links return a deliberate unavailable page; archived financial documents and queued module emails remain inaccessible and unsent.
 
-1. Copy `.env.example` to `.env` and provide the database, JWT and email values.
-2. Install dependencies with `npm install`.
-3. Run `npm run check` and `npm test`.
-4. Start the server with `npm run dev` and open `http://localhost:5001/`.
+## Development
 
-Do not commit `.env`, credentials, signing keys, uploaded customer documents or database exports.
+Use Node 22, copy `.env.example` to `.env`, configure a development MySQL database and unique authentication secrets, then run `npm ci`, `npm run check`, `npm test` and `npm run build`. Start with `npm run dev`. Never commit credentials or uploaded documents. Database integration checks require an explicitly disposable test database; see `scripts/retained-mysql-test.js`.
 
-## Production routes
+## Routes
 
-- Public: `/`, `/request-quote`, `/privacy`, `/terms`, `/support`
-- Authentication: `/login`, `/register`, `/forgot-password`, `/reset-password`
-- Protected: `/admin`, `/dashboard`, `/invoice/view`
-- Liveness: `/api/health`
-- Readiness: `/api/ready`
-- Restricted readiness detail: `/api/security/readiness`
+Public routes are `/`, `/request-quote`, `/register`, `/login`, `/privacy`, `/terms` and `/support`. Authenticated account pages are `/dashboard`, `/profile` and `/security`. Existing role entries redirect to the common workspace while retaining existing identity and permission checks. `/api/health` reports liveness; `/api/ready` checks application readiness.
 
-The intended public origin is `https://app.voxelveda.com`. Keep `FORCE_CANONICAL_HOST=false` until Railway confirms the custom domain and SSL are active.
+## Release and recovery
 
-## Deployment
+Production remains on Railway at https://app.voxelveda.com. Keep the existing service, database and domain. Candidate changes must pass normal CI, merge to `main`, and pass the main-branch checks before a separate `.railway-release` update triggers deployment. The release marker must not change in candidate pull requests.
 
-See `CUSTOM-DOMAIN-SETUP.md`, `DEPLOYMENT-CHECKLIST.md`, and `docs/ENTERPRISE_DEEP_AUDIT.md`. Railway remains the application host; the custom domain changes the public address, not the hosting provider.
+Production starts only after configuration, database, migration, security and service checks pass. Historical migrations are deliberately preserved and checksummed. The retained email worker claims only authentication, security, contact and customer-RFQ messages.
 
-Production startup is fail-closed. The process validates configuration, verifies MySQL, runs checksummed migrations under an advisory lock, initializes critical schemas, services, and workers, and only then binds the HTTP port. Do not replace `/api/ready` with a static environment-variable check.
-
-For databases created before the migration ledger, the runner records pre-Wave-A files as `BASELINED` only when all six established core tables are present and no immutable migration history exists. Fresh databases execute every migration, later migrations always execute normally, and both `APPLIED` and `BASELINED` checksums are immutable on subsequent runs. Run `npm run test:enterprise-wave-a:mysql-legacy` against a disposable-capable local MySQL instance to rehearse this adoption path.
+See [the removal manifest](docs/APPLICATION_REMOVAL_MANIFEST.json) and [release and rollback notes](docs/APPLICATION_RETIREMENT_20261009.md). Rolling back means restoring the previous verified code and pre-deploy configuration through the same CI and release-marker workflow; no database deletion or reverse migration is required.

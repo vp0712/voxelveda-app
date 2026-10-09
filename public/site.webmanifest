@@ -1,21 +1,25 @@
 {
-    "icons":  [
-                  {
-                      "type":  "image/png",
-                      "sizes":  "192x192",
-                      "src":  "/favicon-192.png?v=20260703-brand"
-                  },
-                  {
-                      "type":  "image/png",
-                      "sizes":  "512x512",
-                      "src":  "/favicon-512.png?v=20260703-brand"
-                  }
-              ],
-    "description":  "Engineering, workforce and manufacturing operations control.",
-    "background_color":  "#050b14",
-    "theme_color":  "#07111f",
-    "name":  "Voxel Veda Operations Platform",
-    "start_url":  "/login",
-    "display":  "standalone",
-    "short_name":  "Voxel Veda"
+  "name": "Voxel Veda",
+  "short_name": "Voxel Veda",
+  "description": "Your secure project and quote workspace.",
+  "id": "/login",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F5F7F6",
+  "theme_color": "#F5F7F6",
+  "icons": [
+    {
+      "src": "/favicon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }

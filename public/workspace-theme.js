@@ -11,7 +11,7 @@
     mode = next === 'dark' ? 'dark' : 'light';
     document.documentElement.dataset.colorMode = mode;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = mode === 'dark' ? '#0B1220' : '#F4F7FB';
+    if (meta) meta.content = mode === 'dark' ? '#111E21' : '#F5F7F6';
     document.querySelectorAll('[data-theme-toggle]').forEach(button => {
       button.textContent = mode === 'dark' ? 'Light theme' : 'Dark theme';
       button.setAttribute('aria-label', 'Use ' + (mode === 'dark' ? 'light' : 'dark') + ' theme');
@@ -30,7 +30,7 @@
   apply(mode);
   window.addEventListener('storage', event => { if (event.key === key) apply(event.newValue); });
   document.addEventListener('DOMContentLoaded', () => {
-    const actions = document.querySelector('.topbar-actions, .fm-top-actions, .role-topbar-actions, .profile-actions');
+    const actions = document.querySelector('.topbar-actions, .profile-actions, .account-actions');
     if (actions && !document.querySelector('[data-theme-toggle]')) {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'vv-theme-toggle'; button.dataset.themeToggle = '';

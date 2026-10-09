@@ -52,7 +52,6 @@ async function run() {
 
   const service = fs.readFileSync(path.join(__dirname, '..', 'services', 'databaseRuntimeService.js'), 'utf8');
   const state = fs.readFileSync(path.join(__dirname, '..', 'services', 'runtimeState.js'), 'utf8');
-  const readiness = fs.readFileSync(path.join(__dirname, '..', 'public', 'production-readiness-assurance-center.js'), 'utf8');
   assert.match(service, /probeDatabaseTlsCapability/);
   assert.match(service, /probeTlsOnce/);
   assert.match(service, /DB_TLS_REJECT_UNAUTHORIZED/);
@@ -66,9 +65,9 @@ async function run() {
   assert.match(service, /Database privilege evidence:/);
   assert.match(state, /tls_capable/);
   assert.match(state, /least_privilege_source/);
-  assert.match(readiness, /Database connection evidence/);
-  assert.match(readiness, /TLS capable/);
-  assert.match(readiness, /Runtime user/);
+  assert.match(state, /tls_trust_status/);
+  assert.match(state, /tls_certificate_verification/);
+  assert.match(state, /runtime_user/);
 
   console.log('Database runtime verification regression test passed.');
 }

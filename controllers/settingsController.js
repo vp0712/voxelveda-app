@@ -8,14 +8,8 @@ const SETTING_RULES = Object.freeze({
   company_address: { max: 500 },
   company_email: { max: 254, validate: (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) },
   abn: { max: 20, validate: (value) => !value || /^\d{11}$/.test(value.replace(/[\s-]/g, '')) },
-  payment_terms: { max: 250 },
-  bank_name: { max: 120 },
   website: { max: 300, validate: (value) => { if (!value) return true; try { return new URL(value).protocol === 'https:'; } catch { return false; } } },
-  support_phone: { max: 40, validate: (value) => !value || /^[+()\d\s.-]{6,40}$/.test(value) },
-  base_currency: { max: 3, validate: (value) => !value || /^[A-Z]{3}$/.test(value.toUpperCase()) },
-  financial_year_start: { max: 5, validate: (value) => !value || /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(value) },
-  gst_registration: { max: 20, validate: (value) => !value || ['REGISTERED','NOT_REGISTERED','UNKNOWN'].includes(value.toUpperCase()) },
-  report_footer: { max: 300 }
+  support_phone: { max: 40, validate: (value) => !value || /^[+()\d\s.-]{6,40}$/.test(value) }
 });
 const ALLOWED_SETTINGS = Object.freeze(Object.keys(SETTING_RULES));
 

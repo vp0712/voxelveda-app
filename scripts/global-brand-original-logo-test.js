@@ -32,12 +32,12 @@ assert.equal((twice.match(/global-brand\.css/g) || []).length, 1, 'Brand CSS mus
 assert.equal((twice.match(/global-brand\.js/g) || []).length, 1, 'Brand JS must be injected once');
 
 const css = read('public/global-brand.css');
-assert.match(css, /#vvGlobalBrandPresence\{display:none!important\}/, 'The duplicate corner badge must never obscure primary navigation');
-assert.match(css, /\.vv-brand-loader-logo\{[^}]*filter:none!important/i, 'Original logo must not receive visual filters');
-assert.match(css, /\.vv-brand-loader-logo\{[^}]*animation:none!important/i, 'Original logo artwork itself must not animate');
-assert.match(css, /\.vv-brand-orbit-ring-one\{[^}]*animation:vvBrandOrbitOne/i, 'Loading motion must live outside the logo artwork');
-assert.match(css, /\.vv-brand-scan-line\{[^}]*animation:vvBrandScan/i, 'Reference-style scan motion must live outside the logo artwork');
-assert.match(css, /--vv-brand-overlay-bg:#090e16/i, 'Loader must use the approved premium dark workspace treatment');
+assert.match(css, /#vvGlobalBrandPresence\s*\{\s*display:\s*none\s*!important;/, 'The duplicate corner badge must never obscure primary navigation');
+assert.match(css, /\.vv-brand-loader-logo\s*\{[^}]*filter:\s*none\s*!important/i, 'Original logo must not receive visual filters');
+assert.match(css, /\.vv-brand-loader-logo\s*\{[^}]*animation:\s*none\s*!important/i, 'Original logo artwork itself must not animate');
+assert.match(css, /\.vv-brand-loader-dot\s*\{[^}]*animation:\s*vvBrandPulse/i, 'Loading feedback must animate independently of the logo');
+assert.match(css, /prefers-reduced-motion:\s*reduce/, 'Loading feedback must respect reduced motion');
+assert.match(css, /--vv-brand-overlay-bg:/i, 'Loader background must follow an explicit theme token');
 
 const client = read('public/global-brand.js');
 assert.match(client, /FAIL_SAFE_MS = 30000/, 'Loader must include a fail-safe timeout');
@@ -56,12 +56,10 @@ const app = read('app.js');
 assert.match(app, /injectGlobalBrand/);
 assert.match(app, /global-brand\.css/);
 assert.match(app, /global-brand\.js/);
-assert.match(app, /sendPage\('401\.html',401\)/);
-assert.match(app, /sendPage\('500\.html',500\)/);
+assert.match(app, /for\(const status of \[401,403,404,429,500\]\)/, 'All error statuses must use the shared renderer');
+assert.match(app, /sendPage\(status\+'\.html',status\)/);
 assert.match(app, /sendPage\('maintenance\.html',503\)/);
 assert.match(app, /sendPage\('404\.html',404\)\(req,res\)/);
-
-const admin = read('services/adminPageRenderer.js');
-assert.match(admin, /injectGlobalBrand\(injectRecoveryDrillCenter/);
+assert.match(app, /sendPage\('workspace\.html'\)/, 'Retained customer workspace must use the shared page branding');
 
 console.log('Global original-logo branding and network-stability checks passed.');

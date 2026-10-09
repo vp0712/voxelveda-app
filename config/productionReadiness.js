@@ -21,8 +21,6 @@ function assessProductionReadiness(env = process.env) {
   const jwt = String(env.JWT_SECRET || '');
   const session = String(env.SESSION_SECRET || '');
   const mfa = String(env.MFA_ENCRYPTION_KEY || '').trim();
-  const finance = String(env.FINANCE_ENCRYPTION_KEY || '').trim();
-  const shiftQr = String(env.SHIFT_QR_SIGNING_KEY || '').trim();
   let databaseConfig = null;
 
   try {
@@ -35,9 +33,7 @@ function assessProductionReadiness(env = process.env) {
   if (production && (!session || session.length < 32 || WEAK_SECRETS.has(session.toLowerCase()))) failures.push('SESSION_SECRET must be a unique value of at least 32 characters');
   if (production && jwt === session) failures.push('JWT_SECRET and SESSION_SECRET must be different');
   if (production && secretBytes(mfa) !== 32) failures.push('MFA_ENCRYPTION_KEY must be a unique 32-byte hex or base64 secret');
-  if (production && secretBytes(finance) !== 32) failures.push('FINANCE_ENCRYPTION_KEY must be a unique 32-byte hex or base64 secret');
-  if (production && secretBytes(shiftQr) < 32) failures.push('SHIFT_QR_SIGNING_KEY must be at least 32 random bytes encoded as hex or base64');
-  if (production && [jwt, session, mfa, finance, shiftQr].filter(Boolean).length !== new Set([jwt, session, mfa, finance, shiftQr].filter(Boolean)).size) failures.push('Security secrets and encryption keys must not be reused');
+  if (production && [jwt, session, mfa].filter(Boolean).length !== new Set([jwt, session, mfa].filter(Boolean)).size) failures.push('Security secrets and encryption keys must not be reused');
 
   if (production && env.ALLOW_LEGACY_QUERY_TOKENS === 'true') failures.push('query-string authentication tokens are forbidden in production');
   if (production && env.ENABLE_ADMIN_BOOTSTRAP === 'true') failures.push('admin bootstrap must be disabled after secure provisioning');

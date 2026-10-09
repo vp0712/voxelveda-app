@@ -28,16 +28,14 @@ function initials(name) {
 }
 
 function profilePortal(role) {
-  return ['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(String(role || '').toLowerCase())
-    ? '/admin'
-    : '/dashboard';
+  return '/dashboard';
 }
 
 function redirectToLogin(message = 'Please login to continue.') {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   localStorage.removeItem('role');
-  const params = new URLSearchParams({ message });
+  const params = new URLSearchParams({ message, returnTo: '/profile' });
   window.location.replace(`/login?${params.toString()}`);
 }
 

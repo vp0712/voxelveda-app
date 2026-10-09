@@ -1,8 +1,22 @@
 const pool = require('../config/db');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
-const { ensureWorkforceSchema } = require('./workforceSchema');
+const { ensureEmailQueueSchema } = require('./emailQueueSchema');
 const { sendMail, normalizeAddressList, isEmailTransportError, classifySmtpFailure, attachmentBuffer } = require('./emailService');
+
+// Retired and unclassified messages remain in their original queue rows but
+// cannot be claimed by this deployment. Restore of the previous release can
+// resume its own workflows without losing the historical content.
+const RETAINED_EMAIL_MODULES = Object.freeze(['auth', 'security', 'contact', 'customer_rfqs']);
+const modulePlaceholders = RETAINED_EMAIL_MODULES.map(() => '?').join(', ');
+
+function assertRetainedEmailModule(message) {
+  if (!RETAINED_EMAIL_MODULES.includes(message?.relatedModule)) {
+    const error = new Error('Email delivery for this module is no longer available.');
+    error.code = 'EMAIL_MODULE_RETIRED';
+    throw error;
+  }
+}
 
 function parseJson(value, fallback) {
   try {
@@ -38,7 +52,8 @@ function restoreAttachments(items=[]){
 }
 
 async function queueEmail(message) {
-  await ensureWorkforceSchema();
+  assertRetainedEmailModule(message);
+  await ensureEmailQueueSchema();
   const payload = [
     message.templateKey || null,
     JSON.stringify(normalizeAddressList(message.to)),
@@ -100,24 +115,25 @@ async function writeEmailLog(row, status, result, error) {
 }
 
 async function processEmailQueue(limit = 10) {
-  await ensureWorkforceSchema();
+  await ensureEmailQueueSchema();
   const [rows] = await pool.query(
     `
     SELECT * FROM email_queue
     WHERE status IN ('PENDING', 'RETRY')
+      AND related_module IN (${modulePlaceholders})
       AND scheduled_at <= NOW()
       AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())
     ORDER BY created_at ASC
     LIMIT ?
     `,
-    [Math.max(1, Math.min(Number(limit) || 10, 50))]
+    [...RETAINED_EMAIL_MODULES, Math.max(1, Math.min(Number(limit) || 10, 50))]
   );
 
   const outcomes = [];
   for (const row of rows) {
     const [claim] = await pool.query(
-      `UPDATE email_queue SET status = 'SENDING', attempts = attempts + 1 WHERE id = ? AND status IN ('PENDING', 'RETRY')`,
-      [row.id]
+      `UPDATE email_queue SET status = 'SENDING', attempts = attempts + 1 WHERE id = ? AND status IN ('PENDING', 'RETRY') AND related_module IN (${modulePlaceholders})`,
+      [row.id, ...RETAINED_EMAIL_MODULES]
     );
     if (!claim.affectedRows) continue;
 
@@ -170,4 +186,4 @@ async function processEmailQueue(limit = 10) {
   return outcomes;
 }
 
-module.exports = { queueEmail, processEmailQueue, _test:{serializableAttachments,restoreAttachments} };
+module.exports = { queueEmail, processEmailQueue, RETAINED_EMAIL_MODULES, _test:{serializableAttachments,restoreAttachments} };

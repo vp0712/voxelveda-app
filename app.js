@@ -1,182 +1,96 @@
-const express = require('express');
-const path = require('path');
-const fs = require('node:fs');
-const cors = require('cors');
-const QRCode = require('qrcode');
-
-const authRoutes = require('./routes/authRoutes');
-const rfqRoutes = require('./routes/rfqRoutes');
-const invoiceRoutes = require('./routes/invoiceRoutes');
-const userRoutes = require('./routes/userRoutes');
-const profileRoutes = require('./routes/profileRoutes');
-const settingsRoutes = require('./routes/settingsRoutes');
-const dashboardRoutes = require('./routes/dashboardRoutes');
-const uploadRoutes = require('./routes/uploadRoutes');
-const taskRoutes = require('./routes/taskRoutes');
-const rfqController = require('./controllers/rfqController');
-const aiLeadController = require('./controllers/aiLeadController');
-const stockRoutes = require('./routes/stockRoutes');
-const customerRoutes = require('./routes/customerRoutes');
-const materialRoutes = require('./routes/materialRoutes');
-const meetingRoutes = require('./routes/meetingRoutes');
-const rosterRoutes = require('./routes/rosterRoutes');
-const supplierRoutes = require('./routes/supplierRoutes');
-const supplierController = require('./controllers/supplierController');
-const attendanceController = require('./controllers/attendanceController');
-const complianceRoutes = require('./routes/complianceRoutes');
-const qmsRoutes = require('./routes/qmsRoutes');
-const qualityReleaseController = require('./controllers/qms/qualityReleaseController');
-const competitorRoutes = require('./routes/competitorRoutes');
-const expenseRoutes = require('./routes/expenseRoutes');
-const financeRoutes = require('./routes/financeRoutes');
-const emailRoutes = require('./routes/emailRoutes');
-const highRiskFinanceRoutes = require('./routes/highRiskFinanceRoutes');
-const bankingPortalRoutes = require('./routes/bankingPortalRoutes');
-const documentSecurityRoutes = require('./routes/documentSecurityRoutes');
-const securityDashboardRoutes = require('./routes/securityDashboardRoutes');
-const securityIncidentRoutes = require('./routes/securityIncidentRoutes');
-const operationalTrustRoutes = require('./routes/operationalTrustRoutes');
-const continuousAssuranceRoutes = require('./routes/continuousAssuranceRoutes');
-const securityGovernanceRoutes = require('./routes/securityGovernanceRoutes');
-const integrationWebhookRoutes = require('./routes/integrationWebhookRoutes');
-const vomWhatsAppRoutes = require('./routes/vomWhatsAppRoutes');
-const notificationRoutes = require('./routes/notificationRoutes');
-const trashRoutes = require('./routes/trashRoutes');
-const workflowRoutes = require('./routes/workflowRoutes');
-const procurementRoutes = require('./routes/procurementRoutes');
-const erpWorkspaceRoutes = require('./routes/erpWorkspaceRoutes');
-const securityTelemetryController = require('./controllers/securityTelemetryController');
-const requirePermission = require('./middleware/permissionMiddleware');
-const requireInputPermission = require('./middleware/inputPermissionMiddleware');
-const { hasAnyPermission } = require('./services/authorizationService');
-const pageAuth = require('./middleware/pageAuth');
-const urls = require('./config/urls');
-const { renderAdminPage } = require('./services/adminPageRenderer');
-const { renderFinancePage } = require('./services/workspaceShellRenderer');
-const {renderCheck,renderFrame}=require('./services/workspaceLayoutCheck');
-const { injectGlobalBrand } = require('./services/globalBrandRenderer');
-const { corsOptions, csrfProtection, enforceHttps, rateLimitPolicy, safeApiResponses, securityHeaders, safeErrorHandler } = require('./middleware/securityMiddleware');
-const {
-  aiLeadContract,
-  cocVerificationContract,
-  publicRfqContract,
-  qrGenerationContract,
-  shiftQrContract
-} = require('./middleware/publicEndpointProtection');
-const { botChallenge } = require('./services/botChallengeService');
-const { publicSubmissionDedupe } = require('./services/publicSubmissionDedupeService');
-const auth = require('./middleware/auth');
-const readinessController = require('./controllers/readinessController');
-const readinessRoutes = require('./routes/readinessRoutes');
-const backgroundJobRoutes = require('./routes/backgroundJobRoutes');
-const { publicRouter: publicCareersRoutes, adminRouter: adminCareersRoutes } = require('./routes/careersRoutes');
-const employeeIdentityRoutes = require('./routes/employeeIdentityRoutes');
-const employeeIdentityController = require('./controllers/employeeIdentityController');
-const { servePdfDelivery } = require('./services/financeReportDeliveryService');
-const financeReportBuilder = require('./controllers/financeReportBuilderController');
-const financePrivacy = require('./middleware/financePrivacyMiddleware');
-
-const app = express();
-const publicDir = path.join(__dirname, 'public');
-const pageCache = new Map();
-const captureRawBody = (req, res, buffer) => { req.rawBody = Buffer.from(buffer); };
-const boundedJson = (limit) => express.json({ limit, type: 'application/json', verify: captureRawBody });
-const canonicalFinanceUiAssets = new Set([
-  'finance-intelligence.html',
-  'finance-master.js',
-  'finance-master.css',
-  'finance-bootstrap-guard.js',
-  'finance-advanced-control.js'
-]);
-function isRetiredFinanceUiAsset(asset){
-  const name=String(asset||'').toLowerCase();
-  if(canonicalFinanceUiAssets.has(name))return false;
-  if(!/\.(?:js|css|html)$/.test(name))return false;
-  return name.startsWith('finance-')||name.startsWith('personal-finance-')||name.startsWith('advanced-banking-ui');
-}
-const noStorePublicAssets = new Set([
-  'erp-workspace.js', 'erp-workspace.css',
-  'report-viewer.js', 'report-viewer.css', 'register.js', 'auth-entry.css',
-  'workspace-theme.css', 'workspace-theme.js', 'workspace-shell.js', 'workspace-charts.js',
-  'login.js','admin-dashboard.js','staff.js','profile.js','procurement-ui.js','auth-lifecycle.js','mfa.js','security-page.js','step-up.js','step-up.css','style.css','advanced-theme.css','mobile-shell.js','quality.js','quality.css','shop-floor.js','shop-floor.css','service-worker.js','finance-bootstrap-guard.js','finance-master.js','finance-master.css','finance-advanced-control.js','finance-statement-parsers.js','global-brand.css','global-brand.js',
-  'recovery-assurance.css','recovery-assurance.js','recovery-drill.css','recovery-drill.js','recovery-drill-ledger.css','recovery-drill-ledger.js','recovery-drill-governance.css','recovery-drill-governance.js','recovery-remediation.css','recovery-remediation.js','recovery-executive.css','recovery-executive.js','role-portal.css','role-portal.js','client-portal.html','client-portal.js','visitor-portal.html'
-]);
-app.disable('x-powered-by');
-app.set('trust proxy', 1);
-app.set('query parser', 'simple');
-app.use(enforceHttps);
-app.use(securityHeaders);
-app.use(safeApiResponses);
-const applicationCors = cors(corsOptions());
-app.use((req,res,next) => {
-  // Browsers can submit CSP reports with an opaque ("null") Origin. This
-  // write-only, sanitised telemetry endpoint exposes no response data and needs
-  // no credentialed CORS grant. Keep the allow-list on every application API.
-  if(req.method === 'POST' && req.path === '/api/security/csp-report' && req.headers.origin === 'null') return next();
-  return applicationCors(req,res,next);
-});
+'use strict';
+const express=require('express');
+const path=require('node:path');
+const fs=require('node:fs');
+const cors=require('cors');
+const authRoutes=require('./routes/authRoutes');
+const userRoutes=require('./routes/userRoutes');
+const profileRoutes=require('./routes/profileRoutes');
+const settingsRoutes=require('./routes/settingsRoutes');
+const documentSecurityRoutes=require('./routes/documentSecurityRoutes');
+const securityDashboardRoutes=require('./routes/securityDashboardRoutes');
+const securityIncidentRoutes=require('./routes/securityIncidentRoutes');
+const readinessRoutes=require('./routes/readinessRoutes');
+const backgroundJobRoutes=require('./routes/backgroundJobRoutes');
+const securityTelemetry=require('./controllers/securityTelemetryController');
+const publicRfq=require('./controllers/publicRfqController');
+const readiness=require('./controllers/readinessController');
+const auth=require('./middleware/auth');
+const pageAuth=require('./middleware/pageAuth');
+const {injectGlobalBrand}=require('./services/globalBrandRenderer');
+const urls=require('./config/urls');
+const {corsOptions,csrfProtection,enforceHttps,rateLimitPolicy,safeApiResponses,securityHeaders,safeErrorHandler}=require('./middleware/securityMiddleware');
+const {publicRfqContract}=require('./middleware/publicEndpointProtection');
+const {botChallenge}=require('./services/botChallengeService');
+const {publicSubmissionDedupe}=require('./services/publicSubmissionDedupeService');
+const {retiredRequest,retiredAsset}=require('./services/applicationRetirement');
+const app=express();
+const publicDir=path.join(__dirname,'public');
+const pageCache=new Map();
+const raw=(req,res,buffer)=>{req.rawBody=Buffer.from(buffer)};
+app.disable('x-powered-by');app.set('trust proxy',1);app.set('query parser','simple');
+app.use(enforceHttps);app.use(securityHeaders);app.use(safeApiResponses);
+const applicationCors=cors(corsOptions());
+app.use((req,res,next)=>req.method==='POST'&&req.path==='/api/security/csp-report'&&req.headers.origin==='null'?next():applicationCors(req,res,next));
 app.use(rateLimitPolicy('authenticated_api'));
-app.use('/api/auth', boundedJson('8kb'));
-app.use('/api/public/rfq', boundedJson('16kb'));
-app.use('/api/public/ai-lead', boundedJson('32kb'));
-app.use(express.json({limit:process.env.JSON_BODY_LIMIT||'1mb',type:['application/json','application/csp-report','application/reports+json'],verify:captureRawBody}));
+app.use('/api/auth',express.json({limit:'8kb',type:'application/json',verify:raw}));
+app.use('/api/public/rfq',express.json({limit:'16kb',type:'application/json',verify:raw}));
+app.use(express.json({limit:process.env.JSON_BODY_LIMIT||'1mb',type:['application/json','application/csp-report','application/reports+json'],verify:raw}));
 app.use(express.urlencoded({extended:false,limit:process.env.FORM_BODY_LIMIT||'1mb'}));
-// Browser-generated CSP reports cannot carry the application's CSRF token.
-// Keep this telemetry endpoint narrowly scoped, rate-limited and schema-sanitised,
-// but register it before CSRF enforcement so CSP violations do not create false
-// production errors. All normal state-changing application APIs remain protected.
-app.post('/api/security/csp-report', rateLimitPolicy('csp_report'), securityTelemetryController.recordCspViolation);
-// Meta WhatsApp webhooks are provider-signed and cannot include the browser CSRF token.
-// Signature verification remains fail-closed inside the dedicated VOM webhook route.
-app.use('/api/integrations/whatsapp', vomWhatsAppRoutes);
+app.post('/api/security/csp-report',rateLimitPolicy('csp_report'),securityTelemetry.recordCspViolation);
 app.use(csrfProtection);
-app.get('/api/health',readinessController.health);
-app.get('/api/ready',readinessController.ready);
-app.get('/internal/layout-check',noIndex,pageAuth({adminOnly:true}),renderCheck);
-app.get('/internal/layout-check/:module',noIndex,pageAuth({adminOnly:true}),renderFrame);
-app.use((req,res,next)=>{if(process.env.FORCE_CANONICAL_HOST!=='true'||['/api/health','/api/ready'].includes(req.path))return next();const currentHost=String(req.hostname||'').toLowerCase();const canonicalHost=new URL(urls.app).hostname;const fallbackHost=String(process.env.RAILWAY_FALLBACK_HOST||'voxelveda-app-production.up.railway.app').toLowerCase();if(currentHost!==fallbackHost||currentHost===canonicalHost)return next();return res.redirect(302,new URL(req.originalUrl||'/',`${urls.app}/`).toString())});
-function noIndex(req,res,next){res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive');res.setHeader('Cache-Control','private, no-store');next()}
-function brandedPage(filename){const filePath=path.join(publicDir,filename);if(process.env.NODE_ENV==='production'&&pageCache.has(filePath))return pageCache.get(filePath);const rendered=injectGlobalBrand(fs.readFileSync(filePath,'utf8'));if(process.env.NODE_ENV==='production')pageCache.set(filePath,rendered);return rendered}
-function sendPage(filename,statusCode=200){return(req,res)=>{res.status(statusCode);res.type('html');return res.send(brandedPage(filename))}}
-function redirectPreservingQuery(target){return(req,res)=>{const queryIndex=req.originalUrl.indexOf('?');const query=queryIndex>=0?req.originalUrl.slice(queryIndex):'';return res.redirect(302,`${target}${query}`)}}
-function portalPathForRequestUser(user){
-  const role=String(user?.role||'staff').trim().toLowerCase();
-  if(['viewer','view_only','client','customer'].includes(role))return '/client';
-  if(['admin','super_admin','finance_admin','finance_user','accountant'].includes(role))return '/admin';
-  if(['staff','hr','production','supervisor','manager','sales'].includes(role))return `/portal/${role}`;
-  return '/portal/staff';
-}
-function serveRolePortal(req,res){
-  const requested=String(req.params?.role||'').trim().toLowerCase();
-  const expected=portalPathForRequestUser(req.user);
-  if(expected==='/admin'||expected==='/client')return res.redirect(302,expected);
-  const expectedRole=expected.split('/').filter(Boolean).pop()||'staff';
-  if(requested!==expectedRole)return res.redirect(302,expected);
-  res.type('html');return res.send(brandedPage('staff-dashboard.html'));
-}
-app.get('/',sendPage('index.html'));app.get('/login',noIndex,sendPage('login.html'));app.get('/register',noIndex,sendPage('register.html'));app.get('/request-quote',sendPage('customer.html'));app.get('/privacy',sendPage('privacy-policy.html'));app.get('/terms',sendPage('terms.html'));app.get('/support',sendPage('support.html'));app.get('/careers',sendPage('careers.html'));app.get('/employee/verify/:token',noIndex,sendPage('employee-verify.html'));app.get('/careers-admin',noIndex,pageAuth(),sendPage('careers-admin.html'));app.get('/forgot-password',noIndex,sendPage('forgot-password.html'));app.get('/reset-password',noIndex,sendPage('reset-password.html'));app.get('/accept-invite',noIndex,sendPage('accept-invite.html'));app.get('/mfa',noIndex,sendPage('mfa.html'));app.get('/security',noIndex,pageAuth({allowMfaSetup:true}),sendPage('security.html'));app.get('/attendance-terminal',noIndex,sendPage('shift-qr.html'));app.get('/401',noIndex,sendPage('401.html',401));app.get('/403',noIndex,sendPage('403.html',403));app.get('/404',noIndex,sendPage('404.html',404));app.get('/429',noIndex,sendPage('429.html',429));app.get('/500',noIndex,sendPage('500.html',500));app.get('/maintenance',noIndex,sendPage('maintenance.html',503));
-app.get('/admin',noIndex,pageAuth({workspaceOnly:true}),renderAdminPage);app.get('/finance-intelligence',noIndex,pageAuth({workspaceOnly:true}),renderFinancePage);app.get('/banking',noIndex,pageAuth(),redirectPreservingQuery('/finance-intelligence'));app.get('/finance-reconciliation',noIndex,pageAuth(),(req,res)=>res.redirect(302,'/finance-intelligence#reconciliation'));app.get('/dashboard',noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPathForRequestUser(req.user)));app.get('/portal/:role',noIndex,pageAuth(),serveRolePortal);app.get('/client',noIndex,pageAuth(),(req,res)=>{const target=portalPathForRequestUser(req.user);if(target!=='/client')return res.redirect(302,target);res.type('html');return res.send(brandedPage('client-portal.html'))});app.get('/profile',noIndex,pageAuth(),sendPage('profile.html'));app.get('/employee-id',noIndex,pageAuth({workspaceOnly:true}),sendPage('employee-id.html'));app.get('/quality',noIndex,pageAuth({workspaceOnly:true}),sendPage('quality.html'));app.get('/shop-floor',noIndex,pageAuth(),sendPage('shop-floor.html'));app.get('/invoice/view',noIndex,pageAuth(),sendPage('invoice-pdf.html'));
-app.get('/index.html',redirectPreservingQuery('/'));app.get('/login.html',redirectPreservingQuery('/login'));app.get('/register.html',redirectPreservingQuery('/register'));app.get('/customer.html',redirectPreservingQuery('/request-quote'));app.get('/privacy-policy.html',redirectPreservingQuery('/privacy'));app.get('/admin-dashboard.html',redirectPreservingQuery('/admin'));app.get('/finance-intelligence.html',redirectPreservingQuery('/finance-intelligence'));app.get('/finance-reconciliation.html',redirectPreservingQuery('/finance-intelligence#reconciliation'));app.get('/staff-dashboard.html',redirectPreservingQuery('/dashboard'));app.get('/profile.html',redirectPreservingQuery('/profile'));app.get('/quality.html',redirectPreservingQuery('/quality'));app.get('/shop-floor.html',redirectPreservingQuery('/shop-floor'));app.get('/dashboard.html',redirectPreservingQuery('/dashboard'));app.get('/invoice-pdf.html',redirectPreservingQuery('/invoice/view'));app.get('/shift-qr.html',redirectPreservingQuery('/attendance-terminal'));app.get('/careers-admin.html',redirectPreservingQuery('/careers-admin'));
-app.get('/approvals',noIndex,pageAuth(),(req,res)=>{const portal=portalPathForRequestUser(req.user);return res.redirect(302,`${portal}?view=approvals`)});
-app.get('/finance/reports/:reportId/view',noIndex,pageAuth(),financePrivacy.resolveBankingReportPageScope,financeReportBuilder.viewSnapshot);
-const protectedModuleRoutes=['/rfqs','/invoices','/customers','/suppliers','/procurement','/stock','/raw-material','/packaging','/expenses','/workforce','/timesheets','/roster','/staff','/finance','/financial-years','/compliance','/forms','/settings','/meetings','/tasks','/trash'];
-app.get(protectedModuleRoutes,noIndex,pageAuth(),(req,res)=>{const routeName=req.path.replace(/^\//,'');const portal=portalPathForRequestUser(req.user);return res.redirect(302,`${portal}?view=${encodeURIComponent(routeName)}`)});
+app.get('/api/health',readiness.health);app.get('/api/ready',readiness.ready);
 app.use((req,res,next)=>{
-  const asset=path.basename(req.path||'');
-  if(!isRetiredFinanceUiAsset(asset))return next();
-  res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive');
-  res.setHeader('Cache-Control','no-store, max-age=0');
-  return res.status(410).type('text/plain').send('This legacy Finance interface has been retired. Use /finance-intelligence.');
+ if(process.env.FORCE_CANONICAL_HOST!=='true'||['/api/health','/api/ready'].includes(req.path))return next();
+ const host=String(req.hostname||'').toLowerCase(),canonical=new URL(urls.app).hostname;
+ if(host!==String(process.env.RAILWAY_FALLBACK_HOST||'voxelveda-app-production.up.railway.app').toLowerCase()||host===canonical)return next();
+ return res.redirect(302,new URL(req.originalUrl||'/',`${urls.app}/`).toString());
 });
-app.get('/vendor/chart.umd.js', (req,res) => { res.set('Cache-Control','public, max-age=86400').type('application/javascript').sendFile(path.join(__dirname,'node_modules','chart.js','dist','chart.umd.js')); });
-app.use(express.static(publicDir,{dotfiles:'deny',index:false,setHeaders(res,filePath){res.setHeader('X-Content-Type-Options','nosniff');if(noStorePublicAssets.has(path.basename(filePath)))res.setHeader('Cache-Control','no-store, max-age=0')}}));
-app.use('/invoices',noIndex,auth,requirePermission('VIEW_FINANCE'),express.static(path.join(__dirname,'invoices'),{dotfiles:'deny',index:false,setHeaders(res){res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Cache-Control','private, no-store');res.setHeader('X-Robots-Tag','noindex, nofollow, noarchive')}}));
-app.use('/api/public/careers',publicCareersRoutes);app.get('/api/public/employee-id/:token/verify',rateLimitPolicy('coc_verification'),employeeIdentityController.verify);app.get('/api/public/finance-report/:token/:filename',rateLimitPolicy('coc_verification'),servePdfDelivery);app.get('/api/public/finance-report/:token',rateLimitPolicy('coc_verification'),servePdfDelivery);
+function noIndex(req,res,next){res.set('X-Robots-Tag','noindex, nofollow, noarchive').set('Cache-Control','private, no-store');next()}
+function sendPage(filename,status=200){return(req,res)=>{
+ const source=path.join(publicDir,filename);let html=pageCache.get(source);
+ if(!html||process.env.NODE_ENV!=='production'){html=injectGlobalBrand(fs.readFileSync(source,'utf8'));if(process.env.NODE_ENV==='production')pageCache.set(source,html)}
+ return res.status(status).type('html').send(html);
+}}
+function redirect(target){return(req,res)=>{const index=req.originalUrl.indexOf('?');return res.redirect(302,target+(index>=0?req.originalUrl.slice(index):''));}}
+app.get('/',sendPage('index.html'));
+app.get('/login',noIndex,sendPage('login.html'));
+app.get('/register',noIndex,sendPage('register.html'));
+app.get('/request-quote',sendPage('customer.html'));
+app.get('/privacy',sendPage('privacy-policy.html'));
+app.get('/terms',sendPage('terms.html'));
+app.get('/support',sendPage('support.html'));
+app.get('/careers',sendPage('careers.html'));
+app.get('/forgot-password',noIndex,sendPage('forgot-password.html'));
+app.get('/reset-password',noIndex,sendPage('reset-password.html'));
+app.get('/accept-invite',noIndex,sendPage('accept-invite.html'));
+app.get('/mfa',noIndex,sendPage('mfa.html'));
+app.get('/security',noIndex,pageAuth({allowMfaSetup:true}),sendPage('security.html'));
+app.get('/dashboard',noIndex,pageAuth(),sendPage('workspace.html'));
+app.get('/profile',noIndex,pageAuth(),sendPage('profile.html'));
+app.get(['/admin','/client','/portal/:role','/admin-dashboard.html','/staff-dashboard.html','/client-portal.html'],noIndex,pageAuth(),redirect('/dashboard'));
+const aliases={'/index.html':'/','/login.html':'/login','/register.html':'/register','/customer.html':'/request-quote','/privacy-policy.html':'/privacy','/profile.html':'/profile','/dashboard.html':'/dashboard','/workspace.html':'/dashboard','/security.html':'/security','/mfa.html':'/mfa','/forgot-password.html':'/forgot-password','/reset-password.html':'/reset-password','/accept-invite.html':'/accept-invite','/support.html':'/support','/terms.html':'/terms','/careers.html':'/careers'};
+for(const [from,to] of Object.entries(aliases))app.get(from,redirect(to));
+for(const status of [401,403,404,429,500])app.get('/'+status,noIndex,sendPage(status+'.html',status));
+app.get('/maintenance',noIndex,sendPage('maintenance.html',503));
+app.use((req,res,next)=>{
+ if(!retiredRequest(req.path)&&!retiredAsset(req.path))return next();
+ res.set('Cache-Control','private, no-store').set('X-Robots-Tag','noindex, nofollow, noarchive');
+ if(req.path.startsWith('/api/'))return res.status(410).json({code:'MODULE_RETIRED',message:'This module has been removed from Voxel Veda.'});
+ return sendPage('retired.html',410)(req,res);
+});
+app.post('/api/public/rfq',rateLimitPolicy('public_rfq'),publicRfqContract,botChallenge('public_rfq'),publicSubmissionDedupe({submissionType:'public_rfq'}),publicRfq.createRFQ);
 app.use('/api/auth',authRoutes);
-app.use('/api/procurement',auth,procurementRoutes);
-app.use('/api/erp',auth,erpWorkspaceRoutes);
-app.get('/api/qr',rateLimitPolicy('qr_generation'),qrGenerationContract,async(req,res)=>{try{const data=String(req.query.data||'').trim();const png=await QRCode.toBuffer(data,{type:'png',errorCorrectionLevel:'H',margin:8,width:1024,color:{dark:'#000000',light:'#ffffff'}});res.setHeader('Content-Type','image/png');res.setHeader('Cache-Control','public, max-age=86400');return res.send(png)}catch(err){return res.status(500).json({message:'QR code generation failed.'})}});
-app.post('/api/public/rfq',rateLimitPolicy('public_rfq'),publicRfqContract,botChallenge('public_rfq'),publicSubmissionDedupe({submissionType:'public_rfq'}),rfqController.createRFQ);app.post('/api/public/ai-lead',rateLimitPolicy('ai_lead'),aiLeadContract,botChallenge('ai_lead'),publicSubmissionDedupe({submissionType:'ai_lead'}),aiLeadController.createLead);app.get('/api/public/shift-qr',rateLimitPolicy('shift_qr'),shiftQrContract,attendanceController.publicShiftQrToken);app.get('/api/public/qms/coc/:no/verify',rateLimitPolicy('coc_verification'),cocVerificationContract,qualityReleaseController.verifyCoc);app.get('/api/qms/coc/:no/verify',rateLimitPolicy('coc_verification'),cocVerificationContract,qualityReleaseController.verifyCoc);app.use('/api/integrations/webhooks',integrationWebhookRoutes);
-app.use('/api/rfq',auth,requirePermission('VIEW_RFQS'),rfqRoutes);app.use('/api/invoice',auth,requirePermission('VIEW_FINANCE'),invoiceRoutes);app.use('/api/careers',auth,adminCareersRoutes);app.use('/api/users',auth,userRoutes);app.use('/api/employee-identities',auth,employeeIdentityRoutes);app.use('/api/profile',auth,profileRoutes);app.use('/api/settings',auth,settingsRoutes);app.use('/api/email',auth,requirePermission('MANAGE_COMPANY_EMAIL'),emailRoutes);app.use('/api/dashboard',auth,dashboardRoutes);app.use('/api/upload',auth,uploadRoutes);app.use('/api/documents',auth,documentSecurityRoutes);app.use('/api/notifications',auth,notificationRoutes);app.use('/api/trash',auth,trashRoutes);app.use('/api/workflows',auth,workflowRoutes);app.use('/api/security/readiness',auth,readinessRoutes);app.use('/api/security/workers',auth,backgroundJobRoutes);app.use('/api/security',auth,securityDashboardRoutes);app.use('/api/security',auth,securityIncidentRoutes);app.use('/api/security/operations',auth,operationalTrustRoutes);app.use('/api/security/assurance',auth,continuousAssuranceRoutes);app.use('/api/security/governance',auth,securityGovernanceRoutes);app.use('/api/tasks',auth,taskRoutes);app.use('/api/stock',auth,requirePermission('VIEW_INVENTORY'),stockRoutes);app.use('/api/customers',auth,requirePermission('VIEW_CUSTOMERS'),requireInputPermission('EDIT_CUSTOMERS'),customerRoutes);app.use('/api/materials',auth,requirePermission('VIEW_INVENTORY'),materialRoutes);app.use('/api/meetings',auth,requirePermission('VIEW_MEETINGS'),meetingRoutes);app.use('/api/roster',auth,requirePermission('VIEW_ATTENDANCE'),rosterRoutes);app.get('/api/suppliers/files/:id/view',auth,requirePermission('VIEW_SUPPLIERS'),supplierController.viewSupplierFile);app.use('/api/suppliers',auth,requirePermission('VIEW_SUPPLIERS'),supplierRoutes);app.use('/api/expenses',auth,requirePermission('VIEW_FINANCE'),expenseRoutes);app.use('/api/banking',auth,bankingPortalRoutes);app.use('/api/finance',auth,requirePermission('VIEW_FINANCE'),financeRoutes);app.use('/api/high-risk-finance',auth,highRiskFinanceRoutes);app.use('/api/qms',auth,qmsRoutes);app.use('/api/compliance',auth,requirePermission('VIEW_COMPLIANCE'),requireInputPermission('EDIT_COMPLIANCE'),complianceRoutes);app.use('/api/competitors',auth,requirePermission('VIEW_CUSTOMERS'),requireInputPermission('EDIT_CUSTOMERS'),competitorRoutes);app.use('/api/access-attempts',auth,require('./routes/accessAttemptRoutes'));
-try{app.use('/api/attendance',auth,requirePermission('VIEW_ATTENDANCE'),require('./routes/attendanceRoutes'))}catch{console.log('Attendance routes not loaded.')}
-app.use((req,res)=>{if(!req.path.startsWith('/api/')&&req.accepts('html'))return sendPage('404.html',404)(req,res);return res.status(404).json({message:'Route not found'})});app.use(safeErrorHandler);module.exports=app;
+app.use('/api/users',auth,userRoutes);
+app.use('/api/profile',auth,profileRoutes);
+app.use('/api/settings',auth,settingsRoutes);
+app.use('/api/documents',auth,documentSecurityRoutes);
+app.use('/api/security/readiness',auth,readinessRoutes);
+app.use('/api/security/workers',auth,backgroundJobRoutes);
+app.use('/api/security',auth,securityDashboardRoutes);
+app.use('/api/security',auth,securityIncidentRoutes);
+const noStore=new Set(['workspace.html','workspace.js','workspace.css','workspace-theme.css','workspace-theme.js','style.css','global-brand.css','global-brand.js','public-pages.css','auth-entry.css','login.js','register.js','auth-lifecycle.js','mfa.js','security-page.js','profile.js','step-up.js','step-up.css','service-worker.js']);
+app.use(express.static(publicDir,{dotfiles:'deny',index:false,setHeaders(res,file){res.set('X-Content-Type-Options','nosniff');if(noStore.has(path.basename(file)))res.set('Cache-Control','no-store, max-age=0')}}));
+app.use((req,res)=>{if(!req.path.startsWith('/api/')&&req.accepts('html'))return sendPage('404.html',404)(req,res);return res.status(404).json({message:'Route not found'})});
+app.use(safeErrorHandler);
+module.exports=app;
