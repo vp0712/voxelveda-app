@@ -181,7 +181,7 @@ exports.privileged = async (req, res, next) => {
     await ensureSchemas();
     const placeholders = PRIVILEGED_ROLES.map(() => '?').join(',');
     const [users] = await pool.query(
-      `SELECT u.id, u.user_uuid, u.employee_number, u.name, u.email, u.role, u.department, u.account_status,
+      `SELECT u.id, u.user_uuid, u.name, u.email, u.role, u.account_status,
               u.mfa_enabled, u.last_login_at, u.last_security_review_at,
               (SELECT COUNT(*) FROM auth_sessions s WHERE s.user_id = u.id AND s.revoked_at IS NULL AND s.expires_at > NOW()) AS active_sessions
        FROM users u WHERE u.deleted_at IS NULL AND LOWER(u.role) IN (${placeholders}) ORDER BY FIELD(LOWER(u.role), ${placeholders}), u.name`,

@@ -1,10 +1,10 @@
 const assert = require('assert');
-const { execFileSync } = require('child_process');
+const { listSourceFiles } = require('./source-file-inventory');
 const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-const tracked = [...new Set(execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' }).trim().split('\n').filter(Boolean))];
+const tracked = listSourceFiles(root);
 
 assert(!tracked.some((file) => file === '.env' || /(^|\/)\.env\./.test(file) && !file.endsWith('.env.example')), 'runtime environment files must not be tracked');
 assert(!tracked.some((file) => file.startsWith('node_modules/')), 'node_modules must not be tracked; the lockfile is authoritative');

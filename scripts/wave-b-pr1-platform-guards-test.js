@@ -17,19 +17,15 @@ const {
 } = require('../middleware/securityMiddleware');
 const {
   customerRegistrationContract,
-  publicRfqContract
+  loginContract,
+  mfaCodeContract,
+  passwordChangeContract
 } = require('../middleware/publicEndpointProtection');
 const {
   botChallenge,
   registerBotChallengeAdapter,
   unregisterBotChallengeAdapter
 } = require('../services/botChallengeService');
-const {
-  beginPublicSubmission,
-  completePublicSubmission,
-  payloadHash,
-  validatedIdempotencyKey
-} = require('../services/publicSubmissionDedupeService');
 const { assessProductionReadiness } = require('../config/productionReadiness');
 
 const root = path.join(__dirname, '..');
@@ -53,46 +49,6 @@ async function invoke(middleware, req) {
   await middleware(req, res, (error) => { nextError = error; nextCalled = true; });
   if (nextError) throw nextError;
   return { res, nextCalled };
-}
-
-class DedupeDb {
-  constructor() {
-    this.rows = new Map();
-  }
-
-  key(type, key) {
-    return `${type}:${key}`;
-  }
-
-  async query(sql, params) {
-    if (sql.includes('INSERT INTO public_submission_dedupe')) {
-      const [type, key, payload, lock, ttl] = params;
-      const id = this.key(type, key);
-      const existing = this.rows.get(id);
-      if (!existing || existing.expires_at <= new Date()) {
-        this.rows.set(id, {
-          payload_sha256: payload,
-          lock_token: lock,
-          status: 'PROCESSING',
-          response_status: null,
-          response_json: null,
-          expires_at: new Date(Date.now() + ttl * 1000)
-        });
-      }
-      return [{ affectedRows: 1 }];
-    }
-    if (sql.includes('SELECT payload_sha256')) {
-      return [[this.rows.get(this.key(params[0], params[1]))].filter(Boolean)];
-    }
-    if (sql.includes("SET status = 'COMPLETED'")) {
-      const [status, json, type, key, lock] = params;
-      const row = this.rows.get(this.key(type, key));
-      if (row?.lock_token === lock) Object.assign(row, { status: 'COMPLETED', response_status: status, response_json: json });
-      return [{ affectedRows: row?.lock_token === lock ? 1 : 0 }];
-    }
-    if (sql.includes("SET status = 'FAILED'")) return [{ affectedRows: 1 }];
-    throw new Error(`Unexpected dedupe query: ${sql}`);
-  }
 }
 
 async function run() {
@@ -181,31 +137,42 @@ async function run() {
   assert.equal(authPolicyName('/mfa/verify'), 'mfa');
   assert.equal(authPolicyName('/step-up'), 'step_up');
   assert.equal(authPolicyName('/password-reset/request'), 'password_reset');
-  assert(RATE_LIMIT_POLICIES.public_rfq.max < RATE_LIMIT_POLICIES.authenticated_api.max);
+  assert.equal(authPolicyName('/customer-register'), 'customer_registration');
+  assert(RATE_LIMIT_POLICIES.customer_registration.max < RATE_LIMIT_POLICIES.authenticated_api.max);
 
-  const validRfq = { customer_name: 'A Customer', email: 'buyer@example.com', phone: '', material: 'ABS', quantity: 4, application: 'Prototype' };
-  assert.equal((await invoke(publicRfqContract, { body: validRfq, headers: {} })).nextCalled, true);
-  assert.equal((await invoke(publicRfqContract, { body: { ...validRfq, quantity: 0 }, headers: {} })).res.statusCode, 400);
-  assert.equal((await invoke(customerRegistrationContract, { body: { name: 'Buyer', email: 'buyer@example.com', password: 'long password value', confirm_privacy: true }, headers: {} })).nextCalled, true);
+  const validRegistration = { name: 'Account Example', email: 'fixture@example.invalid', password: 'long password value', confirm_privacy: true };
+  assert.equal((await invoke(customerRegistrationContract, { body: validRegistration, headers: {} })).nextCalled, true);
+  for (const body of [
+    { ...validRegistration, role: 'super_admin' },
+    { ...validRegistration, permissions: ['MANAGE_USERS'] },
+    { ...validRegistration, email: 'invalid' },
+    { ...validRegistration, confirm_privacy: 'true' },
+    { ...validRegistration, confirm_privacy: false },
+    { ...validRegistration, name: '' }, []
+  ]) assert.equal((await invoke(customerRegistrationContract, { body, headers: {} })).res.statusCode, 400);
+  assert.equal((await invoke(customerRegistrationContract, { body: validRegistration, rawBody: Buffer.alloc(8 * 1024 + 1), headers: {} })).res.statusCode, 400);
+
+  const validLogin = { email: 'fixture@example.invalid', password: 'fixture password' };
+  assert.equal((await invoke(loginContract, { body: validLogin, headers: {} })).nextCalled, true);
+  for (const body of [
+    { ...validLogin, role: 'super_admin' }, { ...validLogin, password: '' },
+    { ...validLogin, email: '<script>' }, [], null
+  ]) assert.equal((await invoke(loginContract, { body, headers: {} })).res.statusCode, 400);
+  assert.equal((await invoke(loginContract, { body: validLogin, rawBody: Buffer.alloc(8 * 1024 + 1), headers: {} })).res.statusCode, 400);
+  const challenge = { challenge_token: 'a'.repeat(40), code: '123456' };
+  assert.equal((await invoke(mfaCodeContract, { body: challenge, headers: {} })).nextCalled, true);
+  assert.equal((await invoke(mfaCodeContract, { body: { ...challenge, code: '<script>' }, headers: {} })).res.statusCode, 400);
+  assert.equal((await invoke(mfaCodeContract, { body: { ...challenge, user_id: 999 }, headers: {} })).res.statusCode, 400);
+  assert.equal((await invoke(passwordChangeContract, { body: { current_password: 'fixture old', new_password: 'fixture new' }, headers: {} })).nextCalled, true);
+  assert.equal((await invoke(passwordChangeContract, { body: { current_password: 'fixture old', new_password: 'fixture new', user_id: 999 }, headers: {} })).res.statusCode, 400);
 
   const challengeName = 'test-adapter';
   registerBotChallengeAdapter(challengeName, { async verify({ token }) { return { verified: token === 'valid' }; } });
-  const challengeEnv = { BOT_CHALLENGE_PROVIDER: challengeName, BOT_CHALLENGE_REQUIRED_ENDPOINTS: 'public_rfq' };
-  assert.equal((await invoke(botChallenge('public_rfq', { env: challengeEnv }), { headers: { 'x-bot-challenge-token': 'valid' }, body: {}, ip: '1.1.1.1', get: () => '' })).nextCalled, true);
-  assert.equal((await invoke(botChallenge('public_rfq', { env: challengeEnv }), { headers: {}, body: {}, ip: '1.1.1.1', get: () => '' })).res.statusCode, 403);
-  assert.equal((await invoke(botChallenge('public_rfq', { env: { BOT_CHALLENGE_PROVIDER: 'none', BOT_CHALLENGE_REQUIRED_ENDPOINTS: 'public_rfq' } }), { headers: {}, body: {}, ip: '1.1.1.1', get: () => '' })).res.statusCode, 503);
+  const challengeEnv = { BOT_CHALLENGE_PROVIDER: challengeName, BOT_CHALLENGE_REQUIRED_ENDPOINTS: 'customer_registration' };
+  assert.equal((await invoke(botChallenge('customer_registration', { env: challengeEnv }), { headers: { 'x-bot-challenge-token': 'valid' }, body: {}, ip: '1.1.1.1', get: () => '' })).nextCalled, true);
+  assert.equal((await invoke(botChallenge('customer_registration', { env: challengeEnv }), { headers: {}, body: {}, ip: '1.1.1.1', get: () => '' })).res.statusCode, 403);
+  assert.equal((await invoke(botChallenge('customer_registration', { env: { BOT_CHALLENGE_PROVIDER: 'none', BOT_CHALLENGE_REQUIRED_ENDPOINTS: 'customer_registration' } }), { headers: {}, body: {}, ip: '1.1.1.1', get: () => '' })).res.statusCode, 503);
   unregisterBotChallengeAdapter(challengeName);
-
-  assert.equal(payloadHash({ a: 1, bot_challenge_token: 'one' }), payloadHash({ a: 1, bot_challenge_token: 'two' }));
-  assert.throws(() => validatedIdempotencyKey('bad key'), { code: 'IDEMPOTENCY_KEY_INVALID' });
-  const db = new DedupeDb();
-  const first = await beginPublicSubmission({ db, submissionType: 'public_rfq', body: validRfq, ip: '1.1.1.1', idempotencyKey: 'request-0001' });
-  assert.equal(first.state, 'ACQUIRED');
-  await completePublicSubmission(first, 201, { id: 42 }, db);
-  const replay = await beginPublicSubmission({ db, submissionType: 'public_rfq', body: validRfq, ip: '1.1.1.1', idempotencyKey: 'request-0001' });
-  assert.deepEqual({ state: replay.state, status: replay.status, response: replay.response }, { state: 'REPLAY', status: 201, response: { id: 42 } });
-  const conflict = await beginPublicSubmission({ db, submissionType: 'public_rfq', body: { ...validRfq, quantity: 5 }, ip: '1.1.1.1', idempotencyKey: 'request-0001' });
-  assert.equal(conflict.state, 'CONFLICT');
 
   const readiness = assessProductionReadiness({ NODE_ENV: 'production', RATE_LIMIT_STORE: 'redis', RATE_LIMIT_FAILURE_POLICY: 'memory' });
   assert(readiness.failures.some((item) => item.includes('fail closed')));
@@ -214,10 +181,7 @@ async function run() {
   const authSource = fs.readFileSync(path.join(root, 'controllers', 'authController.js'), 'utf8');
   const authRoutesSource = fs.readFileSync(path.join(root, 'routes', 'authRoutes.js'), 'utf8');
   const registerHtml = fs.readFileSync(path.join(root, 'public', 'register.html'), 'utf8');
-  assert(appSource.includes("rateLimitPolicy('public_rfq')"));
-  assert(appSource.includes("publicSubmissionDedupe({submissionType:'public_rfq'})"));
   assert.match(appSource, /app\.use\('\/api\/auth',express\.json\(\{limit:'8kb'/);
-  assert.match(appSource, /app\.use\('\/api\/public\/rfq',express\.json\(\{limit:'16kb'/);
   assert(authRoutesSource.includes("botChallenge('customer_registration')"));
   assert(!authSource.includes('exports.register ='));
   assert(authSource.includes('const passwordCheck = validatePassword(password'));

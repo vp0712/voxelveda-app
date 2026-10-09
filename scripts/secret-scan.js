@@ -1,10 +1,9 @@
 const fs = require('fs');
 const path = require('path');
-const { execFileSync } = require('child_process');
+const { listSourceFiles } = require('./source-file-inventory');
 
 const root = path.join(__dirname, '..');
-const files = execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: root, encoding: 'utf8' })
-  .split('\n').filter(Boolean)
+const files = listSourceFiles(root)
   .filter((file) => /(^|\/)(?:\.env\.example|[^/]+\.(?:js|json|md|sql|yml|yaml|toml|properties|plist|xcconfig))$/i.test(file));
 const findings = [];
 const signatures = [
@@ -14,8 +13,8 @@ const signatures = [
   ['slack-token', /\bxox[baprs]-[A-Za-z0-9-]{20,}\b/g],
   ['stripe-live-key', /\bsk_live_[A-Za-z0-9]{20,}\b/g]
 ];
-const assignment = /\b(JWT_SECRET|SESSION_SECRET|MFA_ENCRYPTION_KEY|FINANCE_ENCRYPTION_KEY|SHIFT_QR_SIGNING_KEY|SMTP_PASSWORD|DB_PASSWORD|DATABASE_URL|WEBHOOK_SIGNING_KEY)\s*=\s*([^\s#]*)/g;
-const safeValue = /^(|replace-|changeme|example|placeholder|<|\$\{|process\.)/i;
+const assignment = /\b(JWT_SECRET|SESSION_SECRET|MFA_ENCRYPTION_KEY|FINANCE_ENCRYPTION_KEY|SHIFT_QR_SIGNING_KEY|SMTP_PASSWORD|DB_PASSWORD|DATABASE_URL|WEBHOOK_SIGNING_KEY)[ \t]*=[ \t]*([^\s#]*)/g;
+const safeValue = /^(?:replace-|changeme$|example|placeholder|<|\$\{|process\.|crypto\.randomBytes\()/i;
 
 for (const file of files) {
   const full = path.join(root, file);

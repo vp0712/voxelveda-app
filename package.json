@@ -1,7 +1,7 @@
 {
   "name": "voxelveda-backend",
   "version": "1.0.0",
-  "description": "Voxel Veda customer workspace and secure enquiry backend",
+  "description": "Voxel Veda account portal and security backend",
   "main": "server.js",
   "packageManager": "npm@10.9.8",
   "scripts": {
@@ -19,7 +19,6 @@
     "readiness:check": "node scripts/check-production-readiness.js",
     "test:mysql": "node scripts/retained-mysql-test.js",
     "test:registration": "node scripts/customer-registration-test.js",
-    "test:rfq": "node scripts/customer-rfq-intake-test.js",
     "test:retirement": "node scripts/application-retirement-test.js",
     "cap:sync:ios": "npx cap sync ios",
     "cap:open:ios": "npx cap open ios"

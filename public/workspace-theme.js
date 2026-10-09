@@ -1,4 +1,4 @@
-/* Read the saved preference before paint; all portals and charts share it. */
+/* Read the saved preference before paint; retained account screens share it. */
 (() => {
   'use strict';
   const key = 'voxelveda:color-mode';
@@ -11,7 +11,7 @@
     mode = next === 'dark' ? 'dark' : 'light';
     document.documentElement.dataset.colorMode = mode;
     const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.content = mode === 'dark' ? '#111E21' : '#F5F7F6';
+    if (meta) meta.content = mode === 'dark' ? '#101827' : '#F7F8FA';
     document.querySelectorAll('[data-theme-toggle]').forEach(button => {
       button.textContent = mode === 'dark' ? 'Light theme' : 'Dark theme';
       button.setAttribute('aria-label', 'Use ' + (mode === 'dark' ? 'light' : 'dark') + ' theme');
@@ -24,7 +24,7 @@
     tokens() {
       const style = getComputedStyle(document.documentElement);
       const read = name => style.getPropertyValue('--' + name).trim();
-      return { text:read('text-primary'), muted:read('text-secondary'), surface:read('surface'), border:read('border'), primary:read('primary'), series:Array.from({length:6}, (_,i)=>read('series-'+i)) };
+      return { text:read('text-primary'), muted:read('text-secondary'), surface:read('surface'), border:read('border'), primary:read('primary') };
     }
   };
   apply(mode);

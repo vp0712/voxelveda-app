@@ -7,7 +7,6 @@
   place-items: center;
   padding: 20px;
   background:var(--scrim);
-  backdrop-filter: blur(8px);
 }
 .step-up-panel{
   width: min(100%, 520px);
@@ -34,8 +33,9 @@
 .step-up-actions{ display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .step-up-actions button{ padding: 11px 16px; border-radius: 10px; border: 1px solid var(--control-border); font-weight: 800; cursor: pointer; }
 .step-up-cancel{ background: transparent; color: var(--text-primary); }
-.step-up-confirm{ background:var(--surface); border-color: var(--border) !important; color: var(--text-primary); }
-.step-up-confirm:disabled{ opacity: .55; cursor: wait; }
+.step-up-confirm{ background:var(--primary); border-color:var(--primary) !important; color:var(--on-primary); }
+.step-up-confirm:hover:not(:disabled){ background:var(--primary-hover); }
+.step-up-confirm:disabled{ background:var(--surface-muted); color:var(--text-secondary); border-color:var(--border) !important; opacity:1; cursor:wait; }
 @media (max-width: 560px) {
   .step-up-panel{ padding: 21px; }
   .step-up-review div{ grid-template-columns: 1fr; gap: 3px; }

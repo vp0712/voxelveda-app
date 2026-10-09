@@ -140,16 +140,17 @@ async function testEmailRetirement() {
     { id: 1, related_module: 'timesheets', status: 'PENDING', subject: 'Retired timesheet' },
     { id: 2, related_module: 'finance', status: 'RETRY', subject: 'Retired report' },
     { id: 3, related_module: null, status: 'PENDING', subject: 'Unclassified old email' },
-    { id: 4, related_module: 'contact', status: 'PENDING', subject: 'Contact acknowledgement', to_json: '["fixture@example.invalid"]', attempts: 0 }
+    { id: 4, related_module: 'contact', status: 'PENDING', subject: 'Contact acknowledgement', to_json: '["fixture@example.invalid"]', attempts: 0 },
+    { id: 5, related_module: 'customer_rfqs', status: 'PENDING', subject: 'Retired enquiry' }
   ];
-  const retiredBefore = JSON.stringify(rows.slice(0, 3));
+  const retiredBefore = JSON.stringify(rows.filter((row) => row.related_module !== 'contact'));
   const sent = [];
   const queries = [];
   const queue = load(path.join(root, 'services/emailQueue.js'), {
     '../config/db': { query: async (sql, parameters = []) => {
       queries.push({ sql, parameters });
       if (/SELECT \* FROM email_queue/.test(sql)) {
-        assert.match(sql, /related_module IN \(\?, \?, \?, \?\)/);
+        assert.match(sql, /related_module IN \(\?, \?, \?\)/);
         const allowed = parameters.slice(0, -1);
         return [rows.filter((row) => ['PENDING', 'RETRY'].includes(row.status) && allowed.includes(row.related_module)).slice(0, parameters.at(-1))];
       }
@@ -182,10 +183,11 @@ async function testEmailRetirement() {
   assert.equal(sent[0].subject, 'Contact acknowledgement');
   assert.deepEqual(sent[0].attachments[0].content, original);
   assert.equal(sent[0].attachments[0].filename, 'enquiry.bin');
-  assert.equal(JSON.stringify(rows.slice(0, 3)), retiredBefore, 'Retired queue rows and content remain intact');
+  assert.equal(JSON.stringify(rows.filter((row) => row.related_module !== 'contact')), retiredBefore, 'Retired queue rows and content remain intact');
   await queue.processEmailQueue(10);
   assert.equal(sent.length, 1);
   await assert.rejects(queue.queueEmail({ relatedModule: 'finance' }), { code: 'EMAIL_MODULE_RETIRED' });
+  await assert.rejects(queue.queueEmail({ relatedModule: 'customer_rfqs' }), { code: 'EMAIL_MODULE_RETIRED' });
   await assert.rejects(queue.queueEmail({}), { code: 'EMAIL_MODULE_RETIRED' });
   assert.equal(await queue.queueEmail({ relatedModule: 'contact', to: ['fixture@example.invalid'], subject: 'Allowed', attachments: [] }), 5);
   assert.equal(queries.filter(({ sql }) => /INSERT INTO email_queue/.test(sql)).length, 1);

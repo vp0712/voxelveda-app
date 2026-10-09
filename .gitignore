@@ -22,3 +22,7 @@ uploads/*
 *.log
 .DS_Store
 Thumbs.db
+
+# Isolated browser evidence generated in CI or local verification
+account-foundation-proof/
+production-proof/

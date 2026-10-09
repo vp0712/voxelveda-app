@@ -1,13 +1,13 @@
 {
   "name": "Voxel Veda",
   "short_name": "Voxel Veda",
-  "description": "Your secure project and quote workspace.",
+  "description": "Secure access to your Voxel Veda account.",
   "id": "/login",
   "start_url": "/login",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#F5F7F6",
-  "theme_color": "#F5F7F6",
+  "background_color": "#F7F8FA",
+  "theme_color": "#F7F8FA",
   "icons": [
     {
       "src": "/favicon-192.png",

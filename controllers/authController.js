@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const pool = require('../config/db');
-const { effectivePermissions } = require('../services/authorizationService');
+const { activePermissionProjection, effectivePermissions } = require('../services/authorizationService');
 const { getRequestToken, setSessionCookie, clearSessionCookie } = require('../utils/session');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
@@ -11,18 +11,6 @@ const { issueLoginChallenge, requiresMfa } = require('../services/mfaService');
 
 function normalizeRole(role) {
   return String(role || 'staff').trim().toLowerCase();
-}
-
-function parsePermissions(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
 }
 
 function isValidEmail(value) {
@@ -92,7 +80,7 @@ exports.login = async (req, res) => {
       username: user.username || user.email,
       email: user.email,
       role: normalizeRole(user.role),
-      permissions: parsePermissions(user.permissions),
+      permissions: activePermissionProjection(user.permissions),
       session_version: Number(user.session_version || 1)
     };
 
@@ -145,7 +133,7 @@ exports.me = async (req, res) => {
     }
 
     const user = rows[0];
-    const permissions = parsePermissions(user.permissions);
+    const permissions = activePermissionProjection(user.permissions);
 
     res.json({
       user: {

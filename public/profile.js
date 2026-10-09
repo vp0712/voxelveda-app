@@ -91,9 +91,7 @@ function updateCompletion(profile) {
     Boolean(profile.name),
     Boolean(profile.mobile_number),
     Boolean(profile.has_profile_photo),
-    Boolean(profile.email),
-    Boolean(profile.employee_number),
-    Boolean(profile.department)
+    Boolean(profile.email)
   ];
   const completed = checks.filter(Boolean).length;
   const percent = Math.round((completed / checks.length) * 100);
@@ -103,11 +101,9 @@ function updateCompletion(profile) {
   const missing = [];
   if (!profile.mobile_number) missing.push('mobile number');
   if (!profile.has_profile_photo) missing.push('profile photo');
-  if (!profile.department) missing.push('department assignment');
-  if (!profile.employee_number) missing.push('employee number');
   $('completionHint').textContent = missing.length
     ? `Complete: ${missing.join(', ')}.`
-    : 'Your profile is complete and ready for internal use.';
+    : 'Your contact profile is complete.';
 }
 
 function closePhotoViewer() {
@@ -164,8 +160,6 @@ function renderProfile(profile) {
   $('mobile').value = profile.mobile_number || '';
   $('email').value = profile.email || '';
   $('username').value = profile.username || '';
-  $('department').value = profile.department || 'Not assigned';
-  $('employeeNumber').value = profile.employee_number || 'Not assigned';
   $('displayName').textContent = profile.name || 'My Profile';
   $('roleBadge').textContent = String(profile.role || 'user').replaceAll('_', ' ');
   $('accountStatus').textContent = profile.account_status || (profile.active ? 'ACTIVE' : 'INACTIVE');

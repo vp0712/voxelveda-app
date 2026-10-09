@@ -27,80 +27,63 @@ function harness(file, fetchImpl, opts = {}) {
   return { ...dom, context, destinations };
 }
 async function run() {
+  const event = { preventDefault() {} };
   const calls = [];
-  let pendingSubmit;
   const page = harness('workspace.js', async (url, options) => {
     calls.push({ url, options });
-    if (url === '/api/auth/me') return response(200, { user: { name: '<img onerror=alert(1)>', email: 'customer@example.invalid', role: 'admin' } });
-    if (url === '/api/public/rfq') return new Promise((resolve) => { pendingSubmit = resolve; });
+    if (url === '/api/auth/me') return response(200, { user: { name: '<img onerror=alert(1)>', email: 'account@example.invalid', role: 'admin' } });
     return response(503, { message: 'Unavailable' });
   });
   await flush();
-  assert.equal(page.get('rfqFields').disabled, false);
   assert.equal(page.get('welcomeTitle').textContent, 'Welcome, <img onerror=alert(1)>', 'identity uses text content, including imported markup');
-  assert.equal(page.get('customerEmail').value, 'customer@example.invalid');
+  assert.equal(page.get('profileEmail').textContent, 'account@example.invalid');
+  assert.deepEqual(calls.map((call) => call.url), ['/api/auth/me'], 'workspace reads only authenticated identity');
   assert.equal(calls[0].options.credentials, 'same-origin');
-  page.get('rfqPrivacy').checked = true;
-  page.get('projectQuantity').value = '7';
-  page.get('projectDetails').value = 'Precision part';
-  page.get('projectDeadline').value = '2026-10-30';
-  const event = { preventDefault() {} };
-  const first = page.get('workspaceRfqForm').events.submit(event);
-  const duplicate = page.get('workspaceRfqForm').events.submit(event);
-  assert.equal(calls.filter((call) => call.url === '/api/public/rfq').length, 1, 'double submit is guarded');
-  assert.equal(page.get('rfqSubmit').disabled, true);
-  const payload = JSON.parse(calls.at(-1).options.body);
-  assert.equal(payload.quantity, 7);
-  assert.equal(payload.application, 'Precision part\nTarget date: 2026-10-30');
-  assert.deepEqual(Object.keys(payload).sort(), ['application', 'customer_name', 'email', 'material', 'phone', 'quantity']);
-  pendingSubmit(response(200, { rfq_id: 42 }));
-  await Promise.all([first, duplicate]);
-  assert.match(page.get('rfqStatus').textContent, /Reference #42/);
-  assert.equal(page.get('rfqPrivacy').checked, false);
-  assert.equal(page.get('rfqSubmit').disabled, false);
-  assert.equal(page.get('projectDetails').value, '');
   await page.get('logoutButton').events.click();
   assert.match(page.get('workspaceStatus').textContent, /Sign out could not be confirmed/);
   assert.equal(page.context.localStorage.getItem('user'), 'cached', 'failed logout does not pretend session was ended');
+  assert.equal(page.get('logoutButton').disabled, false);
 
-  const unauthorized = harness('workspace.js', async () => response(401, {}), { hash: '#new-rfq' });
+  const signedOut = harness('workspace.js', async (url) => url === '/api/auth/me' ? response(200, { user: { username: 'Account fixture' } }) : response(200, { message: 'Signed out' }));
   await flush();
-  assert.deepEqual(unauthorized.destinations, ['/login?returnTo=%2Fdashboard%23new-rfq']);
+  assert.equal(signedOut.get('profileName').textContent, 'Account fixture');
+  assert.equal(signedOut.get('profileEmail').textContent, 'Not available', 'missing email is not fabricated');
+  await signedOut.get('logoutButton').events.click();
+  assert.deepEqual(signedOut.destinations, ['/login']);
+  for (const key of ['user', 'role', 'token']) assert.equal(signedOut.context.localStorage.getItem(key), null);
+
+  const unauthorized = harness('workspace.js', async () => response(401, {}), { hash: '#account' });
+  await flush();
+  assert.deepEqual(unauthorized.destinations, ['/login?returnTo=%2Fdashboard%23account']);
   assert.equal(unauthorized.context.localStorage.getItem('token'), null);
-  const unavailable = harness('workspace.js', async () => response(500, {}));
+  let identityAttempts = 0;
+  const unavailable = harness('workspace.js', async () => ++identityAttempts === 1 ? response(500, {}) : response(200, { user: { name: 'Retry fixture', email: 'retry@example.invalid' } }));
   await flush();
-  assert.equal(unavailable.get('rfqFields').disabled, true);
+  assert.equal(unavailable.get('profileName').textContent, 'Unavailable');
   assert.equal(unavailable.get('retryIdentity').hidden, false);
   assert.match(unavailable.get('workspaceStatus').textContent, /could not load your account/);
+  await unavailable.get('retryIdentity').events.click();
+  assert.equal(unavailable.get('profileName').textContent, 'Retry fixture');
+  assert.equal(unavailable.get('workspaceStatus').textContent, '');
+  assert.equal(unavailable.get('retryIdentity').hidden, true);
   const timeout = harness('workspace.js', async () => { const error = new Error('timeout'); error.name = 'AbortError'; throw error; });
   await flush();
   assert.match(timeout.get('workspaceStatus').textContent, /timed out/);
-  const negative = harness('workspace.js', async (url) => url === '/api/auth/me' ? response(200, { user: { email: 'a@example.invalid' } }) : response(400, { message: 'Invalid request' }));
+  const malformed = harness('workspace.js', async () => response(200, {}));
   await flush();
-  negative.get('rfqPrivacy').checked = true;
-  negative.get('projectQuantity').value = '0';
-  await negative.get('workspaceRfqForm').events.submit(event);
-  assert.match(negative.get('rfqStatus').textContent, /whole number/);
+  assert.equal(malformed.get('retryIdentity').hidden, false);
+  assert.match(malformed.get('workspaceStatus').textContent, /could not load your account/);
 
-  let publicCalls = 0;
-  let publicResolve;
-  const publicForm = harness('customer.js', async () => { publicCalls += 1; return new Promise((resolve) => { publicResolve = resolve; }); });
-  publicForm.get('customerQuantity').value = '1';
-  await publicForm.get('customerRfqForm').events.submit(event);
-  assert.equal(publicCalls, 0, 'public intake requires consent');
-  publicForm.get('privacyAccepted').checked = true;
-  const publicFirst = publicForm.get('customerRfqForm').events.submit(event);
-  const publicDuplicate = publicForm.get('customerRfqForm').events.submit(event);
-  assert.equal(publicCalls, 1);
-  publicResolve(response(200, {}));
-  await Promise.all([publicFirst, publicDuplicate]);
-  assert.match(publicForm.get('customerStatus').textContent, /did not confirm a request reference/);
-  assert.equal(publicForm.get('customerStatus').dataset.tone, 'error', 'unconfirmed success is not reported as submission');
-  assert.equal(publicForm.get('privacyAccepted').checked, true, 'unconfirmed submission preserves form content');
+  for (const pageName of ['workspace.html', 'index.html', 'login.html', 'register.html']) {
+    const html = read(pageName);
+    assert.doesNotMatch(html, /request-quote|workspaceRfqForm|Customer RFQ|quote request|quotations/i, `${pageName} contains no removed business workflow`);
+  }
+  const workspace = read('workspace.html');
+  for (const target of ['/profile', '/security', '/support', '/privacy', '/terms']) assert.ok(workspace.includes('href="' + target + '"'), 'actual retained route ' + target);
 
   const login = harness('login.js', async () => response(401, {}));
   for (const role of ['viewer', 'admin', 'staff', 'finance_admin', 'accountant', 'production']) assert.equal(login.context.portalPathForUser(role), '/dashboard');
-  for (const target of ['/admin', '/finance', '/portal/staff', '/client', '//example.invalid', '/\\example.invalid', '/removed.html']) {
+  for (const target of ['/admin', '/finance', '/portal/staff', '/client', '//example.invalid', '/\\example.invalid', '/removed.html', '/request-quote']) {
     login.context.window.location.search = '?returnTo=' + encodeURIComponent(target);
     assert.equal(login.context.safeReturnTo('admin'), '/dashboard', target);
   }
@@ -111,12 +94,12 @@ async function run() {
   const saved = harness('login.js', async () => response(200, { user: { role: 'staff' } }), { search: '?returnTo=%2Fsecurity' });
   await saved.context.redirectSavedSession();
   assert.deepEqual(saved.destinations, ['/security'], 'saved sessions retain current account navigation');
-  for (const target of ['/admin', '/finance/reports/RPT_example/view', '/portal/staff', '//evil.invalid', '/security?returnTo=%2Fdashboard']) {
+  for (const target of ['/admin', '/finance/reports/RPT_example/view', '/portal/staff', '/request-quote', '//evil.invalid', '/security?returnTo=%2Fdashboard']) {
     const mfa = harness('mfa.js', async () => response(200, { user: { role: 'finance_admin' } }), { session: { vv_mfa_challenge: 'test-challenge', vv_mfa_return_to: target } });
     await mfa.get('mfaForm').events.submit(event);
     assert.deepEqual(mfa.destinations, [target.startsWith('/security?') ? target : '/dashboard']);
     assert.equal(mfa.context.sessionStorage.getItem('vv_mfa_challenge'), null);
   }
-  console.log('Retained workspace regression passed: identity/error states, consent/quantity, duplicate submission, confirmed reference, failed logout, safe universal login and MFA navigation.');
+  console.log('Retained workspace regression passed: account identity/retry/error states, confirmed/failed logout, absence of removed business workflows, safe universal login and MFA navigation.');
 }
 run().catch((error) => { console.error(error); process.exitCode = 1; });

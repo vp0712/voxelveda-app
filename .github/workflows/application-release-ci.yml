@@ -26,6 +26,29 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Production application build and retained regression gate
         run: npm run build
+      - name: Build the packaged source without Git metadata
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/vv-source-artifact"
+          git archive HEAD | tar -x -C "$RUNNER_TEMP/vv-source-artifact"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RUNNER_TEMP/vv-source-artifact/node_modules"
+          cd "$RUNNER_TEMP/vv-source-artifact"
+          npm run build
+      - name: Install isolated browser verification tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
+          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install chromium
+      - name: Test retained account pages in phone, tablet and desktop browsers
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_PROOF_DIR: ${{ runner.temp }}/account-foundation-proof
+        run: node scripts/account-foundation-browser-test.js
+      - name: Preserve actual browser evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: account-browser-${{ github.sha }}
+          path: ${{ runner.temp }}/account-foundation-proof
+          retention-days: 30
       - name: Verify release marker is separate from candidate changes
         if: github.event_name == 'pull_request'
         shell: bash

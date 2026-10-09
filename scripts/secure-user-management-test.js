@@ -26,7 +26,9 @@ assert.match(controller, /Privileged users cannot approve their own access revie
 assert.match(controller, /Only a super administrator can grant high-risk permissions/);
 assert.match(controller, /PRIVILEGED_MFA_ROLES/);
 assert.match(controller, /revokeEveryCredential\(pool, userId, 'ACCESS_DISABLED'\)/);
-assert.match(controller, /employee_number = COALESCE/);
+assert.doesNotMatch(controller, /employee_number = COALESCE/);
+assert.doesNotMatch(routes, /bodyContract\(\[[^\]]*['\"](?:department|manager_id|access_scope|employee_number)['\"]/);
+assert.doesNotMatch(schema, /UPDATE users SET employee_number|ADD COLUMN (?:employee_number|department|manager_id|access_scope)/);
 assert.match(service, /UPDATE user_api_tokens SET revoked_at/);
 assert.match(service, /UPDATE trusted_devices SET revoked_at/);
 assert.match(service, /DELETE FROM user_mfa_totp/);

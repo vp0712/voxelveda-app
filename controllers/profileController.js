@@ -36,8 +36,8 @@ exports.getMyProfile = async (req, res) => {
     if (!userId) return res.status(401).json({ message: 'Authentication required' });
 
     const [[user]] = await pool.query(
-      `SELECT u.id, u.user_uuid, u.employee_number, u.name, u.username, u.email, u.role,
-              u.department, u.account_status, u.active,
+      `SELECT u.id, u.user_uuid, u.name, u.username, u.email, u.role,
+              u.account_status, u.active,
               p.mobile_number, p.profile_photo_mime, p.profile_photo_size, p.profile_photo_updated_at,
               p.updated_at AS profile_updated_at
        FROM users u
@@ -50,7 +50,10 @@ exports.getMyProfile = async (req, res) => {
 
     return res.json({
       profile: {
-        ...user,
+        id: user.id, user_uuid: user.user_uuid, name: user.name, username: user.username, email: user.email, role: user.role,
+        account_status: user.account_status, mobile_number: user.mobile_number,
+        profile_photo_mime: user.profile_photo_mime, profile_photo_size: user.profile_photo_size,
+        profile_photo_updated_at: user.profile_photo_updated_at, profile_updated_at: user.profile_updated_at,
         active: Number(user.active) !== 0,
         has_profile_photo: Boolean(user.profile_photo_mime),
         profile_photo_url: user.profile_photo_mime ? `/api/profile/photo?v=${encodeURIComponent(user.profile_photo_updated_at || Date.now())}` : null

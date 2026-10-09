@@ -1,4 +1,4 @@
-/* Shared primitives for the retained Voxel Veda account and customer pages.
+/* Shared primitives for the retained Voxel Veda account pages.
    Semantic colours are provided by workspace-theme.css. */
 *, *::before, *::after { box-sizing:border-box; }
 body { margin:0; min-height:100vh; background:var(--page); color:var(--text-primary); font-family:var(--font-body); font-size:16px; line-height:1.5; }
@@ -18,49 +18,6 @@ input::placeholder, textarea::placeholder { color:var(--text-secondary); opacity
 .success-text, .status.success { color:var(--success); }
 .error-text, .status.error { color:var(--danger); }
 .eyebrow { margin:0 0 10px; color:var(--primary); font-size:.8125rem; font-weight:700; letter-spacing:.08em; }
-.public-shell { width:min(1020px,calc(100% - 32px)); margin:36px auto; padding-bottom:calc(80px + env(safe-area-inset-bottom)); }
-.public-shell > .public-hero { display:flex; align-items:center; gap:24px; margin:0 0 28px; }
-.public-logo { width:112px; height:112px; object-fit:contain; flex:0 0 112px; }
-.public-hero h1 { margin:0 0 12px; font-size:clamp(1.75rem,4vw,2.5rem); line-height:1.2; overflow-wrap:anywhere; }
-.public-hero p { color:var(--text-secondary); margin:0; }
-.public-hero .eyebrow { margin:0 0 10px; color:var(--primary); }
-.public-flow-strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin:0 0 22px; }
-.public-flow-strip article { display:grid; grid-template-columns:36px minmax(0,1fr); column-gap:12px; row-gap:4px; padding:16px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); }
-.public-flow-strip span { grid-row:1/3; display:grid; place-items:center; width:32px; height:32px; border-radius:50%; background:var(--surface-muted); color:var(--primary); font-size:.875rem; font-weight:700; }
-.public-flow-strip strong { font-size:.9375rem; font-weight:600; }
-.public-flow-strip small { color:var(--text-secondary); font-size:.8125rem; line-height:1.5; }
-.public-card h2 { margin:0 0 12px; font-size:1.4rem; }
-.form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; margin:20px 0; }
-.form-grid input, .form-grid select, .form-grid textarea { width:100%; min-width:0; }
-.public-actions { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-top:20px; }
-.secondary-link { display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:8px; font-size:.875rem; }
+.public-shell { width:min(1020px,calc(100% - 32px)); margin:36px auto; padding-bottom:env(safe-area-inset-bottom); }
 .privacy-check { display:flex; align-items:flex-start; gap:10px; color:var(--text-secondary); font-size:.875rem; line-height:1.5; }
 .privacy-check input[type="checkbox"] { width:18px; height:18px; min-height:18px; flex:0 0 18px; margin:2px 0 0; accent-color:var(--primary); }
-/* The customer assistant stays a contained, dismissible panel on phones. */
-.vv-ai-widget { position:fixed; right:max(16px,env(safe-area-inset-right)); bottom:calc(16px + env(safe-area-inset-bottom)); z-index:40; max-width:calc(100vw - 32px); }
-.vv-ai-toggle { display:flex; align-items:center; gap:10px; min-height:48px; margin-left:auto; border:1px solid var(--primary); border-radius:24px; padding:8px 14px; background:var(--primary); color:var(--on-primary); box-shadow:var(--shadow); font-size:.875rem; font-weight:600; }
-.vv-ai-orb { display:grid; place-items:center; width:28px; height:28px; border:1px solid currentColor; border-radius:50%; font-size:.75rem; }
-.vv-ai-panel { display:grid; gap:14px; width:min(420px,calc(100vw - 32px)); max-height:calc(100dvh - 104px); margin-bottom:12px; padding:20px; border:1px solid var(--control-border); border-radius:var(--radius); background:var(--surface); color:var(--text-primary); box-shadow:var(--shadow); overflow-y:auto; overscroll-behavior:contain; }
-.vv-ai-panel[hidden] { display:none !important; }
-.vv-ai-head { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
-.vv-ai-head h2 { margin:8px 0 0; font-size:1.25rem; }
-.vv-ai-head .eyebrow { font-size:.6875rem; }
-.vv-ai-stage { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:.8125rem; color:var(--text-secondary); }
-.vv-ai-close { flex:0 0 44px; min-height:44px; width:44px; border:1px solid var(--control-border); border-radius:8px; color:var(--text-primary); background:var(--surface); }
-.vv-ai-messages { display:grid; gap:10px; max-height:260px; overflow-y:auto; padding:2px; }
-.vv-ai-message { padding:12px; border:1px solid var(--border); border-radius:8px; color:var(--text-primary); background:var(--surface-muted); font-size:.875rem; line-height:1.6; overflow-wrap:anywhere; }
-.vv-ai-message.user { border-color:var(--control-border); background:var(--surface); }
-.vv-ai-quick-actions, .vv-ai-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
-.vv-ai-quick-actions button, .vv-ai-actions button, .vv-ai-actions a { min-height:44px; padding:8px 10px; border:1px solid var(--control-border); border-radius:8px; color:var(--text-primary); background:var(--surface); font-size:.8125rem; text-decoration:none; }
-.vv-ai-input-row { display:flex; gap:8px; }
-.vv-ai-input-row input { flex:1; min-width:0; width:100%; }
-.vv-ai-input-row button { min-height:48px; padding:10px 14px; border:0; border-radius:8px; color:var(--on-primary); background:var(--primary); }
-@media(max-width:700px) {
-  .public-flow-strip { grid-template-columns:1fr; }
-  .public-shell { margin:24px auto; }
-  .public-shell > .public-hero { align-items:flex-start; gap:16px; }
-  .public-logo { width:72px; height:72px; flex-basis:72px; }
-  .form-grid { grid-template-columns:1fr; }
-  .card { padding:20px; }
-}
-@media(max-width:420px) { .public-shell > .public-hero { flex-direction:column; } }

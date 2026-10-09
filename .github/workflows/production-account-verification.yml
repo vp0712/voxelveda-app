@@ -1,0 +1,33 @@
+name: Verify deployed account release
+on:
+  push:
+    branches: [main]
+    paths: ['.railway-release']
+permissions:
+  contents: read
+jobs:
+  production-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser verification tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
+          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install chromium
+      - name: Verify exact live revision, retirement boundaries and responsive public pages
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_PROOF_DIR: ${{ runner.temp }}/production-proof
+          VV_EXPECTED_COMMIT: ${{ github.sha }}
+        run: node scripts/production-account-verification.js
+      - name: Preserve live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-proof-${{ github.sha }}
+          path: ${{ runner.temp }}/production-proof
+          retention-days: 30

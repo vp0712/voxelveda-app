@@ -11,7 +11,6 @@ const { isStepUpFresh, stepUpTtlMinutes } = require('./stepUpService');
 const { documentModuleAvailable } = require('./applicationRetirement');
 
 const UPLOAD_ROOT = path.resolve(__dirname, '..', 'uploads');
-const MODULE_PERMISSION = Object.freeze({ rfq: 'VIEW_RFQS' });
 const CLASSIFICATIONS = new Set(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']);
 const ACCESS_POLICIES = Object.freeze({
   PUBLIC: 'AUTHENTICATED', INTERNAL: 'MODULE_OR_OWNER',
@@ -105,7 +104,7 @@ async function getAuthorisedDocument(user, id, db = pool) {
   const [[document]] = await db.query(`SELECT * FROM secure_documents WHERE id = ? AND deleted_at IS NULL LIMIT 1${db === pool ? '' : ' FOR UPDATE'}`, [id]);
   if (!document) return { status: 404 };
   if (!documentModuleAvailable(document.module)) return { status: 410, code: 'MODULE_RETIRED' };
-  const permission = MODULE_PERMISSION[String(document.module).toLowerCase()] || 'VIEW_CONFIDENTIAL_FILES';
+  const permission = 'VIEW_CONFIDENTIAL_FILES';
   const ownsDocument = document.owner_user_id && Number(document.owner_user_id) === Number(user.id);
   const authenticatedOnly = document.access_policy === 'AUTHENTICATED' && document.classification === 'PUBLIC';
   if (!authenticatedOnly && !ownsDocument && !hasPermission(user, permission)) return { status: 403 };

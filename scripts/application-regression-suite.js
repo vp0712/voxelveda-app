@@ -9,6 +9,7 @@ const checks = [
   'auth-lifecycle-test.js',
   'mfa-foundation-test.js',
   'authorization-foundation-test.js',
+  'active-permission-boundaries-test.js',
   'step-up-authentication-test.js',
   'secure-user-management-test.js',
   'file-api-hardening-test.js',
@@ -23,7 +24,6 @@ const checks = [
   'backup-restore-assurance-test.js',
   'smtp-delivery-readiness-evidence-test.js',
   'customer-registration-test.js',
-  'customer-rfq-intake-test.js',
   'core-audit-isolation-test.js',
   'retained-runtime-test.js',
   'retained-workspace-test.js',
@@ -37,6 +37,7 @@ const checks = [
   'railway-startup-gateway-test.js',
   'release-assurance-test.js',
   'secret-scan.js',
+  'source-file-inventory-test.js',
   'injection-sink-audit.js',
   'security-source-test.js'
 ];
