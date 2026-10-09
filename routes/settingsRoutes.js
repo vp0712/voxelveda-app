@@ -11,7 +11,7 @@ const {
 
 const router = express.Router();
 
-router.get('/', authMiddleware, requireAnyPermission('VIEW_DASHBOARD'), getSettings);
+router.get('/', authMiddleware, requireAnyPermission('MANAGE_USERS'), getSettings);
 router.post('/', authMiddleware, requireAnyPermission('MANAGE_USERS'), requireStepUp('CHANGE_SYSTEM_SETTINGS'), bodyContract(ALLOWED_SETTINGS), updateSettings);
 
 module.exports = router;

@@ -132,7 +132,7 @@ async function run() {
   const file = { path: path.join(__dirname, '..', 'uploads', 'fixture-enquiry.txt'), filename: 'fixture-enquiry.txt', originalname: 'enquiry.txt', mimetype: 'text/plain', size: body.length, malwareScan: { status: 'CLEAN' } };
 
   // Reject registration before schema, SQL, local-file or object-storage access.
-  for (const module of ['finance', 'invoice', 'suppliers', 'careers', 'unknown', '', undefined]) {
+  for (const module of ['rfq', 'finance', 'invoice', 'suppliers', 'careers', 'unknown', '', undefined]) {
     await assert.rejects(service.registerDocument({ module, file, recordType: 'evidence', recordId: '42' }), { status: 410, code: 'MODULE_RETIRED' });
   }
   assert.equal(schemaChecks, 0);
@@ -140,7 +140,7 @@ async function run() {
   assert.equal(storage.length, 0);
 
   const archived = [];
-  for (const module of ['finance', 'invoice', 'suppliers', 'careers', 'unknown', '']) {
+  for (const module of ['rfq', 'finance', 'invoice', 'suppliers', 'careers', 'unknown', '']) {
     const row = document(module, { classification: 'PUBLIC', access_policy: 'AUTHENTICATED' });
     const token = 'archived-' + row.id;
     const oldGrant = grant(row, token);
@@ -169,7 +169,7 @@ async function run() {
     assert.deepEqual(transactions.slice(-3), ['begin', 'rollback', 'release']);
   }
 
-  for (const module of ['rfq', 'profile', 'security']) {
+  for (const module of ['profile', 'security']) {
     const row = document(module);
     assert.equal((await service.getAuthorisedDocument(owner, row.id)).status, 200);
     assert.equal((await service.getAuthorisedDocument(other, row.id)).status, 403, 'retained private documents must keep owner/permission isolation');
@@ -216,8 +216,8 @@ async function run() {
   res = response();
   await service.sendDocument(request(owner, { id: local.id }), res);
   assert.deepEqual(res.bytes, body);
-  const registered = await service.registerDocument({ module: 'RFQ', recordType: 'enquiry', recordId: '42', ownerUserId: owner.id, uploadedBy: owner.id, file });
-  assert.equal(documents.get(registered.id).module, 'rfq');
+  const registered = await service.registerDocument({ module: 'PROFILE', recordType: 'evidence', recordId: '42', ownerUserId: owner.id, uploadedBy: owner.id, file });
+  assert.equal(documents.get(registered.id).module, 'profile');
   assert.equal(registered.storage, 'OBJECT_STORAGE');
   assert.equal(registered.content_sha256, sha256);
   for (const item of archived) assert.equal(JSON.stringify({ row: item.row, grant: item.grant }), item.before, 'archived document rows, bytes references and grant state must remain untouched');

@@ -31,11 +31,17 @@ for (const [index, block] of blocks.entries()) {
   }
   assert.ok(contrast(tokens['control-border'], tokens.surface) >= 3, 'Form boundaries must be visible against the form surface');
 }
+assert.equal(base.page.toUpperCase(), 'F7F8FA', 'Default app canvas uses the requested light neutral palette');
+assert.equal(base.surface.toUpperCase(), 'FFFFFF', 'Document and account panels stay clean white');
+assert.equal(base['text-primary'].toUpperCase(), '152544', 'Headings use deep navy');
+assert.equal(base['text-secondary'].toUpperCase(), '526177', 'Secondary body text uses slate');
+assert.equal(base.primary.toUpperCase(), '2454D6', 'Primary actions use royal blue');
 assert.match(css, /\[hidden\].*display:\s*none\s*!important/, 'Appearance changes must preserve hidden permission controls');
 
 // Brand injection must not multiply stale styles or rewrite permission attributes.
-for (const file of ['login.html', 'register.html', 'customer.html', 'profile.html', 'privacy-policy.html', 'index.html', 'workspace.html', 'security.html', 'mfa.html']) {
+for (const file of ['login.html', 'register.html', 'profile.html', 'privacy-policy.html', 'index.html', 'workspace.html', 'security.html', 'mfa.html']) {
   const rendered = injectGlobalBrand(read('public/' + file));
+  assert.ok(rendered.includes('data-vv-theme="navy-blue"'), `${file} uses the requested navy/blue presentation`);
   assert.ok(rendered.includes(`href="${WORKSPACE_CSS}"`), `${file} receives the current palette`);
   assert.equal((rendered.match(/href=["']\/workspace-theme\.css(?:\?[^"']*)?["']/g) || []).length, 1, `${file} has one shared palette`);
   assert.equal(injectGlobalBrand(rendered), rendered, `${file} injection stays idempotent`);
@@ -64,14 +70,29 @@ const context = {
 };
 vm.runInNewContext(read('public/workspace-theme.js'), context);
 assert.equal(context.document.documentElement.dataset.colorMode, 'dark');
-assert.equal(meta.content, '#111E21');
+assert.equal(meta.content, '#101827');
 assert.equal(toggle.textContent, 'Light theme');
 context.window.VoxelTheme.set('light');
 assert.equal(stored, 'light');
-assert.equal(meta.content, '#F5F7F6');
+assert.equal(meta.content, '#F7F8FA');
 assert.equal(toggle.attributes['aria-label'], 'Use dark theme');
 listeners.storage({ key:'voxelveda:color-mode', newValue:'dark' });
 assert.equal(context.document.documentElement.dataset.colorMode, 'dark');
-assert.match(read('public/auth-entry.css'), /font-size:\s*\.75rem/, 'The RFQ and privacy footer retains the requested compact size');
+for (const name of ['manifest.webmanifest', 'site.webmanifest']) {
+  const manifest = JSON.parse(read('public/' + name));
+  assert.equal(manifest.background_color, '#' + base.page);
+  assert.equal(manifest.theme_color, '#' + base.page);
+  assert.ok(!/quote|banking|finance|erp|rfq/i.test(manifest.description));
+}
+stored = null;
+vm.runInNewContext(read('public/workspace-theme.js'), context);
+assert.equal(context.document.documentElement.dataset.colorMode, 'light', 'A first visit defaults to the requested light appearance');
+context.localStorage.getItem = () => { throw new Error('Browser storage blocked'); };
+context.localStorage.setItem = () => { throw new Error('Browser storage blocked'); };
+vm.runInNewContext(read('public/workspace-theme.js'), context);
+assert.equal(context.document.documentElement.dataset.colorMode, 'light');
+context.window.VoxelTheme.set('dark');
+assert.equal(context.document.documentElement.dataset.colorMode, 'dark', 'A storage restriction cannot break a theme action');
+assert.match(read('public/auth-entry.css'), /font-size:\s*\.75rem/, 'The privacy footer retains its compact size');
 assert.match(read('public/auth-entry.css'), /animation:none/, 'Sign in is available immediately instead of being gated by a launch animation');
 console.log('RETAINED_THEME_TEST_OK: light/dark contrast, permission-hidden controls, unchanged logo, palette injection and preference state');

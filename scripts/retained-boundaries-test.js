@@ -52,7 +52,7 @@ async function settingsBoundaries() {
     '../utils/secureLogger': { error() {} }
   });
   assert.deepEqual([...controller.ALLOWED_SETTINGS], ['company_legal_name', 'trading_name', 'company_address', 'company_email', 'abn', 'website', 'support_phone']);
-  const req = { user: { id: 99 }, ip: '127.0.0.1', get: () => 'boundary-test', requestId: 'request-test', session: { id: 'session-test' } };
+  const req = { user: { id: 99, role: 'super_admin' }, ip: '127.0.0.1', get: () => 'boundary-test', requestId: 'request-test', session: { id: 'session-test' } };
   let res = response();
   await controller.getSettings(req, res);
   assert.equal(res.statusCode, 200);
@@ -67,11 +67,27 @@ async function settingsBoundaries() {
   isolated('routes/settingsRoutes.js', {
     express: { Router: () => router },
     '../middleware/authMiddleware': pass,
-    '../middleware/authorizationMiddleware': { requireAnyPermission: () => pass },
+    '../middleware/authorizationMiddleware': require('../middleware/authorizationMiddleware'),
     '../middleware/stepUpMiddleware': () => pass,
     '../middleware/requestContractMiddleware': require('../middleware/requestContractMiddleware'),
     '../controllers/settingsController': controller
   });
+  async function get(user) {
+    const reply = response();
+    for (const handler of routeHandlers.get('get /')) {
+      let next = false;
+      await handler({ ...req, user }, reply, () => { next = true; });
+      if (!next) break;
+    }
+    return reply;
+  }
+  const beforeUnauthorized = queries.length;
+  for (const user of [{ id: 20, role: 'viewer' }, { id: 20, role: 'finance_admin', permissions: ['VIEW_DASHBOARD', 'settings'] }]) {
+    res = await get(user);
+    assert.equal(res.statusCode, 403, 'company settings must retain administrative permission checks without resurrecting old module aliases');
+  }
+  assert.equal(queries.length, beforeUnauthorized, 'denied settings reads must not query company data');
+  assert.equal((await get({ id: 99, role: 'admin' })).statusCode, 200, 'authorized retained administrators can read company settings');
   async function post(body) {
     const reply = response();
     for (const handler of routeHandlers.get('post /')) {
@@ -124,21 +140,21 @@ async function ownershipBoundaries() {
   const assets = [{ id: 1, assigned_to: 20 }];
   const queries = [];
   const events = [];
-  const retained = ['rfq', 'profile', 'security'];
+  const retained = ['profile', 'security'];
   const connection = {
     async query(sql, params = []) {
       queries.push({ sql, params: [...params] });
       if (/information_schema.tables/.test(sql)) return [[{ count: 1 }]];
       if (/SELECT COUNT\(\*\) count FROM secure_documents/.test(sql)) {
-        assert.match(sql, /module IN \('rfq','profile','security'\)/, 'ownership counts must use the same retained scope as mutations');
+        assert.match(sql, /module IN \('profile','security'\)/, 'ownership counts must use the same retained scope as mutations');
         return [[{ count: documents.filter((row) => row.owner_user_id === params[0] && !row.deleted_at && retained.includes(row.module)).length }]];
       }
       if (/SELECT COUNT\(\*\) count FROM (?:service_accounts|security_risk_exceptions)/.test(sql)) return [[{ count: 0 }]];
       if (/SELECT id FROM users/.test(sql)) return [[{ id: params[0] }]];
       if (/UPDATE secure_documents/.test(sql)) {
-        assert.match(sql, /module IN \('rfq','profile','security'\)/, 'retired document ownership must never change');
+        assert.match(sql, /module IN \('profile','security'\)/, 'retired document ownership must never change');
         for (const row of documents) if (row.owner_user_id === params[1] && !row.deleted_at && retained.includes(row.module)) row.owner_user_id = params[0];
-        return [{ affectedRows: 3 }];
+        return [{ affectedRows: 2 }];
       }
       if (/INSERT INTO ownership_transfer_events/.test(sql)) { events.push([...params]); return [{ affectedRows: 1 }]; }
       throw new Error('Unexpected ownership query: ' + sql);
@@ -154,12 +170,12 @@ async function ownershipBoundaries() {
   await assert.rejects(service.transferOwnedRecords(connection, 20, 20, 99, 'Test termination'), /different active user/);
   assert.equal(events.length, 0);
   const counts = await service.transferOwnedRecords(connection, 20, 21, 99, 'Test termination');
-  assert.deepEqual(JSON.parse(JSON.stringify(counts)), { secure_documents: 3, service_accounts: 0, security_risk_exceptions: 0 });
+  assert.deepEqual(JSON.parse(JSON.stringify(counts)), { secure_documents: 2, service_accounts: 0, security_risk_exceptions: 0 });
   for (const row of documents) assert.equal(row.owner_user_id, retained.includes(row.module) && !row.deleted_at ? 21 : row.id === 'finance-only' ? 30 : 20);
   assert.deepEqual(tasks, [{ id: 1, assigned_to: 20 }]);
   assert.deepEqual(assets, [{ id: 1, assigned_to: 20 }]);
   assert.equal(events.length, 1);
-  assert.deepEqual(JSON.parse(events[0][4]), { secure_documents: 3, service_accounts: 0, security_risk_exceptions: 0 });
+  assert.deepEqual(JSON.parse(events[0][4]), { secure_documents: 2, service_accounts: 0, security_risk_exceptions: 0 });
 
   const retiredOnly = await service.transferOwnedRecords(connection, 30, null, 99, 'Retired records remain archived');
   assert.equal(retiredOnly.secure_documents, 0, 'archived retired records must not require or undergo ownership transfer');

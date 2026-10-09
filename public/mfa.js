@@ -8,7 +8,7 @@
     const requested = sessionStorage.getItem('vv_mfa_return_to') || '';
     if (!requested.startsWith('/') || requested.startsWith('//') || requested.includes('\\')) return home;
     const path = requested.split(/[?#]/, 1)[0];
-    return ['/dashboard', '/security', '/profile', '/request-quote'].includes(path) ? requested : home;
+    return ['/dashboard', '/security', '/profile'].includes(path) ? requested : home;
   }
   function clearChallenge() {
     sessionStorage.removeItem('vv_mfa_challenge');

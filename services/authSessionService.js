@@ -2,11 +2,7 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { createSession } = require('./sessionService');
 const { setSessionCookie } = require('../utils/session');
-
-function parsePermissions(value) {
-  if (Array.isArray(value)) return value;
-  try { const parsed = JSON.parse(value || '[]'); return Array.isArray(parsed) ? parsed : []; } catch { return []; }
-}
+const { activePermissionProjection } = require('./authorizationService');
 
 function normalizeRole(value) { return String(value || 'staff').trim().toLowerCase(); }
 
@@ -25,7 +21,7 @@ async function createAuthenticatedSession({ user, req, res, assuranceLevel = 1 }
     username: user.username || user.email,
     email: user.email,
     role: normalizeRole(user.role),
-    permissions: parsePermissions(user.permissions)
+    permissions: activePermissionProjection(user.permissions)
   };
   const token = jwt.sign({
     id: user.id,
@@ -42,4 +38,4 @@ async function createAuthenticatedSession({ user, req, res, assuranceLevel = 1 }
   return { user: publicUser, sessionId };
 }
 
-module.exports = { createAuthenticatedSession, normalizeRole, parsePermissions };
+module.exports = { createAuthenticatedSession, normalizeRole };

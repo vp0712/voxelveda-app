@@ -2,6 +2,7 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const {
+  activePermissionProjection,
   canAccessUserRecord,
   effectivePermissions,
   hasPermission
@@ -9,24 +10,19 @@ const {
 
 const user = (role, permissions = []) => ({ id: 10, role, permissions });
 
-assert.equal(hasPermission(user('staff'), 'VIEW_DASHBOARD'), true);
-assert.equal(hasPermission(user('staff'), 'VIEW_FINANCE'), false);
-assert.equal(hasPermission(user('staff'), 'VIEW_OWN_TIMESHEET'), true);
+assert.equal(effectivePermissions(user('staff')).size, 0);
 assert.equal(hasPermission(user('admin'), 'MANAGE_ROLES'), true);
 assert.equal(hasPermission(user('admin'), 'MANAGE_SECURITY'), false);
-assert.equal(hasPermission(user('manager'), 'MANAGE_TEAM_JOBS'), true);
-assert.equal(hasPermission(user('manager'), 'MANAGE_JOBS'), false);
-assert.equal(hasPermission(user('manager'), 'VIEW_ALL_TIMESHEETS'), false);
-assert.equal(hasPermission(user('finance_user'), 'POST_TRANSACTION'), true);
-assert.equal(hasPermission(user('finance_user'), 'VOID_TRANSACTION'), false);
-assert.equal(hasPermission(user('finance_user'), 'SEND_COMPANY_EMAIL'), true);
-assert.equal(hasPermission(user('finance_user'), 'MANAGE_COMPANY_EMAIL'), false);
-assert.equal(hasPermission(user('accountant'), 'VIEW_FINANCE'), true);
-assert.equal(hasPermission(user('accountant'), 'EDIT_FINANCE'), false);
-assert.equal(hasPermission(user('viewer'), 'VIEW_BANKING'), false);
-assert.equal(hasPermission(user('unknown_role'), 'VIEW_DASHBOARD'), false);
-assert.equal(hasPermission(user('staff', ['finance']), 'VIEW_FINANCE'), true);
-assert.equal(hasPermission(user('staff', ['settings']), 'MANAGE_USERS'), true);
+for (const role of ['finance_admin', 'finance_user', 'accountant', 'hr', 'manager', 'supervisor', 'sales', 'production', 'unknown_role']) {
+  assert.equal(effectivePermissions(user(role)).size, 0, 'legacy operational roles must not acquire administration privileges');
+}
+const archivedFlags = ['finance', 'settings', 'VIEW_BANKING', 'VIEW_RFQS', 'VIEW_DASHBOARD'];
+for (const role of ['staff', 'admin', 'super_admin']) {
+  for (const permission of archivedFlags) assert.equal(hasPermission(user(role, archivedFlags), permission), false, 'retired grants must be inert even for privileged users');
+}
+assert.equal(hasPermission(user('staff', ['settings']), 'MANAGE_USERS'), false, 'retired UI aliases must not become administrator authority');
+assert.equal(hasPermission(user('finance_admin', ['MANAGE_USERS']), 'MANAGE_USERS'), true, 'explicit retained canonical grants remain authoritative');
+assert.deepEqual(activePermissionProjection(JSON.stringify([...archivedFlags, 'VIEW_AUDIT_LOG', 'view_audit_log'])), ['VIEW_AUDIT_LOG']);
 assert.equal(effectivePermissions(user('super_admin')).has('MANAGE_SECURITY'), true);
 
 const root = path.join(__dirname, '..');
@@ -41,7 +37,7 @@ assert.match(userController, /You cannot modify your own role or permissions/);
 assert.match(userController, /USER_ACCESS_CHANGED/);
 assert.match(app, /app\.use\('\/api\/documents',\s*auth,\s*documentSecurityRoutes\)/);
 assert(!app.includes("app.use('/uploads'"));
-assert.match(authController, /exports\.me[\s\S]*const permissions = parsePermissions\(user\.permissions\);[\s\S]*effective_permissions/);
+assert.match(authController, /exports\.me[\s\S]*const permissions = activePermissionProjection\(user\.permissions\);[\s\S]*effective_permissions/);
 
 async function runRecordScopeTests() {
   const directReportDb = {
@@ -51,17 +47,18 @@ async function runRecordScopeTests() {
     }
   };
 
-  assert.equal(await canAccessUserRecord(user('staff'), 10, {
-    own: 'VIEW_OWN_TIMESHEET', team: 'VIEW_TEAM_TIMESHEET', all: 'VIEW_ALL_TIMESHEETS', connection: directReportDb
+  const scope = { own: 'VIEW_CONFIDENTIAL_FILES', team: 'VIEW_AUDIT_LOG', all: 'MANAGE_USERS', connection: directReportDb };
+  assert.equal(await canAccessUserRecord(user('staff', ['VIEW_CONFIDENTIAL_FILES']), 10, {
+    ...scope
   }), true);
-  assert.equal(await canAccessUserRecord(user('manager'), 20, {
-    own: 'VIEW_OWN_TIMESHEET', team: 'VIEW_TEAM_TIMESHEET', all: 'VIEW_ALL_TIMESHEETS', connection: directReportDb
+  assert.equal(await canAccessUserRecord(user('staff', ['VIEW_AUDIT_LOG']), 20, {
+    ...scope
   }), true);
-  assert.equal(await canAccessUserRecord(user('manager'), 30, {
-    own: 'VIEW_OWN_TIMESHEET', team: 'VIEW_TEAM_TIMESHEET', all: 'VIEW_ALL_TIMESHEETS', connection: directReportDb
+  assert.equal(await canAccessUserRecord(user('staff', ['VIEW_AUDIT_LOG']), 30, {
+    ...scope
   }), false);
-  assert.equal(await canAccessUserRecord(user('hr'), 30, {
-    own: 'VIEW_OWN_TIMESHEET', team: 'VIEW_TEAM_TIMESHEET', all: 'VIEW_ALL_TIMESHEETS', connection: directReportDb
+  assert.equal(await canAccessUserRecord(user('admin'), 30, {
+    ...scope
   }), true);
 }
 

@@ -44,7 +44,7 @@ async function revokeEveryCredential(connection, userId, reason) {
 }
 
 const OWNERSHIP_TARGETS = Object.freeze([
-  { table: 'secure_documents', column: 'owner_user_id', active: "deleted_at IS NULL AND module IN ('rfq','profile','security')" },
+  { table: 'secure_documents', column: 'owner_user_id', active: "deleted_at IS NULL AND module IN ('profile','security')" },
   { table: 'service_accounts', column: 'owner_user_id', active: "status='ACTIVE'" },
   { table: 'security_risk_exceptions', column: 'owner_id', active: "status IN ('PENDING_APPROVAL','APPROVED')" }
 ]);

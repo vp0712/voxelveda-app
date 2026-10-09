@@ -10,12 +10,17 @@ function canonicalPermission(value) {
   if (!raw) return [];
   const upper = raw.toUpperCase();
   if (PERMISSIONS.includes(upper)) return [upper];
-  return LEGACY_PERMISSION_MAP[raw.toLowerCase()] || [];
+  const legacyKey = raw.toLowerCase();
+  return Object.hasOwn(LEGACY_PERMISSION_MAP, legacyKey) ? LEGACY_PERMISSION_MAP[legacyKey] : [];
+}
+
+function activePermissionProjection(value) {
+  return [...new Set(parsePermissions(value).flatMap(canonicalPermission))];
 }
 
 function effectivePermissions(user) {
   const role = String(user?.role || '').trim().toLowerCase();
-  const grants = new Set(ROLE_TEMPLATES[role] || []);
+  const grants = new Set((ROLE_TEMPLATES[role] || []).flatMap(canonicalPermission));
   for (const value of parsePermissions(user?.permissions)) for (const permission of canonicalPermission(value)) grants.add(permission);
   for (const value of parsePermissions(user?.temporary_permissions)) for (const permission of canonicalPermission(value)) grants.add(permission);
   for (const value of parsePermissions(user?.break_glass_permissions)) for (const permission of canonicalPermission(value)) grants.add(permission);
@@ -47,4 +52,4 @@ async function canAccessUserRecord(user, targetUserId, options = {}) {
   return false;
 }
 
-module.exports = { canAccessUserRecord, canonicalPermission, effectivePermissions, hasAnyPermission, hasPermission, isManagerOf, parsePermissions };
+module.exports = { activePermissionProjection, canAccessUserRecord, canonicalPermission, effectivePermissions, hasAnyPermission, hasPermission, isManagerOf, parsePermissions };

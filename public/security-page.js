@@ -7,7 +7,7 @@ async function loadMfaStatus() {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) return showStatus(data.message || 'Unable to load MFA status.');
   document.getElementById('mfaStatus').textContent = data.enabled
-    ? `Enabled · ${data.recovery_codes_remaining} recovery codes remaining · assurance level ${data.assurance_level}`
+    ? `Enabled · ${data.recovery_codes_remaining} recovery codes remaining`
     : data.required ? 'Required for your role — setup must be completed now.' : 'Not enabled — strongly recommended.';
   document.getElementById('mfaStartForm').hidden = data.enabled;
 }

@@ -28,3 +28,50 @@ const logo = fs.readFileSync(path.join(root, 'public', 'logo.png'));
 assert.ok(logo.length > 1000, 'Canonical logo asset must exist and be non-empty');
 
 console.log('Railway startup gateway checks passed.');
+
+// Inspect the actual returned warmup document, then execute its retry/navigation
+// script with controlled responses. No backend process or network is started.
+const vm = require('node:vm');
+const functionStart = source.indexOf('function warmupHtml()');
+const functionEnd = source.indexOf('\nfunction serveLogo', functionStart);
+assert.ok(functionStart >= 0 && functionEnd > functionStart);
+const warmup = vm.runInNewContext(source.slice(functionStart, functionEnd) + '\nwarmupHtml()');
+const mainStyle = warmup.match(/html,body\{([^}]+)\}/)[1];
+const messageStyle = warmup.match(/\.txt\{([^}]+)\}/)[1];
+const colour = (style, field) => {
+  const match = style.match(new RegExp('(?:^|;)' + field + ':#([a-f0-9]{6})(?:;|$)', 'i'));
+  assert.ok(match, `Warmup ${field} has an explicit six-digit colour`);
+  return match[1];
+};
+function brightness(hex) {
+  const c = hex.match(/[a-f0-9]{2}/gi).map(value => parseInt(value,16)/255).map(value => value <= .04045 ? value/12.92 : ((value+.055)/1.055)**2.4);
+  return .2126*c[0]+.7152*c[1]+.0722*c[2];
+}
+const background = colour(mainStyle, 'background');
+for (const foreground of [colour(mainStyle, 'color'), colour(messageStyle, 'color')]) {
+  const pair = [brightness(foreground), brightness(background)].sort((a,b)=>b-a);
+  assert.ok((pair[0]+.05)/(pair[1]+.05) >= 4.5, 'Warmup headings and message meet normal-text contrast');
+}
+assert.match(warmup, /<meta name="theme-color" content="#F7F8FA">/);
+assert.equal(background.toUpperCase(), 'F7F8FA');
+const inlineScript = warmup.match(/<script>([\s\S]*?)<\/script>/)[1];
+(async () => {
+  const timers = [];
+  const navigations = [];
+  let readiness = false;
+  const runtime = {
+    fetch:async () => ({ json:async () => ({ backend_ready:readiness }) }),
+    location:{ href:'https://app.voxelveda.com/profile', replace(value) { navigations.push(value); } },
+    setTimeout(callback, delay) { timers.push({ callback, delay }); }
+  };
+  vm.runInNewContext(inlineScript, runtime);
+  assert.equal(timers[0].delay, 700);
+  await timers.shift().callback();
+  assert.equal(navigations.length, 0, 'Warmup cannot navigate while the backend is unavailable');
+  assert.equal(timers[0].delay, 1200);
+  readiness = true;
+  await timers.shift().callback();
+  assert.deepEqual(navigations, ['https://app.voxelveda.com/profile'], 'Readiness returns to the same requested page exactly once');
+  assert.equal(timers.length, 0, 'A ready backend ends polling');
+  console.log('Gateway document contrast and controlled readiness navigation passed.');
+})().catch(error => { console.error(error); process.exitCode = 1; });

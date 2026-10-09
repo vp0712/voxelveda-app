@@ -1,0 +1,23 @@
+{
+  "baseline": "9e8fc1928b913a8ea6c440f9396ce9fb33eab4b7",
+  "verified_dedicated_targets": [
+    "controllers/publicRfqController.js",
+    "public/customer.html",
+    "public/customer.js",
+    "public/customer-rfq-qr.png",
+    "scripts/customer-rfq-intake-test.js",
+    "services/publicSubmissionDedupeService.js",
+    "scripts/security-dashboard-test.js",
+    "scripts/enterprise-wave-a-mysql-legacy-test.js",
+    "android/app/src/main/res/drawable/ic_stat_voxel_notification.xml"
+  ],
+  "dependency_evidence": {
+    "rfq": "app publicRfq import and POST /api/public/rfq -> controller parameterized INSERT rfqs; customer.html/customer.js and workspace quote form were its only UI flows",
+    "dedupe": "Only active call was the RFQ router; no retained authentication caller",
+    "rfq_qr": "Dedicated RFQ entry image with no retained caller",
+    "native_notification_icon": "Operational bridge retired; no remaining Android reference",
+    "unused_tests": "Security dashboard script targeted deleted operational pages; legacy MySQL suite executes retired business migrations"
+  },
+  "retained": "Existing company public pages, identity, account security, profiles, shared permissions and company administration; no replacement business module invented",
+  "data": "No drop, delete, snapshot/file purge, encryption-key destruction or data reclassification; user subsequently waived backup verification; no data or encryption-key destruction authorized"
+}

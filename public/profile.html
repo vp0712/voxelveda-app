@@ -52,21 +52,19 @@
 
       <article class="card">
         <h1>Edit Profile</h1>
-        <p class="subtitle">You can update your own profile. Your login email, username, role and employee number remain protected account fields.</p>
+        <p class="subtitle">You can update your own profile. Your login email, username and role remain protected account fields.</p>
         <form id="profileForm" novalidate>
           <div class="formGrid">
             <div class="field full"><label for="name">Full name</label><input id="name" name="name" maxlength="120" autocomplete="name" required></div>
             <div class="field full"><label for="mobile">Mobile number</label><input id="mobile" name="mobile_number" maxlength="30" inputmode="tel" autocomplete="tel" placeholder="e.g. +61 4xx xxx xxx"></div>
             <div class="field"><label for="email">Email</label><input id="email" readonly></div>
             <div class="field"><label for="username">Username</label><input id="username" readonly></div>
-            <div class="field"><label for="department">Department</label><input id="department" readonly></div>
-            <div class="field"><label for="employeeNumber">Employee number</label><input id="employeeNumber" readonly></div>
           </div>
           <div class="formActions"><button class="btn primary" id="saveBtn" type="submit" disabled>Save Changes</button><span class="dirtyDot" aria-label="Unsaved changes"></span></div>
           <div id="status" class="status" role="status" aria-live="polite"></div>
         </form>
         <div class="meta"><div>Account status<strong id="accountStatus">—</strong></div><div>Profile photo<strong id="photoStatus">Not uploaded</strong></div><div>Photo updated<strong id="photoUpdated">—</strong></div><div>Profile updated<strong id="profileUpdated">—</strong></div></div>
-        <div class="securityNote">Profile photos are served only to the signed-in user. Login identity, permissions, role and employee number cannot be changed from this screen.</div>
+        <div class="securityNote">Profile photos are served only to the signed-in user. Login identity, permissions and role cannot be changed from this screen.</div>
       </article>
     </section>
   </main>

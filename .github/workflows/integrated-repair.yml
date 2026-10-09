@@ -38,10 +38,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Retained runtime and public input contracts
+      - name: Retained runtime and core audit contracts
         run: |
           node scripts/retained-runtime-test.js
-          node scripts/customer-rfq-intake-test.js
           node scripts/core-audit-isolation-test.js
       - name: Disposable MySQL records, audit, document scope and retired-email hold
         run: node scripts/retained-mysql-test.js

@@ -70,7 +70,7 @@ function safeReturnTo(role, user = {}) {
   // Return only to the retained account pages. Old operations and finance links
   // land in the current workspace rather than a removed feature.
   const path = value.split(/[?#]/, 1)[0];
-  return ['/dashboard', '/security', '/profile', '/request-quote'].includes(path) ? value : home;
+  return ['/dashboard', '/security', '/profile'].includes(path) ? value : home;
 }
 
 function showLoginMessageFromUrl() {

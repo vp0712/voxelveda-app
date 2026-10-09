@@ -7,7 +7,7 @@ const { sendMail, normalizeAddressList, isEmailTransportError, classifySmtpFailu
 // Retired and unclassified messages remain in their original queue rows but
 // cannot be claimed by this deployment. Restore of the previous release can
 // resume its own workflows without losing the historical content.
-const RETAINED_EMAIL_MODULES = Object.freeze(['auth', 'security', 'contact', 'customer_rfqs']);
+const RETAINED_EMAIL_MODULES = Object.freeze(['auth', 'security', 'contact']);
 const modulePlaceholders = RETAINED_EMAIL_MODULES.map(() => '?').join(', ');
 
 function assertRetainedEmailModule(message) {

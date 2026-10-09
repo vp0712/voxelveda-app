@@ -1,4 +1,4 @@
-/* Public pages use the same typography, teal actions and responsive surfaces as the app. */
+/* Public pages use the same typography, royal blue actions and responsive surfaces as the app. */
 * { box-sizing:border-box; }
 html { background:var(--page); }
 body { margin:0; min-height:100vh; color:var(--text-primary); background:var(--page); font-family:var(--font-body); line-height:1.5; }

@@ -1,6 +1,4 @@
 const EMAIL_PATTERN = /^[^\s@]{1,64}@[^\s@]{1,189}\.[^\s@]{2,63}$/;
-const COC_NUMBER_PATTERN = /^[A-Z0-9][A-Z0-9._/-]{0,79}$/i;
-const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 const AUTH_IDENTITY_PATTERN = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~@-]{1,254}$/;
 const AUTH_CODE_PATTERN = /^[A-Za-z0-9-]{6,64}$/;
 
@@ -38,40 +36,6 @@ function requestContract({ maxBytes, allowedFields, validate }) {
     return next();
   };
 }
-
-const publicRfqContract = requestContract({
-  maxBytes: 16 * 1024,
-  allowedFields: ['customer_name', 'email', 'phone', 'material', 'quantity', 'application'],
-  validate(req) {
-    const body = req.body || {};
-    const quantity = Number(body.quantity);
-    if (!text(body.customer_name) || text(body.customer_name).length > 120) return { message: 'Customer name must be between 1 and 120 characters', fields: ['customer_name'] };
-    if (!EMAIL_PATTERN.test(text(body.email)) || text(body.email).length > 254) return { message: 'A valid email address is required', fields: ['email'] };
-    if (text(body.phone).length > 40) return { message: 'Phone number is too long', fields: ['phone'] };
-    if (text(body.material).length > 160) return { message: 'Material is too long', fields: ['material'] };
-    if (!Number.isInteger(quantity) || quantity < 1 || quantity > 1000000) return { message: 'Quantity must be a whole number between 1 and 1,000,000', fields: ['quantity'] };
-    if (text(body.application).length > 4000) return { message: 'Application details are too long', fields: ['application'] };
-    return null;
-  }
-});
-
-const aiLeadContract = requestContract({
-  maxBytes: 32 * 1024,
-  allowedFields: ['name', 'email', 'phone', 'company', 'need', 'source', 'page', 'transcript'],
-  validate(req) {
-    const body = req.body || {};
-    if (!text(body.name) || text(body.name).length > 120) return { message: 'Name must be between 1 and 120 characters', fields: ['name'] };
-    if (!EMAIL_PATTERN.test(text(body.email)) || text(body.email).length > 254) return { message: 'A valid email address is required', fields: ['email'] };
-    if (!text(body.need) || text(body.need).length > 1500) return { message: 'Project need must be between 1 and 1,500 characters', fields: ['need'] };
-    if (text(body.phone).length > 80 || text(body.company).length > 160 || text(body.source).length > 120 || text(body.page).length > 500) {
-      return { message: 'One or more lead fields exceed the permitted length' };
-    }
-    if (body.transcript !== undefined && (!Array.isArray(body.transcript) || body.transcript.length > 12 || body.transcript.some((entry) => typeof entry !== 'string' || entry.length > 600))) {
-      return { message: 'Transcript must contain at most 12 text entries of 600 characters', fields: ['transcript'] };
-    }
-    return null;
-  }
-});
 
 const customerRegistrationContract = requestContract({
   maxBytes: 8 * 1024,
@@ -165,39 +129,8 @@ const stepUpContract = requestContract({
   }
 });
 
-function qrGenerationContract(req, res, next) {
-  const keys = Object.keys(req.query || {});
-  if (keys.some((key) => key !== 'data')) return validationError(res, 'QR request contains unsupported parameters', keys.filter((key) => key !== 'data'));
-  const data = text(req.query?.data);
-  if (!data || data.length > 1200 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(data)) {
-    return validationError(res, 'QR data must contain between 1 and 1,200 safe text characters', ['data']);
-  }
-  return next();
-}
-
-function shiftQrContract(req, res, next) {
-  const keys = Object.keys(req.query || {});
-  if (keys.some((key) => key !== 't')) return validationError(res, 'Shift QR request contains unsupported parameters', keys.filter((key) => key !== 't'));
-  if (req.query?.t !== undefined && !/^\d{1,20}$/.test(String(req.query.t))) return validationError(res, 'Shift QR cache value is invalid', ['t']);
-  return next();
-}
-
-function cocVerificationContract(req, res, next) {
-  const number = text(req.params?.no);
-  const hash = text(req.query?.hash);
-  const keys = Object.keys(req.query || {});
-  if (!COC_NUMBER_PATTERN.test(number)) return validationError(res, 'Certificate number format is invalid', ['no']);
-  if (keys.some((key) => key !== 'hash')) return validationError(res, 'Certificate request contains unsupported parameters', keys.filter((key) => key !== 'hash'));
-  if (hash && !SHA256_PATTERN.test(hash)) return validationError(res, 'Certificate integrity hash format is invalid', ['hash']);
-  return next();
-}
-
 module.exports = {
-  COC_NUMBER_PATTERN,
   EMAIL_PATTERN,
-  SHA256_PATTERN,
-  aiLeadContract,
-  cocVerificationContract,
   customerRegistrationContract,
   loginContract,
   mfaAuthenticatedContract,
@@ -206,9 +139,6 @@ module.exports = {
   passwordChangeContract,
   passwordResetRequestContract,
   passwordTokenContract,
-  publicRfqContract,
-  qrGenerationContract,
   requestContract,
-  shiftQrContract,
   stepUpContract
 };

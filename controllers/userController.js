@@ -8,8 +8,8 @@ const { ensureSecuritySchema } = require('../services/securitySchema');
 const { revokeUserSessions, logSecurityEvent } = require('../services/sessionService');
 const { issueToken, revokeUserActionTokens } = require('../services/authActionTokenService');
 const { queueSecurityLink } = require('../services/securityEmailService');
-const { HIGH_RISK_PERMISSIONS, LEGACY_PERMISSION_MAP, PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
-const { canonicalPermission, hasPermission } = require('../services/authorizationService');
+const { HIGH_RISK_PERMISSIONS, PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
+const { activePermissionProjection, canonicalPermission, hasPermission } = require('../services/authorizationService');
 const { assertNoSegregationConflicts } = require('../services/segregationPolicyService');
 const {
   ACCOUNT_STATES, permissionDifference, revokeEveryCredential, transitionAccount
@@ -17,70 +17,34 @@ const {
 
 const PRIVILEGED_MFA_ROLES = new Set(['super_admin', 'admin', 'finance_admin', 'accountant', 'hr']);
 
-const ALLOWED_ROLES = [
-  'admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant',
-  'hr', 'manager', 'supervisor', 'sales', 'production', 'viewer', 'view_only', 'staff'
-];
-
-const ALL_PERMISSIONS = [
-  'dashboard',
-  'rfqs',
-  'rfqs_input',
-  'invoices',
-  'invoices_input',
-  'customers',
-  'customers_input',
-  'tasks',
-  'tasks_input',
-  'roster',
-  'roster_input',
-  'attendance',
-  'attendance_input',
-  'attendance_qr_bypass',
-  'staff',
-  'settings',
-  'stock',
-  'stock_in',
-  'stock_in_input',
-  'stock_out',
-  'stock_out_input',
-  'raw_material',
-  'raw_material_input',
-  'packaging',
-  'packaging_input',
-  'meetings',
-  'meetings_input',
-  'suppliers',
-  'suppliers_input',
-  'expenses',
-  'expenses_input',
-  'compliance',
-  'compliance_input',
-  'competitors',
-  'competitors_input',
-  'finance',
-  'finance_input',
-  'finance_setup',
-  'finance_post_transaction',
-  'finance_create_journal',
-  'finance_lock_period',
-  'finance_reconcile',
-  'finance_export',
-  'finance_view_payroll',
-  'finance_void'
-];
+const ALLOWED_ROLES = Object.keys(ROLE_TEMPLATES);
 
 function parsePermissions(value) {
-  const allowed = new Set([...ALL_PERMISSIONS, ...PERMISSIONS]);
-  if (!value) return [];
-  if (Array.isArray(value)) return [...new Set(value.map((item) => String(item).trim()).filter((item) => allowed.has(item) || LEGACY_PERMISSION_MAP[item.toLowerCase()]))];
+  return activePermissionProjection(value);
+}
 
+function rawPermissions(value) {
+  if (Array.isArray(value)) return value;
   try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? [...new Set(parsed.map((item) => String(item).trim()).filter((item) => allowed.has(item) || LEGACY_PERMISSION_MAP[item.toLowerCase()]))] : [];
-  } catch {
-    return [];
+    const parsed = JSON.parse(value || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+function requestedPermissions(value) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string' || !canonicalPermission(item).length)) {
+    throw Object.assign(new Error('Permission list contains unavailable permissions.'), { statusCode: 400, code: 'PERMISSION_UNAVAILABLE' });
   }
+  return parsePermissions(value);
+}
+
+function preserveArchivedPermissions(previous, active) {
+  return [...rawPermissions(previous).filter((item) => !canonicalPermission(item).length), ...active];
+}
+
+function existingRoleOrAssignable(role, previous) {
+  return ALLOWED_ROLES.includes(role) || role === normalizeRole(previous);
 }
 
 function normalizeRole(role) {
@@ -92,41 +56,30 @@ function isValidEmail(value) {
 }
 
 function isSuperAdmin(req) {
-  return String(req.user?.role || '').toLowerCase() === 'super_admin';
+  return normalizeRole(req.user?.role) === 'super_admin';
 }
 
-function sanitizeAccessScope(value) {
-  if (value === undefined || value === null) return {};
-  if (typeof value !== 'object' || Array.isArray(value)) throw new Error('Access scope must be an object');
-  const allowed = new Set(['departments', 'project_ids']);
-  if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error('Access scope contains unsupported fields');
-  const departments = Array.isArray(value.departments)
-    ? [...new Set(value.departments.map((item) => String(item).trim()).filter(Boolean))].slice(0, 20)
-    : [];
-  const projectIds = Array.isArray(value.project_ids)
-    ? [...new Set(value.project_ids.map(Number).filter((item) => Number.isInteger(item) && item > 0))].slice(0, 100)
-    : [];
-  return { departments, project_ids: projectIds };
-}
-
-function parseAccessScope(value) {
-  if (!value) return {};
-  if (typeof value === 'object') return value;
-  try { return JSON.parse(value); } catch { return {}; }
-}
-
-async function validateManager(managerId, targetUserId) {
-  if (!managerId) return null;
-  if (targetUserId && Number(managerId) === Number(targetUserId)) return 'A user cannot be their own manager';
-  const [[manager]] = await pool.query(
-    'SELECT id, role FROM users WHERE id = ? AND active = 1 AND deleted_at IS NULL LIMIT 1',
-    [managerId]
-  );
-  if (!manager) return 'Selected manager is not an active user';
-  if (!['manager', 'supervisor', 'admin', 'super_admin', 'hr'].includes(String(manager.role || '').toLowerCase())) {
-    return 'Selected user does not have a managerial role';
+const RETIRED_EMPLOYMENT_FIELDS = new Set([
+  'employee_number', 'department', 'manager_id', 'access_scope', 'employee_id',
+  'employment_type', 'job_title', 'salary', 'hourly_rate', 'payroll', 'hire_date'
+]);
+function rejectRetiredEmploymentFields(body) {
+  if (Object.keys(body || {}).some((key) => RETIRED_EMPLOYMENT_FIELDS.has(key))) {
+    throw Object.assign(new Error('Employment fields are no longer available.'), { statusCode: 400, code: 'FIELD_UNAVAILABLE' });
   }
-  return null;
+}
+const ACCOUNT_DTO_FIELDS = [
+  'id', 'user_uuid', 'name', 'username', 'email', 'role', 'active', 'account_status',
+  'mfa_enabled', 'last_mfa_update_at', 'last_login_at', 'password_reset_required',
+  'last_password_reset_at', 'created_at', 'last_password_change_at', 'last_security_review_at',
+  'security_compromised_at', 'active_session_count'
+];
+function accountDto(row) {
+  const dto = {};
+  for (const key of ACCOUNT_DTO_FIELDS) if (Object.hasOwn(row, key)) dto[key] = row[key];
+  dto.active = Number(row.active) !== 0;
+  dto.permissions = parsePermissions(row.permissions);
+  return dto;
 }
 
 function containsHighRiskPermission(permissions) {
@@ -144,26 +97,21 @@ async function assertRoleAuthority(req, targetUserId, requestedRole) {
   }
   if (targetUserId) {
     const [[target]] = await pool.query('SELECT role FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [targetUserId]);
-    if (target?.role === 'super_admin' && !isSuperAdmin(req)) return 'Only a super administrator can manage that account';
+    if (normalizeRole(target?.role) === 'super_admin' && !isSuperAdmin(req)) return 'Only a super administrator can manage that account';
   }
   return null;
 }
 
 exports.createUser = async (req, res) => {
   try {
+    rejectRetiredEmploymentFields(req.body);
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
     const name = String(req.body.name || '').trim();
     const email = String(req.body.email || '').trim().toLowerCase();
     const role = normalizeRole(req.body.role || 'staff');
     const username = String(req.body.username || email.split('@')[0] || '').trim().toLowerCase();
-    const permissions = parsePermissions(req.body.permissions);
-    const department = String(req.body.department || '').trim().slice(0, 120) || null;
-    const managerId = Number(req.body.manager_id || 0) || null;
-    let accessScope;
-    try { accessScope = sanitizeAccessScope(req.body.access_scope); } catch (error) {
-      return res.status(400).json({ message: error.message });
-    }
+    const permissions = requestedPermissions(req.body.permissions);
 
     if (!name || !username || !email || !role) {
       return res.status(400).json({ message: 'Name, username, email and role are required' });
@@ -176,8 +124,6 @@ exports.createUser = async (req, res) => {
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
-    const managerError = await validateManager(managerId, null);
-    if (managerError) return res.status(400).json({ message: managerError });
     const authorityError = await assertRoleAuthority(req, null, role);
     if (authorityError) return res.status(403).json({ message: authorityError });
     if ((role !== 'staff' || permissions.length) && !hasPermission(req.user, 'MANAGE_ROLES')) {
@@ -199,13 +145,13 @@ exports.createUser = async (req, res) => {
 
     const [result] = await pool.query(
       `INSERT INTO users
-       (name, username, email, password, role, permissions, active, password_reset_required, department, manager_id, access_scope)
-       VALUES (?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?)`,
-      [name, username, email, disabledPassword, role, JSON.stringify(permissions), department, managerId, JSON.stringify(accessScope)]
+       (name, username, email, password, role, permissions, active, password_reset_required)
+       VALUES (?, ?, ?, ?, ?, ?, 0, 1)`,
+      [name, username, email, disabledPassword, role, JSON.stringify(permissions)]
     );
 
     await pool.query(
-      "UPDATE users SET account_status = 'INVITED', user_uuid = COALESCE(user_uuid, UUID()), employee_number = COALESCE(employee_number, CONCAT('VV-', LPAD(id, 6, '0'))) WHERE id = ?",
+      "UPDATE users SET account_status = 'INVITED', user_uuid = COALESCE(user_uuid, UUID()) WHERE id = ?",
       [result.insertId]
     );
     const inviteToken = await issueToken({ userId: result.insertId, type: 'INVITE', minutes: 1440, createdBy: req.user.id });
@@ -225,8 +171,9 @@ exports.createUser = async (req, res) => {
     });
   } catch (error) {
     console.error('createUser error:', error);
-    res.status(500).json({
-      message: 'Failed to create user',
+    res.status(error.statusCode || 500).json({
+      message: error.statusCode ? error.message : 'Failed to create user',
+      code: error.code,
       request_id: req.requestId || null
     });
   }
@@ -240,15 +187,11 @@ exports.getUsers = async (req, res) => {
       `SELECT
         id,
         user_uuid,
-        employee_number,
         name,
         username,
         email,
         role,
         permissions,
-        department,
-        manager_id,
-        access_scope,
         active,
         account_status,
         mfa_enabled,
@@ -267,12 +210,7 @@ exports.getUsers = async (req, res) => {
     );
 
     res.json({
-      users: rows.map((row) => ({
-        ...row,
-        active: Number(row.active) !== 0,
-        permissions: parsePermissions(row.permissions),
-        access_scope: parseAccessScope(row.access_scope)
-      }))
+      users: rows.map(accountDto)
     });
   } catch (error) {
     console.error('getUsers error:', error);
@@ -293,12 +231,14 @@ exports.getPermissionCatalog = (req, res) => {
 
 exports.previewPermissionDifference = async (req, res) => {
   try {
+    rejectRetiredEmploymentFields(req.body);
     const userId = Number(req.params.id);
     const role = normalizeRole(req.body.role);
-    const overrides = parsePermissions(req.body.permissions);
-    if (!userId || !ALLOWED_ROLES.includes(role)) return res.status(400).json({ message: 'Valid user and role are required' });
+    const overrides = requestedPermissions(req.body.permissions);
+    if (!userId) return res.status(400).json({ message: 'Valid user and role are required' });
     const [[target]] = await pool.query('SELECT role, permissions FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
     if (!target) return res.status(404).json({ message: 'User not found' });
+    if (!existingRoleOrAssignable(role, target.role)) return res.status(400).json({ message: 'This role is not available for assignment.' });
     const authorityError = await assertRoleAuthority(req, userId, role);
     if (authorityError) return res.status(403).json({ message: authorityError });
     const previous = [...new Set([...(ROLE_TEMPLATES[normalizeRole(target.role)] || []), ...parsePermissions(target.permissions)])];
@@ -306,12 +246,13 @@ exports.previewPermissionDifference = async (req, res) => {
     return res.json({ current_role: normalizeRole(target.role), proposed_role: role, ...permissionDifference(previous, proposed), high_risk_added: permissionDifference(previous, proposed).added.filter((item) => HIGH_RISK_PERMISSIONS.has(item)) });
   } catch (error) {
     console.error('previewPermissionDifference error:', error.message);
-    return res.status(500).json({ message: 'Unable to preview access change' });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Unable to preview access change', code: error.code });
   }
 };
 
 exports.updateUserAccess = async (req, res) => {
   try {
+    rejectRetiredEmploymentFields(req.body);
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
     const userId = Number(req.params.id);
@@ -320,7 +261,7 @@ exports.updateUserAccess = async (req, res) => {
     }
     const role = normalizeRole(req.body.role || 'staff');
     const active = Boolean(req.body.active);
-    const permissions = parsePermissions(req.body.permissions);
+    const permissions = requestedPermissions(req.body.permissions);
     const reason = String(req.body.reason || '').trim().slice(0, 255);
     if (!userId) {
       return res.status(400).json({ message: 'User ID is required' });
@@ -339,15 +280,14 @@ exports.updateUserAccess = async (req, res) => {
       return res.status(400).json({ message: 'You cannot disable your own account' });
     }
 
-    if (!ALLOWED_ROLES.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
-    }
-
     const [[before]] = await pool.query(
       'SELECT role, permissions, active, mfa_enabled, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [userId]
     );
     if (!before) return res.status(404).json({ message: 'User not found' });
+    if (!existingRoleOrAssignable(role, before.role)) return res.status(400).json({ message: 'This role is not available for assignment.' });
+    const storedRole = role === normalizeRole(before.role) ? before.role : role;
+    const storedPermissions = preserveArchivedPermissions(before.permissions, permissions);
     const accessDifference = permissionDifference(
       [...new Set([...(ROLE_TEMPLATES[normalizeRole(before.role)] || []), ...parsePermissions(before.permissions)])],
       [...new Set([...(ROLE_TEMPLATES[role] || []), ...permissions])]
@@ -357,7 +297,7 @@ exports.updateUserAccess = async (req, res) => {
       `UPDATE users
        SET role = ?, permissions = ?, active = ?
        WHERE id = ? AND deleted_at IS NULL`,
-      [role, JSON.stringify(permissions), active ? 1 : 0, userId]
+      [storedRole, JSON.stringify(storedPermissions), active ? 1 : 0, userId]
     );
 
     if (result.affectedRows === 0) {
@@ -386,8 +326,9 @@ exports.updateUserAccess = async (req, res) => {
     res.json({ message: 'User access updated successfully', permission_difference: accessDifference });
   } catch (error) {
     console.error('updateUserAccess error:', error);
-    res.status(500).json({
-      message: 'Failed to update access',
+    res.status(error.statusCode || 500).json({
+      message: error.statusCode ? error.message : 'Failed to update access',
+      code: error.code,
       request_id: req.requestId || null
     });
   }
@@ -506,6 +447,7 @@ exports.completeAccessReview = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
+    rejectRetiredEmploymentFields(req.body);
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
     const userId = Number(req.params.id);
@@ -517,35 +459,22 @@ exports.updateUser = async (req, res) => {
     }
 
     const [[before]] = await pool.query(
-      'SELECT name, username, email, role, permissions, active, department, manager_id, access_scope, mfa_enabled, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
+      'SELECT name, username, email, role, permissions, active, mfa_enabled, account_status FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1',
       [userId]
     );
     if (!before) return res.status(404).json({ message: 'User not found' });
 
     const role = normalizeRole(req.body.role === undefined ? before.role : req.body.role);
     const active = req.body.active === undefined ? Boolean(before.active) : Boolean(req.body.active);
-    const permissions = req.body.permissions === undefined ? parsePermissions(before.permissions) : parsePermissions(req.body.permissions);
-    const department = req.body.department === undefined
-      ? before.department
-      : (String(req.body.department || '').trim().slice(0, 120) || null);
-    const managerId = req.body.manager_id === undefined
-      ? (Number(before.manager_id || 0) || null)
-      : (Number(req.body.manager_id || 0) || null);
-    let accessScope;
-    try {
-      accessScope = req.body.access_scope === undefined
-        ? parseAccessScope(before.access_scope)
-        : sanitizeAccessScope(req.body.access_scope);
-    } catch (error) {
-      return res.status(400).json({ message: error.message });
-    }
+    const permissions = req.body.permissions === undefined ? parsePermissions(before.permissions) : requestedPermissions(req.body.permissions);
+    const storedPermissionsJson = req.body.permissions === undefined
+      ? (typeof before.permissions === 'string' ? before.permissions : JSON.stringify(rawPermissions(before.permissions)))
+      : JSON.stringify(preserveArchivedPermissions(before.permissions, permissions));
+    const storedRole = role === normalizeRole(before.role) ? before.role : role;
     const reason = String(req.body.reason || '').trim().slice(0, 255);
     const accessChanged = role !== normalizeRole(before.role)
       || active !== Boolean(before.active)
-      || !samePermissions(permissions, parsePermissions(before.permissions))
-      || department !== before.department
-      || managerId !== (Number(before.manager_id || 0) || null)
-      || JSON.stringify(accessScope) !== JSON.stringify(parseAccessScope(before.access_scope));
+      || !samePermissions(permissions, parsePermissions(before.permissions));
     if (accessChanged && !reason) {
       return res.status(400).json({ message: 'A reason is required when role, permissions or account status changes' });
     }
@@ -556,9 +485,8 @@ exports.updateUser = async (req, res) => {
     if (authorityError) return res.status(403).json({ message: authorityError });
     if (Number(req.user.id) === userId && (
       req.body.role !== undefined || req.body.permissions !== undefined || req.body.active !== undefined
-      || req.body.department !== undefined || req.body.manager_id !== undefined || req.body.access_scope !== undefined
     )) {
-      return res.status(403).json({ message: 'You cannot modify your own role, permissions, account status or access scope' });
+      return res.status(403).json({ message: 'You cannot modify your own role, permissions or account status' });
     }
     if (req.body.permissions !== undefined && !isSuperAdmin(req) && containsHighRiskPermission(permissions)) return res.status(403).json({ message: 'Only a super administrator can grant high-risk permissions' });
     try { await assertNoSegregationConflicts(role, permissions); } catch (error) { return res.status(error.statusCode || 500).json({ message: error.message, conflicts: error.conflicts || [] }); }
@@ -575,11 +503,7 @@ exports.updateUser = async (req, res) => {
       return res.status(400).json({ message: 'You cannot disable your own account' });
     }
 
-    if (!ALLOWED_ROLES.includes(role)) {
-      return res.status(400).json({ message: 'Invalid role' });
-    }
-    const managerError = await validateManager(managerId, userId);
-    if (managerError) return res.status(400).json({ message: managerError });
+    if (!existingRoleOrAssignable(role, before.role)) return res.status(400).json({ message: 'This role is not available for assignment.' });
 
     const [existing] = await pool.query(
       'SELECT id FROM users WHERE (LOWER(email) = ? OR LOWER(username) = ?) AND id <> ? LIMIT 1',
@@ -587,7 +511,7 @@ exports.updateUser = async (req, res) => {
     );
 
     if (existing.length) {
-      return res.status(400).json({ message: 'Email or username is already used by another staff member' });
+      return res.status(400).json({ message: 'Email or username is already used by another account' });
     }
 
     const [result] = await pool.query(
@@ -597,12 +521,9 @@ exports.updateUser = async (req, res) => {
            email = ?,
            role = ?,
            permissions = ?,
-           active = ?,
-           department = ?,
-           manager_id = ?,
-           access_scope = ?
+           active = ?
        WHERE id = ? AND deleted_at IS NULL`,
-      [name, username, email, role, JSON.stringify(permissions), active ? 1 : 0, department, managerId, JSON.stringify(accessScope), userId]
+      [name, username, email, storedRole, storedPermissionsJson, active ? 1 : 0, userId]
     );
 
     if (result.affectedRows === 0) {
@@ -618,20 +539,21 @@ exports.updateUser = async (req, res) => {
     await logAudit(pool, {
       actorId: req.user.id,
       action: 'USER_RECORD_CHANGED',
-      module: 'staff',
+      module: 'security',
       recordType: 'user',
       recordId: userId,
-      oldValue: { ...before, permissions: parsePermissions(before.permissions), access_scope: parseAccessScope(before.access_scope) },
-      newValue: { name, username, email, role, permissions, active, department, manager_id: managerId, access_scope: accessScope, reason: reason || null },
+      oldValue: accountDto(before),
+      newValue: { name, username, email, role, permissions, active, reason: reason || null },
       ipAddress: req.ip,
       userAgent: req.get('user-agent')
     });
 
-    res.json({ message: 'Staff details updated successfully' });
+    res.json({ message: 'Account details updated successfully' });
   } catch (error) {
     console.error('updateUser error:', error);
-    res.status(500).json({
-      message: 'Failed to update staff details',
+    res.status(error.statusCode || 500).json({
+      message: error.statusCode ? error.message : 'Failed to update account details',
+      code: error.code,
       request_id: req.requestId || null
     });
   }
@@ -802,7 +724,7 @@ exports.deleteUser = async (req, res) => {
     await logAudit(connection, {
       actorId: req.user.id,
       action: 'USER_ACCOUNT_DELETED',
-      module: 'staff',
+      module: 'security',
       recordType: 'user',
       recordId: userId,
       oldValue: { active: Number(target.active) !== 0, role: target.role },

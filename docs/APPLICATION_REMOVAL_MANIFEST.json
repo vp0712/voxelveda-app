@@ -1,6 +1,6 @@
 {
   "baseline": "80733384e62ce47942f5ad19481973f90aa568e0",
-  "scope": "Banking/ERP runtime removal; historical migration checksums and database records preserved",
+  "scope": "Complete Banking/Finance and ERP runtime removal, including RFQ/quotation; historical database records and migration checksums retained",
   "retained_entry_roots": [
     "app.js",
     "server.js",
@@ -42,6 +42,10 @@
     {
       "path": ".github/workflows/recovery-remediation.yml",
       "sha256": "83db01984c25aa772d694ddc79ee84f2333c187f161b90be6753f0e9899e8cee"
+    },
+    {
+      "path": "android/app/src/main/res/drawable/ic_stat_voxel_notification.xml",
+      "sha256": "89cff63fe7c5baebf8303c4f4f8998295634a89690e597913e4d629f1e34b637"
     },
     {
       "path": "controllers/accessAttemptController.js",
@@ -388,6 +392,10 @@
       "sha256": "7299b49984c373cf815b4bc61fcb21ff84a6401ce51de7d0baf20947b3900fdb"
     },
     {
+      "path": "controllers/publicRfqController.js",
+      "sha256": "d00508e49980f2734e8fdde0a91e80345a1bbaf07246e358200264f7de9964a4"
+    },
+    {
       "path": "controllers/qms/governanceController.js",
       "sha256": "2fdc9066a01d8dce6c56705d8c5f2d26a1b7f1a2797e9677ff98ef496edfc21b"
     },
@@ -550,6 +558,18 @@
     {
       "path": "public/controlled-forms.js",
       "sha256": "cbc6d2b72dc57c4afebdfdb796a45fc362ce148926a22b0e269b340cd76cec83"
+    },
+    {
+      "path": "public/customer-rfq-qr.png",
+      "sha256": "1b1975bc54468f14dda9b227868031c1a846215213b98d9275ae6008efc27e75"
+    },
+    {
+      "path": "public/customer.html",
+      "sha256": "36a0ec5f932ec7849ccdfa7d231e8dcf9f24ba502e27db775451f7545e131f4a"
+    },
+    {
+      "path": "public/customer.js",
+      "sha256": "a3e4de0793b83d72c961af5af684959c3cb37852f52adca14134d94ad0390677"
     },
     {
       "path": "public/dashboard-profile-avatar.js",
@@ -1208,6 +1228,10 @@
       "sha256": "9b89443c5ad4cd35fa68648c34a78367856be8612b2ad1bc04029be5c1ace47a"
     },
     {
+      "path": "scripts/customer-rfq-intake-test.js",
+      "sha256": "0ea004e8be9ee723a5aad588e75961192b3c2f11ee65dda2b12667e6bfe9d9e2"
+    },
+    {
       "path": "scripts/database-capacity-recovery-test.js",
       "sha256": "bb8175d1ae95bc746a7b78b6e5c7168df5a73bff657f9c0aeda7163aeaef714f"
     },
@@ -1218,6 +1242,10 @@
     {
       "path": "scripts/employee-identity-test.js",
       "sha256": "e7f5f99e641b8725f3a960d58c8ab7c63ed951a55fe6acd2ae4624ceb5fda895"
+    },
+    {
+      "path": "scripts/enterprise-wave-a-mysql-legacy-test.js",
+      "sha256": "4efc9d35bad102628b2222b93ad5b2e8b6f1d8123417da5f421b715bb4824c92"
     },
     {
       "path": "scripts/erp-wave1-trash-lifecycle-test.js",
@@ -1888,6 +1916,10 @@
       "sha256": "1364eed7819aeafc02d1d8e20d5dbce6a89b07deee715fc3e23e975afb46bdd3"
     },
     {
+      "path": "scripts/security-dashboard-test.js",
+      "sha256": "3852cdd495939252a96ac5f01ecdb3552a21f74e5ec061632ddd678f8325241f"
+    },
+    {
       "path": "scripts/standalone-banking-portal-test.js",
       "sha256": "b7da073b5c6c0fe580b78ca3e59a2df685af6db5e8a7b687ea7f42ba0b7c9c5a"
     },
@@ -2138,6 +2170,10 @@
     {
       "path": "services/procurementService.js",
       "sha256": "fe082e00b94218599a6e6717b64591d1cca0f38129a2247204730511123ece64"
+    },
+    {
+      "path": "services/publicSubmissionDedupeService.js",
+      "sha256": "d0ae623383341676387e204fbcffb3cf732c1f1de421900669c7f49dc66f8388"
     },
     {
       "path": "services/qmsAdvancedSchema.js",

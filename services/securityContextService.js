@@ -5,7 +5,7 @@ const { ensureSecurityGovernanceSchema } = require('./securityGovernanceSchema')
 const hashToken = (value) => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 const IMPERSONATION_HEADER = 'x-impersonation-context';
 const BLOCKED_IMPERSONATION_PREFIXES = [
-  '/api/high-risk-finance', '/api/finance', '/api/security', '/api/users',
+  '/api/security', '/api/users',
   '/api/settings', '/api/email', '/api/integrations'
 ];
 
