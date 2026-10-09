@@ -8,7 +8,7 @@ async function redirectSavedSession() {
     localStorage.removeItem('token');
     localStorage.setItem('user', JSON.stringify(savedUser));
     localStorage.setItem('role', role);
-    window.location.replace(portalPathForUser(role, savedUser));
+    window.location.replace(safeReturnTo(role, savedUser));
     return true;
   } catch {
     localStorage.removeItem('token');
@@ -60,28 +60,17 @@ async function resolveAuthenticatedUser(loginData) {
 }
 
 function portalPathForUser(role, user = {}) {
-  const normalizedRole = String(role || '').trim().toLowerCase();
-  const permissions = Array.isArray(user.permissions) ? user.permissions : [];
-  if (['viewer', 'view_only', 'client', 'customer'].includes(normalizedRole)) return '/client';
-  if (['admin', 'super_admin', 'finance_admin', 'finance_user', 'accountant'].includes(normalizedRole)
-    || permissions.includes('finance')) return '/admin';
-  const internalRoles = new Set(['staff', 'hr', 'production', 'supervisor', 'manager', 'sales']);
-  return internalRoles.has(normalizedRole) ? `/portal/${normalizedRole}` : '/portal/staff';
-}
-
-function hasOperationsWorkspaceAccess(role, user = {}) {
-  return portalPathForUser(role, user) === '/admin';
+  return '/dashboard';
 }
 
 function safeReturnTo(role, user = {}) {
   const home = portalPathForUser(role, user);
   const value = new URLSearchParams(window.location.search).get('returnTo');
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return home;
-  if (value.startsWith('/admin') && home !== '/admin') return home;
-  if (value.startsWith('/portal/')) return home;
-  if (value === '/dashboard') return home;
-  if (value === '/client' && home !== '/client') return home;
-  return value;
+  // Return only to the retained account pages. Old operations and finance links
+  // land in the current workspace rather than a removed feature.
+  const path = value.split(/[?#]/, 1)[0];
+  return ['/dashboard', '/security', '/profile', '/request-quote'].includes(path) ? value : home;
 }
 
 function showLoginMessageFromUrl() {
@@ -89,7 +78,9 @@ function showLoginMessageFromUrl() {
   if (!message) return;
   setLoginStatus(message, 'warning');
 
-  const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
+  const params = new URLSearchParams(window.location.search);
+  params.delete('message');
+  const cleanUrl = `${window.location.pathname}${params.size ? '?' + params.toString() : ''}${window.location.hash || ''}`;
   window.history.replaceState({}, document.title, cleanUrl);
 }
 

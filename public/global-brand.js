@@ -114,10 +114,9 @@
     const path = (() => {
       try { return new URL(urlValue, window.location.href).pathname.toLowerCase(); } catch { return ''; }
     })();
-    if (/statement|import|upload/.test(path)) return 'Processing your file securely…';
-    if (/finance|expense|invoice|payment|bank/.test(path)) return methodName === 'GET' ? 'Refreshing finance data…' : 'Saving finance changes…';
+    if (/upload/.test(path)) return 'Processing your file securely…';
     if (/security|auth|mfa/.test(path)) return 'Verifying securely…';
-    if (/dashboard|report|analytics|insight/.test(path)) return 'Refreshing your workspace…';
+    if (/dashboard|profile/.test(path)) return 'Refreshing your workspace…';
     if (methodName === 'GET') return 'Refreshing data…';
     if (methodName === 'DELETE') return 'Updating records securely…';
     return 'Saving changes…';

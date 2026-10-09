@@ -4,7 +4,7 @@ const { assessProductionReadiness, secretBytes } = require('../config/production
 const key = (byte) => Buffer.alloc(32, byte).toString('base64');
 const valid = {
   NODE_ENV: 'production', JWT_SECRET: 'j'.repeat(48), SESSION_SECRET: 's'.repeat(48),
-  MFA_ENCRYPTION_KEY: key(1), FINANCE_ENCRYPTION_KEY: key(2), SHIFT_QR_SIGNING_KEY: key(3),
+  MFA_ENCRYPTION_KEY: key(1),
   ALLOWED_ORIGINS: 'https://app.voxelveda.com,https://voxelveda.com',
   APP_URL: 'https://app.voxelveda.com', TRUST_PROXY: 'true',
   ALLOW_LEGACY_QUERY_TOKENS: 'false', ENABLE_ADMIN_BOOTSTRAP: 'false',
@@ -20,7 +20,7 @@ assert.deepEqual(assessProductionReadiness(valid), { production: true, ready: tr
 for (const mutation of [
   { JWT_SECRET: 'secret' }, { SESSION_SECRET: valid.JWT_SECRET }, { ALLOWED_ORIGINS: '*' },
   { APP_URL: 'http://app.voxelveda.com' }, { TRUST_PROXY: 'false' }, { DEBUG_AUTH_BYPASS: 'true' },
-  { SHIFT_QR_SIGNING_KEY: '' }, { DB_TLS_REJECT_UNAUTHORIZED: 'false' },
+  { MFA_ENCRYPTION_KEY: '' }, { DB_TLS_REJECT_UNAUTHORIZED: 'false' },
   { RATE_LIMIT_STORE: 'redis', REDIS_URL: '' }, { RATE_LIMIT_FAILURE_POLICY: 'memory' }
 ]) {
   const result = assessProductionReadiness({ ...valid, ...mutation });

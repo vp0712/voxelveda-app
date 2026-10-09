@@ -191,7 +191,7 @@ DROP PROCEDURE vv_test;
   assert.match(statements[0], /CREATE PROCEDURE/);
   assert.match(statements[1], /CALL vv_test/);
   const repositoryMigrations = discoverMigrations();
-  assert(repositoryMigrations.length >= 20);
+  assert(repositoryMigrations.length >= 1, 'Retained application bootstrap migration must exist');
   assert(repositoryMigrations.every((migration) => Array.isArray(migration.statements)));
 }
 
@@ -234,7 +234,7 @@ function testWiring() {
   const steps = [
     'startupEnvironmentReadiness.warnings.forEach',
     'await verifyDatabaseConnection(pool)',
-    'await runMigrations({ pool })',
+    'await runMigrations({ pool, verifyOnly: true })',
     'await initializeCriticalSchemas()',
     'await initializeServices()',
     'await initializeWorkers()',
@@ -248,8 +248,8 @@ function testWiring() {
   }
 
   const app = fs.readFileSync(path.join(root, 'app.js'), 'utf8');
-  assert.match(app, /app\.get\('\/api\/health',readinessController\.health\)/);
-  assert.match(app, /app\.get\('\/api\/ready',readinessController\.ready\)/);
+  assert.match(app, /app\.get\('\/api\/health',readiness\.health\)/);
+  assert.match(app, /app\.get\('\/api\/ready',readiness\.ready\)/);
   assert.match(app, /app\.use\('\/api\/security\/readiness',auth,readinessRoutes\)/);
 }
 

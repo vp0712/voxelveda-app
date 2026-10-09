@@ -38,4 +38,4 @@ jobs:
       - name: Branding and reconnect contracts
         run: node scripts/global-brand-original-logo-test.js
       - name: Whole-system audit
-        run: node scripts/final-system-audit.js
+        run: node scripts/application-retirement-test.js

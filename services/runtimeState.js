@@ -33,6 +33,7 @@ function baseState() {
       tls_requested: false,
       tls_active: false,
       tls_capable: null,
+      tls_trust_status: null,
       tls_cipher: null,
       tls_certificate_verification: null,
       least_privilege_attested: false,

@@ -16,11 +16,8 @@ const {
   rateLimit
 } = require('../middleware/securityMiddleware');
 const {
-  aiLeadContract,
-  cocVerificationContract,
   customerRegistrationContract,
-  publicRfqContract,
-  qrGenerationContract
+  publicRfqContract
 } = require('../middleware/publicEndpointProtection');
 const {
   botChallenge,
@@ -184,15 +181,12 @@ async function run() {
   assert.equal(authPolicyName('/mfa/verify'), 'mfa');
   assert.equal(authPolicyName('/step-up'), 'step_up');
   assert.equal(authPolicyName('/password-reset/request'), 'password_reset');
-  assert.notEqual(RATE_LIMIT_POLICIES.public_rfq.max, RATE_LIMIT_POLICIES.shift_qr.max);
+  assert(RATE_LIMIT_POLICIES.public_rfq.max < RATE_LIMIT_POLICIES.authenticated_api.max);
 
   const validRfq = { customer_name: 'A Customer', email: 'buyer@example.com', phone: '', material: 'ABS', quantity: 4, application: 'Prototype' };
   assert.equal((await invoke(publicRfqContract, { body: validRfq, headers: {} })).nextCalled, true);
   assert.equal((await invoke(publicRfqContract, { body: { ...validRfq, quantity: 0 }, headers: {} })).res.statusCode, 400);
-  assert.equal((await invoke(aiLeadContract, { body: { name: 'Buyer', email: 'buyer@example.com', need: 'Production tooling' }, headers: {} })).nextCalled, true);
   assert.equal((await invoke(customerRegistrationContract, { body: { name: 'Buyer', email: 'buyer@example.com', password: 'long password value', confirm_privacy: true }, headers: {} })).nextCalled, true);
-  assert.equal((await invoke(qrGenerationContract, { query: { data: 'safe-value' }, headers: {} })).nextCalled, true);
-  assert.equal((await invoke(cocVerificationContract, { params: { no: 'COC-0001' }, query: { hash: 'a'.repeat(64) }, headers: {} })).nextCalled, true);
 
   const challengeName = 'test-adapter';
   registerBotChallengeAdapter(challengeName, { async verify({ token }) { return { verified: token === 'valid' }; } });
@@ -222,9 +216,8 @@ async function run() {
   const registerHtml = fs.readFileSync(path.join(root, 'public', 'register.html'), 'utf8');
   assert(appSource.includes("rateLimitPolicy('public_rfq')"));
   assert(appSource.includes("publicSubmissionDedupe({submissionType:'public_rfq'})"));
-  assert(appSource.includes("app.use('/api/auth', boundedJson('8kb'))"));
-  assert(appSource.includes("app.use('/api/public/rfq', boundedJson('16kb'))"));
-  assert(appSource.includes("app.use('/api/public/ai-lead', boundedJson('32kb'))"));
+  assert.match(appSource, /app\.use\('\/api\/auth',express\.json\(\{limit:'8kb'/);
+  assert.match(appSource, /app\.use\('\/api\/public\/rfq',express\.json\(\{limit:'16kb'/);
   assert(authRoutesSource.includes("botChallenge('customer_registration')"));
   assert(!authSource.includes('exports.register ='));
   assert(authSource.includes('const passwordCheck = validatePassword(password'));

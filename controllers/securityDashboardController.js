@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { ensureSecurityOperationsSchema } = require('../services/securityOperationsSchema');
-const { ensureWorkforceSchema } = require('../services/workforceSchema');
+const { ensureCoreAuditSchema } = require('../services/coreAuditSchema');
 const { ensureOperationalTrustSchema } = require('../services/operationalTrustSchema');
 const { ensureSecurityGovernanceSchema } = require('../services/securityGovernanceSchema');
 const { redactSensitive } = require('../utils/securityRedaction');
@@ -11,7 +11,7 @@ const PRIVILEGED_ROLES = ['super_admin', 'admin', 'finance_admin', 'accountant',
 const HIGH_RISK_EVENTS = ['ROLE_CHANGED', 'PERMISSION_CHANGED', 'USER_DISABLED', 'ACCOUNT_TERMINATED', 'BANK_DETAILS_CHANGED', 'PAYMENT_APPROVED', 'SENSITIVE_EXPORT', 'MFA_DISABLED', 'SECURITY_SETTING_CHANGED', 'BREAK_GLASS_ACTIVATED', 'IMPERSONATION_STARTED', 'DATABASE_SECURITY_ATTESTED'];
 
 async function ensureSchemas() {
-  await Promise.all([ensureSecuritySchema(), ensureSecurityOperationsSchema(), ensureOperationalTrustSchema(), ensureWorkforceSchema(), ensureSecurityGovernanceSchema()]);
+  await Promise.all([ensureSecuritySchema(), ensureSecurityOperationsSchema(), ensureOperationalTrustSchema(), ensureCoreAuditSchema(), ensureSecurityGovernanceSchema()]);
 }
 
 function safePage(query) {

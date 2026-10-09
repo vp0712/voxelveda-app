@@ -1,5 +1,5 @@
 const statusNode = document.getElementById('status');
-const showStatus = (message, ok = false) => { statusNode.textContent = message; statusNode.style.color = ok ? '#22c55e' : '#f87171'; };
+const showStatus = (message, ok = false) => { statusNode.textContent = message; statusNode.style.color = ok ? 'var(--success)' : 'var(--danger)'; };
 function escapeHtml(value) { const div = document.createElement('div'); div.textContent = String(value); return div.innerHTML; }
 async function loadMfaStatus() {
   const response = await fetch('/api/auth/mfa/status');
@@ -41,14 +41,5 @@ document.getElementById('mfaConfirmForm').addEventListener('submit', async (even
   document.getElementById('mfaSetup').hidden = true;
   document.getElementById('mfaStartForm').hidden = true;
 });
-function loadProductionReadinessAssuranceCenter() {
-  if (document.querySelector('script[data-production-readiness-assurance]')) return;
-  const script = document.createElement('script');
-  script.src = '/production-readiness-assurance-center.js?v=20260917-production-readiness-assurance';
-  script.defer = true;
-  script.dataset.productionReadinessAssurance = '1';
-  document.head.appendChild(script);
-}
 loadSessions();
 loadMfaStatus();
-loadProductionReadinessAssuranceCenter();

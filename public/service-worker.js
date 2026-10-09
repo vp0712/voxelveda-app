@@ -1,4 +1,4 @@
-const CACHE_NAME = 'voxel-veda-public-v3';
+const CACHE_NAME = 'voxel-veda-public-v4-teal';
 const PUBLIC_ASSETS = ['/public-pages.css', '/favicon-192.png', '/favicon-512.png', '/logo.png'];
 
 self.addEventListener('install', (event) => {

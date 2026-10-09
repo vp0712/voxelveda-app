@@ -23,8 +23,8 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand"><img src="/voxel-veda-logo.png" alt="Voxel Veda"><div><strong>Voxel Veda</strong><span>Secure company profile</span></div></div>
-      <a class="back" id="backLink" href="/dashboard">← Dashboard</a>
+      <div class="brand"><img src="/voxel-veda-logo.png" alt="Voxel Veda"><div><strong>Voxel Veda</strong><span>Your account profile</span></div></div>
+      <a class="back" id="backLink" href="/dashboard">← Workspace</a>
     </header>
 
     <section class="grid" aria-label="User profile">
@@ -46,18 +46,18 @@
         <div class="completion">
           <div class="completionHead"><strong>Profile completeness</strong><span id="completionPercent">0%</span></div>
           <div class="completionTrack" aria-hidden="true"><i id="completionBar"></i></div>
-          <small id="completionHint">Complete your profile to help internal teams identify and contact you.</small>
+          <small id="completionHint">Keep your contact details up to date.</small>
         </div>
       </article>
 
       <article class="card">
         <h1>Edit Profile</h1>
-        <p class="subtitle">You can update your own profile. Your login email, username, role and employee number remain protected company fields.</p>
+        <p class="subtitle">You can update your own profile. Your login email, username, role and employee number remain protected account fields.</p>
         <form id="profileForm" novalidate>
           <div class="formGrid">
             <div class="field full"><label for="name">Full name</label><input id="name" name="name" maxlength="120" autocomplete="name" required></div>
             <div class="field full"><label for="mobile">Mobile number</label><input id="mobile" name="mobile_number" maxlength="30" inputmode="tel" autocomplete="tel" placeholder="e.g. +61 4xx xxx xxx"></div>
-            <div class="field"><label for="email">Company email</label><input id="email" readonly></div>
+            <div class="field"><label for="email">Email</label><input id="email" readonly></div>
             <div class="field"><label for="username">Username</label><input id="username" readonly></div>
             <div class="field"><label for="department">Department</label><input id="department" readonly></div>
             <div class="field"><label for="employeeNumber">Employee number</label><input id="employeeNumber" readonly></div>

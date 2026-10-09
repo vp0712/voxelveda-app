@@ -9,7 +9,6 @@ const routes = read('routes/securityIncidentRoutes.js');
 const controller = read('controllers/securityIncidentController.js');
 const schema = read('services/securityOperationsSchema.js');
 const report = read('services/securityReportService.js');
-const ui = read('public/admin-dashboard.js');
 
 for (const permission of ['MANAGE_SECURITY_INCIDENTS', 'EXPORT_SECURITY_REPORT', 'REVOKE_ORGANISATION_SESSIONS']) {
   assert(HIGH_RISK_PERMISSIONS.has(permission), `${permission} must remain high risk`);
@@ -30,7 +29,5 @@ assert.match(controller, /session_version = session_version \+ 1/);
 assert.match(report, /security_report_snapshots/i);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS security_incidents/);
 assert.match(schema, /CREATE TABLE IF NOT EXISTS security_incident_actions/);
-assert.match(ui, /Emergency Organisation Sign-out/);
-assert.match(ui, /Immutable action history/);
 
 console.log('Incident-response tests passed.');

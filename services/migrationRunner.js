@@ -150,7 +150,7 @@ function safeMigrationMessage(error) {
     .slice(0, 500);
 }
 
-async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger = console, env = process.env } = {}) {
+async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger = console, env = process.env, verifyOnly = false } = {}) {
   if (!pool?.getConnection) throw new MigrationError('A database pool is required', 'MIGRATION_POOL_REQUIRED');
   const migrations = discoverMigrations(migrationsDir);
   const requestedTimeout = Number(lockTimeoutSeconds || env.MIGRATION_LOCK_TIMEOUT_SECONDS || 60);
@@ -168,7 +168,7 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
     }
     lockAcquired = true;
     await ensureMigrationLedger(connection);
-    const baselinedIds = await baselineLegacySchema(connection, migrations, env, logger);
+    const baselinedIds = verifyOnly ? [] : await baselineLegacySchema(connection, migrations, env, logger);
     baselined = baselinedIds.length;
     const newlyBaselined = new Set(baselinedIds);
 
@@ -189,6 +189,14 @@ async function runMigrations({ pool, migrationsDir, lockTimeoutSeconds, logger =
       if (['APPLIED', 'BASELINED'].includes(existing?.status)) {
         if (!newlyBaselined.has(migration.migration_id)) skipped += 1;
         continue;
+      }
+
+      if (verifyOnly) {
+        throw new MigrationError(
+          `Historical migration ${migration.migration_id} is not applied; retired schemas will not be modified`,
+          'HISTORICAL_MIGRATION_UNAPPLIED',
+          { migration_id: migration.migration_id }
+        );
       }
 
       await connection.query(

@@ -1,8 +1,8 @@
-name: Integrated Repair Regression
+name: Retained Application Database Regression
 on:
   pull_request:
   push:
-    branches: [main, 'finance-release-*']
+    branches: [main, 'simplify-*']
 permissions:
   contents: read
 jobs:
@@ -38,7 +38,10 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - run: node scripts/integrated-repair-regression-test.js
-      - run: node scripts/workspace-navigation-behaviour-test.js
-      - run: node scripts/integrated-repair-mysql-test.js
-      - run: node scripts/finance-report-snapshot-mysql-test.js
+      - name: Retained runtime and public input contracts
+        run: |
+          node scripts/retained-runtime-test.js
+          node scripts/customer-rfq-intake-test.js
+          node scripts/core-audit-isolation-test.js
+      - name: Disposable MySQL records, audit, document scope and retired-email hold
+        run: node scripts/retained-mysql-test.js

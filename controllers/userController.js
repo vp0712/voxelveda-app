@@ -2,7 +2,7 @@ const pool = require('../config/db');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const { ensureUserLifecycleSchema } = require('../services/userLifecycleService');
-const { ensureWorkforceSchema } = require('../services/workforceSchema');
+const { ensureCoreAuditSchema } = require('../services/coreAuditSchema');
 const { logAudit } = require('../services/auditService');
 const { ensureSecuritySchema } = require('../services/securitySchema');
 const { revokeUserSessions, logSecurityEvent } = require('../services/sessionService');
@@ -733,7 +733,7 @@ exports.deleteUser = async (req, res) => {
   try {
     await ensureUserLifecycleSchema();
     await ensureSecuritySchema();
-    await ensureWorkforceSchema();
+    await ensureCoreAuditSchema();
     connection = await pool.getConnection();
     await connection.beginTransaction();
 

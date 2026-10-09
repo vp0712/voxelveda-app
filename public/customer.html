@@ -1,106 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
+<!doctype html>
+<html lang="en-AU">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Voxel Veda Customer RFQ</title>
-<link rel="stylesheet" href="/style.css?v=20260723-titanium-sidebar-fix" />
-  <link rel="stylesheet" href="/advanced-theme.css?v=20260824-mobile-shell-v4" />
-  <link rel="icon" type="image/png" href="/favicon.png?v=20260703-brand" />
-  <link rel="shortcut icon" href="/favicon.ico?v=20260703-brand" />
-  <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=20260703-brand" />
-  <link rel="manifest" href="/site.webmanifest?v=20260703-brand" />
-  <meta name="theme-color" content="#0b0d0f" />
-  <meta property="og:site_name" content="Voxel Veda" />
-  <link rel="canonical" href="https://app.voxelveda.com/request-quote" />
-  <meta property="og:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />
-  <meta property="og:image:width" content="1254" />
-  <meta property="og:image:height" content="1254" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /></head>
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Request a quote | Voxel Veda</title>
+  <meta name="description" content="Send your engineering project requirements to the Voxel Veda team.">
+  <link rel="canonical" href="https://app.voxelveda.com/request-quote">
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/workspace-theme.css?v=20261009">
+  <script src="/workspace-theme.js?v=20261009"></script>
+  <link rel="stylesheet" href="/workspace.css?v=20261009">
+</head>
 <body>
-  <main class="public-shell">
-    <section class="public-hero">
-      <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda Logo" class="public-logo" />
-      <div>
-        <p class="eyebrow">Customer Request Portal</p>
-        <h1>Request a quote for advanced manufacturing work</h1>
-        <p>
-          Send your project details to Voxel Veda. Our team will review your
-          request and follow up with the right next step.
-        </p>
-      </div>
-    </section>
-
-
-    <section class="public-flow-strip" aria-label="Voxel Veda RFQ workflow">
-      <article><span>01</span><strong>Submit RFQ</strong><small>Share project, material, quantity and deadline.</small></article>
-      <article><span>02</span><strong>Engineering Review</strong><small>Team checks feasibility, tolerance and production route.</small></article>
-      <article><span>03</span><strong>Quote & Schedule</strong><small>Receive next step with clearer scope and delivery planning.</small></article>
-    </section>
-    <section class="card public-card">
-      <h2>RFQ Details</h2>
-      <p id="customerStatus" class="status-note">All fields marked with contact details help us respond faster.</p>
-
-      <div class="form-grid">
-        <input id="customerName" placeholder="Customer or company name" autocomplete="organization" />
-        <input id="customerEmail" type="email" placeholder="Email address" autocomplete="email" />
-        <input id="customerPhone" placeholder="Phone number" autocomplete="tel" />
-        <input id="customerMaterial" placeholder="Material or technology" />
-        <input id="customerQuantity" type="number" min="1" placeholder="Quantity" />
-        <input id="customerApplication" placeholder="Application or project summary" />
-      </div>
-
-      <label class="privacy-check">
-        <input id="privacyAccepted" type="checkbox" />
-        <span>I have read and accept the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span>
-      </label>
-
-      <div class="public-actions">
-        <button type="button" class="primary-btn" onclick="submitCustomerRFQ()">Submit RFQ</button>
-        <a class="secondary-link" href="/login">Staff login</a>
-      </div>
-    </section>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="workspace-header">
+    <a class="workspace-brand" href="/" aria-label="Voxel Veda home"><img src="/logo.png" alt="Voxel Veda"><span>Voxel Veda</span></a>
+    <nav aria-label="Primary"><a href="/register">Create an account</a><a href="/login">Sign in</a><a href="/support">Support</a></nav>
+  </header>
+  <main id="main" class="workspace-main">
+    <section class="welcome"><p class="eyebrow">START A PROJECT</p><h1>Request a quote</h1><p>Share your part, material and quantity. Our team will review your requirements and contact you about the next step.</p></section>
+    <div class="workspace-grid">
+      <section class="panel" aria-labelledby="detailsTitle">
+        <h2 id="detailsTitle">Project details</h2>
+        <form id="customerRfqForm">
+          <div class="form-grid">
+            <label>Customer or company name<input id="customerName" name="customer_name" autocomplete="organization" maxlength="120" required></label>
+            <label>Email<input id="customerEmail" name="email" type="email" autocomplete="email" maxlength="254" required></label>
+            <label>Phone <span class="optional">(optional)</span><input id="customerPhone" name="phone" type="tel" autocomplete="tel" maxlength="40"></label>
+            <label>Material or process <span class="optional">(optional)</span><input id="customerMaterial" name="material" maxlength="160"></label>
+            <label>Quantity<input id="customerQuantity" name="quantity" type="number" inputmode="numeric" min="1" max="1000000" step="1" value="1" required></label>
+            <label class="full-width">Project description <span class="optional">(optional)</span><textarea id="customerApplication" name="application" maxlength="4000" rows="6" placeholder="Application, critical dimensions, finish, delivery needs or confidentiality requirements"></textarea></label>
+          </div>
+          <label class="privacy-consent"><input id="privacyAccepted" type="checkbox" required><span>I accept the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
+          <button id="customerSubmit" class="button" type="submit">Submit request</button>
+          <p id="customerStatus" class="status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+      <aside class="panel"><h2>Prepare your brief</h2><ul class="brief-list"><li>Describe the part and intended use</li><li>Include material and performance requirements</li><li>Specify important dimensions and tolerances</li><li>State quantity and delivery needs</li></ul><p class="muted">For drawings, files or an existing enquiry, contact our team.</p><a class="text-link" href="mailto:info@voxelveda.com">info@voxelveda.com</a></aside>
+    </div>
   </main>
-  <aside class="vv-ai-widget" id="vvAiWidget" aria-label="Voxel Veda AI assistant">
-    <button type="button" class="vv-ai-toggle" id="vvAiToggle" aria-expanded="false" aria-controls="vvAiPanel" onclick="toggleVoxelAi()">
-      <span class="vv-ai-orb">AI</span>
-      <span>Voxel Veda AI</span>
-    </button>
-    <section class="vv-ai-panel" id="vvAiPanel" hidden>
-      <div class="vv-ai-head">
-        <div>
-          <p class="eyebrow">Manufacturing Assistant</p>
-          <div class="vv-ai-stage"><span id="vvAiStep">Contact</span><strong id="vvAiProgress">1/5</strong></div>
-          <h2>How can I help?</h2>
-        </div>
-        <button type="button" class="vv-ai-close" aria-label="Close assistant" onclick="toggleVoxelAi(false)">x</button>
-      </div>
-      <div class="vv-ai-messages" id="vvAiMessages" aria-live="polite">
-        <div class="vv-ai-message bot">Hi, I am Voxel Veda AI. First I will collect your details so the engineering team can contact you. What is your full name?</div>
-      </div>
-      <div class="vv-ai-quick-actions" aria-label="AI quick actions">
-        <button type="button" onclick="askVoxelAi('What material should I choose?')">Material</button>
-        <button type="button" onclick="askVoxelAi('What files do I need for RFQ?')">Files</button>
-        <button type="button" onclick="askVoxelAi('I need NDA or confidential project support')">NDA</button>
-        <button type="button" onclick="askVoxelAi('Help me complete the RFQ')">RFQ help</button>
-        <button type="button" onclick="showVoxelAiReadiness()">Readiness</button>
-        <button type="button" onclick="showVoxelAiChecklist()">Checklist</button>
-      </div>
-      <div class="vv-ai-input-row">
-        <input id="vvAiInput" type="text" placeholder="Your full name" onkeydown="handleVoxelAiKey(event)" />
-        <button type="button" onclick="sendVoxelAiQuestion()">Send</button>
-      </div>
-      <div class="vv-ai-actions">
-        <button type="button" onclick="focusCustomerField('customerApplication')">Fill RFQ</button>
-        <button type="button" onclick="copyVoxelAiSummary()">Copy summary</button>
-        <button type="button" onclick="startNewVoxelAiLead()">New lead</button>
-        <a href="mailto:info@voxelveda.com?subject=Voxel%20Veda%20RFQ%20Support">Email team</a>
-        <a href="tel:+61420407232">Call</a>
-      </div>
-    </section>
-  </aside>
-  <script src="/customer.js?v=20260704-request-theme"></script>
+  <footer class="workspace-footer"><span>Voxel Veda Pty Ltd</span><nav aria-label="Footer"><a href="/request-quote">Customer RFQ</a><a href="/privacy">Privacy Policy</a><a href="/support">Support</a></nav></footer>
+  <script src="/customer.js?v=20261009" defer></script>
 </body>
 </html>

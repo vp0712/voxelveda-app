@@ -1,5 +1,5 @@
 const pool = require('../config/db');
-const { ensureWorkforceSchema } = require('./workforceSchema');
+const { ensureCoreAuditSchema } = require('./coreAuditSchema');
 
 let schemaPromise;
 
@@ -10,14 +10,7 @@ async function tolerateDuplicate(sql) {
 }
 
 async function createSecurityGovernanceSchema() {
-  await ensureWorkforceSchema();
-  await tolerateDuplicate('ALTER TABLE audit_logs ADD COLUMN request_id VARCHAR(80) NULL');
-  await tolerateDuplicate('ALTER TABLE audit_logs ADD COLUMN session_id CHAR(36) NULL');
-  await tolerateDuplicate("ALTER TABLE audit_logs ADD COLUMN result VARCHAR(20) NOT NULL DEFAULT 'SUCCESS'");
-  await tolerateDuplicate('ALTER TABLE audit_logs ADD COLUMN metadata_json JSON NULL');
-  await tolerateDuplicate('ALTER TABLE audit_logs ADD COLUMN previous_integrity_hash CHAR(64) NULL');
-  await tolerateDuplicate('ALTER TABLE audit_logs ADD COLUMN integrity_hash CHAR(64) NULL');
-  await tolerateDuplicate('ALTER TABLE audit_logs ADD INDEX idx_audit_request (request_id, created_at)');
+  await ensureCoreAuditSchema();
   await tolerateDuplicate('ALTER TABLE users ADD COLUMN terminated_at DATETIME NULL');
   await tolerateDuplicate('ALTER TABLE users ADD COLUMN terminated_by INT NULL');
 
@@ -98,9 +91,6 @@ async function createSecurityGovernanceSchema() {
   ) ENGINE=InnoDB`);
 
   const registry = [
-    ['sensitive_bank_details', 'account_name_ciphertext', 'RESTRICTED', 'AES-256-GCM', 'FINANCE_ENCRYPTION_KEY'],
-    ['sensitive_bank_details', 'bsb_ciphertext', 'RESTRICTED', 'AES-256-GCM', 'FINANCE_ENCRYPTION_KEY'],
-    ['sensitive_bank_details', 'account_number_ciphertext', 'RESTRICTED', 'AES-256-GCM', 'FINANCE_ENCRYPTION_KEY'],
     ['user_mfa_totp', 'secret_ciphertext', 'RESTRICTED', 'AES-256-GCM', 'MFA_ENCRYPTION_KEY'],
     ['auth_sessions', 'token_hash', 'RESTRICTED', 'SHA-256 HASH', null],
     ['mfa_recovery_codes', 'code_hash', 'RESTRICTED', 'SHA-256 HASH', null],

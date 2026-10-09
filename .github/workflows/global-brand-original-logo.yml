@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - 'app.js'
-      - 'services/adminPageRenderer.js'
+      - 'public/workspace.css'
+      - 'public/workspace-theme.css'
+      - 'public/workspace-theme.js'
       - 'services/globalBrandRenderer.js'
       - 'public/global-brand.css'
       - 'public/global-brand.js'
@@ -18,7 +20,9 @@ on:
     branches: [main]
     paths:
       - 'app.js'
-      - 'services/adminPageRenderer.js'
+      - 'public/workspace.css'
+      - 'public/workspace-theme.css'
+      - 'public/workspace-theme.js'
       - 'services/globalBrandRenderer.js'
       - 'public/global-brand.css'
       - 'public/global-brand.js'
@@ -46,10 +50,9 @@ jobs:
       - name: Syntax checks
         run: |
           node --check app.js
-          node --check services/adminPageRenderer.js
           node --check services/globalBrandRenderer.js
           node --check public/global-brand.js
       - name: Original logo and global branding contracts
         run: node scripts/global-brand-original-logo-test.js
-      - name: Whole-system regression audit
-        run: node scripts/final-system-audit.js
+      - name: Retained application route and retirement contracts
+        run: node scripts/application-retirement-test.js

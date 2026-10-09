@@ -229,7 +229,7 @@ async function run() {
   assert(server.includes('await backgroundJobService.initialize()'));
   const controller = source('controllers/backgroundJobController.js');
   assert(controller.indexOf('BACKGROUND_JOB_MANUAL_RETRY_REQUESTED') < controller.indexOf('retryDeadLetter(id'));
-  for (const file of ['emailQueueWorker.js', 'trashPurgeService.js', 'workflowEscalationService.js', 'weeklyTimesheetScheduler.js']) {
+  for (const file of ['emailQueueWorker.js']) {
     const worker = source(`services/${file}`);
     assert(worker.includes('backgroundJobService.createScheduler'), `${file} is not registered with the lease scheduler`);
     assert(!worker.includes('setInterval('), `${file} still owns a process-local interval`);

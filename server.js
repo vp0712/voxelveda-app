@@ -23,35 +23,11 @@ const { healthProbe: objectStorageHealthProbe } = require('./services/objectStor
 const { selfTestWebhookVerifier } = require('./services/webhookSecurityService');
 const { verifyBackupRestoreProvider } = require('./config/backupRestoreAssurance');
 const { backgroundJobService } = require('./services/backgroundJobService');
-const {
-  startFinanceStatementIngestionWorker,
-  stopFinanceStatementIngestionWorker
-} = require('./services/financeStatementIngestionWorker');
-const { objectStorageDocumentsEnabled } = require('./services/documentSecurityService');
-const { ensureFinanceSchema } = require('./services/financeSchema');
-const { repairKnownLegacyPdfDateRunaway } = require('./services/financeDateIntegrityRepair');
 const { ensureSecuritySchema } = require('./services/securitySchema');
-const { ensureHighRiskFinanceSchema } = require('./services/highRiskFinanceSchema');
 const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
 const { ensureOperationalTrustSchema } = require('./services/operationalTrustSchema');
-const { ensureAssuranceSchema } = require('./services/assuranceSchema');
 const { ensureSecurityGovernanceSchema } = require('./services/securityGovernanceSchema');
-const { ensureQmsSchema } = require('./services/qmsSchema');
-const { ensureQmsAdvancedSchema } = require('./services/qmsAdvancedSchema');
-const { ensureQmsQualityGovernanceSchema } = require('./services/qmsQualityGovernanceSchema');
-const { ensureQmsEnterpriseCompletionSchema } = require('./services/qmsEnterpriseCompletionSchema');
-const { ensureNotificationSchema } = require('./services/notificationSchema');
-const { ensureTrashSchema } = require('./services/trashSchema');
-const { ensureWorkflowSchema } = require('./services/workflowSchema');
-const { ensureProcurementSchema } = require('./services/procurementSchema');
-const { ensureWorkforceSchema } = require('./services/workforceSchema');
-const { ensureEnterpriseControlPlaneSchema } = require('./services/enterpriseControlPlaneSchema');
-const { ensureCareersSchema } = require('./services/careersSchema');
-const { ensureEmployeeIdentitySchema } = require('./services/employeeIdentitySchema');
-const { startWeeklyTimesheetScheduler, stopWeeklyTimesheetScheduler } = require('./services/weeklyTimesheetScheduler');
-const { startVomWhatsAppScheduler, stopVomWhatsAppScheduler } = require('./services/vomWhatsAppService');
-const { startTrashPurgeScheduler, stopTrashPurgeScheduler } = require('./services/trashPurgeService');
-const { startWorkflowSlaScheduler, stopWorkflowSlaScheduler } = require('./services/workflowEscalationService');
+const { ensureEmailQueueSchema } = require('./services/emailQueueSchema');
 const {
   CONTROL_STATES,
   addWarning,
@@ -72,25 +48,11 @@ let shuttingDown = false;
 
 async function initializeCriticalSchemas() {
   const schemas = [
-    ['finance', 'Finance foundation schema ready.', () => ensureFinanceSchema()],
     ['security', 'Security schema ready.', () => ensureSecuritySchema()],
-    ['high_risk_finance', 'High-risk finance schema ready.', () => ensureHighRiskFinanceSchema()],
     ['security_operations', 'Security operations schema ready.', () => ensureSecurityOperationsSchema()],
     ['operational_trust', 'Operational trust schema ready.', () => ensureOperationalTrustSchema()],
-    ['assurance', 'Continuous assurance schema ready.', () => ensureAssuranceSchema()],
     ['security_governance', 'Identity governance schema ready.', () => ensureSecurityGovernanceSchema()],
-    ['qms', 'QMS controlled-record schema ready.', () => ensureQmsSchema()],
-    ['qms_operations', 'QMS/MES operational schema ready.', () => ensureQmsAdvancedSchema()],
-    ['qms_governance', 'QMS quality-release governance schema ready.', () => ensureQmsQualityGovernanceSchema()],
-    ['qms_completion', 'QMS enterprise completion schema ready.', () => ensureQmsEnterpriseCompletionSchema()],
-    ['notifications', 'Notification Centre schema ready.', () => ensureNotificationSchema()],
-    ['trash', 'Enterprise Trash schema ready.', () => ensureTrashSchema()],
-    ['workflow', 'Workflow Engine schema ready.', () => ensureWorkflowSchema()],
-    ['procurement', 'Procurement lifecycle schema ready.', () => ensureProcurementSchema()],
-    ['workforce', 'Workforce schema ready.', () => ensureWorkforceSchema()],
-    ['enterprise_control_plane', 'Enterprise control plane schema ready.', () => ensureEnterpriseControlPlaneSchema()],
-    ['careers', 'Careers recruitment schema ready.', () => ensureCareersSchema()],
-    ['employee_identity', 'Employee identity schema ready.', () => ensureEmployeeIdentitySchema()]
+    ['email_queue', 'Email queue schema ready.', () => ensureEmailQueueSchema()]
   ];
 
   for (const [key, message, initialize] of schemas) {
@@ -236,33 +198,10 @@ async function initializeServices() {
 
 async function initializeWorkers() {
   setCriticalService('background_workers', CONTROL_STATES.INITIALIZING);
-  setCriticalService('finance_ingestion_worker', CONTROL_STATES.INITIALIZING);
   const framework = await backgroundJobService.initialize();
-  const financeWorkerStarted = startFinanceStatementIngestionWorker();
-  const started = [
-    startWeeklyTimesheetScheduler(),
-    startTrashPurgeScheduler(),
-    startWorkflowSlaScheduler(),
-    startVomWhatsAppScheduler(),
-    startEmailQueueWorker(),
-    financeWorkerStarted
-  ].filter(Boolean).length;
-  const financeWorkerRequired = process.env.NODE_ENV === 'production'
-    && String(process.env.FINANCE_INGESTION_WORKER_REQUIRED || 'true').toLowerCase() !== 'false';
-  const durableStorageRequired = process.env.NODE_ENV === 'production'
-    && String(process.env.FINANCE_STATEMENT_DURABLE_STORAGE_REQUIRED || 'true').toLowerCase() !== 'false';
-  if (!financeWorkerStarted && financeWorkerRequired) {
-    setCriticalService('finance_ingestion_worker', CONTROL_STATES.FAILED, 'Finance statement worker is required but disabled');
-    throw Object.assign(new Error('Finance statement worker is required but disabled.'), { code: 'FINANCE_INGESTION_WORKER_REQUIRED' });
-  }
-  if (durableStorageRequired && !objectStorageDocumentsEnabled()) {
-    setCriticalService('finance_ingestion_worker', CONTROL_STATES.FAILED, 'Private durable statement storage is required but unavailable');
-    throw Object.assign(new Error('Private durable statement storage is required but unavailable.'), { code: 'FINANCE_DURABLE_STORAGE_REQUIRED' });
-  }
-  setCriticalService('finance_ingestion_worker', financeWorkerStarted ? CONTROL_STATES.OPERATIONAL : CONTROL_STATES.NOT_CONFIGURED,
-    financeWorkerStarted ? 'Durable statement queue worker registered with heartbeat, bounded retries and stale-job recovery' : 'Finance statement ingestion worker disabled');
+  const started = startEmailQueueWorker() ? 1 : 0;
   setCriticalService('background_workers', CONTROL_STATES.OPERATIONAL,
-    `${framework.registered_jobs} jobs registered with durable MySQL leases; ${started} schedulers enabled`);
+    `${framework.registered_jobs} retained email jobs registered with durable MySQL leases; ${started} schedulers enabled`);
   console.log(`Background worker framework ready: ${framework.registered_jobs} jobs registered, ${started} schedulers enabled with durable MySQL leases.`);
 }
 
@@ -280,24 +219,6 @@ function listenApplication() {
       });
       markReady();
       console.log(`Server ready on ${HOST}:${PORT}`);
-
-      // Never hold application readiness behind a historical data repair.
-      // The repair is exact-match + idempotent and runs after the server is usable.
-      setImmediate(() => {
-        repairKnownLegacyPdfDateRunaway()
-          .then((dateRepair) => {
-            console.log(`Finance date-integrity repair check completed: ${dateRepair.repaired}/${dateRepair.checked} targeted statement(s) corrected.`);
-          })
-          .catch((error) => {
-            addWarning(`Finance legacy PDF date-integrity repair did not complete: ${error.code || error.message}`);
-            console.error('Finance date-integrity repair failed safely:', error.code || error.message);
-          });
-        require('./services/financeStatementSourceRepair').repairKnownStatementSourceArtifacts()
-          .catch((error) => {
-            addWarning(`Statement source verification did not complete: ${error.code || 'SOURCE_REPAIR_UNAVAILABLE'}`);
-            console.error('Statement source verification failed safely:', error.code || 'SOURCE_REPAIR_UNAVAILABLE');
-          });
-      });
 
       resolve(server);
     });
@@ -317,12 +238,12 @@ async function bootstrap() {
     console.log('Database connection ready.');
 
     // Capacity recovery runs before migrations/schedulers so a full external
-    // MySQL database cannot strand authentication, statement ingestion or email.
+    // MySQL database cannot strand authentication or permitted customer email.
     await recoverDatabaseCapacity();
 
     setPhase('RUNNING_MIGRATIONS');
     setMigrations({ state: CONTROL_STATES.INITIALIZING });
-    const migrationResult = await runMigrations({ pool });
+    const migrationResult = await runMigrations({ pool, verifyOnly: true });
     setMigrations({ state: CONTROL_STATES.OPERATIONAL, ...migrationResult });
     setCriticalService('migrations', CONTROL_STATES.OPERATIONAL, migrationResult.schema_version || 'no migrations');
     console.log(`Migrations ready at ${migrationResult.schema_version || 'unversioned'} (${migrationResult.applied} applied, ${migrationResult.baselined || 0} baselined, ${migrationResult.skipped} verified).`);
@@ -347,11 +268,6 @@ async function bootstrap() {
     const failedPhase = detailedReadiness().phase;
     markFailed(error, failedPhase);
     stopEmailQueueWorker();
-    stopWeeklyTimesheetScheduler();
-    stopTrashPurgeScheduler();
-    stopWorkflowSlaScheduler();
-    stopVomWhatsAppScheduler();
-    await stopFinanceStatementIngestionWorker().catch(() => {});
     await getRateLimitService().close().catch(() => {});
     await pool.end().catch(() => {});
     const migrationContext = error?.details?.migration_id
@@ -367,11 +283,6 @@ async function shutdown(signal = 'shutdown', exitCode = 0) {
   shuttingDown = true;
   console.log(`${signal} received. Closing server.`);
   stopEmailQueueWorker();
-  stopWeeklyTimesheetScheduler();
-  stopTrashPurgeScheduler();
-  stopWorkflowSlaScheduler();
-  stopVomWhatsAppScheduler();
-  await stopFinanceStatementIngestionWorker().catch(() => {});
   await getRateLimitService().close().catch(() => {});
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
   await pool.end().catch(() => {});

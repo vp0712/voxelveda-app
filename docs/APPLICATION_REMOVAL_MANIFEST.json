@@ -1,0 +1,2581 @@
+{
+  "baseline": "80733384e62ce47942f5ad19481973f90aa568e0",
+  "scope": "Banking/ERP runtime removal; historical migration checksums and database records preserved",
+  "retained_entry_roots": [
+    "app.js",
+    "server.js",
+    "scripts/railway-startup-gateway.js",
+    "utils/seedAdmin.js",
+    "scripts/verify-malware-scanner.js",
+    "scripts/verify-object-storage.js",
+    "scripts/run-database-capacity-recovery-once.js"
+  ],
+  "removed": [
+    {
+      "path": ".github/workflows/advanced-banking-platform.yml",
+      "sha256": "baa15d181b90b90f2b489e2ed76892bf740ff4d63d898f9e07f21341258e5836"
+    },
+    {
+      "path": ".github/workflows/bank-account-lifecycle.yml",
+      "sha256": "445dc047eef901fed5a553ac729fc795b595cb1e1abcb8fe5a3286471045f043"
+    },
+    {
+      "path": ".github/workflows/finance-release-ci.yml",
+      "sha256": "161cb215633fd8feda17042184695c3231b0c25cad72c8b91b81a95043155bc3"
+    },
+    {
+      "path": ".github/workflows/recovery-assurance-dashboard.yml",
+      "sha256": "1e7d308182d41dd45f4df5ec2d401fb5cc90a638396ce2171a0453f2c967ece4"
+    },
+    {
+      "path": ".github/workflows/recovery-drill-evidence-ledger.yml",
+      "sha256": "c1e6489570028904f0440a09215eb951794bb12c16df4fd48a2674e897b78c76"
+    },
+    {
+      "path": ".github/workflows/recovery-drill-governance.yml",
+      "sha256": "c91eb42362da7e946ee571fc9232a98859bf18fa1af6fc429faebd24f9f32975"
+    },
+    {
+      "path": ".github/workflows/recovery-drill-readiness.yml",
+      "sha256": "d30f31c2f3515ae117dd142650c67bd29e146a4e58fbea213ed1915b53e1b0e6"
+    },
+    {
+      "path": ".github/workflows/recovery-remediation.yml",
+      "sha256": "83db01984c25aa772d694ddc79ee84f2333c187f161b90be6753f0e9899e8cee"
+    },
+    {
+      "path": "controllers/accessAttemptController.js",
+      "sha256": "6df8db381a66cfaa4c52f214b70ed2f0a92a00324a87627ee72276cfc9c0179c"
+    },
+    {
+      "path": "controllers/advancedBankingController.js",
+      "sha256": "b150c847c0b9098ac422112522517c5f7c87cbafa7c98eb9c84a48e94f2c9a94"
+    },
+    {
+      "path": "controllers/aiLeadController.js",
+      "sha256": "f3dd19e13235c7c67199cf7f6492cb022ef7d928d566e9e116e1e7cb9c075925"
+    },
+    {
+      "path": "controllers/attendanceController.js",
+      "sha256": "420c55a5c20ac07f02aaf817c24f4af4f498c3ff239689e03a5426864646e841"
+    },
+    {
+      "path": "controllers/bankAccountLifecycleController.js",
+      "sha256": "36dcd5ad65f6163a64c45e0295828feb67eaebea805e298778bb398f1e51b32c"
+    },
+    {
+      "path": "controllers/bankingOperatingSystemController.js",
+      "sha256": "7f83667dd0ca4a7644b39feda04ec038d51e4f34ce0fd1a68707c4764f272065"
+    },
+    {
+      "path": "controllers/careersController.js",
+      "sha256": "7a2b989d86c0270d07e92bd2f2a44c0e750e27345d3a63af75b2bba054e2a703"
+    },
+    {
+      "path": "controllers/competitorController.js",
+      "sha256": "895edea677efe2c35954f7bde92383407b4c91d55da8a77f42719e7d6027eb43"
+    },
+    {
+      "path": "controllers/complianceController.js",
+      "sha256": "0e7f01e2e52f56839fdd3e340721b8fb320f6f5f28ec4dff8475d079dcf1a102"
+    },
+    {
+      "path": "controllers/continuousAssuranceController.js",
+      "sha256": "cef4833a424e01d7233efb3c42b91af9ff26a2f49291aaa748333b1b022147c4"
+    },
+    {
+      "path": "controllers/customerController.js",
+      "sha256": "fc2edca28249fc4b0ca7c62ebcf6af1ea742692735fae6428edaa7721cbf4a8c"
+    },
+    {
+      "path": "controllers/dashboardController.js",
+      "sha256": "99fc08dc7a86999ae898fe34d2dd5ad10ddb244dcc77daec6ebe51c46f1cee24"
+    },
+    {
+      "path": "controllers/emailController.js",
+      "sha256": "a02ef8f53abe9af11c3045fdaca4f51321358106549b4b60e9430c15ce54449b"
+    },
+    {
+      "path": "controllers/employeeIdentityController.js",
+      "sha256": "2f614812daec3b84c537d9ee48017048ceeced39e5535cd50337d50ace515dd9"
+    },
+    {
+      "path": "controllers/enterpriseControlPlaneController.js",
+      "sha256": "5face1bd8d8c036662ad160cb69abe556cc937f2e85703fd494fd473f9c2240c"
+    },
+    {
+      "path": "controllers/erpWorkspaceController.js",
+      "sha256": "1bf1c39fdd7d52ce491e5a97a4ac9604b5889d5c46f60536f40b63ad64e2193a"
+    },
+    {
+      "path": "controllers/expenseController.js",
+      "sha256": "3f51b137953e4b95f700b75a508241147f1b87afebc69836418259d08a8f70d2"
+    },
+    {
+      "path": "controllers/financeAccountantHandoverController.js",
+      "sha256": "f4b4d9cc3c4fab3bff9147b085528e3a431c20f585b14207cecc8561669c687d"
+    },
+    {
+      "path": "controllers/financeAnomalyExplainController.js",
+      "sha256": "aba0b99a905a0c46ea796ad3b2059a401b01713233af44647dafb805511fd558"
+    },
+    {
+      "path": "controllers/financeAuditController.js",
+      "sha256": "5a2134970e5aa974fe78eec78bd6abe2f64de277ec1058933dfa779a4da4e691"
+    },
+    {
+      "path": "controllers/financeBankingReadinessController.js",
+      "sha256": "95ee00e9ee90dcd07502e20321138e7883f685403c6f566c35358d38073bb7e0"
+    },
+    {
+      "path": "controllers/financeCashControlController.js",
+      "sha256": "7ef25e8e953aa1c86d19e0348746882664372600e2c979eec73698e69cdfbdc3"
+    },
+    {
+      "path": "controllers/financeCashCustodyController.js",
+      "sha256": "6d4bdfef9ec34cc6dbb5791853bd01c4aab63fb55d8a5114967a7ab5c824d673"
+    },
+    {
+      "path": "controllers/financeCategoryController.js",
+      "sha256": "17e911b2e640d93da182ce80ca98218b8dce43895ef7864a6bad7ac17b2ca357"
+    },
+    {
+      "path": "controllers/financeCloseAssuranceController.js",
+      "sha256": "3414d87fcd4d63110e33bbec1e97c2aa88e7a22bf91e2929c1bc91b2cc2fb1c0"
+    },
+    {
+      "path": "controllers/financeController.js",
+      "sha256": "2619f42668ad0e98033ffdee628ee46ccd007d6fc215f7dfa155196e2a93553d"
+    },
+    {
+      "path": "controllers/financeCounterpartyController.js",
+      "sha256": "84f4cdfbddc4242a10c0660576daa739ed9efc19bb59931ebb3b00d4fd5294e2"
+    },
+    {
+      "path": "controllers/financeFxController.js",
+      "sha256": "546a76ce671729b97d41e4f1393356869c1c956f336f99884e8047e50fd77800"
+    },
+    {
+      "path": "controllers/financeIntelligenceController.js",
+      "sha256": "64ac85b0113ed7f50a4c7ccb1378a65b41a6a971959246aea9ebd7eceee8e21d"
+    },
+    {
+      "path": "controllers/financeJobProfitabilityController.js",
+      "sha256": "e374fa145316ac59e2f7cfd8b75e545e5f95f25e2e3251520091e8c544032c78"
+    },
+    {
+      "path": "controllers/financeOperationsController.js",
+      "sha256": "a8e185b22ff091de57c1a7454af9ba68f1c2bab6dfe3cf12f32c661128ab29f4"
+    },
+    {
+      "path": "controllers/financePerformanceRiskController.js",
+      "sha256": "727668b39b47177e3c56cf6801192a5a677c509fae3740dc078271bd8cf426b3"
+    },
+    {
+      "path": "controllers/financePlanningControlController.js",
+      "sha256": "16a69e611b2e027f7bc9238e4056e739df7e3439f01ef016a5067a81f5fe79b7"
+    },
+    {
+      "path": "controllers/financeReceiptController.js",
+      "sha256": "54fd0ad4710cc1f42ffcfc516babba4ed6043c86c8bb3889ed6c1d9c41a42929"
+    },
+    {
+      "path": "controllers/financeReconciliationCenterController.js",
+      "sha256": "5305c79be3f85ea5556e0c54a560b7a4c134354cd23ed04fd0e75feb117a47ed"
+    },
+    {
+      "path": "controllers/financeRelationshipController.js",
+      "sha256": "ae3c60d98d227e91369086e4895563ed4f58d3bbeb46192ac7f4c48145abccb3"
+    },
+    {
+      "path": "controllers/financeReportBuilderController.js",
+      "sha256": "ba4b2ba0d49aff0122bedbb662b403f67d04412f6b6e41fc341b1c24824a0915"
+    },
+    {
+      "path": "controllers/financeSearchController.js",
+      "sha256": "639b4984663782814942bb7c13ef225b2ef67dc2b9ef32cabf3a12574a115ff6"
+    },
+    {
+      "path": "controllers/financeStatementIngestionController.js",
+      "sha256": "c0303acd2634153df89dd9235872b222c2f2f87ce1e7a39816e4200add22235d"
+    },
+    {
+      "path": "controllers/financeTransactionIntelligenceController.js",
+      "sha256": "4c08c62b54e91d67dccbb55aee72cc4a6c41b121c2b86c7a0455d89d9c3902f4"
+    },
+    {
+      "path": "controllers/financeTransactionLifecycleController.js",
+      "sha256": "fb8b81ec126a97fcd5914af5ccfb2affb0a7b64c356e76db59a57703d5cce62c"
+    },
+    {
+      "path": "controllers/financeTreasuryController.js",
+      "sha256": "2d2766374845bc3e9b83bfa64667f629972948fabf62d85f4e425ef8ccbfc676"
+    },
+    {
+      "path": "controllers/financeUserPreferencesController.js",
+      "sha256": "4a52aee7a31d8c41e3745f672f714145af2c22fdb122f1b452d3b16cdfc233e0"
+    },
+    {
+      "path": "controllers/highRiskFinanceController.js",
+      "sha256": "1d36be5c8c70d390986521e2aa897aab663b3a87a9aef3b0e6aadf471e6b962e"
+    },
+    {
+      "path": "controllers/integrationWebhookController.js",
+      "sha256": "cb7c3b13e0e4ac6472cab0cd99d2400718590e7df0569c084c471871ed25ba14"
+    },
+    {
+      "path": "controllers/invoiceController.js",
+      "sha256": "82260de45e66b1a14f423854172bdaa894f4e88a7deabbd2825e10199a4a5437"
+    },
+    {
+      "path": "controllers/materialController.js",
+      "sha256": "8937d8314c1854cbca060331894f1fa61123ff2e3367fd359b09126029b2b176"
+    },
+    {
+      "path": "controllers/meetingController.js",
+      "sha256": "37b34509c2640942c1584cf5babe942c9828b9478bf8f1dbc3e0c444218c8c40"
+    },
+    {
+      "path": "controllers/notificationController.js",
+      "sha256": "db6358c6830d453273d6248865b0cffbf743e674a66a39c97cc618e20e66468b"
+    },
+    {
+      "path": "controllers/openBankingController.js",
+      "sha256": "3cd6b352a55d796fa7910bad035cc580acb1971c7d0355edf1fe557a117d07ed"
+    },
+    {
+      "path": "controllers/operationalTrustController.js",
+      "sha256": "332f1508624020daa2dc01cfdf22bc87e6e808e06d4626dce0e4616f84c3e506"
+    },
+    {
+      "path": "controllers/personalAssetLifecycleController.js",
+      "sha256": "8a715a937dc42c9cca23356bc3dd862463089572c3ce558c2d74141d606a5792"
+    },
+    {
+      "path": "controllers/personalDebtPlanningController.js",
+      "sha256": "4121893f1c0febb3691014742b2d641e34892def6e215438f1666ce69221f3ed"
+    },
+    {
+      "path": "controllers/personalFinanceCanonicalBackupController.js",
+      "sha256": "3a919643bfed791939664c1d46f9dda6841711b7087e8ce48806088b5f56977f"
+    },
+    {
+      "path": "controllers/personalFinanceCanonicalRestoreController.js",
+      "sha256": "7890bc47b32a0719dfd13940405ca48ac02a71ddf15f43cab0daab235f66a282"
+    },
+    {
+      "path": "controllers/personalFinancePostRestoreVerificationController.js",
+      "sha256": "a9080ecd28c788bd478dd3f859617cf8084004eac452332b49a25426b641a0aa"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryCapaAnalyticsController.js",
+      "sha256": "70dc4cd0c584cd5faae5577665bd452eef9cf257c88929792615f13221121455"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryCapaController.js",
+      "sha256": "5a877c7ccd6afbc579b448fdea9c35952347a1b3a52ee989d5f6ce9c37dcdadd"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryCapaRiskAssuranceController.js",
+      "sha256": "d6097a398df9f58da41db828ad98a4d5c679ea5ef6a6a69a5901969eaea49beb"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryCertificationController.js",
+      "sha256": "8f1eb2677de2cebaddca1cd309b75febd4bab1f867da0d2c063dfd354dd70780"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryControlSchedulingController.js",
+      "sha256": "b2a9c8f2d15129ef98b1d9353d5869f334502ddfb67db82a225853b430545cc6"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryControlTestingController.js",
+      "sha256": "fea3637cc5126c2afcfeb3cb3a0f25aa3f3aa1992b711046345ca2e3512ab894"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryEvidenceInvestigationController.js",
+      "sha256": "edc49628af6fe2f349b2c02eaa9cc6c7fad575a859befa476da984664be6a9f7"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryGovernanceReportingController.js",
+      "sha256": "4122eb61053b0db80b1d608b71bc985c6e8300bccf9a0a7aebcdade481efecc7"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryIncidentCaseController.js",
+      "sha256": "8803b1840dd6c6db21246325c571a3d8dee64eff758309d9daf50f4517f1df12"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryIntegrityWatchController.js",
+      "sha256": "8865b63736ce97a73e7139dc33556142aefae01a3bae9535b9ef42f62c0032b2"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryKnowledgeDispositionController.js",
+      "sha256": "457f6e08d2079021030fa1d3477b198e9c063764982955d4dcde4f54dddc03a2"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryKnowledgeReviewPlannerController.js",
+      "sha256": "a893c4aef7be8432428b5d9a1e21ee6ac17c824a46e44d4ca0d6331acb11ccd1"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryLessonsKnowledgeController.js",
+      "sha256": "fa735204548a4d625f2bbcb54353e4629eb618374c296c523fc702da92297956"
+    },
+    {
+      "path": "controllers/personalFinanceRecoveryManagementReviewController.js",
+      "sha256": "c3b2d5c153e6e12ea97e7cac45fc05a536cc80cb6e13ab3d8c90326a84421180"
+    },
+    {
+      "path": "controllers/personalFinanceRestoreTransportController.js",
+      "sha256": "892859c324ccd72063fc6282bbcf6a3558a672df6e1e8b8351d12bbcc525915b"
+    },
+    {
+      "path": "controllers/personalFinanceSavedViewsController.js",
+      "sha256": "33d30ffae6ba4497098f6ca3e7eb0644f48a643dbfaf993ee6d37c6b09022040"
+    },
+    {
+      "path": "controllers/personalFinancialDataQualityController.js",
+      "sha256": "c57125be6f1aae325e8cbbffc461af252bad32d7c00a7d1818a300eec2b42951"
+    },
+    {
+      "path": "controllers/personalFinancialRoadmapController.js",
+      "sha256": "8b68fcf89afdee9a93abff8ae1ad5aaef59c2f3ba118e9630ed31ce4832defcb"
+    },
+    {
+      "path": "controllers/personalMoneyAttentionController.js",
+      "sha256": "63f9c00f9e81f6834840292c8139d151735368b660009b71844b8abea940c430"
+    },
+    {
+      "path": "controllers/personalMoneyController.js",
+      "sha256": "a363a867f8f39d63aeccd3145b4a6b58a1ebb071908252b4f9d9fe0adcea58c7"
+    },
+    {
+      "path": "controllers/personalMoneyDailyBriefingController.js",
+      "sha256": "0c8aa16c11b783d99d74ba4dea7d5fb2042a5345559b2bd7e44fd023c62dd260"
+    },
+    {
+      "path": "controllers/personalMoneyHealthController.js",
+      "sha256": "f8537bd4fc46faab11d236eeda6d167c1cf5e369885e34fcf5e22ca2b83c8b92"
+    },
+    {
+      "path": "controllers/personalMoneyReviewController.js",
+      "sha256": "809fc7d492a1973a06917dc86f6f1d918be7349cdd9f28da9ed5477e90b097f5"
+    },
+    {
+      "path": "controllers/personalMoneySmartController.js",
+      "sha256": "796a9ea215a95cb32b7b7ede00a90d26320c49d1a04d56c8216cd34521401bf0"
+    },
+    {
+      "path": "controllers/personalNetWorthController.js",
+      "sha256": "9b5825f493393d5a669d7a25aab462bc6c49cbb977d2ceaeca8332cccc96ec3a"
+    },
+    {
+      "path": "controllers/personalRecurringCommitmentController.js",
+      "sha256": "f26cdde4ecaf8d949401d58db68335b28c7590a5e677264f37095b6d24b27d56"
+    },
+    {
+      "path": "controllers/personalSavingsReserveController.js",
+      "sha256": "03953a266c6611b1545276acb780b1d6b08f7c8fc45803a44c87301fc2e28813"
+    },
+    {
+      "path": "controllers/personalSpendingChallengeController.js",
+      "sha256": "175f3749c9cf061f4efa13f52a92728051d5680a239998203b81a6c6fccf7aeb"
+    },
+    {
+      "path": "controllers/personalTaxEvidenceControlController.js",
+      "sha256": "ff2308acc4b8fd0e9ff602b36e34d1c2c58cbc378f07ae22a22278029657c103"
+    },
+    {
+      "path": "controllers/procurementController.js",
+      "sha256": "7299b49984c373cf815b4bc61fcb21ff84a6401ce51de7d0baf20947b3900fdb"
+    },
+    {
+      "path": "controllers/qms/governanceController.js",
+      "sha256": "2fdc9066a01d8dce6c56705d8c5f2d26a1b7f1a2797e9677ff98ef496edfc21b"
+    },
+    {
+      "path": "controllers/qms/inspectionController.js",
+      "sha256": "977894324751bc2dd57ce95913f5c5abfe3161c4465cb340187371a37eb21c45"
+    },
+    {
+      "path": "controllers/qms/qualityReleaseController.js",
+      "sha256": "4c66c7688d2fb8345dc4b8a097fb0a89d407f38b6853edc6919e7e9a517e3ffb"
+    },
+    {
+      "path": "controllers/qms/recordController.js",
+      "sha256": "6251a218b08934965539b50303b58bb627fede72b3e7e944bff32834e28c34e2"
+    },
+    {
+      "path": "controllers/qmsEnterpriseController.js",
+      "sha256": "45fae8619d0c69b592e2d5f29aafd0a045fe733b6df6984b6543c73cc0defe72"
+    },
+    {
+      "path": "controllers/qmsEvidenceController.js",
+      "sha256": "6a96b0ffd39daf26bf72108d12946b0f6cc33bc089f1851576c333a4c1a47270"
+    },
+    {
+      "path": "controllers/qmsFacilityController.js",
+      "sha256": "6c8dd383b18e222619cc9f1f408cfa5a4a0be509b7e64ac4d9f2493b12d11eec"
+    },
+    {
+      "path": "controllers/qmsOperationsController.js",
+      "sha256": "893d7423b8d61529c4692f20e02421fd0afef42f5301936a9eafd161b2ad28ba"
+    },
+    {
+      "path": "controllers/qmsRecordController.js",
+      "sha256": "c2486b907b770652cd8b9b4f4767918fb1c48963a4e48995300e89924ed26c7b"
+    },
+    {
+      "path": "controllers/qmsShopFloorController.js",
+      "sha256": "4ccf40820ad4cdd8a98f46cbf20b70abeab485483545ccf0f9c7b3a7dc6714b5"
+    },
+    {
+      "path": "controllers/rfqController.js",
+      "sha256": "430aaf2c47fe2d244cd5a31cb624b954083613cfc03330da1e07c9327132ad3f"
+    },
+    {
+      "path": "controllers/rosterController.js",
+      "sha256": "0881470b2fc55eba1c8bbff2a9cbe093c8b4945fa6fed984d487d0662c17842a"
+    },
+    {
+      "path": "controllers/securityGovernanceController.js",
+      "sha256": "3048004226a247afd2fbdddca7d7daf91a1b26de306060ce0a84459789b38383"
+    },
+    {
+      "path": "controllers/statementDataManagementController.js",
+      "sha256": "0d43c67c68596e2d6b8fbaf702f7bb0e8bf7b854c991457c54e7227b17bf1092"
+    },
+    {
+      "path": "controllers/statementImportController.js",
+      "sha256": "c7ce6ea0b8860b87396dd5e0262800e020627fb8911dcfd8796f63c3880c83dc"
+    },
+    {
+      "path": "controllers/stockController.js",
+      "sha256": "109634cb0a36082b5def65e6e15f46f9c1d4d0d1b33406168f9406deecb0d238"
+    },
+    {
+      "path": "controllers/supplierController.js",
+      "sha256": "bca9a37621e9be6751e6815f0dc88397a5d1f0239babf323d88e480cc0d71d65"
+    },
+    {
+      "path": "controllers/taskController.js",
+      "sha256": "0543833968a7a3b0b231a2f48e98b23daedee92faf8de78afce2617968471613"
+    },
+    {
+      "path": "controllers/timesheetWorkflowController.js",
+      "sha256": "ef570931869e970ae6a78685f0ed4ea3b2595f216efb0f82ded1870c653abafb"
+    },
+    {
+      "path": "controllers/trashController.js",
+      "sha256": "83cdb0e1f33d2b8422d16983c6d6d5bfd34a8087e797abb6c65e12b0a06c1853"
+    },
+    {
+      "path": "controllers/vomWhatsAppController.js",
+      "sha256": "406f5c0478e187b14fcddf91539561272915946c3d9d4dfce02843a8b0b52c91"
+    },
+    {
+      "path": "controllers/workflowController.js",
+      "sha256": "9048186a06c2f59f5cf07d44cc7e9f65bf599a99f9ab0b03120fa5e7151f5507"
+    },
+    {
+      "path": "middleware/enterpriseMutationGuard.js",
+      "sha256": "9a8c5f71d2e4d9fdc730854a88e67cf4a24f2d318776eba8491cd753edac5e92"
+    },
+    {
+      "path": "middleware/financePrivacyMiddleware.js",
+      "sha256": "f72ed564696644d27ded7c0e7b095061e71da6dc7589a919e12c11afb359735f"
+    },
+    {
+      "path": "middleware/financeStatementUpload.js",
+      "sha256": "3866e76398715808f5841a59c0f03c1808d244a3cadbaef8670019cb0d7a8164"
+    },
+    {
+      "path": "middleware/highRiskPaymentMiddleware.js",
+      "sha256": "331f1949bdb5064bef7eb21810c54aa973433926f203a1b6e5d756e78b1936ad"
+    },
+    {
+      "path": "middleware/inputPermissionMiddleware.js",
+      "sha256": "77e7ca792f499c069e45e7c797da0fead333e8e39fb08d2ddbb564b3b0f725d6"
+    },
+    {
+      "path": "middleware/permissionMiddleware.js",
+      "sha256": "1478b16eaa702e1ccb6c2856d2623bdcd430997fbc58c35a41fa5bbaa978492a"
+    },
+    {
+      "path": "middleware/qmsTransitionValidationMiddleware.js",
+      "sha256": "175325e9d54d3d6aa9d74c17aa8430e5af5865a3d2182c4d57f475ba3b0db3ca"
+    },
+    {
+      "path": "middleware/roleMiddleware.js",
+      "sha256": "5cdd4f4449de694bfab88903453f73de5f218726fef261b666f195f9d2faaf9e"
+    },
+    {
+      "path": "middleware/securityContextMiddleware.js",
+      "sha256": "65d7fd2d696df787da2927de030a471275742b368e6a1cf04d01c59e885ca438"
+    },
+    {
+      "path": "middleware/sensitiveExportMiddleware.js",
+      "sha256": "3be1d185ff8f1ac8f2f95038635833f17cac7b6a3c55d98582b82caf0db8ca84"
+    },
+    {
+      "path": "middleware/statementPreviewSanitizer.js",
+      "sha256": "4e14b8b5a26df7277164601e80146457baa6baacde90434bcadce6388407d334"
+    },
+    {
+      "path": "middleware/uploadSecurity.js",
+      "sha256": "63e02200f4dd65bacdb9c7604228a20b40afd90328b7e0a76d136a94059472fa"
+    },
+    {
+      "path": "public/admin-dashboard.html",
+      "sha256": "ff3ddecab5cb0988523df3724ec145e4734bbf8a0a0971526596aa2fb9b4680c"
+    },
+    {
+      "path": "public/admin-dashboard.js",
+      "sha256": "a4bd62e4419d8443ccc9c26181c268dd3798338581a1bb05fd10fae1e4706c11"
+    },
+    {
+      "path": "public/advanced-theme.css",
+      "sha256": "583dfe671f345c7da42e581b0aaddaf815b47d424c8e37fcb5499128c83f4baf"
+    },
+    {
+      "path": "public/careers-admin.html",
+      "sha256": "6ecedb873a6ef36d98d6526962afea8046bb7265eb9f3b2a96e0b029cba766e3"
+    },
+    {
+      "path": "public/client-portal.html",
+      "sha256": "c6a6ea93fb684e4781f9df3d86238ba49333f5f478d5d3ba4005fce206dccc1f"
+    },
+    {
+      "path": "public/client-portal.js",
+      "sha256": "0509da0c69de884461ff79a853c43aa42c7f73b4d301b4f1d60946968e6ed63d"
+    },
+    {
+      "path": "public/controlled-forms.js",
+      "sha256": "cbc6d2b72dc57c4afebdfdb796a45fc362ce148926a22b0e269b340cd76cec83"
+    },
+    {
+      "path": "public/dashboard-profile-avatar.js",
+      "sha256": "4001e85a5e5d6a079cb1941e45e300bf45f192d6ae2e36dfbc595896eda6dc3a"
+    },
+    {
+      "path": "public/dashboard.html",
+      "sha256": "7aa8657d954bb2928f4a4bffe173b075ce8b36aea6a2a3136d240542f0cb5fdf"
+    },
+    {
+      "path": "public/employee-id.html",
+      "sha256": "615204cfed4c9f25173171e1af34efdcc8a34486bf807068531f88a18f3a3374"
+    },
+    {
+      "path": "public/employee-verify.html",
+      "sha256": "2a767cad7dff2ab38307919697f8e9f475ecbcd0092e4b410ed31df5a6e0c494"
+    },
+    {
+      "path": "public/erp-workspace.css",
+      "sha256": "e41271a68aa31cbcb8cb358aac66da3248cc07901ab9a72e4d48bd3f3f881c45"
+    },
+    {
+      "path": "public/erp-workspace.js",
+      "sha256": "2fd382db309356c721051338f241e5d6cd1d389cc4b77911a78855b1d8605075"
+    },
+    {
+      "path": "public/expense-payments.css",
+      "sha256": "cf2b620c1a152ad96a4c12ea1abbd6927fff61e0f0ed08daa0dde2e43bdc0bcb"
+    },
+    {
+      "path": "public/expense-payments.js",
+      "sha256": "4b6c0fbf2e35a8eeafe455ed2eacd60e2319a34113e4e87a8e2ace09a8f16dc2"
+    },
+    {
+      "path": "public/finance-advanced-control.js",
+      "sha256": "b50cab31736bcec4e87b0637bae59a351357ebd43bccb445d161c0ff28096866"
+    },
+    {
+      "path": "public/finance-bootstrap-guard.js",
+      "sha256": "fb9b1419c7cf5ca00fe63ba871a8dd4db16331826be0e672b902b612561834f1"
+    },
+    {
+      "path": "public/finance-intelligence.html",
+      "sha256": "9d796b1f3b877f2090e20bd281a728b42eaafa95bc280d09d171a7ea0dc655c7"
+    },
+    {
+      "path": "public/finance-master.css",
+      "sha256": "cc11b812adaff38a518e450b08497a00cf843995b788327e79e599fe878492c0"
+    },
+    {
+      "path": "public/finance-master.js",
+      "sha256": "800d5bf63983dfb682b0a2cca3a74fa4a79cb656358d690911b83620b5b0e1bd"
+    },
+    {
+      "path": "public/financial-decision-assistant.js",
+      "sha256": "22b646fb57cf94f12383d9c4741b5bc79103b0b1854bf16d6a38192eac8ebbd0"
+    },
+    {
+      "path": "public/forms/company/calibration-measurement-tool-register.pdf",
+      "sha256": "73b2931ddb2369a94f71878045cac1c2a1a75211926f3129fc8b21e43e611c4d"
+    },
+    {
+      "path": "public/forms/company/client-intake-form.pdf",
+      "sha256": "e13a89e314b395b202b7bf368dcdd40f130bb560c8aa4e5e5c2b5f858d778c9d"
+    },
+    {
+      "path": "public/forms/company/customer-complaint-product-failure.pdf",
+      "sha256": "9fbc1893b35e58cd447ccb0c556fea0e536abceb4491cef147ffaf89e7a8d27e"
+    },
+    {
+      "path": "public/forms/company/delivery-docket-form.pdf",
+      "sha256": "9d3d93fad3e96b1197924b872975d6b046626654c8360542588c1b5c046c88ed"
+    },
+    {
+      "path": "public/forms/company/emergency-drill-evacuation-checklist.pdf",
+      "sha256": "549415056c8076595ec8b0b54b35959b1b18779c5198cd807a41b4fd5352ae5e"
+    },
+    {
+      "path": "public/forms/company/export-dispatch-document-checklist.pdf",
+      "sha256": "fa155b026dfaba389cb3368195dd6372c960b93f1f6428487e4f6b34585ed96c"
+    },
+    {
+      "path": "public/forms/company/first-aid-fire-safety-inspection.pdf",
+      "sha256": "690e0774f790518f6e03b807c6ba340b328f64fc64e1df22c1db776038dd8ac6"
+    },
+    {
+      "path": "public/forms/company/hazard-chemical-handling-chart.pdf",
+      "sha256": "55bdc8938f3c933d67f149a76db48b0498eefcb6b11d404934313b3ef21f2ff3"
+    },
+    {
+      "path": "public/forms/company/hazard-risk-assessment.pdf",
+      "sha256": "302cc0432e42d3dbd003515e9452e851caafea4ae36a4c4b799bf2b4b63228c5"
+    },
+    {
+      "path": "public/forms/company/hygiene-housekeeping-chart.pdf",
+      "sha256": "8de855de5a9780b5cc3484526c6cf019a75aec873c245d38acb6b72c298995a7"
+    },
+    {
+      "path": "public/forms/company/import-customs-document-checklist.pdf",
+      "sha256": "9f9fd466e304251217936c491e5a998d6d04269dc3674eef25f007b34857625d"
+    },
+    {
+      "path": "public/forms/company/incident-near-miss-report.pdf",
+      "sha256": "d9e6507271d0cbdff705f1e9d5c3a32e14627b85a75e0b28298fc4c63117e9c2"
+    },
+    {
+      "path": "public/forms/company/job-contract-agreement.pdf",
+      "sha256": "4dc9f0342689959309eb4788e82210fd57b097041677193eed7c97a19cfcdac7"
+    },
+    {
+      "path": "public/forms/company/job-traveller-production-batch-record.pdf",
+      "sha256": "bb6a6b1b9521020987b77ca5ad9aa7dc9be2df90aa11af07b5a0e0d1942afd8d"
+    },
+    {
+      "path": "public/forms/company/machinery-prestart-checklist.pdf",
+      "sha256": "b9057fd12b933634bd9e62034a3dcfdbefec937a0b155d983c9283dcca6ad313"
+    },
+    {
+      "path": "public/forms/company/machinery-safety-chart.pdf",
+      "sha256": "5024954a6748087965cfd08faad3ae71ebbfce9261d6f2baa59a52842e50931c"
+    },
+    {
+      "path": "public/forms/company/non-conformance-corrective-action.pdf",
+      "sha256": "882e0db4585b2d950371a9a2b7d452aefe4f46b9a019d39da9b5e254bccf9cda"
+    },
+    {
+      "path": "public/forms/company/packaging-receiving-release.pdf",
+      "sha256": "5b4c25fde36cf7cdf55617216a922317acf4e1e7f1294b0a18a5cb8baa6a10d4"
+    },
+    {
+      "path": "public/forms/company/ppe-safety-rules-chart.pdf",
+      "sha256": "e5fedc7fe8143a449405ae1ef31ec35e6317e1de7eff7010370fc42d096f9801"
+    },
+    {
+      "path": "public/forms/company/preventive-maintenance-service-log.pdf",
+      "sha256": "824f4b6fb9dd4c498cac178b66427f879808bb773f4e09a8392ba0595e428c18"
+    },
+    {
+      "path": "public/forms/company/privacy-confidentiality-policy.pdf",
+      "sha256": "aba30a136db56787e5927e4d459b7743d07736ca05cee436ad6d48f4718f12b9"
+    },
+    {
+      "path": "public/forms/company/purchase-order-supplier-bill-register.pdf",
+      "sha256": "568223135c0a89be0850cd4c8923a41d780051aeae482cae773a1003cc138863"
+    },
+    {
+      "path": "public/forms/company/quality-inspection-release-certificate.pdf",
+      "sha256": "48c6c30ec7df8b25828a68e5163b2f15f5a47dc6d845d10670b896dd4a372e24"
+    },
+    {
+      "path": "public/forms/company/raw-material-receiving-traceability.pdf",
+      "sha256": "669d8498afb027820dd2956b0d0bfd03fe1fc0c2d4e5ea3b54e9b326b5218780"
+    },
+    {
+      "path": "public/forms/company/safety-induction-form.pdf",
+      "sha256": "479b0ed0cf6b0873d194b896b3e4b4ea24ea584befbcd3033b275ec3b4c1f5dc"
+    },
+    {
+      "path": "public/forms/company/staff-joining-form.pdf",
+      "sha256": "3b09573be81a55d76a13582e87c43bd7d4f6daeae530870c8eadda2d738b42ed"
+    },
+    {
+      "path": "public/forms/company/supplier-onboarding-approval.pdf",
+      "sha256": "41aa09c172b2d0b90484ff938cda16d03fce85c49a67d14dd9575f433bd1b01f"
+    },
+    {
+      "path": "public/forms/company/swms-jsa-work-method-statement.pdf",
+      "sha256": "7452fff83cc2be09bf9181a8fb6ac5f54d6ae87fda6800c585fe91c18fccda2e"
+    },
+    {
+      "path": "public/forms/company/timesheet-roster-approval-record.pdf",
+      "sha256": "a1c589179546e12e5843e95485f490cf74edff3ace981d8af9c69552a4be9cd7"
+    },
+    {
+      "path": "public/forms/company/training-competency-matrix.pdf",
+      "sha256": "981968c642301fef7105e80f86b618930cb3966f7f1d90c01197e2e59978be74"
+    },
+    {
+      "path": "public/forms/company/visitor-contractor-induction.pdf",
+      "sha256": "511019b34047640012689ad070cdff68ac6d9a54bd414dc6f0056c32d649d6f5"
+    },
+    {
+      "path": "public/forms/company/waste-disposal-environment-register.pdf",
+      "sha256": "71cd7ec17d6966316ef1aa82bfd1fa582711688e5d67fe9a5c5de1f62f1e2cd7"
+    },
+    {
+      "path": "public/forms/voxel-veda-quality-process-sheet.pdf",
+      "sha256": "1edb7ddf4aefd6d60996267af8b190d8ac558d94c489fe0e1bfb9dc73a8aee48"
+    },
+    {
+      "path": "public/invoice-pdf.html",
+      "sha256": "c56a20401f89bcefe47521af24f6d594c33735eaf2d9cafd8f67e77b67daaa87"
+    },
+    {
+      "path": "public/personal-asset-lifecycle.js",
+      "sha256": "fa3850a5f7e9aa914f8c937dce201b21431e6182ffaa357be1cd8d17d9e10791"
+    },
+    {
+      "path": "public/personal-cashflow-forecast.js",
+      "sha256": "aa5a49aa6593f6eac1b4edfc0ef8ca5909031eb9232cf1943512e6d942e675a4"
+    },
+    {
+      "path": "public/personal-category-budgets.js",
+      "sha256": "635d9eca436b933d1ce29f1d721bbbb75e9c96b69bf0023ca0ab596a71174f03"
+    },
+    {
+      "path": "public/personal-debt-intelligence.js",
+      "sha256": "938a60bc4abf4582db8c2827b84ee0ec62f513220ce4b55b8ce2832b415b8ecd"
+    },
+    {
+      "path": "public/personal-financial-action-center.js",
+      "sha256": "1e519b2fff353fb6531e2aabc20b71462b120a4c25a9cd7610b173d8b20a1993"
+    },
+    {
+      "path": "public/personal-financial-control-center.js",
+      "sha256": "f425f43de420653627bdeceb7b6fd107740fa8c1363b7e8ec9a7340461c68829"
+    },
+    {
+      "path": "public/personal-financial-data-quality-integrity.js",
+      "sha256": "a0e14621e220f3bf8cc85f455465d651fd9c8cc8d5971d68f028ceea9ac3920e"
+    },
+    {
+      "path": "public/personal-financial-document-evidence-vault.js",
+      "sha256": "7d0e610742435d31dd3c79c52b50bf4a224a11202ac1fea474765e4361d52c30"
+    },
+    {
+      "path": "public/personal-financial-risk-intelligence.js",
+      "sha256": "7299d7da7aa117d73d0cda9fac17a269e66ac43c0be5534d375964e47f31e19d"
+    },
+    {
+      "path": "public/personal-financial-roadmap.js",
+      "sha256": "26f4f226995ea74584da250c99ec8bc49927f93ee07afd945860cd4ffb5febe9"
+    },
+    {
+      "path": "public/personal-insurance-protection-register.js",
+      "sha256": "e2e16db7f3c2c6bbab062743a0175df35d3f9f787d510970b979007218b83c77"
+    },
+    {
+      "path": "public/personal-money-attention.js",
+      "sha256": "c6b20bf19dd3bc7bfee0f91f08a9d1ed0a49b3c49d772bc605331232d0726440"
+    },
+    {
+      "path": "public/personal-money-calendar.js",
+      "sha256": "f8c1d08e138ddbe3fbf5b27eacd55c691a4a8fdedb791ae89e978f3d51f5d60a"
+    },
+    {
+      "path": "public/personal-money-center.js",
+      "sha256": "a0ed4a17ebb544ef581756ff0cf8a3cc84841d81538a35a0861ddae4bb0c7616"
+    },
+    {
+      "path": "public/personal-money-daily-briefing.js",
+      "sha256": "35de8f441f2b7c3874de9f57afea262c2014f9f7cc85291e6914d1912e7de8e0"
+    },
+    {
+      "path": "public/personal-money-health.js",
+      "sha256": "6921a9186df9eff1a97900e57356c7ae17bcc41be045b3fd85ee1c1287588340"
+    },
+    {
+      "path": "public/personal-money-home.js",
+      "sha256": "beccce289af0fa402ca81905fe0c0cd7b68df6c833b10c8e49133e57748eee54"
+    },
+    {
+      "path": "public/personal-money-mobile-nav.js",
+      "sha256": "a4d929e2aa79041046a9e31e6f67753ef73aef1417ce66b67352f44d0819b85d"
+    },
+    {
+      "path": "public/personal-money-review.js",
+      "sha256": "5374a219ccd269694a47c44950ab2994919b5d906a1aea7e9c1051b1113bc79c"
+    },
+    {
+      "path": "public/personal-money-smart.js",
+      "sha256": "468f4726fffb3743b7324b5c3dd548e6930c083ddd2a124507cd26a8c4b51a83"
+    },
+    {
+      "path": "public/personal-net-worth.js",
+      "sha256": "8baa40646a81ff9315fa35fffadb452027a550fe665f2b5bad5acfa47a2c591c"
+    },
+    {
+      "path": "public/personal-roadmap-intelligence.js",
+      "sha256": "9b954d973b6abb7b55ba170b97fcc1983928d29c7c9914862287cbb95c47a917"
+    },
+    {
+      "path": "public/personal-savings-intelligence.js",
+      "sha256": "b4985d3a2c3940534f8b2dff0241410a9ae8b5d3f9cd887d8be2f2496ce5aeeb"
+    },
+    {
+      "path": "public/personal-spending-categories.js",
+      "sha256": "0eebbb38d827e44f47e2ccfdbe90091982f92fea46628c4e40ffcef22b88ecd1"
+    },
+    {
+      "path": "public/personal-spending-challenges.js",
+      "sha256": "588f5fbd59c864be2981a1fe3fadcf936bf32e26ddff4c478def68354117869d"
+    },
+    {
+      "path": "public/personal-spending-patterns.js",
+      "sha256": "5393548009733a6c8a71be5769870398434ddfe8c1e5461006ef5b2311566c13"
+    },
+    {
+      "path": "public/personal-subscription-intelligence.js",
+      "sha256": "ace75a1d1c8afaf6015d1beef6314ec9e95ef079425fa9a11a3303fc5ad1c99c"
+    },
+    {
+      "path": "public/personal-tax-financial-year-intelligence.js",
+      "sha256": "dc7b2fc2c2fa3d29ea3629be9ba0cced98c701452bd25f4663645d7f21dc7a13"
+    },
+    {
+      "path": "public/personal-wealth-planning.js",
+      "sha256": "0f39b883b85b94162003711f1b9c9a0b094653a83644e0dc36a18a0eb1f4efd5"
+    },
+    {
+      "path": "public/personal-wealth-position-intelligence.js",
+      "sha256": "76e473a3b3ab584069f74158e5d8ea71778d2f4d8ac062334ca35ef3dbf6faee"
+    },
+    {
+      "path": "public/personal-year-end-accountant-handover.js",
+      "sha256": "a3bed1544fe4efeb4cacfd50e4bae8da9ce7da97a78722ed6cd8f12c6eab525e"
+    },
+    {
+      "path": "public/predictive-money-intelligence.js",
+      "sha256": "e02103448a7be1ea17255ece970ae14e5baf4e9b3fc6242debe9693137db5a7a"
+    },
+    {
+      "path": "public/procurement-ui.js",
+      "sha256": "8e7feb12ca07e147f6d807cbfd81cadd03be100f0b57896246dd705fa662c597"
+    },
+    {
+      "path": "public/production-readiness-assurance-center.js",
+      "sha256": "322c5f87128d486a6f053dc8c530a5d014fbc14c69eae41f7e4b9f4e244cc39f"
+    },
+    {
+      "path": "public/qr-widget.js",
+      "sha256": "d0d81812e2a3b11ac233b5c302ee1ebd46ef5c252aef0a30890fdb5779ef7fbe"
+    },
+    {
+      "path": "public/quality.css",
+      "sha256": "a3ab65c108589dc6dd145e0c1f4b521a770784c10932ab5cb16c70fbd970324a"
+    },
+    {
+      "path": "public/quality.html",
+      "sha256": "69373f39c8cd27e4917aef0bfcd6e0553e6bfbc677251464eb7b57b687a91afb"
+    },
+    {
+      "path": "public/quality.js",
+      "sha256": "8e5dcd55f1634c6932fd7ee7a499b851df5206bc5972c880a5217d4bfb68bf6f"
+    },
+    {
+      "path": "public/recovery-assurance.css",
+      "sha256": "f6391f28e1206d919d34b3ff4339cf4d8d0d45596462f40099edd88516c54ecd"
+    },
+    {
+      "path": "public/recovery-assurance.js",
+      "sha256": "b33a2959f8cb5943a5e23b6a45275f67f957dd0daba239986b9ca1a1e7b4ea6c"
+    },
+    {
+      "path": "public/recovery-drill-governance.css",
+      "sha256": "a589f313afaa166955e43588c8750b108d615702aa62ebca6dc359f4f90c7b84"
+    },
+    {
+      "path": "public/recovery-drill-governance.js",
+      "sha256": "34615679cf15c4a9386bcbb9aa53943a981f18c39beb9265ab4c6052178648da"
+    },
+    {
+      "path": "public/recovery-drill-ledger.css",
+      "sha256": "c4321c3141716f6423936021abd3f0de7a6e522bc4f134b26e3a4c38a53cc8af"
+    },
+    {
+      "path": "public/recovery-drill-ledger.js",
+      "sha256": "095c4b4a7ab58e9ab079acc1dfd158dc894cb6760bf9e91ec4bed15ff6644493"
+    },
+    {
+      "path": "public/recovery-drill.css",
+      "sha256": "278fb20c17f903d044f29571ca08fc41cb6cad4afb8266d128c09d480d00ae29"
+    },
+    {
+      "path": "public/recovery-drill.js",
+      "sha256": "9fd10e085752613f52433a60950ace417241b798109862bd7ea2a6e0ab4d06f2"
+    },
+    {
+      "path": "public/recovery-executive.css",
+      "sha256": "0ee02b23a385e03d4293488c0d398d49f05e5628c5aa81c1354365e30d615386"
+    },
+    {
+      "path": "public/recovery-executive.js",
+      "sha256": "b037583e69e125fbdbb6c3fafedcfbfed8ac994888a5643e55a981a5cf07d819"
+    },
+    {
+      "path": "public/recovery-remediation.css",
+      "sha256": "674911f678ae32734fcd72cdb10ebb5cf3fffefc3a13ab2da76422a75b8000af"
+    },
+    {
+      "path": "public/recovery-remediation.js",
+      "sha256": "ceb8bc2fd2f1ee695725fa592d34de6f7e9bcbce747354ea93af3f3a3c857912"
+    },
+    {
+      "path": "public/report-viewer.css",
+      "sha256": "25d89a438ef0a6944d95018abdbb2d5e1421c44665bec22a721437fc13802de7"
+    },
+    {
+      "path": "public/report-viewer.js",
+      "sha256": "8098efd1a2d5a366d39a6a9e9dc87bc9fa4c438efe2bbe899b8219ec33a7daed"
+    },
+    {
+      "path": "public/role-portal.css",
+      "sha256": "a5a8ebb01a1ebaef9730b403e36d5bb124e46f090e9432284565aa7819274afc"
+    },
+    {
+      "path": "public/role-portal.js",
+      "sha256": "49b9b84ca1cc15571661eca6037dc933bfe792e516a14c029a64ba77d1e32650"
+    },
+    {
+      "path": "public/shift-qr-terminal.js",
+      "sha256": "87ac4420ee4da596abecd6d3e478b2fa425132ef998fb813dce746b3c1e266f4"
+    },
+    {
+      "path": "public/shift-qr.html",
+      "sha256": "e133eec6374777fe718e439ccc69610dd2c53b78b621f59350743006dca93980"
+    },
+    {
+      "path": "public/shop-floor.css",
+      "sha256": "8a0f71a308916cdebeb8e5e66905ca1f22661b4665ec87fd025154a6d8d67f2e"
+    },
+    {
+      "path": "public/shop-floor.html",
+      "sha256": "5462b8921acec8da30fd9835055e76d03127641dd87729d35b85b4a0550c69ee"
+    },
+    {
+      "path": "public/shop-floor.js",
+      "sha256": "250db7d67122679cccf468dc4a1f1c9035821e8fdc81ca6b808692ba5f036961"
+    },
+    {
+      "path": "public/staff-dashboard.html",
+      "sha256": "d4787930f48c45471f3b519344812ebeb431447872e8df8177041f708b5b9b81"
+    },
+    {
+      "path": "public/staff.js",
+      "sha256": "a058ea3557806a541ee4684cd26da7b8ae635a46fa8b42c46b54e69563af2df2"
+    },
+    {
+      "path": "public/test.html",
+      "sha256": "5842da6a6672cb06f9171d13be3b43ab8a1edf567b830d4e62d26d73b41780a6"
+    },
+    {
+      "path": "public/visitor-portal.html",
+      "sha256": "b80ff314a0cf2237b1074d984d22a6a200c109db071fdbd5e43b1a9c12950982"
+    },
+    {
+      "path": "public/workflow-ui.js",
+      "sha256": "3990a1acbdc70d17c5a4183c53c3b0fec96d49b0b2c02dabfc54a102cbb118a5"
+    },
+    {
+      "path": "public/workspace-charts.js",
+      "sha256": "1a685d3f13994442419f252b3dfa524acf0120256cda118893b9ffa5b98b4a30"
+    },
+    {
+      "path": "public/workspace-layout-check.html",
+      "sha256": "adc3d7c192908c0116ff5a1d83f8f173761368006edb374a842df35169bacb06"
+    },
+    {
+      "path": "public/workspace-layout-check.js",
+      "sha256": "145295900f96e09a936e03c168d7133493414e254945c558bdfc5c587e275d27"
+    },
+    {
+      "path": "public/workspace-shell.js",
+      "sha256": "bf766ee86b787ff7270dee517c9ca4c9d42cd260a9b478d8c0e2e216533013b9"
+    },
+    {
+      "path": "routes/accessAttemptRoutes.js",
+      "sha256": "555637cc8003230e72e5b49b9f52c1ed36c063d1cd868824fe215b8ad6c7a5aa"
+    },
+    {
+      "path": "routes/advancedBankingRoutes.js",
+      "sha256": "2e3b6a8adc9c937b958f3ccc50ae67ba1206d467296af65ede5169b9b74d9767"
+    },
+    {
+      "path": "routes/attendanceRoutes.js",
+      "sha256": "88fd73f8f0cdbf4289923ffc87c53b58ab0a0412876d4094ce3ca27f86aa96d4"
+    },
+    {
+      "path": "routes/bankingPortalRoutes.js",
+      "sha256": "0980fa48c73506f179ee43626960e40fcfb26a79300f7cf2c43e4bbb066374c0"
+    },
+    {
+      "path": "routes/careersRoutes.js",
+      "sha256": "d29e5ccb2f019ce74116f77e92f2d0b812822cd7176636d401d95d1adf21c944"
+    },
+    {
+      "path": "routes/competitorRoutes.js",
+      "sha256": "7d06df179eaa8ff1171f26460f2496f0b38fc31c2207b2ec8d46544098e200f3"
+    },
+    {
+      "path": "routes/complianceRoutes.js",
+      "sha256": "727cbc24f378bb0c0e4bc8bddbf6c4f3434f2f0fc4208ec77abcacb6c8a7becc"
+    },
+    {
+      "path": "routes/continuousAssuranceRoutes.js",
+      "sha256": "0dde37af8721f1afa8cf8752aa7ade7acbc98f9e8b12277caf19e9799760165b"
+    },
+    {
+      "path": "routes/customerRoutes.js",
+      "sha256": "4df933569408179114fcec4536189a8cc4c48234e9e4303b8127163a492c5b90"
+    },
+    {
+      "path": "routes/dashboardRoutes.js",
+      "sha256": "5b153b4adb779f328d701542a431152b2ae37b43aba3ce50f146b1eae3b5e497"
+    },
+    {
+      "path": "routes/emailRoutes.js",
+      "sha256": "d6c336c74b6f0d792ceeb9fcda1819ca5bc5ee1d34890ca280b72b46148e92fe"
+    },
+    {
+      "path": "routes/employeeIdentityRoutes.js",
+      "sha256": "89c486568259570851b8fd81fe0f517eb2625e8ce1516c6dfe8a274b03048cd4"
+    },
+    {
+      "path": "routes/enterpriseControlPlaneRoutes.js",
+      "sha256": "a9fb95acc767fa77753e8c27fbfdd39475ceb448305129d134c0c63f9e81a9d8"
+    },
+    {
+      "path": "routes/erpWorkspaceRoutes.js",
+      "sha256": "7511c3e9c109b58154c52de09f0a1badfd2c5b261be888f0960c76ae67d06d30"
+    },
+    {
+      "path": "routes/expenseRoutes.js",
+      "sha256": "891a4bb6038b64b60afa91c1a487b63b74e4eb74b3291a153ec16bbe2207c5ec"
+    },
+    {
+      "path": "routes/financeRoutes.js",
+      "sha256": "6461934a9dc38072dc0ad803a3d8a80fb92026f254bd4bf36a25f7290ebb6d31"
+    },
+    {
+      "path": "routes/highRiskFinanceRoutes.js",
+      "sha256": "af37759c17f6bc47ce867919b0c91be94db11092c11e32263343ec725405dcf4"
+    },
+    {
+      "path": "routes/integrationWebhookRoutes.js",
+      "sha256": "d20a5faa0aa6c521b8d668059cc1186cdc8ed72a8333db610c4b2210a0495757"
+    },
+    {
+      "path": "routes/invoiceRoutes.js",
+      "sha256": "3a957df2aec58dd6eaf0b6980c228fc977b6aaa3b63f3b22e505733ae0a4b1ac"
+    },
+    {
+      "path": "routes/materialRoutes.js",
+      "sha256": "63c9a5244445ae6da14ecc4476ccaf885449bdd788cf844f8c6de21f8ea01a31"
+    },
+    {
+      "path": "routes/meetingRoutes.js",
+      "sha256": "a9044a368182256150b58a09b0bc821cbbdae66a68b04daf9799ae2b8f099c94"
+    },
+    {
+      "path": "routes/notificationRoutes.js",
+      "sha256": "20b4218efc805eb97adcde33782d74feaaf6bcc2722c9594197f09358edecb55"
+    },
+    {
+      "path": "routes/operationalTrustRoutes.js",
+      "sha256": "6f9d90d15d082f0f8e784dcd2487728bc3efe7f4c9255cfff0b9df5f7ccf6e34"
+    },
+    {
+      "path": "routes/procurementRoutes.js",
+      "sha256": "90d7186bef962fb99bdd6611f7b14d50338b352a6bbf462f79acc0d5a991931a"
+    },
+    {
+      "path": "routes/qmsEnterpriseRoutes.js",
+      "sha256": "be633af61d509c71a73d3ed0f5b0881439198c7a2045f5405eafaca005abbb03"
+    },
+    {
+      "path": "routes/qmsRoutes.js",
+      "sha256": "89b8612cc7dea337a1f0e1045181f165aaab589cd3b38490792c6911bc1dbf5a"
+    },
+    {
+      "path": "routes/rfqRoutes.js",
+      "sha256": "8175548661cfc80c20b9728c4ab14aa76c7616c51539712620a5f2c4da3818f0"
+    },
+    {
+      "path": "routes/rosterRoutes.js",
+      "sha256": "5c95f9728bfef7c4e69c1bec35966c5d5d69447985987dbf016d18d28a8d02ff"
+    },
+    {
+      "path": "routes/securityGovernanceRoutes.js",
+      "sha256": "5450f1e909be22dc59f54346bf7bedd884a1d4d9bc21d17c67fcb6c187b8aa61"
+    },
+    {
+      "path": "routes/stockRoutes.js",
+      "sha256": "30374ee528f57322ee1cd6ec1d64ac96cc2768f07aa9316955ff859bbca37ca7"
+    },
+    {
+      "path": "routes/supplierRoutes.js",
+      "sha256": "406aa8ada9a8e4193199164037c187f05fd3aa8610a866b71b4ae35e5ca87cd6"
+    },
+    {
+      "path": "routes/taskRoutes.js",
+      "sha256": "131e7d23f5f4688e0cd48161a6bce7e4c000c8a3fdfea0afe401c0aea7c5fc17"
+    },
+    {
+      "path": "routes/trashRoutes.js",
+      "sha256": "56fe4b836fc946397e9b0062faa0d79dfb44149b85e5a7b5ead8b33844c9d194"
+    },
+    {
+      "path": "routes/uploadRoutes.js",
+      "sha256": "1432308f51c79fb46d9d1e15ca6f9606bb121c9cb589572af17ae98b51990364"
+    },
+    {
+      "path": "routes/vomWhatsAppRoutes.js",
+      "sha256": "f44ba43f8e37c37bf9274f7624d5d7db814bc813fc55dc6dd39f106a87094b3a"
+    },
+    {
+      "path": "routes/workflowRoutes.js",
+      "sha256": "a049126986f7b8c493ca535f69cb6b881e2459190eb27da1f3fc2adf28f08b8b"
+    },
+    {
+      "path": "scripts/access-update-actions-test.js",
+      "sha256": "1cd5ba0f05a0a9c781db7a52f909e005b1676d106ec29eca381a10aa218074b3"
+    },
+    {
+      "path": "scripts/admin-button-activation-test.js",
+      "sha256": "0786b02c5bf24a61950e37c00e776dbc574a0e09f3186727a8e6c5642a87aca9"
+    },
+    {
+      "path": "scripts/advanced-banking-platform-test.js",
+      "sha256": "e45843853c7af6b77ba3f4098d53dc7313fcb51f525e5bf8b94ae79da57b2ec1"
+    },
+    {
+      "path": "scripts/apply-recovery-drill-ledger-migration.js",
+      "sha256": "1c60325159869759eeb968ef20f7672c392039b3fb213658a99d9af67f2df754"
+    },
+    {
+      "path": "scripts/apply-recovery-remediation-migration.js",
+      "sha256": "1c986df0063eb9e9f9cfdc7d4663c08e94dc727634b8b457ff612331fd8d0d32"
+    },
+    {
+      "path": "scripts/bank-account-lifecycle-test.js",
+      "sha256": "74b87cd1b0a017afeea3419f4d12cb3050ee07cc4bcebcf6da31289ecef3ecca"
+    },
+    {
+      "path": "scripts/banking-account-scope-test.js",
+      "sha256": "05b1d0927c327b547f166b9d366ba869175eca9bde204e57e6601af048dc0331"
+    },
+    {
+      "path": "scripts/banking-command-center-test.js",
+      "sha256": "429038ad775ccf5a3adfd99d3a20064bc2a6b8e5077cdccaa43b05a1c86e33bd"
+    },
+    {
+      "path": "scripts/banking-os-multi-user-test.js",
+      "sha256": "9475bfa66dee39978c80a683f34061bc6caf2440e3fd5a64b3fc503f67456125"
+    },
+    {
+      "path": "scripts/banking-workspace-error-recovery-test.js",
+      "sha256": "74f401dd3b5419d6a7f199957da45ca1077102b3f79f669a3b370cb5e5184591"
+    },
+    {
+      "path": "scripts/continuous-assurance-test.js",
+      "sha256": "cb4fa24dfeb974cace1b42f3edb4a31e7aa434c8ba4c49dc3d9580055cea4e55"
+    },
+    {
+      "path": "scripts/controlled-form-library-test.js",
+      "sha256": "9b89443c5ad4cd35fa68648c34a78367856be8612b2ad1bc04029be5c1ace47a"
+    },
+    {
+      "path": "scripts/database-capacity-recovery-test.js",
+      "sha256": "bb8175d1ae95bc746a7b78b6e5c7168df5a73bff657f9c0aeda7163aeaef714f"
+    },
+    {
+      "path": "scripts/domain-smoke-test.js",
+      "sha256": "eae61f45c60641b7c1a67925db8e74f45b799e327ccda7f3e45f4ed8854a764a"
+    },
+    {
+      "path": "scripts/employee-identity-test.js",
+      "sha256": "e7f5f99e641b8725f3a960d58c8ab7c63ed951a55fe6acd2ae4624ceb5fda895"
+    },
+    {
+      "path": "scripts/erp-wave1-trash-lifecycle-test.js",
+      "sha256": "e3768a487a775ea7f7287d98166347277f151c1fa2bf152485cc10cc0f754917"
+    },
+    {
+      "path": "scripts/erp-wave1-trash-notification-test.js",
+      "sha256": "39825cb1830561d52155494132e07632d602529a84360c7a60ce9bd6d457af18"
+    },
+    {
+      "path": "scripts/erp-wave2-workflow-lifecycle-test.js",
+      "sha256": "07a709ffd045d6886ce722836b156f2330d5497954a62c99a7cb4d2b4f7ccfe6"
+    },
+    {
+      "path": "scripts/erp-wave2-workflow-test.js",
+      "sha256": "3f39fddffdc4b143821155b7a4300d9a48d15caf6cf953b5611ad5be706c845a"
+    },
+    {
+      "path": "scripts/erp-wave3-procurement-lifecycle-test.js",
+      "sha256": "d60b60883745fca6bc2282c9a9ced6e82ca9852a67c450af11a89369ed44734c"
+    },
+    {
+      "path": "scripts/erp-wave3-procurement-test.js",
+      "sha256": "47068660443372c56625165e0fe39520eeccf56d802a3c2d6ec85f1e690c39c2"
+    },
+    {
+      "path": "scripts/erp-workspace-test.js",
+      "sha256": "4afe04b4ef48c8cd7ad2c642c326d5d05cdad2bbf3de646a0049f330ab49672a"
+    },
+    {
+      "path": "scripts/final-system-audit.js",
+      "sha256": "df8301c5dfece40c9432855f85c5edd8272d9f2d0ec61ec7844bf64bc1d8da68"
+    },
+    {
+      "path": "scripts/finance-account-segmentation-test.js",
+      "sha256": "37b55563b1f33065bb9d637da126d01a7850ad350643ae246938e8487a5dc317"
+    },
+    {
+      "path": "scripts/finance-accountant-handover-test.js",
+      "sha256": "996dbde2d7e70eec899d34e2ceee6b9bdfec2825fb6d9b7e2450b5701522e0ab"
+    },
+    {
+      "path": "scripts/finance-action-reliability-test.js",
+      "sha256": "f69e0524d341853bea735e65f7ed89e9edba3cfb7f272febca35385fbb3e663f"
+    },
+    {
+      "path": "scripts/finance-advanced-control-test.js",
+      "sha256": "1fc51ea248b07139d8eff41807ae0614ac75520ec55604ca6a37d15c6d82a9fb"
+    },
+    {
+      "path": "scripts/finance-advanced-loading-resilience-test.js",
+      "sha256": "8827b9dc0e61ea54485c9016697a513c82e21bd2be2c3004541861c9411301be"
+    },
+    {
+      "path": "scripts/finance-anomaly-explain-control-test.js",
+      "sha256": "cd44af2c510d7a8580b8ed14a5bc899cb7ede8660a94b21bafa4625dac7dc458"
+    },
+    {
+      "path": "scripts/finance-australian-crdr-adapter-test.js",
+      "sha256": "ed48500b2200c512ada9c306d579cf178a5803001d78a4bcccb5f950c40c9c5b"
+    },
+    {
+      "path": "scripts/finance-banking-readiness-test.js",
+      "sha256": "31e8cdc6e66dc913775f7ab170c5f9388d3f46a29cdc5331dcf1d74561dce688"
+    },
+    {
+      "path": "scripts/finance-bootstrap-resilience-test.js",
+      "sha256": "10b76c42d528aadc695dfb1fdc5813b694ee173229d7fb4c774a4291b7216bbb"
+    },
+    {
+      "path": "scripts/finance-borrow-lend-delete-lifecycle-test.js",
+      "sha256": "43a1f0a01d434e68d3d134c5339051444090d6711b7449020767840c931ffd5f"
+    },
+    {
+      "path": "scripts/finance-bulk-review-rules-v2-test.js",
+      "sha256": "40178a84bff45df2c98856789b6ff2fc103c004f74cf30e95c67f715a1c5cb64"
+    },
+    {
+      "path": "scripts/finance-cash-control-test.js",
+      "sha256": "2f9d10c069ece975aca947f3ae4be6f00bff02fd232d85f3da47d8e1ab01a35e"
+    },
+    {
+      "path": "scripts/finance-cash-custody-control-test.js",
+      "sha256": "b97bca3c9bd7dc39bfa204b1999134a36f686264732909a16b4f82a40da21b54"
+    },
+    {
+      "path": "scripts/finance-category-manager-test.js",
+      "sha256": "0bc32398f38ff94296f6e4a678f9e9c7eb69bf810cf4a04e9fc37fc9ff80623c"
+    },
+    {
+      "path": "scripts/finance-close-assurance-test.js",
+      "sha256": "e7504852d68f5d0a9cbf91ba7cf672627136ee7a067388bb0fbb317ff106fbfa"
+    },
+    {
+      "path": "scripts/finance-control-actions-test.js",
+      "sha256": "37f78b691b8ca2e567ac7eec98951d7d5afa34ade9024e96370688827aed0d49"
+    },
+    {
+      "path": "scripts/finance-control-centre-completion-test.js",
+      "sha256": "6e3178544345e591b5bfad0dba69b74a7e53758e495bc1069b3461b1801a761b"
+    },
+    {
+      "path": "scripts/finance-counterparty-control-test.js",
+      "sha256": "b8d8145fd7893bf99cde6fec6381ec1d7e612239b6c64d7995936cb65e19ad83"
+    },
+    {
+      "path": "scripts/finance-date-integrity-repair-test.js",
+      "sha256": "35cca35ea4ded8e8a651911983440c4ff07f4ffedc7bf4ac9495a0bb429f6237"
+    },
+    {
+      "path": "scripts/finance-domain-test.js",
+      "sha256": "1a5b845646db527d1602d6903eece83e9e4313754fd537016c8e4b98e7cb59e3"
+    },
+    {
+      "path": "scripts/finance-email-pdf-delivery-test.js",
+      "sha256": "616ea2bd11c9190c1f5b835f96f7138946618261c7d68a87fb500daa2364d8e5"
+    },
+    {
+      "path": "scripts/finance-email-transport-binary-test.js",
+      "sha256": "3900bacc5d8e4d7f4f65b627ec45b308330642537b199d795916eca92616c6ef"
+    },
+    {
+      "path": "scripts/finance-filter-consistency-test.js",
+      "sha256": "1d37c7e32cb835f6be355eda506541679f07e4fca441187c9bb780b53d887cb0"
+    },
+    {
+      "path": "scripts/finance-fpa-planning-control-test.js",
+      "sha256": "113066080d5ff5af3ef813fe5950bb1628940f3fd0350a6c11e3845ff7b5f267"
+    },
+    {
+      "path": "scripts/finance-full-surface-acceptance-test.js",
+      "sha256": "a34c28cd438c0dcaf817eb6e77bfd4e5aa23e9bef90d3ca612bdefc6ff20995a"
+    },
+    {
+      "path": "scripts/finance-fx-rates-test.js",
+      "sha256": "f01032fde4a1d3ad1ddae3929994020551eb8f1dc337cbc99000e68b8598dee1"
+    },
+    {
+      "path": "scripts/finance-global-search-company-security-test.js",
+      "sha256": "7cd3b00a7852c2ceebb03f9453d16b1a627e1a4ae762cc42611094c044221639"
+    },
+    {
+      "path": "scripts/finance-governance-controls-test.js",
+      "sha256": "ca399ff2af0734ccfb9a2cfc26ee66c4dda0ecbf28e01ebcb5ca5da65f0f62b8"
+    },
+    {
+      "path": "scripts/finance-import-wizard-test.js",
+      "sha256": "6852c7e14b8ad157f4e912d9c017c550482283fdbdbed75390374944b182933a"
+    },
+    {
+      "path": "scripts/finance-intelligence-admin-integration-test.js",
+      "sha256": "72778cb50e832dab0be9393579beb32f21f0f1cac7e177f600d5f5aaf96fa39c"
+    },
+    {
+      "path": "scripts/finance-international-bank-adapter-test.js",
+      "sha256": "6dd020eddf57dd4a48c3bac58a9266b83c0cd5eea799f0dd6df2dc620a16ac64"
+    },
+    {
+      "path": "scripts/finance-job-profitability-test.js",
+      "sha256": "3354a5f7a4460f58dd5c88c4e9793b459ae8cb4ec8cdc43b478f618b4560c134"
+    },
+    {
+      "path": "scripts/finance-legacy-ui-gate-test.js",
+      "sha256": "16a30e88dab9ef5a6a7b19b75e06298aa531ab34072d17139cbdff91df557d2e"
+    },
+    {
+      "path": "scripts/finance-master-os-test.js",
+      "sha256": "7c9746e641c9b3cf2277e65379caeaa2d69e855570f049ecb26f5f1094bea5a0"
+    },
+    {
+      "path": "scripts/finance-original-bank-data-test.js",
+      "sha256": "862a11533615a7f02ec0e64dca1ab2f0191c5555e371feae1327b4415cb6119b"
+    },
+    {
+      "path": "scripts/finance-original-requirements-acceptance-test.js",
+      "sha256": "6eb16c5b698d3627e152ff7b99b306e9b9d12717183131b0d328a987ca1c2795"
+    },
+    {
+      "path": "scripts/finance-pdf-statement-parser-test.js",
+      "sha256": "149c5c80783be72d6067f295dfb21126c4c4e59165414f815931d48c8ff499e0"
+    },
+    {
+      "path": "scripts/finance-performance-risk-control-test.js",
+      "sha256": "29408728707d5fdd21e27d084f75e0dbef33546f149ffa0d0f0ba430dc9ab598"
+    },
+    {
+      "path": "scripts/finance-personal-control-surfaces-test.js",
+      "sha256": "1e5d174b6d22625882770d7e48d638b8803867c3f8c16de7a55bf54b106cdb69"
+    },
+    {
+      "path": "scripts/finance-planning-controls-test.js",
+      "sha256": "9bd9a2aed8a5a9b8c6a8f8cbe0107cba0ad35ecc7c599e8ff27b730e6b80381b"
+    },
+    {
+      "path": "scripts/finance-privacy-rules-test.js",
+      "sha256": "3869124ece98eeac8cd2c6a34432c187ed290d38a3f6de90ac37f4dffb009114"
+    },
+    {
+      "path": "scripts/finance-production-regression-suite.js",
+      "sha256": "81082806463df3c77b8a5d74356653de9fd36705c6d703658db96149cc97d5a1"
+    },
+    {
+      "path": "scripts/finance-receipt-audit-center-test.js",
+      "sha256": "fc486d0af34c2ae3e57495e15571869a935a868fb3efdaad4f322c2e7c60e413"
+    },
+    {
+      "path": "scripts/finance-reconciliation-center-test.js",
+      "sha256": "1795ec1e6e21d98f89bef8aec0af92d30f029bb84567186d7fb7bab8ad147594"
+    },
+    {
+      "path": "scripts/finance-reimbursement-settlement-test.js",
+      "sha256": "0602ea3f388c961b284781db7b19473d448af480a0d78cbe0216ce881b58fb0c"
+    },
+    {
+      "path": "scripts/finance-relationship-workflows-test.js",
+      "sha256": "d48e004cc2438146e8fc4e466cc8fff48654b86e87c84a449dda3273098d3882"
+    },
+    {
+      "path": "scripts/finance-release-consistency-test.js",
+      "sha256": "9305afff476c0ccdb63dc72695402ba585e56e16161e81cbba6ae9e8dab67f18"
+    },
+    {
+      "path": "scripts/finance-report-actions-test.js",
+      "sha256": "c19a4b7a79b93260dfcf67fbdd17c2628be0d6589a0f3c9eb0c06021270889ab"
+    },
+    {
+      "path": "scripts/finance-report-builder-v2-test.js",
+      "sha256": "afbf60c0b429fd4e362427e5739b36f0a956b1aee705a14a1cd8289364a5d638"
+    },
+    {
+      "path": "scripts/finance-report-snapshot-mysql-test.js",
+      "sha256": "24f7b7ea604e8dbda09444aca6f92b1f8df84ac9efa0c4265c653399feb09d87"
+    },
+    {
+      "path": "scripts/finance-report-snapshot-test.js",
+      "sha256": "e15aa91830d02da428256e0f8654c4d291c59a767945010533c904542ba0fb5b"
+    },
+    {
+      "path": "scripts/finance-report-viewer-browser-test.js",
+      "sha256": "7831aa2cdbcbdce831a7fba1152d9a4798c29dafb83a1704c08fbf3dd4447a43"
+    },
+    {
+      "path": "scripts/finance-statement-dedupe-report-test.js",
+      "sha256": "2685bde2081076696de67bb1ac8cb8765f8f4c2c5e7f9ae7f3af643833231e5c"
+    },
+    {
+      "path": "scripts/finance-statement-ingestion-architecture-test.js",
+      "sha256": "43f5197af913bc54eaa0c8e0bb182b6022b188db4f5f166d1fa59a6a81ff2643"
+    },
+    {
+      "path": "scripts/finance-statement-ingestion-real-files-test.js",
+      "sha256": "5fd3dbc6825e572d524abe1330d9ddbc6b20061c2e2e283a671efc3b95971a35"
+    },
+    {
+      "path": "scripts/finance-statement-legacy-resume-test.js",
+      "sha256": "60e942833c3b758934e2ac76fd306b37cdeba74c0618ee05b003a51eb0b3d30e"
+    },
+    {
+      "path": "scripts/finance-statement-review-fixtures.json",
+      "sha256": "7887f823edf8c0a04d2d0d7605aa9d3b060e30640da86b9a9e820401e91c47a6"
+    },
+    {
+      "path": "scripts/finance-statement-review-test.js",
+      "sha256": "ef40b905cdd6a575521873738a94a9a93bf31aeade205098facd8d57b0aaacaf"
+    },
+    {
+      "path": "scripts/finance-statement-source-evidence-test.js",
+      "sha256": "42b71d203bcaea600a3090ed9d44f1df2570325b8945693f51bb22df85f036d0"
+    },
+    {
+      "path": "scripts/finance-statement-timeout-recovery-test.js",
+      "sha256": "1d850034f9e34c7b9c189a340703b174c39a46b5c5ce36b5bb28b11befd4645a"
+    },
+    {
+      "path": "scripts/finance-transaction-lifecycle-test.js",
+      "sha256": "d45c49e542c384ab2d465d00587d6a7085b18c789c60eabc015a3eee07dd16c3"
+    },
+    {
+      "path": "scripts/finance-treasury-control-test.js",
+      "sha256": "d95c0ec1761ec59c843e8576a109bb5030c07db65dc01716c4b293e23ee2a220"
+    },
+    {
+      "path": "scripts/finance-trusted-totals-test.js",
+      "sha256": "4861ede2a00ab89e3d366e464e065c0d475c3aa8b4869ffec411b08187ebdbe0"
+    },
+    {
+      "path": "scripts/finance-ui-smoke.js",
+      "sha256": "04a078fdb264457b9648e530f48e1f31d7bb804eac330bb70c27b3ad80a57125"
+    },
+    {
+      "path": "scripts/finance-unified-net-worth-test.js",
+      "sha256": "6ca7a775aee1064a9d69e50639e8c998329619a2c056f94a5a34ec02c4e7c8b5"
+    },
+    {
+      "path": "scripts/finance-unified-roadmap-test.js",
+      "sha256": "54f2585ef2a560f03b7f227310cfa0d8fe965dcfd58255e06b63da6322c08a9c"
+    },
+    {
+      "path": "scripts/finance-unified-runtime-regression-test.js",
+      "sha256": "a95299fa4b33390e674eb6a14cc04aadcc3875b9fcd4e18e3b6b5bfb99fc4320"
+    },
+    {
+      "path": "scripts/finance-user-preferences-planning-test.js",
+      "sha256": "47798c97c89b10086dcabe2ac894bdafa218c4fdc6f7ed31f11f771e29c511a5"
+    },
+    {
+      "path": "scripts/finance-workspace-theme-test.js",
+      "sha256": "d4ac27c6298a3602c4a6c0df84736970969b71cd6e012850b5bdda57da612632"
+    },
+    {
+      "path": "scripts/finance-xlsx-export-test.js",
+      "sha256": "75bd8fda8310f1c83faa2a8f00eaccf7c8c136371649f3ea496c7882c5d50293"
+    },
+    {
+      "path": "scripts/generate-company-forms.js",
+      "sha256": "6546da66274c64367c5386a3756dba2e9a7d4383b409c0265f0cdc7e143eb3e1"
+    },
+    {
+      "path": "scripts/generate-quality-process-sheet.js",
+      "sha256": "b4bf6612a7408c5562dd5f6ecf4b7096b1b31ffa042a46b5dd44f87cac4b7257"
+    },
+    {
+      "path": "scripts/high-risk-finance-test.js",
+      "sha256": "b1a0042ab4f0aa5ff9a0af2c9bd459e7afc36e771db4bed8f153090b75eb4c41"
+    },
+    {
+      "path": "scripts/inspect-finance-schema.js",
+      "sha256": "328d38b8a25c05b28ab3981116793d8474a4167797f98194183c174e6e51a5c8"
+    },
+    {
+      "path": "scripts/integrated-repair-mysql-test.js",
+      "sha256": "fc5e1a4562ea33fa3b636b70f547726200b8f7fdfdb1b6c441fb590da5be6f81"
+    },
+    {
+      "path": "scripts/integrated-repair-regression-test.js",
+      "sha256": "327cada3cec461fb0ed39d0d90c6c01321911b3106acd576387ca9bc9457ae96"
+    },
+    {
+      "path": "scripts/multibank-statement-history-test.js",
+      "sha256": "d6fec69ff05b1f5190cf38093e24bb555d35e6d9357855a1b4a8c9f098fadfb8"
+    },
+    {
+      "path": "scripts/open-banking-sandbox-foundation-test.js",
+      "sha256": "233c75740e2de80b3dfe370aeb4f8ad5d6e367c400da3d851d1e232fd1be2942"
+    },
+    {
+      "path": "scripts/operational-trust-test.js",
+      "sha256": "e87d42ba38afbe8ede711e9f06e2d6257a9742db46d241c8c2a061e367e7e772"
+    },
+    {
+      "path": "scripts/personal-asset-lifecycle-test.js",
+      "sha256": "823f4d235e4901e4004161bf704600904446a32bf6a75ef4c3f2ea3445ecbffb"
+    },
+    {
+      "path": "scripts/personal-debt-control-test.js",
+      "sha256": "7139a47449e2e37d56d298c44d1d32b05b17199ea7be2231b3752bf8c1584de4"
+    },
+    {
+      "path": "scripts/personal-finance-alerts-continuous-monitoring-test.js",
+      "sha256": "05d38e8bc6e1fae45bb7365a28e1cff677b5b3ef8815270f41ce52b21fc47c87"
+    },
+    {
+      "path": "scripts/personal-finance-audit-trail-change-history-test.js",
+      "sha256": "8db0e8a01b4ceed0ffa47d4935b62992297594b1aa0bbdbd9e0fde29d13c9d58"
+    },
+    {
+      "path": "scripts/personal-finance-automation-approval-center-test.js",
+      "sha256": "7ec654717f10be7230fac204ef54ba24ff7bdee36dad90eae19163a0dca4bc8f"
+    },
+    {
+      "path": "scripts/personal-finance-backup-recovery-data-portability-test.js",
+      "sha256": "bdbe29ef99140e240cb2018d526ffe1ca91bc0fa755349b039dc4156ee1dfa86"
+    },
+    {
+      "path": "scripts/personal-finance-canonical-backup-engine-test.js",
+      "sha256": "c62a0c4676663b2e782471c3981bbc5543584c3c70c48cea415a3eae19ab850d"
+    },
+    {
+      "path": "scripts/personal-finance-disaster-recovery-restore-approval-test.js",
+      "sha256": "65fd81cacc6e94b6b712b6f9cb637ec6f77ebe29a82611ee7e2a8a02f3dc9810"
+    },
+    {
+      "path": "scripts/personal-finance-post-restore-verification-test.js",
+      "sha256": "7d2bc50f0c0b42677298fb3a9b8678f43dcc4db8d9aa795fd147cfd051e9a591"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-calendar-planning-test.js",
+      "sha256": "628d085b0680e111d2670c488d697fbcf298e4156716d408e8af166314378c10"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-evidence-freshness-test.js",
+      "sha256": "683bce681969ef2f7dbc3b1818df18bcff733a51af8bb32aeafa87abbb6cf0f4"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-evidence-integrity-test.js",
+      "sha256": "b31f385064ff0f459a7949a9cc65291a47b461ffaf4280a8f61640f182ba052c"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-evidence-lineage-test.js",
+      "sha256": "7648d5fc6e7dd780f50fd8d650dc62b2ab71fd8e1fbd29a67d1b4a5cad2ea46d"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-exception-investigation-test.js",
+      "sha256": "bbe16772a0b1d9dc44b81cc4891dc4b0e651d5ad1825a47b93d633cdf7c70007"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-executive-command-test.js",
+      "sha256": "9567997d31b21e02d666924af71a8692f77f55947d1968026520a505fbc30569"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-investigation-quality-test.js",
+      "sha256": "f7f8103f9981f8c80cbfa8ec0cf6443a05aec704a971aad86cbbc286097176a8"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-investigation-sla-evidence-test.js",
+      "sha256": "c2808a2602a33106d2656ef84339ee8fcb019bd82b9cf89052f3f2f15b9d3942"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-knowledge-disposition-test.js",
+      "sha256": "0ac2091135fe7b9c4a41b550f9981ed231b7257416e13736aac169126f1c9791"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-knowledge-gap-test.js",
+      "sha256": "83367f9dcb5d4dd4a18ccd2abb31121ac915615ec0746de5f4c8fb3b4c594e0c"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-knowledge-impact-transition-test.js",
+      "sha256": "e0d4884209a9b01a3243945e51b04b5333b4fe24a491025b081bf3b27c83498a"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-knowledge-library-test.js",
+      "sha256": "fd3c883226f05bd7026c88491d9f7a8429b155a49208b4e82b91f054905182ed"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-knowledge-review-planner-test.js",
+      "sha256": "6740d39a434ca178572d47ac5f2d9a244ef19dc4b837c0b14f38c14b5cf43c2e"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-lessons-effectiveness-test.js",
+      "sha256": "6705d99fb5968a0d52eb9af958dede8aeccb291475ec8c66d9010de6399d5e1b"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-assurance-lessons-knowledge-test.js",
+      "sha256": "1570c00cff2e7e9e7ebb439a13ef693edd55043a576da2825fdb2c8f27467e4d"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-capa-continuous-improvement-test.js",
+      "sha256": "1da715ae4daab680ab150a7034d98398c96db4e72e1316754a86426dedb15333"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-capa-effectiveness-analytics-test.js",
+      "sha256": "ec3fdf9b3ff86950a7ad6e4344192d42fe3fc9e1862bef1a313a7bb19ac682a9"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-capa-risk-assurance-test.js",
+      "sha256": "78c93a104af7b4c3170c65b605ce0320d044cd0b958a393a3329148b456e313c"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-certification-test.js",
+      "sha256": "19af42c5eb4dae82d677fe6113528069ffae22d756dff4424f2cc72f9c7f8efd"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-control-scheduling-evidence-test.js",
+      "sha256": "96436fefd505c0bc0da8726f6673cb79d4ef272d8a5f4dce0e218550c591aefc"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-control-testing-assurance-test.js",
+      "sha256": "7819c66c8deca8fb849579229451836ffa7b549e58886cacc13a84077080ddf1"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-governance-reporting-test.js",
+      "sha256": "9c09f71ce8cd6cae9cf9ce4887b2a7f789f6941db7bc62101c6b249417dea081"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-incident-case-management-test.js",
+      "sha256": "cf56fc480a4191a7d66d3e9d43f483145416f7741f5d0d427419bb55390baf22"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-incident-sla-governance-test.js",
+      "sha256": "2305c365f645cf282bb6091d41a3400da177484de09a505d351176a96129e197"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-integrity-watch-test.js",
+      "sha256": "8648b1cd0f1971278a5373f4c1f8431f51093273706d91dafb105e3f5d2baf17"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-management-review-attestation-test.js",
+      "sha256": "3a149fffc66c539c53eba8445e78dfbcdff688b5409c1eecceb983dae72ae8db"
+    },
+    {
+      "path": "scripts/personal-finance-recovery-remediation-planner-test.js",
+      "sha256": "8c8a7a8887cbbc7f095d5186966a517d32764ac515f2cc6daa06ed5807e1ba48"
+    },
+    {
+      "path": "scripts/personal-finance-security-privacy-control-center-test.js",
+      "sha256": "dd3616f0cf24d618eddcd0cc1cb9db10f73da8ca6dc806034debc98324da93a3"
+    },
+    {
+      "path": "scripts/personal-finance-streaming-restore-transport-test.js",
+      "sha256": "18911e2602f847a601ca202d3913e3bfae7cf7371a5c87daa1220269f149d25a"
+    },
+    {
+      "path": "scripts/personal-finance-transaction-safe-restore-executor-test.js",
+      "sha256": "93864ee44f11527b08c866a84e6a34a86c4c3c8f0949be9886e01d04ce184881"
+    },
+    {
+      "path": "scripts/personal-financial-action-center-test.js",
+      "sha256": "192d67cac6f469b9dd1649a8afc516ccb392253ad18c3c37dbd266c6990534f5"
+    },
+    {
+      "path": "scripts/personal-financial-control-center-test.js",
+      "sha256": "6f067e76fcca954a4bcd6d3dddb955aab2de7e8a00ee270e966c76161c952d76"
+    },
+    {
+      "path": "scripts/personal-financial-data-quality-integrity-test.js",
+      "sha256": "22136a301c4018c5624600adeee51ba92bb32618250de56961c78f31dbca6ab8"
+    },
+    {
+      "path": "scripts/personal-financial-document-evidence-vault-test.js",
+      "sha256": "4dfc61b538479d60e87ebeea43fddb58acc1c98e86a8f7cdafe83ab292fac90c"
+    },
+    {
+      "path": "scripts/personal-financial-risk-intelligence-test.js",
+      "sha256": "241b6647164846335b92088d7081454933b8b63052374aeff420b05935fce609"
+    },
+    {
+      "path": "scripts/personal-financial-roadmap-test.js",
+      "sha256": "3198adbdfaa20f9819c6808b5d1884fa8733ef06fcfdb768ee17cc77644de0e5"
+    },
+    {
+      "path": "scripts/personal-insurance-protection-register-test.js",
+      "sha256": "4c5918cc4c49518f0cd5685bfde23c3ea1baf10e53d2ad6ae1ceb90a9ad2d878"
+    },
+    {
+      "path": "scripts/personal-money-attention-test.js",
+      "sha256": "337261564c8341fe6cf09a2a1e58d59440fb7e29128cea62f2509d05cb38587d"
+    },
+    {
+      "path": "scripts/personal-money-center-test.js",
+      "sha256": "bc5d6739e338a8539384eff24ff49cd0e970550bc8560a19c67015acdd76237f"
+    },
+    {
+      "path": "scripts/personal-money-health-test.js",
+      "sha256": "9135a4d704606715a091f6b89897bda000dd7811b2a54086f429680e4ef8aec3"
+    },
+    {
+      "path": "scripts/personal-money-home-test.js",
+      "sha256": "2ae473d26d1f3aafc6e7eaf5eb7e46bb49d2562374fee3b7409dfbbbacb08ed9"
+    },
+    {
+      "path": "scripts/personal-money-lifecycle-test.js",
+      "sha256": "e111ac93c1ce0f27d6e1195f869dca21c13fe5efed53eaacf6825832789c20ab"
+    },
+    {
+      "path": "scripts/personal-money-mobile-nav-test.js",
+      "sha256": "74df8a0f9bda5ce37c391d7084805a0d9c36c9d1bbc8a4887d900a5571e8e17d"
+    },
+    {
+      "path": "scripts/personal-money-review-test.js",
+      "sha256": "ca6c9c53823e2105d6f2d49f25529a8c6b0b1fce2ec29c29ccc4ad99ba6bd578"
+    },
+    {
+      "path": "scripts/personal-money-smart-test.js",
+      "sha256": "02e15fc8130af51b930bd5d7468f7a464334e251d4255751f43839a177ec7bc0"
+    },
+    {
+      "path": "scripts/personal-net-worth-test.js",
+      "sha256": "3da664bc4683543e1815ed1bc09094232d1583ab831688e33a9fda7fefab64f7"
+    },
+    {
+      "path": "scripts/personal-recurring-commitment-control-test.js",
+      "sha256": "ee7308e885d7bca6c06d6e7fc8af4a75536a864d0dd09319fbc5a8b2d5c172d0"
+    },
+    {
+      "path": "scripts/personal-roadmap-intelligence-test.js",
+      "sha256": "cea8eee008c73b096508a8a6be5bc7251e2ee86fb42e4885a26982b22d28e680"
+    },
+    {
+      "path": "scripts/personal-savings-reserve-control-test.js",
+      "sha256": "1d229a7e94cd4d652bf0e2d30a20613b9045021101d44bd074960df66b73625a"
+    },
+    {
+      "path": "scripts/personal-spending-challenges-test.js",
+      "sha256": "f08e3df58070f855dfb8322d044bc96dc51794f5ca20dd6b9ed124f85288553f"
+    },
+    {
+      "path": "scripts/personal-tax-evidence-control-test.js",
+      "sha256": "1e040f81148855f9f78fa0008adc2d8d9dcf3a6d6dde27c2360711818ceb3f36"
+    },
+    {
+      "path": "scripts/personal-tax-financial-year-intelligence-test.js",
+      "sha256": "1324c4e421ef8783e66adac09748ed23d5d5aea628062a747e65c761932c8a31"
+    },
+    {
+      "path": "scripts/personal-wealth-position-intelligence-test.js",
+      "sha256": "cca066f94eb5084f6725cbbd061d36a9657f16e672b92151954dc45d3b9d6813"
+    },
+    {
+      "path": "scripts/personal-year-end-accountant-handover-test.js",
+      "sha256": "79ce8a402bb6ab3d380f283f8ffd0bcf5a6940687f18c7c60f5aa823c22a82b4"
+    },
+    {
+      "path": "scripts/phase-37-50-security-test.js",
+      "sha256": "65125bacff6332559a6be0482ad0346711354ee80839575ff93bbbea47478bcf"
+    },
+    {
+      "path": "scripts/phase-51-70-security-test.js",
+      "sha256": "b04248eb989ba7d3581449fcd33c03cc42b9c8ee0aff3d0172395a003e786218"
+    },
+    {
+      "path": "scripts/phase-71-140-enterprise-test.js",
+      "sha256": "af41e7662f2fd8c88ea5de220b88f1d636966c95a71ab971756d1794737cd25a"
+    },
+    {
+      "path": "scripts/premium-invoice-layout-test.js",
+      "sha256": "913321fa436e3fa416adeeb125ffad0c1ad39abab96f1501f7b9e5222775b446"
+    },
+    {
+      "path": "scripts/print-save-pdf-test.js",
+      "sha256": "873fd34c4925f89023ba36f2580015e297626eece5c9b4e4fbf9dfca804681ca"
+    },
+    {
+      "path": "scripts/production-readiness-assurance-center-test.js",
+      "sha256": "4ff5cba71e5c7fab6a73deeb36edefaefddc10a6bdedad08d26b4a95ac4260a7"
+    },
+    {
+      "path": "scripts/qms-controlled-record-foundation-test.js",
+      "sha256": "2f8cf1534ffc36fc10c91908337b2280fb9812bcd82e5cf5402bcdd8b80d3384"
+    },
+    {
+      "path": "scripts/qms-enterprise-completion-test.js",
+      "sha256": "8612533726aab2c40d3f1b709e2c3332b5237bf31965c2fa44117a69340c96e3"
+    },
+    {
+      "path": "scripts/qms-operational-foundation-test.js",
+      "sha256": "28af80df8a8eb3fd0fb37adbcae429b3da1d28eb0243b807f87d321560e6c4f6"
+    },
+    {
+      "path": "scripts/qms-quality-governance-test.js",
+      "sha256": "b229d9a3d0af70c9611ebc3efa44a1755dca98e3722dc15da45b77b72aafc56e"
+    },
+    {
+      "path": "scripts/recovery-assurance-dashboard-test.js",
+      "sha256": "69afbdde00a03a423559cbba6dbedb17ef0527f379931d81efc8bab48cbfe1ff"
+    },
+    {
+      "path": "scripts/recovery-drill-evidence-ledger-test.js",
+      "sha256": "5c12a950a8e5fca9b6fe94166f5e9968858825835252642685032c1d6f0cf509"
+    },
+    {
+      "path": "scripts/recovery-drill-governance-test.js",
+      "sha256": "7a226085018a7937d0853e56847e36f3d487619cbe4ec39df6141013201d75dd"
+    },
+    {
+      "path": "scripts/recovery-drill-readiness-test.js",
+      "sha256": "57af634e4cb052fe586a94b5b74f40eb9f27b38a22bc2d513222f20365745ca8"
+    },
+    {
+      "path": "scripts/recovery-executive-oversight-test.js",
+      "sha256": "598fd06e3d928634f264d50ccdc1e04ee7c237171019b8cc775343c36345abb8"
+    },
+    {
+      "path": "scripts/recovery-remediation-test.js",
+      "sha256": "4290775bf6f3691293cd51547011a17941d58ff6b6aa96c45a44c72e8965dbac"
+    },
+    {
+      "path": "scripts/run-loader-network-stability-tests.js",
+      "sha256": "1364eed7819aeafc02d1d8e20d5dbce6a89b07deee715fc3e23e975afb46bdd3"
+    },
+    {
+      "path": "scripts/standalone-banking-portal-test.js",
+      "sha256": "b7da073b5c6c0fe580b78ca3e59a2df685af6db5e8a7b687ea7f42ba0b7c9c5a"
+    },
+    {
+      "path": "scripts/start-finance-ingestion-worker.js",
+      "sha256": "0964e34e63566fcb9428c11e857ec02f93dac9def4ae5808c58565f8a68e514c"
+    },
+    {
+      "path": "scripts/statement-data-controls-test.js",
+      "sha256": "8c339dd4b1edb80fd47b86d5971ade00206e1a088e7390807915b6cca6fc33af"
+    },
+    {
+      "path": "scripts/statement-first-money-warehouse-test.js",
+      "sha256": "45054a0f816cb896d96190b7ca138dceb2287c85215667baeb81f0d545ff25a2"
+    },
+    {
+      "path": "scripts/statement-null-date-staging-test.js",
+      "sha256": "388485838d83c532f997ea093cd801b920452856133b000a058d078320bc252c"
+    },
+    {
+      "path": "scripts/wave-b-pr3-qms-fail-closed-test.js",
+      "sha256": "1e96252aebe7f0efeeebf86e58a28642bc33f86281c034d0ec38cf64acfc48b5"
+    },
+    {
+      "path": "scripts/workspace-charts-behaviour-test.js",
+      "sha256": "d949e57b9cfbd8e4a15825c3455bd70aca7d9196ef567f1757c714024bde3cd4"
+    },
+    {
+      "path": "scripts/workspace-layout-check-test.js",
+      "sha256": "40ccb3bd580cbecf7c298725cc63729eb1749c54cfcccc94339686552fa18e7a"
+    },
+    {
+      "path": "scripts/workspace-navigation-behaviour-test.js",
+      "sha256": "4dd054556103176b77feee108e6d229bf10af364b6ac37370fa9c3e5fc9b0bd7"
+    },
+    {
+      "path": "services/adaptiveRiskService.js",
+      "sha256": "5c2dd8d159b5b3412a829c2b5e390488bb2da7cab5585242d3f6231a4d440435"
+    },
+    {
+      "path": "services/adminPageRenderer.js",
+      "sha256": "f659a951f08d650833b232221a1727ef220a1c20e16cc9cf333f687eb9605fa5"
+    },
+    {
+      "path": "services/advancedBankingSyncService.js",
+      "sha256": "67377c568e5b38c35e462bd629b99ec5cd03e41f5eae076901efe507e72bc42e"
+    },
+    {
+      "path": "services/aiSecurityPolicy.js",
+      "sha256": "d903d1e0da141dd887b50fd7f841fc714813d6b88ddd530a442800cbd10b00db"
+    },
+    {
+      "path": "services/assuranceSchema.js",
+      "sha256": "06601fe92c5c68f85f0bc614b9d2e7b9a5a22303ce13d0b6ccb6ce987b4bad9a"
+    },
+    {
+      "path": "services/auditIntegrityService.js",
+      "sha256": "3e65ddcd679210ba349ff2ca1e5d2aa009a1e16b82a433d92845c6a341b1f124"
+    },
+    {
+      "path": "services/bankSyncScheduler.js",
+      "sha256": "26a61ec9bbbc1f381a0f21a37011abe8a738a3b454646e01bd9db61250c90cba"
+    },
+    {
+      "path": "services/careersSchema.js",
+      "sha256": "c846e516af753727fbd2177c3d6dd09aac4afe568ac0c6e9dfeedd702df31ea3"
+    },
+    {
+      "path": "services/emailTemplates.js",
+      "sha256": "be0e2e49a6fd555d264e8a8b68a3752691e74f9f5f395004329453445c42d1ab"
+    },
+    {
+      "path": "services/employeeIdentitySchema.js",
+      "sha256": "e6a4c179cd87548dc58b5142250b0d153978a1b0a608303150dfa94d8291fd49"
+    },
+    {
+      "path": "services/enterpriseControlPlaneSchema.js",
+      "sha256": "656f2b929abbfdac815120f6762ee221eea5909fd72753e97504043b5406dbe8"
+    },
+    {
+      "path": "services/erpWorkspaceService.js",
+      "sha256": "7f4503af01d44f0eac327650282a09f81abb53b3e6e92959cce390237ce27312"
+    },
+    {
+      "path": "services/expensePaymentDomain.js",
+      "sha256": "ab89c45aa9360cf148fccab84e491a23d42694eca2aef76c63faeb8dcb4290a6"
+    },
+    {
+      "path": "services/expenseRegisterFilters.js",
+      "sha256": "605f38bb6a4ff2895631a92a7b99e7542c2a25bcfe43531823326d37ec13f009"
+    },
+    {
+      "path": "services/financeBankCategoryService.js",
+      "sha256": "b56f41fce92e1421fe16e31c478b8f67529248436711c20ecfbe6caf291de8a5"
+    },
+    {
+      "path": "services/financeCapabilityRegistry.js",
+      "sha256": "fcd3d383a42a9cbc32ecc2b6bb86951a3e6c3e14e90dfc7e08f4930684148fc9"
+    },
+    {
+      "path": "services/financeCashCustodyService.js",
+      "sha256": "c47c77d38c2787a3c01b08c07a42e0fa7b33e000f6c98f31f00d2f601b4ad94d"
+    },
+    {
+      "path": "services/financeCloseAssuranceService.js",
+      "sha256": "7d3701d1f29082bfe23aa065164adfc0d3c9a403ad0d21b7f73d7ffedc55df05"
+    },
+    {
+      "path": "services/financeDateIntegrityRepair.js",
+      "sha256": "1866e8fc683dbef130c484fd1f773e620e27cca13af341350fd72301c4111eb9"
+    },
+    {
+      "path": "services/financeDomain.js",
+      "sha256": "4c2a4421e11b52a3ac42ad440a222355c0ffc944db223ca939cd60a42a115a67"
+    },
+    {
+      "path": "services/financeEncryptionService.js",
+      "sha256": "7ff1f766c16f6482427a82e5d174c3fe8ee92ba3e2ba8457fe4a12887db509c7"
+    },
+    {
+      "path": "services/financeFilterContract.js",
+      "sha256": "d34e584c7d2bb02bf18c8a2d67ccd3d6ccb082f863c3635587b86962b721e85d"
+    },
+    {
+      "path": "services/financePdfValidationService.js",
+      "sha256": "5b5bc0dfcde9bf0630b92aedfdd4c91e6ec93de0f74f7f6af276ea3972ae37ad"
+    },
+    {
+      "path": "services/financePrivacyService.js",
+      "sha256": "1484a9c849e31decdf404b8f1acc6f517a9962050f4ea73a614333c45b5f4bc6"
+    },
+    {
+      "path": "services/financeReportDeliveryService.js",
+      "sha256": "befbd487520433583f4edaf6ec9a8d6186fd91ed5b87c40bf05e8f796b649280"
+    },
+    {
+      "path": "services/financeReportHtmlService.js",
+      "sha256": "7bdbf0bbb30102178bdb58ecf8770cee4ef772be789c17881177707e7acae7fb"
+    },
+    {
+      "path": "services/financeReportPdfService.js",
+      "sha256": "2d33872c4d0004ab2eb38a06d89c614426e557287f9acf1a2efa281048454520"
+    },
+    {
+      "path": "services/financeReportSnapshotService.js",
+      "sha256": "6474f1322890061c5dd6ee2154ff50c5f010b5c53b3caff88d8107e85b7f065d"
+    },
+    {
+      "path": "services/financeRuleEngine.js",
+      "sha256": "5baad6c4acb90e05016daca57a8315370b7092fdc2ac9befd9f61d4b2de5ac13"
+    },
+    {
+      "path": "services/financeSchema.js",
+      "sha256": "26d1b1dd0329e8545b69de193429f671712f795edf1dedbcc0539084f369bed6"
+    },
+    {
+      "path": "services/financeStatementAdapters/australianCrDr.js",
+      "sha256": "a91dae74dc9955c57243bf54d214f19ab4d2ae9247708573df4aa5034832159f"
+    },
+    {
+      "path": "services/financeStatementAdapters/generic.js",
+      "sha256": "87e3685873337f3c0256de56800ba4145747384bc52e8897819820aef837cecc"
+    },
+    {
+      "path": "services/financeStatementAdapters/index.js",
+      "sha256": "45c2774aebaa9eaf688f6f79b406ee8ab9113df9d9343e810af53ab89c865400"
+    },
+    {
+      "path": "services/financeStatementAdapters/international.js",
+      "sha256": "2e9cd219205948f471b9d2e7acacc4d5dd5fce0dd4da62349447923f3f852351"
+    },
+    {
+      "path": "services/financeStatementColumns.js",
+      "sha256": "04db7f2ae83f55d55807a82bf15a40a274208661c50b016cb8462f40f8afa89f"
+    },
+    {
+      "path": "services/financeStatementDetection.js",
+      "sha256": "7d38b034b6c4a063eb79b319acb7bc32114196a4cb00fc413d93567ad979d004"
+    },
+    {
+      "path": "services/financeStatementEvidence.js",
+      "sha256": "38f34a04de97575a04ff428f55a5cdfd53ef48199cf5645b137c8855d9575c29"
+    },
+    {
+      "path": "services/financeStatementIngestionWorker.js",
+      "sha256": "78a718399ef239ed5b9bd1afe52550029e141561ba9489e949b8c1e60e8b29a5"
+    },
+    {
+      "path": "services/financeStatementMoney.js",
+      "sha256": "0a976ba7fb2ffd75f84faef6aa661d4fc4e446d2ae995c054c292b6165b1d9d0"
+    },
+    {
+      "path": "services/financeStatementOriginalRecovery.js",
+      "sha256": "74e0d6255ce7a9d11b7350b0d4d5696159583d019b4c0fcf33b867101f590306"
+    },
+    {
+      "path": "services/financeStatementParser.js",
+      "sha256": "99a3853d8a8d40f213f6b3d47f00ab64725a9fe58840f9202c741b746048ba70"
+    },
+    {
+      "path": "services/financeStatementSourceRepair.js",
+      "sha256": "decee329e931405bdb9b733a92236e46efdc4f33d43302348f93a69f74f1b41f"
+    },
+    {
+      "path": "services/financeStatementValidation.js",
+      "sha256": "6c7abfa60c030f31bcb5d78dfaa4ea3a470ed1459a7c92eb4ec1ef97b3279ab8"
+    },
+    {
+      "path": "services/financeTrustedTotals.js",
+      "sha256": "fdbcb90eeffdf860eee1ab5c8db0009c29a6fc1fb605384be4a8265db0d8df4c"
+    },
+    {
+      "path": "services/financeUserPreferencesService.js",
+      "sha256": "32f950413a0a74c7a57f858fdc670e4773500b07aae11101671bc630afe6d5d8"
+    },
+    {
+      "path": "services/highRiskFinanceSchema.js",
+      "sha256": "0e984a7f65074ff0c3e9c0927425592705f5bc30da3f132f35db05ba5e8db290"
+    },
+    {
+      "path": "services/invoiceService.js",
+      "sha256": "72108efbc611e989b04bc1ba129c16b94c957f868619d4cc5784d1528f0d2d89"
+    },
+    {
+      "path": "services/notificationSchema.js",
+      "sha256": "a86471bc1ec0719cd0527a1b8118fc3afabf971fe01747ec5277c0861cebb4bf"
+    },
+    {
+      "path": "services/notificationService.js",
+      "sha256": "c8376c62ca6a52147e08de9207d13a85b762338b5ffe612d76d3570111b38a3f"
+    },
+    {
+      "path": "services/openBankingProviderService.js",
+      "sha256": "2bf55edf1c279577695a1d3cc320c4fa3602fa9ed54c6a892728825a3e097f23"
+    },
+    {
+      "path": "services/paymentRiskService.js",
+      "sha256": "120ea9028a823c7cb291ac24bb9d9bf282ecdb0faa606ac235ba45919f973df0"
+    },
+    {
+      "path": "services/procurementCatalogData.js",
+      "sha256": "dc1bc18f69434c13a9cae39730504f2b14b5d8141089ac9c455855a3e5b7205d"
+    },
+    {
+      "path": "services/procurementSchema.js",
+      "sha256": "b4c472d3aa70f8f02744a266cbc40be549fe4416ac7bca5165efce1a2a717037"
+    },
+    {
+      "path": "services/procurementService.js",
+      "sha256": "fe082e00b94218599a6e6717b64591d1cca0f38129a2247204730511123ece64"
+    },
+    {
+      "path": "services/qmsAdvancedSchema.js",
+      "sha256": "0e3a6b20f1180a03a25f9639f65456c4fc02868fe9d046bd29576a0231da900c"
+    },
+    {
+      "path": "services/qmsDefinitionService.js",
+      "sha256": "6fdc2e7a614807084161703298ae67d5fbf03df73ccc290f51384c60a98aa21c"
+    },
+    {
+      "path": "services/qmsEnterpriseCompletionSchema.js",
+      "sha256": "87fc6cce96e0b8f8d73f931992766da15ba0da2f6bc025a60c7218264245d444"
+    },
+    {
+      "path": "services/qmsGateService.js",
+      "sha256": "51c28b4eff9cd9d482f080a230e689952c4618221478beacf108529334caf218"
+    },
+    {
+      "path": "services/qmsQualityGovernanceSchema.js",
+      "sha256": "6d670c3c374a18e6ec3aa109976734819038a8fed0d5ccdd4e1fd4783c51c3b3"
+    },
+    {
+      "path": "services/qmsSchema.js",
+      "sha256": "1f42a13034551a7372f03dbe2af9ceada72dac259b16f15b6d40d9006c063a0e"
+    },
+    {
+      "path": "services/qmsValidationService.js",
+      "sha256": "1f000ed7e8dc194c0f914339ae2a2a01ec407592640dc523891b5b651cff615c"
+    },
+    {
+      "path": "services/securityAlertService.js",
+      "sha256": "d386fb8b1907b6ad30bfef7f3119c70b1f581a938d0553127b80e995fbfd2c64"
+    },
+    {
+      "path": "services/securityEventOutboxService.js",
+      "sha256": "4122420f81cbeb8c96ec99e11399c976f8b2ac2216a7d5d28a5a536e4f5133ae"
+    },
+    {
+      "path": "services/statementCoverage.js",
+      "sha256": "80880802cfeca2f86a75254ab4f93de607b649a4956d7369c6a8fcb2a1fb3eaa"
+    },
+    {
+      "path": "services/timesheetWorkflowService.js",
+      "sha256": "091cc216c0698e42cf535287519f4826928710b850a368f8870e62c3ea77310a"
+    },
+    {
+      "path": "services/trashPurgeService.js",
+      "sha256": "2c5b79d80b8176e3674e218fd7e7e7be9651003a296f79c9919335a6121b11ce"
+    },
+    {
+      "path": "services/trashSchema.js",
+      "sha256": "f30318f2bd5c1c8bf3015879ad9fd63c2b31fa1e9a99151036510d196c129378"
+    },
+    {
+      "path": "services/trashService.js",
+      "sha256": "322fb05dadab771df1469d3b875b1444deb1bc07201bc6f85e66201b1915f5d4"
+    },
+    {
+      "path": "services/vomWhatsAppService.js",
+      "sha256": "1d036b83c114d47ca9b3e4f0c84d674cdc7a77a5d9aa13f89214c23212d63766"
+    },
+    {
+      "path": "services/weeklyTimesheetScheduler.js",
+      "sha256": "36508e81a71d3ee974f0dd9a9f3a435809005fc5d6e45eb17069165607e17422"
+    },
+    {
+      "path": "services/workflowEscalationService.js",
+      "sha256": "e1cca14639b80b824bc2af8c039780e7fe2d7aa6a0c69a79418f2fba9fa4d496"
+    },
+    {
+      "path": "services/workflowSchema.js",
+      "sha256": "a1c7884928b71948a8b32ae31e8f8c89efd2939d5ba2a739359c11d8f0d70e53"
+    },
+    {
+      "path": "services/workflowService.js",
+      "sha256": "77a11d1e15f74158e6f4d7a393851d86d9b1a95b6209d495ce9fbc10cd1587bf"
+    },
+    {
+      "path": "services/workforceSchema.js",
+      "sha256": "a721ebc73077fc715f7c12ab933d3de83e1f644f345995a4ba0ba09eb815b9a8"
+    },
+    {
+      "path": "services/workspaceLayoutCheck.js",
+      "sha256": "737d542523f3095373490d69f96d07ed3b635a2e17511b106c925dd26e2c00ba"
+    },
+    {
+      "path": "services/workspaceShellRenderer.js",
+      "sha256": "0de476d2039d2e820f674589442d671e385718a629d71643c937384bdc0162e7"
+    },
+    {
+      "path": "utils/auditHelper.js",
+      "sha256": "82f3b36660e76b0ff4e18692b740ce75eada628edf36a849d8fc0e60a8a13df5"
+    },
+    {
+      "path": "utils/money.js",
+      "sha256": "e578ae753e68dbbac928eef928cae17d6378f69e7332461df27b469b34923027"
+    },
+    {
+      "path": "utils/pricingHelper.js",
+      "sha256": "ee0ac720b2e2a66e5c8dfa1f60750a4a8270584fb44df7507e8082da2e142106"
+    },
+    {
+      "path": "utils/tokenRevocation.js",
+      "sha256": "845f4ed50643bd3af89df93f13ccd28198eb52efcc634d9146cf24b9f68c86c8"
+    }
+  ],
+  "preserved_migrations": [
+    {
+      "path": "migrations/20260809_timesheet_workflow.sql",
+      "sha256": "b446be311bdbbc38e820c31058a50d465aa7adca2c8f7c7e97f5671709ff3d85"
+    },
+    {
+      "path": "migrations/20260809_weekly_timesheet_email_user_lifecycle.sql",
+      "sha256": "8cf90af61d98ca3c86ce79c04f632a95f2c8d0fa54db562301efcdeb14809465"
+    },
+    {
+      "path": "migrations/20260824_finance_foundation.sql",
+      "sha256": "173b72932ad11d7ac9a922efe07b6b61a7948e87898ef81abc78f893d7b8c406"
+    },
+    {
+      "path": "migrations/20260904_expense_payments.sql",
+      "sha256": "f2d5fca5cf7af0da05039cd10dcc61efc9d5872dc5643e261f8f9a8d349d6d97"
+    },
+    {
+      "path": "migrations/20260905_auth_lifecycle.sql",
+      "sha256": "5e461159d0467c84895623122fb2435bbdc4136f494c40ae0a97a50ccf95e834"
+    },
+    {
+      "path": "migrations/20260905_authorization_foundation.sql",
+      "sha256": "976d504f9086167dd136d6f8080e7f319bc5fb71bf9dc40f49e6e13a887cbdd2"
+    },
+    {
+      "path": "migrations/20260905_high_risk_finance.sql",
+      "sha256": "75785ad71e2a1112a3322309b835170b678e7da9f9230454d4baab0547c85526"
+    },
+    {
+      "path": "migrations/20260905_mfa_foundation.sql",
+      "sha256": "7a629aa6ce1587dd0c924ae607034b443a1a04299121a2d37454e6e4f9963c60"
+    },
+    {
+      "path": "migrations/20260905_step_up_authentication.sql",
+      "sha256": "b91bc409aed498878fbee78b5ef586c1bacdfaeaf5b710e82cb6bc6e7764bc9f"
+    },
+    {
+      "path": "migrations/20260906_file_api_audit_security.sql",
+      "sha256": "77f69aada124518ca63a81b96526c322c4d80aa0e2cd4e844a4dff5941a7b711"
+    },
+    {
+      "path": "migrations/20260906_incident_response_readiness.sql",
+      "sha256": "cfcb3b52e7af6c56eb209c1ceed0cd2ef4730765db66f9791c01ba03baea35c4"
+    },
+    {
+      "path": "migrations/20260906_secure_user_management.sql",
+      "sha256": "0a6d90b1c81b95d504ad855545c76eed85cf1d1bc9d19abe859db0512470b533"
+    },
+    {
+      "path": "migrations/20260907_continuous_assurance.sql",
+      "sha256": "3cfecb6b51344b5c8471cd45141bb6ccfd3fff053cf05613bbd4f4f03e364de5"
+    },
+    {
+      "path": "migrations/20260907_operational_trust.sql",
+      "sha256": "fa905fe6478ccadaeac27e60464a61209217df27cc5a989583dd8c3401926d47"
+    },
+    {
+      "path": "migrations/20260907_phase_37_50_transaction_data_hardening.sql",
+      "sha256": "105de480ca9c56267e8b0b5c9dc22bcbea467c6251abc65e3b966523893bbfbd"
+    },
+    {
+      "path": "migrations/20260908_phase_51_70_identity_governance.sql",
+      "sha256": "1e385c1d5f7e9b1aefdc735c588f4227329dead4a6b1805d33ba5ed844758fe5"
+    },
+    {
+      "path": "migrations/20260909_erp_wave1_trash_notifications.sql",
+      "sha256": "e5d9345e02ef95a916300817fe067897be992e64fb93a69eb524adc4081d9355"
+    },
+    {
+      "path": "migrations/20260910_erp_wave2_workflow_engine.sql",
+      "sha256": "b79712f54b821c19be992d3e19e06412fe3fef52abd6382af4223b309a068d88"
+    },
+    {
+      "path": "migrations/20260910_erp_wave3_procurement.sql",
+      "sha256": "1b32d04916328d750778055b0c39fd3a52e77f2bd2eccb4a152d2f36e5e61174"
+    },
+    {
+      "path": "migrations/20260911_enterprise_bootstrap_readiness.sql",
+      "sha256": "828623acb1ae2964be754248b49e1f90f305af5816e5b5bf3522381edcd1690c"
+    },
+    {
+      "path": "migrations/20260911_wave_b1_public_submission_dedupe.sql",
+      "sha256": "05b6b3eaeb66fbebb21e574647c2fc8350be4a9ffb05b131fb30ba778e52b09b"
+    },
+    {
+      "path": "migrations/20260912_wave_b2_background_job_safety.sql",
+      "sha256": "82dc37bef7eb1903129958f46828f3226d90acf5e99b26b6d331938209376497"
+    },
+    {
+      "path": "migrations/20260915_finance_intelligence_bank_hub.sql",
+      "sha256": "00f8b8db52709cfc7fe2ce50a2e5b7f1557ec726fb2dd1042c82ccceaf6db3cf"
+    },
+    {
+      "path": "migrations/20260915_finance_statement_staging_review.sql",
+      "sha256": "a1f6cfebc36de34fd54e6e35224e596d6ac0c894bab0746ef32fa1656b878663"
+    },
+    {
+      "path": "migrations/20260915_finance_transaction_intelligence.sql",
+      "sha256": "3ba8b1c27925f608b600a89888be1cf69d4c326b0254b67ff563528284681dd9"
+    },
+    {
+      "path": "migrations/20260915_user_self_profiles.sql",
+      "sha256": "ef4bc626a84b43b01ec1f8b0a4293e0de191610cc5487860cf1c1acee29c0ecd"
+    },
+    {
+      "path": "migrations/20260916_asset_lifecycle_protection.sql",
+      "sha256": "3ec528f8cecef200097685f93da54e9c7a48cb9cf387034ed38372df7ce77230"
+    },
+    {
+      "path": "migrations/20260916_open_banking_sandbox_foundation.sql",
+      "sha256": "c8ab4091baf80bf9f7ef2546fb100bc39802279be92faa693796e9c79ce4b281"
+    },
+    {
+      "path": "migrations/20260916_personal_finance_post_restore_verification.sql",
+      "sha256": "4ac755a286a3aaa05fce4270bda8021864786fcc67cab8de64e9fd2db481e94c"
+    },
+    {
+      "path": "migrations/20260916_personal_finance_recovery_certification.sql",
+      "sha256": "5c7e03dc17031f496f9dcca31579c7d72b7b8562c74fb6be18fa0649952abd96"
+    },
+    {
+      "path": "migrations/20260916_personal_finance_recovery_incident_cases.sql",
+      "sha256": "d747c953a987da8cf6caefaac4bdb1521a5312077ce05e5ab81c6c88ce1915c1"
+    },
+    {
+      "path": "migrations/20260916_personal_finance_restore_executor.sql",
+      "sha256": "eaaec6ed1d592f76874f7a9edc319f07e072902165c6a3494353de743af9a66c"
+    },
+    {
+      "path": "migrations/20260916_personal_finance_restore_stream_transport.sql",
+      "sha256": "51184e2bab15b35d2721a3e056fdded5dae917bfe9af8be9e3e97c7e58cd3df5"
+    },
+    {
+      "path": "migrations/20260916_personal_financial_roadmaps.sql",
+      "sha256": "2b46515bec1970ab4bba2ab97953f058dfca0bb0becc8702650e75e35d16e8c5"
+    },
+    {
+      "path": "migrations/20260916_personal_money_attention_center.sql",
+      "sha256": "726af63427f26434441e579fac27c0ebe4d71a5bbd246f6202b9b350d15fae96"
+    },
+    {
+      "path": "migrations/20260916_personal_money_center.sql",
+      "sha256": "254013718d6df6a19cbcdfadf7be358ddcb1cb126393596df9ec58aa7261408c"
+    },
+    {
+      "path": "migrations/20260916_personal_money_review_inbox.sql",
+      "sha256": "bc6f30ff182d3c2517e800c165a06f8fd5b3471f7a2260cfd368bb08e962b747"
+    },
+    {
+      "path": "migrations/20260916_personal_money_smart_cashflow.sql",
+      "sha256": "55a200caa2929b4246a6f7fd3e82d518e324d5079e45a7d2863a03a6d762f589"
+    },
+    {
+      "path": "migrations/20260916_personal_net_worth_assets.sql",
+      "sha256": "2969a5b46f77ab6bbbb15714b83b0351306829c220023b438beadcce84658b15"
+    },
+    {
+      "path": "migrations/20260916_personal_saved_views.sql",
+      "sha256": "c6799b06326e2b489043ac63b925fc0124306d09166284abba52dd0f296c2fe8"
+    },
+    {
+      "path": "migrations/20260916_personal_spending_challenges.sql",
+      "sha256": "e62ee538208541f8da095c853a1ed7a87700660c08150337953df07fb84579e2"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_capa.sql",
+      "sha256": "66a123d49aea4dc570ec7479ec1c80805de084ffbcbdfd96a0038c4f6ddcbd6a"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_control_scheduling.sql",
+      "sha256": "174cec61fbe92fce627082038178c6dde67894732ac51464eee743f242b77b60"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_control_testing.sql",
+      "sha256": "de628e6913c321a07b0564f46393485e9384ca6b11666d66958703b23909a79f"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_exception_investigations.sql",
+      "sha256": "c4b8ea7a44d71fed7a4bac1e39df88457a03e2480c94a52e04afeca38a381b84"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_incident_sla_governance.sql",
+      "sha256": "d2678ffb5226bce3bed8eb03a54c446d17c872a3d2136fd7b53f7a925c56b792"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_investigation_sla_evidence.sql",
+      "sha256": "4b8bdf78ef2d724f8d79507c313eff25f61354f5dd9bfc1d3af0ec23a9022ed7"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_knowledge_disposition.sql",
+      "sha256": "ec14146fa3245d61013c13afefb90d00ccd9baa088cb49bb2a124f5a37d1a026"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_knowledge_review_planner.sql",
+      "sha256": "4f7d5fdc8723197b9de189881a8b6fce386fe7882d5701c25ea21c036123fd85"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_lessons_knowledge.sql",
+      "sha256": "fb696be01ba1d190c16778c6d8bdaf92934510188c35218eb520abb116b78a6b"
+    },
+    {
+      "path": "migrations/20260917_personal_finance_recovery_management_reviews.sql",
+      "sha256": "ea463c30eb0c3a9b7fd4799b49f9b07fc38eaf99339ae89cd91b84ee52fc208c"
+    },
+    {
+      "path": "migrations/20260917_recovery_drill_evidence_ledger.sql",
+      "sha256": "d3f719035c9b468bf697f8593b6f000a3fc457d0898ffaeed76cd722de2904a9"
+    },
+    {
+      "path": "migrations/20260917_recovery_remediation_workflow.sql",
+      "sha256": "0585ed5a66616f96a744b41184f28b8d47b8b7a15300004b6e2b15267f4dcb75"
+    },
+    {
+      "path": "migrations/20260918_advanced_au_banking_platform.sql",
+      "sha256": "14862af334f4add7ab061a5536d02e0d7d83ff734df8a160a9e03cb8d46570b0"
+    },
+    {
+      "path": "migrations/20260918_bank_grade_review_company_ledger.sql",
+      "sha256": "b99f03a1ae8a35dd90f2e8fd8c9595f7c591e95cdf91995186c8551f77d2309d"
+    },
+    {
+      "path": "migrations/20260918_banking_os_multi_user.sql",
+      "sha256": "65feb0e3c826f554692e495718c1ba8e7397c083e28e874c1adb64631fb48686"
+    },
+    {
+      "path": "migrations/20260918_cash_category_backfill.sql",
+      "sha256": "c6bc787dad0d73cfde38cd5770b0d82802844c83ccc6c436744f6dd4419e6248"
+    },
+    {
+      "path": "migrations/20260918_premium_banking_budgets.sql",
+      "sha256": "1e96f5cfaf9720260606952b2271980ee601956bd8eba0b0ac41c73dbe57f243"
+    },
+    {
+      "path": "migrations/20260918_statement_review_reparse_tracking.sql",
+      "sha256": "fdd21603c7fefdecf7fbe044201130d51828512ddb2036e16f62451b953092c3"
+    },
+    {
+      "path": "migrations/20260923_finance_original_bank_data.sql",
+      "sha256": "18014c7f134f52c41b8288e318d54f619c263da35f101c3d243ab26f5a1aa7aa"
+    },
+    {
+      "path": "migrations/20260923_finance_receipt_requirements.sql",
+      "sha256": "102dae7a9c82dd78a7dd49c60b4a4eb8b17b31423ccba8d8df4faa8f3a49e4ea"
+    },
+    {
+      "path": "migrations/20260923_finance_relationship_workflows.sql",
+      "sha256": "ea556a6c00ffee15ff3ff1fec251c9f0b8b3d80e242d64b2640a8175a0660729"
+    },
+    {
+      "path": "migrations/20260923_finance_review_rules_v2.sql",
+      "sha256": "3bd8aa829c9b773a3bc0a70c4682c96d36c26e8afb2f0211f3259ee050f610ce"
+    },
+    {
+      "path": "migrations/20260923_finance_saved_reports.sql",
+      "sha256": "de8b79212877ef95434002bee59f3ea6e9ecd7aa805b8021792642ecfc7516db"
+    },
+    {
+      "path": "migrations/20260923_finance_system_categories.sql",
+      "sha256": "d677b6962bdf3c26b89de547423ccd27e728bc5ccc7843769fc4f09a7906b867"
+    },
+    {
+      "path": "migrations/20260923_finance_transaction_archive.sql",
+      "sha256": "c63b9b5d2ec7d3f8836d5564425a34941b4a50aff2c8f1931a8f7cb73d3f2cec"
+    },
+    {
+      "path": "migrations/20260923_finance_user_preferences.sql",
+      "sha256": "24ed082a972b2d84ddca2f0bf819a2e6052da10b3f986d5a758965542c8917c3"
+    },
+    {
+      "path": "migrations/20260924_finance_cash_control.sql",
+      "sha256": "460f6a2aa84a32c39c16979b6a88dc534afc6d016e521ec89401b6a962992d13"
+    },
+    {
+      "path": "migrations/20260924_finance_cash_custody_control.sql",
+      "sha256": "653d7e46c2697b209e04f159db86356e8ae7478d40c6c03cf9d1a424091e1b64"
+    },
+    {
+      "path": "migrations/20260924_finance_close_assurance.sql",
+      "sha256": "818565c6534c457bb17949d42916865d7e210f898afdd12a9182cb76bf29a51d"
+    },
+    {
+      "path": "migrations/20260924_finance_fpa_planning.sql",
+      "sha256": "b02327b9b95d677d31896cb1faf926a796ddd631b50b850b4818f8a49aad38d9"
+    },
+    {
+      "path": "migrations/20260924_finance_fx_rates.sql",
+      "sha256": "3b923dcfa744e0429901c4a0227221d38631f6f8ae44ca8d93bb9e98857de4ad"
+    },
+    {
+      "path": "migrations/20260924_finance_issue_controls.sql",
+      "sha256": "f8eda708b0f3d0c4de5edc82328d19242088ba043876818176e7e3c66799b4d8"
+    },
+    {
+      "path": "migrations/20260924_personal_debt_planning.sql",
+      "sha256": "df53ab855e5da728d71fbd5e9a4d6c082a93b467a9d866694210eeb0219f84ae"
+    },
+    {
+      "path": "migrations/20260924_personal_recurring_commitment_control.sql",
+      "sha256": "faa90da7c70a4a777aebb7361cbd01aa865fa2be1331b4c0b75cfe5c0c6a1d5b"
+    },
+    {
+      "path": "migrations/20260924_personal_savings_reserve_control.sql",
+      "sha256": "fbe18d5684d8cf4299d9c553efb852a68f3c9a85fda385cd104a567459c76406"
+    },
+    {
+      "path": "migrations/20260924_personal_tax_evidence_control.sql",
+      "sha256": "c8c04bb088c01ba8126c41581de1a3cde0f5e0dba5fb36aa24fd038e4ddbcee0"
+    },
+    {
+      "path": "migrations/20260925_finance_ingestion_pipeline.sql",
+      "sha256": "98673165ad3f6a117e4e598856934f9dd652c19b8fd6f0a075ddc2a7356ac5a7"
+    },
+    {
+      "path": "migrations/20260926_finance_document_compatibility.sql",
+      "sha256": "d5640b3d7874ad8b54c536eeff19386c71e11d16b0ebe753d12ff1f5a2c7a260"
+    },
+    {
+      "path": "migrations/20261001_finance_account_segmentation.sql",
+      "sha256": "2d669dbc598b0082a2922987ce027fe350597f3d32933c648f24e596de2c2cff"
+    },
+    {
+      "path": "migrations/20261006_erp_campaign_register.sql",
+      "sha256": "0073d42dd539d61dac10fe2077a5118190e0ff5685ff434a7bd2430040b33c89"
+    },
+    {
+      "path": "migrations/20261007_finance_report_snapshots.sql",
+      "sha256": "0a77add58adb04a2b83ee789cd43c23cc57897b9998da7aaae20ccd19334f008"
+    }
+  ],
+  "original_logo": {
+    "path": "public/voxel-veda-logo.png",
+    "sha256": "ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312"
+  }
+}
