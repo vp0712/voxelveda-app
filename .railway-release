@@ -1,11 +1,13 @@
-application-release: 20261008-customer-registration-and-login-footer
-candidate-commit: 3a9ff4b882d9cab5f57625fd292113a6a64f47f5
-merged-commit: e31cc24a0bf5e74811963a7ff25a16cc382154cf
+application-release: 20261009-banking-erp-retirement-customer-teal
+candidate-commit: f58fa6d7634c3b7c1161554c7246d87e488ef2c2
+merged-commit: bc3b4040fa8a3e6dd80f15b73cd538110a97fdee
 production-branch: main
-scope: register-create-account-entry; small-bottom-line-customer-rfq-and-privacy-links; native-registration-form-with-consent-progress-timeout-and-duplicate-submit-protection; compact-checkbox-and-scrollable-form
-preserved: original-company-logo; financial-records-and-permissions; existing-integrated-finance-snapshot-viewer-delivery-repair; customer-only-viewer-with-no-extra-permissions
-ci: candidate-and-pr-eight-checks-success; 77-check-production-build-success; full-application-and-isolated-customer-registration-regression-success-in-CI; actual-Chromium-phone-tablet-desktop-entry-navigation-footer-and-Enter-submission-success
-configuration: existing-PUBLIC_APP_URL=https://app.voxelveda.com; ALLOW_PUBLIC_CUSTOMER_REGISTRATION=true-set-with-skipDeploys-and-loaded-through-this-marker
-verification: production-revision-pages-footer-links-and-registration-validation-to-be-checked-after-rollout; prior-authenticated-finance-viewer-proof-still-requires-permitted-session
-rollback-deployment: 8eb0cdfb-c888-487a-b4cc-273e2b0f0f35
+scope: remove-banking-and-erp-runtime-files-pages-apis-jobs; retained-customer-workspace-rfq-registration-profile-security; white-charcoal-teal-theme-and-dark-option; small-bottom-line-customer-rfq-and-privacy-links
+preserved: original-company-logo; historical-database-records; uploaded-document-bytes; stored-permissions; encrypted-record-secrets; all-82-historical-migration-checksums
+ci: candidate-eight-pr-checks-success; merged-main-nine-checks-success; 34-check-production-build-success; actual-disposable-MySQL-retired-records-audit-document-isolation-queue-restart-parity-success; Chromium-local-phone-tablet-desktop-dark-mode-and-refresh-success
+configuration: existing-app-service-domain-and-database; next-deploy-predeploy-command-retains-malware-object-storage-capacity-guards-and-removes-two-retired-recovery-migration-wrappers
+verification: live-revision-health-readiness-public-pages-authentication-redirects-retired-routes-and-screenshots-to-be-checked-after-rollout; private-production-and-native-device-runtime-not-claimed
+rollback-deployment: a7112230-6587-443b-b2ba-08a4d4e7543a
+rollback-commit: 80733384e62ce47942f5ad19481973f90aa568e0
+rollback: restore-previous-code-through-CI-and-marker-workflow-and-restore-previous-five-wrapper-predeploy-command; never-delete-records-or-reverse-historical-migrations
 policy: single-marker-controlled-production-deploy
