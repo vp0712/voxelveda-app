@@ -55,6 +55,8 @@ async function main(){
    assert.deepEqual(assetFailures,[],'Retired landing page assets also load successfully');await context.close();
   }
  }finally{await browser.close();}
+
+ for(const filename of ["live-home-phone.png", "live-home-desktop.png"]){console.log('VV_SCREENSHOT '+JSON.stringify({filename,mime_type:'image/png',base64:fs.readFileSync(path.join(out,filename)).toString('base64')}));}
  proof.completed_at=new Date().toISOString();proof.result='passed';
 }
 main().catch(error=>{proof.result='failed';proof.error=error.message;console.error(error);process.exitCode=1;}).finally(()=>{fs.writeFileSync(path.join(out,'production-verification.json'),JSON.stringify(proof,null,2));console.log(JSON.stringify({result:proof.result,expected_commit:expected,checks:proof.checks.length}));});

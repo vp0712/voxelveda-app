@@ -53,6 +53,8 @@ app.use(express.static(path.join(project,'public')));
    assert.ok(apiCalls.every(api=>['/api/auth/me','/api/profile','/api/auth/mfa/status','/api/auth/sessions'].includes(api)),'no removed API is called');
    results.push({viewport:view,overflow:false,pageErrors:errors,assetFailures,identity:true,profileNavigation:true,securityNavigation:true,refresh:true,apiCalls,fixtureOnly:true});await context.close();
   }
+
+ for(const filename of ["local-account-phone.png", "local-account-desktop.png"]){console.log('VV_SCREENSHOT '+JSON.stringify({filename,mime_type:'image/png',base64:fs.readFileSync(path.join(out,filename)).toString('base64')}));}
   fs.writeFileSync(path.join(out,'local-browser.json'),JSON.stringify({source:'Actual retained account assets with local fixture identity/profile/security endpoints. No production authentication, account writes, financial cards or business workflows.',results},null,2));
   console.log(JSON.stringify(results,null,2));
  }finally{if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
