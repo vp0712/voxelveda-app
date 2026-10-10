@@ -28,7 +28,6 @@ app.disable('x-powered-by');app.set('trust proxy',1);app.set('query parser','sim
 app.use(enforceHttps);app.use(securityHeaders);app.use(safeApiResponses);
 const applicationCors=cors(corsOptions());
 app.use((req,res,next)=>req.method==='POST'&&req.path==='/api/security/csp-report'&&req.headers.origin==='null'?next():applicationCors(req,res,next));
-app.use(rateLimitPolicy('authenticated_api'));
 app.use('/api/auth',express.json({limit:'8kb',type:'application/json',verify:raw}));
 app.use(express.json({limit:process.env.JSON_BODY_LIMIT||'1mb',type:['application/json','application/csp-report','application/reports+json'],verify:raw}));
 app.use(express.urlencoded({extended:false,limit:process.env.FORM_BODY_LIMIT||'1mb'}));
@@ -73,6 +72,11 @@ app.use((req,res,next)=>{
  if(req.path.startsWith('/api/'))return res.status(410).json({code:'MODULE_RETIRED',message:'This module has been removed from Voxel Veda.'});
  return sendPage('retired.html',410)(req,res);
 });
+// Public pages/assets and internal liveness probes do not consume an API quota.
+// In particular, the gateway probes /api/health every second; limiting those
+// probes could make a healthy backend appear unavailable every quota window.
+const apiRateLimit=rateLimitPolicy('authenticated_api');
+app.use((req,res,next)=>req.path.startsWith('/api/')?apiRateLimit(req,res,next):next());
 app.use('/api/auth',authRoutes);
 app.use('/api/users',auth,userRoutes);
 app.use('/api/profile',auth,profileRoutes);

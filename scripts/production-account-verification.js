@@ -10,7 +10,7 @@ const expected=process.env.VV_EXPECTED_COMMIT;
 assert.match(expected||'',/^[a-f0-9]{40}$/,'An exact deployed commit is required');
 const out=process.env.VV_PROOF_DIR || path.resolve('production-proof');
 fs.mkdirSync(out,{recursive:true});
-const proof={origin,expected_commit:expected,started_at:new Date().toISOString(),access:'Public pages and anonymous security boundaries only. No production identity was impersonated.',checks:[]};
+const proof={origin,expected_commit:expected,started_at:new Date().toISOString(),access:'Public pages and anonymous security boundaries only. No production identity was impersonated.',checks:[],browser_navigation:[]};
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function getJson(route){const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000),headers:{'Cache-Control':'no-cache'}});return {status:response.status,body:await response.json()};}
 async function main(){
@@ -40,16 +40,28 @@ async function main(){
    page.on('response',response=>{const request=response.request();if(['script','stylesheet','image','font'].includes(request.resourceType())&&response.status()>=400)assetFailures.push({url:response.url(),status:response.status(),type:request.resourceType()});});
    page.on('requestfailed',request=>{if(['script','stylesheet','image','font'].includes(request.resourceType()))assetFailures.push({url:request.url(),error:request.failure()?.errorText||'Request failed',type:request.resourceType()});});
    page.on('pageerror',error=>errors.push(error.message));
+   const waitForSettledPage=async()=>{
+    await page.getByRole('heading',{level:1}).waitFor({state:'visible'});
+    await page.waitForFunction(()=>document.readyState==='complete'&&[...document.images].every(img=>img.complete&&img.naturalWidth>0)&&(!document.fonts||document.fonts.status==='loaded'));
+    await page.locator('#vvGlobalBrandLoader').waitFor({state:'hidden'});
+   };
    for(const route of ['/','/login','/register','/support']){
-    const response=await page.goto(origin+route,{waitUntil:'networkidle'});assert.equal(response.status(),200,route);
+    const response=await page.goto(origin+route,{waitUntil:'domcontentloaded'});assert.equal(response.status(),200,route);
+    await waitForSettledPage();
+    const refreshed=await page.reload({waitUntil:'domcontentloaded'});assert.equal(refreshed.status(),200,route+' remains available after refresh');
+    await waitForSettledPage();
     const layout=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth,heading:document.querySelector('h1')?.textContent,brokenImages:[...document.images].filter(img=>!img.complete||img.naturalWidth===0).map(img=>img.src),links:[...document.querySelectorAll('a[href]')].map(a=>a.getAttribute('href'))}));
     assert.ok(layout.scroll<=layout.client,viewport.name+' '+route+' must not overflow');assert.deepEqual(layout.brokenImages,[]);assert.ok(layout.heading);
     assert.ok(layout.links.every(link=>{const destination=new URL(link,page.url());return destination.origin!==origin||(!retiredRequest(destination.pathname)&&!retiredAsset(destination.pathname));}),'Navigation has no retired destinations');
     assert.deepEqual(assetFailures,[],'All production scripts, styles, images and fonts load successfully');
     const label=route==='/'?'home':route.slice(1);await page.screenshot({path:path.join(out,'live-'+label+'-'+viewport.name+'.png'),fullPage:true});
-    proof.checks.push({viewport,route,heading:layout.heading,overflow:false,broken_images:[],asset_failures:[]});
+    proof.checks.push({viewport,route,heading:layout.heading,overflow:false,broken_images:[],asset_failures:[],refresh:true});
    }
-   const retiredResponse=await page.goto(origin+'/finance',{waitUntil:'networkidle'});assert.equal(retiredResponse.status(),410);await page.getByRole('heading',{name:'This module is no longer available'}).waitFor();
+   await page.goto(origin+'/login',{waitUntil:'domcontentloaded'});await waitForSettledPage();
+   await page.goBack({waitUntil:'domcontentloaded'});await waitForSettledPage();assert.equal(new URL(page.url()).pathname,'/support','Browser Back retains the previous public page');
+   await page.goForward({waitUntil:'domcontentloaded'});await waitForSettledPage();assert.equal(new URL(page.url()).pathname,'/login','Browser Forward restores the intended page');
+   proof.browser_navigation.push({viewport,back:'/support',forward:'/login',passed:true});
+   const retiredResponse=await page.goto(origin+'/finance',{waitUntil:'domcontentloaded'});assert.equal(retiredResponse.status(),410);await page.waitForFunction(()=>document.readyState==='complete'&&[...document.images].every(img=>img.complete&&img.naturalWidth>0));await page.getByRole('heading',{name:'This module is no longer available'}).waitFor();await page.locator('#vvGlobalBrandLoader').waitFor({state:'hidden'});
    if(viewport.name==='phone'||viewport.name==='desktop')await page.screenshot({path:path.join(out,'live-retired-'+viewport.name+'.png'),fullPage:true});
    assert.deepEqual(errors,[],'No page JavaScript errors');
    assert.deepEqual(assetFailures,[],'Retired landing page assets also load successfully');await context.close();

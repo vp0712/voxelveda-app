@@ -2,7 +2,7 @@
 
 The latest product instruction removes all Banking, Finance and ERP business workflows, including RFQ and quoting, from Voxel Veda. It supersedes both the earlier Finance repair/extraction request and the intervening customer-RFQ release. This version retains the company information site and existing account, registration, profile, security, user administration and support foundations. It does not introduce a replacement business module while the intended future purpose is being clarified.
 
-**This update is not yet verified live.** The earlier teal/customer-RFQ release passed its candidate checks but its Railway build failed. The currently inspected successful production deployment remains the previous release. Record the final merged commit, release marker, Railway revision and live evidence below only after verification.
+**The account-only removal and navy theme were deployed and verified on 10 October 2026.** Production revision `243826f7fa4b189ca11b8e4057af793e560f7476`, Railway deployment `1e475aa4-a5f5-474d-8b65-853ca5067440`, returned the actual account portal and retired responses. The settled live Chromium proof passed 33 checks across phone, landscape phone, tablet and desktop. A follow-up hardens request-limiter recovery and separates page assets and health probes from API rate limits; its rollout must receive its own exact-revision verification.
 
 ## Architecture implemented in this candidate
 
@@ -15,7 +15,7 @@ The latest product instruction removes all Banking, Finance and ERP business wor
 - The new palette uses deep navy, slate and royal blue, with coordinated light/dark appearances. It replaces the earlier teal choice. Privacy and support remain readable footer links; retired RFQ links are removed.
 - The original `public/logo.png` remains byte-identical: SHA-256 `ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312`.
 
-The existing domain is `https://app.voxelveda.com`. No new domain or infrastructure cutover is proposed. These candidate routes must still be checked on that actual domain after a successful deployment.
+The verified existing domain is `https://app.voxelveda.com`. No new domain or separate Banking app was created. Company, sign-in, registration and support pages, protected account entry redirects, retired links and service-worker asset version were checked on that actual domain.
 
 ## Preservation, backups and exports
 
@@ -35,19 +35,20 @@ The shared email queue supports retained account/security/contact messages. RFQ,
 
 | Issue | Reproduction / affected module | Severity | Cause | Candidate repair | Evidence / remaining limit |
 | --- | --- | --- | --- | --- | --- |
-| Removed product remained reachable through direct URLs | Request an old Banking/Finance/ERP page, API or asset | High | Retired router imports, static files and startup jobs outlived navigation changes | Delete source implementations and router/job registrations; return explicit `410` | Real Express fixture and removed-source/import-closure checks; live verification pending |
-| RFQ/quoting remained after all ERP business workflows were retired | Open `/request-quote` or POST `/api/public/rfq` | High | Interim customer release intentionally retained public RFQ intake | Remove RFQ controller, form, client code, route and active references; hold old queued RFQ mail | Updated source/route tests; final runtime and live checks pending |
+| Removed product remained reachable through direct URLs | Request an old Banking/Finance/ERP page, API or asset | High | Retired router imports, static files and startup jobs outlived navigation changes | Delete source implementations and router/job registrations; return explicit `410` | Real Express fixture and source/import checks passed; 11 representative retired URLs returned 410 live |
+| RFQ/quoting remained after all ERP business workflows were retired | Open `/request-quote` or POST `/api/public/rfq` | High | Interim customer release intentionally retained public RFQ intake | Remove RFQ controller, form, client code, route and active references; hold old queued RFQ mail | Updated source/route tests passed; actual RFQ page/API retired live |
 | Old role dashboards reopened operational UI | Open former role dashboard filenames or `/portal/:role` | High | Separate operational role shells and client return paths | Keep authenticated account-home redirects and canonical account return paths | Actual page-auth/Express alias fixture; authenticated production session not supplied |
 | Direct shell filenames bypassed canonical page entry | Request `/workspace.html`, `/security.html` or `/profile.html` | Medium | Static filename access differed from page routing | Redirect to the protected canonical account pages | Anonymous login/return-path regression |
 | Generic documents and owner transfers could expose/change archived business data | Request old Finance/RFQ document as owner or via an existing grant; terminate/transfer an account | High | Module-agnostic shared content and ownership targets | Restrict read/grant/mutation scope before content reads; preserve archived owner IDs | Retained boundary/document fixtures; no actual historical file content read |
 | Foundation startup still depended on removed workers | Start after physical business-source deletion | High | Shared initialization and job scheduling imported workforce/Finance implementations | Extract account/security audit and email schema; retire business jobs | Real bootstrap dependency and failure/shutdown fixtures; retained import closure |
 | Retired pending email could send after cutover | Claim an old RFQ/Finance/timesheet/unknown queue row | High | Queue claims were not scoped to the current product | Retained module whitelist for enqueue/claim; preserve old rows | Queue fixture checks provider calls and row/content parity; no real recipient mail sent |
 | Generic settings/ownership still touched archived data | Write bank/tax/report settings or transfer retired records | High | Shared broad settings and ownership allowlists | Company/contact-only settings and account/security-only transfer scope | Actual route/controller/ownership fixtures; archived values preserved |
-| Shared security/job APIs and cleanup still included archived business entries | List audit/events/job failures or run retained cleanup after removal | High | Shared queries and retention lacked an active module/job boundary | Filter before pagination and mutation; preserve archived mail/jobs/events; remove emergency truncation; isolate security report totals | Service/SQL regressions implemented; disposable MySQL archive parity and final CI required |
-| Railway build failed after local/CI checks passed | Build release-marker commit `9e8fc1928b913a8ea6c440f9396ce9fb33eab4b7` | High | Scanners expected `.git` in the packaged Railway source artifact | Add deterministic actual-file inventory when Git metadata is absent; retain validation and secret checks | Portability fix implemented in candidate; complete build/redeployment still required |
-| Retained pages loaded mixed/obsolete theme assets | Open company, login, registration, profile and account-home screens | Medium | Broad role/ERP style injection and old asset versions | One navy/slate/royal-blue contract, canonical shared asset versions and accessible controls | Updated renderer/theme/browser checks required; live screenshots pending |
+| Shared security/job APIs and cleanup still included archived business entries | List audit/events/job failures or run retained cleanup after removal | High | Shared queries and retention lacked an active module/job boundary | Filter before pagination and mutation; preserve archived mail/jobs/events; remove emergency truncation; isolate security report totals | Service/SQL regressions and disposable MySQL archive parity passed; actual startup registers only the retained mail job |
+| Railway build failed after local/CI checks passed | Build release-marker commit `9e8fc1928b913a8ea6c440f9396ce9fb33eab4b7` | High | Scanners expected `.git` in the packaged Railway source artifact | Add deterministic actual-file inventory when Git metadata is absent; retain validation and secret checks | Complete packaged-source production build and Railway deployment passed; checks remain enabled |
+| Retained pages loaded mixed/obsolete theme assets | Open company, login, registration, profile and account-home screens | Medium | Broad role/ERP style injection and old asset versions | One navy/slate/royal-blue contract, canonical shared asset versions and accessible controls | Renderer/theme and synthetic authenticated browser tests passed; settled public production screenshots captured |
+| API limiter could block health probes and ordinary navigation | Repeated gateway health probes or load pages/assets in one limiter window | High | Global authenticated-API limiter also counted public pages, assets and health/readiness; Redis failure state did not recover safely | Restrict global limiter to APIs with health/readiness exclusions; retain dedicated auth limits and fail-closed distributed protection; recover only after a successful store operation | Follow-up regression/build and independent live rollout required; the isolated production 503 cause is not proven by logs |
 
-The failure in Railway deployment `331cf7f9-b772-436c-965d-548680beea0a` occurred during build; it is not a successful customer or account-only release. The previous successful production deployment stayed active. Provider acceptance, healthy local pages or source tests cannot substitute for a successful actual production revision.
+The failure in Railway deployment `331cf7f9-b772-436c-965d-548680beea0a` occurred during build and left the previous deployment active. Subsequent account-only deployment `1e475aa4-a5f5-474d-8b65-853ca5067440` succeeded, with migration logs showing 0 applied, 0 baselined and 82 verified. Provider acceptance or a local build is not substituted for live proof.
 
 This issue register does not claim every original workflow was fully audited or repaired. Business workflows are being removed under the latest instruction. No current production record-count/export parity or whole-app authenticated production audit has been completed without the necessary access and evidence.
 
@@ -62,7 +63,7 @@ Run the retained-product suites against the final tree; obsolete feature tests a
 - `scripts/core-audit-isolation-test.js` and retained boundary/document tests: schema retry/idempotence, audit redaction/integrity, company-only settings, preserved archived values/owners, and denied retired module reads/grants without content access.
 - Scanner/source inventory regressions: Git checkout and packaged-source enumeration, incomplete artifacts, runtime environment files and hardcoded secret rejection. Production build must exercise the packaged-source path.
 
-The updated retirement fixture passed after RFQ deletion, checking the retained runtime sources and the full removal manifest. The final suite includes 36 checks, with dedicated security archive isolation. Full production build, disposable MySQL and actual browser checks are required on the final candidate in CI. The local managed shell prevents child-process execution (EPERM), so a local npm build was blocked rather than reported as passed.
+The updated retirement fixture passed after RFQ deletion, checking retained runtime sources and all 567 verified removed paths. The deployed suite passed 36 checks, including security archive isolation. CI passed syntax/lint/typecheck, full production build, disposable MySQL archive parity, and synthetic authenticated browser checks. Railway independently passed its packaged-source build. The local managed shell prevents child-process execution (EPERM); local build is not reported as passed. Production dependency audit reported zero findings; seven development-tooling advisories remain.
 
 All test identities are synthetic and local only. No test mints a production credential, sends a real email, creates a real account/RFQ, changes a customer/financial record, initiates a payment or accesses an inbox. Fixture coverage does not prove a private authenticated production session, actual backup/export integrity, provider delivery, production record counts or execution on a real Safari/Android/WebView device. Report those limits explicitly.
 
@@ -92,13 +93,13 @@ The archived unfinished Finance report repair is source recovery only. It is not
 
 | Evidence | Current result |
 | --- | --- |
-| Latest candidate / merged commit | Pending account-only changes |
-| Required checks and production build | Previous candidate/main checks passed; Railway build then failed. Latest account-only/packaged-source checks pending |
-| Latest release-marker commit | Pending |
-| Railway deployment / live revision / result | Latest attempted teal release failed build; previous successful production remains active |
+| Verified candidate / merged commit | `293767cefcfd369ca69e395a6d4698fd1bbf6d34` / `661dc7da79edb6f4f4a2c45ba112e3e00e5e474c` |
+| Required checks and production build | Candidate and merged-main checks passed; 36-check production build, MySQL, synthetic browser, source/security and packaged Railway build passed |
+| Verified release-marker commit | `243826f7fa4b189ca11b8e4057af793e560f7476` |
+| Railway deployment / live revision / result | `1e475aa4-a5f5-474d-8b65-853ca5067440` / `243826f7fa4b189ca11b8e4057af793e560f7476` / SUCCESS |
 | Verified backup/export/restore evidence | User waived verification; no backup/restore claim |
-| Live domain and backend readiness | Pending latest-release checks |
-| Live Banking/Finance/ERP/RFQ retirement responses | Pending latest-release checks |
-| Live company, registration/account pages and logo | Pending latest-release checks |
-| Phone/tablet/desktop screenshots | Pending latest palette/account-only checks |
+| Live domain and backend readiness | Exact SHA and ready status verified on `https://app.voxelveda.com` |
+| Live Banking/Finance/ERP/RFQ retirement responses | 11 representative retired pages/APIs/assets return 410, including old report link |
+| Live company, registration/account pages and logo | Company/login/register/support load; protected pages redirect to login; empty registration request validates without creating an account; logo loads unchanged |
+| Phone/tablet/desktop screenshots | Settled 33-check production proof passed: [workflow run 38094503678](https://github.com/vp0712/voxelveda-app/actions/runs/38094503678), artifact `11685581651` |
 | Authenticated production account/profile/security | Requires an authorized application session; fixture tests do not substitute |

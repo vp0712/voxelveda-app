@@ -77,15 +77,19 @@ function markReady() { state.ready = true; state.ready_at = new Date().toISOStri
 function markFailed(error, phase = state.phase) { state.ready = false; state.phase = 'FAILED'; state.failure = { phase: String(phase || 'UNKNOWN').slice(0, 80), code: String(error?.code || 'STARTUP_FAILED').slice(0, 80) }; }
 function liveness() { return { status: 'ok', service: 'voxel-veda-app', deployment_sha: state.deployment_sha, uptime_seconds: Math.max(0, Math.floor(process.uptime())) }; }
 function publicReadiness() {
+  // markReady records successful bootstrap. Transient dependency failures may
+  // reduce readiness without erasing that evidence or clearing a fatal failure.
+  const dependenciesReady = Object.values(state.critical_services).every(({ state: serviceState }) =>
+    [CONTROL_STATES.OPERATIONAL, CONTROL_STATES.EXTERNALLY_VERIFIED, CONTROL_STATES.DEGRADED].includes(serviceState));
   return {
-    ready: state.ready,
+    ready: state.ready && dependenciesReady,
     database: { ...state.database },
     schema_version: state.migrations.schema_version,
     critical_services: Object.fromEntries(Object.entries(state.critical_services).map(([key, value]) => [key, value.state])),
     deployment_sha: state.deployment_sha
   };
 }
-function detailedReadiness() { return JSON.parse(JSON.stringify({ ...publicReadiness(), phase: state.phase, started_at: state.started_at, ready_at: state.ready_at, failure: state.failure, warnings: state.warnings, migrations: state.migrations, controls: state.controls, critical_service_details: state.critical_services })); }
+function detailedReadiness() { const readiness = publicReadiness(); return JSON.parse(JSON.stringify({ ...readiness, phase: state.ready && !readiness.ready ? 'DEGRADED' : state.phase, started_at: state.started_at, ready_at: state.ready_at, failure: state.failure, warnings: state.warnings, migrations: state.migrations, controls: state.controls, critical_service_details: state.critical_services })); }
 function controlSnapshot() { return JSON.parse(JSON.stringify(state.controls)); }
 
 module.exports = { CONTROL_KEYS, CONTROL_STATES, addWarning, controlSnapshot, deploymentSha, detailedReadiness, liveness, markFailed, markReady, publicReadiness, resetRuntimeState, setControl, setCriticalService, setDatabase, setMigrations, setPhase };
