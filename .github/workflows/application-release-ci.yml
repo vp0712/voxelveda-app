@@ -26,6 +26,10 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Production application build and retained regression gate
         run: npm run build
+      - name: Run the complete build with production HTTPS enforcement
+        env:
+          NODE_ENV: production
+        run: npm run build
       - name: Build the packaged source without Git metadata
         shell: bash
         run: |
