@@ -1,13 +1,14 @@
-application-release: 20261009-banking-erp-retirement-customer-teal
-candidate-commit: f58fa6d7634c3b7c1161554c7246d87e488ef2c2
-merged-commit: bc3b4040fa8a3e6dd80f15b73cd538110a97fdee
+application-release: 20261010-banking-erp-removal-navy-account-portal
+candidate-commit: 293767cefcfd369ca69e395a6d4698fd1bbf6d34
+merged-commit: 661dc7da79edb6f4f4a2c45ba112e3e00e5e474c
 production-branch: main
-scope: remove-banking-and-erp-runtime-files-pages-apis-jobs; retained-customer-workspace-rfq-registration-profile-security; white-charcoal-teal-theme-and-dark-option; small-bottom-line-customer-rfq-and-privacy-links
-preserved: original-company-logo; historical-database-records; uploaded-document-bytes; stored-permissions; encrypted-record-secrets; all-82-historical-migration-checksums
-ci: candidate-eight-pr-checks-success; merged-main-nine-checks-success; 34-check-production-build-success; actual-disposable-MySQL-retired-records-audit-document-isolation-queue-restart-parity-success; Chromium-local-phone-tablet-desktop-dark-mode-and-refresh-success
-configuration: existing-app-service-domain-and-database; next-deploy-predeploy-command-retains-malware-object-storage-capacity-guards-and-removes-two-retired-recovery-migration-wrappers
-verification: live-revision-health-readiness-public-pages-authentication-redirects-retired-routes-and-screenshots-to-be-checked-after-rollout; private-production-and-native-device-runtime-not-claimed
+scope: physically-remove-567-banking-finance-erp-rfq-dedicated-files; account-registration-login-profile-security-company-support; neutral-white-navy-slate-royal-blue-theme
+preserved: original-company-logo; historical-business-database-rows; document-bytes; encrypted-record-secrets; stored-roles-and-grants; 82-unchanged-historical-migration-checksums; archived-mail-job-event-records
+ci: final-candidate-six-checks-success; merged-main-five-checks-success; 36-regression-production-build-success; packaged-source-without-git-build-success; disposable-MySQL-archive-retention-document-session-queue-parity-success; Chromium-fixture-phone-landscape-tablet-desktop-navigation-refresh-dark-mode-assets-success
+configuration: existing-app-service-and-app.voxelveda.com; permitted-marker-controlled-deploy; three-shared-predeploy-guards; public-account-registration-enabled-on-next-deploy
+verification: exact-live-revision-health-readiness-retired-routes-login-return-paths-safe-registration-validation-public-mobile-desktop-screenshots-required-after-rollout
+limits: private-authenticated-production-and-native-device-runtime-not-claimed; no-real-recipient-email-or-payment-test
+backup: user-waived-backup-verification; no-record-file-key-erasure-authorized; no-backup-restore-proof-claimed
 rollback-deployment: a7112230-6587-443b-b2ba-08a4d4e7543a
 rollback-commit: 80733384e62ce47942f5ad19481973f90aa568e0
-rollback: restore-previous-code-through-CI-and-marker-workflow-and-restore-previous-five-wrapper-predeploy-command; never-delete-records-or-reverse-historical-migrations
-policy: single-marker-controlled-production-deploy
+rollback: restore-compatible-code-through-CI-and-marker-workflow; restore-previous-five-wrapper-predeploy-command-if-returning-to-old-baseline; never-drop-records-or-reverse-historical-migrations
