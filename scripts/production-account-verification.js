@@ -41,7 +41,9 @@ async function main(){
    page.on('requestfailed',request=>{if(['script','stylesheet','image','font'].includes(request.resourceType()))assetFailures.push({url:request.url(),error:request.failure()?.errorText||'Request failed',type:request.resourceType()});});
    page.on('pageerror',error=>errors.push(error.message));
    for(const route of ['/','/login','/register','/support']){
-    const response=await page.goto(origin+route,{waitUntil:'networkidle'});assert.equal(response.status(),200,route);
+    const response=await page.goto(origin+route,{waitUntil:'domcontentloaded'});assert.equal(response.status(),200,route);
+    await page.getByRole('heading',{level:1}).waitFor({state:'visible'});
+    await page.waitForFunction(()=>document.readyState==='complete'&&[...document.images].every(img=>img.complete&&img.naturalWidth>0)&&(!document.fonts||document.fonts.status==='loaded'));
     const layout=await page.evaluate(()=>({scroll:document.documentElement.scrollWidth,client:document.documentElement.clientWidth,heading:document.querySelector('h1')?.textContent,brokenImages:[...document.images].filter(img=>!img.complete||img.naturalWidth===0).map(img=>img.src),links:[...document.querySelectorAll('a[href]')].map(a=>a.getAttribute('href'))}));
     assert.ok(layout.scroll<=layout.client,viewport.name+' '+route+' must not overflow');assert.deepEqual(layout.brokenImages,[]);assert.ok(layout.heading);
     assert.ok(layout.links.every(link=>{const destination=new URL(link,page.url());return destination.origin!==origin||(!retiredRequest(destination.pathname)&&!retiredAsset(destination.pathname));}),'Navigation has no retired destinations');
@@ -49,7 +51,7 @@ async function main(){
     const label=route==='/'?'home':route.slice(1);await page.screenshot({path:path.join(out,'live-'+label+'-'+viewport.name+'.png'),fullPage:true});
     proof.checks.push({viewport,route,heading:layout.heading,overflow:false,broken_images:[],asset_failures:[]});
    }
-   const retiredResponse=await page.goto(origin+'/finance',{waitUntil:'networkidle'});assert.equal(retiredResponse.status(),410);await page.getByRole('heading',{name:'This module is no longer available'}).waitFor();
+   const retiredResponse=await page.goto(origin+'/finance',{waitUntil:'domcontentloaded'});assert.equal(retiredResponse.status(),410);await page.waitForFunction(()=>document.readyState==='complete'&&[...document.images].every(img=>img.complete&&img.naturalWidth>0));await page.getByRole('heading',{name:'This module is no longer available'}).waitFor();
    if(viewport.name==='phone'||viewport.name==='desktop')await page.screenshot({path:path.join(out,'live-retired-'+viewport.name+'.png'),fullPage:true});
    assert.deepEqual(errors,[],'No page JavaScript errors');
    assert.deepEqual(assetFailures,[],'Retired landing page assets also load successfully');await context.close();

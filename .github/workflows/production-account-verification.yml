@@ -1,8 +1,8 @@
 name: Verify deployed account release
 on:
   push:
-    branches: [main]
-    paths: ['.railway-release']
+    branches: [main, 'verify-production-*']
+    paths: ['.railway-release', 'scripts/production-account-verification.js', '.github/workflows/production-account-verification.yml']
 permissions:
   contents: read
 jobs:
@@ -23,7 +23,12 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           VV_PROOF_DIR: ${{ runner.temp }}/production-proof
           VV_EXPECTED_COMMIT: ${{ github.sha }}
-        run: node scripts/production-account-verification.js
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_NAME" == verify-production-* ]]; then
+            export VV_EXPECTED_COMMIT="${GITHUB_REF_NAME#verify-production-}"
+          fi
+          node scripts/production-account-verification.js
       - name: Preserve live evidence
         if: always()
         uses: actions/upload-artifact@v4
