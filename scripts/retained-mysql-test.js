@@ -360,8 +360,53 @@ async function main() {
   await testIdentityAndProfile();
   await testDocuments();
   await testQueue();
+  await testArchivedRetention();
   assert.deepEqual(await historicalState(), historicalRows, 'All retained workflows preserve historical retired data.');
   console.log(`MYSQL_RETAINED_OK: ${facts.join('; ')}.`);
+}
+
+async function testArchivedRetention() {
+  // All DDL/data remain inside the explicitly guarded, fresh disposable database.
+  const { splitMigrationSql } = require('../services/migrationRunner');
+  const workerSql = fs.readFileSync(path.join(__dirname, '..', 'migrations', '20260912_wave_b2_background_job_safety.sql'), 'utf8');
+  for (const sql of splitMigrationSql(workerSql)) await pool.query(sql);
+  const run = crypto.randomUUID();
+  await pool.query(`INSERT INTO background_job_runs(run_uuid,job_key,lease_token,started_at,completed_at,status)
+    VALUES(?, 'finance_statement_import', ?, '2000-01-01', '2000-01-01', 'COMPLETED')`, [run, crypto.randomUUID()]);
+  await pool.query(`INSERT INTO background_job_failures(run_uuid,job_key,attempt,error_code,error_summary,failed_at)
+    VALUES(?, 'finance_statement_import', 1, 'ARCHIVED', 'Historical trace to preserve', '2000-01-01')`, [run]);
+  await pool.query(`INSERT INTO background_job_dead_letters(run_uuid,job_key,attempt,error_code,error_summary,status,resolved_at,created_at)
+    VALUES(?, 'finance_statement_import', 1, 'ARCHIVED', 'Historical trace to preserve', 'RESOLVED', '2000-01-01', '2000-01-01')`, [run]);
+  await pool.query(`INSERT INTO email_queue(to_json,subject,related_module,status,sent_at,created_at)
+    VALUES('["archive@example.invalid"]','Historical report mail','finance','SENT','2000-01-01','2000-01-01'),
+    ('["archive@example.invalid"]','Unclassified historical mail',NULL,'SENT','2000-01-01','2000-01-01')`);
+  await pool.query(`INSERT INTO email_logs(recipients,subject,related_module,status,created_at)
+    VALUES('archive@example.invalid','Historical report log','finance','SENT','2000-01-01'),
+    ('archive@example.invalid','Unclassified historical log',NULL,'SENT','2000-01-01')`);
+  await pool.query(`INSERT INTO security_events(event_type,result,metadata_json,created_at)
+    VALUES('BANK_DETAILS_CHANGED','SUCCESS','{"module":"finance","fixture":true}','2000-01-01'),
+    ('STEP_UP_REQUIRED','DENIED','{"action":"APPROVE_PAYMENT","fixture":true}','2000-01-01')`);
+  const archivedState = async () => {
+    const rows = {};
+    for (const table of ['background_job_runs','background_job_failures','background_job_dead_letters']) {
+      rows[table] = (await pool.query(`SELECT * FROM ${table} WHERE job_key='finance_statement_import' ORDER BY run_uuid`))[0];
+    }
+    rows.queue = (await pool.query("SELECT * FROM email_queue WHERE related_module='finance' OR related_module IS NULL ORDER BY id"))[0];
+    rows.logs = (await pool.query("SELECT * FROM email_logs WHERE related_module='finance' OR related_module IS NULL ORDER BY id"))[0];
+    rows.events = (await pool.query("SELECT * FROM security_events WHERE event_type='BANK_DETAILS_CHANGED' OR JSON_UNQUOTE(JSON_EXTRACT(metadata_json,'$.action'))='APPROVE_PAYMENT' ORDER BY id"))[0];
+    return digest(rows);
+  };
+  const before = await archivedState();
+  const { BackgroundJobStore } = require('../services/backgroundJobStore');
+  const store = new BackgroundJobStore(pool);
+  await store.initialize(['email_queue_delivery']);
+  await store.pruneTelemetry({ aggressive: true, jobKeys: ['email_queue_delivery'] });
+  assert.equal(await archivedState(), before, 'Retained worker startup/retention never changes archived job rows.');
+  await require('../services/databaseCapacityRecoveryService').recoverDatabaseCapacity({ force: true });
+  await require('../services/securityEventRetentionService').pruneSecurityEvents();
+  assert.equal(await archivedState(), before, 'Capacity recovery and security retention preserve archived mail, jobs and events.');
+  assert.deepEqual(await store.listDeadLetters(1, ['email_queue_delivery']), [], 'Archived failures are absent from retained pages.');
+  facts.push('real SQL worker startup, capacity recovery and retention preserve old Finance/unclassified mail, jobs and security events');
 }
 
 main().catch((error) => {

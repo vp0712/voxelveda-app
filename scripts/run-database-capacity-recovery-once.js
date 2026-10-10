@@ -23,8 +23,6 @@ async function targetedTableFootprint() {
   const targets = [
     'background_job_runs',
     'security_events',
-    'statement_import_pages',
-    'statement_import_rows',
     'audit_logs',
     'email_logs',
     'email_queue',

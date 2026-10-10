@@ -1,6 +1,7 @@
 'use strict';
 
 const pool = require('../config/db');
+const { retainedEventScope } = require('./securityDataScope');
 
 const DEFAULT_RETENTION_DAYS = 90;
 const DEFAULT_STEP_UP_REQUIRED_RETENTION_DAYS = 7;
@@ -26,6 +27,7 @@ function isSecurityEventCapacityError(error) {
 }
 
 async function deleteBatches(whereSql, params = [], maxRows = Infinity) {
+  const scope = retainedEventScope();
   const batchSize = boundedInteger(process.env.SECURITY_EVENT_PRUNE_BATCH_SIZE, DEFAULT_BATCH_SIZE, 100, 10000);
   const maxBatches = boundedInteger(process.env.SECURITY_EVENT_PRUNE_MAX_BATCHES, DEFAULT_MAX_BATCHES, 1, 100);
   let deleted = 0;
@@ -33,8 +35,8 @@ async function deleteBatches(whereSql, params = [], maxRows = Infinity) {
     const limit = Math.min(batchSize, Math.max(0, maxRows - deleted));
     if (!limit) break;
     const [result] = await pool.query(
-      `DELETE FROM security_events WHERE ${whereSql} ORDER BY id ASC LIMIT ${limit}`,
-      params
+      `DELETE FROM security_events WHERE (${scope.sql}) AND (${whereSql}) ORDER BY id ASC LIMIT ${limit}`,
+      [...scope.params, ...params]
     );
     const affected = Number(result?.affectedRows || 0);
     deleted += affected;
@@ -44,9 +46,10 @@ async function deleteBatches(whereSql, params = [], maxRows = Infinity) {
 }
 
 async function trimRoutineOverflow() {
+  const scope = retainedEventScope();
   const cap = boundedInteger(process.env.SECURITY_EVENT_ROUTINE_ROW_CAP, DEFAULT_ROUTINE_ROW_CAP, 500, 100000);
   const [[row]] = await pool.query(
-    "SELECT COUNT(*) AS count FROM security_events WHERE event_type='STEP_UP_REQUIRED'"
+    `SELECT COUNT(*) AS count FROM security_events WHERE (${scope.sql}) AND event_type='STEP_UP_REQUIRED'`, scope.params
   );
   const count = Number(row?.count || 0);
   const excess = Math.max(0, count - cap);
@@ -73,7 +76,7 @@ async function pruneSecurityEvents({ emergency = false } = {}) {
   );
   deleted += await trimRoutineOverflow();
 
-  // Security events are operational telemetry, not the immutable finance audit
+  // Retained security events are operational telemetry, separate from archived audit
   // ledger. Keep a substantial retention window but do not let this table grow
   // without bound and take authentication offline.
   deleted += await deleteBatches(

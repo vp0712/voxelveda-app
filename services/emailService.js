@@ -510,67 +510,18 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
   }
 }
 
-async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [], attachmentFallback = null }) {
-  const recipients = validateRecipients(to, 'to');
-  const ccRecipients = validateRecipients(cc, 'cc');
-  const bccRecipients = validateRecipients(bcc, 'bcc');
-  const safeAttachments = assertAttachmentIntegrity(attachments);
-  const hasPdf = safeAttachments.some(isPdfAttachment);
-  const pdfTransport = String(process.env.PDF_EMAIL_TRANSPORT || 'auto').trim().toLowerCase();
-
-  const smtpArgs = {
-    to: recipients,
-    cc: ccRecipients,
-    bcc: bccRecipients,
-    subject,
-    html,
-    text,
-    replyTo,
-    attachments: safeAttachments
+async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [] }) {
+  const args = {
+    to: validateRecipients(to, 'to'),
+    cc: validateRecipients(cc, 'cc'),
+    bcc: validateRecipients(bcc, 'bcc'),
+    subject, html, text, replyTo,
+    attachments: assertAttachmentIntegrity(attachments)
   };
-  const relayArgs = { ...smtpArgs };
-  // Finance supplies truthful alternative bodies. Do not send its PDF through a
-  // relay whose live filename behaviour has not been recipient-tested. Other
-  // established mail flows keep their existing transport contract.
-  async function relayDelivery(){
-    const omitPdf=hasPdf&&attachmentFallback&&process.env.WORDPRESS_MAIL_RELAY_PDF_FILENAME_VERIFIED!=='true';
-    const args=omitPdf?{...relayArgs,html:attachmentFallback.html,text:attachmentFallback.text,attachments:[]}:relayArgs;
-    const result=await sendViaHttpsRelay(args);
-    return {...result,transport:'https_relay',attachmentOmitted:!!omitPdf,attachmentOmissionReason:omitPdf?'RELAY_FILENAME_UNVERIFIED':null};
-  }
-
-  if (isHostingerMailApiConfigured() && (pdfTransport === 'hostinger_mail_api' || hasPdf)) {
-    try {
-      return await sendViaHostingerMailApi(relayArgs);
-    } catch (error) {
-      if (pdfTransport === 'hostinger_mail_api') throw error;
-      if (!isRelayConfigured() && missingSmtpKeys().length) throw error;
-    }
-  }
-
-  if (hasPdf && isRelayConfigured() && pdfTransport === 'https_relay') {
-    const result = await relayDelivery();
-    // The relay already sent the message. A missing acknowledgment cannot turn
-    // acceptance into a failed response and encourage a duplicate resend.
-    return { ...result, transport: 'https_relay' };
-  }
-
-  if (hasPdf) {
-    try {
-      return await sendViaSmtp(smtpArgs);
-    } catch (error) {
-      if (!isRelayConfigured() || !isEmailTransportError(error)) throw error;
-      const result = await relayDelivery();
-      return { ...result, transport: 'https_relay' };
-    }
-  }
-
-  if (isRelayConfigured()) {
-    const result = await relayDelivery();
-    return { ...result, transport: 'https_relay' };
-  }
-
-  return sendViaSmtp(smtpArgs);
+  // Retained account mail uses the existing shared transport configuration.
+  if (isRelayConfigured()) return { ...await sendViaHttpsRelay(args), transport: 'https_relay' };
+  if (missingSmtpKeys().length && isHostingerMailApiConfigured()) return sendViaHostingerMailApi(args);
+  return sendViaSmtp(args);
 }
 
 module.exports = {

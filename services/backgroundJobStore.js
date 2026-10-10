@@ -1,9 +1,15 @@
+function deadLetterNotFound() {
+  return Object.assign(new Error('Background job dead letter was not found.'), {
+    code: 'BACKGROUND_JOB_DEAD_LETTER_NOT_FOUND', statusCode: 404
+  });
+}
+
 class BackgroundJobStore {
   constructor(pool) {
     this.pool = pool;
   }
 
-  async initialize() {
+  async initialize(jobKeys = []) {
     for (const table of [
       'background_job_leases',
       'background_job_runs',
@@ -12,10 +18,13 @@ class BackgroundJobStore {
     ]) {
       await this.pool.query(`SELECT 1 FROM ${table} LIMIT 1`);
     }
-    await this.pruneTelemetry({ aggressive: true });
+    await this.pruneTelemetry({ aggressive: true, jobKeys });
   }
 
   async pruneTelemetry(options = {}) {
+    const jobKeys = Array.isArray(options.jobKeys) ? options.jobKeys : [];
+    if (!jobKeys.length) return { deletedRuns: 0, skipped: true, reason: 'no_registered_jobs' };
+    const placeholders = jobKeys.map(() => '?').join(',');
     const aggressive = Boolean(options.aggressive);
     const runRetentionDays = aggressive ? 2 : 7;
     const failureRetentionDays = aggressive ? 14 : 30;
@@ -27,12 +36,12 @@ class BackgroundJobStore {
     for (let i = 0; i < maxBatches; i += 1) {
       const [result] = await this.pool.query(
         `DELETE FROM background_job_runs
-          WHERE status IN ('COMPLETED','FAILED','RETRY')
+          WHERE job_key IN (${placeholders}) AND status IN ('COMPLETED','FAILED','RETRY')
             AND completed_at IS NOT NULL
             AND completed_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
           ORDER BY completed_at ASC
           LIMIT ?`,
-        [runRetentionDays, batchSize]
+        [...jobKeys, runRetentionDays, batchSize]
       );
       const affected = Number(result.affectedRows || 0);
       deletedRuns += affected;
@@ -41,17 +50,17 @@ class BackgroundJobStore {
 
     await this.pool.query(
       `DELETE FROM background_job_failures
-        WHERE created_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
+        WHERE job_key IN (${placeholders}) AND failed_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
         LIMIT ?`,
-      [failureRetentionDays, aggressive ? 5000 : 500]
+      [...jobKeys, failureRetentionDays, aggressive ? 5000 : 500]
     ).catch(() => {});
     await this.pool.query(
       `DELETE FROM background_job_dead_letters
-        WHERE status='RESOLVED'
+        WHERE job_key IN (${placeholders}) AND status='RESOLVED'
           AND resolved_at IS NOT NULL
           AND resolved_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
         LIMIT ?`,
-      [resolvedRetentionDays, aggressive ? 5000 : 500]
+      [...jobKeys, resolvedRetentionDays, aggressive ? 5000 : 500]
     ).catch(() => {});
 
     if (deletedRuns) console.log(`BACKGROUND_JOB_TELEMETRY_PRUNED runs=${deletedRuns} retention_days=${runRetentionDays}`);
@@ -160,10 +169,9 @@ class BackgroundJobStore {
     }
   }
 
-  async completeRun({ runUuid, processedCount, failedCount, triggerSource }) {
-    // Scheduled no-op polls carry no operational evidence worth retaining. With
-    // a 5-second Finance queue poll they otherwise create ~17k rows/day even
-    // when there is nothing to process, eventually exhausting small MySQL plans.
+  async completeRun({ runUuid, jobKey, processedCount, failedCount, triggerSource }) {
+    // Delete only the current worker's no-op run; archived histories are never
+    // treated as disposable scheduler telemetry.
     if (String(triggerSource || '').toUpperCase() === 'SCHEDULED'
       && Number(processedCount || 0) === 0
       && Number(failedCount || 0) === 0) {
@@ -180,7 +188,7 @@ class BackgroundJobStore {
        WHERE run_uuid = ? AND status = 'RUNNING'`,
       [processedCount, failedCount, runUuid]
     );
-    await this.pruneTelemetry({ aggressive: false }).catch(() => {});
+    await this.pruneTelemetry({ aggressive: false, jobKeys: jobKey ? [jobKey] : [] }).catch(() => {});
   }
 
   async scheduleRetry({ runUuid, jobKey, attempt, errorCode, errorSummary, retryAt }) {
@@ -256,14 +264,16 @@ class BackgroundJobStore {
     );
   }
 
-  async deadLetterForRetry(id, actorId) {
+  async deadLetterForRetry(id, actorId, jobKeys = []) {
+    if (!jobKeys.length) throw deadLetterNotFound();
+    const placeholders = jobKeys.map(() => '?').join(',');
     const connection = await this.pool.getConnection();
     try {
       await connection.beginTransaction();
       const [[row]] = await connection.query(
         `SELECT id, run_uuid, job_key, status, attempt, error_code, created_at
-         FROM background_job_dead_letters WHERE id = ? LIMIT 1 FOR UPDATE`,
-        [id]
+         FROM background_job_dead_letters WHERE id = ? AND job_key IN (${placeholders}) LIMIT 1 FOR UPDATE`,
+        [id, ...jobKeys]
       );
       if (!row) {
         const error = new Error('Background job dead letter not found.');
@@ -280,8 +290,8 @@ class BackgroundJobStore {
       await connection.query(
         `UPDATE background_job_dead_letters
          SET status = 'RETRYING', retry_requested_by = ?, retry_requested_at = NOW(3)
-         WHERE id = ? AND status = 'OPEN'`,
-        [actorId, id]
+         WHERE id = ? AND status = 'OPEN' AND job_key IN (${placeholders})`,
+        [actorId, id, ...jobKeys]
       );
       await connection.commit();
       return row;
@@ -303,40 +313,46 @@ class BackgroundJobStore {
     return Boolean(result.affectedRows);
   }
 
-  async listHealthData() {
+  async listHealthData(jobKeys = []) {
+    if (!jobKeys.length) return { leases: [], runs: [], deadLetters: [] };
+    const placeholders = jobKeys.map(() => '?').join(',');
     const [leases] = await this.pool.query(
       `SELECT job_key, acquired_at, heartbeat_at, lease_expires_at,
               lease_expires_at > NOW(3) AS lease_active
-       FROM background_job_leases ORDER BY job_key`
+       FROM background_job_leases WHERE job_key IN (${placeholders}) ORDER BY job_key`, jobKeys
     );
     const [runs] = await this.pool.query(
       `SELECT run_uuid, job_key, started_at, completed_at, status, attempt,
               processed_count, failed_count, deployment_sha, trigger_source,
               next_attempt_at, error_code
-       FROM background_job_runs ORDER BY started_at DESC, run_uuid DESC LIMIT 500`
+       FROM background_job_runs WHERE job_key IN (${placeholders}) ORDER BY started_at DESC, run_uuid DESC LIMIT 500`, jobKeys
     );
     const [deadLetters] = await this.pool.query(
       `SELECT job_key, COUNT(*) AS open_count
-       FROM background_job_dead_letters WHERE status IN ('OPEN', 'RETRYING') GROUP BY job_key`
+       FROM background_job_dead_letters WHERE status IN ('OPEN', 'RETRYING') AND job_key IN (${placeholders}) GROUP BY job_key`, jobKeys
     );
     return { leases, runs, deadLetters };
   }
 
-  async listDeadLetters(limit = 50) {
+  async listDeadLetters(limit = 50, jobKeys = []) {
+    if (!jobKeys.length) return [];
+    const placeholders = jobKeys.map(() => '?').join(',');
     const [rows] = await this.pool.query(
       `SELECT id, run_uuid, job_key, attempt, error_code, error_summary, status,
               retry_requested_by, retry_requested_at, retry_run_uuid, resolved_at, created_at
-       FROM background_job_dead_letters ORDER BY created_at DESC LIMIT ?`,
-      [limit]
+       FROM background_job_dead_letters WHERE job_key IN (${placeholders}) ORDER BY created_at DESC, id DESC LIMIT ?`,
+      [...jobKeys, limit]
     );
     return rows;
   }
 
-  async getDeadLetter(id) {
+  async getDeadLetter(id, jobKeys = []) {
+    if (!jobKeys.length) throw deadLetterNotFound();
+    const placeholders = jobKeys.map(() => '?').join(',');
     const [[row]] = await this.pool.query(
       `SELECT id, run_uuid, job_key, attempt, error_code, status, created_at
-       FROM background_job_dead_letters WHERE id = ? LIMIT 1`,
-      [id]
+       FROM background_job_dead_letters WHERE id = ? AND job_key IN (${placeholders}) LIMIT 1`,
+      [id, ...jobKeys]
     );
     if (!row) {
       const error = new Error('Background job dead letter was not found.');
