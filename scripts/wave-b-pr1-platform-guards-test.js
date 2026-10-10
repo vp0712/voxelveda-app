@@ -58,12 +58,12 @@ async function invoke(middleware, req) {
 
 // Exercise application matching without a listening socket, external Redis,
 // database, SMTP or production identity.
-function fixtureRequest(app, url) {
+function fixtureRequest(app, url, { headers = {} } = {}) {
   return new Promise((resolve, reject) => {
     const socket = new net.Socket();
     const req = new http.IncomingMessage(socket);
     req.url = url; req.method = 'GET';
-    req.headers = { host: 'app.voxelveda.com', accept: 'application/json' };
+    req.headers = { host: 'app.voxelveda.com', accept: 'application/json', 'x-forwarded-proto': 'https', ...headers };
     req.push(null);
     const res = new http.ServerResponse(req);
     const chunks = [];
@@ -73,7 +73,7 @@ function fixtureRequest(app, url) {
       if (typeof encoding === 'function') { callback = encoding; encoding = undefined; }
       if (chunk) chunks.push(Buffer.from(chunk, encoding));
       res.finished = true; clearTimeout(timer); callback?.(); res.emit('finish'); socket.destroy();
-      resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') });
+      resolve({ status: res.statusCode, headers: res.getHeaders(), body: Buffer.concat(chunks).toString('utf8') });
       return res;
     };
     res.on('error', error => { clearTimeout(timer); reject(error); });
@@ -146,6 +146,18 @@ async function transientLimiterRecovery() {
     runtime.setCriticalService('rate_limiter', runtime.CONTROL_STATES.OPERATIONAL);
     runtime.markReady();
     const app = appLimiterFixture();
+    const originalNodeEnv = process.env.NODE_ENV;
+    try {
+      process.env.NODE_ENV = 'production';
+      const httpLogin = await fixtureRequest(app, '/login?returnTo=/dashboard', { headers: { 'x-forwarded-proto': 'http' } });
+      assert.equal(httpLogin.status, 308, 'Production HTTP pages must still redirect to HTTPS');
+      assert.equal(httpLogin.headers.location, 'https://app.voxelveda.com/login?returnTo=/dashboard');
+      assert.equal((await fixtureRequest(app, '/api/health', { headers: { 'x-forwarded-proto': 'http' } })).status, 200,
+        'Internal plaintext liveness probes must retain their explicit HTTPS exemption');
+    } finally {
+      if (originalNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = originalNodeEnv;
+    }
     // More than one complete default gateway quota. Real route matching proves
     // these probes do not consume or disable the protected API's Redis quota.
     for (let index = 0; index < 1000; index++) assert.equal((await fixtureRequest(app, '/api/health')).status, 200);
