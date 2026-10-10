@@ -1,14 +1,17 @@
-application-release: 20261010-banking-erp-removal-navy-account-portal
-candidate-commit: 293767cefcfd369ca69e395a6d4698fd1bbf6d34
-merged-commit: 661dc7da79edb6f4f4a2c45ba112e3e00e5e474c
+application-release: 20261010-complete-banking-erp-retirement-navy-account-portal
+candidate-commit: 4f8ce4f6b4bfe6164c1d2c11a42790c1347da267
+merged-commit: 8f5a3c91f476779852d283c0a43482b3249de511
 production-branch: main
-scope: physically-remove-567-banking-finance-erp-rfq-dedicated-files; account-registration-login-profile-security-company-support; neutral-white-navy-slate-royal-blue-theme
-preserved: original-company-logo; historical-business-database-rows; document-bytes; encrypted-record-secrets; stored-roles-and-grants; 82-unchanged-historical-migration-checksums; archived-mail-job-event-records
-ci: final-candidate-six-checks-success; merged-main-five-checks-success; 36-regression-production-build-success; packaged-source-without-git-build-success; disposable-MySQL-archive-retention-document-session-queue-parity-success; Chromium-fixture-phone-landscape-tablet-desktop-navigation-refresh-dark-mode-assets-success
-configuration: existing-app-service-and-app.voxelveda.com; permitted-marker-controlled-deploy; three-shared-predeploy-guards; public-account-registration-enabled-on-next-deploy
-verification: exact-live-revision-health-readiness-retired-routes-login-return-paths-safe-registration-validation-public-mobile-desktop-screenshots-required-after-rollout
-limits: private-authenticated-production-and-native-device-runtime-not-claimed; no-real-recipient-email-or-payment-test
-backup: user-waived-backup-verification; no-record-file-key-erasure-authorized; no-backup-restore-proof-claimed
-rollback-deployment: a7112230-6587-443b-b2ba-08a4d4e7543a
-rollback-commit: 80733384e62ce47942f5ad19481973f90aa568e0
-rollback: restore-compatible-code-through-CI-and-marker-workflow; restore-previous-five-wrapper-predeploy-command-if-returning-to-old-baseline; never-drop-records-or-reverse-historical-migrations
+scope: physical-removal-of-all-banking-finance-erp-and-rfq-runtime; retained-registration-account-profile-security-company-contact; navy-slate-royal-blue-theme
+preserved: original-company-logo; archived-business-records-and-document-bytes; stored-identity-and-permissions; encrypted-record-secrets; all-82-historical-migration-checksums
+request-protection: retained-api-and-auth-distributed-rate-limits-fail-closed; pages-assets-health-and-ready-do-not-consume-api-quota; verified-store-recovery-cannot-clear-fatal-or-other-service-failures
+ci: candidate-seven-checks-success; merged-main-required-checks-success; 36-check-production-and-packaged-source-builds-success; real-disposable-MySQL-archive-identity-document-mail-job-event-parity-success; synthetic-authenticated-Chromium-phone-tablet-desktop-refresh-and-dark-mode-success
+configuration: existing-app-service-domain-database-object-storage-and-security-providers; three-shared-predeploy-guards-retained; only-core-email-job-registered
+verification: exact-live-commit-health-readiness-retired-routes-public-pages-four-viewports-refresh-back-forward-assets-and-settled-screenshots-to-be-verified-after-rollout
+prior-verified-release: 243826f7fa4b189ca11b8e4057af793e560f7476; deployment-1e475aa4-a5f5-474d-8b65-853ca5067440; settled-public-proof-33-checks-success
+limitations: private-production-role-sessions-native-Safari-Android-WebView-and-recipient-inboxes-not-claimed; no-real-test-email-account-payment-or-business-record-write
+backup-policy: user-waived-backup-verification; no-backup-export-or-restore-claim; no-production-business-table-file-snapshot-or-key-deletion
+rollback-deployment: 1e475aa4-a5f5-474d-8b65-853ca5067440
+rollback-commit: 243826f7fa4b189ca11b8e4057af793e560f7476
+rollback: prior-account-release-through-normal-PR-CI-marker-workflow-without-data-reversal; full-pre-retirement-code-restoration-from-80733384e62ce47942f5ad19481973f90aa568e0-also-requires-prior-five-wrapper-predeploy-command
+policy: single-marker-controlled-production-deploy
