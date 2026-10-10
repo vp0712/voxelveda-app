@@ -11,6 +11,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -27,6 +29,8 @@ jobs:
         run: |
           if [[ "$GITHUB_REF_NAME" == verify-production-* ]]; then
             export VV_EXPECTED_COMMIT="${GITHUB_REF_NAME#verify-production-}"
+          else
+            export VV_EXPECTED_COMMIT="$(git log -1 --format=%H -- .railway-release)"
           fi
           node scripts/production-account-verification.js
       - name: Preserve live evidence
