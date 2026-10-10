@@ -1,0 +1,35 @@
+name: Verify live public browser console
+on:
+  push:
+    branches: ['verify-console-*']
+    paths: ['scripts/production-console-verification.js', '.github/workflows/production-console-verification.yml']
+permissions:
+  contents: read
+jobs:
+  public-console-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install isolated browser verification tooling
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
+          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install chromium
+      - name: Capture the actual deployed public console without application writes
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_PROOF_DIR: ${{ runner.temp }}/production-console-proof
+        shell: bash
+        run: |
+          export VV_EXPECTED_COMMIT="${GITHUB_REF_NAME#verify-console-}"
+          node scripts/production-console-verification.js
+      - name: Preserve console evidence including failed checks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-console-proof-${{ github.sha }}
+          path: ${{ runner.temp }}/production-console-proof
+          retention-days: 30
