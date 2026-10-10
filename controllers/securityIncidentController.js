@@ -226,7 +226,7 @@ exports.exportReport = async (req, res, next) => {
       ['Integrity', 'Snapshot SHA-256', snapshot.content_sha256], ['Notice', 'Disclaimer', report.disclaimer]
     ];
     await logAudit(pool, { actorId: req.user.id, action: 'SECURITY_REPORT_EXPORTED', module: 'security', recordType: 'security_report', recordId: snapshot.id, newValue: { period: report.period, content_sha256: snapshot.content_sha256 }, ipAddress: req.ip, userAgent: req.get('user-agent') });
-    await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_EXPORT', req, metadata: { export_type: 'SECURITY_REPORT', report_id: snapshot.id } });
+    await logSecurityEvent({ actorId: req.user.id, eventType: 'SECURITY_REPORT_EXPORTED', req, metadata: { export_type: 'SECURITY_REPORT', report_id: snapshot.id } });
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="Voxel-Veda-Security-Review-${report.period.end.slice(0, 10)}.csv"`);
     res.setHeader('Cache-Control', 'private, no-store');

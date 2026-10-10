@@ -2,6 +2,12 @@
 
 const crypto = require('node:crypto');
 const pool = require('../config/db');
+const { retainedEventScope } = require('./securityDataScope');
+
+// Only the current email worker and reversible capacity probe are retained.
+// Unknown and retired module job history remains archived in place.
+const RETAINED_CAPACITY_JOB_KEYS = Object.freeze(['email_queue_delivery', 'capacity.probe']);
+const RETAINED_EMAIL_MODULES = Object.freeze(['auth', 'security', 'contact']);
 
 const CAPACITY_CODES = new Set(['ER_RECORD_FILE_FULL', 'ER_DISK_FULL']);
 
@@ -102,61 +108,59 @@ async function capacityProbe() {
 
 async function normalRecovery() {
   const deleted = {};
+  const jobScope = `job_key IN (${RETAINED_CAPACITY_JOB_KEYS.map(() => '?').join(',')})`;
+  const emailScope = `related_module IN (${RETAINED_EMAIL_MODULES.map(() => '?').join(',')})`;
+  const securityScope = retainedEventScope();
   deleted.background_job_runs = await deleteBatches({
     table: 'background_job_runs',
-    where: "status IN ('COMPLETED','FAILED','RETRY') AND completed_at IS NOT NULL AND completed_at < DATE_SUB(NOW(3), INTERVAL 6 HOUR)",
+    where: `${jobScope} AND status IN ('COMPLETED','FAILED','RETRY') AND completed_at IS NOT NULL AND completed_at < DATE_SUB(NOW(3), INTERVAL 6 HOUR)`,
+    params: RETAINED_CAPACITY_JOB_KEYS,
     orderBy: 'completed_at ASC',
     maxRows: 100000
   });
   deleted.background_job_failures = await deleteBatches({
     table: 'background_job_failures',
-    where: 'failed_at < DATE_SUB(NOW(3), INTERVAL 7 DAY)',
+    where: `${jobScope} AND failed_at < DATE_SUB(NOW(3), INTERVAL 7 DAY)`,
+    params: RETAINED_CAPACITY_JOB_KEYS,
     orderBy: 'failed_at ASC',
     maxRows: 50000
   });
   deleted.background_job_dead_letters = await deleteBatches({
     table: 'background_job_dead_letters',
-    where: "status='RESOLVED' AND resolved_at IS NOT NULL AND resolved_at < DATE_SUB(NOW(3), INTERVAL 7 DAY)",
+    where: `${jobScope} AND status='RESOLVED' AND resolved_at IS NOT NULL AND resolved_at < DATE_SUB(NOW(3), INTERVAL 7 DAY)`,
+    params: RETAINED_CAPACITY_JOB_KEYS,
     orderBy: 'resolved_at ASC',
     maxRows: 20000
   });
   deleted.security_step_up_required = await deleteBatches({
     table: 'security_events',
-    where: "event_type='STEP_UP_REQUIRED' AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)",
+    where: `(${securityScope.sql}) AND event_type='STEP_UP_REQUIRED' AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
+    params: securityScope.params,
     orderBy: 'id ASC',
     maxRows: 100000
   });
   deleted.security_events = await deleteBatches({
     table: 'security_events',
-    where: 'created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)',
+    where: `(${securityScope.sql}) AND created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)`,
+    params: securityScope.params,
     orderBy: 'id ASC',
     maxRows: 100000
   });
   deleted.email_logs = await deleteBatches({
     table: 'email_logs',
-    where: 'created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)',
+    where: `${emailScope} AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+    params: RETAINED_EMAIL_MODULES,
     orderBy: 'id ASC',
     maxRows: 50000
   });
   deleted.email_queue_sent = await deleteBatches({
     table: 'email_queue',
-    where: "status='SENT' AND sent_at IS NOT NULL AND sent_at < DATE_SUB(NOW(), INTERVAL 30 DAY)",
+    where: `${emailScope} AND status='SENT' AND sent_at IS NOT NULL AND sent_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`,
+    params: RETAINED_EMAIL_MODULES,
     orderBy: 'id ASC',
     maxRows: 50000
   });
   return deleted;
-}
-
-async function emergencyRecovery() {
-  const actions = [];
-  // background_job_runs is high-volume scheduler telemetry, not source-of-truth.
-  // If the DB cannot allocate even one row after normal pruning, reclaim its
-  // tablespace atomically. Leases/dead letters remain intact.
-  if (await tableExists('background_job_runs')) {
-    await pool.query('TRUNCATE TABLE background_job_runs');
-    actions.push('TRUNCATE_BACKGROUND_JOB_RUNS');
-  }
-  return actions;
 }
 
 async function recoverDatabaseCapacity(options = {}) {
@@ -165,7 +169,6 @@ async function recoverDatabaseCapacity(options = {}) {
 
   const before = await databaseFootprint().catch(() => ({ size_mb: null, data_free_mb: null, largest: [] }));
   let deleted = {};
-  let emergencyActions = [];
   let probe = await capacityProbe();
 
   try {
@@ -176,15 +179,8 @@ async function recoverDatabaseCapacity(options = {}) {
   }
 
   probe = await capacityProbe();
-  if (!probe.writable && isCapacityError(probe.error)) {
-    emergencyActions = await emergencyRecovery();
-    // Retry bounded cleanup after reclaiming background-job telemetry pages.
-    deleted = { ...deleted, ...(await normalRecovery().catch((error) => {
-      if (!isCapacityError(error)) throw error;
-      return { emergency_followup_error: String(error.code || error.errno || 'CAPACITY') };
-    })) };
-    probe = await capacityProbe();
-  }
+  // Never truncate shared tables to manufacture successful startup. Capacity
+  // failure after scoped retention must fail readiness and preserve archives.
 
   const after = await databaseFootprint().catch(() => ({ size_mb: null, data_free_mb: null, largest: [] }));
   const summary = {
@@ -192,7 +188,7 @@ async function recoverDatabaseCapacity(options = {}) {
     after_size_mb: after.size_mb,
     data_free_mb: after.data_free_mb,
     deleted,
-    emergency_actions: emergencyActions,
+    emergency_actions: [],
     writable: Boolean(probe.writable),
     top_tables: after.largest.slice(0, 8)
   };
@@ -211,5 +207,5 @@ module.exports = {
   databaseFootprint,
   isCapacityError,
   recoverDatabaseCapacity,
-  _test: { boundedInteger }
+  _test: { boundedInteger, RETAINED_CAPACITY_JOB_KEYS, RETAINED_EMAIL_MODULES }
 };

@@ -226,6 +226,7 @@ async function testCapacityIsolation() {
     query, beginTransaction: async () => {}, rollback: async () => {}, release() {}
   };
   const capacity = load(path.join(root, 'services/databaseCapacityRecoveryService.js'), {
+    './securityDataScope': require('../services/securityDataScope'),
     '../config/db': { query, getConnection: async () => connection }
   });
   const result = await capacity.recoverDatabaseCapacity({ force: true });

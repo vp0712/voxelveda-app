@@ -63,7 +63,7 @@ class BackgroundJobService {
   }
 
   async initialize() {
-    await this.store.initialize();
+    await this.store.initialize([...this.jobs.keys()]);
     this.initialized = true;
     return { state: 'OPERATIONAL', registered_jobs: this.jobs.size };
   }
@@ -214,7 +214,7 @@ class BackgroundJobService {
         throw error;
       }
       const counts = resultCounts(result);
-      await this.store.completeRun({ runUuid: run.runUuid, triggerSource: run.triggerSource, ...counts });
+      await this.store.completeRun({ runUuid: run.runUuid, jobKey: run.jobKey, triggerSource: run.triggerSource, ...counts });
       await this.store.resolveDeadLetters(definition.jobKey, run.runUuid);
       return { jobKey: definition.jobKey, runUuid: run.runUuid, status: JOB_STATES.COMPLETED, attempt: run.attempt, ...counts, result };
     } catch (error) {
@@ -263,7 +263,7 @@ class BackgroundJobService {
   }
 
   async health() {
-    const data = await this.store.listHealthData();
+    const data = await this.store.listHealthData([...this.jobs.keys()]);
     const latestByJob = new Map();
     for (const run of data.runs) if (!latestByJob.has(run.job_key)) latestByJob.set(run.job_key, run);
     const leases = new Map(data.leases.map((lease) => [lease.job_key, lease]));
@@ -301,7 +301,7 @@ class BackgroundJobService {
   }
 
   async listDeadLetters(limit) {
-    const rows = await this.store.listDeadLetters(boundedInteger(limit, 50, 1, 100));
+    const rows = await this.store.listDeadLetters(boundedInteger(limit, 50, 1, 100), [...this.jobs.keys()]);
     return rows.map((row) => ({
       ...row,
       error_summary: safeError({ code: row.error_code, message: row.error_summary }).summary
@@ -309,11 +309,16 @@ class BackgroundJobService {
   }
 
   async getDeadLetter(id) {
-    return this.store.getDeadLetter(id);
+    const row = await this.store.getDeadLetter(id, [...this.jobs.keys()]);
+    this.definition(row.job_key);
+    return row;
   }
 
   async retryDeadLetter(id, actorId) {
-    const deadLetter = await this.store.deadLetterForRetry(id, actorId);
+    // Check retained registration before claiming or auditing a manual retry.
+    // The store repeats the job-key constraint while holding the row lock.
+    await this.getDeadLetter(id);
+    const deadLetter = await this.store.deadLetterForRetry(id, actorId, [...this.jobs.keys()]);
     try {
       const result = await this.runJob(deadLetter.job_key, {
         force: true,

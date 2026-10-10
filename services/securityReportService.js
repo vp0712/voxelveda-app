@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const pool = require('../config/db');
 const { ensureSecurityOperationsSchema } = require('./securityOperationsSchema');
+const { retainedAuditScope, retainedEventScope, RETAINED_HIGH_RISK_EVENTS } = require('./securityDataScope');
 
 const PRIVILEGED_ROLES = ['super_admin', 'admin', 'finance_admin', 'accountant', 'hr'];
 
@@ -24,15 +25,17 @@ async function buildSecurityReport(period) {
   await ensureSecurityOperationsSchema();
   const placeholders = PRIVILEGED_ROLES.map(() => '?').join(',');
   const params = [period.start, period.end];
-  const [results] = await Promise.all([
-    pool.query('SELECT event_type, result, COUNT(*) AS count FROM security_events WHERE created_at >= ? AND created_at < ? GROUP BY event_type, result ORDER BY count DESC', params),
-    pool.query('SELECT action, module, COUNT(*) AS count FROM audit_logs WHERE created_at >= ? AND created_at < ? GROUP BY action, module ORDER BY count DESC LIMIT 50', params),
+  const eventScope = retainedEventScope();
+  const auditScope = retainedAuditScope();
+  const results = await Promise.all([
+    pool.query(`SELECT event_type, result, COUNT(*) AS count FROM security_events WHERE ${eventScope.sql} AND created_at >= ? AND created_at < ? GROUP BY event_type, result ORDER BY count DESC`, [...eventScope.params, ...params]),
+    pool.query(`SELECT action, module, COUNT(*) AS count FROM audit_logs WHERE ${auditScope.sql} AND created_at >= ? AND created_at < ? GROUP BY action, module ORDER BY count DESC LIMIT 50`, [...auditScope.params, ...params]),
     pool.query(`SELECT COUNT(*) AS total, SUM(mfa_enabled = 1) AS mfa_enabled FROM users WHERE active = 1 AND deleted_at IS NULL AND LOWER(role) IN (${placeholders})`, PRIVILEGED_ROLES),
     pool.query("SELECT severity, status, COUNT(*) AS count FROM security_incidents WHERE opened_at < ? AND (closed_at IS NULL OR closed_at >= ?) GROUP BY severity, status", [period.end, period.start]),
     pool.query("SELECT COUNT(*) AS count FROM auth_sessions WHERE created_at >= ? AND created_at < ?", params),
     pool.query("SELECT COUNT(*) AS count FROM auth_sessions WHERE revoked_at >= ? AND revoked_at < ?", params),
-    pool.query("SELECT COUNT(*) AS count FROM security_events WHERE event_type = 'LOGIN_FAILURE' AND created_at >= ? AND created_at < ?", params),
-    pool.query("SELECT COUNT(*) AS count FROM security_events WHERE event_type IN ('ROLE_OR_PERMISSION_CHANGED','BANK_DETAILS_CHANGED','PAYMENT_APPROVED','SENSITIVE_EXPORT','ORGANISATION_SESSIONS_REVOKED') AND created_at >= ? AND created_at < ?", params)
+    pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE ${eventScope.sql} AND event_type = 'LOGIN_FAILURE' AND created_at >= ? AND created_at < ?`, [...eventScope.params, ...params]),
+    pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE ${eventScope.sql} AND event_type IN (${RETAINED_HIGH_RISK_EVENTS.map(() => '?').join(',')}) AND created_at >= ? AND created_at < ?`, [...eventScope.params, ...RETAINED_HIGH_RISK_EVENTS, ...params])
   ]);
   const privileged = results[2][0][0];
   return {

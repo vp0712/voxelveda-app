@@ -30,7 +30,7 @@ function buildRecoveryDrillReadiness({ recovery = {}, env = process.env, now = n
     buildStep(
       'protect_production',
       'Protect production before the drill',
-      'Prevent a recovery test from touching live customer or finance data.',
+      'Prevent a recovery test from touching live identity data or archived business records.',
       'ready',
       'Use a separate recovery service/database and separate credentials. Production restore remains intentionally unavailable from this screen.',
       ['Isolated recovery environment name', 'Recovery-only credentials', 'Production write protection confirmation']
@@ -62,8 +62,8 @@ function buildRecoveryDrillReadiness({ recovery = {}, env = process.env, now = n
       restoreVerified ? 'ready' : 'pending',
       restoreVerified
         ? 'Recent restore evidence is available; retain the integrity checklist with the drill evidence pack.'
-        : 'After restore, validate authentication, finance reads, document metadata, latest transactions, critical counts, and audit history before calling the drill successful.',
-      ['Critical row/count checks', 'Latest-record timestamp checks', 'Authentication smoke test', 'Finance read-only smoke test', 'Audit-log continuity check']
+        : 'After restore, validate authentication, retained document access, account counts and audit history. Verify archived business records remain intact and unavailable through retired routes.',
+      ['Critical row/count checks', 'Latest-record timestamp checks', 'Authentication smoke test', 'Retired-record isolation and archive integrity check', 'Audit-log continuity check']
     ),
     buildStep(
       'measure_objectives',

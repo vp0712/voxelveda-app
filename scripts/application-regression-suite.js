@@ -25,6 +25,7 @@ const checks = [
   'smtp-delivery-readiness-evidence-test.js',
   'customer-registration-test.js',
   'core-audit-isolation-test.js',
+  'security-data-scope-test.js',
   'retained-runtime-test.js',
   'retained-workspace-test.js',
   'retained-theme-test.js',

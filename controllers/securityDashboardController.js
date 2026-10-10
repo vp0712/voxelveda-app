@@ -6,9 +6,10 @@ const { ensureOperationalTrustSchema } = require('../services/operationalTrustSc
 const { ensureSecurityGovernanceSchema } = require('../services/securityGovernanceSchema');
 const { redactSensitive } = require('../utils/securityRedaction');
 const { CONTROL_STATES, controlSnapshot } = require('../services/runtimeState');
+const { RETAINED_HIGH_RISK_EVENTS, retainedAuditScope, retainedEventScope } = require('../services/securityDataScope');
 
 const PRIVILEGED_ROLES = ['super_admin', 'admin', 'finance_admin', 'accountant', 'hr'];
-const HIGH_RISK_EVENTS = ['ROLE_CHANGED', 'PERMISSION_CHANGED', 'USER_DISABLED', 'ACCOUNT_TERMINATED', 'BANK_DETAILS_CHANGED', 'PAYMENT_APPROVED', 'SENSITIVE_EXPORT', 'MFA_DISABLED', 'SECURITY_SETTING_CHANGED', 'BREAK_GLASS_ACTIVATED', 'IMPERSONATION_STARTED', 'DATABASE_SECURITY_ATTESTED'];
+const HIGH_RISK_EVENTS = RETAINED_HIGH_RISK_EVENTS;
 
 async function ensureSchemas() {
   await Promise.all([ensureSecuritySchema(), ensureSecurityOperationsSchema(), ensureOperationalTrustSchema(), ensureCoreAuditSchema(), ensureSecurityGovernanceSchema()]);
@@ -24,6 +25,8 @@ function issue(key, severity, title, detail, count = 1) {
 
 async function collectIssues() {
   const issues = [];
+  const auditScope = retainedAuditScope();
+  const eventScope = retainedEventScope();
   const placeholders = PRIVILEGED_ROLES.map(() => '?').join(',');
   const [[noMfa]] = await pool.query(
     `SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL AND LOWER(role) IN (${placeholders}) AND mfa_enabled = 0`,
@@ -46,10 +49,10 @@ async function collectIssues() {
   );
   if (Number(oldSessions.count)) issues.push(issue('old-privileged-sessions', 'HIGH', 'Old privileged sessions', 'Revoke or review privileged sessions older than 24 hours.', Number(oldSessions.count)));
 
-  const [[failed]] = await pool.query("SELECT COUNT(*) AS count FROM security_events WHERE event_type = 'LOGIN_FAILURE' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)");
+  const [[failed]] = await pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE ${eventScope.sql} AND event_type = 'LOGIN_FAILURE' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, eventScope.params);
   if (Number(failed.count) >= 10) issues.push(issue('repeated-login-failures', 'HIGH', 'Repeated failed logins', 'Investigate the elevated failed-login volume in the last 24 hours.', Number(failed.count)));
 
-  const [[unscanned]] = await pool.query("SELECT COUNT(*) AS count FROM secure_documents WHERE deleted_at IS NULL AND scan_status = 'UNAVAILABLE'");
+  const [[unscanned]] = await pool.query("SELECT COUNT(*) AS count FROM secure_documents WHERE deleted_at IS NULL AND scan_status = 'UNAVAILABLE' AND LOWER(module) IN ('profile','security')");
   const controls = controlSnapshot();
   if (![CONTROL_STATES.OPERATIONAL, CONTROL_STATES.EXTERNALLY_VERIFIED].includes(controls.malware_scanner.state) || Number(unscanned.count)) {
     issues.push(issue('malware-scanner-unavailable', 'MEDIUM', 'Malware scanner not configured', 'Uploaded files are type-validated but are not malware-scanned.', Math.max(1, Number(unscanned.count))));
@@ -84,8 +87,6 @@ async function collectIssues() {
   if (Number(criticalIncidents.count)) issues.push(issue('open-critical-incidents', 'CRITICAL', 'Critical security incidents remain open', 'Review containment and recovery evidence in the Incident Response register.', Number(criticalIncidents.count)));
   const [[unverifiedBackups]] = await pool.query("SELECT COUNT(*) AS count FROM backup_attestations WHERE status = 'VERIFIED' AND backup_completed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
   if (!Number(unverifiedBackups.count)) issues.push(issue('backup-evidence-stale', 'HIGH', 'No recent verified backup evidence', 'Record provider-backed backup evidence and test restoration. Do not rely on an unverified status badge.'));
-  const [[pendingExports]] = await pool.query("SELECT COUNT(*) AS count FROM sensitive_export_requests WHERE status = 'PENDING_APPROVAL' AND expires_at > NOW()");
-  if (Number(pendingExports.count)) issues.push(issue('pending-sensitive-exports', 'MEDIUM', 'Sensitive exports await independent approval', 'Review or allow the requests to expire.', Number(pendingExports.count)));
   const [[staleSecrets]] = await pool.query("SELECT COUNT(*) AS count FROM security_secret_inventory WHERE rotated_at IS NULL OR rotated_at < DATE_SUB(NOW(), INTERVAL rotate_after_days DAY)");
   if (Number(staleSecrets.count)) issues.push(issue('secret-rotation-overdue', 'HIGH', 'Security secret rotation reviews are overdue', 'Rotate through the deployment secret manager and record metadata only.', Number(staleSecrets.count)));
   const [[databasePosture]] = await pool.query("SELECT COUNT(*) count FROM database_security_attestations WHERE status='VERIFIED' AND tls_in_use=1 AND least_privilege_verified=1 AND expires_at>NOW()");
@@ -94,7 +95,7 @@ async function collectIssues() {
   if (Number(activeBreakGlass.count)) issues.push(issue('break-glass-active', 'CRITICAL', 'Emergency access is active', 'Confirm the incident remains active and revoke emergency access immediately when containment work ends.', Number(activeBreakGlass.count)));
   const [[activeImpersonation]] = await pool.query("SELECT COUNT(*) count FROM impersonation_contexts WHERE status='ACTIVE' AND ended_at IS NULL AND expires_at>NOW()");
   if (Number(activeImpersonation.count)) issues.push(issue('support-impersonation-active', 'MEDIUM', 'Read-only support impersonation is active', 'Confirm the support session is expected and allow its short expiry or end it.', Number(activeImpersonation.count)));
-  const [[unchainedAudit]] = await pool.query("SELECT COUNT(*) count FROM audit_logs WHERE integrity_hash IS NULL AND created_at>=DATE_SUB(NOW(),INTERVAL 24 HOUR)");
+  const [[unchainedAudit]] = await pool.query(`SELECT COUNT(*) count FROM audit_logs WHERE ${auditScope.sql} AND integrity_hash IS NULL AND created_at>=DATE_SUB(NOW(),INTERVAL 24 HOUR)`, auditScope.params);
   if (Number(unchainedAudit.count)) issues.push(issue('audit-chain-coverage-gap', 'HIGH', 'Recent audit entries lack integrity hashes', 'Investigate legacy or bypass audit writers before relying on chain coverage.', Number(unchainedAudit.count)));
   return issues;
 }
@@ -103,15 +104,16 @@ exports.dashboard = async (req, res, next) => {
   try {
     await ensureSchemas();
     const placeholders = PRIVILEGED_ROLES.map(() => '?').join(',');
-    const [rows] = await Promise.all([
+    const eventScope = retainedEventScope();
+    const rows = await Promise.all([
       pool.query("SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL AND account_status = 'ACTIVE'"),
       pool.query(`SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL AND LOWER(role) IN (${placeholders})`, PRIVILEGED_ROLES),
       pool.query('SELECT COUNT(*) AS total, SUM(mfa_enabled = 1) AS enabled FROM users WHERE active = 1 AND deleted_at IS NULL'),
-      pool.query("SELECT COUNT(*) AS count FROM security_events WHERE event_type = 'LOGIN_FAILURE' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)"),
+      pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE ${eventScope.sql} AND event_type = 'LOGIN_FAILURE' AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, eventScope.params),
       pool.query("SELECT COUNT(*) AS count FROM users WHERE account_status = 'LOCKED' OR locked_until > NOW()"),
       pool.query('SELECT COUNT(*) AS count FROM auth_sessions WHERE revoked_at IS NULL AND expires_at > NOW()'),
       pool.query('SELECT COUNT(*) AS count FROM users WHERE active = 1 AND deleted_at IS NULL AND COALESCE(last_login_at, created_at) < DATE_SUB(NOW(), INTERVAL ? DAY)', [Math.min(730, Math.max(60, Number(process.env.STALE_ACCOUNT_HIGH_RISK_DAYS || 90)))]),
-      pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE event_type IN (${HIGH_RISK_EVENTS.map(() => '?').join(',')}) AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, HIGH_RISK_EVENTS),
+      pool.query(`SELECT COUNT(*) AS count FROM security_events WHERE ${eventScope.sql} AND event_type IN (${HIGH_RISK_EVENTS.map(() => '?').join(',')}) AND created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`, [...eventScope.params, ...HIGH_RISK_EVENTS]),
       pool.query("SELECT COUNT(*) AS count FROM security_incidents WHERE status NOT IN ('RESOLVED','CLOSED')")
     ]);
     const issues = await collectIssues();
@@ -142,7 +144,8 @@ exports.events = async (req, res, next) => {
   try {
     await ensureSchemas();
     const { page, limit } = safePage(req.query);
-    const filters = ['1=1']; const params = [];
+    const scope = retainedEventScope('se');
+    const filters = [scope.sql]; const params = [...scope.params];
     if (req.query.event_type) { filters.push('se.event_type = ?'); params.push(String(req.query.event_type).slice(0, 80)); }
     if (req.query.result) { filters.push('se.result = ?'); params.push(String(req.query.result).slice(0, 20)); }
     const where = filters.join(' AND ');
@@ -161,7 +164,8 @@ exports.audit = async (req, res, next) => {
   try {
     await ensureSchemas();
     const { page, limit } = safePage(req.query);
-    const filters = ['1=1']; const params = [];
+    const scope = retainedAuditScope('al');
+    const filters = [scope.sql]; const params = [...scope.params];
     if (req.query.module) { filters.push('al.module = ?'); params.push(String(req.query.module).slice(0, 80)); }
     if (req.query.action) { filters.push('al.action = ?'); params.push(String(req.query.action).slice(0, 120)); }
     const where = filters.join(' AND ');
