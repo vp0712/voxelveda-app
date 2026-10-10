@@ -116,6 +116,8 @@ function appLimiterFixture() {
 async function transientLimiterRecovery() {
   let options;
   let consumed = 0;
+  let quitCalls = 0;
+  let destroyCalls = 0;
   const client = {
     isOpen: false, isReady: false,
     on() {},
@@ -125,7 +127,8 @@ async function transientLimiterRecovery() {
     },
     async ping() { return 'PONG'; },
     async eval() { return [++consumed, 60000]; },
-    async quit() { this.isOpen = false; this.isReady = false; }
+    async quit() { quitCalls += 1; this.isOpen = false; this.isReady = false; },
+    destroy() { destroyCalls += 1; this.isOpen = false; this.isReady = false; }
   };
   const limiter = new RateLimitService({
     env: { NODE_ENV: 'production', RATE_LIMIT_STORE: 'redis', REDIS_URL: 'redis://fixture', RATE_LIMIT_FAILURE_POLICY: 'deny' },
@@ -185,6 +188,11 @@ async function transientLimiterRecovery() {
     assert.equal((await fixtureRequest(app, '/api/users')).status, 200);
     assert.equal((await fixtureRequest(app, '/api/ready')).status, 503, 'Limiter recovery cannot clear a fatal startup failure');
     assert.equal(runtime.detailedReadiness().failure.code, 'DB_STARTUP_DENIED');
+    client.isReady = false;
+    await limiter.close();
+    assert.equal(destroyCalls, 1, 'Shutdown must destroy a reconnecting socket directly');
+    assert.equal(quitCalls, 0, 'Shutdown cannot queue QUIT while Redis is offline');
+    assert.equal(options.socket.reconnectStrategy(0), false, 'Shutdown disables all reconnection attempts');
   } finally {
     await limiter.close();
     setRateLimitServiceForTests(original);
