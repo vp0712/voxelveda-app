@@ -72,6 +72,7 @@ class RedisRateLimitStore {
     this.clientFactory = clientFactory;
     this.client = null;
     this.lastError = null;
+    this.initialized = false;
   }
 
   async initialize() {
@@ -86,7 +87,11 @@ class RedisRateLimitStore {
       disableOfflineQueue: true,
       socket: {
         connectTimeout: this.connectTimeoutMs,
-        reconnectStrategy: false
+        // Initial verification still fails promptly. After a verified startup,
+        // retry lost connections with bounded delay; no requests queue offline.
+        reconnectStrategy: (retries) => this.initialized
+          ? Math.min(250 * (2 ** Math.min(retries, 5)), 5000)
+          : false
       }
     });
     this.client.on?.('error', (error) => {
@@ -99,11 +104,12 @@ class RedisRateLimitStore {
       error.code = 'REDIS_HEALTH_FAILED';
       throw error;
     }
+    this.initialized = true;
     return this.health();
   }
 
   async consume(key, windowMs) {
-    if (!this.client?.isOpen) {
+    if (!this.client?.isOpen || this.client.isReady === false) {
       const error = new Error('Redis rate-limit connection is unavailable');
       error.code = 'REDIS_NOT_CONNECTED';
       throw error;
@@ -131,14 +137,17 @@ class RedisRateLimitStore {
   }
 
   async health() {
-    if (!this.client?.isOpen) return { provider: 'REDIS', distributed: true, ok: false };
+    if (!this.client?.isOpen || this.client.isReady === false) return { provider: 'REDIS', distributed: true, ok: false };
     const result = await this.client.ping();
     return { provider: 'REDIS', distributed: true, ok: String(result).toUpperCase() === 'PONG' };
   }
 
   async close() {
+    this.initialized = false;
     if (!this.client?.isOpen) return;
-    await this.client.quit().catch(() => this.client.disconnect?.());
+    const destroy = () => this.client.destroy ? this.client.destroy() : this.client.disconnect?.();
+    if (this.client.isReady === false) return destroy();
+    await this.client.quit().catch(destroy);
   }
 }
 
@@ -212,7 +221,12 @@ class RateLimitService {
       throw error;
     }
     try {
-      return await this.active.consume(key, windowMs);
+      const result = await this.active.consume(key, windowMs);
+      if (this.active instanceof RedisRateLimitStore) {
+        this.state = STORE_STATES.OPERATIONAL;
+        this.lastErrorCode = null;
+      }
+      return result;
     } catch (error) {
       this.lastErrorCode = String(error.code || 'RATE_LIMIT_STORE_ERROR');
       if (this.mode === 'REDIS' && this.canUseMemoryFallback()) {

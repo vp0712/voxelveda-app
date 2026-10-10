@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const path = require('path');
 const { getRateLimitService, positiveInteger } = require('../services/rateLimitService');
-const { CONTROL_STATES, markFailed, setControl, setCriticalService } = require('../services/runtimeState');
+const { CONTROL_STATES, setControl, setCriticalService } = require('../services/runtimeState');
 
 const WINDOW_MS = Number(process.env.RATE_LIMIT_WINDOW_MS || 15 * 60 * 1000);
 const GENERAL_LIMIT = Number(process.env.RATE_LIMIT_MAX || 900);
@@ -29,7 +29,17 @@ function rateLimit({ windowMs = WINDOW_MS, max = GENERAL_LIMIT, keyPrefix = 'api
     if (typeof skip === 'function' && skip(req)) return next();
     try {
       const identity = String(keyGenerator(req) || 'unknown').slice(0, 512);
-      const entry = await getRateLimitService().consume(`${keyPrefix}:${identity}`, duration);
+      const limiter = getRateLimitService();
+      const entry = await limiter.consume(`${keyPrefix}:${identity}`, duration);
+      // Only a completed counter operation verifies recovery. This updates the
+      // limiter dependency; fatal startup/other-service failures remain intact.
+      const status = limiter.status?.();
+      if (status) {
+        const recoveredState = status.state === 'DEGRADED' ? CONTROL_STATES.DEGRADED : CONTROL_STATES.OPERATIONAL;
+        setControl('redis_limiter', status.distributed ? CONTROL_STATES.EXTERNALLY_VERIFIED : recoveredState,
+          'Configured rate-limit store completed a counter operation');
+        setCriticalService('rate_limiter', recoveredState);
+      }
       res.setHeader('RateLimit-Limit', String(limit));
       res.setHeader('RateLimit-Remaining', String(Math.max(0, limit - entry.count)));
       res.setHeader('RateLimit-Reset', String(Math.ceil(entry.resetAt / 1000)));
@@ -44,7 +54,6 @@ function rateLimit({ windowMs = WINDOW_MS, max = GENERAL_LIMIT, keyPrefix = 'api
       if (error.code !== 'RATE_LIMIT_STORE_UNAVAILABLE') return next(error);
       setControl('redis_limiter', CONTROL_STATES.FAILED, error.causeCode || error.code);
       setCriticalService('rate_limiter', CONTROL_STATES.FAILED, error.causeCode || error.code);
-      markFailed(error, 'RATE_LIMIT_RUNTIME');
       res.setHeader('Retry-After', '30');
       return res.status(503).json({
         code: 'RATE_LIMIT_PROTECTION_UNAVAILABLE',

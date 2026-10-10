@@ -1,6 +1,10 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const http = require('node:http');
+const net = require('node:net');
+const vm = require('node:vm');
+const express = require('express');
 
 const {
   MemoryRateLimitStore,
@@ -27,6 +31,7 @@ const {
   unregisterBotChallengeAdapter
 } = require('../services/botChallengeService');
 const { assessProductionReadiness } = require('../config/productionReadiness');
+const runtime = require('../services/runtimeState');
 
 const root = path.join(__dirname, '..');
 
@@ -51,7 +56,144 @@ async function invoke(middleware, req) {
   return { res, nextCalled };
 }
 
+// Exercise application matching without a listening socket, external Redis,
+// database, SMTP or production identity.
+function fixtureRequest(app, url) {
+  return new Promise((resolve, reject) => {
+    const socket = new net.Socket();
+    const req = new http.IncomingMessage(socket);
+    req.url = url; req.method = 'GET';
+    req.headers = { host: 'app.voxelveda.com', accept: 'application/json' };
+    req.push(null);
+    const res = new http.ServerResponse(req);
+    const chunks = [];
+    const timer = setTimeout(() => reject(new Error(`Fixture request timed out: ${url}`)), 2000);
+    res.write = (chunk, encoding) => { if (chunk) chunks.push(Buffer.from(chunk, encoding)); return true; };
+    res.end = (chunk, encoding, callback) => {
+      if (typeof encoding === 'function') { callback = encoding; encoding = undefined; }
+      if (chunk) chunks.push(Buffer.from(chunk, encoding));
+      res.finished = true; clearTimeout(timer); callback?.(); res.emit('finish'); socket.destroy();
+      resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') });
+      return res;
+    };
+    res.on('error', error => { clearTimeout(timer); reject(error); });
+    app.handle(req, res, error => { clearTimeout(timer); reject(error || new Error(`Unhandled route: ${url}`)); });
+  });
+}
+
+function appLimiterFixture() {
+  const module = { exports: {} };
+  const pass = (req, res, next) => next();
+  const dependencies = {
+    express, cors: require('cors'),
+    './controllers/securityTelemetryController': { recordCspViolation: pass },
+    './controllers/readinessController': {
+      health: (req, res) => res.status(200).json({ status: 'ok' }),
+      ready: (req, res) => { const result = runtime.publicReadiness(); return res.status(result.ready ? 200 : 503).json(result); }
+    },
+    './middleware/auth': pass, './middleware/pageAuth': () => pass,
+    './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
+    './config/urls': require('../config/urls'),
+    './middleware/securityMiddleware': require('../middleware/securityMiddleware'),
+    './services/applicationRetirement': require('../services/applicationRetirement')
+  };
+  for (const name of ['auth', 'user', 'profile', 'settings', 'documentSecurity', 'securityDashboard', 'securityIncident', 'readiness', 'backgroundJob']) {
+    dependencies[`./routes/${name}Routes`] = express.Router().use((req, res) => res.json({ fixture: 'retained-api' }));
+  }
+  const filename = path.join(root, 'app.js');
+  vm.runInNewContext(fs.readFileSync(filename, 'utf8'), {
+    module, exports: module.exports, __dirname: root, __filename: filename,
+    Buffer, URL, Set, Map, process: { env: { NODE_ENV: 'test' } },
+    require(name) {
+      if (Object.hasOwn(dependencies, name)) return dependencies[name];
+      if (name.startsWith('node:')) return require(name);
+      throw new Error(`Unexpected limiter fixture dependency: ${name}`);
+    }
+  }, { filename });
+  return module.exports;
+}
+
+async function transientLimiterRecovery() {
+  let options;
+  let consumed = 0;
+  const client = {
+    isOpen: false, isReady: false,
+    on() {},
+    async connect() {
+      assert.equal(options.socket.reconnectStrategy(0), false, 'Unverified startup failures must remain fail-closed');
+      this.isOpen = true; this.isReady = true;
+    },
+    async ping() { return 'PONG'; },
+    async eval() { return [++consumed, 60000]; },
+    async quit() { this.isOpen = false; this.isReady = false; }
+  };
+  const limiter = new RateLimitService({
+    env: { NODE_ENV: 'production', RATE_LIMIT_STORE: 'redis', REDIS_URL: 'redis://fixture', RATE_LIMIT_FAILURE_POLICY: 'deny' },
+    clientFactory(configuration) { options = configuration; return client; }
+  });
+  const original = getRateLimitService();
+  try {
+    await limiter.initialize();
+    assert.equal(options.disableOfflineQueue, true, 'Protected operations cannot queue across an outage');
+    assert.equal(options.socket.reconnectStrategy(0), 250);
+    assert.equal(options.socket.reconnectStrategy(10000), 5000, 'Reconnect delay must remain bounded');
+    setRateLimitServiceForTests(limiter);
+    runtime.resetRuntimeState();
+    runtime.setCriticalService('database', runtime.CONTROL_STATES.OPERATIONAL);
+    runtime.setCriticalService('rate_limiter', runtime.CONTROL_STATES.OPERATIONAL);
+    runtime.markReady();
+    const app = appLimiterFixture();
+    // More than one complete default gateway quota. Real route matching proves
+    // these probes do not consume or disable the protected API's Redis quota.
+    for (let index = 0; index < 1000; index++) assert.equal((await fixtureRequest(app, '/api/health')).status, 200);
+    assert.equal((await fixtureRequest(app, '/api/ready')).status, 200);
+    for (const url of ['/', '/login', '/register', '/support', '/global-brand.css', '/finance', '/api/finance/accounts']) {
+      assert.equal((await fixtureRequest(app, url)).status, url.includes('finance') ? 410 : 200);
+    }
+    assert.equal(consumed, 0, 'Liveness, readiness, pages and retired routes cannot consume API counters');
+    assert.equal((await fixtureRequest(app, '/api/users')).status, 200);
+    assert.equal(consumed, 1, 'Retained APIs must still consume the distributed counter');
+
+    client.isReady = false;
+    const outage = await fixtureRequest(app, '/api/users');
+    assert.equal(outage.status, 503);
+    assert.equal(JSON.parse(outage.body).code, 'RATE_LIMIT_PROTECTION_UNAVAILABLE');
+    assert.equal(limiter.status().state, 'FAILED');
+    assert.equal(limiter.status().provider, 'REDIS', 'Production must never fall back to a local quota');
+    assert.equal(consumed, 1, 'Offline Redis operations must fail before counter execution');
+    assert.equal((await fixtureRequest(app, '/api/ready')).status, 503);
+    assert.equal(runtime.detailedReadiness().phase, 'DEGRADED');
+    assert.equal((await fixtureRequest(app, '/login')).status, 200, 'A Redis outage cannot block the login document');
+    assert.equal((await fixtureRequest(app, '/global-brand.css')).status, 200, 'A Redis outage cannot block retained styling');
+    assert.equal((await fixtureRequest(app, '/api/auth/login')).status, 503, 'Authentication APIs retain fail-closed request protection');
+    assert.equal((await fixtureRequest(app, '/api/health')).status, 200);
+    assert.equal((await fixtureRequest(app, '/api/finance/accounts')).status, 410);
+
+    client.isReady = true;
+    assert.equal((await fixtureRequest(app, '/api/ready')).status, 503, 'A socket flag alone is not verified limiter recovery');
+    assert.equal((await fixtureRequest(app, '/api/users')).status, 200);
+    assert.equal(consumed, 2, 'Recovery retains the shared quota rather than resetting counters');
+    assert.equal(limiter.status().state, 'OPERATIONAL');
+    assert.equal(limiter.status().last_error_code, null);
+    assert.equal((await fixtureRequest(app, '/api/ready')).status, 200, 'A verified Redis counter operation restores dependency readiness');
+
+    runtime.setCriticalService('database', runtime.CONTROL_STATES.FAILED);
+    assert.equal((await fixtureRequest(app, '/api/users')).status, 200);
+    assert.equal((await fixtureRequest(app, '/api/ready')).status, 503, 'Limiter recovery cannot clear another failed dependency');
+    runtime.setCriticalService('database', runtime.CONTROL_STATES.OPERATIONAL);
+    runtime.markFailed(Object.assign(new Error('Fatal startup failure'), { code: 'DB_STARTUP_DENIED' }), 'CONNECTING_DATABASE');
+    assert.equal((await fixtureRequest(app, '/api/users')).status, 200);
+    assert.equal((await fixtureRequest(app, '/api/ready')).status, 503, 'Limiter recovery cannot clear a fatal startup failure');
+    assert.equal(runtime.detailedReadiness().failure.code, 'DB_STARTUP_DENIED');
+  } finally {
+    await limiter.close();
+    setRateLimitServiceForTests(original);
+    runtime.resetRuntimeState();
+  }
+}
+
 async function run() {
+  await transientLimiterRecovery();
   let now = 1000;
   const memory = new MemoryRateLimitStore({ namespace: 'test:one', now: () => now });
   assert.equal((await memory.consume('client', 1000)).count, 1);

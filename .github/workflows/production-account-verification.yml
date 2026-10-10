@@ -1,16 +1,59 @@
 name: Verify deployed account release
 on:
   push:
-    branches: [main]
-    paths: ['.railway-release']
+    branches: [main, 'verify-production-*']
+    paths: ['.railway-release', 'scripts/production-account-verification.js', '.github/workflows/production-account-verification.yml']
 permissions:
   contents: read
 jobs:
+  release-selection:
+    runs-on: ubuntu-latest
+    outputs:
+      should_verify: ${{ steps.release.outputs.should_verify }}
+      expected_commit: ${{ steps.release.outputs.expected_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select an actual release or explicit read-only verification
+        id: release
+        env:
+          VV_PUSH_BEFORE: ${{ github.event.before }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_NAME" == verify-production-* ]]; then
+            expected_commit="${GITHUB_REF_NAME#verify-production-}"
+            if [[ ! "$expected_commit" =~ ^[a-f0-9]{40}$ ]]; then
+              echo '::error::The verification branch must identify an exact 40-character deployed commit.'
+              exit 1
+            fi
+          elif [[ "$GITHUB_REF_NAME" == main ]]; then
+            if [[ "$VV_PUSH_BEFORE" =~ ^[a-f0-9]{40}$ && "$VV_PUSH_BEFORE" != 0000000000000000000000000000000000000000 ]]; then
+              marker_change="$(git diff --name-only "$VV_PUSH_BEFORE" "$GITHUB_SHA" -- .railway-release)"
+            else
+              marker_change="$(git show --format= --name-only "$GITHUB_SHA" -- .railway-release)"
+            fi
+            if [[ "$marker_change" != .railway-release ]]; then
+              echo 'should_verify=false' >> "$GITHUB_OUTPUT"
+              echo '::notice::This is an implementation push, not a Railway release-marker change. Production proof is skipped until the release is deployed.'
+              exit 0
+            fi
+            expected_commit="$GITHUB_SHA"
+          else
+            echo '::error::Unexpected production verification branch.'
+            exit 1
+          fi
+          echo 'should_verify=true' >> "$GITHUB_OUTPUT"
+          echo "expected_commit=$expected_commit" >> "$GITHUB_OUTPUT"
   production-proof:
+    needs: release-selection
+    if: needs.release-selection.outputs.should_verify == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -22,8 +65,10 @@ jobs:
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           VV_PROOF_DIR: ${{ runner.temp }}/production-proof
-          VV_EXPECTED_COMMIT: ${{ github.sha }}
-        run: node scripts/production-account-verification.js
+          VV_EXPECTED_COMMIT: ${{ needs.release-selection.outputs.expected_commit }}
+        shell: bash
+        run: |
+          node scripts/production-account-verification.js
       - name: Preserve live evidence
         if: always()
         uses: actions/upload-artifact@v4
