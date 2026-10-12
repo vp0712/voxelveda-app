@@ -76,17 +76,18 @@ async function run() {
 
   for (const pageName of ['workspace.html', 'index.html', 'login.html', 'register.html']) {
     const html = read(pageName);
-    assert.doesNotMatch(html, /request-quote|workspaceRfqForm|Customer RFQ|quote request|quotations/i, `${pageName} contains no removed business workflow`);
+    assert.doesNotMatch(html, /finance-intelligence|banking|erp-workspace/i, `${pageName} contains no excluded Banking/ERP workflow`);
   }
   const workspace = read('workspace.html');
   for (const target of ['/profile', '/security', '/support', '/privacy', '/terms']) assert.ok(workspace.includes('href="' + target + '"'), 'actual retained route ' + target);
 
   const login = harness('login.js', async () => response(401, {}));
   for (const role of ['viewer', 'admin', 'staff', 'finance_admin', 'accountant', 'production']) assert.equal(login.context.portalPathForUser(role), '/dashboard');
-  for (const target of ['/admin', '/finance', '/portal/staff', '/client', '//example.invalid', '/\\example.invalid', '/removed.html', '/request-quote']) {
+  for (const target of ['/finance', '/portal/staff', '/client', '//example.invalid', '/\\example.invalid', '/removed.html', '/request-quote']) {
     login.context.window.location.search = '?returnTo=' + encodeURIComponent(target);
     assert.equal(login.context.safeReturnTo('admin'), '/dashboard', target);
   }
+  for(const target of ['/admin','/quality','/shop-floor']){login.context.window.location.search='?returnTo='+encodeURIComponent(target);assert.equal(login.context.safeReturnTo('admin'),target,'original protected return path survives sign in');}
   login.context.window.location.search = '?returnTo=' + encodeURIComponent('/security?mfa_setup=required');
   assert.equal(login.context.safeReturnTo('viewer'), '/security?mfa_setup=required');
   login.context.window.location.search = '?returnTo=%2Fprofile';

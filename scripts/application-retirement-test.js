@@ -92,7 +92,18 @@ function applicationFixture() {
     return fixture;
   };
   const dependencies = {
-    express, cors: require('cors'),
+    express, cors: require('cors'), qrcode:{toBuffer:async()=>Buffer.from('fixture')},
+    './middleware/permissionMiddleware':()=>pass,
+    './services/authorizationService':require('../services/authorizationService'),
+    './middleware/publicEndpointProtection':Object.fromEntries(['publicRfqContract','aiLeadContract','shiftQrContract','cocVerificationContract','qrGenerationContract'].map(name=>[name,pass])),
+    './services/botChallengeService':{botChallenge:()=>pass},
+    './services/publicSubmissionDedupeService':{publicSubmissionDedupe:()=>pass},
+    './routes/careersRoutes':{publicRouter:router(),adminRouter:router()},
+    './controllers/rfqController':{createRFQ:(req,res)=>res.status(400).json({code:'VALIDATION_FAILED'})},
+    './controllers/attendanceController':{publicShiftQrToken:pass},
+    './controllers/aiLeadController':{createLead:pass},
+    './controllers/employeeIdentityController':{verify:pass},
+    './controllers/qms/qualityReleaseController':{verifyCoc:pass},
     './controllers/securityTelemetryController': { recordCspViolation: pass },
     './controllers/readinessController': actualReadiness,
     './middleware/auth': pass, './middleware/pageAuth': actualPageAuth,
@@ -104,9 +115,10 @@ function applicationFixture() {
       rateLimitPolicy: () => pass, safeApiResponses: pass,
       safeErrorHandler(error, req, res, next) { return res.status(500).json({ message: 'Fixture error' }); }
     },
-    './services/applicationRetirement': require('../services/applicationRetirement')
+    './services/applicationRetirement': require('../services/applicationRetirement'),
+    './controllers/originalReportController':{download:pass}
   };
-  for (const name of ['auth', 'user', 'profile', 'settings', 'documentSecurity', 'securityDashboard', 'securityIncident', 'readiness', 'backgroundJob']) {
+  for (const name of ['auth', 'user', 'profile', 'settings', 'documentSecurity', 'securityDashboard', 'securityIncident', 'readiness', 'backgroundJob','rfq','invoice','customer','supplier','stock','material','meeting','roster','attendance','expense','compliance','competitor','dashboard','task','procurement','qms','notification','workflow','trash','upload','email','employeeIdentity','accessAttempt','operationalTrust','continuousAssurance','securityGovernance']) {
     dependencies[`./routes/${name}Routes`] = router();
   }
   return { app: isolated('app.js', dependencies, { NODE_ENV: 'test' }), effects, testToken };
@@ -114,20 +126,9 @@ function applicationFixture() {
 
 async function routeBoundaries() {
   const { app, effects, testToken } = applicationFixture();
-  const retiredPages = ['/finance', '/finance/reports/RPT_saved/view', '/banking', '/financial-years', '/quality', '/shop-floor',
-    '/attendance-terminal', '/employee-id', '/employee/verify/example', '/careers-admin', '/invoices', '/rfqs', '/customers', '/suppliers',
-    '/procurement', '/inventory', '/stock', '/tasks', '/roster', '/timesheets', '/expenses', '/qms', '/compliance', '/workflows', '/trash',
-    '/request-quote', '/customer.html', '/rfq', '/quotes', '/quotations'];
-  const retiredApis = ['/api/finance/accounts', '/api/banking/accounts', '/api/high-risk-finance/payments', '/api/erp/workspace',
-    '/api/dashboard', '/api/rfq', '/api/invoice', '/api/customers', '/api/suppliers', '/api/procurement', '/api/stock', '/api/materials',
-    '/api/tasks', '/api/meetings', '/api/roster', '/api/attendance', '/api/expenses', '/api/qms', '/api/compliance', '/api/competitors',
-    '/api/workflows', '/api/trash', '/api/careers', '/api/employee-identities', '/api/email', '/api/upload', '/api/notifications',
-    '/api/integrations', '/api/access-attempts', '/api/security/operations', '/api/security/assurance', '/api/security/governance',
-    '/api/public/finance-report/example', '/api/public/careers', '/api/public/employee-id', '/api/public/shift-qr', '/api/public/qms', '/api/public/ai-lead',
-    '/api/public/rfq'];
-  const retiredAssets = ['/finance.js', '/finance.css', '/banking.js', '/personal-money.js', '/advanced-banking.js', '/premium-banking.css',
-    '/report-viewer.js', '/role-portal.css', '/staff.js', '/controlled-forms.js', '/procurement.js', '/workflow.js', '/quality.js', '/shop-floor.js',
-    '/customer.js'];
+  const retiredPages = ['/finance','/finance/reports/RPT_saved/view','/finance-intelligence','/banking','/financial-years','/erp'];
+  const retiredApis = ['/api/finance/accounts','/api/banking/accounts','/api/high-risk-finance/payments','/api/erp/workspace','/api/public/finance-report/example'];
+  const retiredAssets = ['/finance.js','/finance.css','/banking.js','/personal-money.js','/advanced-banking.js','/premium-banking.css','/report-viewer.js','/erp-workspace.js','/erp-workspace.css'];
   for (const url of [...retiredPages, ...retiredApis, ...retiredAssets]) {
     const result = await request(app, url);
     assert.equal(result.status, 410, `${url} must explicitly report feature retirement`);
@@ -142,14 +143,14 @@ async function routeBoundaries() {
       assert.doesNotMatch(result.body, /<script[^>]+src=["'][^"']*(?:finance|banking|customer|rfq|role-portal|workspace-shell)/i);
     }
   }
-  for (const url of ['/api/public/rfq', '/api/rfq', '/api/invoice', '/api/finance/accounts']) {
+  for (const url of ['/api/erp/workspace', '/api/banking/accounts', '/api/high-risk-finance/payments', '/api/finance/accounts']) {
     const result = await request(app, url, { method: 'POST', headers: { accept: 'application/json' } });
     assert.equal(result.status, 410, `${url} cannot recreate retired data through POST`);
     assert.equal(JSON.parse(result.body).code, 'MODULE_RETIRED');
   }
   assert.deepEqual(effects, { database: 0, schemas: 0, routes: 0 }, 'Retired routes cannot touch a database, provider or retained API handler');
 
-  for (const url of ['/dashboard?section=account', '/security?tab=sessions', '/profile', '/admin', '/client', '/portal/viewer']) {
+  for (const url of ['/dashboard?section=account', '/security?tab=sessions', '/profile', '/admin', '/client', '/portal/viewer', '/quality', '/shop-floor', '/invoice/view', '/careers-admin', '/employee-id']) {
     const result = await request(app, url);
     assert.equal(result.status, 302);
     assert.equal(result.headers.location, `/login?returnTo=${encodeURIComponent(url)}`);
@@ -173,7 +174,7 @@ async function routeBoundaries() {
     assert.match(String(result.headers['content-type']), /^text\/html/);
     assert.match(result.body, /data-vv-theme="navy-blue"/);
     assert.match(result.body, /\/logo\.png/);
-    assert.doesNotMatch(result.body, /(?:href|src)=["'][^"']*(?:\/finance|\/banking|\/request-quote|\/customer(?:\.|\/)|\/rfq|\/quotes|role-portal|advanced-theme|workspace-shell)/i);
+    assert.doesNotMatch(result.body, /(?:href|src)=["'][^"']*(?:\/finance|\/banking|\/erp|\/financial-years|advanced-banking|premium-banking|personal-money|report-viewer)/i);
   }
   const notFound = await request(app, '/unknown-app-page');
   assert.equal(notFound.status, 404);
@@ -187,7 +188,8 @@ async function routeBoundaries() {
   assert.equal(JSON.parse(ready.body).ready, false);
 
   const authenticated = { headers: { cookie: `vv_session=${testToken}` } };
-  const workspace = await request(app, '/dashboard', authenticated);
+  assert.equal((await request(app,'/dashboard',authenticated)).headers.location,'/client','original role home is restored');
+  const workspace = await request(app, '/account', authenticated);
   assert.equal(workspace.status, 200);
   assert.doesNotMatch(workspace.body, /workspaceRfqForm|rfqSubmit|projectQuantity|Submit request/);
   assert.match(workspace.body, /\/workspace\.js/);
@@ -207,32 +209,31 @@ async function routeBoundaries() {
   const invalidSession = await request(app, '/dashboard?from=expired-session', { headers: { cookie: 'vv_session=invalid-fixture-token' } });
   assert.equal(invalidSession.status, 302);
   assert.equal(invalidSession.headers.location, '/login?returnTo=%2Fdashboard%3Ffrom%3Dexpired-session');
-  for (const url of ['/admin', '/client', '/portal/admin', '/admin-dashboard.html', '/staff-dashboard.html', '/client-portal.html']) {
+  for (const url of ['/admin','/portal/admin']) {
+    const result=await request(app,url,authenticated);assert.equal(result.status,302);assert.equal(result.headers.location,'/client');
+  }
+  assert.equal((await request(app,'/client',authenticated)).status,200);
+  for (const url of ['/admin-dashboard.html', '/staff-dashboard.html', '/client-portal.html']) {
     const result = await request(app, url + '?section=account', authenticated);
     assert.equal(result.status, 302);
     assert.equal(result.headers.location, '/dashboard?section=account');
   }
-  assert.equal(effects.routes, 0, 'Route verification never writes through retained API handlers');
+  assert.equal(effects.routes, 0, 'Page verification never invokes API handlers');
+  for(const url of ['/api/rfq','/api/invoice','/api/procurement/workspace','/api/stock','/api/qms','/api/attendance','/api/tasks']){const result=await request(app,url,{headers:{accept:'application/json'}});assert.equal(result.status,401,`Original API reaches authenticated module: ${url}`);}
+  assert.equal((await request(app,'/request-quote')).status,200);
+  assert.equal((await request(app,'/api/public/rfq',{method:'POST',headers:{accept:'application/json'}})).status,400,'Original RFQ intake validates input instead of retirement');
 }
 
 function sourceGraph() {
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'docs/APPLICATION_REMOVAL_MANIFEST.json'), 'utf8'));
   assert.equal(manifest.baseline, '80733384e62ce47942f5ad19481973f90aa568e0');
   assert(manifest.removed.length > 200, 'The removal manifest must enumerate real source deletion, not menu hiding');
-  for (const entry of manifest.removed) {
-    assert.equal(fs.existsSync(path.join(root, entry.path)), false, `Retired source remains: ${entry.path}`);
-    assert.match(entry.sha256, /^[a-f0-9]{64}$/);
-  }
-  for (const relative of ['controllers/publicRfqController.js', 'public/customer.html', 'public/customer.js', 'scripts/customer-rfq-intake-test.js']) {
-    assert.equal(fs.existsSync(path.join(root, relative)), false, `Latest RFQ retirement must physically remove ${relative}`);
-    assert(manifest.removed.some((entry) => entry.path === relative), `Removal provenance is missing for ${relative}`);
-  }
-  const { documentModuleAvailable } = require('../services/applicationRetirement');
-  for (const retiredModule of ['finance', 'banking', 'invoice', 'rfq', 'procurement', 'workflow']) {
-    assert.equal(documentModuleAvailable(retiredModule), false, `Archived ${retiredModule} documents cannot re-enter the account app`);
-  }
-  assert.equal(documentModuleAvailable('profile'), true);
-  assert.equal(documentModuleAvailable('security'), true);
+  const { documentModuleAvailable,retiredRequest,retiredAsset } = require('../services/applicationRetirement');
+  for(const module of ['finance','banking','erp','high-risk-finance'])assert.equal(documentModuleAvailable(module),false,`Excluded ${module} documents remain retired`);
+  for(const module of ['profile','security','rfq','invoice','procurement','qms','supplier','careers'])assert.equal(documentModuleAvailable(module),true,`Original ${module} document access is restored`);
+  for(const relative of ['controllers/financeController.js','controllers/bankingPortalController.js','controllers/erpWorkspaceController.js','routes/financeRoutes.js','routes/bankingPortalRoutes.js','routes/erpWorkspaceRoutes.js','services/erpWorkspaceService.js','public/erp-workspace.js','public/finance-intelligence.html'])assert.equal(fs.existsSync(path.join(root,relative)),false,`Excluded runtime remains physically removed: ${relative}`);
+  for(const route of ['/api/rfq','/api/invoice','/api/procurement','/api/qms','/request-quote','/quality','/shop-floor'])assert.equal(retiredRequest(route),false,`Original route is restored: ${route}`);
+  for(const asset of ['/staff.js','/procurement-ui.js','/quality.js','/customer.js'])assert.equal(retiredAsset(asset),false,`Original asset is restored: ${asset}`);
   if (manifest.preserved_migrations) {
     assert(manifest.preserved_migrations.length > 0);
     for (const entry of manifest.preserved_migrations) {
@@ -244,7 +245,7 @@ function sourceGraph() {
   assert(roots.includes('app.js') && roots.includes('server.js') && roots.includes('scripts/railway-startup-gateway.js'));
   const seen = new Set();
   const pending = [...roots];
-  const retiredSource = /^(?:finance|banking|advancedBanking|premiumBanking|personal(?:Money|Debt|Asset|Net|Spending|Financial|Roadmap)|highRiskFinance|workforce|invoice|supplier|procurement|qms|controlledForm|shiftQr|vom|erp|trash|workflow|attendance|roster|publicRfq|rfq|quote|quotation|customerController)/i;
+  const retiredSource = /^(?:finance|banking|advancedBanking|premiumBanking|personal(?:Money|Debt|Asset|Net|Spending|Financial|Roadmap)|highRiskFinance|vom|erpWorkspace)/i;
   while (pending.length) {
     const relative = pending.pop();
     if (seen.has(relative)) continue;
@@ -253,7 +254,6 @@ function sourceGraph() {
     const filename = path.join(root, relative);
     assert(fs.existsSync(filename), `Missing retained source: ${relative}`);
     const source = fs.readFileSync(filename, 'utf8');
-    assert.doesNotMatch(source, /INSERT\s+INTO\s+(?:`)?(?:customer_rfqs|rfqs|quotations|quotes)(?:`|\s|\()/i, `Retired enquiry writes remain reachable: ${relative}`);
     for (const match of source.matchAll(/\brequire\s*\(\s*['"]([^'"]+)['"]\s*\)/g)) {
       if (!match[1].startsWith('.')) continue;
       const candidate = path.resolve(path.dirname(filename), match[1]);
@@ -263,8 +263,8 @@ function sourceGraph() {
     }
   }
   const startup = fs.readFileSync(path.join(root, 'server.js'), 'utf8');
-  assert.doesNotMatch(startup, /(?:start|schedule|ensure)(?:Finance|Banking|Statement|Timesheet|Workflow|Trash|Vom|Qms|Procurement|Workforce)/i);
-  assert.doesNotMatch(startup, /(?:statementIngestion|financeIngestion|bankSync|weeklyTimesheet)/i);
+  assert.doesNotMatch(startup, /(?:start|schedule|ensure)(?:Finance|Banking|Statement|Vom)/i);
+  assert.doesNotMatch(startup, /(?:statementIngestion|financeIngestion|bankSync)/i);
   const logoHash = crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 'public/logo.png'))).digest('hex');
   assert.equal(logoHash, 'ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312', 'Original company logo must remain byte-identical');
   return seen.size;

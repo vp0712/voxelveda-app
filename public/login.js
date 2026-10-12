@@ -67,10 +67,9 @@ function safeReturnTo(role, user = {}) {
   const home = portalPathForUser(role, user);
   const value = new URLSearchParams(window.location.search).get('returnTo');
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return home;
-  // Return only to the retained account pages. Old operations and finance links
-  // land in the current workspace rather than a removed feature.
+  // The server checks access for every restored protected destination.
   const path = value.split(/[?#]/, 1)[0];
-  return ['/dashboard', '/security', '/profile'].includes(path) ? value : home;
+  return ['/dashboard', '/security', '/profile', '/admin', '/staff-dashboard', '/client-portal', '/quality', '/shop-floor', '/attendance-terminal'].includes(path) ? value : home;
 }
 
 function showLoginMessageFromUrl() {

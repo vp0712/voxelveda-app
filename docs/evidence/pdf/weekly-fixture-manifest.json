@@ -1,0 +1,39 @@
+{
+  "fixture_only": true,
+  "recipient_delivery": false,
+  "pdf_pages": {
+    "single": 1,
+    "overnight": 1,
+    "multi": 5
+  },
+  "files": {
+    "weekly-single.pdf": {
+      "bytes": 1652985,
+      "sha256": "82624be7d27415f0225043d53598b3cb57860cf7ac67cb98002452dbc3c12226"
+    },
+    "weekly-overnight.pdf": {
+      "bytes": 1652867,
+      "sha256": "7b5ed890fc22d3453a96c39a5a5030788a1a9c3542836dca21c6722ebabb50ea"
+    },
+    "weekly-multi.pdf": {
+      "bytes": 1661617,
+      "sha256": "2cb8e06012dcd4aa22dd7517be0b059670ce65c0df69d2486c9a0658eccd6b50"
+    },
+    "weekly-single-page.png": {
+      "bytes": 133121,
+      "sha256": "19f648f57cdbbe57ed7d70be76da9fa4f6441d595717a6f72826a36fe92c9349"
+    },
+    "weekly-overnight-page.png": {
+      "bytes": 131532,
+      "sha256": "998cf24c72992b898ca301134c5670953c1dc0101d410dda3f80a8aae8dc92a6"
+    },
+    "weekly-multi-page-4.png": {
+      "bytes": 179780,
+      "sha256": "e23eef6a59a0403f59f84b7f0a0bb5fe16d5ed0e7401f9ed0303e82951a2a9ee"
+    },
+    "weekly-multi-page-5.png": {
+      "bytes": 83539,
+      "sha256": "ef4ae34aaaa50b47a4c45fd44a15408ac0531e5402fd68e180df374cd4c6bbd6"
+    }
+  }
+}

@@ -1,5 +1,6 @@
 # Dependencies and generated output
 node_modules/
+deployment/wordpress/vendor/
 android/.gradle/
 android/app/build/
 android/build/

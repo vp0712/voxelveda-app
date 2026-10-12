@@ -18,6 +18,7 @@ async function createEmailQueueSchema() {
     html_body LONGTEXT NULL,
     text_body LONGTEXT NULL,
     attachments_json LONGTEXT NULL,
+    delivery_policy_json LONGTEXT NULL,
     related_module VARCHAR(80) NULL,
     related_record_id VARCHAR(80) NULL,
     status VARCHAR(30) NOT NULL DEFAULT 'PENDING',
@@ -52,6 +53,10 @@ async function createEmailQueueSchema() {
 
   for (const sql of [
     'ALTER TABLE email_queue ADD COLUMN idempotency_key VARCHAR(180) NULL',
+    'ALTER TABLE email_queue ADD COLUMN claimed_at DATETIME NULL',
+    'ALTER TABLE email_queue ADD COLUMN provider_accepted_at DATETIME NULL',
+    'ALTER TABLE email_queue ADD COLUMN recipient_verified_at DATETIME NULL',
+    'ALTER TABLE email_queue ADD COLUMN delivery_policy_json LONGTEXT NULL',
     'ALTER TABLE email_queue ADD UNIQUE KEY uniq_email_idempotency (idempotency_key)'
   ]) {
     try { await pool.query(sql); } catch (error) {

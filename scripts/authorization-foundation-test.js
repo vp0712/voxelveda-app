@@ -10,19 +10,22 @@ const {
 
 const user = (role, permissions = []) => ({ id: 10, role, permissions });
 
-assert.equal(effectivePermissions(user('staff')).size, 0);
+assert.equal(hasPermission(user('staff'), 'VIEW_OWN_JOBS'), true);
+assert.equal(hasPermission(user('staff'), 'MANAGE_USERS'), false);
 assert.equal(hasPermission(user('admin'), 'MANAGE_ROLES'), true);
 assert.equal(hasPermission(user('admin'), 'MANAGE_SECURITY'), false);
-for (const role of ['finance_admin', 'finance_user', 'accountant', 'hr', 'manager', 'supervisor', 'sales', 'production', 'unknown_role']) {
-  assert.equal(effectivePermissions(user(role)).size, 0, 'legacy operational roles must not acquire administration privileges');
+for (const role of ['finance_admin', 'finance_user', 'accountant', 'hr', 'manager', 'supervisor', 'sales', 'production']) {
+  assert.equal(hasPermission(user(role), 'MANAGE_USERS'), false, 'operational roles do not acquire account administration');
+  assert.equal(hasPermission(user(role), 'VIEW_DASHBOARD'), true, 'original role workflows remain available');
 }
-const archivedFlags = ['finance', 'settings', 'VIEW_BANKING', 'VIEW_RFQS', 'VIEW_DASHBOARD'];
+assert.equal(effectivePermissions(user('unknown_role')).size, 0);
+const archivedFlags = ['VIEW_BANKING', 'VIEW_BANK_DETAILS', 'CREATE_JOURNAL', 'finance_setup', 'finance_reconcile', 'settings'];
 for (const role of ['staff', 'admin', 'super_admin']) {
-  for (const permission of archivedFlags) assert.equal(hasPermission(user(role, archivedFlags), permission), false, 'retired grants must be inert even for privileged users');
+  for (const permission of archivedFlags) assert.equal(hasPermission(user(role, archivedFlags), permission), false, 'retired Banking/Finance grants remain inert');
 }
-assert.equal(hasPermission(user('staff', ['settings']), 'MANAGE_USERS'), false, 'retired UI aliases must not become administrator authority');
-assert.equal(hasPermission(user('finance_admin', ['MANAGE_USERS']), 'MANAGE_USERS'), true, 'explicit retained canonical grants remain authoritative');
-assert.deepEqual(activePermissionProjection(JSON.stringify([...archivedFlags, 'VIEW_AUDIT_LOG', 'view_audit_log'])), ['VIEW_AUDIT_LOG']);
+assert.equal(hasPermission(user('staff', ['settings']), 'MANAGE_USERS'), false, 'stale UI aliases must not become administrator authority');
+assert.equal(hasPermission(user('finance_admin', ['MANAGE_USERS']), 'MANAGE_USERS'), true, 'explicit canonical grants remain authoritative');
+assert.deepEqual(activePermissionProjection(JSON.stringify([...archivedFlags, 'rfqs', 'VIEW_AUDIT_LOG', 'view_audit_log'])), ['VIEW_RFQS', 'VIEW_AUDIT_LOG']);
 assert.equal(effectivePermissions(user('super_admin')).has('MANAGE_SECURITY'), true);
 
 const root = path.join(__dirname, '..');

@@ -1,4 +1,4 @@
-name: Verify deployed account release
+name: Verify deployed original application release
 on:
   push:
     branches: [main, 'verify-production-*']
@@ -57,6 +57,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Install the locked PDF validation dependencies
+        run: npm ci --ignore-scripts
       - name: Install isolated browser verification tooling
         run: |
           npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0

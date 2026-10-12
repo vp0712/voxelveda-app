@@ -24,7 +24,7 @@ async function run() {
     assert(!scope.RETAINED_EVENT_TYPES.includes(name));
     assert(!scope.RETAINED_HIGH_RISK_EVENTS.includes(name));
   }
-  for (const name of ['finance', 'banking', 'rfq', 'invoice', 'payroll', 'inventory']) {
+  for (const name of ['finance', 'banking', 'erp']) {
     assert(!scope.RETAINED_AUDIT_MODULES.includes(name));
   }
   const eventScope = scope.retainedEventScope('se');
@@ -46,7 +46,7 @@ async function run() {
       assert.deepEqual(Array.from(params).slice(0, boundary.params.length), boundary.params);
       let records = fixtures[audit ? 'audit' : 'events'].filter((row) => audit
         ? scope.RETAINED_AUDIT_MODULES.includes(row.module)
-        : scope.RETAINED_EVENT_TYPES.includes(row.event_type) && !['finance', 'RFQ'].includes(row.metadata_json.module || row.metadata_json.scope));
+        : scope.RETAINED_EVENT_TYPES.includes(row.event_type) && !['finance','banking','erp'].includes(String(row.metadata_json.module || row.metadata_json.scope || '').toLowerCase()));
       if (/al.module = \?|se.event_type = \?/.test(sql)) records = records.filter((row) => (audit ? row.module : row.event_type) === params[boundary.params.length]);
       return /COUNT\(\*\)/.test(sql) ? [[{ total: records.length }]] : [records.slice(params.at(-1), params.at(-1) + params.at(-2))];
     }
@@ -80,10 +80,10 @@ async function run() {
   }
   for (const [handler, key] of [[controller.audit, 'logs'], [controller.events, 'events']]) {
     const first = await call(handler, { page: '1', limit: '10' });
-    assert.equal(first.total, 2);
-    assert.equal(first[key].length, 2);
+    assert.equal(first.total, 3);
+    assert.equal(first[key].length, 3);
     const next = await call(handler, { page: '2', limit: '10' });
-    assert.equal(next.total, 2, 'pagination must count only visible retained entries');
+    assert.equal(next.total, 3, 'pagination must count only visible retained entries');
     assert.equal(next[key].length, 0);
   }
   const retiredAudit = await call(controller.audit, { module: 'finance' });

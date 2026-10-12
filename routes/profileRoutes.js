@@ -30,7 +30,7 @@ function singlePhoto(req, res, next) {
 }
 
 router.get('/', getMyProfile);
-router.post('/', bodyContract(['name', 'mobile_number'], { required: ['name'] }), updateMyProfile);
+router.post('/', bodyContract(['name', 'mobile_number', 'timesheet_delivery_email'], { required: ['name'] }), updateMyProfile);
 router.get('/photo', getMyProfilePhoto);
 router.post('/photo', singlePhoto, uploadMyProfilePhoto);
 router.delete('/photo', deleteMyProfilePhoto);

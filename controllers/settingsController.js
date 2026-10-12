@@ -23,7 +23,7 @@ async function ensureSettingsTable(connection = pool) {
 
 function validateSettings(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw Object.assign(new Error('Settings must be a JSON object'), { statusCode: 400 });
-  const unexpected = Object.keys(input).filter((key) => !SETTING_RULES[key]);
+  const unexpected = Object.keys(input).filter((key) => !Object.hasOwn(SETTING_RULES,key));
   if (unexpected.length) throw Object.assign(new Error('Unsupported settings cannot be stored'), { statusCode: 400, fields: unexpected });
   const output = {};
   for (const [key, raw] of Object.entries(input)) {

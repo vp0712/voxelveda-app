@@ -10,7 +10,7 @@ const findings = [];
 for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
   const checks = [
-    { name: 'request interpolation in SQL template', regex: /\.query\s*\(\s*`[\s\S]{0,1600}\$\{[^}]*req\.(?:body|query|params)/g },
+    { name: 'request interpolation in SQL template', regex: /\.query\s*\(\s*`(?:\\[\s\S]|[^`])*\$\{[^}`]*req\.(?:body|query|params)/g },
     { name: 'request concatenation in SQL', regex: /\.query\s*\([^;]{0,1600}(?:\+\s*req\.(?:body|query|params)|req\.(?:body|query|params)[^;]{0,300}\+)/g },
     { name: 'raw request data sent as HTML', regex: /res\.send\s*\(\s*req\.(?:body|query|params)/g }
   ];

@@ -82,6 +82,16 @@ async function testStartup() {
     for (const [filename, method] of Object.entries(schemas)) {
       dependencies[`./services/${filename}`] = { [method]: async () => calls.push(filename) };
     }
+    const originalSchemas={rfqSchema:'ensureRfqSchema',hrAdministrationSchema:'ensureHrAdministrationSchema',workforceSchema:'ensureWorkforceSchema',notificationSchema:'ensureNotificationSchema',trashSchema:'ensureTrashSchema',workflowSchema:'ensureWorkflowSchema',procurementSchema:'ensureProcurementSchema',careersSchema:'ensureCareersSchema',employeeIdentitySchema:'ensureEmployeeIdentitySchema',qmsSchema:'ensureQmsSchema',qmsAdvancedSchema:'ensureQmsAdvancedSchema',qmsQualityGovernanceSchema:'ensureQmsQualityGovernanceSchema',qmsEnterpriseCompletionSchema:'ensureQmsEnterpriseCompletionSchema'};
+    const originalControllers={invoice:'ensureInvoiceColumns',customer:'ensureCustomerTable',stock:'ensureStockTable',material:'ensureMaterialTable',supplier:'ensureSupplierTables',meeting:'ensureMeetingTable',task:'ensureTaskTables',roster:'ensureRosterTable',attendance:'ensureAttendanceTables',expense:'ensureExpenseTables',compliance:'ensureComplianceTables',dashboard:'ensureDashboardTables'};
+    for(const [name,method] of Object.entries(originalSchemas))dependencies['./services/'+name]={[method]:async()=>calls.push(name)};
+    for(const [name,method] of Object.entries(originalControllers))dependencies['./controllers/'+name+'Controller']={[method]:async()=>calls.push(name)};
+    dependencies['./services/originalSchemaInventory']={inspectOriginalSchema:async()=>{calls.push('original.preflight');return {existingTableCount:20,originalTableCount:20,compatible:true,missingTables:[],missingColumns:[]}}};
+    dependencies['./services/weeklyTimesheetScheduler']={getWeeklyTimesheetSchedule:()=>({timezone:'Australia/Sydney',next_due_utc:'2026-10-19T20:00:00Z'}),startWeeklyTimesheetScheduler:()=>{calls.push('timesheet.start');return true},stopWeeklyTimesheetScheduler:()=>calls.push('timesheet.stop')};
+    dependencies['./services/documentDeliveryService']={ensureDocumentDeliverySchema:async()=>calls.push('documentDeliverySchema')};
+    dependencies['./services/weeklyTimesheetDeliverySchema']={ensureWeeklyTimesheetDeliverySchema:async()=>calls.push('weeklyTimesheetDeliverySchema')};
+    dependencies['./services/workflowEscalationService']={startWorkflowSlaScheduler:()=>{calls.push('workflow.start');return false},stopWorkflowSlaScheduler:()=>calls.push('workflow.stop')};
+    dependencies['./services/releasePdfVerificationService']={queueAuthorisedReleasePdf:async()=>({enabled:false})};
     const server = load(path.join(root, 'server.js'), dependencies, { NODE_ENV: 'production' });
     if (databaseFails) {
       await assert.rejects(server.bootstrap(), { code: 'DB_TEST_DENIED' });
@@ -92,17 +102,18 @@ async function testStartup() {
     } else {
       await server.bootstrap();
       assert.deepEqual(calls, [
-        'database', 'capacity', 'migrations', ...Object.keys(schemas),
-        'attestation', 'limiter', 'jobs', 'email.start', 'listen'
+        'database', 'capacity', 'migrations', 'original.preflight', ...Object.keys(schemas), ...Object.keys(originalSchemas),...Object.keys(originalControllers),'documentDeliverySchema','weeklyTimesheetDeliverySchema','original.preflight',
+        'attestation', 'limiter', 'jobs', 'email.start', 'timesheet.start','workflow.start', 'listen'
       ]);
       assert.equal(runtime.publicReadiness().ready, true);
       assert.deepEqual(Object.keys(runtime.publicReadiness().critical_services).sort(), [
-        'background_workers', 'database', 'migrations', 'rate_limiter',
+        'background_workers', 'weekly_timesheet_worker', 'database', 'migrations', 'rate_limiter',
         'schema_email_queue', 'schema_operational_trust', 'schema_security',
         'schema_security_governance', 'schema_security_operations'
       ].sort());
+      assert.equal(runtime.publicReadiness().critical_services.weekly_timesheet_worker,'OPERATIONAL');
       await server.shutdown();
-      assert.deepEqual(calls.slice(-3), ['email.stop', 'limiter.close', 'pool.close']);
+      assert.deepEqual(calls.slice(-5), ['email.stop','timesheet.stop','workflow.stop', 'limiter.close', 'pool.close']);
     }
   }
 }
@@ -118,8 +129,9 @@ async function testEmailSchema() {
     } }
   });
   await schema.ensureEmailQueueSchema();
+  const initializedCount=statements.length;
   await schema.ensureEmailQueueSchema();
-  assert.equal(statements.length, 4, 'Shared schema promise must prevent repeated initialization');
+  assert.equal(statements.length, initializedCount, 'Shared schema promise must prevent repeated initialization');
   assert.match(statements[0], /CREATE TABLE IF NOT EXISTS email_queue/);
   assert.match(statements[1], /CREATE TABLE IF NOT EXISTS email_logs/);
   assert.doesNotMatch(statements.join('\n'), /DROP|DELETE|TRUNCATE|weekly_timesheets|staff|finance/i);
@@ -132,25 +144,25 @@ async function testEmailSchema() {
   });
   await assert.rejects(retrySchema.ensureEmailQueueSchema(), { code: 'ER_ACCESS_DENIED_ERROR' });
   await retrySchema.ensureEmailQueueSchema();
-  assert.equal(attempts, 5, 'An unsuccessful schema attempt must be retried, not cached as success');
+  assert.equal(attempts, initializedCount+1, 'An unsuccessful schema attempt must be retried, not cached as success');
 }
 
 async function testEmailRetirement() {
   const rows = [
-    { id: 1, related_module: 'timesheets', status: 'PENDING', subject: 'Retired timesheet' },
+    { id: 1, related_module: 'banking', status: 'PENDING', subject: 'Retired Banking document' },
     { id: 2, related_module: 'finance', status: 'RETRY', subject: 'Retired report' },
     { id: 3, related_module: null, status: 'PENDING', subject: 'Unclassified old email' },
-    { id: 4, related_module: 'contact', status: 'PENDING', subject: 'Contact acknowledgement', to_json: '["fixture@example.invalid"]', attempts: 0 },
+    { id: 4, related_module: 'timesheets', status: 'PENDING', subject: 'Original timesheet document', to_json: '["fixture@example.invalid"]', attempts: 0 },
     { id: 5, related_module: 'customer_rfqs', status: 'PENDING', subject: 'Retired enquiry' }
   ];
-  const retiredBefore = JSON.stringify(rows.filter((row) => row.related_module !== 'contact'));
+  const retiredBefore = JSON.stringify(rows.filter((row) => row.related_module !== 'timesheets'));
   const sent = [];
   const queries = [];
   const queue = load(path.join(root, 'services/emailQueue.js'), {
     '../config/db': { query: async (sql, parameters = []) => {
       queries.push({ sql, parameters });
       if (/SELECT \* FROM email_queue/.test(sql)) {
-        assert.match(sql, /related_module IN \(\?, \?, \?\)/);
+        assert.match(sql, /related_module IN \(\?(?:, \?)+\)/);
         const allowed = parameters.slice(0, -1);
         return [rows.filter((row) => ['PENDING', 'RETRY'].includes(row.status) && allowed.includes(row.related_module)).slice(0, parameters.at(-1))];
       }
@@ -166,24 +178,27 @@ async function testEmailRetirement() {
       return [{ affectedRows: 1 }];
     } },
     './emailQueueSchema': { ensureEmailQueueSchema: async () => {} },
+    './weeklyDeliveryPolicy': require('../services/weeklyDeliveryPolicy'),
+    './documentPdfService': require('../services/documentPdfService'),
     './emailService': {
       sendMail: async (message) => { sent.push(message); return { messageId: 'fixture-provider-accepted' }; },
       normalizeAddressList: (items) => Array.isArray(items) ? items : items ? [items] : [],
       attachmentBuffer: (item) => Buffer.isBuffer(item.content) ? item.content : null,
+      assertAttachmentIntegrity:require('../services/emailService').assertAttachmentIntegrity,
       isEmailTransportError: () => false,
       classifySmtpFailure: () => ({ code: 'FIXTURE_FAILURE', category: 'fixture' })
     }
   });
-  const original = Buffer.from([0, 255, 128, 10, 13, 60, 0, 250]);
-  const stored = await queue._test.serializableAttachments([{ filename: 'enquiry.bin', contentType: 'application/octet-stream', content: original }]);
+  const original = (await require('../services/documentPdfService').createDocumentPdf({title:'Fixture timesheet',reference:'TS-FIXTURE',columns:[],rows:[]})).buffer;
+  const stored = await queue._test.serializableAttachments([{ filename: 'timesheet.pdf', contentType: 'application/pdf', content: original }]);
   rows[3].attachments_json = JSON.stringify(stored);
   const outcomes = await queue.processEmailQueue(10);
   assert.equal(outcomes.length, 1);
   assert.equal(sent.length, 1, 'Retired emails must never reach the provider');
-  assert.equal(sent[0].subject, 'Contact acknowledgement');
+  assert.equal(sent[0].subject, 'Original timesheet document');
   assert.deepEqual(sent[0].attachments[0].content, original);
-  assert.equal(sent[0].attachments[0].filename, 'enquiry.bin');
-  assert.equal(JSON.stringify(rows.filter((row) => row.related_module !== 'contact')), retiredBefore, 'Retired queue rows and content remain intact');
+  assert.equal(sent[0].attachments[0].filename, 'timesheet.pdf');
+  assert.equal(JSON.stringify(rows.filter((row) => row.related_module !== 'timesheets')), retiredBefore, 'Retired queue rows and content remain intact');
   await queue.processEmailQueue(10);
   assert.equal(sent.length, 1);
   await assert.rejects(queue.queueEmail({ relatedModule: 'finance' }), { code: 'EMAIL_MODULE_RETIRED' });
@@ -239,6 +254,7 @@ async function testCapacityIsolation() {
     assert.ok(allowed.has(table), `Capacity recovery must not mutate a retired record table: ${table}`);
   }
   assert.doesNotMatch(mutations.join('\n'), /statement_import|finance|bank|processing_errors|rfqs|customers|invoices/i);
+  assert.equal(queries.some(sql=>/^\s*(DELETE|UPDATE|TRUNCATE|DROP)/i.test(sql)),false,'capacity recovery holds all original and retired history');
 }
 
 async function run() {

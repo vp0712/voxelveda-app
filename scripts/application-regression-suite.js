@@ -2,8 +2,8 @@
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-// Explicit suite: missing checks fail the build. Removed product modules have
-// retirement/access/data-preservation checks instead of obsolete feature tests.
+// Explicit suite: original workflows, document delivery and current security
+// all remain mandatory. Retired Banking/ERP boundaries have separate checks.
 const checks = [
   'security-foundation-test.js',
   'auth-lifecycle-test.js',
@@ -26,6 +26,7 @@ const checks = [
   'customer-registration-test.js',
   'core-audit-isolation-test.js',
   'security-data-scope-test.js',
+  'restored-security-scope-test.js',
   'retained-runtime-test.js',
   'retained-workspace-test.js',
   'retained-theme-test.js',
@@ -40,7 +41,28 @@ const checks = [
   'secret-scan.js',
   'source-file-inventory-test.js',
   'injection-sink-audit.js',
-  'security-source-test.js'
+  'security-source-test.js',
+  'original-workflow-test.js',
+  'core-workflow-test.js',
+  'core-roster-test.js',
+  'staff-expense-workflow-test.js',
+  'procurement-workflow-test.js',
+  'invoice-workflow-regression-test.js',
+  'document-pdf-delivery-test.js',
+  'document-delivery-lifecycle-test.js',
+  'document-module-isolation-test.js',
+  'email-relay-review-test.js',
+  'qms-restoration-workflow-test.js',
+  'qms-document-stock-test.js',
+  'original-report-test.js',
+  'timesheet-preference-test.js',
+  'weekly-timesheet-eligibility-test.js',
+  'weekly-timesheet-api-test.js',
+  'weekly-timesheet-pdf-test.js',
+  'timesheet-workflow-regression-test.js',
+  'email-legacy-document-queue-test.js',
+  'managed-weekly-email-queue-test.js',
+  'external-link-safety-test.js'
 ];
 
 for (const check of checks) {
@@ -54,4 +76,4 @@ for (const check of checks) {
     process.exit(result.status || 1);
   }
 }
-console.log(`Application regression suite passed: ${checks.length} retained security, customer, retirement and release checks.`);
+console.log(`Application regression suite passed: ${checks.length} original workflows, PDFs, security, retirement and release checks.`);

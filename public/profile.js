@@ -1,5 +1,6 @@
 let currentProfile = null;
 let initialEditableState = '';
+let profileSaving = false;
 
 const $ = (id) => document.getElementById(id);
 const statusEl = $('status');
@@ -65,7 +66,7 @@ async function api(path, options = {}) {
     throw error;
   }
   const data = await readJson(response);
-  if (!response.ok) throw new Error(data.message || 'Request failed');
+  if (!response.ok) throw Object.assign(new Error(data.message || 'Request failed'), { fields: data.fields || {} });
   return data;
 }
 
@@ -76,12 +77,12 @@ function displayDate(value) {
 }
 
 function editableState() {
-  return JSON.stringify({ name: $('name').value.trim(), mobile_number: $('mobile').value.trim() });
+  return JSON.stringify({ name: $('name').value.trim(), mobile_number: $('mobile').value.trim(), timesheet_delivery_email: $('timesheetDeliveryEmail').value.trim() });
 }
 
 function updateDirtyState() {
   const dirty = Boolean(currentProfile) && editableState() !== initialEditableState;
-  $('saveBtn').disabled = !dirty;
+  $('saveBtn').disabled = !dirty || profileSaving;
   $('profileForm').classList.toggle('dirty', dirty);
   return dirty;
 }
@@ -158,6 +159,9 @@ function renderProfile(profile) {
   currentProfile = profile;
   $('name').value = profile.name || '';
   $('mobile').value = profile.mobile_number || '';
+  $('timesheetDeliveryEmail').value = profile.timesheet_delivery_email || '';
+  $('timesheetDeliveryError').textContent = '';
+  $('timesheetDeliveryEmail').removeAttribute('aria-invalid');
   $('email').value = profile.email || '';
   $('username').value = profile.username || '';
   $('displayName').textContent = profile.name || 'My Profile';
@@ -183,21 +187,33 @@ async function loadProfile() {
 
 async function saveProfile(event) {
   event.preventDefault();
+  if (profileSaving) return;
   const saveBtn = $('saveBtn');
   const name = $('name').value.trim();
   const mobile = $('mobile').value.trim();
+  const timesheetDeliveryEmail = $('timesheetDeliveryEmail').value.trim();
+  $('timesheetDeliveryError').textContent = '';
+  $('timesheetDeliveryEmail').removeAttribute('aria-invalid');
   if (!name) return setStatus('Full name is required.', 'error');
+  if (timesheetDeliveryEmail && (!$('timesheetDeliveryEmail').checkValidity() || /[,;<>\r\n]/.test(timesheetDeliveryEmail))) {
+    $('timesheetDeliveryError').textContent = 'Enter one valid email address, or leave blank to disable delivery.';
+    $('timesheetDeliveryEmail').setAttribute('aria-invalid', 'true');
+    $('timesheetDeliveryEmail').focus();
+    return setStatus('Check the timesheet delivery email.', 'error');
+  }
 
+  profileSaving = true;
   saveBtn.disabled = true;
   setStatus('Saving changes…');
   try {
     const data = await api('/api/profile', {
       method: 'POST',
-      body: JSON.stringify({ name, mobile_number: mobile })
+      body: JSON.stringify({ name, mobile_number: mobile, timesheet_delivery_email: timesheetDeliveryEmail || null })
     });
     if (currentProfile) {
       currentProfile.name = data.profile?.name ?? name;
       currentProfile.mobile_number = data.profile?.mobile_number ?? (mobile || null);
+      currentProfile.timesheet_delivery_email = data.profile?.timesheet_delivery_email ?? null;
       currentProfile.profile_updated_at = new Date().toISOString();
       renderProfile(currentProfile);
     }
@@ -208,7 +224,14 @@ async function saveProfile(event) {
     }
     setStatus('Profile updated successfully.', 'ok');
   } catch (error) {
+    if (error.fields?.timesheet_delivery_email) {
+      $('timesheetDeliveryError').textContent = error.fields.timesheet_delivery_email;
+      $('timesheetDeliveryEmail').setAttribute('aria-invalid', 'true');
+      $('timesheetDeliveryEmail').focus();
+    }
     setStatus(error.message, 'error');
+  } finally {
+    profileSaving = false;
     updateDirtyState();
   }
 }
@@ -315,6 +338,7 @@ async function removePhoto() {
 $('profileForm').addEventListener('submit', saveProfile);
 $('name').addEventListener('input', updateDirtyState);
 $('mobile').addEventListener('input', updateDirtyState);
+$('timesheetDeliveryEmail').addEventListener('input', updateDirtyState);
 $('takePhotoBtn').addEventListener('click', () => $('cameraInput').click());
 $('choosePhotoBtn').addEventListener('click', () => $('galleryInput').click());
 $('removePhotoBtn').addEventListener('click', removePhoto);

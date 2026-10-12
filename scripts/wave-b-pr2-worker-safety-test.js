@@ -206,13 +206,7 @@ async function testArchiveSafeRetention() {
   assert.equal(queries.some(({ sql }) => /^\s*DELETE\b/.test(sql)), false, 'Startup before registration must never prune archived jobs');
   await store.pruneTelemetry({ aggressive: true, jobKeys: ['email_queue_delivery'] });
   const pruneQueries = queries.filter(({ sql }) => /^\s*DELETE\b/.test(sql));
-  assert.equal(pruneQueries.length, 3);
-  for (const { sql, params } of pruneQueries) {
-    assert.match(sql, /WHERE job_key IN \(\?\)/);
-    assert.equal(params[0], 'email_queue_delivery');
-    assert(sql.indexOf('job_key IN') < sql.indexOf('LIMIT'));
-  }
-  assert.match(pruneQueries.find(({ sql }) => sql.includes('background_job_failures')).sql, /failed_at/);
+  assert.equal(pruneQueries.length, 0, 'all original and retired job telemetry remains on preservation hold');
 
   async function recoveryFixture({ failProbe = false } = {}) {
     const archive = Object.fromEntries(['background_job_runs', 'background_job_failures', 'background_job_dead_letters'].map((table) => [table,
@@ -220,7 +214,7 @@ async function testArchiveSafeRetention() {
     ]));
     for (const table of ['email_logs', 'email_queue']) archive[table] = ['finance', 'rfq', 'workforce', null, 'unknown', 'auth', 'security', 'contact'].map((related_module, id) => ({ id, related_module }));
     archive.security_events = [{ id: 1, event_type: 'BANK_DETAILS_CHANGED' }, { id: 2, event_type: 'STEP_UP_REQUIRED', module: 'finance' }, { id: 3, event_type: 'LOGIN_FAILURE', module: 'auth' }];
-    const before = JSON.stringify(Object.fromEntries(Object.entries(archive).map(([table, rows]) => [table, rows.filter((row) => row.payload === 'retired-record' || ['finance', 'rfq', 'workforce', null, 'unknown'].includes(row.related_module) || row.module === 'finance' || row.event_type === 'BANK_DETAILS_CHANGED')])));
+    const before = JSON.stringify(archive);
     const calls = [];
     const query = async (sql, params = []) => {
       calls.push({ sql, params });
@@ -267,9 +261,10 @@ async function testArchiveSafeRetention() {
     });
     if (failProbe) await assert.rejects(fixture.exports.recoverDatabaseCapacity({ force: true }), { code: 'DATABASE_CAPACITY_EXHAUSTED' });
     else assert.equal((await fixture.exports.recoverDatabaseCapacity({ force: true })).writable, true);
-    const after = JSON.stringify(Object.fromEntries(Object.entries(archive).map(([table, rows]) => [table, rows.filter((row) => row.payload === 'retired-record' || ['finance', 'rfq', 'workforce', null, 'unknown'].includes(row.related_module) || row.module === 'finance' || row.event_type === 'BANK_DETAILS_CHANGED')])));
+    const after = JSON.stringify(archive);
     assert.equal(after, before, 'Retired, unknown and unscoped records remain byte-identical during normal and failed capacity recovery');
-    assert.equal(calls.filter(({ sql }) => /^\s*INSERT/.test(sql)).length >= 2, true, 'Readiness uses an actual transactional write probe');
+    assert.equal(calls.filter(({ sql }) => /^\s*INSERT/.test(sql)).length,failProbe?1:2,'Readiness uses a transactional probe and fails at the first rejected write');
+    assert.equal(calls.some(({sql})=>/^\s*(DELETE|TRUNCATE|DROP)/.test(sql)),false,'Capacity checks preserve every original and retired history row');
   }
   await recoveryFixture();
   await recoveryFixture({ failProbe: true });
@@ -369,8 +364,9 @@ async function run() {
   const routes = source('routes/backgroundJobRoutes.js');
   assert(routes.includes("requireAnyPermission('MANAGE_BACKGROUND_JOBS')"));
   assert(routes.includes("requireStepUp('RETRY_BACKGROUND_JOB')"));
-  const permissions = source('config/permissionCatalog.js');
-  assert(permissions.includes("'MANAGE_BACKGROUND_JOBS'"));
+  const { PERMISSIONS, ROLE_TEMPLATES } = require('../config/permissionCatalog');
+  assert(PERMISSIONS.includes('MANAGE_BACKGROUND_JOBS'));
+  assert(ROLE_TEMPLATES.super_admin.includes('MANAGE_BACKGROUND_JOBS'));
   const server = source('server.js');
   assert(server.includes('await backgroundJobService.initialize()'));
   const controller = source('controllers/backgroundJobController.js');

@@ -1,0 +1,55 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const auth = require('../services/authorizationService');
+const policy = require('../services/weeklyTimesheetEligibility');
+const queries = [], revisions = [];
+const row = { id: 12, user_id: 4, period_start: '2026-10-05', period_end: '2026-10-11', version: 1,
+  status: 'SENT', total_minutes: 480, claim_token: 'private-claim', claim_expires_at: '2026-10-12 08:00:00',
+  snapshot_json: JSON.stringify({ staff_id: 4, rows: [{ user_id: 4, total_minutes: 480 }] }) };
+const db = { async query(sql, params = []) {
+  queries.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
+  if (/SELECT COUNT/.test(sql)) return [[{ total: 1 }]];
+  if (/SELECT \* FROM weekly_timesheet_deliveries/.test(sql)) return [[row]];
+  if (/SELECT id FROM users WHERE id/.test(sql)) return [[...(params[0] === 4 && params[1] === 10 ? [{id:4}] : [])]];
+  if (/FROM weekly_timesheet_delivery_versions/.test(sql)) return [[{ version: 1, status: 'SENT' }]];
+  return [[{ ...row, staff_name: 'Fixture employee 4' }]];
+} };
+const dependencies = { '../config/db': db, '../services/authorizationService': auth,
+  '../utils/dateOnly': require('../utils/dateOnly'), '../services/weeklyTimesheetScheduler': {
+    ensureWeeklyTimesheetDeliverySchema: async () => {}, getWeeklyTimesheetSchedule: () => policy.scheduleDetails(new Date('2026-10-12T02:00:00Z')),
+    queueWeeklyTimesheetRevision: async (options) => { revisions.push(options); return { status: 'QUEUED', version: 2, source_sha256: 'fixture' }; }
+  } };
+const moduleFixture = { exports: {} }, filename = path.join(__dirname, '../controllers/weeklyTimesheetDeliveryController.js');
+new vm.Script(fs.readFileSync(filename, 'utf8'), { filename }).runInNewContext({ module: moduleFixture, exports: moduleFixture.exports,
+  console: { error() {} }, require(name) { if (!Object.hasOwn(dependencies, name)) throw new Error('Unexpected API dependency '+name); return dependencies[name]; } });
+const controller = moduleFixture.exports;
+async function call(method, { user, params = {}, query = {}, body = {} } = {}) {
+  const result = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = JSON.parse(JSON.stringify(value)); return this; } };
+  await controller[method]({ user, params, query, body }, result); return result;
+}
+async function main() {
+  const own = { id: 4, role: 'staff', permissions: ['VIEW_OWN_TIMESHEET'] };
+  const ownList = await call('list', { user: own, query: { page: 1, page_size: 10 } });
+  assert.equal(ownList.statusCode, 200); assert.equal(ownList.body.total, 1); assert.equal(ownList.body.schedule.timezone, 'Australia/Sydney');
+  assert(queries.filter(entry => /FROM weekly_timesheet_deliveries d/.test(entry.sql)).every(entry => /d.user_id=\?/.test(entry.sql) && entry.params[0] === 4), 'own lists must bind the authenticated staff identity in both totals and rows');
+  await call('list',{user:{id:10,role:'manager',permission_boundary:['VIEW_TEAM_TIMESHEET']}});assert(queries.at(-1).sql.includes('(u.manager_id=? AND d.user_id<>?)'),'team-only permission boundary cannot silently grant own timesheet access');
+  const detail = await call('detail', { user: own, params: { id: 12 } });
+  assert.equal(detail.statusCode, 200); assert(!Object.hasOwn(detail.body.delivery, 'claim_token')); assert(!Object.hasOwn(detail.body.delivery, 'claim_expires_at'));
+  assert.equal((await call('detail', { user: { id: 5, role: 'staff' }, params: { id: 12 } })).statusCode, 403);
+  assert.equal((await call('detail', { user: { id: 10, role: 'manager' }, params: { id: 12 } })).statusCode, 200);
+  assert.equal((await call('detail', { user: { id: 11, role: 'manager' }, params: { id: 12 } })).statusCode, 403);
+  for (const query of [{page:-1},{page_size:101},{from_date:'2026-02-30'},{status:'SENT;DROP'},{user_id:'Infinity'}]) assert.equal((await call('list', { user: own, query })).statusCode, 422);
+  for (const body of [{recipient:'other@example.invalid'},{to:['other@example.invalid']},{cc:[]},{bcc:[]},{include_employee:true}]) {
+    assert.equal((await call('revise', { user: {id:99,role:'admin'}, params:{id:12}, body:{expected_version:1,reason:'Correct actual work',...body} })).statusCode,422);
+  }
+  assert.equal(revisions.length,0,'recipient overrides cannot reach revision generation or queueing');
+  const revision=await call('revise',{user:{id:99,role:'admin'},params:{id:12},body:{expected_version:1,reason:'Correct actual work',confirm_possible_previous_delivery:true}});
+  assert.equal(revision.statusCode,202);assert.equal(revision.body.email_sent,false);assert.equal(revisions[0].confirmPossiblePreviousDelivery,true);assert.equal(revisions[0].retryGeneration,false);
+  const retry=await call('retryGeneration',{user:{id:99,role:'admin'},params:{id:12},body:{expected_version:1,reason:'Retry corrected parser error'}});
+  assert.equal(retry.statusCode,202);assert.equal(revisions[1].retryGeneration,true);
+  console.log('Weekly timesheet API tests passed: own/team staff isolation; bound search, date/status and pagination validation; hidden claim metadata; controlled revision and generation retry; recipient overrides/copies blocked before generation. Fixtures only, no mail transport.');
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});
