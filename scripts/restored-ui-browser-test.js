@@ -146,7 +146,9 @@ async function run() {
     await page.evaluate(()=>localStorage.removeItem('voxelVedaCompanyFormRecordsV1'));
     assert.equal(await page.evaluate(()=>safeNotificationActionPath('/\\outside.example/')), '', 'notification URLs cannot escape origin through backslashes');
     await page.evaluate(()=>window.goSection('attendanceSection'));
-    await page.locator('#weeklyDeliveryBody').getByText('Staff fixture',{exact:true}).waitFor();
+    // The staff cell also contains a nested staff-ID subline. Match the actual
+    // delivery row rather than requiring the cell's combined text to be exact.
+    await page.locator('#weeklyDeliveryBody tr').filter({hasText:'Staff fixture'}).waitFor();
     assert.equal(await page.locator('#timesheetSendRecipient').count(),0,'weekly recipients cannot be overridden');
     assert.equal(await page.getByRole('button',{name:'Send Timesheet',exact:true}).count(),0,'legacy send form is removed');
     assert.equal(await page.locator('#timesheetReportStaffSelect').count(),1,'general report filters remain separate');

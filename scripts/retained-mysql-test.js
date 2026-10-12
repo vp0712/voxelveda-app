@@ -475,6 +475,16 @@ async function testStaleQueueReview(queue) {
   facts.push('real atomic multi-table stale transport review keeps queue/current delivery/version consistent without clearing frozen sources or known acceptance');
 }
 
+async function makeWeeklyFixtureDue(queueId) {
+  // This fixture calls the worker immediately. MySQL DATETIME(0) can round a
+  // default JavaScript enqueue time into the next second. Make only this
+  // synthetic row due; retain the real period/source/recipient validators.
+  const [due] = await pool.query(`UPDATE email_queue SET scheduled_at=DATE_SUB(NOW(),INTERVAL 1 MINUTE)
+    WHERE id=? AND related_module='timesheets' AND status='PENDING'
+      AND scheduled_at<=DATE_ADD(NOW(),INTERVAL 1 SECOND)`, [queueId]);
+  assert.equal(due.affectedRows, 1, 'Only an immediately queued pending weekly fixture may have its worker due time adjusted.');
+}
+
 async function testWeeklyDelivery() {
   const { DateTime } = require('luxon');
   const policy = require('../services/weeklyTimesheetEligibility');
@@ -532,6 +542,7 @@ async function testWeeklyDelivery() {
   const [[queueCount]] = await pool.query("SELECT COUNT(*) AS count FROM email_queue WHERE idempotency_key LIKE ?", [`weekly-timesheet:30:${period.start}:${period.end}:v%`]);
   assert.equal(queueCount.count, 1, 'Concurrent and restarted schedulers produce exactly one immutable staff/week queue.');
   const sentBefore = capturedMessages.length;
+  await makeWeeklyFixtureDue(worked.email_queue_id);
   assert.deepEqual(await queue.processEmailQueue(50), [{ id: worked.email_queue_id, status: 'SENT', provider_accepted: true, recipient_verified: false }]);
   assert.equal(capturedMessages.length, sentBefore + 1);
   assert.deepEqual(capturedMessages.at(-1).attachments[0].content, attachments[0].content, 'Worker transport uses the same staff-specific validated queue PDF.');
@@ -547,6 +558,7 @@ async function testWeeklyDelivery() {
   const [[revisionRequest]] = await pool.query('SELECT email_queue_id,pdf_sha256,generation_status FROM document_delivery_requests WHERE id=?', [revision.request_id]);
   assert.equal(revisionRequest.generation_status, 'VALIDATED');
   assert.equal(revisionRequest.email_queue_id, revision.queue_id);
+  await makeWeeklyFixtureDue(revision.queue_id);
   await pool.query("UPDATE users SET timesheet_delivery_email='changed-30@example.invalid' WHERE id=30");
   const held = await queue.processEmailQueue(50);
   assert.equal(held.length, 1);
