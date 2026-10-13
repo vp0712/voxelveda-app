@@ -317,7 +317,33 @@ async function run() {
           const parts=['.vv-payable-summary','.vv-chart-context','.vv-chart-empty','.vv-chart-data','.supplier-orbit-stats'].map(selector=>card?.querySelector(selector)).filter(Boolean).map(element=>element.getBoundingClientRect());
           return parts.every((rect,index)=>index===0 || parts[index-1].bottom<=rect.top+1);
         }),`${name}/${mode}: supplier summary, empty chart note and recorded values do not overlap`);
+        assert.ok(await page.evaluate(()=>{
+          const card=document.querySelector('.supplier-flow-card');
+          const queue=document.querySelector('.supplier-queue-card');
+          const rows=[...document.querySelectorAll('.supplier-flow-card .supplier-flow-row')];
+          if(!card || !queue || !rows.length)return false;
+          const bounds=card.getBoundingClientRect(),next=queue.getBoundingClientRect();
+          const contained=rect=>rect.left>=bounds.left-1 && rect.right<=bounds.right+1 && rect.top>=bounds.top-1 && rect.bottom<=bounds.bottom+1;
+          const elements=rows.flatMap(row=>[row,...row.querySelectorAll('.supplier-flow-label,.supplier-flow-money')]);
+          const textRects=rows.flatMap(row=>[...row.querySelectorAll('.supplier-flow-label strong,.supplier-flow-label>span,.supplier-flow-money>span,.supplier-flow-money>strong')].flatMap(element=>{
+            const range=document.createRange();range.selectNodeContents(element);return [...range.getClientRects()];
+          }));
+          const separate=bounds.right<=next.left+1 || next.right<=bounds.left+1 || bounds.bottom<=next.top+1 || next.bottom<=bounds.top+1;
+          return separate && elements.every(element=>contained(element.getBoundingClientRect())) && textRects.every(contained);
+        }),`${name}/${mode}: supplier category rows and text stay inside their card and clear the payment queue`);
         assert.equal(await page.locator('#supplierDebtChart').isVisible(),false,`${name}/${mode}: empty chart axes and legend are hidden`);
+        assert.ok(await page.evaluate(()=>{
+          const metadata=document.getElementById('adminInfo');
+          const surface=metadata?.closest('.topbar');
+          if(!metadata || !surface)return false;
+          const channels=color=>color.match(/[0-9]+(?:\.[0-9]+)?/g)?.map(Number);
+          const fg=channels(getComputedStyle(metadata).color),bg=channels(getComputedStyle(surface).backgroundColor);
+          if(!fg || !bg || (bg[3] ?? 1)!==1)return false;
+          const alpha=fg[3] ?? 1;
+          const luminance=rgb=>rgb.slice(0,3).map(value=>{const s=value/255;return s<=0.04045?s/12.92:((s+0.055)/1.055)**2.4;}).reduce((sum,value,index)=>sum+value*[0.2126,0.7152,0.0722][index],0);
+          const foreground=luminance(fg.slice(0,3).map((value,index)=>value*alpha+bg[index]*(1-alpha))),background=luminance(bg);
+          return (Math.max(foreground,background)+0.05)/(Math.min(foreground,background)+0.05)>=4.5;
+        }),`${name}/${mode}: account metadata has readable contrast against its actual topbar surface`);
         assert.equal(await page.locator('.sidebar .logo-img').evaluate(img=>getComputedStyle(img).filter),'none');
         if(viewport.width<=1023) {
           await page.locator('.topbar-menu-btn').click();

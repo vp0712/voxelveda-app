@@ -39,6 +39,7 @@ body { background:var(--page) !important; color:var(--text-primary) !important; 
 .topbar.vv-topbar { position:relative !important; inset:auto !important; width:100% !important; min-width:0 !important; min-height:72px !important; padding:14px !important; background:var(--surface) !important; color:var(--text-primary) !important; z-index:20 !important; }
 .topbar-actions { display:flex !important; flex-wrap:wrap !important; align-items:center !important; gap:8px !important; min-width:0 !important; }
 .topbar :is(.topbar-kicker,p,span,.profile-chip,.profile-name) { color:var(--text-primary) !important; }
+.topbar #adminInfo { color:var(--text-secondary) !important; }
 .topbar-menu-btn, .mobile-menu-btn, .sidebar-close { display:none !important; }
 .notification-panel { background:var(--surface) !important; color:var(--text-primary) !important; width:min(420px,calc(100vw - 28px)) !important; max-height:65dvh !important; overflow:auto !important; }
 .main :is(.card,.workflow-workspace,.procurement-workspace) { background:var(--surface) !important; color:var(--text-primary) !important; border-color:var(--border) !important; min-width:0 !important; }
@@ -75,6 +76,17 @@ tr { background:var(--surface) !important; }
 .vv-chart-data button:disabled { color:var(--text-primary); }
 .vv-chart-data strong { font-variant-numeric:tabular-nums; }
 .vv-chart-empty { padding:12px; color:var(--text-secondary); background:var(--surface-muted); }
+.supplier-flow-card .supplier-flow-list { min-width:0; width:100%; }
+.supplier-flow-card .supplier-flow-row {
+  width:100%; min-width:0; max-width:100%; box-sizing:border-box;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  grid-template-areas:"label money" "track track";
+  align-items:start; gap:10px; text-align:left;
+}
+.supplier-flow-card .supplier-flow-label { grid-area:label; }
+.supplier-flow-card .supplier-flow-money { grid-area:money; text-align:right; font-variant-numeric:tabular-nums; }
+.supplier-flow-card :is(.supplier-flow-label,.supplier-flow-money) { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.supplier-flow-card .supplier-flow-track { grid-area:track; min-width:0; width:100%; box-sizing:border-box; }
 .mobile-bottom-nav { display:none !important; }
 .quality-register { overflow:auto; max-width:100%; }
 .quality-register table { width:100%; border-collapse:collapse; }
@@ -118,6 +130,8 @@ tr { background:var(--surface) !important; }
   .client-top { flex-wrap:wrap; }
   .client-profile-row { flex-wrap:wrap; }
   .quality-register dl { grid-template-columns:1fr; }
+  .supplier-flow-card .supplier-flow-row { grid-template-columns:minmax(0,1fr); grid-template-areas:"label" "money" "track"; }
+  .supplier-flow-card .supplier-flow-money { text-align:left; }
   .top { flex-wrap:wrap; gap:12px; }
   .hero .state :is(span,strong), .hero .kicker { color:var(--nav-text); }
 }
