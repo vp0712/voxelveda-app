@@ -5,6 +5,7 @@ const { bodyContract } = require('../middleware/requestContractMiddleware');
 const requireStepUp = require('../middleware/stepUpMiddleware');
 
 const router = express.Router();
+router.use(require('./procurementImportRoutes'));
 
 router.get('/workspace', requireAnyPermission('VIEW_PROCUREMENT'), controller.workspace);
 router.post('/requisitions', requireAnyPermission('CREATE_PURCHASE_REQUISITION'), bodyContract(

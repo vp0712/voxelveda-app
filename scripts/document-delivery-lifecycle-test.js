@@ -43,6 +43,12 @@ async function main(){
  failBookkeeping=false;await queueDocumentEmail(changed);assert.equal(sendCount,2);assert.equal(messages.length,2);
  const stale={...message,data:{...data,reference:'FIXTURE-STALE-3',rows:[['Identity','FIXTURE-STALE-3']]},beforeQueue:async()=>{throw Object.assign(new Error('Document changed while rendering.'),{code:'PDF_DOCUMENT_CHANGED'});}};
  await assert.rejects(()=>queueDocumentEmail(stale),{code:'PDF_DOCUMENT_CHANGED'});assert.equal(sendCount,2);assert.equal([...requests.values()].at(-1).generation_status,'GENERATION_FAILED');
+ const frozenData={...data,title:'FROZEN PROCUREMENT FIXTURE',reference:'FIXTURE-FROZEN-4',filename:'FIXTURE-FROZEN-4',rows:[['Identity','FIXTURE-FROZEN-4']]};
+ const frozen=await actualPdf.createDocumentPdf(frozenData);const frozenMessage={...message,module:'procurement',recordId:'report:fixture',data:frozenData,validatedArtifact:{buffer:frozen.buffer,filename:frozen.filename,sha256:frozen.validation.sha256}};
+ failRender=true;const retained=await queueDocumentEmail(frozenMessage);assert.equal(retained.generation_status,'VALIDATED');assert.deepEqual(messages.at(-1).attachments[0].content,frozen.buffer,'Frozen preview/download bytes must be queued unchanged without re-rendering');
+ const mismatchData={...frozenData,reference:'FIXTURE-MISMATCH-5',filename:'FIXTURE-MISMATCH-5',rows:[['Identity','FIXTURE-MISMATCH-5']]};const mismatch=await actualPdf.createDocumentPdf(mismatchData);const beforeInvalid=sendCount;
+ await assert.rejects(()=>queueDocumentEmail({...frozenMessage,data:mismatchData,validatedArtifact:{buffer:mismatch.buffer,filename:mismatch.filename,sha256:'0'.repeat(64)}}),{code:'PDF_SNAPSHOT_MISMATCH'});assert.equal(sendCount,beforeInvalid,'Invalid retained PDF hash must not enqueue or send');
+ failRender=false;
  console.log('Document lifecycle tests passed: generation failure retains immutable source and sends nothing; controlled retry queues one validated PDF; duplicate request reuses queue; bookkeeping failure atomically rolls back the queue; changed-source guard sends nothing; provider acceptance remains separate from recipient receipt.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

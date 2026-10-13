@@ -3615,22 +3615,11 @@ function openSupplierFileDialog(supplierId) {
 
 async function viewSupplierFile(id) {
   try {
-    const res = await fetch(`/api/suppliers/files/${id}/view`, {
+    await window.VoxelOperations.openPdf(`/api/suppliers/files/${encodeURIComponent(id)}/view`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-
-    if (!res.ok) {
-      const data = await safeJson(res);
-      showToast(data.message || 'Supplier file could not be opened');
-      return;
-    }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch {
-    showToast('Supplier file could not be opened');
+  } catch (error) {
+    showToast(error.message || 'Supplier file could not be opened');
   }
 }
 
@@ -4048,22 +4037,11 @@ function openExpenseFileDialog(id) {
 
 async function viewExpenseFile(id) {
   try {
-    const res = await fetch(`/api/expenses/files/${id}/view`, {
+    await window.VoxelOperations.openPdf(`/api/expenses/files/${encodeURIComponent(id)}/view`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-
-    if (!res.ok) {
-      const data = await safeJson(res);
-      showToast(data.message || 'Bill file could not be opened');
-      return;
-    }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank', 'noopener');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch {
-    showToast('Bill file could not be opened');
+  } catch (error) {
+    showToast(error.message || 'Bill file could not be opened');
   }
 }
 

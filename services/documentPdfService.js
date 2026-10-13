@@ -62,9 +62,15 @@ async function createDocumentPdf(data) {
     const logo = path.join(__dirname, '..', 'public', 'Frame 1.png');
     if (fs.existsSync(logo)) doc.image(logo, left, 24, { fit: [94, 56] });
     doc.font('DocumentBold').fontSize(19).fillColor(navy);
-    if(doc.heightOfString(data.title,{width:width-118})>58)doc.fontSize(15);
-    const titleHeight=doc.heightOfString(data.title,{width:width-118,lineGap:2});
-    text(data.title, 160, 29, width - 118, { align: 'right' });
+    const titleWidth=width-118;
+    const longTitle=String(data.title).length>24 || doc.widthOfString(String(data.title))>titleWidth*0.85;
+    let titleSize=longTitle?15:19;
+    doc.fontSize(titleSize);
+    while(titleSize>12 && doc.widthOfString(String(data.title))>titleWidth){titleSize--;doc.fontSize(titleSize);}
+    const titleHeight=doc.heightOfString(data.title,{width:titleWidth,lineGap:2});
+    // Long headings use the full available panel from its left edge. This
+    // keeps their complete title readable without a right-aligned overflow.
+    text(data.title,160,29,titleWidth,{align:longTitle?'left':'right'});
     const referenceY=29+titleHeight+5;
     doc.font('DocumentRegular').fontSize(9).fillColor(muted);
     text(data.reference || '', 160, referenceY, width - 118, { align: 'right' });
@@ -90,10 +96,22 @@ async function createDocumentPdf(data) {
   if (data.period) paragraph(`Period: ${data.period}`);
   const expectedText = [data.title, data.reference, data.party, data.period];
   for (const table of data.tables || [{ columns: data.columns || [], rows: data.rows || [] }]) {
-    if (table.title) paragraph(table.title, { bold: true, size: 11 });
     const columns = table.columns;
     if (!columns.length) continue;
     const scale = width / columns.reduce((sum, col) => sum + (col.width || 1), 0);
+    if (table.title) {
+      // Keep a section title with its repeated heading and first data row.
+      // This avoids orphaned headings at the foot of a multipage report.
+      doc.font('DocumentBold').fontSize(11);
+      const titleHeight=doc.heightOfString(table.title,{width,lineGap:2})+9;
+      doc.font('DocumentBold').fontSize(8);
+      const headingHeight=Math.max(26,...columns.map(col=>doc.heightOfString(String(col.label),{width:(col.width||1)*scale-14,lineGap:2})+16));
+      doc.font('DocumentRegular').fontSize(8);
+      const first=table.rows[0]||columns.map((_,i)=>i?'':'No records for this period.');
+      const firstHeight=Math.max(28,...first.map((cell,i)=>doc.heightOfString(String(cell??''),{width:(columns[i].width||1)*scale-14,lineGap:2})+16));
+      if(y+titleHeight+headingHeight+firstHeight>bottom)nextPage();
+      paragraph(table.title,{bold:true,size:11});
+    }
     function tableHeader() {
       doc.font('DocumentBold').fontSize(8).fillColor('#ffffff');
       const height=Math.max(26,...columns.map(col=>doc.heightOfString(String(col.label),{width:(col.width || 1)*scale-14,lineGap:2})+16));

@@ -1,7 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const pool = require('../config/db');
-const { createDocumentPdf,validatePdf } = require('./documentPdfService');
+const { createDocumentPdf,validatePdf,safePdfFilename } = require('./documentPdfService');
 const { queueEmail,restoreAttachments } = require('./emailQueue');
 const { ensureEmailQueueSchema } = require('./emailQueueSchema');
 let schemaPromise;
@@ -19,7 +19,7 @@ function ensureDocumentDeliverySchema() {
   ) ENGINE=InnoDB`).catch(error => { schemaPromise = null; throw error; });
   return schemaPromise;
 }
-async function queueDocumentEmail({ module, recordId, data, to, subject, html, text, createdBy, beforeQueue, afterQueue, idempotencyKey, deliveryPolicy }) {
+async function queueDocumentEmail({ module, recordId, data, to, subject, html, text, createdBy, beforeQueue, afterQueue, idempotencyKey, deliveryPolicy, validatedArtifact }) {
   await ensureDocumentDeliverySchema();
   await ensureEmailQueueSchema();
   const source = JSON.stringify(data);
@@ -30,15 +30,27 @@ async function queueDocumentEmail({ module, recordId, data, to, subject, html, t
   const [[request]] = await pool.query('SELECT * FROM document_delivery_requests WHERE request_key=?', [requestKey]);
   if (request.email_queue_id) {
     const [[queue]] = await pool.query('SELECT id,status,message_id,last_error,provider_accepted_at FROM email_queue WHERE id=?', [request.email_queue_id]);
-    return { document_pdf_url: `/api/email/documents/${request.id}/pdf`, delivery_status_url: `/api/email/documents/${request.id}`, request_id: request.id, generation_status: request.generation_status, email_queue_id: request.email_queue_id, email_status: queue?.status || 'PENDING', provider_accepted: Boolean(queue?.provider_accepted_at || queue?.status === 'SENT'), recipient_verified: false, existing: true };
+    return { document_pdf_url: `/api/email/documents/${request.id}/pdf`, delivery_status_url: `/api/email/documents/${request.id}`, request_id: request.id, generation_status: request.generation_status, email_queue_id: request.email_queue_id, email_status: queue?.status || 'UNKNOWN', email_queued: Boolean(queue && ['PENDING','RETRY','SENDING'].includes(queue.status)), last_error: queue?.last_error || null, provider_accepted: Boolean(queue?.provider_accepted_at || queue?.status === 'SENT'), recipient_verified: false, existing: true };
   }
   const [claim] = await pool.query(`UPDATE document_delivery_requests SET generation_status='GENERATING',last_error=NULL
     WHERE id=? AND (generation_status IN ('PENDING','GENERATION_FAILED') OR (generation_status='GENERATING' AND updated_at < DATE_SUB(NOW(),INTERVAL 5 MINUTE)))`, [request.id]);
-  if (!claim.affectedRows) return { document_pdf_url: `/api/email/documents/${request.id}/pdf`, delivery_status_url: `/api/email/documents/${request.id}`, request_id: request.id, generation_status: request.generation_status, email_status: 'NOT_QUEUED', provider_accepted: false, recipient_verified: false, existing: true };
+  if (!claim.affectedRows) return { document_pdf_url: `/api/email/documents/${request.id}/pdf`, delivery_status_url: `/api/email/documents/${request.id}`, request_id: request.id, generation_status: request.generation_status, email_status: 'NOT_QUEUED', email_queued: false, provider_accepted: false, recipient_verified: false, existing: true };
   let conn;
   try {
     // The immutable source snapshot is the authority for rendering and its retained retry.
-    const artifact = await createDocumentPdf(JSON.parse(request.source_json));
+    let artifact;
+    if (validatedArtifact) {
+      const sourceData = JSON.parse(request.source_json);
+      const expectedText = [sourceData.title, sourceData.reference, sourceData.party, sourceData.period,
+        ...(sourceData.tables || [{ rows: sourceData.rows || [] }]).flatMap(table => (table.rows || []).flat()),
+        ...(sourceData.totals || []).map(total => total.value)];
+      const validation = await validatePdf(validatedArtifact.buffer, { expectedText });
+      if (!/^[a-f0-9]{64}$/.test(String(validatedArtifact.sha256)) || validatedArtifact.sha256 !== validation.sha256 ||
+          safePdfFilename(validatedArtifact.filename) !== safePdfFilename(sourceData.filename || sourceData.reference || sourceData.title)) {
+        throw Object.assign(new Error('The retained PDF bytes or filename do not match their authoritative document snapshot.'), {code:'PDF_SNAPSHOT_MISMATCH'});
+      }
+      artifact = { buffer: validatedArtifact.buffer, filename: safePdfFilename(validatedArtifact.filename), validation };
+    } else artifact = await createDocumentPdf(JSON.parse(request.source_json));
     // Keep the queue insert and validated document status in one transaction.
     // Workers cannot claim a message whose document bookkeeping did not commit.
     conn=await pool.getConnection();await conn.beginTransaction();
@@ -51,7 +63,7 @@ async function queueDocumentEmail({ module, recordId, data, to, subject, html, t
     await conn.query(`UPDATE document_delivery_requests SET generation_status='VALIDATED',pdf_sha256=?,pdf_pages=?,email_queue_id=?,last_error=NULL WHERE id=?`, [queuedValidation.sha256, queuedValidation.pages, queueId, request.id]);
     if(afterQueue)await afterQueue(conn,queueId,request.id);
     await conn.commit();
-    return { document_pdf_url: `/api/email/documents/${request.id}/pdf`, delivery_status_url: `/api/email/documents/${request.id}`, request_id: request.id, generation_status: 'VALIDATED', email_queue_id: queueId, email_status: 'PENDING', provider_accepted: false, recipient_verified: false, existing: false };
+    return { document_pdf_url: `/api/email/documents/${request.id}/pdf`, delivery_status_url: `/api/email/documents/${request.id}`, request_id: request.id, generation_status: 'VALIDATED', email_queue_id: queueId, email_status: 'PENDING', email_queued: true, provider_accepted: false, recipient_verified: false, existing: false };
   } catch (error) {
     if(conn){await conn.rollback().catch(()=>{});conn.release();conn=null;}
     // A lost commit response must not downgrade an already committed document.
@@ -60,4 +72,11 @@ async function queueDocumentEmail({ module, recordId, data, to, subject, html, t
     throw error;
   } finally {if(conn)conn.release();}
 }
-module.exports = { queueDocumentEmail, ensureDocumentDeliverySchema };
+function deliveryMessage(delivery,label='Document') {
+  if(delivery.provider_accepted)return `The provider accepted the ${label.toLowerCase()} email. Recipient receipt and opening are unverified.`;
+  if(delivery.email_queued)return `${label} PDF validated and queued for email delivery.`;
+  if(delivery.email_status==='FAILED')return `${label} PDF is validated, but the retained email delivery failed. Review its recorded failure and request an authorised retry; no new message was queued.`;
+  if(delivery.email_status==='REVIEW_REQUIRED')return `${label} email delivery requires review because provider acceptance is uncertain. No automatic resend was requested.`;
+  return `${label} email has not been queued. Review the document generation and delivery status before retrying.`;
+}
+module.exports = { queueDocumentEmail, ensureDocumentDeliverySchema, deliveryMessage };

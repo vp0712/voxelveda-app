@@ -1,0 +1,56 @@
+{
+  "generated_at": "2026-10-13T10:42:14.067Z",
+  "fixture_only": true,
+  "real_email_sent": false,
+  "recipient_opening_verified": false,
+  "documents": [
+    {
+      "fixture": "individual",
+      "pages": 1,
+      "bytes": 1652754,
+      "sha256": "643229af037124e9cc1825a3781f3a13ae902cc58aa75c0d9267de4cc9f12368",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "multi",
+      "pages": 9,
+      "bytes": 1669443,
+      "sha256": "58677b5628b951a5ca48de2dc6ec71b9589680ac697d6cdd574b8bd10d9d70ad",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "imported",
+      "pages": 1,
+      "bytes": 1652416,
+      "sha256": "c356f411f90d81bdea932abfe5673daa86fe76627cd23a19fc5fd6a78fe0bc93",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "nativePo",
+      "pages": 1,
+      "bytes": 1650176,
+      "sha256": "e3fb7d26cfcf0aa52a2c3b6fd481c5819185c95eee29ab370b6060d3fa37c70d",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "csv",
+      "pages": 1,
+      "bytes": 1650853,
+      "sha256": "3b7fcc25b3f905784868a759b0647921bcaea9178df42c8ac81ddf8d68125113",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "xlsx",
+      "pages": 1,
+      "bytes": 1649723,
+      "sha256": "f3a7da6f4d921e938d272c376822d2e48284298d44ac3b405576208d31793e96",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    }
+  ]
+}

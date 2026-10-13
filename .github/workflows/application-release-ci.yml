@@ -24,6 +24,10 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
+      - name: Install bounded local OCR tools for real scanned-input fixtures
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends tesseract-ocr poppler-utils util-linux
       - name: Production application build and retained regression gate
         run: npm run build
       - name: Run the complete build with production HTTPS enforcement
@@ -56,6 +60,18 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/restored-application-proof
         run: timeout --signal=TERM --kill-after=10s 180s node scripts/restored-ui-browser-test.js
+      - name: Test procurement import, records, reports and private source workflows in responsive browsers
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          PROCUREMENT_PROOF_DIR: ${{ runner.temp }}/procurement-import-proof
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/procurement-import-browser-test.js
+      - name: Preserve procurement workflow browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: procurement-browser-${{ github.sha }}
+          path: ${{ runner.temp }}/procurement-import-proof
+          retention-days: 30
       - name: Preserve actual browser evidence
         uses: actions/upload-artifact@v4
         with:

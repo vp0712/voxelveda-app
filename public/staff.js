@@ -578,22 +578,11 @@ async function updateStaffRfqStatus(id, action) {
 
 async function openStaffInvoicePdf(id) {
   try {
-    const res = await fetch(`/api/invoice/${id}/pdf`, {
+    await window.VoxelOperations.openPdf(`/api/invoice/${encodeURIComponent(id)}/pdf`, {
       headers: { Authorization: `Bearer ${token}` }
     });
-
-    if (!res.ok) {
-      const data = await safeJson(res);
-      showToast(data.message || 'Invoice PDF failed');
-      return;
-    }
-
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    window.open(url, '_blank');
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
-  } catch {
-    showToast('Invoice PDF failed');
+  } catch (error) {
+    showToast(error.message || 'Invoice PDF failed');
   }
 }
 
