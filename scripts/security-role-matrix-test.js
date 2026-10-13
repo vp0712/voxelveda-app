@@ -7,8 +7,8 @@ const user = (role, permissions = []) => ({ id: 1, role, permissions });
 const matrix = [
   ['staff', 'MANAGE_USERS', false], ['staff', 'VIEW_BANKING', false],
   ['manager', 'MANAGE_USERS', false], ['manager', 'VIEW_BANK_DETAILS', false],
-  ['finance_user', 'POST_TRANSACTION', false], ['finance_user', 'MANAGE_SECURITY', false],
-  ['accountant', 'VIEW_FINANCE', false], ['accountant', 'MANAGE_USERS', false],
+  ['finance_user', 'VIEW_BANK_DETAILS', false], ['finance_user', 'MANAGE_SECURITY', false],
+  ['accountant', 'VIEW_FINANCE', true], ['accountant', 'MANAGE_USERS', false],
   ['hr', 'VIEW_PAYROLL_BANKING', false], ['hr', 'MANAGE_USERS', false],
   ['admin', 'MANAGE_USERS', true], ['admin', 'REVOKE_ORGANISATION_SESSIONS', false],
   ['super_admin', 'REVOKE_ORGANISATION_SESSIONS', true], ['super_admin', 'MANAGE_SECURITY_INCIDENTS', true]
@@ -25,7 +25,7 @@ for (const role of ['constructor', '__proto__', 'toString']) {
 assert.equal(hasPermission(user('staff', ['role', 'SUPER_ADMIN']), 'MANAGE_SECURITY'), false, 'untrusted role fields must not become permissions');
 assert.equal(hasPermission(user('finance_admin', ['MANAGE_USERS']), 'MANAGE_USERS'), true, 'retained explicit grants remain valid without promoting the legacy role');
 for (const role of ['admin', 'super_admin', 'finance_admin', 'sales']) {
-  const archived = ['VIEW_BANKING', 'VIEW_RFQS', 'VIEW_DASHBOARD', 'EDIT_FINANCE', 'rfqs', 'settings'];
+  const archived = ['VIEW_BANKING', 'VIEW_BANK_DETAILS', 'VIEW_BANK_DETAILS', 'finance_reconcile', 'settings'];
   for (const permission of archived) assert.equal(hasPermission(user(role, archived), permission), false, 'stored obsolete permissions must never reactivate');
 }
 

@@ -23,6 +23,8 @@ const { healthProbe: objectStorageHealthProbe } = require('./services/objectStor
 const { selfTestWebhookVerifier } = require('./services/webhookSecurityService');
 const { verifyBackupRestoreProvider } = require('./config/backupRestoreAssurance');
 const { backgroundJobService } = require('./services/backgroundJobService');
+const {startWeeklyTimesheetScheduler,stopWeeklyTimesheetScheduler,getWeeklyTimesheetSchedule}=require('./services/weeklyTimesheetScheduler');
+const {startWorkflowSlaScheduler,stopWorkflowSlaScheduler}=require('./services/workflowEscalationService');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
 const { ensureOperationalTrustSchema } = require('./services/operationalTrustSchema');
@@ -47,6 +49,10 @@ let server = null;
 let shuttingDown = false;
 
 async function initializeCriticalSchemas() {
+  // Observe the preserved original schema before any additive compatibility
+  // changes. Historical migrations remain checksum-only; no tables are dropped.
+  const inventory=await require('./services/originalSchemaInventory').inspectOriginalSchema(pool);
+  console.log(`Original schema preflight: existing_tables=${inventory.existingTableCount} original_tables=${inventory.originalTableCount} compatible=${inventory.compatible?'yes':'no'} missing_tables=${inventory.missingTables.join(',')||'none'} missing_columns=${inventory.missingColumns.join(',')||'none'}`);
   const schemas = [
     ['security', 'Security schema ready.', () => ensureSecuritySchema()],
     ['security_operations', 'Security operations schema ready.', () => ensureSecurityOperationsSchema()],
@@ -67,6 +73,22 @@ async function initializeCriticalSchemas() {
       throw error;
     }
   }
+  const originals=[
+    ['rfqSchema','ensureRfqSchema'],['hrAdministrationSchema','ensureHrAdministrationSchema'],
+    ['workforceSchema','ensureWorkforceSchema'],['notificationSchema','ensureNotificationSchema'],
+    ['trashSchema','ensureTrashSchema'],['workflowSchema','ensureWorkflowSchema'],
+    ['procurementSchema','ensureProcurementSchema'],['careersSchema','ensureCareersSchema'],
+    ['employeeIdentitySchema','ensureEmployeeIdentitySchema'],['qmsSchema','ensureQmsSchema'],
+    ['qmsAdvancedSchema','ensureQmsAdvancedSchema'],['qmsQualityGovernanceSchema','ensureQmsQualityGovernanceSchema'],
+    ['qmsEnterpriseCompletionSchema','ensureQmsEnterpriseCompletionSchema']
+  ];
+  for(const [module,method] of originals)await require('./services/'+module)[method]();
+  for(const [module,method] of [['invoice','ensureInvoiceColumns'],['customer','ensureCustomerTable'],['stock','ensureStockTable'],['material','ensureMaterialTable'],['supplier','ensureSupplierTables'],['meeting','ensureMeetingTable'],['task','ensureTaskTables'],['roster','ensureRosterTable'],['attendance','ensureAttendanceTables'],['expense','ensureExpenseTables'],['compliance','ensureComplianceTables'],['dashboard','ensureDashboardTables']])await require('./controllers/'+module+'Controller')[method]();
+  await require('./services/documentDeliveryService').ensureDocumentDeliverySchema();
+  await require('./services/weeklyTimesheetDeliverySchema').ensureWeeklyTimesheetDeliverySchema();
+  const restored=await require('./services/originalSchemaInventory').inspectOriginalSchema(pool);
+  if(!restored.compatible)throw Object.assign(new Error('Original application schema is incompatible; records were preserved.'),{code:'ORIGINAL_SCHEMA_INCOMPATIBLE',details:{missingTables:restored.missingTables,missingColumns:restored.missingColumns}});
+  console.log(`Original schema verified: ${restored.originalTableCount} original base tables compatible; historical IDs, records and keys preserved.`);
 }
 
 function configured(keys) {
@@ -180,28 +202,34 @@ async function initializeServices() {
   }
 
   if (!isEmailConfigured()) {
-    setControl('smtp', CONTROL_STATES.NOT_CONFIGURED, 'SMTP credentials are incomplete');
+    setControl('smtp', CONTROL_STATES.NOT_CONFIGURED, 'Company email transport is not configured');
     return;
   }
 
-  setControl('smtp', CONTROL_STATES.INITIALIZING, 'Verifying SMTP provider connection');
+  setControl('smtp', CONTROL_STATES.INITIALIZING, 'Verifying configured company email transport');
   try {
-    await verifyConnection();
-    setControl('smtp', CONTROL_STATES.EXTERNALLY_VERIFIED, 'SMTP provider accepted a verified transport connection');
-    console.log('SMTP connection verified.');
+    const result=await verifyConnection();
+    const transport=result?.transport||(require('./services/emailService').isRelayConfigured()?'https_relay':'smtp');
+    setControl('smtp', CONTROL_STATES.EXTERNALLY_VERIFIED, `Company email transport health verified: ${transport}; recipient delivery is not confirmed`);
+    console.log(`Company email transport health verified: ${transport}; no recipient receipt claim.`);
   } catch (error) {
     setControl('smtp', CONTROL_STATES.DEGRADED, error.code || 'SMTP_CONNECTION_FAILED');
-    addWarning('SMTP delivery is degraded; queued email remains available for retry after provider recovery');
-    console.warn('SMTP verification failed; startup will continue with queued delivery degraded.');
+    addWarning('Company email delivery is degraded; queued email remains available for controlled retry');
+    console.warn('Company email transport verification failed; startup will continue with queued delivery degraded.');
   }
 }
 
 async function initializeWorkers() {
   setCriticalService('background_workers', CONTROL_STATES.INITIALIZING);
   const framework = await backgroundJobService.initialize();
-  const started = startEmailQueueWorker() ? 1 : 0;
+  const weeklySchedule=getWeeklyTimesheetSchedule();
+  const emailStarted=startEmailQueueWorker(),weeklyStarted=startWeeklyTimesheetScheduler(),workflowStarted=startWorkflowSlaScheduler();
+  const started = [emailStarted,weeklyStarted,workflowStarted].filter(Boolean).length;
+  setCriticalService('weekly_timesheet_worker',weeklyStarted?CONTROL_STATES.OPERATIONAL:CONTROL_STATES.DEGRADED,
+    `Worked-only weekly PDF job ${weeklyStarted?'registered and scheduled':'disabled'}; ${weeklySchedule.timezone}; next due ${weeklySchedule.next_due_utc || 'none'}`);
+  console.log('Weekly timesheet runtime configuration',JSON.stringify(weeklySchedule));
   setCriticalService('background_workers', CONTROL_STATES.OPERATIONAL,
-    `${framework.registered_jobs} retained email jobs registered with durable MySQL leases; ${started} schedulers enabled`);
+    `${framework.registered_jobs} original application jobs registered with durable MySQL leases; ${started} schedulers enabled`);
   console.log(`Background worker framework ready: ${framework.registered_jobs} jobs registered, ${started} schedulers enabled with durable MySQL leases.`);
 }
 
@@ -255,6 +283,16 @@ async function bootstrap() {
     setPhase('INITIALIZING_SERVICES');
     await initializeServices();
 
+    // Optional, explicitly authorised release verification uses an immutable
+    // fixture and the configured company transport, never business recipients.
+    try {
+      const verification=await require('./services/releasePdfVerificationService').queueAuthorisedReleasePdf();
+      if(verification.enabled)console.log(`Release PDF verification: request_id=${verification.request_id} generation_status=${verification.generation_status} email_queue_id=${verification.email_queue_id||'none'} email_status=${verification.email_status}; recipient receipt remains unverified.`);
+    } catch(error) {
+      addWarning('Authorised release PDF verification is pending controlled retry: '+(error.code||'PDF_VERIFICATION_FAILED'));
+      console.warn('Release PDF verification pending: '+(error.code||'PDF_VERIFICATION_FAILED'));
+    }
+
     if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') {
       await require('./utils/seedAdmin')();
     }
@@ -268,6 +306,8 @@ async function bootstrap() {
     const failedPhase = detailedReadiness().phase;
     markFailed(error, failedPhase);
     stopEmailQueueWorker();
+    stopWeeklyTimesheetScheduler();
+    stopWorkflowSlaScheduler();
     await getRateLimitService().close().catch(() => {});
     await pool.end().catch(() => {});
     const migrationContext = error?.details?.migration_id
@@ -283,6 +323,8 @@ async function shutdown(signal = 'shutdown', exitCode = 0) {
   shuttingDown = true;
   console.log(`${signal} received. Closing server.`);
   stopEmailQueueWorker();
+  stopWeeklyTimesheetScheduler();
+  stopWorkflowSlaScheduler();
   await getRateLimitService().close().catch(() => {});
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
   await pool.end().catch(() => {});

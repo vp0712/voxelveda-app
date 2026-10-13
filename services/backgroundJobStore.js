@@ -21,50 +21,10 @@ class BackgroundJobStore {
     await this.pruneTelemetry({ aggressive: true, jobKeys });
   }
 
-  async pruneTelemetry(options = {}) {
-    const jobKeys = Array.isArray(options.jobKeys) ? options.jobKeys : [];
-    if (!jobKeys.length) return { deletedRuns: 0, skipped: true, reason: 'no_registered_jobs' };
-    const placeholders = jobKeys.map(() => '?').join(',');
-    const aggressive = Boolean(options.aggressive);
-    const runRetentionDays = aggressive ? 2 : 7;
-    const failureRetentionDays = aggressive ? 14 : 30;
-    const resolvedRetentionDays = aggressive ? 14 : 30;
-    const batchSize = aggressive ? 1000 : 250;
-    const maxBatches = aggressive ? 80 : 4;
-    let deletedRuns = 0;
-
-    for (let i = 0; i < maxBatches; i += 1) {
-      const [result] = await this.pool.query(
-        `DELETE FROM background_job_runs
-          WHERE job_key IN (${placeholders}) AND status IN ('COMPLETED','FAILED','RETRY')
-            AND completed_at IS NOT NULL
-            AND completed_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
-          ORDER BY completed_at ASC
-          LIMIT ?`,
-        [...jobKeys, runRetentionDays, batchSize]
-      );
-      const affected = Number(result.affectedRows || 0);
-      deletedRuns += affected;
-      if (affected < batchSize) break;
-    }
-
-    await this.pool.query(
-      `DELETE FROM background_job_failures
-        WHERE job_key IN (${placeholders}) AND failed_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
-        LIMIT ?`,
-      [...jobKeys, failureRetentionDays, aggressive ? 5000 : 500]
-    ).catch(() => {});
-    await this.pool.query(
-      `DELETE FROM background_job_dead_letters
-        WHERE job_key IN (${placeholders}) AND status='RESOLVED'
-          AND resolved_at IS NOT NULL
-          AND resolved_at < DATE_SUB(NOW(3), INTERVAL ? DAY)
-        LIMIT ?`,
-      [...jobKeys, resolvedRetentionDays, aggressive ? 5000 : 500]
-    ).catch(() => {});
-
-    if (deletedRuns) console.log(`BACKGROUND_JOB_TELEMETRY_PRUNED runs=${deletedRuns} retention_days=${runRetentionDays}`);
-    return { deletedRuns, runRetentionDays };
+  async pruneTelemetry() {
+    // Preserve all existing delivery/retry/job history during restoration.
+    // Capacity recovery must not remove evidence of historical work.
+    return { deletedRuns: 0, held: true, reason: 'HISTORY_PRESERVATION' };
   }
 
   async acquireLease({ jobKey, leaseOwner, leaseToken, leaseSeconds }) {

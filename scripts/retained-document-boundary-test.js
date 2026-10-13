@@ -7,7 +7,7 @@ const { hasPermission } = require('../services/authorizationService');
 const retirement = require('../services/applicationRetirement');
 
 async function run() {
-  const body = Buffer.from('Fixture enquiry evidence\nOnly retained documents may be read.');
+  const body=(await require('../services/documentPdfService').createDocumentPdf({title:'Fixture document',reference:'DOC-FIXTURE',columns:[],rows:[]})).buffer;
   const sha256 = crypto.createHash('sha256').update(body).digest('hex');
   const documents = new Map();
   const grants = new Map();
@@ -109,7 +109,9 @@ async function run() {
     },
     './sessionService': { async logSecurityEvent(event) { events.push(event); } },
     './stepUpService': { isStepUpFresh: (session) => session?.fresh === true, stepUpTtlMinutes: () => 5 },
-    './applicationRetirement': retirement
+    './applicationRetirement': retirement,
+    './customerRecordScope': require('../services/customerRecordScope'),
+    './documentPdfService':require('../services/documentPdfService')
   };
   new vm.Script(fs.readFileSync(filename, 'utf8'), { filename }).runInNewContext({
     module: moduleFixture, exports: moduleFixture.exports,
@@ -121,7 +123,7 @@ async function run() {
     }
   });
   const service = moduleFixture.exports;
-  const owner = { id: 20, role: 'viewer', permissions: [] };
+  const owner = { id: 20, role: 'staff', permissions: [] };
   const other = { id: 21, role: 'viewer', permissions: [] };
   const admin = { id: 99, role: 'super_admin', permissions: ['VIEW_BANKING', 'VIEW_CONFIDENTIAL_FILES', 'VIEW_RFQS'] };
   const request = (user, params, fresh = true) => ({ user, params, body: { ttl_minutes: 5 }, session: { id: 'fixture-session', fresh } });
@@ -132,7 +134,7 @@ async function run() {
   const file = { path: path.join(__dirname, '..', 'uploads', 'fixture-enquiry.txt'), filename: 'fixture-enquiry.txt', originalname: 'enquiry.txt', mimetype: 'text/plain', size: body.length, malwareScan: { status: 'CLEAN' } };
 
   // Reject registration before schema, SQL, local-file or object-storage access.
-  for (const module of ['rfq', 'finance', 'invoice', 'suppliers', 'careers', 'unknown', '', undefined]) {
+  for (const module of ['banking','finance','erp','high-risk-finance','unknown','',undefined]) {
     await assert.rejects(service.registerDocument({ module, file, recordType: 'evidence', recordId: '42' }), { status: 410, code: 'MODULE_RETIRED' });
   }
   assert.equal(schemaChecks, 0);
@@ -140,7 +142,7 @@ async function run() {
   assert.equal(storage.length, 0);
 
   const archived = [];
-  for (const module of ['rfq', 'finance', 'invoice', 'suppliers', 'careers', 'unknown', '']) {
+  for (const module of ['banking','finance','erp','high-risk-finance','unknown','']) {
     const row = document(module, { classification: 'PUBLIC', access_policy: 'AUTHENTICATED' });
     const token = 'archived-' + row.id;
     const oldGrant = grant(row, token);
@@ -169,7 +171,7 @@ async function run() {
     assert.deepEqual(transactions.slice(-3), ['begin', 'rollback', 'release']);
   }
 
-  for (const module of ['profile', 'security']) {
+  for (const module of ['profile', 'security','rfq','invoice','suppliers','careers']) {
     const row = document(module);
     assert.equal((await service.getAuthorisedDocument(owner, row.id)).status, 200);
     assert.equal((await service.getAuthorisedDocument(other, row.id)).status, 403, 'retained private documents must keep owner/permission isolation');
@@ -196,7 +198,9 @@ async function run() {
     const replay = response();
     await service.sendGrantedDocument(request(owner, { token }), replay);
     assert.equal(replay.statusCode, 404, 'allowed grants must remain single use');
+    const storageBeforeArchive=storage.length;
     assert.equal(await service.removeDocumentInternal(row.id), true);
+    assert.equal(storage.length,storageBeforeArchive,'archive preserves all local and object attachment bytes');
     assert(row.deleted_at, 'permitted retained document removal must still work');
   }
 

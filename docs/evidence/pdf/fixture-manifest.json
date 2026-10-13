@@ -1,0 +1,46 @@
+{
+  "generated_by": "scripts/document-pdf-delivery-test.js",
+  "purpose": "Automated fixtures, no business records or real customer recipient. MIME fixture decodes to the exact invoice PDF bytes. Hashes describe the saved artifacts in this directory; PDF creation timestamps vary between runs.",
+  "artifacts": [
+    {
+      "file": "invoice.pdf",
+      "bytes": 1658468,
+      "sha256": "45dae93cc9fe79046fd107a9daf5b7f437c9d9b263c763f65aec476635049835"
+    },
+    {
+      "file": "statement.pdf",
+      "bytes": 1658569,
+      "sha256": "1042c81fe9e7d01004d230dcc522b6f7ff4257ba0e6f734510bd78a5af130d70"
+    },
+    {
+      "file": "blank.pdf",
+      "bytes": 1648646,
+      "sha256": "08a9023ac7b8639e0133a2e2e34a19bea3d8d0ba5e8cbdbb4691702c7f25dc04"
+    },
+    {
+      "file": "timesheet.pdf",
+      "bytes": 1649695,
+      "sha256": "663d66679aedcca7e491bdf204053efa116174fb1bd985de05e7f916f5152a48"
+    },
+    {
+      "file": "employee.pdf",
+      "bytes": 1653092,
+      "sha256": "7368ad6b613adec2d657f29f601fa23b1a2fc13bd66517e7e6c5f8c647b04ff7"
+    },
+    {
+      "file": "release.pdf",
+      "bytes": 1649431,
+      "sha256": "6d4312ec0998f6a8aa6b854cc99417560ba33a635f90d6e0bb5914c5746e84f9"
+    },
+    {
+      "file": "purchase.pdf",
+      "bytes": 1657748,
+      "sha256": "b4fd0df37c7666910b4201c485b5a7ce108cf53e739cebee18b6e5a2c4af52df"
+    },
+    {
+      "file": "fixture.eml",
+      "bytes": 2241041,
+      "sha256": "5d4d2050259645add3b21224942158ff0a44d8e96e8e580fe08ec06bbe846518"
+    }
+  ]
+}

@@ -13,7 +13,12 @@ const RATE_LIMIT_POLICIES = Object.freeze({
   password_reset: { windowMs: 60 * 60 * 1000, max: Number(process.env.PASSWORD_RESET_RATE_LIMIT_MAX || 6), keyPrefix: 'auth:password-reset' },
   invitation: { windowMs: 15 * 60 * 1000, max: Number(process.env.INVITATION_RATE_LIMIT_MAX || 10), keyPrefix: 'auth:invitation' },
   customer_registration: { windowMs: 60 * 60 * 1000, max: Number(process.env.CUSTOMER_REGISTRATION_RATE_LIMIT_MAX || 5), keyPrefix: 'public:customer-registration' },
-  csp_report: { windowMs: 60 * 1000, max: Number(process.env.CSP_REPORT_RATE_LIMIT_MAX || 30), keyPrefix: 'public:csp-report' }
+  csp_report: { windowMs: 60 * 1000, max: Number(process.env.CSP_REPORT_RATE_LIMIT_MAX || 30), keyPrefix: 'public:csp-report' },
+  public_rfq: {windowMs:3600000,max:Number(process.env.PUBLIC_RFQ_RATE_LIMIT_MAX||8),keyPrefix:'public:rfq'},
+  ai_lead: {windowMs:3600000,max:Number(process.env.AI_LEAD_RATE_LIMIT_MAX||6),keyPrefix:'public:lead'},
+  shift_qr: {windowMs:60000,max:30,keyPrefix:'public:shift-qr'},
+  coc_verification: {windowMs:60000,max:30,keyPrefix:'public:verification'},
+  qr_generation: {windowMs:60000,max:30,keyPrefix:'public:qr'}
 });
 
 function clientIp(req) {

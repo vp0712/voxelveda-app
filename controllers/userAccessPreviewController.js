@@ -32,9 +32,9 @@ function authorityWarning(req, targetUserId, targetRole, proposedRole) {
 
 exports.previewPermissionDifference = async (req, res) => {
   try {
-    const retiredFields = ['employee_number', 'department', 'manager_id', 'access_scope', 'employee_id', 'employment_type', 'job_title', 'salary', 'hourly_rate', 'payroll', 'hire_date'];
-    if (retiredFields.some((key) => Object.hasOwn(req.body || {}, key))) {
-      return res.status(400).json({ code: 'FIELD_UNAVAILABLE', message: 'Employment fields are no longer available.' });
+    const unsupportedFields = Object.keys(req.body || {}).filter(key => !['role', 'permissions'].includes(key));
+    if (unsupportedFields.length) {
+      return res.status(400).json({ code: 'FIELD_UNAVAILABLE', message: 'Access previews accept only role and permission changes.', fields: unsupportedFields });
     }
     const userId = Number(req.params.id);
     const proposedRole = normalizeRole(req.body.role);

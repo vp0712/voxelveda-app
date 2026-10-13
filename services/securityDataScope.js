@@ -2,7 +2,16 @@
 
 // Historical audit entries remain untouched, including their integrity chain.
 // Active security views and retention jobs use the same explicit boundary.
-const RETAINED_AUDIT_MODULES = Object.freeze(['security', 'profile', 'settings', 'auth', 'authentication', 'users', 'authorization']);
+const RETAINED_AUDIT_MODULES = Object.freeze([
+  'security', 'profile', 'settings', 'auth', 'authentication', 'users', 'authorization',
+  'rfq', 'rfqs', 'invoice', 'invoices', 'quotation', 'quotations',
+  'customer', 'customers', 'supplier', 'suppliers', 'procurement',
+  'stock', 'materials', 'material', 'inventory', 'production', 'qms', 'compliance',
+  'staff', 'hr', 'attendance', 'roster', 'timesheet', 'timesheets',
+  'task', 'tasks', 'meeting', 'meetings', 'notification', 'notifications',
+  'document', 'documents', 'workflow', 'workflows', 'trash', 'expenses', 'expense',
+  'careers', 'recruitment', 'employee_identities', 'security_assurance', 'security_governance', 'enterprise_control_plane'
+]);
 const RETAINED_EVENT_TYPES = Object.freeze([
   'LOGIN_FAILURE', 'LOGIN_SUCCESS', 'MFA_SETUP_REQUIRED', 'MFA_CHALLENGE_ISSUED',
   'MFA_FAILED', 'MFA_ENABLED', 'MFA_DISABLED', 'MFA_VERIFIED', 'MFA_RECOVERY_CODE_USED',
@@ -18,7 +27,17 @@ const RETAINED_EVENT_TYPES = Object.freeze([
   'INCIDENT_ACCOUNT_CONTAINED', 'INCIDENT_RECOVERY_INITIATED', 'SECURITY_REPORT_EXPORTED',
   'SENSITIVE_DOCUMENT_VIEWED', 'DOCUMENT_DOWNLOAD_GRANT_CREATED',
   'BREAK_GLASS_ACTIVATED', 'BREAK_GLASS_ACCESS_USED', 'IMPERSONATION_STARTED',
-  'IMPERSONATION_ACCESS_USED', 'DATABASE_SECURITY_ATTESTED', 'DB_CAPACITY_PROBE'
+  'IMPERSONATION_ACCESS_USED', 'DATABASE_SECURITY_ATTESTED', 'DB_CAPACITY_PROBE',
+  'API_TOKEN_CREATED', 'API_TOKEN_REVOKED', 'WEBHOOK_SOURCE_CHANGED', 'DATA_RETENTION_POLICY_CHANGED',
+  'DATA_RETENTION_PREVIEWED', 'RETENTION_HOLD_CREATED', 'SENSITIVE_EXPORT_REQUESTED', 'SENSITIVE_EXPORT_APPROVED',
+  'SECRET_ROTATION_RECORDED', 'BACKUP_ATTESTATION_RECORDED', 'DOCUMENT_QUARANTINED', 'SECURITY_ALERT_RULE_CHANGED',
+  'TRUSTED_DEVICE_REVOKED', 'SECURITY_EVIDENCE_SNAPSHOT_CREATED', 'AUDIT_INTEGRITY_SEALED',
+  'JIT_ACCESS_REQUESTED', 'JIT_ACCESS_APPROVED', 'ACCESS_REVIEW_CREATED', 'ACCESS_REVIEW_DECISION',
+  'SEGREGATION_POLICY_CHANGED', 'RISK_EXCEPTION_REQUESTED', 'RISK_EXCEPTION_APPROVED',
+  'CRYPTO_KEY_VERSION_RECORDED', 'SERVICE_ACCOUNT_CREATED', 'RESILIENCE_EXERCISE_RECORDED',
+  'BREAK_GLASS_REQUESTED', 'BREAK_GLASS_REVOKED', 'IMPERSONATION_ENDED',
+  'CONTROL_EVIDENCE_RECORDED', 'CHANGE_REQUESTED', 'CHANGE_APPROVED', 'RESILIENCE_DRILL_RECORDED',
+  'VENDOR_RISK_ASSESSED', 'AI_ACTION_POLICY_UPDATED', 'MANUFACTURING_TRACE_RECORDED'
 ]);
 const RETAINED_HIGH_RISK_EVENTS = Object.freeze([
   'ROLE_CHANGED', 'PERMISSION_CHANGED', 'ROLE_OR_PERMISSION_CHANGED', 'USER_DISABLED',
@@ -42,7 +61,7 @@ function retainedEventScope(alias = '') {
   const params = [...RETAINED_EVENT_TYPES];
   const metadataFields = {
     module: RETAINED_AUDIT_MODULES,
-    scope: ['account', 'user', 'users', 'security', 'profile', 'settings', 'auth', 'authentication', 'authorization', 'organisation', 'organization', 'application'],
+    scope: ['account', 'user', 'organisation', 'organization', 'application', ...RETAINED_AUDIT_MODULES],
     recordType: ['user', 'profile', 'profile_photo', 'auth_session', 'security_report', 'security_incident', 'settings', 'security'],
     record_type: ['user', 'profile', 'profile_photo', 'auth_session', 'security_report', 'security_incident', 'settings', 'security'],
     export_type: ['security_report']

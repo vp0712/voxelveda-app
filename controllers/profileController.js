@@ -1,6 +1,9 @@
 const pool = require('../config/db');
 const { logAudit } = require('../services/auditService');
 const { logSecurityEvent } = require('../services/sessionService');
+const { ensureHrAdministrationSchema } = require('../services/hrAdministrationSchema');
+const { ensureSecurityGovernanceSchema } = require('../services/securityGovernanceSchema');
+const { normalizeTimesheetDeliveryEmail } = require('../services/timesheetDeliveryPreferenceService');
 
 const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
@@ -34,9 +37,10 @@ exports.getMyProfile = async (req, res) => {
   try {
     const userId = Number(req.user?.id);
     if (!userId) return res.status(401).json({ message: 'Authentication required' });
+    await ensureHrAdministrationSchema();
 
     const [[user]] = await pool.query(
-      `SELECT u.id, u.user_uuid, u.name, u.username, u.email, u.role,
+      `SELECT u.id, u.user_uuid, u.name, u.username, u.email, u.role, u.timesheet_delivery_email,
               u.account_status, u.active,
               p.mobile_number, p.profile_photo_mime, p.profile_photo_size, p.profile_photo_updated_at,
               p.updated_at AS profile_updated_at
@@ -52,6 +56,7 @@ exports.getMyProfile = async (req, res) => {
       profile: {
         id: user.id, user_uuid: user.user_uuid, name: user.name, username: user.username, email: user.email, role: user.role,
         account_status: user.account_status, mobile_number: user.mobile_number,
+        timesheet_delivery_email: user.timesheet_delivery_email || null,
         profile_photo_mime: user.profile_photo_mime, profile_photo_size: user.profile_photo_size,
         profile_photo_updated_at: user.profile_photo_updated_at, profile_updated_at: user.profile_updated_at,
         active: Number(user.active) !== 0,
@@ -66,47 +71,71 @@ exports.getMyProfile = async (req, res) => {
 };
 
 exports.updateMyProfile = async (req, res) => {
+  let connection;
+  let committed = false;
   try {
     const userId = Number(req.user?.id);
     if (!userId) return res.status(401).json({ message: 'Authentication required' });
 
     let name;
     let mobileNumber;
+    let designatedEmail;
     try {
       name = sanitizeName(req.body.name);
       mobileNumber = normalizeMobile(req.body.mobile_number);
+      if (Object.hasOwn(req.body, 'timesheet_delivery_email')) designatedEmail = normalizeTimesheetDeliveryEmail(req.body.timesheet_delivery_email);
     } catch (validationError) {
-      return res.status(400).json({ message: validationError.message });
+      return res.status(400).json({ message: validationError.message, code: validationError.code, fields: validationError.fields });
     }
 
-    const [[beforeUser]] = await pool.query('SELECT name FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1', [userId]);
+    await ensureHrAdministrationSchema();
+    await ensureSecurityGovernanceSchema();
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+    // Lock the account before its preferences, matching the delivery worker's
+    // lock order. An already completed delivery keeps its original recipient.
+    const [[beforeUser]] = await connection.query('SELECT name, timesheet_delivery_email FROM users WHERE id = ? AND deleted_at IS NULL LIMIT 1 FOR UPDATE', [userId]);
     if (!beforeUser) return res.status(404).json({ message: 'Profile not found' });
-    const [[beforeProfile]] = await pool.query('SELECT mobile_number FROM user_profiles WHERE user_id = ? LIMIT 1', [userId]);
+    const [[beforeProfile]] = await connection.query('SELECT mobile_number FROM user_profiles WHERE user_id = ? LIMIT 1 FOR UPDATE', [userId]);
+    if (designatedEmail === undefined) designatedEmail = beforeUser.timesheet_delivery_email || null;
+    if (name === beforeUser.name && mobileNumber === (beforeProfile?.mobile_number || null)
+        && designatedEmail === (beforeUser.timesheet_delivery_email || null)) {
+      await connection.commit();
+      committed = true;
+      return res.json({ message: 'Profile is already up to date', unchanged: true, profile: { name, mobile_number: mobileNumber, timesheet_delivery_email: designatedEmail } });
+    }
 
-    await pool.query('UPDATE users SET name = ? WHERE id = ? AND deleted_at IS NULL', [name, userId]);
-    await pool.query(
+    await connection.query('UPDATE users SET name = ?, timesheet_delivery_email = ? WHERE id = ? AND deleted_at IS NULL', [name, designatedEmail, userId]);
+    await connection.query(
       `INSERT INTO user_profiles (user_id, mobile_number)
        VALUES (?, ?)
        ON DUPLICATE KEY UPDATE mobile_number = VALUES(mobile_number), updated_at = CURRENT_TIMESTAMP(3)`,
       [userId, mobileNumber]
     );
 
-    await logAudit(pool, {
+    await logAudit(connection, {
       actorId: userId,
       action: 'SELF_PROFILE_UPDATED',
       module: 'profile',
       recordType: 'user',
       recordId: userId,
-      oldValue: { name: beforeUser.name, mobile_number: beforeProfile?.mobile_number || null },
-      newValue: { name, mobile_number: mobileNumber },
+      oldValue: { name: beforeUser.name, mobile_number: beforeProfile?.mobile_number || null, timesheet_delivery_email: beforeUser.timesheet_delivery_email || null },
+      newValue: { name, mobile_number: mobileNumber, timesheet_delivery_email: designatedEmail },
       ipAddress: req.ip,
       userAgent: req.get('user-agent')
     });
+    await connection.commit();
+    committed = true;
 
-    return res.json({ message: 'Profile updated successfully', profile: { name, mobile_number: mobileNumber } });
+    return res.json({ message: 'Profile updated successfully', profile: { name, mobile_number: mobileNumber, timesheet_delivery_email: designatedEmail } });
   } catch (error) {
     console.error('updateMyProfile error:', error.message);
     return res.status(500).json({ message: 'Unable to update profile', request_id: req.requestId || null });
+  } finally {
+    if (connection) {
+      if (!committed) await connection.rollback().catch(() => {});
+      connection.release();
+    }
   }
 };
 

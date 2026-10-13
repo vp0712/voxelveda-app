@@ -57,6 +57,7 @@
           <div class="formGrid">
             <div class="field full"><label for="name">Full name</label><input id="name" name="name" maxlength="120" autocomplete="name" required></div>
             <div class="field full"><label for="mobile">Mobile number</label><input id="mobile" name="mobile_number" maxlength="30" inputmode="tel" autocomplete="tel" placeholder="e.g. +61 4xx xxx xxx"></div>
+            <div class="field full"><label for="timesheetDeliveryEmail">Timesheet delivery email</label><input id="timesheetDeliveryEmail" name="timesheet_delivery_email" type="email" maxlength="254" inputmode="email" aria-describedby="timesheetDeliveryHint timesheetDeliveryError" placeholder="One designated email address"><small id="timesheetDeliveryHint">Weekly PDFs go only to this address when you worked eligible shifts. Leave blank to disable delivery. Your login email will not be used as a fallback.</small><small id="timesheetDeliveryError" role="alert"></small></div>
             <div class="field"><label for="email">Email</label><input id="email" readonly></div>
             <div class="field"><label for="username">Username</label><input id="username" readonly></div>
           </div>
@@ -77,6 +78,6 @@
     </div>
   </div>
 
-  <script src="/profile.js?v=20260915-avatar-viewer-r3" defer></script>
+  <script src="/profile.js?v=20261012-timesheet-preference" defer></script>
 </body>
 </html>

@@ -9,6 +9,8 @@ const { deleteObject, getObject, isConfigured: objectStorageConfigured, keyFromS
 const { logSecurityEvent } = require('./sessionService');
 const { isStepUpFresh, stepUpTtlMinutes } = require('./stepUpService');
 const { documentModuleAvailable } = require('./applicationRetirement');
+const { validatePdf, safePdfFilename, storedDocumentArtifact } = require('./documentPdfService');
+const { customerScoped, ownsCustomerRecord } = require('./customerRecordScope');
 
 const UPLOAD_ROOT = path.resolve(__dirname, '..', 'uploads');
 const CLASSIFICATIONS = new Set(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']);
@@ -46,6 +48,53 @@ function scanStatusForFile(file) {
   if (synchronous === 'CLEAN') return 'CLEAN';
   if (synchronous === 'UNVERIFIED') return 'UNAVAILABLE';
   return currentScanStatus();
+}
+
+const ORIGINAL_DOCUMENT_PERMISSIONS=Object.freeze({
+  rfq:['VIEW_RFQS'],invoice:['VIEW_FINANCE'],invoices:['VIEW_FINANCE'],quotation:['VIEW_FINANCE'],quotes:['VIEW_FINANCE'],
+  customer:['VIEW_CUSTOMERS'],customers:['VIEW_CUSTOMERS'],supplier:['VIEW_SUPPLIERS'],suppliers:['VIEW_SUPPLIERS'],
+  procurement:['VIEW_PROCUREMENT'],stock:['VIEW_INVENTORY'],materials:['VIEW_INVENTORY'],
+  expense:['VIEW_FINANCE'],expenses:['VIEW_FINANCE'],qms:['VIEW_QMS'],compliance:['VIEW_COMPLIANCE'],
+  meeting:['VIEW_MEETINGS','MANAGE_MEETINGS'],meetings:['VIEW_MEETINGS','MANAGE_MEETINGS'],
+  careers:['VIEW_STAFF_HR','MANAGE_USERS'],staff:['VIEW_STAFF_HR','MANAGE_USERS'],hr:['VIEW_STAFF_HR','MANAGE_USERS'],
+  'employee-identities':['VIEW_STAFF_HR','MANAGE_USERS']
+});
+async function mayViewDocument(user,document,db=pool){
+  if(!documentModuleAvailable(document.module))return false;
+  if(!user || !Number.isSafeInteger(Number(user.id)) || Number(user.id)<1)return false;
+  const module=String(document.module || '').toLowerCase();
+  if (customerScoped(user) && ['rfq','rfqs','invoice','invoices','quotation','quotes'].includes(module)) {
+    const invoiceModule = ['invoice','invoices','quotation','quotes'].includes(module);
+    if (!hasPermission(user, invoiceModule ? 'VIEW_FINANCE' : 'VIEW_RFQS')) return false;
+    const id = Number(document.record_id);
+    if (!Number.isSafeInteger(id) || id < 1) return false;
+    const [[record]] = invoiceModule
+      ? await db.query('SELECT customer_email FROM invoices WHERE id=? AND IFNULL(deleted,0)=0 LIMIT 1', [id])
+      : await db.query('SELECT email FROM rfqs WHERE id=? AND IFNULL(deleted,0)=0 LIMIT 1', [id]);
+    return Boolean(record && ownsCustomerRecord(user, invoiceModule ? record.customer_email : record.email));
+  }
+  const ownsDocument=Number(document.owner_user_id)>0 && Number(document.owner_user_id)===Number(user.id);
+  if(ownsDocument)return true;
+  if(['profile','security'].includes(module)){
+    const publicDocument=document.access_policy==='AUTHENTICATED' && document.classification==='PUBLIC';
+    return publicDocument || hasPermission(user,'VIEW_CONFIDENTIAL_FILES');
+  }
+  if(ORIGINAL_DOCUMENT_PERMISSIONS[module])return ORIGINAL_DOCUMENT_PERMISSIONS[module].some(permission=>hasPermission(user,permission));
+  if(['attendance','timesheet','timesheets','roster'].includes(module)){
+    if(hasPermission(user,'VIEW_ALL_TIMESHEETS') || hasPermission(user,'EDIT_ATTENDANCE'))return true;
+    if(!hasPermission(user,'VIEW_TEAM_TIMESHEET') || !Number.isSafeInteger(Number(document.owner_user_id)) || Number(document.owner_user_id)<1)return false;
+    const [[owner]]=await db.query('SELECT manager_id FROM users WHERE id=? LIMIT 1',[Number(document.owner_user_id)]);
+    return Number(owner?.manager_id)===Number(user.id);
+  }
+  if(['task','tasks'].includes(module)){
+    if(hasPermission(user,'MANAGE_JOBS'))return true;
+    const id=Number(document.record_id);
+    if(!Number.isSafeInteger(id) || id<1 || !/^(task|job)$/i.test(String(document.record_type)))return false;
+    if(!hasPermission(user,'MANAGE_TEAM_JOBS') && !hasPermission(user,'VIEW_OWN_JOBS'))return false;
+    const [[task]]=await db.query('SELECT t.assigned_to,u.manager_id FROM tasks t LEFT JOIN users u ON u.id=t.assigned_to WHERE t.id=? AND IFNULL(t.deleted,0)=0 LIMIT 1',[id]);
+    return Boolean(task && ((hasPermission(user,'VIEW_OWN_JOBS') && Number(task.assigned_to)===Number(user.id)) || (hasPermission(user,'MANAGE_TEAM_JOBS') && Number(task.manager_id)===Number(user.id))));
+  }
+  return false;
 }
 
 async function registerDocument({ module, recordType, recordId, ownerUserId, uploadedBy, file, classification = 'CONFIDENTIAL' }) {
@@ -104,10 +153,7 @@ async function getAuthorisedDocument(user, id, db = pool) {
   const [[document]] = await db.query(`SELECT * FROM secure_documents WHERE id = ? AND deleted_at IS NULL LIMIT 1${db === pool ? '' : ' FOR UPDATE'}`, [id]);
   if (!document) return { status: 404 };
   if (!documentModuleAvailable(document.module)) return { status: 410, code: 'MODULE_RETIRED' };
-  const permission = 'VIEW_CONFIDENTIAL_FILES';
-  const ownsDocument = document.owner_user_id && Number(document.owner_user_id) === Number(user.id);
-  const authenticatedOnly = document.access_policy === 'AUTHENTICATED' && document.classification === 'PUBLIC';
-  if (!authenticatedOnly && !ownsDocument && !hasPermission(user, permission)) return { status: 403 };
+  if(!await mayViewDocument(user,document,db))return {status:403};
   if (document.scan_status === 'QUARANTINED' || document.scan_status === 'PENDING_SCAN') return { status: 423 };
 
   const objectKey = keyFromStorageUri(document.storage_path);
@@ -145,12 +191,7 @@ async function removeDocumentInternal(id) {
   const [[document]] = await pool.query('SELECT * FROM secure_documents WHERE id=? LIMIT 1', [id]);
   if (!document) return false;
   requireAvailableDocumentModule(document.module);
-  const objectKey = keyFromStorageUri(document.storage_path);
-  if (objectKey) await deleteObject(objectKey).catch(() => {});
-  else {
-    const resolved = safeStoredPath(document.storage_path);
-    if (resolved) await fs.promises.unlink(resolved).catch(() => {});
-  }
+  // Archive access without erasing the original attachment or its hash/history.
   await pool.query('UPDATE secure_documents SET deleted_at=NOW() WHERE id=? AND deleted_at IS NULL', [id]);
   return true;
 }
@@ -171,30 +212,29 @@ async function sendDocument(req, res) {
   return streamDocument(req, res, result);
 }
 
-async function streamDocument(req, res, result) {
+async function prepareStoredPdf(result) {
   requireAvailableDocumentModule(result.document.module);
-  res.setHeader('Content-Type', result.document.mime_type || 'application/octet-stream');
-  res.setHeader('Content-Disposition', `inline; filename="${safeDispositionName(result.document.original_name)}"`);
-  res.setHeader('Cache-Control', 'private, no-store');
-  await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id,
-    metadata: { documentId: result.document.id, module: result.document.module, recordType: result.document.record_type, recordId: result.document.record_id, classification: result.document.classification, storage: result.storage } });
+  const body = result.storage === 'OBJECT_STORAGE' ? await getObject(result.objectKey) : await fs.promises.readFile(result.path);
+  const actual = crypto.createHash('sha256').update(body).digest('hex');
+  if (result.document.content_sha256 && actual !== result.document.content_sha256) throw Object.assign(new Error('Document integrity verification failed'), { code: 'DOCUMENT_INTEGRITY_MISMATCH', status: 409 });
+  return storedDocumentArtifact(body, result.document.original_name);
+}
 
-  if (result.storage === 'OBJECT_STORAGE') {
-    const body = await getObject(result.objectKey);
-    if (result.document.content_sha256) {
-      const actualSha256 = crypto.createHash('sha256').update(body).digest('hex');
-      if (actualSha256 !== result.document.content_sha256) {
-        const error = new Error('Document integrity verification failed');
-        error.code = 'DOCUMENT_INTEGRITY_MISMATCH';
-        error.status = 409;
-        throw error;
-      }
-    }
-    res.setHeader('Content-Length', String(body.length));
-    return res.end(body);
+async function streamDocument(req, res, result, preparedArtifact) {
+  let artifact;
+  try { artifact = preparedArtifact || await prepareStoredPdf(result); }
+  catch (error) {
+    if(error.status===410 || error.status===409)throw error;
+    return res.status(422).json({ code: error.code || 'PDF_DOCUMENT_INVALID', message: error.message });
   }
-
-  return fs.createReadStream(result.path).pipe(res);
+  await logSecurityEvent({ actorId: req.user.id, eventType: 'SENSITIVE_DOCUMENT_VIEWED', req, sessionId: req.session?.id,
+    metadata: { documentId: result.document.id, module: result.document.module, recordType: result.document.record_type, recordId: result.document.record_id, classification: result.document.classification, storage: result.storage, pdfValidated: true } });
+  res.setHeader('Content-Type', 'application/pdf');
+  res.setHeader('Content-Disposition', `inline; filename="${safePdfFilename(result.document.original_name)}"`);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Content-Length', artifact.buffer.length);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  return res.end(artifact.buffer);
 }
 
 function tokenHash(token) {
@@ -244,9 +284,15 @@ async function sendGrantedDocument(req, res) {
       await db.rollback();
       return res.status(403).json({ message: 'Security verification is required to download this restricted document.', code: 'STEP_UP_REQUIRED', assurance_required: 3, verification_valid_minutes: stepUpTtlMinutes() });
     }
+    let artifact;
+    try { artifact=await prepareStoredPdf(result); }
+    catch(error) {
+      await db.rollback();
+      return res.status(error.status || 422).json({code:error.code || 'PDF_DOCUMENT_INVALID',message:error.message});
+    }
     await db.query('UPDATE document_download_grants SET used_at = NOW() WHERE id = ? AND used_at IS NULL', [grant.id]);
     await db.commit();
-    return streamDocument(req, res, result);
+    return streamDocument(req, res, result, artifact);
   } catch (error) {
     await db.rollback().catch(() => {});
     throw error;
@@ -257,6 +303,7 @@ module.exports = {
   createDocumentGrant,
   documentObjectKey,
   getAuthorisedDocument,
+  mayViewDocument,
   objectStorageDocumentsEnabled,
   readDocumentBodyInternal,
   removeDocumentInternal,
@@ -266,5 +313,6 @@ module.exports = {
   scanStatusForFile,
   sendDocument,
   sendGrantedDocument,
-  streamDocument
+  streamDocument,
+  _test:{mayViewDocument,ORIGINAL_DOCUMENT_PERMISSIONS}
 };

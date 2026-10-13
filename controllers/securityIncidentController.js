@@ -207,15 +207,12 @@ exports.report = async (req, res, next) => {
   } catch (error) { return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Security report could not be generated' }); }
 };
 
-function csvCell(value) { return `"${String(value ?? '').replaceAll('"', '""')}"`; }
-
 exports.exportReport = async (req, res, next) => {
   try {
     const period = parsePeriod(req.query);
     const report = await buildSecurityReport(period);
     const snapshot = await persistSecurityReport(report, req.user.id);
     const rows = [
-      ['Section', 'Metric', 'Result'],
       ['Period', 'Start', report.period.start], ['Period', 'End', report.period.end],
       ['Identity', 'Privileged users', report.identity.privileged_users],
       ['Identity', 'Privileged MFA coverage', `${report.identity.privileged_mfa_coverage}%`],
@@ -223,14 +220,14 @@ exports.exportReport = async (req, res, next) => {
       ['Risk', 'Failed logins', report.risk.failed_logins], ['Risk', 'High-risk actions', report.risk.high_risk_actions],
       ...report.incidents.map((item) => ['Incidents', `${item.severity}/${item.status}`, item.count]),
       ...report.security_events.map((item) => ['Security event', `${item.event_type}/${item.result}`, item.count]),
-      ['Integrity', 'Snapshot SHA-256', snapshot.content_sha256], ['Notice', 'Disclaimer', report.disclaimer]
+      ...report.audit_summary.map((item)=>['Audit', `${item.module}/${item.action}`, item.count])
     ];
+    const {createDocumentPdf,sendPdfResponse,dateLabel}=require('../services/documentPdfService');
+    const artifact=await createDocumentPdf({title:'Security review',reference:`SECURITY-${report.period.end.slice(0,10).replace(/-/g,'')}`,issueDate:report.generated_at,period:`${dateLabel(report.period.start)} to ${dateLabel(report.period.end)}`,columns:[{label:'Section',width:2},{label:'Metric',width:5},{label:'Result',width:2,align:'right'}],rows,notes:[report.disclaimer]});
     await logAudit(pool, { actorId: req.user.id, action: 'SECURITY_REPORT_EXPORTED', module: 'security', recordType: 'security_report', recordId: snapshot.id, newValue: { period: report.period, content_sha256: snapshot.content_sha256 }, ipAddress: req.ip, userAgent: req.get('user-agent') });
     await logSecurityEvent({ actorId: req.user.id, eventType: 'SECURITY_REPORT_EXPORTED', req, metadata: { export_type: 'SECURITY_REPORT', report_id: snapshot.id } });
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="Voxel-Veda-Security-Review-${report.period.end.slice(0, 10)}.csv"`);
     res.setHeader('Cache-Control', 'private, no-store');
-    return res.send(rows.map((row) => row.map(csvCell).join(',')).join('\n'));
+    return await sendPdfResponse(res,artifact,true);
   } catch (error) { return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Security report export failed' }); }
 };
 

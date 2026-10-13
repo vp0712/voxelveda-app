@@ -18,6 +18,6 @@ router.post('/incidents/:id/prepare-recovery', requireAnyPermission('MANAGE_SECU
 router.post('/incidents/:id/status', requireAnyPermission('MANAGE_SECURITY_INCIDENTS'), actionLimit, requireStepUp('CHANGE_SECURITY_INCIDENT_STATUS'), bodyContract(['status','reason'], { required: ['status','reason'] }), controller.updateStatus);
 router.post('/emergency/revoke-all-sessions', requireAnyPermission('REVOKE_ORGANISATION_SESSIONS'), actionLimit, requireStepUp('REVOKE_ORGANISATION_SESSIONS'), bodyContract(['incident_id','reason','confirmation'], { required: ['incident_id','reason','confirmation'] }), controller.revokeOrganisationSessions);
 router.get('/report', requireAnyPermission('VIEW_AUDIT_LOG', 'EXPORT_SECURITY_REPORT'), readLimit, controller.report);
-router.get('/report.csv', requireAnyPermission('EXPORT_SECURITY_REPORT'), actionLimit, requireStepUp('EXPORT_SECURITY_REPORT'), controller.exportReport);
+router.get(['/report.pdf','/report.csv'], requireAnyPermission('EXPORT_SECURITY_REPORT'), actionLimit, requireStepUp('EXPORT_SECURITY_REPORT'), controller.exportReport);
 
 module.exports = router;

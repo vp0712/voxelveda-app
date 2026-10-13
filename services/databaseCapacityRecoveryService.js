@@ -2,7 +2,6 @@
 
 const crypto = require('node:crypto');
 const pool = require('../config/db');
-const { retainedEventScope } = require('./securityDataScope');
 
 // Only the current email worker and reversible capacity probe are retained.
 // Unknown and retired module job history remains archived in place.
@@ -63,22 +62,6 @@ async function databaseFootprint() {
   };
 }
 
-async function deleteBatches({ table, where, params = [], orderBy, maxRows = 10000 }) {
-  if (!await tableExists(table)) return 0;
-  const batchSize = boundedInteger(process.env.DB_CAPACITY_PRUNE_BATCH_SIZE, 1000, 100, 5000);
-  const maxBatches = boundedInteger(process.env.DB_CAPACITY_PRUNE_MAX_BATCHES, 50, 1, 200);
-  let deleted = 0;
-  for (let batch = 0; batch < maxBatches && deleted < maxRows; batch += 1) {
-    const limit = Math.min(batchSize, maxRows - deleted);
-    const sql = `DELETE FROM \`${table}\` WHERE ${where}${orderBy ? ` ORDER BY ${orderBy}` : ''} LIMIT ${limit}`;
-    const [result] = await pool.query(sql, params);
-    const affected = Number(result?.affectedRows || 0);
-    deleted += affected;
-    if (affected < limit) break;
-  }
-  return deleted;
-}
-
 async function capacityProbe() {
   const connection = await pool.getConnection();
   try {
@@ -106,81 +89,15 @@ async function capacityProbe() {
   }
 }
 
-async function normalRecovery() {
-  const deleted = {};
-  const jobScope = `job_key IN (${RETAINED_CAPACITY_JOB_KEYS.map(() => '?').join(',')})`;
-  const emailScope = `related_module IN (${RETAINED_EMAIL_MODULES.map(() => '?').join(',')})`;
-  const securityScope = retainedEventScope();
-  deleted.background_job_runs = await deleteBatches({
-    table: 'background_job_runs',
-    where: `${jobScope} AND status IN ('COMPLETED','FAILED','RETRY') AND completed_at IS NOT NULL AND completed_at < DATE_SUB(NOW(3), INTERVAL 6 HOUR)`,
-    params: RETAINED_CAPACITY_JOB_KEYS,
-    orderBy: 'completed_at ASC',
-    maxRows: 100000
-  });
-  deleted.background_job_failures = await deleteBatches({
-    table: 'background_job_failures',
-    where: `${jobScope} AND failed_at < DATE_SUB(NOW(3), INTERVAL 7 DAY)`,
-    params: RETAINED_CAPACITY_JOB_KEYS,
-    orderBy: 'failed_at ASC',
-    maxRows: 50000
-  });
-  deleted.background_job_dead_letters = await deleteBatches({
-    table: 'background_job_dead_letters',
-    where: `${jobScope} AND status='RESOLVED' AND resolved_at IS NOT NULL AND resolved_at < DATE_SUB(NOW(3), INTERVAL 7 DAY)`,
-    params: RETAINED_CAPACITY_JOB_KEYS,
-    orderBy: 'resolved_at ASC',
-    maxRows: 20000
-  });
-  deleted.security_step_up_required = await deleteBatches({
-    table: 'security_events',
-    where: `(${securityScope.sql}) AND event_type='STEP_UP_REQUIRED' AND created_at < DATE_SUB(NOW(), INTERVAL 1 HOUR)`,
-    params: securityScope.params,
-    orderBy: 'id ASC',
-    maxRows: 100000
-  });
-  deleted.security_events = await deleteBatches({
-    table: 'security_events',
-    where: `(${securityScope.sql}) AND created_at < DATE_SUB(NOW(), INTERVAL 90 DAY)`,
-    params: securityScope.params,
-    orderBy: 'id ASC',
-    maxRows: 100000
-  });
-  deleted.email_logs = await deleteBatches({
-    table: 'email_logs',
-    where: `${emailScope} AND created_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`,
-    params: RETAINED_EMAIL_MODULES,
-    orderBy: 'id ASC',
-    maxRows: 50000
-  });
-  deleted.email_queue_sent = await deleteBatches({
-    table: 'email_queue',
-    where: `${emailScope} AND status='SENT' AND sent_at IS NOT NULL AND sent_at < DATE_SUB(NOW(), INTERVAL 30 DAY)`,
-    params: RETAINED_EMAIL_MODULES,
-    orderBy: 'id ASC',
-    maxRows: 50000
-  });
-  return deleted;
-}
-
 async function recoverDatabaseCapacity(options = {}) {
   const enabled = String(process.env.DB_CAPACITY_RECOVERY_ENABLED ?? (process.env.NODE_ENV === 'production' ? 'true' : 'false')).toLowerCase() === 'true';
   if (!enabled && !options.force) return { skipped: true, reason: 'disabled' };
 
   const before = await databaseFootprint().catch(() => ({ size_mb: null, data_free_mb: null, largest: [] }));
-  let deleted = {};
-  let probe = await capacityProbe();
-
-  try {
-    deleted = await normalRecovery();
-  } catch (error) {
-    if (!isCapacityError(error)) throw error;
-    console.warn(`DB_CAPACITY_NORMAL_PRUNE_BLOCKED code=${error.code || error.errno || 'UNKNOWN'}`);
-  }
-
-  probe = await capacityProbe();
-  // Never truncate shared tables to manufacture successful startup. Capacity
-  // failure after scoped retention must fail readiness and preserve archives.
+  const deleted = {};
+  const probe = await capacityProbe();
+  // Preservation hold: capacity checks never erase historical business, audit,
+  // email or worker records. The probe is rolled back before returning.
 
   const after = await databaseFootprint().catch(() => ({ size_mb: null, data_free_mb: null, largest: [] }));
   const summary = {
@@ -195,7 +112,7 @@ async function recoverDatabaseCapacity(options = {}) {
   console.log('DB_CAPACITY_RECOVERY', JSON.stringify(summary));
 
   if (!probe.writable) {
-    const error = new Error('Database remains unable to allocate new rows after safe capacity recovery.');
+    const error = new Error('Database cannot allocate new rows; historical records were preserved and provider capacity must be reviewed.');
     error.code = isCapacityError(probe.error) ? 'DATABASE_CAPACITY_EXHAUSTED' : (probe.error?.code || 'DATABASE_WRITE_PROBE_FAILED');
     error.details = summary;
     throw error;

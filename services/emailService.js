@@ -2,6 +2,8 @@ const nodemailer = require('nodemailer');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { companyProfile } = require('../config/companyProfile');
+const { validatePdf, safePdfFilename } = require('./documentPdfService');
+const { assertWeeklyDeliveryPolicy } = require('./weeklyDeliveryPolicy');
 
 const SMTP_FIELDS = {
   host: ['SMTP_HOST', 'EMAIL_HOST', 'MAIL_HOST'],
@@ -95,7 +97,9 @@ const EMAIL_TRANSPORT_CODES = new Set([
   'ENETUNREACH',
   'EDNS',
   'EMAIL_HTTPS_RELAY_FAILED',
-  'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE'
+  'DELIVERY_REVIEW_REQUIRED',
+  'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE',
+  'PDF_RELAY_CONTRACT_REQUIRED'
 ]);
 
 function isEmailTransportError(error) {
@@ -133,6 +137,11 @@ function smtpReadinessSummary(error = null) {
 function emailFailureDetails(error) {
   const code = String(error?.code || 'EMAIL_DELIVERY_FAILED').toUpperCase();
 
+  if(code==='DELIVERY_REVIEW_REQUIRED')return {status:409,code,message:error.message,retryable:false,provider_accepted:error.providerAccepted===true,recipient_verified:false};
+
+  if (code === 'PDF_RELAY_CONTRACT_REQUIRED') return { status: 503, code, message: error.message, retryable: false };
+  if (code.startsWith('PDF_')) return { status: 422, code, message: error.message, retryable: false };
+
   if (code === 'SMTP_CONFIG_MISSING') {
     return {
       status: 503,
@@ -156,7 +165,7 @@ function emailFailureDetails(error) {
     return {
       status: 503,
       code: 'EMAIL_TRANSPORT_UNAVAILABLE',
-      message: 'Direct email delivery is unavailable from the current hosting connection. The document is still ready to preview, download, or send from your mail app.',
+      message: 'Company email delivery is unavailable from the current hosting connection. The request remains queued for a controlled retry; validated documents remain available to preview or download.',
       retryable: true
     };
   }
@@ -247,30 +256,39 @@ function isPdfAttachment(attachment) {
   return filename.endsWith('.pdf') || contentType === 'application/pdf';
 }
 
-function assertAttachmentIntegrity(attachments = []) {
+async function assertAttachmentIntegrity(attachments = []) {
+  const validated = [];
   for (const attachment of attachments) {
-    if (!isPdfAttachment(attachment)) continue;
-    const buffer = attachment.path ? fs.readFileSync(attachment.path) : attachmentBuffer(attachment);
-    if (!buffer || buffer.length < 5 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
-      const error = new Error('PDF attachment is not a valid PDF document.');
-      error.code = 'PDF_ATTACHMENT_INVALID';
-      throw error;
+    if (!attachment || !String(attachment.filename || '').toLowerCase().endsWith('.pdf')) {
+      throw Object.assign(new Error('Document attachments must have a .pdf filename. No email was sent.'), { code: 'PDF_ATTACHMENT_FILENAME_INVALID' });
     }
-    if (!String(attachment.filename || '').toLowerCase().endsWith('.pdf')) {
-      const error = new Error('PDF attachment filename must end in .pdf.');
-      error.code = 'PDF_ATTACHMENT_FILENAME_INVALID';
-      throw error;
-    }
-    attachment.contentType = 'application/pdf';
-    attachment.contentDisposition = 'attachment';
-    attachment.content = buffer;
-    delete attachment.path;
-    delete attachment.encoding;
+    const buffer = attachment.path ? await fs.promises.readFile(attachment.path) : attachmentBuffer(attachment);
+    const validation = await validatePdf(buffer, { expectedText: attachment.expectedText || [] });
+    validated.push({ filename: safePdfFilename(attachment.filename), contentType: 'application/pdf', contentDisposition: 'attachment', content: buffer, validation });
   }
-  return attachments;
+  return validated;
 }
 
-async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachments = [] }) {
+async function assertRelayPdfCapability() {
+  const config = relayConfig();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(`${config.url.replace(/\/+$/, '')}/health`, {
+      method: 'GET', headers: { 'X-Voxel-Veda-Relay-Token': config.token }, signal: controller.signal
+    });
+    let health = {};
+    try { health = await response.json(); } catch {}
+    if (!response.ok || Number(health.attachment_contract_version) < 3 || health.pdf_bytes_validated !== true || health.attachment_filename_preserved !== true) {
+      throw Object.assign(new Error('The company email relay must support validated PDF bytes and original .pdf filenames before document email can be sent. The request is retained for controlled retry.'), { code: 'PDF_RELAY_CONTRACT_REQUIRED' });
+    }
+    return health;
+  } finally { clearTimeout(timeout); }
+}
+
+async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
+  assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+  attachments = await assertAttachmentIntegrity(attachments);
   const config = smtpConfig();
   const transporter = createTransporter();
   try {
@@ -285,6 +303,7 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
       replyTo: replyTo || config.replyTo || undefined,
       attachments
     });
+    if (deliveryPolicy && (result.rejected?.length || !Array.isArray(result.accepted) || result.accepted.length !== 1 || String(result.accepted[0]).toLowerCase() !== deliveryPolicy.recipient.toLowerCase())) throw Object.assign(new Error('The SMTP recipient outcome requires review before retry.'), {code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:Boolean(result.accepted?.length)});
     return { ...result, transport: 'smtp', attachmentFilenameGuaranteed: true, receivedVerified: false };
   } finally {
     transporter.close();
@@ -293,8 +312,11 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
 
 async function verifyConnection() {
   let relayResult = null;
-  const primaryTransport = String(process.env.EMAIL_PRIMARY_TRANSPORT || '').trim().toLowerCase();
-  if (isRelayConfigured()) {
+  const primaryTransport = selectedEmailTransport();
+  if(primaryTransport==='smtp' && missingSmtpKeys().length)throw Object.assign(new Error('The selected SMTP transport is incomplete.'),{code:'SMTP_CONFIG_MISSING'});
+  if(primaryTransport==='hostinger_mail_api')throw Object.assign(new Error('The selected HTTPS mail API requires an authorised provider health check. Configuration alone does not verify connectivity or recipient delivery.'),{code:'EMAIL_TRANSPORT_VERIFICATION_UNSUPPORTED'});
+  if(primaryTransport==='https_relay' && !isRelayConfigured())throw Object.assign(new Error('The configured HTTPS company relay is incomplete.'),{code:'EMAIL_HTTPS_RELAY_FAILED'});
+  if (primaryTransport==='https_relay' && isRelayConfigured()) {
     const config = relayConfig();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -309,7 +331,9 @@ async function verifyConnection() {
         error.code = 'EMAIL_HTTPS_RELAY_FAILED';
         throw error;
       }
-      relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay' };
+      let health = {};
+      try { health = await response.json(); } catch {}
+      relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay', pdf_attachment_contract_version: Number(health.attachment_contract_version || 0), pdf_attachments_supported: Number(health.attachment_contract_version || 0) >= 3 && health.pdf_bytes_validated === true && health.attachment_filename_preserved === true, recipient_verified: false };
       let relayEndpoint='configured';
       try {
         const relayUrl=new URL(config.url);
@@ -335,19 +359,19 @@ async function verifyConnection() {
       await transporter.verify();
       const summary = smtpReadinessSummary();
       console.log(`SMTP transport evidence: ok=yes host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} identity_domain=${summary.identity_domain || 'unknown'} from_domain=${summary.from_domain || 'unknown'} attachment_pdf=yes`);
-      return { ...summary, relay: relayResult };
+      return { ...summary, transport: 'smtp', relay: relayResult, recipient_verified: false };
     } catch (error) {
       const summary = smtpReadinessSummary(error);
       const f = summary.failure;
       console.warn(`SMTP transport evidence: ok=no category=${f.category} code=${f.code} response_code=${f.response_code || 'none'} command=${f.command || 'none'} host=${summary.host} port=${summary.port} secure=${summary.secure ? 'yes' : 'no'} attachment_pdf=no`);
       error.smtpReadiness = summary;
-      if (!relayResult) throw error;
+      if (!relayResult || primaryTransport==='smtp') throw error;
       return { ...relayResult, smtp: summary, attachment_pdf: false };
     } finally {
       transporter.close();
     }
   }
-  return relayResult || smtpReadinessSummary();
+  return relayResult || { ...smtpReadinessSummary(), transport: 'smtp', recipient_verified: false };
 }
 
 function safeAttachmentFilename(value, contentType = '') {
@@ -358,6 +382,7 @@ function safeAttachmentFilename(value, contentType = '') {
 }
 
 async function relayAttachments(attachments = []) {
+  attachments = await assertAttachmentIntegrity(attachments);
   let totalBytes = 0;
   const encoded = [];
   for (const attachment of attachments) {
@@ -400,7 +425,9 @@ async function relayAttachments(attachments = []) {
   return encoded;
 }
 
-async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attachments = [] }) {
+async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attachments = [], deliveryKey, deliveryPolicy }) {
+  assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+  if (deliveryPolicy) throw Object.assign(new Error('The Hostinger API has no verified final-recipient privacy contract for weekly timesheets. Keep the request pending and verify the configured transport before sending.'), {code:'DELIVERY_REVIEW_REQUIRED',reasonCode:'WEEKLY_TRANSPORT_PRIVACY_UNVERIFIED'});
   const config = hostingerMailApiConfig();
   if (!isHostingerMailApiConfigured()) {
     const error = new Error('Hostinger Mail API transport is not configured.');
@@ -458,11 +485,19 @@ async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attac
   }
 }
 
-async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, attachments }) {
+async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
+  assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+  if (attachments.length) {
+    const health = await assertRelayPdfCapability();
+    if (deliveryPolicy && health.weekly_recipient_privacy_enforced !== true) throw Object.assign(new Error('The existing relay must enforce the designated single recipient through final MIME construction before weekly timesheets can be sent.'), {code:'PDF_RELAY_CONTRACT_REQUIRED'});
+  }
   const config = relayConfig();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  let attempted=false;
   try {
+    const encodedAttachments=(await relayAttachments(attachments)).map(item => ({ filename: item.filename, contentType: 'application/pdf', contentDisposition: 'attachment', content_base64: item.content_base64, byte_length: item.byte_length, sha256: item.sha256 }));
+    attempted=true;
     const response = await fetch(config.url, {
       method: 'POST',
       headers: {
@@ -478,10 +513,11 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
         html: html || '',
         text: text || '',
         reply_to: replyTo || '',
-        request_id: `railway-${Date.now()}`,
-        attachment_contract_version: 2,
+        request_id: deliveryKey || `railway:${crypto.createHash('sha256').update(JSON.stringify({to,cc,bcc,subject,text,html,attachments:attachments.map(item=>({filename:item.filename,sha256:crypto.createHash('sha256').update(item.content).digest('hex')}))})).digest('hex')}`,
+        attachment_contract_version: 3,
         preserve_attachment_filenames: true,
-        attachments: await relayAttachments(attachments)
+        delivery_policy: deliveryPolicy || undefined,
+        attachments: encodedAttachments
       }),
       signal: controller.signal
     });
@@ -490,10 +526,21 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
     try { result = raw ? JSON.parse(raw) : {}; } catch { result = {}; }
     if (!response.ok || result.sent !== true) {
       const error = new Error(result.message || `WordPress mail relay returned ${response.status}`);
-      error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+      error.code = ['DELIVERY_REVIEW_REQUIRED','PDF_RELAY_VALIDATION_FAILED'].includes(result.code) ? result.code : 'EMAIL_HTTPS_RELAY_FAILED';
       error.responseCode = response.status;
+      error.providerAccepted = result.provider_accepted === true || result.data?.provider_accepted === true;
       throw error;
     }
+    if(attachments.length){
+      const received=Array.isArray(result.attachments)?result.attachments:[];
+      const validContract=Number(result.attachment_contract_version)>=3 && result.pdf_bytes_validated===true && result.attachment_filename_preserved===true;
+      const exactParts=received.length===encodedAttachments.length && encodedAttachments.every((part,index)=>{
+        const claim=received[index] || {};
+        return claim.filename===part.filename && claim.contentType==='application/pdf' && Number(claim.byte_length)===part.byte_length && claim.sha256===part.sha256 && Number(claim.pages)>=1;
+      });
+      if(!validContract || !exactParts)throw Object.assign(new Error('The relay accepted this message without confirming the exact validated PDF attachment metadata. Administrator review is required before retry; recipient receipt remains unverified.'),{code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:true});
+    }
+    if (deliveryPolicy && (result.weekly_recipient_privacy_enforced !== true || result.designated_recipient !== deliveryPolicy.recipient)) throw Object.assign(new Error('The relay accepted the weekly message without confirming its exact designated recipient and zero copies. Review provider logs before any retry.'), {code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:true});
     return {
       messageId: result.provider_message_id || result.request_id || null,
       accepted: to,
@@ -503,22 +550,33 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
       receivedVerified: false
     };
   } catch (error) {
-    if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+    if(attempted && (!error.code || error.name==='AbortError' || ['ECONNRESET','ECONNECTION','ETIMEDOUT'].includes(error.code))){error.code='DELIVERY_REVIEW_REQUIRED';error.message='The relay transaction outcome is uncertain. Review provider logs before retry to prevent duplicate delivery.';}
+    if(!error.code)error.code='EMAIL_HTTPS_RELAY_FAILED';
     throw error;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [] }) {
+function selectedEmailTransport() {
+  const configured=String(process.env.EMAIL_PRIMARY_TRANSPORT || '').trim().toLowerCase();
+  if(configured && !['smtp','https_relay','hostinger_mail_api'].includes(configured))throw Object.assign(new Error('The configured company email transport is unsupported. Administrator review is required.'),{code:'EMAIL_TRANSPORT_CONFIG_INVALID'});
+  return configured || (isRelayConfigured()?'https_relay':isHostingerMailApiConfigured()?'hostinger_mail_api':'smtp');
+}
+async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
   const args = {
     to: validateRecipients(to, 'to'),
     cc: validateRecipients(cc, 'cc'),
     bcc: validateRecipients(bcc, 'bcc'),
-    subject, html, text, replyTo,
-    attachments: assertAttachmentIntegrity(attachments)
+    subject, html, text, replyTo, deliveryKey, deliveryPolicy,
+    attachments: await assertAttachmentIntegrity(attachments)
   };
-  // Retained account mail uses the existing shared transport configuration.
+  assertWeeklyDeliveryPolicy(args, args);
+  // Explicit transport selection is honoured; no provider change is inferred from PDF failures.
+  const selected = selectedEmailTransport();
+  if (selected === 'smtp') return sendViaSmtp(args);
+  if (selected === 'hostinger_mail_api') return sendViaHostingerMailApi(args);
+  if (selected === 'https_relay' && !isRelayConfigured()) throw Object.assign(new Error('The configured HTTPS company relay is incomplete.'), {code:'EMAIL_HTTPS_RELAY_FAILED'});
   if (isRelayConfigured()) return { ...await sendViaHttpsRelay(args), transport: 'https_relay' };
   if (missingSmtpKeys().length && isHostingerMailApiConfigured()) return sendViaHostingerMailApi(args);
   return sendViaSmtp(args);
@@ -526,6 +584,7 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
 
 module.exports = {
   sendMail,
+  selectedEmailTransport,
   verifyConnection,
   createTransporter,
   isEmailConfigured,
@@ -545,6 +604,7 @@ module.exports = {
   isEmailTransportError,
   emailFailureDetails,
   assertAttachmentIntegrity,
+  assertRelayPdfCapability,
   attachmentBuffer,
   isPdfAttachment,
   sendViaSmtp

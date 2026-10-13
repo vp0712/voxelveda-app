@@ -40,8 +40,8 @@ const { isSecurityEventCapacityError } = require('../services/securityEventReten
 
 assert.equal(isSecurityEventCapacityError({ code: 'ER_RECORD_FILE_FULL', errno: 1114, message: "The table 'security_events' is full" }), true);
 assert.equal(isSecurityEventCapacityError({ code: 'ER_BAD_FIELD_ERROR', errno: 1054, message: 'Unknown column' }), false);
-assert.match(retentionSource, /STEP_UP_REQUIRED/);
-assert.match(retentionSource, /SECURITY_EVENT_ROUTINE_ROW_CAP/);
+assert.match(retentionSource, /HISTORY_PRESERVATION/);
+assert.doesNotMatch(retentionSource, /DELETE FROM|TRUNCATE|DROP TABLE/, 'security-event preservation holds historical audit evidence');
 assert.match(sessionSource, /SECURITY_EVENT_CAPACITY_FALLBACK/);
 assert.match(sessionSource, /pruneSecurityEvents\(\{ emergency: true \}\)/);
 assert.match(sessionSource, /return \{ persisted: false, fallback: 'RUNTIME_LOG' \}/);

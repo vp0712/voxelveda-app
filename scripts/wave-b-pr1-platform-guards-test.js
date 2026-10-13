@@ -85,7 +85,18 @@ function appLimiterFixture() {
   const module = { exports: {} };
   const pass = (req, res, next) => next();
   const dependencies = {
-    express, cors: require('cors'),
+    express, cors: require('cors'), qrcode:{toBuffer:async()=>Buffer.from('fixture')},
+    './middleware/permissionMiddleware':()=>pass,
+    './services/authorizationService':require('../services/authorizationService'),
+    './middleware/publicEndpointProtection':Object.fromEntries(['publicRfqContract','aiLeadContract','shiftQrContract','cocVerificationContract','qrGenerationContract'].map(name=>[name,pass])),
+    './services/botChallengeService':{botChallenge:()=>pass},
+    './services/publicSubmissionDedupeService':{publicSubmissionDedupe:()=>pass},
+    './routes/careersRoutes':{publicRouter:express.Router(),adminRouter:express.Router()},
+    './controllers/rfqController':{createRFQ:pass},
+    './controllers/attendanceController':{publicShiftQrToken:pass},
+    './controllers/aiLeadController':{createLead:pass},
+    './controllers/employeeIdentityController':{verify:pass},
+    './controllers/qms/qualityReleaseController':{verifyCoc:pass},
     './controllers/securityTelemetryController': { recordCspViolation: pass },
     './controllers/readinessController': {
       health: (req, res) => res.status(200).json({ status: 'ok' }),
@@ -95,9 +106,10 @@ function appLimiterFixture() {
     './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
     './config/urls': require('../config/urls'),
     './middleware/securityMiddleware': require('../middleware/securityMiddleware'),
-    './services/applicationRetirement': require('../services/applicationRetirement')
+    './services/applicationRetirement': require('../services/applicationRetirement'),
+    './controllers/originalReportController':{download:pass}
   };
-  for (const name of ['auth', 'user', 'profile', 'settings', 'documentSecurity', 'securityDashboard', 'securityIncident', 'readiness', 'backgroundJob']) {
+  for (const name of ['auth', 'user', 'profile', 'settings', 'documentSecurity', 'securityDashboard', 'securityIncident', 'operationalTrust', 'continuousAssurance', 'securityGovernance', 'readiness', 'backgroundJob','rfq','invoice','customer','supplier','stock','material','meeting','roster','attendance','expense','compliance','competitor','dashboard','task','procurement','qms','notification','workflow','trash','upload','email','employeeIdentity','accessAttempt']) {
     dependencies[`./routes/${name}Routes`] = express.Router().use((req, res) => res.json({ fixture: 'retained-api' }));
   }
   const filename = path.join(root, 'app.js');

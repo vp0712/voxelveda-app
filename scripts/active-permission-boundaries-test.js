@@ -53,7 +53,7 @@ async function call(handler, req) {
 }
 
 function fixtureDatabase() {
-  const originalPermissions = ' [ "VIEW_BANKING", "rfqs", "MANAGE_USERS", "VIEW_AUDIT_LOG" ] ';
+  const originalPermissions = ' [ "VIEW_BANKING", "VIEW_BANK_DETAILS", "MANAGE_USERS", "VIEW_AUDIT_LOG" ] ';
   const record = {
     id: 2, name: 'Legacy account', username: 'legacy.fixture',
     email: 'legacy@example.invalid', role: 'Finance_Admin',
@@ -61,16 +61,18 @@ function fixtureDatabase() {
     department: 'Archived operations', manager_id: 99,
     access_scope: ' { "departments": ["Archived"], "project_ids": [7] } ',
     employment_status: 'ARCHIVED', job_title: 'Archived production role', mfa_enabled: 1,
-    account_status: 'ACTIVE', session_version: 1, password: 'fixture-hash'
+    account_status: 'ACTIVE', session_version: 1, password: 'fixture-hash',
+    timesheet_delivery_email: 'private-delivery@example.invalid'
   };
   const queries = [];
   const mutations = [];
   const db = {
-    async query(sql, params = []) {
+    async query(sql, params = [], inTransaction = false) {
       const compact = sql.replace(/\s+/g, ' ').trim();
       queries.push({ sql: compact, params: plain(params) });
       if (/^SELECT id FROM users WHERE (?:\(LOWER\(email\)|LOWER\(email\))/.test(compact)) return [[]];
       if (/^SELECT /.test(compact) && compact.includes('FROM users')) {
+        if (/FOR UPDATE$/.test(compact)) assert.equal(inTransaction, true, 'account edits must read the locked record within their transaction');
         const selected = { ...record };
         for (const field of ['employee_number', 'department', 'manager_id', 'access_scope', 'employment_status', 'job_title']) {
           if (!new RegExp(`\\b${field}\\b`).test(compact)) delete selected[field];
@@ -78,11 +80,12 @@ function fixtureDatabase() {
         return [[selected]];
       }
       if (compact.startsWith('UPDATE users SET name = ?')) {
+        assert.equal(inTransaction, true, 'account edits must write through the acquired connection');
         mutations.push({ sql: compact, params: plain(params) });
-        const keys = ['name', 'username', 'email', 'role', 'permissions', 'active'];
-        assert.equal(params.length, 7, 'profile updates must contain only six retained fields and the stable user ID');
-        assert.equal(params[6], record.id);
-        assert.doesNotMatch(compact, /\b(?:employee_number|department|manager_id|access_scope|employment_status|job_title)\b/);
+        const keys = ['name', 'username', 'email', 'role', 'permissions', 'active', 'department', 'manager_id', 'access_scope', 'timesheet_delivery_email'];
+        assert.equal(params.length, 11, 'profile updates retain staff fields, the private delivery preference and the stable user ID');
+        assert.equal(params[10], record.id);
+        assert.doesNotMatch(compact, /employee_number =/, 'existing employee identity cannot be overwritten');
         keys.forEach((key, index) => { record[key] = params[index]; });
         return [{ affectedRows: 1 }];
       }
@@ -102,7 +105,31 @@ function fixtureDatabase() {
         record.account_status = 'MFA_SETUP_REQUIRED';
         return [{ affectedRows: 1 }];
       }
+      if (compact.startsWith('UPDATE auth_sessions SET revoked_at = NOW(), revoke_reason = ?')) {
+        assert.equal(inTransaction, true, 'session revocation must share the account edit transaction');
+        mutations.push({ sql: compact, params: plain(params) });
+        return [{ affectedRows: 1 }];
+      }
       throw new Error(`Unexpected fixture SQL: ${compact}`);
+    },
+    async getConnection() {
+      let snapshot;
+      let completed = false;
+      let active = false;
+      return {
+        query(sql, params) { assert.equal(active, true); return db.query(sql, params, true); },
+        async beginTransaction() { snapshot = plain(record); active = true; },
+        async commit() { completed = true; active = false; },
+        async rollback() {
+          if (snapshot && !completed) {
+            for (const key of Object.keys(record)) delete record[key];
+            Object.assign(record, snapshot);
+          }
+          completed = true;
+          active = false;
+        },
+        release() { assert.equal(completed, true, 'every acquired connection must complete its transaction'); }
+      };
     }
   };
   return { db, record, queries, mutations, originalPermissions };
@@ -124,7 +151,10 @@ async function run() {
     '../config/db': f.db,
     bcryptjs: { hash: forbidden('password hash for an invalid invitation') }, crypto,
     '../services/userLifecycleService': { ensureUserLifecycleSchema: schemaCheck },
+    '../services/hrAdministrationSchema': { ensureHrAdministrationSchema: schemaCheck },
     '../services/coreAuditSchema': { ensureCoreAuditSchema: noop },
+    '../services/securityGovernanceSchema': { ensureSecurityGovernanceSchema: schemaCheck },
+    '../services/timesheetDeliveryPreferenceService': require('../services/timesheetDeliveryPreferenceService'),
     '../services/auditService': { logAudit: async (_db, audit) => audits.push(plain(audit)) },
     '../services/securitySchema': { ensureSecuritySchema: schemaCheck },
     '../services/sessionService': {
@@ -164,7 +194,7 @@ async function run() {
     ['/:id/access', { role: 'staff', active: true, permissions: [], reason: 'Fixture reason' }],
     ['/:id/access/preview', { role: 'staff', permissions: [] }]
   ]) {
-    for (const field of ['employee_number', 'department', 'manager_id', 'access_scope']) {
+    for (const field of ['employee_number', 'salary', 'hourly_rate']) {
       const req = request({ ...body, [field]: 'retired-field-fixture' });
       const res = response();
       for (const handler of registeredRoutes.get(route)) {
@@ -180,7 +210,7 @@ async function run() {
 
   assert.deepEqual(authorization.activePermissionProjection(f.originalPermissions), ['MANAGE_USERS', 'VIEW_AUDIT_LOG']);
   assert.equal(authorization.hasPermission(f.record, 'MANAGE_USERS'), true);
-  for (const permission of ['VIEW_BANKING', 'VIEW_FINANCE', 'VIEW_RFQS', 'rfqs', 'settings', 'dashboard']) {
+  for (const permission of ['VIEW_BANKING', 'VIEW_BANK_DETAILS', 'CREATE_JOURNAL', 'finance_setup', 'settings']) {
     assert.equal(authorization.hasPermission({ role: 'super_admin', permissions: [permission] }, permission), false);
   }
   for (const role of ['finance_admin', 'finance_user', 'accountant', 'hr', 'sales', 'production', 'manager', 'supervisor']) {
@@ -197,11 +227,12 @@ async function run() {
   const archivedFields = ['employee_number', 'department', 'manager_id', 'access_scope', 'employment_status', 'job_title'];
   const archivedValues = Object.fromEntries(archivedFields.map((field) => [field, f.record[field]]));
   for (const field of archivedFields) {
-    assert.equal(Object.prototype.hasOwnProperty.call(res.body.users[0], field), false, `retained user DTO omits ${field}`);
+    if (['employee_number','department','manager_id','access_scope'].includes(field)) assert.equal(Object.prototype.hasOwnProperty.call(res.body.users[0], field), true, `staff DTO restores ${field}`);
+    else assert.equal(Object.prototype.hasOwnProperty.call(res.body.users[0], field), false, `unsupported field ${field} stays private`);
     assert.equal(f.record[field], archivedValues[field]);
   }
 
-  for (const [field, value] of Object.entries({ department: 'New operations', manager_id: 3, access_scope: {}, employee_number: 'VV-NEW' })) {
+  for (const [field, value] of Object.entries({ salary: 80000, hourly_rate: 40, employee_number: 'VV-NEW' })) {
     for (const handler of [controller.createUser, controller.updateUser, controller.updateUserAccess, controller.previewPermissionDifference, preview.previewPermissionDifference]) {
       const mutationsBefore = f.mutations.length;
       const queriesBefore = f.queries.length;
@@ -227,6 +258,7 @@ async function run() {
   assert.equal(f.record.role, 'Finance_Admin', 'ordinary profile edits preserve the original legacy role ID');
   assert.equal(f.record.permissions, f.originalPermissions, 'ordinary profile edits preserve raw permission JSON byte for byte');
   assert.equal(f.record.account_status, 'ACTIVE');
+  assert.equal(f.record.timesheet_delivery_email, 'private-delivery@example.invalid', 'omitted recipient preferences are preserved');
   for (const field of archivedFields) assert.equal(f.record[field], archivedValues[field], 'ordinary profile edits preserve archived workforce data exactly');
 
   for (const handler of [controller.previewPermissionDifference, preview.previewPermissionDifference]) {
@@ -238,13 +270,13 @@ async function run() {
     assert.equal(f.mutations.length, mutationsBefore, 'previews are read-only');
   }
 
-  for (const retired of ['VIEW_BANKING', 'VIEW_RFQS', 'rfqs', 'settings']) {
+  for (const retired of ['VIEW_BANKING', 'VIEW_BANK_DETAILS', 'finance_setup', 'settings']) {
     for (const handler of [controller.updateUser, controller.updateUserAccess, controller.previewPermissionDifference, preview.previewPermissionDifference]) {
       const mutationsBefore = f.mutations.length;
       const rawBefore = f.record.permissions;
       const req = request({ name: f.record.name, username: f.record.username, email: f.record.email,
         role: 'finance_admin', permissions: [retired], active: true, reason: 'Fixture invalid-grant check' });
-      res = await call(handler, req);
+      res = await call(handler, handler === preview.previewPermissionDifference ? request({role:req.body.role,permissions:req.body.permissions}, {user:req.user}) : req);
       assert.equal(res.statusCode, 400, `${retired}: ${JSON.stringify(res.body)}`);
       assert.equal(res.body.code, 'PERMISSION_UNAVAILABLE');
       assert.equal(f.mutations.length, mutationsBefore, 'retired permission requests must not write');
@@ -262,14 +294,14 @@ async function run() {
 
   for (const handler of [controller.updateUser, controller.updateUserAccess, controller.previewPermissionDifference, preview.previewPermissionDifference]) {
     const mutationsBefore = f.mutations.length;
-    res = await call(handler, request({ name: f.record.name, username: f.record.username, email: f.record.email,
-      role: 'finance_user', permissions: [], active: true, reason: 'Fixture unavailable-role check' }));
+    res = await call(handler, request(handler === preview.previewPermissionDifference ? {role:'banking_delegate',permissions:[]} : { name: f.record.name, username: f.record.username, email: f.record.email,
+      role: 'banking_delegate', permissions: [], active: true, reason: 'Fixture unavailable-role check' }));
     assert.equal(res.statusCode, 400, JSON.stringify(res.body));
     assert.equal(f.mutations.length, mutationsBefore, 'new assignment of retired roles must not write');
   }
   res = await call(controller.createUser, request({
     name: 'Never invited', username: 'never.fixture', email: 'never@example.invalid',
-    role: 'finance_user', permissions: []
+    role: 'banking_delegate', permissions: []
   }));
   assert.equal(res.statusCode, 400);
 
@@ -292,7 +324,7 @@ async function run() {
     assert.equal(f.record.permissions, preservedRawPermissions);
   }
   const protectedPreviewMutations = f.mutations.length;
-  res = await call(preview.previewPermissionDifference, request(protectedAccountChange, { user: nonSuperAdmin }));
+  res = await call(preview.previewPermissionDifference, request({role:protectedAccountChange.role,permissions:protectedAccountChange.permissions}, { user: nonSuperAdmin }));
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.allowed_to_apply, false);
   assert.match(res.body.authority_warning, /Only a super administrator can manage this account/);
@@ -305,7 +337,7 @@ async function run() {
     reason: 'Revoke the explicit active administration grant'
   }));
   assert.equal(res.statusCode, 200, JSON.stringify(res.body));
-  assert.deepEqual(JSON.parse(f.record.permissions), ['VIEW_BANKING', 'rfqs', 'VIEW_AUDIT_LOG']);
+  assert.deepEqual(JSON.parse(f.record.permissions), ['VIEW_BANKING', 'VIEW_BANK_DETAILS', 'VIEW_AUDIT_LOG']);
   assert.equal(f.record.role, 'Finance_Admin');
   assert.equal(authorization.hasPermission(f.record, 'MANAGE_USERS'), false, 'revoked active grants cannot survive in archived data');
   assert.equal(authorization.hasPermission(f.record, 'VIEW_AUDIT_LOG'), true);
@@ -343,7 +375,7 @@ async function run() {
   res = await call(auth.me, request({}, { user: { id: 2 } }));
   assert.equal(res.statusCode, 200);
   assert.deepEqual(res.body.user.permissions, ['VIEW_AUDIT_LOG']);
-  assert.deepEqual(res.body.user.effective_permissions, ['VIEW_AUDIT_LOG']);
+  assert.deepEqual(res.body.user.effective_permissions, [...authorization.effectivePermissions({role:'finance_admin',permissions:['VIEW_AUDIT_LOG']})]);
   assert.equal(res.body.user.role, 'finance_admin');
   const authRawPermissions = f.record.permissions;
   res = await call(auth.login, request({ email: f.record.email, password: 'fixture-password-not-stored' }));
@@ -414,6 +446,34 @@ async function run() {
   const existingSeed = await seedFixture({ ...bootstrapEnv, NODE_ENV: 'development' }, true);
   await existingSeed.seed();
   assert.equal(existingSeed.queries.some(({ sql }) => /^(INSERT|UPDATE|DELETE)/.test(sql)), false, 'bootstrap never overwrites an existing identity');
+
+  const hrBefore = { employee_number: f.record.employee_number, permissions: f.record.permissions, role: f.record.role };
+  const hrSessionsBefore = f.mutations.filter(({ sql }) => sql.startsWith('UPDATE auth_sessions SET revoked_at = NOW(), revoke_reason = ?')).length;
+  res = await call(controller.updateUser, request({name:f.record.name,username:f.record.username,email:f.record.email,
+    department:'Engineering',manager_id:null,access_scope:{departments:['Engineering'],project_ids:[7]},reason:'Restore approved reporting scope'}));
+  assert.equal(res.statusCode,200,JSON.stringify(res.body));
+  assert.equal(f.record.department,'Engineering');
+  assert.equal(f.record.manager_id,null);
+  assert.deepEqual(JSON.parse(f.record.access_scope),{departments:['Engineering'],project_ids:[7]});
+  assert.equal(f.record.employee_number,hrBefore.employee_number,'staff edits preserve employee identity');
+  assert.equal(f.record.permissions,hrBefore.permissions,'staff edits preserve existing raw grants');
+  assert.equal(f.record.role,hrBefore.role);
+  assert.equal(f.mutations.filter(({ sql }) => sql.startsWith('UPDATE auth_sessions SET revoked_at = NOW(), revoke_reason = ?')).length,hrSessionsBefore+1,'reporting-scope change revokes stale sessions within the account transaction');
+  assert.equal(audits.at(-1).newValue.department,'Engineering');
+  res=await call(controller.getUsers,request());
+  assert.equal(res.body.users[0].department,'Engineering','saved reporting metadata survives a fresh read');
+  assert.deepEqual(res.body.users[0].access_scope,{departments:['Engineering'],project_ids:[7]});
+  for(const changes of [{manager_id:2},{manager_id:-1},{department:'x'.repeat(121)},{access_scope:{all:true}},{access_scope:{project_ids:[-1]}},{active:'false'}]){
+    const before=f.mutations.length;
+    res=await call(controller.updateUser,request({name:f.record.name,username:f.record.username,email:f.record.email,reason:'Fixture invalid HR change',...changes}));
+    assert.equal(res.statusCode,400,JSON.stringify(res.body));
+    assert.equal(f.mutations.length,before,'invalid HR fields and reporting cycles cannot write');
+    assert.ok(res.body.fields,'HR validation identifies the invalid field');
+  }
+  const beforeScopeSelf=f.mutations.length;
+  res=await call(controller.updateUser,request({name:f.record.name,username:f.record.username,email:f.record.email,department:'Self assigned',reason:'Fixture self assignment'},{user:{id:2,role:'super_admin',permissions:[]}}));
+  assert.equal(res.statusCode,403);
+  assert.equal(f.mutations.length,beforeScopeSelf,'staff cannot change their own reporting authority');
 
   console.log('PASS active permission boundaries: archived role/grant preservation, strict mutations, revocation, auth DTO/JWT projection, legacy MFA/session duration, safe explicit bootstrap');
 }

@@ -1,8 +1,8 @@
-name: Retained Application Database Regression
+name: Original Application MySQL Regression
 on:
   pull_request:
   push:
-    branches: [main, 'simplify-*']
+    branches: [main, 'simplify-*', 'restore-*', 'original-*']
 permissions:
   contents: read
 jobs:
@@ -38,9 +38,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
-      - name: Retained runtime and core audit contracts
+      - name: Original runtime and shared audit contracts
         run: |
           node scripts/retained-runtime-test.js
           node scripts/core-audit-isolation-test.js
-      - name: Disposable MySQL records, audit, document scope and retired-email hold
+      - name: Disposable MySQL original schema, record preservation, PDF grants and atomic email claims
         run: node scripts/retained-mysql-test.js

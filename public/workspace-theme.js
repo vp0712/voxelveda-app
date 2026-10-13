@@ -24,13 +24,13 @@
     tokens() {
       const style = getComputedStyle(document.documentElement);
       const read = name => style.getPropertyValue('--' + name).trim();
-      return { text:read('text-primary'), muted:read('text-secondary'), surface:read('surface'), border:read('border'), primary:read('primary') };
+      return { text:read('text-primary'), muted:read('text-secondary'), surface:read('surface'), border:read('border'), primary:read('primary'), series:mode === 'dark' ? ['#9EBBFF','#7DD3FC','#A9E0BA','#F6D690','#D8BCFF','#FFB7AD'] : ['#2454D6','#087C9F','#17683C','#8C5711','#6D36AB','#B42318'] };
     }
   };
   apply(mode);
   window.addEventListener('storage', event => { if (event.key === key) apply(event.newValue); });
   document.addEventListener('DOMContentLoaded', () => {
-    const actions = document.querySelector('.topbar-actions, .profile-actions, .account-actions');
+    const actions = document.querySelector('.topbar-actions, .profile-actions, .account-actions, .client-top, .actions');
     if (actions && !document.querySelector('[data-theme-toggle]')) {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'vv-theme-toggle'; button.dataset.themeToggle = '';
