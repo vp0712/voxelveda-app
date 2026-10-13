@@ -1,6 +1,6 @@
-application-release: 20261013-staff-mobile-attendance-private-avatars-notifications
-candidate-commit: 5a571ea5cbfe6d1c58a3d3c103999265eea3f122
-merged-commit: d3706b6b5a209eb2720c6844752836695b0f3ed2
+application-release: 20261013-staff-mobile-attendance-required-scanner-verified
+candidate-commit: 92efd3d3527e8aa980f4da0f05b32be9684a247f
+merged-commit: a9c38d8d0df2806ab3c318239a2a666887b950fa
 production-branch: main
 previous-live-commit: a0d0b4298666775d5db35cb63b8eca292897398b
 scope: existing-original-staff-home-attendance-roster-timesheets-profile-and-notifications; original-business-and-procurement-PDF-workflows-preserved; only-added-Banking-Finance-OS-and-separate-ERP-portal-remain-retired
@@ -14,9 +14,10 @@ mobile: compact-shared-header-and-saved-photo; five-primary-staff-actions; full-
 weekly-delivery: worked-shifts-only; audited-designated-timesheet-email-required; exactly-one-To-no-CC-no-BCC-no-login-email-fallback-or-manager-copy; eligibility-and-source-rechecked; durable-staff-week-idempotency-and-explicit-sent-revisions
 weekly-schedule: retained-Monday-0700-Australia-Sydney-default-and-configured-Australian-IANA-timezone; bounded-latest-completed-week; no-zero-hour-email-or-historical-backfill
 pdf-delivery: retained-immutable-source-and-parser-validated-PDF-bytes-hash-version; at-least-one-valid-page-and-identity; application-pdf-safe-pdf-filename-and-disposition; non-PDF-and-error-downloads-rejected; uncertain-provider-outcomes-held-for-review
-ci: exact-final-candidate-five-workflows-success; exact-merged-main-seven-workflows-success; 70-mandatory-normal-production-HTTPS-and-packaged-source-regressions; real-disposable-MySQL; real-PHP-PDF-parser-PHPMailer-MIME; retained-account-original-procurement-and-staff-Chromium
-ci-candidate-release-run: 38433633956
-ci-merged-release-run: 38434477370
+ci: exact-repaired-candidate-four-applicable-workflows-success; exact-merged-main-five-applicable-workflows-success; original-implementation-branding-and-gates-already-verified; 70-mandatory-normal-production-HTTPS-required-scanner-and-packaged-source-regressions; real-disposable-MySQL; real-PHP-PDF-parser-PHPMailer-MIME; retained-account-original-procurement-and-staff-Chromium
+ci-candidate-release-run: 38436718389
+ci-merged-release-run: 38437345589
+failed-release-attempt: a886e793e9247fa5406a2d71e83d38a8376a682b-Railway-4f7e2ee5-2378-430f-bc41-665b38b152eb; build-fixture-mocked-unconfigured-scanner; repaired-clean-scanner-fixture-and-required-production-CI; production-upload-security-unchanged
 browser-evidence: pinned-published-before-baseline-a0d0b4298666775d5db35cb63b8eca292897398b; after-four-viewports-both-themes; ten-emulated-camera-cases; real-loader-provider-failure-retry; three-in-flight-account-switch-cases; actual-native-MutationObserver-12-frames-controls-zero-avatar-child-mutations
 verification-limits: synthetic-accounts-only-for-private-workflow-tests; no-real-staff-attendance-or-business-email-tests; native-iOS-Android-camera-and-authenticated-production-private-workflows-not-claimed; received-PDF-opening-unverified
 configuration: same-Railway-app-service-domain-database-private-storage-and-info-at-voxelveda-company-WordPress-HTTPS-transport; no-provider-DNS-or-billing-change; unchanged-three-predeploy-guards; registered-import-email-queue-and-private-weekly-workers
