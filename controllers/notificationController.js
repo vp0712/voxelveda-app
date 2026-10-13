@@ -1,10 +1,10 @@
 const pool = require('../config/db');
 const { ensureNotificationSchema } = require('../services/notificationSchema');
-const { NOTIFICATION_CATEGORIES, normaliseCategory, normaliseActionUrl } = require('../services/notificationService');
+const { NOTIFICATION_CATEGORIES, normaliseCategory, normaliseActionUrl, visibleNotificationWhere, resolveNotificationTarget } = require('../services/notificationService');
 const { findActiveTrashItem, moveToTrash, restoreTrashItem, TrashError } = require('../services/trashService');
 
 function activeNotificationWhere(respectPreferences = false) {
-  const base = "user_id = ? AND deleted_at IS NULL AND dismissed_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) AND UPPER(COALESCE(linked_module,'')) NOT IN ('FINANCE','BANKING','ERP','PERSONAL_FINANCE')";
+  const base = "user_id = ? AND deleted_at IS NULL AND dismissed_at IS NULL AND (expires_at IS NULL OR expires_at > NOW()) AND UPPER(COALESCE(linked_module,'')) NOT IN ('BANKING','ERP','PERSONAL_FINANCE','FINANCE_OS','HIGH_RISK_FINANCE')";
   if (!respectPreferences) return base;
   return `${base} AND NOT EXISTS (
     SELECT 1 FROM notification_preferences np
@@ -14,100 +14,73 @@ function activeNotificationWhere(respectPreferences = false) {
   )`;
 }
 
-function respondError(res, error) {
-  if (error instanceof TrashError) return res.status(error.statusCode).json({ message: error.message, code: error.code });
-  console.error('NOTIFICATION API ERROR:', error);
-  return res.status(500).json({ message: 'Notification operation failed' });
+function respondError(res,error) {
+  if(error instanceof TrashError)return res.status(error.statusCode).json({message:error.message,code:error.code});
+  if(Number.isInteger(error.status || error.statusCode) && (error.status || error.statusCode)<500)return res.status(error.status || error.statusCode).json({message:error.message,code:error.code});
+  console.error('NOTIFICATION API ERROR:',error.code || error.name);
+  return res.status(500).json({message:'Notifications could not be loaded. Please retry.',code:'NOTIFICATION_OPERATION_FAILED'});
 }
-
-exports.list = async (req, res) => {
-  try {
-    await ensureNotificationSchema();
-    const userId = Number(req.user.id);
-    const page = Math.max(1, Math.floor(Number(req.query.page || 1)));
-    const limit = Math.min(100, Math.max(1, Math.floor(Number(req.query.limit || 30))));
-    const offset = (page - 1) * limit;
-    if (!Number.isSafeInteger(page) || !Number.isSafeInteger(limit) || !Number.isSafeInteger(offset)) return res.status(400).json({ message: 'Choose a valid notification page and limit.' });
-    const where = [activeNotificationWhere(true)];
-    const params = [userId];
-    const tab = String(req.query.tab || 'all').toLowerCase();
-    const category = String(req.query.category || '').toUpperCase();
-    const priority = String(req.query.priority || '').toUpperCase();
-
-    if (tab === 'unread') where.push('is_read = 0');
-    if (tab === 'important') where.push("UPPER(priority) IN ('HIGH', 'CRITICAL')");
-    if (NOTIFICATION_CATEGORIES.has(category)) { where.push('UPPER(category) = ?'); params.push(category); }
-    if (['LOW', 'NORMAL', 'HIGH', 'CRITICAL'].includes(priority)) { where.push('UPPER(priority) = ?'); params.push(priority); }
-
-    const whereSql = where.join(' AND ');
-    const [[countRow]] = await pool.query(`SELECT COUNT(*) AS total FROM notifications WHERE ${whereSql}`, params);
-    const [notifications] = await pool.query(
-      `SELECT id, type, category, title, message, priority, linked_module, linked_record_id,
-              action_url, is_read, read_at, expires_at, created_at
-       FROM notifications
-       WHERE ${whereSql}
-       ORDER BY FIELD(UPPER(priority), 'CRITICAL', 'HIGH', 'NORMAL', 'LOW'), created_at DESC, id DESC
-       LIMIT ? OFFSET ?`,
-      [...params, limit, offset]
-    );
-    return res.json({
-      notifications: notifications.map((notification) => ({ ...notification, action_url: normaliseActionUrl(notification.action_url) })),
-      page,
-      limit,
-      total: Number(countRow?.total || 0),
-      pages: Math.max(1, Math.ceil(Number(countRow?.total || 0) / limit))
-    });
-  } catch (error) {
-    return respondError(res, error);
-  }
-};
-
-exports.unreadCount = async (req, res) => {
-  try {
-    await ensureNotificationSchema();
-    const [[row]] = await pool.query(
-      `SELECT COUNT(*) AS unread FROM notifications WHERE ${activeNotificationWhere(true)} AND is_read = 0`,
-      [Number(req.user.id)]
-    );
-    return res.json({ unread: Number(row?.unread || 0) });
-  } catch (error) {
-    return respondError(res, error);
-  }
-};
-
-async function setReadState(req, res, isRead) {
-  try {
-    await ensureNotificationSchema();
-    const id = Number(req.params.id);
-    if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Choose a valid notification' });
-    const [result] = await pool.query(
-      `UPDATE notifications SET is_read = ?, read_at = ${isRead ? 'NOW()' : 'NULL'}
-       WHERE id = ? AND ${activeNotificationWhere()}`,
-      [isRead ? 1 : 0, id, Number(req.user.id)]
-    );
-    if (!result.affectedRows) return res.status(404).json({ message: 'Notification not found' });
-    return res.json({ message: isRead ? 'Notification marked as read' : 'Notification marked as unread' });
-  } catch (error) {
-    return respondError(res, error);
-  }
+async function unreadFor(db,user) {
+  const scope=visibleNotificationWhere(user);
+  const [[row]]=await db.query(`SELECT COUNT(*) AS unread FROM notifications WHERE ${scope.sql} AND is_read=0`,scope.params);
+  return Number(row?.unread || 0);
 }
-
-exports.markRead = (req, res) => setReadState(req, res, true);
-exports.markUnread = (req, res) => setReadState(req, res, false);
-
-exports.markAllRead = async (req, res) => {
+function validId(value) {const id=Number(value);if(!Number.isSafeInteger(id) || id<1)throw Object.assign(new Error('Choose a valid notification.'),{status:400});return id;}
+exports.list=async(req,res)=>{
   try {
     await ensureNotificationSchema();
-    const [result] = await pool.query(
-      `UPDATE notifications SET is_read = 1, read_at = NOW()
-       WHERE ${activeNotificationWhere()} AND is_read = 0`,
-      [Number(req.user.id)]
-    );
-    return res.json({ message: 'All notifications marked as read', updated: result.affectedRows });
-  } catch (error) {
-    return respondError(res, error);
-  }
+    const page=Number(req.query.page || 1),limit=Number(req.query.limit || 30),offset=(page-1)*limit;
+    if(!Number.isSafeInteger(page) || page<1 || !Number.isSafeInteger(limit) || limit<1 || limit>100 || !Number.isSafeInteger(offset) || offset>10000000)return res.status(400).json({message:'Choose a valid notification page and limit.'});
+    const scope=visibleNotificationWhere(req.user),where=[scope.sql],params=[...scope.params];
+    const tab=String(req.query.tab || 'all').toLowerCase(),category=String(req.query.category || '').toUpperCase(),priority=String(req.query.priority || '').toUpperCase();
+    if(tab==='unread')where.push('is_read=0');
+    if(tab==='important')where.push("UPPER(priority) IN ('HIGH','CRITICAL')");
+    if(NOTIFICATION_CATEGORIES.has(category)){where.push('UPPER(category)=?');params.push(category);}
+    if(['LOW','NORMAL','HIGH','CRITICAL'].includes(priority)){where.push('UPPER(priority)=?');params.push(priority);}
+    const sql=where.join(' AND ');
+    const [countResult,rowsResult,unread]=await Promise.all([
+      pool.query(`SELECT COUNT(*) AS total FROM notifications WHERE ${sql}`,params),
+      pool.query(`SELECT id,type,category,title,message,priority,linked_module,linked_record_id,action_url,is_read,read_at,expires_at,created_at FROM notifications WHERE ${sql} ORDER BY created_at DESC,id DESC LIMIT ? OFFSET ?`,[...params,limit,offset]),unreadFor(pool,req.user)
+    ]);
+    const count=countResult[0][0],notifications=await Promise.all(rowsResult[0].map(async row=>({...row,...await resolveNotificationTarget(pool,row,req.user)})));
+    const total=Number(count?.total || 0);
+    return res.json({notifications,page,limit,total,pages:Math.max(1,Math.ceil(total/limit)),unread});
+  }catch(error){return respondError(res,error);}
 };
+exports.unreadCount=async(req,res)=>{try{await ensureNotificationSchema();return res.json({unread:await unreadFor(pool,req.user)});}catch(error){return respondError(res,error);}};
+async function setReadState(req,res,isRead) {
+  try {
+    await ensureNotificationSchema();const id=validId(req.params.id),scope=visibleNotificationWhere(req.user);
+    const [[visible]]=await pool.query(`SELECT id FROM notifications WHERE id=? AND ${scope.sql}`,[id,...scope.params]);
+    if(!visible)return res.status(404).json({message:'Notification not found.'});
+    await pool.query(`UPDATE notifications SET is_read=?,read_at=${isRead?'COALESCE(read_at,NOW())':'NULL'} WHERE id=? AND ${scope.sql}`,[isRead?1:0,id,...scope.params]);
+    return res.json({message:isRead?'Notification marked as read':'Notification marked as unread',id,is_read:isRead,unread:await unreadFor(pool,req.user)});
+  }catch(error){return respondError(res,error);}
+}
+exports.markRead=(req,res)=>setReadState(req,res,true);
+exports.markUnread=(req,res)=>setReadState(req,res,false);
+exports.markAllRead=async(req,res)=>{
+  try {
+    await ensureNotificationSchema();const scope=visibleNotificationWhere(req.user);
+    const [result]=await pool.query(`UPDATE notifications SET is_read=1,read_at=COALESCE(read_at,NOW()) WHERE ${scope.sql} AND is_read=0`,scope.params);
+    return res.json({message:'Visible notifications marked as read',updated:Number(result.affectedRows || 0),unread:await unreadFor(pool,req.user)});
+  }catch(error){return respondError(res,error);}
+};
+async function notificationTarget(req,res,markRead) {
+  let connection;
+  try {
+    await ensureNotificationSchema();const id=validId(req.params.id),scope=visibleNotificationWhere(req.user);
+    connection=markRead?await pool.getConnection():pool;
+    if(markRead)await connection.beginTransaction();
+    const [[row]]=await connection.query(`SELECT id,type,category,title,message,priority,linked_module,linked_record_id,action_url,is_read,read_at,created_at FROM notifications WHERE id=? AND ${scope.sql}${markRead?' FOR UPDATE':''}`,[id,...scope.params]);
+    if(!row){if(markRead)await connection.rollback();return res.status(404).json({message:'This notification is no longer available.'});}
+    const target=await resolveNotificationTarget(connection,row,req.user);
+    if(markRead){await connection.query(`UPDATE notifications SET is_read=1,read_at=COALESCE(read_at,NOW()) WHERE id=? AND ${scope.sql}`,[id,...scope.params]);await connection.commit();row.is_read=1;}
+    return res.json({notification:{...row,...target},...target,unread:await unreadFor(pool,req.user)});
+  }catch(error){if(markRead && connection)await connection.rollback().catch(()=>{});return respondError(res,error);}finally{if(markRead)connection?.release();}
+}
+exports.open=(req,res)=>notificationTarget(req,res,true);
+exports.target=(req,res)=>notificationTarget(req,res,false);
 
 async function deleteNotificationById(id, req, reason) {
   return moveToTrash({

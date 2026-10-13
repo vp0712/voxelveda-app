@@ -85,6 +85,7 @@ async function initializeCriticalSchemas() {
     ['qmsEnterpriseCompletionSchema','ensureQmsEnterpriseCompletionSchema']
   ];
   for(const [module,method] of originals)await require('./services/'+module)[method]();
+  await require('./services/profilePhotoService').ensureProfilePhotoSchema();
   for(const [module,method] of [['invoice','ensureInvoiceColumns'],['customer','ensureCustomerTable'],['stock','ensureStockTable'],['material','ensureMaterialTable'],['supplier','ensureSupplierTables'],['meeting','ensureMeetingTable'],['task','ensureTaskTables'],['roster','ensureRosterTable'],['attendance','ensureAttendanceTables'],['expense','ensureExpenseTables'],['compliance','ensureComplianceTables'],['dashboard','ensureDashboardTables']])await require('./controllers/'+module+'Controller')[method]();
   await require('./services/documentDeliveryService').ensureDocumentDeliverySchema();
   await require('./services/weeklyTimesheetDeliverySchema').ensureWeeklyTimesheetDeliverySchema();

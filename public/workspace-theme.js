@@ -13,7 +13,8 @@
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.content = mode === 'dark' ? '#101827' : '#F7F8FA';
     document.querySelectorAll('[data-theme-toggle]').forEach(button => {
-      button.textContent = mode === 'dark' ? 'Light theme' : 'Dark theme';
+      button.textContent = button.hasAttribute('data-theme-compact') ? (mode === 'dark' ? '☀' : '☾') : (mode === 'dark' ? 'Light theme' : 'Dark theme');
+      button.title = 'Use ' + (mode === 'dark' ? 'light' : 'dark') + ' theme';
       button.setAttribute('aria-label', 'Use ' + (mode === 'dark' ? 'light' : 'dark') + ' theme');
     });
     window.dispatchEvent(new CustomEvent('workspace:theme', { detail: { mode } }));
@@ -31,9 +32,10 @@
   window.addEventListener('storage', event => { if (event.key === key) apply(event.newValue); });
   document.addEventListener('DOMContentLoaded', () => {
     const actions = document.querySelector('.topbar-actions, .profile-actions, .account-actions, .client-top, .actions');
-    if (actions && !document.querySelector('[data-theme-toggle]')) {
+    if (actions && !document.querySelector('[data-theme-toggle], #staffThemeControl')) {
       const button = document.createElement('button');
       button.type = 'button'; button.className = 'vv-theme-toggle'; button.dataset.themeToggle = '';
+      if (actions.closest('.vv-topbar')) button.dataset.themeCompact = '';
       actions.appendChild(button);
     }
     document.querySelectorAll('[data-theme-toggle]').forEach(button => button.addEventListener('click', () => window.VoxelTheme.set(mode === 'dark' ? 'light' : 'dark')));

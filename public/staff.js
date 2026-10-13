@@ -1,5 +1,6 @@
 const token = '';
-localStorage.removeItem('token');
+window.VoxelAvatar?.clear();
+    localStorage.removeItem('token');
 let currentUser = {};
 try { currentUser = JSON.parse(localStorage.getItem('user') || '{}'); } catch { localStorage.removeItem('user'); }
 let currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
@@ -62,7 +63,8 @@ function authHeaders() {
 function redirectToLogin(message = 'Your session expired. Please login again.') {
   if (redirectingToLogin) return;
   redirectingToLogin = true;
-  ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
+  window.VoxelAvatar?.clear();
+    ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
   const params = new URLSearchParams({ message });
   window.location.replace(`/login?${params.toString()}`);
   throw new Error('Redirecting to login');
@@ -76,6 +78,7 @@ async function logout() {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
   } finally {
+    window.VoxelAvatar?.clear();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
@@ -1843,7 +1846,8 @@ function renderStaffProfile(user) {
   });
 
   document.querySelectorAll('#profileAvatar, #sidebarAvatar').forEach((el) => {
-    el.textContent = initials;
+    if (window.VoxelAvatar) window.VoxelAvatar.mount(el, { self: true, name: displayName });
+    else el.textContent = initials;
   });
 }
 
@@ -3206,6 +3210,7 @@ function staffNotificationAge(value) {
 }
 
 function renderStaffNotifications() {
+  if (window.VoxelNotificationCenter) return;
   const list = document.getElementById('staffNotificationList');
   const empty = document.getElementById('staffNotificationEmpty');
   const badge = document.getElementById('staffNotificationBadge');
@@ -3227,6 +3232,7 @@ function renderStaffNotifications() {
 }
 
 async function loadStaffNotifications() {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.refresh();
   if (staffNotificationState.loading) return;
   staffNotificationState.loading = true;
   renderStaffNotifications();
@@ -3250,12 +3256,14 @@ async function loadStaffNotifications() {
 }
 
 function closeStaffNotificationPanel() {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.close();
   const panel = document.getElementById('staffNotificationPanel');
   if (panel) panel.hidden = true;
   document.getElementById('staffNotificationBell')?.setAttribute('aria-expanded', 'false');
 }
 
 function toggleStaffNotificationPanel(event) {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.toggle(event);
   event?.stopPropagation?.();
   const panel = document.getElementById('staffNotificationPanel');
   if (!panel) return;
@@ -3388,6 +3396,7 @@ async function openStaffNotificationPreferences() {
 }
 
 document.addEventListener('click', (event) => {
+  if (window.VoxelNotificationCenter) return;
   if (!event.target.closest?.('.notification-center')) closeStaffNotificationPanel();
 });
 

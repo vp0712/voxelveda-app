@@ -7,21 +7,36 @@ const weeklyDeliveryController = require('../controllers/weeklyTimesheetDelivery
 const auth = require('../middleware/auth'); // IMPORTANT
 const requireInputPermission = require('../middleware/inputPermissionMiddleware');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
+const { bodyContract } = require('../middleware/requestContractMiddleware');
 
 /* ================= STAFF ATTENDANCE ================= */
 
 router.get('/shift-qr', auth, attendanceController.shiftQrToken);
+const attend = requireAnyPermission('VIEW_ATTENDANCE');
+const actionFields = ['request_id','action','attendance_id','qr_proof','shift_qr_token','task_id','category','notes'];
+router.post('/qr/validate', auth, attend, bodyContract(['token','action','attendance_id'],{required:['token','action']}), attendanceController.validateQr);
+router.post('/actions', auth, attend, bodyContract(actionFields,{required:['request_id','action']}), attendanceController.action);
+router.get('/reconcile', auth, attend, attendanceController.reconcile);
+router.post('/sessions/:id/note', auth, attend, bodyContract(['request_id','expected_revision','task_id','category','notes'],{required:['request_id','expected_revision']}), attendanceController.saveCheckoutNote);
+router.get('/corrections', auth, attend, attendanceController.listCorrections);
+router.get('/corrections/:id', auth, attend, attendanceController.correctionDetail);
+router.post('/corrections', auth, attend, bodyContract(['request_id','correction_type','attendance_id','expected_revision','clock_in','clock_out','break_minutes','notes','reason'],{required:['request_id','clock_in','reason']}), attendanceController.requestCorrection);
+const reviewCorrections = requireAnyPermission('EDIT_ATTENDANCE','APPROVE_TEAM_TIMESHEET','APPROVE_ALL_TIMESHEETS');
+router.post('/corrections/:id/approve', auth, attend, reviewCorrections, bodyContract(['expected_revision','reason'],{required:['expected_revision','reason']}), attendanceController.approveCorrection);
+router.post('/corrections/:id/reject', auth, attend, reviewCorrections, bodyContract(['expected_revision','reason'],{required:['expected_revision','reason']}), attendanceController.rejectCorrection);
 
 // Must be logged in
-router.post('/clock-in', auth, requireAnyPermission('VIEW_ATTENDANCE'), attendanceController.clockIn);
+router.post('/clock-in', auth, attend, bodyContract(actionFields,{required:['request_id']}), attendanceController.clockIn);
 
-router.post('/clock-out', auth, requireAnyPermission('VIEW_ATTENDANCE'), attendanceController.clockOut);
+router.post('/clock-out', auth, attend, bodyContract(actionFields,{required:['request_id','attendance_id']}), attendanceController.clockOut);
 
-router.get('/today', auth, attendanceController.todayAttendance);
+router.get('/today', auth, attend, attendanceController.todayAttendance);
 
 router.get('/week', auth, attendanceController.weekAttendance);
 
-router.get('/my', auth, attendanceController.myAttendance);
+router.get('/my', auth, attend, attendanceController.myAttendance);
+router.get('/sessions', auth, attend, attendanceController.sessions);
+router.get('/team', auth, attend, attendanceController.team);
 
 /* ================= ADMIN ATTENDANCE ================= */
 

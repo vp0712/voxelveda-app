@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Voxel Veda Workforce Panel</title>
 <link rel="stylesheet" href="/original-layout.css?v=20261011-restored">
 
@@ -18,14 +18,9 @@
   <meta property="og:image:height" content="1254" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />  <link rel="stylesheet" href="/original-role-layout.css?v=20260926-role-portals" />
-<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script></head>
+<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/staff-home.css?v=20261013-staff-mobile"><link rel="stylesheet" href="/notification-center.css?v=20261013-staff-mobile"></head>
 
 <body class="staff-portal">
-  <button class="mobile-menu-btn" type="button" aria-label="Open menu" aria-controls="primarySidebar" aria-expanded="false" data-mobile-menu-action="open">
-    <span></span>
-    <span></span>
-    <span></span>
-  </button>
   <div class="mobile-sidebar-backdrop" data-mobile-menu-action="close" aria-hidden="true"></div>
 
   <div class="app-shell">
@@ -42,7 +37,7 @@
       </div>
 
       <div class="staff-sidebar-profile">
-        <div id="sidebarAvatar" class="staff-avatar small">V</div>
+        <div id="sidebarAvatar" class="staff-avatar small" data-avatar-self></div>
         <div>
           <strong id="sidebarProfileName">Loading...</strong>
           <span id="sidebarProfileUsername">@staff</span>
@@ -52,6 +47,9 @@
 
       <nav class="sidebar-nav" aria-label="Staff sections">
       <button class="nav-btn active" data-section="dashboardSection">Home</button>
+      <button class="nav-btn permission-roster hidden-section" data-section="rosterSection">My shifts</button>
+      <button class="nav-btn permission-attendance hidden-section" data-section="timesheetSection">My timesheets</button>
+      <button class="nav-btn permission-tasks hidden-section" data-section="tasksSection">Tasks</button>
       <button class="nav-btn" data-section="profileSection">Profile</button>
       <button class="nav-btn permission-approvals hidden-section" data-section="approvalsSection">My Approvals</button>
       <details class="nav-group permission-sales hidden-section" open>
@@ -67,15 +65,6 @@
         </div>
       </details>
       <button class="nav-btn permission-procurement hidden-section" data-section="procurementSection">Procurement</button>
-      <details class="nav-group permission-tasks hidden-section" open>
-        <summary class="nav-group-toggle">
-          <span>Task Control</span>
-          <span class="nav-group-caret">v</span>
-        </summary>
-        <div class="nav-submenu">
-          <button class="nav-btn nav-sub-btn permission-tasks hidden-section" data-section="tasksSection">Task Board</button>
-        </div>
-      </details>
       <details class="nav-group permission-stock hidden-section" open>
         <summary class="nav-group-toggle">
           <span>Stock Management</span>
@@ -86,16 +75,6 @@
           <button class="nav-btn nav-sub-btn permission-stock permission-stock-out hidden-section" data-section="stockOutSection">Stock Out</button>
           <button class="nav-btn nav-sub-btn permission-stock permission-raw-material hidden-section" data-section="rawMaterialSection">Raw Material</button>
           <button class="nav-btn nav-sub-btn permission-stock permission-packaging hidden-section" data-section="packagingSection">Packaging</button>
-        </div>
-      </details>
-      <details class="nav-group permission-workforce hidden-section" open>
-        <summary class="nav-group-toggle">
-          <span>Workforce</span>
-          <span class="nav-group-caret">v</span>
-        </summary>
-        <div class="nav-submenu">
-          <button class="nav-btn nav-sub-btn permission-attendance hidden-section" data-section="timesheetSection">Timesheet</button>
-          <button class="nav-btn nav-sub-btn permission-roster hidden-section" data-section="rosterSection">Roster</button>
         </div>
       </details>
       <details class="nav-group permission-finance hidden-section" open>
@@ -135,50 +114,27 @@
     <main class="main">
 
       <!-- HEADER -->
-      <header class="topbar">
-        <div>
-          <h2>Workforce Home</h2>
-          <p id="staffInfo">Loading staff...</p>
+      <header class="topbar staff-home-topbar">
+        <div class="staff-header-heading">
+          <button class="topbar-menu-btn staff-icon-button" type="button" aria-label="Open menu" aria-controls="primarySidebar" aria-expanded="false" data-mobile-menu-action="toggle"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+          <h2 id="staffPageTitle">Home</h2>
+          <p id="staffInfo" class="staff-visually-hidden" aria-live="polite">Loading staff...</p>
         </div>
         <div class="staff-top-actions">
           <div class="notification-center">
-            <button id="staffNotificationBell" class="notification-bell" type="button" aria-label="Open notifications" aria-expanded="false" onclick="return toggleStaffNotificationPanel(event)">
-              <span class="bell-mark">!</span>
-              <span id="staffNotificationBadge" class="notification-badge hidden-section">0</span>
-            </button>
-            <div id="staffNotificationPanel" class="notification-panel" hidden>
-              <div class="notification-panel-head"><strong>Notification Centre</strong><span id="staffNotificationCount">0 new</span></div>
-              <div class="notification-tabs" role="tablist" aria-label="Notification filters">
-                <button class="active" type="button" data-staff-notification-tab="all" onclick="return setStaffNotificationTab('all')">All</button>
-                <button type="button" data-staff-notification-tab="unread" onclick="return setStaffNotificationTab('unread')">Unread</button>
-                <button type="button" data-staff-notification-tab="important" onclick="return setStaffNotificationTab('important')">Important</button>
-              </div>
-              <div class="notification-tabs notification-category-tabs" role="tablist" aria-label="Notification categories">
-                <button class="active" type="button" data-staff-notification-category="" onclick="return setStaffNotificationCategory('')">Every area</button>
-                <button type="button" data-staff-notification-category="HR" onclick="return setStaffNotificationCategory('HR')">HR</button>
-                <button type="button" data-staff-notification-category="TASKS" onclick="return setStaffNotificationCategory('TASKS')">Tasks</button>
-                <button type="button" data-staff-notification-category="QUALITY" onclick="return setStaffNotificationCategory('QUALITY')">Quality</button>
-                <button type="button" data-staff-notification-category="PRODUCTION" onclick="return setStaffNotificationCategory('PRODUCTION')">Production</button>
-                <button type="button" data-staff-notification-category="SYSTEM" onclick="return setStaffNotificationCategory('SYSTEM')">System</button>
-              </div>
-              <div class="notification-toolbar">
-                <button type="button" onclick="return markAllStaffNotificationsRead()">Mark all read</button>
-                <button type="button" onclick="return clearStaffNotifications('read')">Clear read</button>
-                <button type="button" onclick="return clearStaffNotifications('all')">Clear all</button>
-                <button type="button" onclick="return openStaffNotificationPreferences()">Preferences</button>
-              </div>
-              <div id="staffNotificationList" class="notification-list"></div>
-              <div id="staffNotificationEmpty" class="notification-empty">No new notifications</div>
+            <button id="staffNotificationBell" class="notification-bell staff-icon-button" type="button" data-notification-toggle aria-label="Open notifications" aria-expanded="false" aria-controls="staffNotificationPanel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M9.5 21h5"/></svg><span id="staffNotificationBadge" class="notification-badge hidden-section">0</span></button>
+            <div id="staffNotificationPanel" class="notification-panel" data-notification-panel hidden></div>
+          </div>
+          <button id="staffThemeControl" class="staff-icon-button" type="button" aria-label="Use dark theme" title="Change theme"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13A8.5 8.5 0 1 1 11 3.5 7 7 0 0 0 20.5 13Z"/></svg></button>
+          <div class="staff-profile-menu-wrap">
+            <button id="staffProfileMenuToggle" class="staff-icon-button staff-avatar-control" type="button" aria-label="Open profile menu" aria-expanded="false" aria-controls="staffProfileMenu"><span id="staffHeaderAvatar" class="staff-avatar small" data-avatar-self></span></button>
+            <div id="staffProfileMenu" class="staff-profile-menu" hidden>
+              <strong id="staffProfileMenuName">Your account</strong>
+              <button type="button" data-staff-home-section="profileSection">My profile</button>
+              <a href="/profile">Photo and account settings</a>
+              <button type="button" id="staffProfileLogout">Sign out</button>
             </div>
           </div>
-          <button class="staff-task-alert permission-tasks hidden-section" type="button" onclick="return goStaffSection('tasksSection')" aria-label="Open task alerts">
-            <span class="staff-task-alert-icon">!</span>
-            <span>
-              <strong>Task Alerts</strong>
-              <small><b id="taskAlertDueCount">0</b> due today | <b id="taskAlertOverdueCount">0</b> overdue</small>
-            </span>
-          </button>
-          <span class="live-pill">Active Session</span>
         </div>
       </header>
 
@@ -186,7 +142,7 @@
       <section id="profileSection" class="page-section hidden-section">
         <div class="staff-profile-shell">
           <div class="staff-profile-hero">
-            <div id="profileAvatar" class="staff-avatar">V</div>
+            <div id="profileAvatar" class="staff-avatar" data-avatar-self></div>
             <h2 id="profileName">Staff Member</h2>
             <span id="profileRoleBadge" class="staff-role-pill">Staff</span>
           </div>
@@ -270,159 +226,29 @@
       </section>
 
       <!-- DASHBOARD -->
-      <section id="dashboardSection" class="page-section">
-
-        <div class="staff-mission-hero">
-          <div class="staff-mission-copy">
-            <span id="staffMissionDate">Today</span>
-            <h1 id="staffMissionGreeting">Ready for your shift</h1>
-            <p id="staffMissionStatus">Your live work panel is syncing tasks, roster and attendance.</p>
-          </div>
-          <button class="staff-mission-scan permission-attendance hidden-section" type="button" onclick="return openMissionShiftScanner()">
-            <span id="staffMissionActionLabel">Attendance</span>
-            <strong id="staffMissionActionText">Start Shift</strong>
-          </button>
+      <section id="dashboardSection" class="page-section staff-home-section">
+        <div class="staff-home-greeting">
+          <div><p id="staffHomeDate" class="staff-home-eyebrow">Checking workplace time...</p><h1 id="staffHomeGreeting">Welcome</h1><p id="staffHomeTeam">Loading your workspace...</p></div>
+          <button type="button" class="staff-icon-button" id="staffHomeRefresh" aria-label="Refresh home"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M18.5 7A8 8 0 0 0 5 6M5.5 17A8 8 0 0 0 19 18"/></svg></button>
         </div>
-
-        <div class="staff-mission-grid">
-          <button class="staff-mission-tile permission-tasks hidden-section" type="button" onclick="return goStaffSection('tasksSection')">
-            <span>Due Today</span>
-            <strong id="todayTaskCount">0</strong>
-            <small>Tasks needing attention</small>
-          </button>
-          <button class="staff-mission-tile danger-tile permission-tasks hidden-section" type="button" onclick="return goStaffSection('tasksSection')">
-            <span>Overdue</span>
-            <strong id="overdueTaskCount">0</strong>
-            <small>Priority recovery queue</small>
-          </button>
-          <button class="staff-mission-tile permission-attendance" type="button" onclick="return goStaffSection('timesheetSection')">
-            <span>Weekly Hours</span>
-            <strong id="weekHoursCount">0.00</strong>
-            <small id="staffWeekSignal">This week recorded</small>
-          </button>
-          <button class="staff-mission-tile permission-roster hidden-section" type="button" onclick="return goStaffSection('rosterSection')">
-            <span>Next Shift</span>
-            <strong id="staffHomeNextShiftDate">-</strong>
-            <small id="staffHomeNextShiftTime">No upcoming shift</small>
-          </button>
+        <div id="staffHomeError" class="staff-home-feedback" role="status" hidden><span id="staffHomeErrorText"></span><button type="button" id="staffHomeRetry">Retry</button></div>
+        <div id="staffHomeAttendance" class="staff-home-attendance permission-attendance hidden-section" aria-busy="true">
+          <div class="staff-home-card-heading"><div><p class="staff-home-eyebrow">Today</p><h2>Your attendance</h2></div><span id="staffHomeStatus" class="staff-home-status">Checking...</span></div>
+          <div class="staff-home-worked"><strong id="staffHomeWorked">—</strong><span>Worked today</span><small id="staffHomeWorkedDetail">Waiting for your attendance record</small></div>
+          <div class="staff-home-shift-actions"><button id="staffHomePrimaryAction" class="primary-btn" type="button" disabled>Checking attendance...</button><button id="staffHomeBreakAction" class="secondary-btn" type="button" hidden>Take a break</button></div>
+          <div class="staff-home-totals"><div><span>Breaks today</span><strong id="staffHomeBreak">—</strong></div><div><span>Sessions</span><strong id="staffHomeSessions">—</strong></div><div><span>This week</span><strong id="weekHoursCount">—</strong><small id="staffWeekSignal">Recorded hours</small></div></div>
+          <div class="staff-home-session-boundaries"><div><span>First check-in</span><strong id="staffHomeFirstCheckIn">—</strong></div><div><span id="staffHomeLastCheckOutLabel">Latest check-out</span><strong id="staffHomeLastCheckOut">—</strong></div></div>
+          <div class="staff-home-card-heading staff-home-timeline-heading"><h3>Today’s timeline</h3><button type="button" id="staffHomeHistory" class="staff-text-button">History & corrections</button></div>
+          <ol id="staffHomeTimeline" class="staff-home-timeline"><li class="staff-home-empty">Loading today’s sessions...</li></ol>
+          <p id="staffHomeAttendanceNote" class="staff-home-muted"></p>
         </div>
-
-
-        <div class="vv-suite-panel staff-suite-panel">
-          <div class="vv-suite-head compact">
-            <div>
-              <span class="panel-kicker">My Work App</span>
-              <h2>Today's Workforce Tools</h2>
-              <p>Everything assigned to your account appears here based on admin access.</p>
-            </div>
-          </div>
-          <div class="vv-suite-grid staff-suite-grid">
-            <button type="button" class="vv-suite-card permission-attendance hidden-section" onclick="return openMissionShiftScanner()"><span>Time Clock</span><strong>Start / End shift</strong><small>QR attendance and timesheet record.</small></button>
-            <button type="button" class="vv-suite-card permission-roster hidden-section" onclick="return goStaffSection('rosterSection')"><span>Roster</span><strong>My shifts</strong><small>View upcoming shift time, location and notes.</small></button>
-            <button type="button" class="vv-suite-card permission-tasks hidden-section" onclick="return goStaffSection('tasksSection')"><span>Tasks</span><strong>Assigned work</strong><small>Due, overdue and progress updates.</small></button>
-            <button type="button" class="vv-suite-card permission-leave hidden-section" onclick="return goStaffSection('leaveSection')"><span>Time Off</span><strong>Leave requests</strong><small>Submit request and follow approval status.</small></button>
-            <button type="button" class="vv-suite-card permission-availability hidden-section" onclick="return goStaffSection('availabilitySection')"><span>Availability</span><strong>Roster preference</strong><small>Tell admin when you can work.</small></button>
-            <button type="button" class="vv-suite-card permission-forms hidden-section" onclick="return goStaffSection('formsSection')"><span>Forms</span><strong>Checklists</strong><small>Quality, safety and daily records.</small></button>
-            <button type="button" class="vv-suite-card permission-documents hidden-section" onclick="return goStaffSection('documentsSection')"><span>Knowledge</span><strong>Documents</strong><small>Policies, SOPs and company files.</small></button>
-            <button type="button" class="vv-suite-card permission-messages hidden-section" onclick="return goStaffSection('messagesSection')"><span>Messages</span><strong>Contact admin</strong><small>Operational notes and help requests.</small></button>
-            <button type="button" class="vv-suite-card permission-rfqs hidden-section" onclick="return goStaffSection('staffRfqSection')"><span>Sales</span><strong>RFQ register</strong><small>Live customer quote requests and status.</small></button>
-            <button type="button" class="vv-suite-card permission-invoices hidden-section" onclick="return goStaffSection('staffInvoiceSection')"><span>Accounts</span><strong>Invoices</strong><small>Invoice value, paid and balance records.</small></button>
-            <button type="button" class="vv-suite-card permission-customers hidden-section" onclick="return goStaffSection('staffCustomerSection')"><span>CRM</span><strong>Customers</strong><small>Customer contact and order history.</small></button>
-            <button type="button" class="vv-suite-card permission-suppliers hidden-section" onclick="return goStaffSection('staffSupplierSection')"><span>Supply</span><strong>Suppliers</strong><small>Supplier contacts, files and commercial notes.</small></button>
-            <button type="button" class="vv-suite-card permission-expenses hidden-section" onclick="return goStaffSection('staffExpenseSection')"><span>Expenses</span><strong>Expenses</strong><small>View expense records assigned to your account.</small></button>
-            <button type="button" class="vv-suite-card permission-raw-material hidden-section" onclick="return goStaffSection('rawMaterialSection')"><span>Materials</span><strong>Raw material</strong><small>Material quantity, worth and traceability.</small></button>
-            <button type="button" class="vv-suite-card permission-packaging hidden-section" onclick="return goStaffSection('packagingSection')"><span>Materials</span><strong>Packaging</strong><small>Packaging stock, supplier and process records.</small></button>
-            <button type="button" class="vv-suite-card permission-meetings hidden-section" onclick="return goStaffSection('meetingsSection')"><span>Events</span><strong>Meetings</strong><small>Inspections, conference and visit schedule.</small></button>
-            <button type="button" class="vv-suite-card permission-compliance hidden-section" onclick="return goStaffSection('staffComplianceSection')"><span>Governance</span><strong>Compliance</strong><small>Licences, process sheets and review dates.</small></button>
-            <button type="button" class="vv-suite-card permission-competitors hidden-section" onclick="return goStaffSection('staffCompetitorSection')"><span>Market</span><strong>Competitors</strong><small>Industry companies and capability tracking.</small></button>
-          </div>
+        <div class="staff-home-work-grid">
+          <section class="staff-home-card permission-roster hidden-section"><div class="staff-home-card-heading"><h2>Next shift</h2><button class="staff-text-button" type="button" data-staff-home-section="rosterSection">My shifts</button></div><div id="staffHomeNextShift" class="staff-home-empty">Loading your next shift...</div></section>
+          <section class="staff-home-card permission-tasks hidden-section"><div class="staff-home-card-heading"><h2>Assigned tasks</h2><button class="staff-text-button" type="button" data-staff-home-section="tasksSection">View all</button></div><div id="staffHomeTasks" class="staff-home-empty">Loading assigned work...</div></section>
         </div>
-        <div id="staffActionHub" class="staff-action-hub">
-          <button class="staff-action-card permission-leave hidden-section" type="button" onclick="return goStaffSection('leaveSection')">
-            <span>People Ops</span>
-            <strong>Leave Requests</strong>
-            <small>Submit leave and track manager review status.</small>
-          </button>
-          <button class="staff-action-card permission-availability hidden-section" type="button" onclick="return goStaffSection('availabilitySection')">
-            <span>Roster Planning</span>
-            <strong>Availability</strong>
-            <small>Tell the team when you are available or unavailable.</small>
-          </button>
-          <button class="staff-action-card permission-documents hidden-section" type="button" onclick="return goStaffSection('documentsSection')">
-            <span>Knowledge Base</span>
-            <strong>Documents</strong>
-            <small>Read policies, SOPs and safety records.</small>
-          </button>
-          <button class="staff-action-card permission-forms hidden-section" type="button" onclick="return goStaffSection('formsSection')">
-            <span>Quality Control</span>
-            <strong>Forms</strong>
-            <small>Submit daily checklists and process records.</small>
-          </button>
-          <button class="staff-action-card permission-messages hidden-section" type="button" onclick="return goStaffSection('messagesSection')">
-            <span>Communication</span>
-            <strong>Messages</strong>
-            <small>Send operational updates to the office.</small>
-          </button>
-          <button class="staff-action-card permission-tasks hidden-section" type="button" onclick="return goStaffSection('tasksSection')">
-            <span>Task Control</span>
-            <strong>Task Board</strong>
-            <small>View assigned work and update progress.</small>
-          </button>
-          <button class="staff-action-card permission-meetings hidden-section" type="button" onclick="return goStaffSection('meetingsSection')">
-            <span>Meetings & Inspections</span>
-            <strong>Upcoming Events</strong>
-            <small>Review council, government, customer and conference appointments.</small>
-          </button>
-        </div>
-
-        <div class="metric-grid permission-finance hidden-section">
-          <div class="card kpi-teal">
-            <h3>Revenue</h3>
-            <p><strong id="staffRevenueValue">$0.00</strong></p>
-            <span>Collected this financial year</span>
-          </div>
-          <div class="card kpi-blue">
-            <h3>Expenses</h3>
-            <p><strong id="staffExpenseValue">$0.00</strong></p>
-            <span>Recorded this financial year</span>
-          </div>
-          <div class="card kpi-green">
-            <h3>Net Result</h3>
-            <p><strong id="staffNetWorthValue">$0.00</strong></p>
-            <span>Revenue minus expenses</span>
-          </div>
-        </div>
-
-        <div id="announcementPanel" class="card announcement-panel hidden-section">
-          <div class="section-head">
-            <div>
-              <h2>Announcements</h2>
-              <p>Important company news and updates</p>
-            </div>
-            <button class="secondary-btn" onclick="return loadAnnouncements()">Refresh</button>
-          </div>
-          <div id="announcementList" class="card-list">
-            <div class="empty-state">Loading announcements...</div>
-          </div>
-        </div>
-
-        <!-- ATTENDANCE -->
-        <div class="card staff-shift-console permission-attendance">
-          <div class="section-head">
-            <div>
-              <h2>Shift Tracking</h2>
-              <p id="staffShiftSubline">Start or end your shift securely.</p>
-            </div>
-          </div>
-
-          <p id="attendanceStatus">Checking attendance...</p>
-
-          <div class="shift-action-row">
-            <button id="clockInBtn" class="primary-btn" onclick="return openShiftQrScanner('in')">Start Shift</button>
-            <button id="clockOutBtn" class="secondary-btn" onclick="return openShiftQrScanner('out')">End Shift</button>
-          </div>
-        </div>
-
+        <div id="staffHomeAccountOnly" class="staff-home-card" hidden><h2>Your account</h2><p>Your account’s permitted work sections appear in the menu.</p><button class="secondary-btn" type="button" data-staff-home-section="profileSection">Open my profile</button></div>
+        <div id="announcementPanel" class="card announcement-panel hidden-section"><div class="section-head"><div><h2>Company updates</h2><p>Announcements for your account</p></div><button class="secondary-btn" type="button" onclick="return loadAnnouncements()">Refresh</button></div><div id="announcementList" class="card-list"><div class="empty-state">Loading announcements...</div></div></div>
+        <div class="staff-visually-hidden" aria-hidden="true"><span id="taskAlertDueCount"></span><span id="taskAlertOverdueCount"></span><span id="todayTaskCount"></span><span id="overdueTaskCount"></span><span id="staffHomeNextShiftDate"></span><span id="staffHomeNextShiftTime"></span><p id="attendanceStatus"></p><button id="clockInBtn" type="button" tabindex="-1"></button><button id="clockOutBtn" type="button" tabindex="-1"></button></div>
       </section>
 
       <!-- TASKS -->
@@ -1220,13 +1046,19 @@
   </div>
 
 
-  <nav class="mobile-bottom-nav staff-mobile-bottom-nav" aria-label="Staff mobile quick navigation">
-    <button type="button" class="nav-btn" data-section="dashboardSection">Home</button>
-    <button type="button" data-section="timesheetSection" class="nav-btn permission-attendance hidden-section">Shift</button>
-    <button type="button" class="mobile-bottom-primary permission-attendance hidden-section" onclick="return openMissionShiftScanner()">QR</button>
-    <button type="button" data-section="tasksSection" class="nav-btn permission-tasks hidden-section">Tasks</button>
-    <button type="button" class="nav-btn permission-approvals hidden-section" data-section="approvalsSection">Approvals</button>
+  <nav class="mobile-bottom-nav staff-mobile-bottom-nav" aria-label="Staff quick navigation">
+    <button type="button" class="nav-btn active" data-section="dashboardSection">Home</button>
+    <button type="button" class="nav-btn permission-roster hidden-section" data-section="rosterSection">Shifts</button>
+    <button type="button" class="nav-btn permission-attendance hidden-section" data-section="timesheetSection">Timesheets</button>
+    <button type="button" class="nav-btn permission-tasks hidden-section" data-section="tasksSection">Tasks</button>
+    <button type="button" class="nav-btn" data-section="profileSection">Profile</button>
   </nav>
+  <div id="staffAttendanceOverlay" class="staff-attendance-overlay" hidden>
+    <section class="staff-attendance-sheet" role="dialog" aria-modal="true" aria-labelledby="staffAttendanceTitle" tabindex="-1">
+      <div class="staff-home-card-heading"><h2 id="staffAttendanceTitle">Attendance</h2><button id="staffAttendanceClose" class="staff-icon-button" type="button" aria-label="Close attendance"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+      <div id="staffAttendanceBody"></div>
+    </section>
+  </div>
   <div id="toast" class="toast"></div>
 
   <div id="staffDialogBackdrop" class="dialog-backdrop" onclick="return closeStaffDialog(event)">
@@ -1252,7 +1084,13 @@
   </div>
 
   <script src="/step-up.js?v=20260905"></script>
-  <script src="/staff.js?v=20261013-procurement-pdf"></script>
+  <script src="/staff.js?v=20261013-staff-mobile"></script>
+  <script src="/workspace-overlays.js?v=20261013-staff-mobile"></script>
+  <script src="/profile-avatar.js?v=20261013-staff-mobile"></script>
+  <script src="/dashboard-profile-avatar.js?v=20261013-staff-mobile"></script>
+  <script src="/notification-center.js?v=20261013-staff-mobile"></script>
+  <script src="/attendance-scanner.js?v=20261013-staff-mobile"></script>
+  <script src="/staff-home.js?v=20261013-staff-mobile"></script>
   <script src="/workflow-ui.js?v=20261011-restored"></script>
   <script src="/role-portal.js?v=20260926-role-portals"></script>
   <script src="/procurement-ui.js?v=20261013-procurement-pdf"></script>

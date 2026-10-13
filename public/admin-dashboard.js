@@ -1,5 +1,6 @@
 const token = '';
-localStorage.removeItem('token');
+window.VoxelAvatar?.clear();
+    localStorage.removeItem('token');
 let currentUser = {};
 try { currentUser = JSON.parse(localStorage.getItem('user') || '{}'); } catch { localStorage.removeItem('user'); }
 let currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
@@ -149,7 +150,8 @@ function authHeaders() {
 function redirectToLogin(message = 'Your session expired. Please login again.') {
   if (redirectingToLogin) return;
   redirectingToLogin = true;
-  ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
+  window.VoxelAvatar?.clear();
+    ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
   const params = new URLSearchParams({ message });
   window.location.replace(`/login?${params.toString()}`);
   throw new Error('Redirecting to login');
@@ -163,6 +165,7 @@ async function logout() {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
   } finally {
+    window.VoxelAvatar?.clear();
     ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
     window.location.href = '/login';
   }
@@ -212,7 +215,10 @@ function syncTopbarUser(user = currentUser) {
   const initial = name.slice(0, 1).toUpperCase();
   const initialEl = document.getElementById('profileInitial');
   const nameEl = document.getElementById('profileNameLabel');
-  if (initialEl) initialEl.innerText = initial;
+  if (initialEl) {
+    if (window.VoxelAvatar) window.VoxelAvatar.mount(initialEl, { self: true, name });
+    else initialEl.innerText = initial;
+  }
   if (nameEl) nameEl.innerText = name.split(' ')[0] || name;
 }
 
@@ -223,6 +229,7 @@ function setActivePageTitle(btn) {
 }
 
 function closeNotificationPanel() {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.close();
   const panel = document.getElementById('notificationPanel');
   const bell = document.getElementById('notificationBell');
   if (panel) panel.hidden = true;
@@ -230,6 +237,7 @@ function closeNotificationPanel() {
 }
 
 function toggleNotificationPanel(event) {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.toggle(event);
   event?.stopPropagation?.();
   const panel = document.getElementById('notificationPanel');
   const bell = document.getElementById('notificationBell');
@@ -335,6 +343,7 @@ function notificationAge(value) {
 }
 
 function renderNotificationDropdown() {
+  if (window.VoxelNotificationCenter) return;
   const listEl = document.getElementById('notificationList');
   const emptyEl = document.getElementById('notificationEmpty');
   const badgeEl = document.getElementById('notificationBadge');
@@ -367,6 +376,7 @@ function renderNotificationDropdown() {
 }
 
 async function loadNotificationCenter() {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.refresh();
   if (notificationState.loading) return;
   notificationState.loading = true;
   renderNotificationDropdown();
@@ -518,6 +528,7 @@ async function openNotificationPreferences() {
 }
 
 document.addEventListener('click', (event) => {
+  if (window.VoxelNotificationCenter) return;
   if (!event.target.closest?.('.notification-center')) closeNotificationPanel();
 });
 
@@ -5022,7 +5033,7 @@ async function loadStaff() {
       rowRenderer: (u) => `
         <tr>
           <td><strong>${escapeHtml(u.employee_number || `VV-${String(u.id).padStart(6, '0')}`)}</strong><small class="user-uuid">${escapeHtml(u.user_uuid || '')}</small></td>
-          <td>${escapeHtml(u.name)}</td>
+          <td><span class="vv-directory-identity"><span class="vv-directory-avatar" data-avatar-user-id="${Number(u.id)}" data-avatar-name="${escapeHtml(u.name)}" aria-label="${escapeHtml(u.name)} profile photo"></span><span>${escapeHtml(u.name)}</span></span></td>
           <td>${escapeHtml(u.username || '-')}</td>
           <td>${escapeHtml(u.email)}</td>
           <td>${escapeHtml(u.role)}</td>

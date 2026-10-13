@@ -176,7 +176,7 @@ async function initializeRetainedSchemas() {
   ];
   const initializers = services.map(([name, method]) => [`../services/${name}`, method])
     .concat(controllers.map(([name, method]) => [`../controllers/${name}Controller`, method]))
-    .concat([['../services/documentDeliveryService', 'ensureDocumentDeliverySchema'], ['../services/weeklyTimesheetDeliverySchema', 'ensureWeeklyTimesheetDeliverySchema']]);
+    .concat([['../services/documentDeliveryService', 'ensureDocumentDeliverySchema'], ['../services/weeklyTimesheetDeliverySchema', 'ensureWeeklyTimesheetDeliverySchema'], ['../services/attendanceMobileSchema', 'ensureAttendanceMobileSchema']]);
   for (let pass = 0; pass < 2; pass++) {
     for (const [module, method] of initializers) {
       if (pass) delete require.cache[require.resolve(module)];
@@ -229,7 +229,7 @@ async function testIdentityAndProfile() {
   assert.equal(own.body.profile.email, 'owner@example.invalid');
   assert.deepEqual(Object.keys(own.body.profile).sort(), [
     'id', 'user_uuid', 'name', 'username', 'email', 'role', 'account_status',
-    'mobile_number', 'timesheet_delivery_email', 'profile_photo_mime', 'profile_photo_size', 'profile_photo_updated_at',
+    'mobile_number', 'timesheet_delivery_email', 'profile_photo_mime', 'profile_photo_size', 'profile_photo_updated_at', 'profile_photo_revision',
     'profile_updated_at', 'active', 'has_profile_photo', 'profile_photo_url'
   ].sort(), 'The profile DTO exposes only retained identity, contact and photo fields.');
   for (const field of ['department', 'employee_number', 'manager_id', 'access_scope', 'password', 'permissions']) {
@@ -872,9 +872,314 @@ async function main() {
   await testWeeklyDelivery();
   await testProcurementRecordsAndSnapshots();
   await testProcurementImports();
+  await prepareMobileUsers();
+  await testDurableProfilePhotos();
+  await testDurableNotifications();
+  await testDurableAttendanceActions();
+  await testAttendanceCorrections();
   await testArchivedRetention();
   assert.deepEqual(await historicalState(), historicalRows, 'All restored workflows preserve original and retired historical records.');
   console.log(`MYSQL_RETAINED_OK: ${facts.join('; ')}.`);
+}
+
+const mobileUsers = {
+  staff: { id: 131, role: 'staff', permissions: ['VIEW_ATTENDANCE', 'VIEW_OWN_JOBS', 'VIEW_OWN_TIMESHEET'] },
+  other: { id: 132, role: 'staff', permissions: ['VIEW_ATTENDANCE', 'VIEW_OWN_JOBS', 'VIEW_OWN_TIMESHEET'] },
+  manager: { id: 133, role: 'supervisor', permissions: ['VIEW_ATTENDANCE', 'VIEW_TEAM_TIMESHEET', 'APPROVE_TEAM_TIMESHEET'] },
+  approver: { id: 134, role: 'integration_fixture', permissions: ['VIEW_ATTENDANCE', 'EDIT_ATTENDANCE', 'APPROVE_ALL_TIMESHEETS'] },
+  outsideManager: { id: 135, role: 'supervisor', permissions: ['VIEW_ATTENDANCE', 'VIEW_TEAM_TIMESHEET', 'APPROVE_TEAM_TIMESHEET'] }
+};
+async function prepareMobileUsers() {
+  for (const [label, user] of Object.entries(mobileUsers)) {
+    await pool.query('INSERT INTO users(id,name,username,email,password,role,permissions,active,department,manager_id) VALUES(?,?,?,?,?,?,?,1,?,?)',
+      [user.id, `Synthetic ${label} SQL fixture`, `synthetic-${label}-${user.id}`, `synthetic-${label}@example.invalid`, 'not-a-login-hash', user.role, JSON.stringify(user.permissions), 'Synthetic verification team', label === 'staff' ? mobileUsers.manager.id : label === 'other' ? mobileUsers.outsideManager.id : null]);
+  }
+}
+async function testDurableProfilePhotos() {
+  const storage = require('../services/objectStorageService'), configured = storage.isConfigured;
+  const provider = process.env.OBJECT_STORAGE_PROVIDER;
+  storage.isConfigured = () => false; delete process.env.OBJECT_STORAGE_PROVIDER;
+  let photos = require('../services/profilePhotoService');
+  const canvas = require('@napi-rs/canvas').createCanvas(128, 96), drawing = canvas.getContext('2d');
+  drawing.fillStyle = '#165b82'; drawing.fillRect(0, 0, 128, 96);
+  drawing.fillStyle = '#e7b554'; drawing.fillRect(64, 0, 64, 96);
+  const original = { buffer: await canvas.encode('png'), mimetype: 'image/png', originalname: 'synthetic-avatar.png' };
+  const req = { user: mobileUsers.staff, params: { id: mobileUsers.other.id }, query: { user_id: mobileUsers.other.id }, ip: '127.0.0.1', requestId: 'synthetic-photo-sql', get: () => 'Synthetic photo SQL fixture' };
+  try {
+    await photos.ensureProfilePhotoSchema();
+    delete require.cache[require.resolve('../services/profilePhotoService')]; photos = require('../services/profilePhotoService');
+    await photos.ensureProfilePhotoSchema();
+    const first = await photos.saveProfilePhoto(mobileUsers.staff.id, original, req, { x: 1, y: 0.5, zoom: 1.25 });
+    assert.equal(first.mime, 'image/jpeg'); assert.equal(first.width, 512); assert.equal(first.height, 512);
+    const [[persisted]] = await pool.query('SELECT profile_photo,profile_photo_sha256,profile_photo_object_key,profile_photo_width,profile_photo_height FROM user_profiles WHERE user_id=?', [mobileUsers.staff.id]);
+    assert.deepEqual(persisted.profile_photo, first.buffer); assert.equal(persisted.profile_photo_sha256, first.sha256);
+    assert.equal(persisted.profile_photo_object_key, null); assert.equal(persisted.profile_photo_width, 512); assert.equal(persisted.profile_photo_height, 512);
+    const [[beforeRepeat]] = await pool.query("SELECT COUNT(*) count FROM audit_logs WHERE action='PROFILE_PHOTO_UPDATED' AND actor_id=?", [mobileUsers.staff.id]);
+    const repeated = await photos.saveProfilePhoto(mobileUsers.staff.id, original, req, { x: 1, y: 0.5, zoom: 1.25 });
+    assert.equal(repeated.unchanged, true); assert.equal(repeated.sha256, first.sha256);
+    const [[afterRepeat]] = await pool.query("SELECT COUNT(*) count FROM audit_logs WHERE action='PROFILE_PHOTO_UPDATED' AND actor_id=?", [mobileUsers.staff.id]);
+    assert.equal(afterRepeat.count, beforeRepeat.count, 'Identical normalized bytes do not create repeated photo revisions.');
+    delete require.cache[require.resolve('../services/profilePhotoService')]; photos = require('../services/profilePhotoService');
+    assert.deepEqual((await photos.getProfilePhoto(mobileUsers.staff.id)).buffer, first.buffer, 'A service restart reads exact durable normalized photo bytes.');
+    assert.equal(await photos.getProfilePhoto(mobileUsers.other.id), null, 'Switching authenticated account never reads the previous owner photo.');
+    const profile = require('../controllers/profileController'), own = response();
+    await profile.getMyProfilePhoto(req, own); assert.equal(own.statusCode, 200); assert.deepEqual(own.body, first.buffer);
+    assert.equal(own.headers['cache-control'], 'private, no-store'); assert.equal(own.headers.vary, 'Cookie, Authorization');
+    const denied = response(); await profile.getStaffProfilePhoto({ ...req, user: mobileUsers.other, params: { id: mobileUsers.staff.id } }, denied);
+    assert.equal(denied.statusCode, 404);
+    const teammate = response(); await profile.getStaffProfilePhoto({ ...req, user: mobileUsers.manager, params: { id: mobileUsers.staff.id } }, teammate);
+    assert.equal(teammate.statusCode, 200); assert.deepEqual(teammate.body, first.buffer);
+    const outside = response(); await profile.getStaffProfilePhoto({ ...req, user: mobileUsers.outsideManager, params: { id: mobileUsers.staff.id } }, outside);
+    assert.equal(outside.statusCode, 404, 'Team photo access uses the saved manager relationship.');
+    await assert.rejects(() => photos.saveProfilePhoto(mobileUsers.staff.id, { buffer: Buffer.from('not an image'), mimetype: 'image/png' }, req), { code: 'PROFILE_PHOTO_SIGNATURE_INVALID' });
+    await assert.rejects(() => photos.saveProfilePhoto(mobileUsers.staff.id, original, req, { zoom: 4 }), { code: 'PROFILE_PHOTO_CROP_INVALID' });
+    process.env.OBJECT_STORAGE_PROVIDER = 'synthetic-incomplete-provider';
+    await assert.rejects(() => photos.saveProfilePhoto(mobileUsers.staff.id, original, req, { x: 0 }), { code: 'PROFILE_PHOTO_STORAGE_UNAVAILABLE' });
+    delete process.env.OBJECT_STORAGE_PROVIDER;
+    assert.deepEqual((await photos.getProfilePhoto(mobileUsers.staff.id)).buffer, first.buffer, 'Invalid photos/crops and unavailable selected storage preserve the saved photo.');
+    await pool.query('UPDATE user_profiles SET profile_photo=? WHERE user_id=?', [Buffer.from('synthetic corrupt stored photo'), mobileUsers.staff.id]);
+    try { await assert.rejects(() => photos.getProfilePhoto(mobileUsers.staff.id), { code: 'PROFILE_PHOTO_INTEGRITY_FAILED' }); }
+    finally { await pool.query('UPDATE user_profiles SET profile_photo=? WHERE user_id=?', [first.buffer, mobileUsers.staff.id]); }
+    await photos.removeProfilePhoto(mobileUsers.staff.id, req);
+    assert.equal(await photos.getProfilePhoto(mobileUsers.staff.id), null);
+    const [[removed]] = await pool.query('SELECT profile_photo,profile_photo_sha256,profile_photo_object_key FROM user_profiles WHERE user_id=?', [mobileUsers.staff.id]);
+    assert.deepEqual(removed, { profile_photo: null, profile_photo_sha256: null, profile_photo_object_key: null });
+    assert.equal((await photos.removeProfilePhoto(mobileUsers.staff.id, req)).unchanged, true);
+    assert.deepEqual(await historicalState(), historicalRows);
+    facts.push('durable normalized profile photo bytes/restart/idempotency, private no-store response, account/team isolation, failed validation/storage preservation and retained owner-only removal');
+  } finally {
+    storage.isConfigured = configured;
+    if (provider === undefined) delete process.env.OBJECT_STORAGE_PROVIDER; else process.env.OBJECT_STORAGE_PROVIDER = provider;
+  }
+}
+
+async function testDurableNotifications() {
+  const service = require('../services/notificationService'), controller = require('../controllers/notificationController');
+  const user = mobileUsers.staff, other = mobileUsers.other;
+  const event = { userId: user.id, type: 'synthetic_verification', title: 'Synthetic durable notification fixture', message: 'A synthetic supported-system event.', category: 'SYSTEM', linkedModule: 'SYSTEM', dedupeKey: 'synthetic-atomic-event-1', actionUrl: null };
+  const ids = await Promise.all([service.createNotification(pool, event), service.createNotification(pool, event)]);
+  assert.equal(Number(ids[0]), Number(ids[1]), 'Concurrent event delivery retains one recipient notification.');
+  const otherId = await service.createNotification(pool, { ...event, userId: other.id });
+  assert.notEqual(Number(otherId), Number(ids[0]), 'The same event belongs independently to each recipient.');
+  const req = { user, params: {}, query: { page: 1, limit: 30 }, body: {}, ip: '127.0.0.1', get: () => 'Synthetic notification SQL fixture' };
+  const list = response(); await controller.list(req, list); assert.equal(list.statusCode, 200);
+  assert.ok(list.body.notifications.some(item => Number(item.id) === Number(ids[0])));
+  assert.ok(list.body.notifications.every(item => Number(item.id) !== Number(otherId)));
+  const unreadBefore = response(); await controller.unreadCount(req, unreadBefore); assert.equal(unreadBefore.body.unread, 1);
+  const denied = response(); await controller.markRead({ ...req, params: { id: otherId } }, denied); assert.equal(denied.statusCode, 404);
+  const read = response(); await controller.markRead({ ...req, params: { id: ids[0] } }, read); assert.equal(read.statusCode, 200);
+  delete require.cache[require.resolve('../controllers/notificationController')];
+  const restarted = require('../controllers/notificationController'), unreadAfter = response(); await restarted.unreadCount(req, unreadAfter);
+  assert.equal(unreadAfter.body.unread, 0, 'Read state survives a controller restart.');
+  const [[otherRead]] = await pool.query('SELECT is_read FROM notifications WHERE id=?', [otherId]); assert.equal(otherRead.is_read, 0);
+  const all = response(); await restarted.markAllRead(req, all); assert.equal(all.statusCode, 200);
+  const [[otherStillUnread]] = await pool.query('SELECT is_read FROM notifications WHERE id=?', [otherId]); assert.equal(otherStillUnread.is_read, 0);
+  const [legacyRetired] = await pool.query("INSERT INTO notifications(user_id,type,category,title,message,linked_module,action_url) VALUES(?,'synthetic_legacy','SYSTEM','Synthetic legacy Banking notice','Preserved legacy notice bytes','BANKING','/banking')", [user.id]);
+  const invoiceNotice = await service.createNotification(pool, { ...event, category: 'FINANCE', linkedModule: 'INVOICE', linkedRecordId: 1, actionUrl: '/dashboard?view=invoices', dedupeKey: 'synthetic-original-invoice-notice' });
+  const [[beforeHidden]] = await pool.query('SELECT * FROM notifications WHERE id=?', [legacyRetired.insertId]);
+  const hiddenCount = response(); await restarted.unreadCount(req, hiddenCount); assert.equal(hiddenCount.body.unread, 0, 'Retired and unsupported-account module notices never enter the unread badge.');
+  const hiddenRead = response(); await restarted.markRead({ ...req, params: { id: legacyRetired.insertId } }, hiddenRead); assert.equal(hiddenRead.statusCode, 404);
+  const hiddenAll = response(); await restarted.markAllRead(req, hiddenAll); assert.equal(hiddenAll.statusCode, 200);
+  const [[afterHidden]] = await pool.query('SELECT * FROM notifications WHERE id=?', [legacyRetired.insertId]); assert.deepEqual(afterHidden, beforeHidden, 'Hidden historical notifications are preserved rather than rewritten by read-all.');
+  const [[originalInvoiceCategory]] = await pool.query('SELECT category,linked_module,is_read FROM notifications WHERE id=?', [invoiceNotice]);
+  assert.deepEqual(originalInvoiceCategory, { category: 'FINANCE', linked_module: 'INVOICE', is_read: 0 }, 'Original invoice notification categories remain stored while the recipient lacks invoice access.');
+  for (const target of ['/banking', '/dashboard?view=erp', '/dashboard?view=personal-finance', '//other.invalid/path', 'javascript:alert(1)']) assert.equal(service.normaliseActionUrl(target), null);
+  assert.equal(service.normaliseActionUrl('/portal/staff?view=tasks'), '/portal/staff?view=tasks');
+  assert.deepEqual(await historicalState(), historicalRows);
+  facts.push('actual notification recipient/event uniqueness, durable read/unread totals/restart, owner-only read-all and retained-link sanitization');
+}
+
+async function testDurableAttendanceActions() {
+  const user = mobileUsers.staff, other = mobileUsers.other;
+  let actions = require('../services/attendanceActionService');
+  const daily = require('../services/attendanceDailyService'), qr = require('../services/attendanceQrService');
+  const schema = '../services/attendanceMobileSchema';
+  await require(schema).ensureAttendanceMobileSchema();
+  delete require.cache[require.resolve(schema)]; await require(schema).ensureAttendanceMobileSchema();
+  const req = { user, ip: '127.0.0.1', id: 'synthetic-attendance-sql', get: () => 'Synthetic attendance SQL fixture' };
+  const start = new Date('2026-10-03T15:30:00Z'); // Sydney 01:30 before spring DST.
+  async function proof(action, attendanceId, now) {
+    return (await actions.resolveQr({ user, input: { action, attendance_id: attendanceId, token: qr.createSiteToken(now).token }, now })).qr_proof;
+  }
+  const checkInId = crypto.randomUUID(), scan = await proof('CHECK_IN', null, start);
+  const input = { action: 'CHECK_IN', request_id: checkInId, qr_proof: scan, clock_in: '2099-01-01T00:00:00Z', timestamp: '1900-01-01T00:00:00Z' };
+  const concurrent = await Promise.all([actions.performAction({ user, input, req, now: start }), actions.performAction({ user, input, req, now: start })]);
+  assert.equal(concurrent[0].attendance_id, concurrent[1].attendance_id);
+  assert.equal(concurrent.filter(result => result.existing).length, 1);
+  const attendanceId = concurrent[0].attendance_id;
+  assert.equal(concurrent[0].attendance.clock_in, '2026-10-03T15:30:00.000Z', 'Device-supplied clocks cannot replace server UTC.');
+  assert.equal(concurrent[0].attendance.work_date, '2026-10-04');
+  const separateDevice = await actions.performAction({ user, input: { ...input, request_id: crypto.randomUUID() }, req, now: new Date('2026-10-03T15:30:01Z') });
+  assert.equal(separateDevice.attendance_id, attendanceId); assert.equal(separateDevice.unchanged, true);
+  const [[openCount]] = await pool.query('SELECT COUNT(*) count FROM staff_attendance WHERE user_id=? AND clock_out IS NULL AND IFNULL(deleted,0)=0', [user.id]);
+  assert.equal(openCount.count, 1, 'Distinct device request IDs cannot create concurrent open shifts.');
+  await assert.rejects(() => actions.performAction({ user, input: { action: 'CHECK_OUT', attendance_id: attendanceId, request_id: checkInId }, req, now: new Date('2026-10-03T16:00:00Z') }), { code: 'ATTENDANCE_IDEMPOTENCY_CONFLICT' });
+  await assert.rejects(() => actions.performAction({ user: other, input: { action: 'BREAK_START', attendance_id: attendanceId, request_id: crypto.randomUUID() }, req, now: new Date('2026-10-03T16:00:00Z') }), { code: 'ATTENDANCE_SESSION_NOT_FOUND' });
+  const breakStartId = crypto.randomUUID();
+  const breakStarts = await Promise.all([0, 1].map(() => actions.performAction({ user, input: { action: 'BREAK_START', attendance_id: attendanceId, request_id: breakStartId }, req, now: new Date('2026-10-03T16:00:00Z') })));
+  assert.equal(breakStarts.filter(result => result.existing).length, 1);
+  const [[breakCount]] = await pool.query('SELECT COUNT(*) count FROM attendance_break_intervals WHERE attendance_id=?', [attendanceId]); assert.equal(breakCount.count, 1);
+  const onBreak = await daily.readToday({ user, now: new Date('2026-10-03T16:10:00Z') });
+  assert.equal(onBreak.status, 'ON_BREAK'); assert.equal(onBreak.active_attendance.live_worked_minutes, 30); assert.equal(onBreak.active_attendance.live_break_minutes, 10);
+  assert.equal(onBreak.break_policy.automatic_deduction, false);
+
+  // Model a database commit whose reply is lost. SQL commits normally; only the
+  // synthetic transport reply throws. Reconcile must recover its saved receipt.
+  const endBreakId = crypto.randomUUID(), originalGetConnection = pool.getConnection;
+  pool.getConnection = async function () {
+    const connection = await originalGetConnection.call(pool), commit = connection.commit;
+    connection.commit = async function () {
+      connection.commit = commit; await commit.call(connection);
+      throw Object.assign(new Error('Synthetic committed database reply lost'), { code: 'FIXTURE_COMMIT_REPLY_LOST' });
+    };
+    return connection;
+  };
+  try {
+    await assert.rejects(() => actions.performAction({ user, input: { action: 'BREAK_END', attendance_id: attendanceId, request_id: endBreakId }, req, now: new Date('2026-10-03T16:15:00Z') }), { code: 'FIXTURE_COMMIT_REPLY_LOST' });
+  } finally { pool.getConnection = originalGetConnection; }
+  const reconciledBreak = await actions.reconcileAction({ user, requestId: endBreakId, now: new Date('2026-10-03T16:15:00Z') });
+  assert.equal(reconciledBreak.found, true); assert.equal(reconciledBreak.receipt.action, 'BREAK_END'); assert.equal(reconciledBreak.receipt.attendance_id, attendanceId);
+  const end = new Date('2026-10-03T17:30:00Z'), checkoutId = crypto.randomUUID();
+  const invalidTaskRequest = crypto.randomUUID();
+  await assert.rejects(() => actions.performAction({ user, input: { action: 'CHECK_OUT', attendance_id: attendanceId, request_id: invalidTaskRequest, qr_proof: qr.createActionProof({ userId: user.id, action: 'CHECK_OUT', attendanceId, siteToken: qr.createSiteToken(end).token, now: end }).qr_proof, task_id: 999999 }, req, now: end }), { code: 'ATTENDANCE_TASK_UNAVAILABLE' });
+  const [[afterFailedCheckout]] = await pool.query('SELECT clock_out,break_minutes FROM staff_attendance WHERE id=?', [attendanceId]);
+  assert.equal(afterFailedCheckout.clock_out, null); assert.equal(afterFailedCheckout.break_minutes, 15);
+  const [[invalidTaskReceipt]] = await pool.query('SELECT COUNT(*) count FROM attendance_action_receipts WHERE user_id=? AND request_id=?', [user.id, invalidTaskRequest]); assert.equal(invalidTaskReceipt.count, 0, 'A rejected checkout rolls back its receipt and leaves the exact session open.');
+  const completed = await actions.performAction({ user, input: { action: 'CHECK_OUT', attendance_id: attendanceId, request_id: checkoutId, qr_proof: await proof('CHECK_OUT', attendanceId, end) }, req, now: end });
+  assert.equal(completed.attendance.total_minutes, 105, 'DST wall-clock jump does not add an hour; only the recorded 15-minute break is deducted.');
+  assert.equal(completed.attendance.break_minutes, 15); assert.equal(completed.attendance.clock_out, '2026-10-03T17:30:00.000Z');
+  const noteId = crypto.randomUUID(), note = { request_id: noteId, expected_revision: completed.attendance.revision, notes: 'Synthetic completed-shift note', category: 'Synthetic verification' };
+  const notes = await actions.saveCheckoutNote({ user, attendanceId, input: note, req, now: new Date('2026-10-03T17:31:00Z') });
+  assert.equal(notes.attendance.notes, note.notes); assert.equal(notes.attendance.checkout_category, note.category);
+  assert.equal((await actions.saveCheckoutNote({ user, attendanceId, input: note, req, now: new Date('2026-10-03T17:32:00Z') })).existing, true);
+  await assert.rejects(() => actions.saveCheckoutNote({ user, attendanceId, input: { ...note, request_id: crypto.randomUUID() }, req, now: new Date('2026-10-03T17:32:00Z') }), { code: 'ATTENDANCE_REVISION_CONFLICT' });
+  await assert.rejects(() => actions.saveCheckoutNote({ user: other, attendanceId, input: { ...note, request_id: crypto.randomUUID() }, req, now: new Date('2026-10-03T17:32:00Z') }), { code: 'ATTENDANCE_SESSION_NOT_FOUND' });
+  delete require.cache[require.resolve('../services/attendanceActionService')]; actions = require('../services/attendanceActionService');
+  const restartedReceipt = await actions.reconcileAction({ user, requestId: checkoutId, now: new Date('2026-10-03T18:00:00Z') });
+  assert.equal(restartedReceipt.found, true); assert.equal(restartedReceipt.receipt.attendance_id, attendanceId);
+  assert.equal((await actions.reconcileAction({ user: other, requestId: checkoutId, now: new Date('2026-10-03T18:00:00Z') })).found, false);
+  const secondStart = new Date('2026-10-03T18:00:00Z');
+  const second = await actions.performAction({ user, input: { action: 'CHECK_IN', request_id: crypto.randomUUID(), qr_proof: await proof('CHECK_IN', null, secondStart) }, req, now: secondStart });
+  assert.notEqual(second.attendance_id, attendanceId);
+  const oldReplay = await actions.performAction({ user, input: { action: 'CHECK_OUT', attendance_id: attendanceId, request_id: checkoutId, qr_proof: 'expired-proof-must-not-replace-committed-receipt' }, req, now: secondStart });
+  assert.equal(oldReplay.existing, true); assert.equal(oldReplay.attendance_id, attendanceId);
+  assert.equal(oldReplay.state.active_attendance.id, second.attendance_id, 'A completed old checkout retry never closes a newer shift.');
+  const secondEnd = new Date('2026-10-03T18:30:00Z');
+  await actions.performAction({ user, input: { action: 'CHECK_OUT', attendance_id: second.attendance_id, request_id: crypto.randomUUID(), qr_proof: await proof('CHECK_OUT', second.attendance_id, secondEnd) }, req, now: secondEnd });
+  const day = await daily.readToday({ user, now: secondEnd });
+  assert.equal(day.summary.worked_minutes, 135); assert.equal(day.summary.session_count, 2);
+  assert.equal(day.summary.recorded_break_minutes, 15); assert.equal(day.summary.review_required, false);
+  assert.deepEqual(day.timeline.map(event => event.type), ['CHECK_IN', 'BREAK_START', 'BREAK_END', 'CHECK_OUT', 'CHECK_IN', 'CHECK_OUT']);
+  assert.deepEqual((await daily.readToday({ user: other, now: secondEnd })).sessions, [], 'Daily timelines are scoped to the authenticated account.');
+  const overnightStart = new Date('2026-10-04T12:30:00Z');
+  const overnight = await actions.performAction({ user, input: { action: 'CHECK_IN', request_id: crypto.randomUUID(), qr_proof: await proof('CHECK_IN', null, overnightStart) }, req, now: overnightStart });
+  const tomorrow = await daily.readToday({ user, now: new Date('2026-10-04T13:30:00Z') });
+  assert.equal(tomorrow.work_date, '2026-10-05'); assert.equal(tomorrow.active_attendance.overnight, true);
+  assert.equal(tomorrow.active_attendance.allocated_work_date, '2026-10-04'); assert.equal(tomorrow.active_attendance.live_worked_minutes, 60);
+  assert.equal(tomorrow.summary.live_worked_minutes, 0, 'An overnight shift remains allocated to its start date rather than entering tomorrow twice.');
+  const overnightEnd = new Date('2026-10-04T14:00:00Z');
+  const overnightComplete = await actions.performAction({ user, input: { action: 'CHECK_OUT', attendance_id: overnight.attendance_id, request_id: crypto.randomUUID(), qr_proof: await proof('CHECK_OUT', overnight.attendance_id, overnightEnd) }, req, now: overnightEnd });
+  assert.equal(overnightComplete.attendance.total_minutes, 90); assert.equal(overnightComplete.attendance.work_date, '2026-10-04');
+  const [legacy] = await pool.query("INSERT INTO staff_attendance(user_id,clock_in,work_date,total_minutes,total_hours,notes) VALUES(?,'2026-10-10 09:00:00','2026-10-10',120,2,'Synthetic unverified legacy session')", [other.id]);
+  const legacyEnd = new Date('2026-10-10T01:30:00Z');
+  const legacyProof = await actions.resolveQr({ user: other, input: { action: 'CHECK_OUT', attendance_id: legacy.insertId, token: qr.createSiteToken(legacyEnd).token }, now: legacyEnd });
+  const legacyClosed = await actions.performAction({ user: other, input: { action: 'CHECK_OUT', attendance_id: legacy.insertId, request_id: crypto.randomUUID(), qr_proof: legacyProof.qr_proof }, req, now: legacyEnd });
+  assert.equal(legacyClosed.attendance.review_required, true); assert.equal(legacyClosed.attendance.review_reason, 'ATTENDANCE_TIMEZONE_UNVERIFIED');
+  assert.equal(legacyClosed.attendance.total_minutes, 120, 'Closing an unverified legacy session does not invent UTC worked time.');
+  const [[legacyStored]] = await pool.query("SELECT DATE_FORMAT(clock_in,'%Y-%m-%d %H:%i:%s') clock_in,timestamp_basis,clock_out_timestamp_basis FROM staff_attendance WHERE id=?", [legacy.insertId]);
+  assert.deepEqual(legacyStored, { clock_in: '2026-10-10 09:00:00', timestamp_basis: null, clock_out_timestamp_basis: 'UTC' });
+  const legacyDaily = await daily.readToday({ user: other, now: legacyEnd });
+  assert.equal(legacyDaily.summary.worked_minutes, 0); assert.equal(legacyDaily.summary.review_required, true, 'Unverified legacy time stays excluded from authoritative daily work totals.');
+  assert.deepEqual(await historicalState(), historicalRows, 'Attendance actions and new metadata preserve historical unverified clock values.');
+  facts.push('real durable attendance receipts, concurrent devices/single session, lost-commit reconciliation, actual breaks, UTC/DST/overnight allocation, exact-session notes, scoped timelines and old checkout replay safety');
+}
+
+async function testAttendanceCorrections() {
+  const corrections = require('../services/attendanceCorrectionService'), user = mobileUsers.staff;
+  const req = { user, ip: '127.0.0.1', id: 'synthetic-correction-sql', get: () => 'Synthetic correction SQL fixture' };
+  const now = new Date('2026-10-13T00:00:00Z');
+  const [[first]] = await pool.query('SELECT * FROM staff_attendance WHERE user_id=? ORDER BY id LIMIT 1', [user.id]);
+  const [originalBreaks] = await pool.query('SELECT id,started_at,ended_at,start_request_id,end_request_id FROM attendance_break_intervals WHERE attendance_id=? ORDER BY id', [first.id]);
+  const input = { request_id: crypto.randomUUID(), attendance_id: first.id, expected_revision: first.revision, clock_in: '2026-10-04T01:40:00+10:00', clock_out: '2026-10-04T04:30:00+11:00', break_minutes: 10, notes: 'Synthetic reviewed correction', reason: 'Synthetic actual start and break correction' };
+  const requested = await corrections.requestCorrection({ user, input, req, now });
+  assert.equal(requested.correction.status, 'PENDING');
+  const [[unchanged]] = await pool.query('SELECT * FROM staff_attendance WHERE id=?', [first.id]);
+  assert.deepEqual(unchanged, first, 'A correction request preserves original attendance until authorised approval.');
+  assert.equal((await corrections.requestCorrection({ user, input, req, now })).correction.id, requested.correction.id);
+  await assert.rejects(() => corrections.requestCorrection({ user, input: { ...input, reason: 'Conflicting reuse of correction UUID' }, req, now }), { code: 'ATTENDANCE_IDEMPOTENCY_CONFLICT' });
+  await assert.rejects(() => corrections.decideCorrection({ user: { ...user, permissions: [...user.permissions, 'EDIT_ATTENDANCE'] }, id: requested.correction.id, input: { expected_revision: 1, reason: 'Synthetic self-approval attempt' }, decision: 'APPROVED', req, now }), { code: 'ATTENDANCE_CORRECTION_ACCESS_DENIED' });
+  assert.equal((await corrections.listCorrections({ user, query: { scope: 'own' } })).total, 1);
+  const team = await corrections.listCorrections({ user: mobileUsers.manager, query: { scope: 'team' } });
+  assert.equal(team.total, 1); assert.equal(team.corrections[0].can_review, true);
+  assert.equal((await corrections.listCorrections({ user: mobileUsers.outsideManager, query: { scope: 'team' } })).total, 0);
+  await assert.rejects(() => corrections.getCorrection({ user: mobileUsers.outsideManager, id: requested.correction.id }), { code: 'ATTENDANCE_CORRECTION_NOT_FOUND' });
+  await assert.rejects(() => corrections.listCorrections({ user, query: { scope: 'all' } }), { code: 'ATTENDANCE_CORRECTION_ACCESS_DENIED' });
+  const decision = { expected_revision: requested.correction.revision, reason: 'Synthetic supervisor verified actual times' };
+  const approved = await Promise.all([0, 1].map(() => corrections.decideCorrection({ user: mobileUsers.manager, id: requested.correction.id, input: decision, decision: 'APPROVED', req, now })));
+  assert.equal(approved.filter(result => result.existing).length, 1);
+  assert.equal(approved[0].attendance.total_minutes, 100);
+  assert.equal(approved[0].attendance.entry_source, 'MANUAL'); assert.equal(approved[0].attendance.manual_authorised_by, mobileUsers.manager.id);
+  assert.equal(approved[0].attendance.timestamp_basis, 'UTC'); assert.equal(approved[0].attendance.recorded_timezone, 'Australia/Sydney');
+  const [preservedBreaks] = await pool.query('SELECT id,started_at,ended_at,start_request_id,end_request_id FROM attendance_break_intervals WHERE attendance_id=? ORDER BY id', [first.id]);
+  assert.deepEqual(preservedBreaks, originalBreaks, 'Approved corrections supersede break evidence without rewriting its original timestamps or request IDs.');
+  const [[effectiveBreaks]] = await pool.query('SELECT COUNT(*) count FROM attendance_break_intervals WHERE attendance_id=? AND superseded_at IS NULL', [first.id]);
+  assert.equal(effectiveBreaks.count, 0);
+  const [[superseded]] = await pool.query('SELECT superseded_by,superseded_by_correction_id FROM attendance_break_intervals WHERE attendance_id=?', [first.id]);
+  assert.equal(superseded.superseded_by, mobileUsers.manager.id); assert.equal(superseded.superseded_by_correction_id, requested.correction.id);
+
+  const lockedInput = { ...input, request_id: crypto.randomUUID(), expected_revision: approved[0].attendance.revision, clock_in: '2026-10-04T01:45:00+10:00', reason: 'Synthetic correction awaiting period amendment' };
+  const lockedRequest = await corrections.requestCorrection({ user, input: lockedInput, req, now });
+  const [period] = await pool.query("INSERT INTO weekly_timesheets(user_id,week_start,week_end,status) VALUES(?,'2026-09-28','2026-10-04','APPROVED')", [user.id]);
+  const lockedDecision = { user: mobileUsers.manager, id: lockedRequest.correction.id, input: { expected_revision: 1, reason: 'Synthetic locked-period review' }, decision: 'APPROVED', req, now };
+  await assert.rejects(() => corrections.decideCorrection(lockedDecision), { code: 'ATTENDANCE_PERIOD_LOCKED' });
+  await pool.query("UPDATE weekly_timesheets SET status='DRAFT' WHERE id=?", [period.insertId]);
+  await pool.query("INSERT INTO payroll_ready(timesheet_id,user_id,period_start,period_end,status,locked_at) VALUES(?,?,'2026-09-28','2026-10-04','LOCKED',NOW())", [period.insertId, user.id]);
+  await assert.rejects(() => corrections.decideCorrection({ ...lockedDecision, user: mobileUsers.approver }), { code: 'ATTENDANCE_PERIOD_LOCKED' });
+  const [[stillApproved]] = await pool.query('SELECT revision,total_minutes FROM staff_attendance WHERE id=?', [first.id]);
+  assert.equal(stillApproved.revision, approved[0].attendance.revision); assert.equal(stillApproved.total_minutes, 100);
+  await pool.query('UPDATE users SET manager_id=? WHERE id=?', [mobileUsers.outsideManager.id, user.id]);
+  try { await assert.rejects(() => corrections.decideCorrection(lockedDecision), { code: 'ATTENDANCE_CORRECTION_ACCESS_DENIED' }); }
+  finally { await pool.query('UPDATE users SET manager_id=? WHERE id=?', [mobileUsers.manager.id, user.id]); }
+
+  const missing = { request_id: crypto.randomUUID(), correction_type: 'MISSING_SESSION', clock_in: '2026-10-06T09:00:00+11:00', clock_out: '2026-10-06T10:30:00+11:00', break_minutes: 15, notes: 'Synthetic missing-session request', reason: 'Synthetic missed start/end request' };
+  const [[beforeMissing]] = await pool.query('SELECT COUNT(*) count FROM staff_attendance WHERE user_id=?', [user.id]);
+  const missingRequest = await corrections.requestCorrection({ user, input: missing, req, now });
+  assert.equal(missingRequest.correction.status, 'PENDING'); assert.equal(missingRequest.correction.attendance_id, null);
+  const [[afterPendingMissing]] = await pool.query('SELECT COUNT(*) count FROM staff_attendance WHERE user_id=?', [user.id]);
+  assert.equal(afterPendingMissing.count, beforeMissing.count, 'Pending missing-session requests never add claimed worked time.');
+  assert.equal((await corrections.requestCorrection({ user, input: missing, req, now })).correction.id, missingRequest.correction.id);
+  await assert.rejects(() => corrections.requestCorrection({ user, input: { ...missing, clock_out: '2026-10-06T11:00:00+11:00' }, req, now }), { code: 'ATTENDANCE_IDEMPOTENCY_CONFLICT' });
+  const missingApproved = await corrections.decideCorrection({ user: mobileUsers.manager, id: missingRequest.correction.id, input: { expected_revision: 1, reason: 'Synthetic supervisor approved evidence' }, decision: 'APPROVED', req, now });
+  assert.ok(missingApproved.attendance.id); assert.equal(missingApproved.attendance.entry_source, 'MANUAL');
+  assert.equal(missingApproved.attendance.total_minutes, 75); assert.equal(missingApproved.attendance.work_date, '2026-10-06');
+  assert.equal(missingApproved.attendance.manual_authorised_by, mobileUsers.manager.id);
+  const missingReplay = await corrections.decideCorrection({ user: mobileUsers.manager, id: missingRequest.correction.id, input: { expected_revision: 1, reason: 'Synthetic supervisor approved evidence' }, decision: 'APPROVED', req, now });
+  assert.equal(missingReplay.existing, true); assert.equal(missingReplay.attendance.id, missingApproved.attendance.id);
+  const [[afterMissingApproval]] = await pool.query('SELECT COUNT(*) count FROM staff_attendance WHERE user_id=?', [user.id]); assert.equal(afterMissingApproval.count, beforeMissing.count + 1);
+  const overlapInput = { ...missing, request_id: crypto.randomUUID(), clock_in: '2026-10-06T09:15:00+11:00', clock_out: '2026-10-06T10:00:00+11:00', break_minutes: 0, reason: 'Synthetic overlap must be rejected' };
+  let overlapRequest;
+  try { overlapRequest = await corrections.requestCorrection({ user, input: overlapInput, req, now }); }
+  catch (error) { assert.equal(error.code, 'ATTENDANCE_CORRECTION_OVERLAP'); }
+  if (overlapRequest) await assert.rejects(() => corrections.decideCorrection({ user: mobileUsers.manager, id: overlapRequest.correction.id, input: { expected_revision: 1, reason: 'Synthetic overlapping review' }, decision: 'APPROVED', req, now }), { code: 'ATTENDANCE_CORRECTION_OVERLAP' });
+  for (const invalidStart of ['2026-10-04T02:30:00', '2026-04-05T02:30:00']) await assert.rejects(() => corrections.requestCorrection({ user, input: { ...missing, request_id: crypto.randomUUID(), clock_in: invalidStart, clock_out: null }, req, now }), { code: 'ATTENDANCE_TIME_INVALID' });
+  const [[afterRejectedOverlap]] = await pool.query('SELECT COUNT(*) count FROM staff_attendance WHERE user_id=?', [user.id]); assert.equal(afterRejectedOverlap.count, beforeMissing.count + 1);
+  const daily = require('../services/attendanceDailyService');
+  const [attendanceBeforeRead] = await pool.query('SELECT * FROM staff_attendance WHERE user_id IN (?,?) ORDER BY id', [user.id, mobileUsers.other.id]);
+  const teamSessions = await daily.listSessions({ user: mobileUsers.manager, query: { scope: 'team', page_size: 1, status: 'ALL', from: '2026-10-04', to: '2026-10-10' } });
+  assert.equal(teamSessions.sessions.length, 1); assert.equal(teamSessions.total, 4); assert.equal(teamSessions.pages, 4);
+  assert.equal(teamSessions.summary.session_count, 4, 'Team summary counts cover all filtered sessions independently of the page.');
+  assert.equal(teamSessions.sessions[0].user_id, user.id); assert.equal(teamSessions.sessions[0].staff_name, 'Synthetic staff SQL fixture');
+  assert.equal(teamSessions.sessions[0].staff_department, 'Synthetic verification team');
+  const outsideSessions = await daily.listSessions({ user: mobileUsers.outsideManager, query: { scope: 'team', page_size: 100 } });
+  assert.equal(outsideSessions.total, 1); assert.ok(outsideSessions.sessions.every(session => session.user_id === mobileUsers.other.id));
+  await assert.rejects(() => daily.listSessions({ user, query: { scope: 'team' } }), { code: 'ATTENDANCE_TEAM_ACCESS_DENIED' });
+  await assert.rejects(() => daily.listSessions({ user: mobileUsers.manager, query: { scope: 'all' } }), { code: 'ATTENDANCE_TEAM_ACCESS_DENIED' });
+  const ownSessions = await daily.listMySessions({ user, query: { page: 1, page_size: 1, from: '2026-10-04', to: '2026-10-10' } });
+  assert.equal(ownSessions.total, 4); assert.equal(ownSessions.pages, 4); assert.equal(ownSessions.attendance.length, 1);
+  const [attendanceAfterRead] = await pool.query('SELECT * FROM staff_attendance WHERE user_id IN (?,?) ORDER BY id', [user.id, mobileUsers.other.id]);
+  assert.deepEqual(attendanceAfterRead, attendanceBeforeRead, 'Team/own overview reads cannot mutate attendance records.');
+  assert.deepEqual(await historicalState(), historicalRows, 'Corrections preserve pre-existing unverified historical attendance and all original stored records.');
+  facts.push('real correction request/decision idempotency, pending preservation, team/private review authority, effective break supersession, approved/payroll locks, missing-session approval and overlap/DST guards');
 }
 
 async function testArchivedRetention() {

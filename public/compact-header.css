@@ -1,0 +1,20 @@
+.vv-topbar { min-width: 0; }
+.vv-topbar .topbar-title { min-width: 0; }
+.vv-topbar .topbar-actions { flex-shrink: 0; gap: 8px; }
+.vv-topbar .notification-bell, .vv-topbar .profile-chip, .vv-topbar .vv-theme-toggle { min-width: 44px; min-height: 44px; }
+.vv-topbar .notification-bell svg { width: 23px; height: 23px; display: block; fill: none; stroke: currentColor; stroke-width: 1.8; }
+.vv-topbar .profile-chip { display: inline-flex; align-items: center; gap: 8px; }
+.vv-theme-toggle[data-theme-compact] { display: inline-grid; place-items: center; width: 44px; padding: 8px; font-size: 20px; }
+@media (max-width: 760px) {
+  .vv-topbar { display: flex; align-items: center; gap: 8px; padding-top: max(8px, env(safe-area-inset-top)); padding-inline: max(10px, env(safe-area-inset-left)); }
+  .vv-topbar .topbar-title { flex: 1; }
+  .vv-topbar .topbar-title h2 { font-size: 17px; line-height: 1.25; overflow-wrap: anywhere; margin: 0; }
+  .vv-topbar .topbar-kicker, .vv-topbar #adminInfo, .vv-topbar #staffInfo,
+  .vv-topbar #profileNameLabel, .vv-topbar .live-pill, .vv-topbar .topbar-quick-action { display: none; }
+  .vv-topbar .profile-chip { padding: 3px; width: 44px; flex: 0 0 44px; }
+  .vv-topbar .profile-initial { width: 36px; height: 36px; min-width: 36px; }
+  .vv-topbar .topbar-actions { gap: 3px; }
+  .vv-topbar .notification-bell { width: 44px; padding: 8px; }
+  .mobile-bottom-nav { padding-bottom: max(6px, env(safe-area-inset-bottom)); }
+}
+.vv-directory-identity{display:flex;align-items:center;gap:.6rem;min-width:0}.vv-directory-avatar{display:grid;place-items:center;flex:0 0 36px;width:36px;height:36px;border-radius:50%;background:var(--surface-muted);color:var(--text-primary);font-size:.75rem;font-weight:700}

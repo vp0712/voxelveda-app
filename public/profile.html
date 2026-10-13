@@ -6,6 +6,9 @@
   <meta name="robots" content="noindex,nofollow,noarchive">
   <title>My Profile | Voxel Veda</title>
   <link rel="icon" href="/favicon-32.png">
+  <link rel="stylesheet" href="/workspace-theme.css?v=20261013-shared-avatar">
+  <script src="/workspace-theme.js?v=20261013-shared-avatar" defer></script>
+  <script src="/workspace-overlays.js?v=20261013-shared-avatar" defer></script>
   <style>
     :root{}
     *{box-sizing:border-box;}body{margin:0;background:var(--page);color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh;}
@@ -39,10 +42,11 @@
           <button class="btn primary" id="takePhotoBtn" type="button">Take Photo</button>
           <button class="btn" id="choosePhotoBtn" type="button">Choose Photo</button>
           <button class="btn danger" id="removePhotoBtn" type="button">Remove Photo</button>
+          <button class="btn" id="retryPhotoBtn" type="button" hidden>Retry loading photo</button>
         </div>
         <input id="cameraInput" type="file" accept="image/*" capture="user">
         <input id="galleryInput" type="file" accept="image/*">
-        <p class="helper">Take a photo or choose one from your phone. Large phone photos are automatically resized and converted to a secure upload format before being sent.</p>
+        <p class="helper">Take a photo or choose a JPG, PNG or WebP image up to 24 megapixels. Position the square crop before saving. Photos are resized and stored privately.</p>
         <div class="completion">
           <div class="completionHead"><strong>Profile completeness</strong><span id="completionPercent">0%</span></div>
           <div class="completionTrack" aria-hidden="true"><i id="completionBar"></i></div>
@@ -65,7 +69,7 @@
           <div id="status" class="status" role="status" aria-live="polite"></div>
         </form>
         <div class="meta"><div>Account status<strong id="accountStatus">—</strong></div><div>Profile photo<strong id="photoStatus">Not uploaded</strong></div><div>Photo updated<strong id="photoUpdated">—</strong></div><div>Profile updated<strong id="profileUpdated">—</strong></div></div>
-        <div class="securityNote">Profile photos are served only to the signed-in user. Login identity, permissions and role cannot be changed from this screen.</div>
+        <div class="securityNote">Profile photos are private to your signed-in account and authorised staff-directory access. Login identity, permissions and role cannot be changed from this screen.</div>
       </article>
     </section>
   </main>
@@ -78,6 +82,10 @@
     </div>
   </div>
 
-  <script src="/profile.js?v=20261012-timesheet-preference" defer></script>
+  <style>.profileCropOverlay{position:fixed;inset:0;z-index:12000;background:rgba(5,15,35,.8);display:grid;place-items:center;padding:max(12px,env(safe-area-inset-top)) 12px max(12px,env(safe-area-inset-bottom));overflow:auto}.profileCropPanel{background:var(--surface);color:var(--text-primary);border:1px solid var(--border);border-radius:18px;padding:20px;width:min(420px,100%);max-height:95dvh;overflow:auto}.profileCropPanel canvas{width:min(100%,320px);height:auto;display:block;margin:12px auto;border-radius:12px}.profileCropPanel label{display:grid;gap:4px;margin:10px 0;font-size:14px}.profileCropPanel input{min-height:44px;width:100%}.profileCropActions{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}.profileCropActions button{min-height:44px}</style>
+  <script src="/profile-avatar.js?v=20261013-shared-avatar" defer></script>
+  <link rel="stylesheet" href="/notification-center.css?v=20261013-staff-mobile">
+  <script src="/notification-center.js?v=20261013-staff-mobile" defer></script>
+  <script src="/profile.js?v=20261013-shared-avatar" defer></script>
 </body>
 </html>

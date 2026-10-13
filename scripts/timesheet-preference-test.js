@@ -60,6 +60,7 @@ function database() {
     '../config/db': db, bcryptjs: { hash: async () => 'fixture-only-disabled-password' },
     '../services/auditService': { async logAudit(connection, entry) { assert.notEqual(connection, db, 'audit must share the record transaction'); if (state.auditFailure) throw new Error('Audit unavailable'); state.audits.push(plain(entry)); } },
     '../services/hrAdministrationSchema': { ensureHrAdministrationSchema: noop }, '../services/securityGovernanceSchema': { ensureSecurityGovernanceSchema: noop },
+    '../services/profilePhotoService': { ensureProfilePhotoSchema: noop }, '../services/customerRecordScope': require('../services/customerRecordScope'),
     '../services/timesheetDeliveryPreferenceService': { normalizeTimesheetDeliveryEmail }, '../services/userLifecycleService': { ensureUserLifecycleSchema: noop },
     '../services/coreAuditSchema': { ensureCoreAuditSchema: noop }, '../services/securitySchema': { ensureSecuritySchema: noop },
     '../services/sessionService': { revokeUserSessions: noop, logSecurityEvent: noop }, '../services/authActionTokenService': { issueToken: async () => 'fixture-token', revokeUserActionTokens: noop },

@@ -72,6 +72,18 @@ jobs:
           name: procurement-browser-${{ github.sha }}
           path: ${{ runner.temp }}/procurement-import-proof
           retention-days: 30
+      - name: Test staff attendance, avatars and notifications with before/after responsive evidence
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/staff-mobile-proof
+        run: timeout --signal=TERM --kill-after=10s 240s node scripts/staff-mobile-browser-test.js
+      - name: Preserve staff mobile before/after browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staff-mobile-browser-${{ github.sha }}
+          path: ${{ runner.temp }}/staff-mobile-proof
+          retention-days: 30
       - name: Preserve actual browser evidence
         uses: actions/upload-artifact@v4
         with:

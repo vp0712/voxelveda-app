@@ -135,21 +135,14 @@ async function recordTransition(connection, timesheet, action, toStatus, actorId
   );
 }
 
-async function notifyAdmins(connection, timesheet, title, message, priority = 'normal') {
-    await connection.query(
-      `
-      INSERT INTO notifications
-      (user_id, type, category, title, message, priority, linked_module, linked_record_id, action_url)
-      SELECT id, 'TIMESHEET', 'HR', ?, ?, ?, 'timesheets', ?, '/admin?view=timesheets'
-      FROM users
-    WHERE active = 1
-      AND (
-        LOWER(role) IN ('admin', 'super_admin', 'hr')
-        OR id = (SELECT manager_id FROM users WHERE id = ? LIMIT 1)
-      )
-    `,
-    [title, message, priority, String(timesheet.id), timesheet.user_id]
-  );
+async function notifyAdmins(connection,timesheet,title,message,priority='normal') {
+  const [[event]]=await connection.query('SELECT version_no,status FROM weekly_timesheets WHERE id=? LIMIT 1',[timesheet.id]);
+  if(!event || !Number.isSafeInteger(Number(event.version_no)) || Number(event.version_no)<1)throw new Error('The submitted timesheet version is unavailable.');
+  const [recipients]=await connection.query(`SELECT id FROM users WHERE active=1 AND deleted_at IS NULL AND (LOWER(role) IN ('admin','super_admin','hr') OR id=(SELECT manager_id FROM users WHERE id=? LIMIT 1))`,[timesheet.user_id]);
+  for(const recipient of recipients)await createNotification(connection,{
+    userId:recipient.id,type:'TIMESHEET',category:'HR',title,message,priority,linkedModule:'timesheets',linkedRecordId:timesheet.id,actionUrl:'/admin?view=timesheets',
+    dedupeKey:`timesheet-submitted:${timesheet.id}:version:${Number(event.version_no)}:status:${event.status}`
+  });
 }
 
 async function listTimesheets({ user, status = 'ALL', userId, fromDate, toDate } = {}) {
