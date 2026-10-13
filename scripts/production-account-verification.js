@@ -42,7 +42,7 @@ async function main(){
  for(const route of ['/api/profile','/api/profile/photo','/api/profile/staff/1/photo','/api/notifications','/api/notifications/unread-count','/api/attendance/today','/api/attendance/my','/api/attendance/reconcile','/api/attendance/corrections']){
   const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000)});assert.equal(response.status,401,route+' retains authentication');proof.checks.push({route,status:401,staff_mobile_authentication_boundary:true});
  }
- for(const name of ['staff-home.js','staff-home.css','attendance-scanner.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js']){
+ for(const name of ['staff-home.js','staff-home.css','attendance-scanner.js','staff.js','admin-dashboard.js','profile.js','workflow-ui.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js']){
   const response=await fetch(origin+'/'+name,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,name+' is deployed');
   const bytes=Buffer.from(await response.arrayBuffer()),digest=buffer=>crypto.createHash('sha256').update(buffer).digest('hex');
   assert.equal(digest(bytes),digest(fs.readFileSync(path.join(__dirname,'../public',name))),name+' matches exact release bytes');

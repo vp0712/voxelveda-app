@@ -7,8 +7,9 @@ const {injectGlobalBrand}=require('../services/globalBrandRenderer');
 const project=path.resolve(__dirname,'..');
 const out=process.env.VV_PROOF_DIR || path.join(project,'account-foundation-proof');fs.mkdirSync(out,{recursive:true});
 const app=express();app.use(express.json());
-app.get('/api/auth/me',(req,res)=>res.json({user:{name:'Ana Fixture',email:'ana@example.invalid',role:'viewer'}}));
-app.get('/api/profile',(req,res)=>res.json({profile:{name:'Ana Fixture',email:'ana@example.invalid',username:'ana.fixture',role:'viewer',active:true,account_status:'ACTIVE',has_profile_photo:false,mobile_number:null}}));
+app.get('/api/auth/me',(req,res)=>res.json({user:{id:1,name:'Ana Fixture',email:'ana@example.invalid',role:'viewer'}}));
+app.get('/api/profile',(req,res)=>res.json({profile:{id:1,name:'Ana Fixture',email:'ana@example.invalid',username:'ana.fixture',role:'viewer',active:true,account_status:'ACTIVE',has_profile_photo:false,profile_photo_url:null,profile_photo_revision:null,mobile_number:null,timesheet_delivery_email:null}}));
+app.get('/api/notifications/preferences',(req,res)=>res.json({preferences:[]}));
 app.get('/api/auth/mfa/status',(req,res)=>res.json({enabled:false,required:false,recovery_codes_remaining:0,assurance_level:1}));
 app.get('/api/auth/sessions',(req,res)=>res.json({sessions:[{id:1,current:true,user_agent:'Local browser fixture',last_seen_at:'2026-10-09T12:00:00Z'}]}));
 app.post('/api/auth/logout',(req,res)=>res.json({message:'Signed out'}));
@@ -50,7 +51,7 @@ app.use(express.static(path.join(project,'public')));
    }
    assert.deepEqual(errors,[]);
    assert.deepEqual(assetFailures,[],'All retained scripts, styles, images and fonts load successfully');
-   assert.ok(apiCalls.every(api=>['/api/auth/me','/api/profile','/api/auth/mfa/status','/api/auth/sessions'].includes(api)),'no removed API is called');
+   assert.ok(apiCalls.every(api=>['/api/auth/me','/api/profile','/api/auth/mfa/status','/api/auth/sessions','/api/notifications/preferences'].includes(api)),'Only retained account and personal notification-settings APIs are called');
    results.push({viewport:view,overflow:false,pageErrors:errors,assetFailures,identity:true,profileNavigation:true,securityNavigation:true,refresh:true,apiCalls,fixtureOnly:true});await context.close();
   }
 

@@ -5,7 +5,7 @@ const { dateOnly } = require('../utils/dateOnly');
 const { DateTime } = require('luxon');
 const attendanceTime = require('../services/attendanceTimeService');
 const { ensureWeeklyTimesheetDeliverySchema } = require('../services/weeklyTimesheetDeliverySchema');
-const { attendanceRecordedHours } = require('../services/attendanceRecordedTotals');
+const verifiedAttendance = require('../services/attendanceVerifiedSummaryService');
 
 const mobileActions = require('../services/attendanceActionService');
 const dailyAttendance = require('../services/attendanceDailyService');
@@ -106,18 +106,15 @@ async function createAttendanceTablesStructures() {
 
 }
 
-async function markIncompleteShiftsForReview(userId = null) {
+async function incompleteShiftsForReview(userId = null) {
   await ensureAttendanceTables();
   const params = userId ? [userId] : [];
   const [rows] = await pool.query(`SELECT id,user_id FROM staff_attendance
     WHERE IFNULL(deleted,0)=0 AND clock_out IS NULL
       AND TIMESTAMPDIFF(MINUTE,clock_in,UTC_TIMESTAMP())>=720
       AND IFNULL(review_required,0)=0 ${userId ? 'AND user_id=?' : ''}`, params);
-  if (rows.length) await pool.query(`UPDATE staff_attendance SET review_required=1,
-    review_reason='INCOMPLETE_SHIFT_REQUIRES_REVIEW',attendance_status='INCOMPLETE',revision=revision+1
-    WHERE id IN (?) AND clock_out IS NULL AND IFNULL(deleted,0)=0`, [rows.map((row) => row.id)]);
-  // Review metadata only: preserve the absent clock-out, original minutes and
-  // historical notes. Reading attendance never manufactures completed hours.
+  // Detection is read-only. Stored review flags and locked attendance revisions
+  // remain untouched; eligible-work assessment reports the incomplete source.
   return rows;
 }
 
@@ -180,7 +177,7 @@ exports.weekAttendance = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized user' });
     }
 
-    await markIncompleteShiftsForReview(userId);
+    await incompleteShiftsForReview(userId);
 
     const start = weekStartDate();
     const end = weekEndDate();
@@ -193,6 +190,7 @@ exports.weekAttendance = async (req, res) => {
       week_start: start,
       week_end: end,
       total_hours: data.totalHours,
+      verified_total_minutes:data.verified_total_minutes,historical_saved_hours:data.historical_saved_hours,verification_status:data.verification_status,review_required:data.review_required,review_issues:data.review_issues,duplicate_records:data.duplicate_records,
       attendance: data.rows,
       timesheet, company_timezone: attendanceTime.companyTimezone()
     });
@@ -220,7 +218,7 @@ exports.allAttendance = async (req, res) => {
       return res.status(403).json({ message: 'Admin only' });
     }
 
-    await markIncompleteShiftsForReview();
+    const incomplete = new Set((await incompleteShiftsForReview()).map(row => Number(row.id)));
 
     const archived = String(req.query?.archived || '').toLowerCase() === 'true';
 
@@ -251,7 +249,7 @@ exports.allAttendance = async (req, res) => {
     );
 
     res.json({
-      attendance: rows, company_timezone: attendanceTime.companyTimezone()
+      attendance: rows.map(row => ({...row, computed_review_required: incomplete.has(Number(row.id)), computed_review_reason: incomplete.has(Number(row.id)) ? 'INCOMPLETE_SHIFT_REQUIRES_REVIEW' : null})), company_timezone: attendanceTime.companyTimezone()
     });
   } catch (err) {
     console.error('ALL ATTENDANCE ERROR FULL:', err);
@@ -361,7 +359,7 @@ exports.userTimesheets = async (req, res) => {
       return res.status(400).json({ message: 'Staff user is required' });
     }
 
-    await markIncompleteShiftsForReview(userId);
+    await incompleteShiftsForReview(userId);
 
     const groupStart = period === 'monthly'
       ? "DATE_FORMAT(a.work_date, '%Y-%m-01')"
@@ -535,35 +533,8 @@ exports.restoreAttendance = (req, res) => archiveAttendance(req, res, false);
 /* ================= HELPERS ================= */
 
 async function getWeekAttendance(userId, start, end) {
-  const [rows] = await pool.query(
-    `
-    SELECT
-      id,
-      user_id,
-      clock_in,
-      clock_out,
-      total_minutes,
-      total_hours,
-      work_date,
-      notes,
-      break_minutes,entry_source,timestamp_basis,clock_out_timestamp_basis,recorded_timezone,attendance_status,review_required,review_reason,
-      DATE_FORMAT(clock_in,'%Y-%m-%d %H:%i:%s') AS clock_in_utc_text,
-      DATE_FORMAT(clock_out,'%Y-%m-%d %H:%i:%s') AS clock_out_utc_text,
-      created_at
-    FROM staff_attendance
-    WHERE IFNULL(deleted, 0) = 0 AND user_id = ?
-    AND work_date BETWEEN ? AND ?
-    ORDER BY work_date ASC, clock_in ASC
-    `,
-    [userId, start, end]
-  );
-
-  const totalHours = attendanceRecordedHours(rows);
-
-  return {
-    rows,
-    totalHours: Number(totalHours.toFixed(2))
-  };
+  const summary=await verifiedAttendance.loadVerifiedSummary({db:pool,userId,fromDate:start,toDate:end});
+  return {rows:summary.records,totalHours:summary.actualHours,...verifiedAttendance.diagnostics(summary)};
 }
 
 async function refreshCurrentWeekTimesheet(userId) {

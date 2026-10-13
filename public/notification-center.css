@@ -33,6 +33,13 @@
 .vv-notification-record div{display:grid;gap:3px;min-width:0}
 .vv-notification-record dt{color:var(--text-secondary,#536277);font-size:13px}
 .vv-notification-record dd{margin:0;color:var(--text-primary,#172a43);font-size:15px;line-height:1.5;overflow-wrap:anywhere;white-space:pre-wrap}
+.vv-notification-record-cover{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(12,24,43,.35);box-sizing:border-box}
+.vv-notification-record-dialog{display:flex;flex-direction:column;width:min(560px,100%);max-height:calc(100dvh - 40px);min-width:0;overflow:hidden;border:1px solid var(--border,#d8dee8);border-radius:18px;background:var(--surface,#fff);color:var(--text-primary,#172a43);box-shadow:0 14px 48px rgba(10,25,50,.2)}
+.vv-notification-record-dialog *{box-sizing:border-box;min-width:0}
+.vv-notification-record-dialog .vv-notification-head h2{overflow-wrap:anywhere}
+.vv-notification-record-dialog .vv-notification-head button{padding:0 10px;font:inherit;font-size:14px}
+.vv-notification-record-content{padding:20px;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;touch-action:pan-y;min-height:0}
+.vv-notification-record-content:focus-visible{outline:2px solid var(--primary,#2454d6);outline-offset:-3px}
 .vv-notification-preferences{margin-top:20px;scroll-margin-top:20px;color:var(--text-primary,#172a43)}
 .vv-notification-preferences p{color:var(--text-secondary,#536277);font-size:14px;line-height:1.5}
 .vv-notification-preferences form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -40,3 +47,4 @@
 .vv-notification-preferences input{width:20px;height:20px;flex:none}
 .vv-notification-preferences button{min-height:44px;padding:10px 14px;border:1px solid var(--control-border,#aab6c8);border-radius:10px;background:var(--surface,#fff);color:var(--text-primary,#172a43);font:inherit;cursor:pointer;justify-self:start}
 @media(max-width:640px){.vv-notification-panel{left:0!important;right:0!important;top:auto!important;bottom:0;width:100%;max-width:100%;max-height:min(76dvh,640px);border-radius:20px 20px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom,0px)}.vv-notification-backdrop{background:rgba(12,24,43,.35)}.vv-notification-head{padding:16px 18px}.vv-notification-foot{padding-bottom:8px}.vv-notification-preferences form{grid-template-columns:1fr}}
+@media(max-width:640px){.vv-notification-record-cover{align-items:flex-end;padding:0}.vv-notification-record-dialog{width:100%;max-height:85dvh;border-radius:20px 20px 0 0;padding-bottom:env(safe-area-inset-bottom,0px)}}

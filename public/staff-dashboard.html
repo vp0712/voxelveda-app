@@ -236,7 +236,7 @@
           <div class="staff-home-card-heading"><div><p class="staff-home-eyebrow">Today</p><h2>Your attendance</h2></div><span id="staffHomeStatus" class="staff-home-status">Checking...</span></div>
           <div class="staff-home-worked"><strong id="staffHomeWorked">—</strong><span>Worked today</span><small id="staffHomeWorkedDetail">Waiting for your attendance record</small></div>
           <div class="staff-home-shift-actions"><button id="staffHomePrimaryAction" class="primary-btn" type="button" disabled>Checking attendance...</button><button id="staffHomeBreakAction" class="secondary-btn" type="button" hidden>Take a break</button></div>
-          <div class="staff-home-totals"><div><span>Breaks today</span><strong id="staffHomeBreak">—</strong></div><div><span>Sessions</span><strong id="staffHomeSessions">—</strong></div><div><span>This week</span><strong id="weekHoursCount">—</strong><small id="staffWeekSignal">Recorded hours</small></div></div>
+          <div class="staff-home-totals"><div><span>Breaks today</span><strong id="staffHomeBreak">—</strong></div><div><span>Sessions</span><strong id="staffHomeSessions">—</strong></div><div><span>This week</span><strong id="staffHomeWeekHours">—</strong><small id="staffWeekSignal">Recorded hours</small></div></div>
           <div class="staff-home-session-boundaries"><div><span>First check-in</span><strong id="staffHomeFirstCheckIn">—</strong></div><div><span id="staffHomeLastCheckOutLabel">Latest check-out</span><strong id="staffHomeLastCheckOut">—</strong></div></div>
           <div class="staff-home-card-heading staff-home-timeline-heading"><h3>Today’s timeline</h3><button type="button" id="staffHomeHistory" class="staff-text-button">History & corrections</button></div>
           <ol id="staffHomeTimeline" class="staff-home-timeline"><li class="staff-home-empty">Loading today’s sessions...</li></ol>
@@ -248,7 +248,7 @@
         </div>
         <div id="staffHomeAccountOnly" class="staff-home-card" hidden><h2>Your account</h2><p>Your account’s permitted work sections appear in the menu.</p><button class="secondary-btn" type="button" data-staff-home-section="profileSection">Open my profile</button></div>
         <div id="announcementPanel" class="card announcement-panel hidden-section"><div class="section-head"><div><h2>Company updates</h2><p>Announcements for your account</p></div><button class="secondary-btn" type="button" onclick="return loadAnnouncements()">Refresh</button></div><div id="announcementList" class="card-list"><div class="empty-state">Loading announcements...</div></div></div>
-        <div class="staff-visually-hidden" aria-hidden="true"><span id="taskAlertDueCount"></span><span id="taskAlertOverdueCount"></span><span id="todayTaskCount"></span><span id="overdueTaskCount"></span><span id="staffHomeNextShiftDate"></span><span id="staffHomeNextShiftTime"></span><p id="attendanceStatus"></p><button id="clockInBtn" type="button" tabindex="-1"></button><button id="clockOutBtn" type="button" tabindex="-1"></button></div>
+        <div class="staff-visually-hidden" aria-hidden="true"><span id="weekHoursCount"></span><span id="taskAlertDueCount"></span><span id="taskAlertOverdueCount"></span><span id="todayTaskCount"></span><span id="overdueTaskCount"></span><span id="staffHomeNextShiftDate"></span><span id="staffHomeNextShiftTime"></span><p id="attendanceStatus"></p><button id="clockInBtn" type="button" tabindex="-1"></button><button id="clockOutBtn" type="button" tabindex="-1"></button></div>
       </section>
 
       <!-- TASKS -->
@@ -1092,7 +1092,7 @@
   <script src="/attendance-scanner.js?v=20261013-staff-mobile"></script>
   <script src="/staff-home.js?v=20261013-staff-mobile"></script>
   <script src="/workflow-ui.js?v=20261011-restored"></script>
-  <script src="/role-portal.js?v=20260926-role-portals"></script>
+  <script src="/role-portal.js?v=20261013-staff-mobile"></script>
   <script src="/procurement-ui.js?v=20261013-procurement-pdf"></script>
 </body>
 </html>

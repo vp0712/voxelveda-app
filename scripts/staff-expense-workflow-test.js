@@ -24,6 +24,7 @@ function fixture(type) {
     if(/SELECT DATE_FORMAT\(UTC_TIMESTAMP/.test(text))return [[{server_utc:new Date().toISOString().slice(0,19).replace('T',' ')}]];
     if (/SELECT permissions FROM users/.test(text)) return [[{ permissions: '["attendance_qr_bypass"]' }]];
     if (/SELECT id,active,deleted_at FROM users/.test(text)) return [[{id:params[0],active:1,deleted_at:null}]];
+    if (/SELECT id,name,role,active,deleted_at,account_status,employee_number FROM users/.test(text))return [[{id:params[0],name:'Fixture staff',role:'staff',active:1,account_status:'ACTIVE',deleted_at:null}]];
     if (/SELECT id FROM users/.test(text)) return [[{ id: params[0] }]];
     if (type === 'attendance') {
       if(/SELECT \* FROM attendance_action_receipts/.test(text))return [[...state.receipts.filter(row=>row.user_id===params[0]&&row.request_id===params[1]).map(plain)]];
@@ -116,10 +117,12 @@ function fixture(type) {
     const actionService=load('services/attendanceActionService.js',{
       '../config/db':db,'./attendanceMobileSchema':{ensureAttendanceMobileSchema:async()=>{}},
       './attendanceTimeService':require('../services/attendanceTimeService'),'./attendanceQrService':{},
-      './attendanceMobilePolicy':require('../services/attendanceMobilePolicy'),'./authorizationService':auth,
+      './attendanceCorrectionService':{assertMutablePeriod:async()=>{}},
+      './attendanceMobilePolicy':require('../services/attendanceMobilePolicy'),'./authorizationService':auth,'../utils/dateOnly':dates,
       './auditService':dependencies['../services/auditService'],
       './attendanceDailyService':{readToday:async()=>({status:state.records.some(row=>!row.clock_out&&!row.deleted)?'WORKING':'COMPLETED'})}
     });
+    dependencies['../services/attendanceVerifiedSummaryService']=require('../services/attendanceVerifiedSummaryService');
     dependencies['../services/attendanceActionService']=actionService;
     dependencies['../services/attendanceDailyService']={};dependencies['../services/attendanceQrService']={};
     dependencies['../services/attendanceMobileSchema']={ensureAttendanceMobileSchema:async()=>{}};

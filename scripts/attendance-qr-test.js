@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 const previous={key:process.env.SHIFT_QR_SIGNING_KEY,site:process.env.SHIFT_QR_SITE_ID};
-process.env.SHIFT_QR_SIGNING_KEY='synthetic-attendance-qr-fixture-signing-key';
+process.env.SHIFT_QR_SIGNING_KEY=crypto.randomBytes(32).toString('hex');
 process.env.SHIFT_QR_SITE_ID='fixture-workplace-a';
 const qr=require('../services/attendanceQrService');
 const at=new Date('2026-10-13T00:00:00Z');
@@ -12,7 +12,8 @@ try{
  const site=qr.createSiteToken(at),decoded=qr.validateSiteToken(site.token,at);
  assert.equal(decoded.site_id,'fixture-workplace-a');assert.equal(decoded.purpose,'ATTENDANCE_SITE');
  assert.throws(()=>qr.validateSiteToken('https://unrelated.invalid/?shift_qr_token='+site.token,at),{code:'ATTENDANCE_QR_INVALID'});
- assert.throws(()=>qr.validateSiteToken(site.token.slice(0,-1)+(site.token.endsWith('A')?'B':'A'),at),{code:'ATTENDANCE_QR_INVALID'});
+ const changed=site.token.split('.');changed[2]=(changed[2].startsWith('A')?'B':'A')+changed[2].slice(1);
+ assert.throws(()=>qr.validateSiteToken(changed.join('.'),at),{code:'ATTENDANCE_QR_INVALID'});
  assert.throws(()=>qr.validateSiteToken(site.token,new Date(site.expires_at)),{code:'ATTENDANCE_QR_EXPIRED'});
  assert.throws(()=>qr.validateSiteToken(signed({...decoded,site_id:'fixture-workplace-b'}),at),{code:'ATTENDANCE_QR_WRONG_SITE'});
  assert.throws(()=>qr.validateSiteToken(signed({...decoded,purpose:'UNRELATED_LINK'}),at),{code:'ATTENDANCE_QR_WRONG_PURPOSE'});

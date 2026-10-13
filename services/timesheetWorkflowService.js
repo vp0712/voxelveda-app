@@ -1,7 +1,7 @@
 const pool = require('../config/db');
 const { ensureWorkforceSchema } = require('./workforceSchema');
 const { ensureWeeklyTimesheetDeliverySchema } = require('./weeklyTimesheetDeliverySchema');
-const { attendanceRecordedHours } = require('./attendanceRecordedTotals');
+const verifiedAttendance = require('./attendanceVerifiedSummaryService');
 const { logAudit, logActivity } = require('./auditService');
 const { createNotification } = require('./notificationService');
 const { renderEmailTemplate } = require('./emailTemplates');
@@ -50,25 +50,15 @@ function requestMeta(req) {
 }
 
 async function calculateTimesheet(db, timesheet) {
-  const [records] = await db.query(
-    `
-    SELECT id, user_id, clock_in, clock_out, total_minutes, total_hours, work_date, notes,
-      break_minutes,entry_source,timestamp_basis,recorded_timezone,manual_authorised_by,manual_authorised_at,
-      attendance_status,review_required,review_reason,
-      DATE_FORMAT(clock_in,'%Y-%m-%d %H:%i:%s') AS clock_in_utc_text,
-      DATE_FORMAT(clock_out,'%Y-%m-%d %H:%i:%s') AS clock_out_utc_text,
-      DATE_FORMAT(manual_authorised_at,'%Y-%m-%d %H:%i:%s') AS manual_authorised_at_utc_text
-    FROM staff_attendance
-    WHERE user_id = ? AND deleted = 0 AND work_date BETWEEN ? AND ?
-    ORDER BY work_date ASC, clock_in ASC ${db === pool ? '' : 'FOR UPDATE'}
-    `,
-    [timesheet.user_id, timesheet.week_start, timesheet.week_end]
-  );
-  const actualHours = attendanceRecordedHours(records);
+  const verified=await verifiedAttendance.loadVerifiedSummary({db,userId:timesheet.user_id,fromDate:timesheet.week_start,toDate:timesheet.week_end,lock:db!==pool});
+  const records=verified.records;
+  const actualHours = verified.actualHours;
   const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
   return {
     records,
     actualHours,
+    ...verifiedAttendance.diagnostics(verified),
+    reviewRequired:verified.reviewRequired,reviewIssues:verified.reviewIssues,eligibleRecords:verified.eligibleRecords,
     ordinaryHours: Number(Math.min(actualHours, standardHours).toFixed(2)),
     overtimeHours: Number(Math.max(0, actualHours - standardHours).toFixed(2))
   };
@@ -110,7 +100,9 @@ async function createVersion(connection, timesheet, summary, status, actorId, re
       ordinary_hours: summary.ordinaryHours,
       overtime_hours: summary.overtimeHours
     },
-    attendance: summary.records
+    attendance: summary.eligibleRecords,
+    source_attendance: summary.records,
+    verification: {total_minutes:summary.verified_total_minutes,total_hours:summary.verified_total_hours,historical_saved_hours:summary.historical_saved_hours,review_issues:summary.reviewIssues,duplicates:summary.duplicate_records}
   };
 
   await connection.query(
@@ -248,6 +240,7 @@ async function submitTimesheet(id, user, req) {
     }
     const toStatus = timesheet.status === 'CORRECTION_REQUIRED' ? 'CORRECTION_RESUBMITTED' : 'PENDING_APPROVAL';
     const summary = await calculateTimesheet(connection, timesheet);
+    verifiedAttendance.assertReviewResolved(summary);
     const versionNo = await createVersion(connection, timesheet, summary, toStatus, user.id, null);
     await connection.query(
       `
@@ -296,6 +289,7 @@ async function approveTimesheet(id, user, options = {}, req) {
     }
 
     const calculated = await calculateTimesheet(connection, timesheet);
+    verifiedAttendance.assertReviewResolved(calculated);
     const approvedHours = options.approvedHours === undefined
       ? calculated.actualHours
       : Number(options.approvedHours);

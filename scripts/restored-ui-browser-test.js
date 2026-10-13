@@ -45,6 +45,7 @@ function result(rows) { return [rows, []]; }
 async function query(statement, parameters = []) {
   const sql = String(statement).replace(/\s+/g,' ').trim();
   statements.push({ sql, parameters });
+  if (/UTC_TIMESTAMP\(\)/i.test(sql) && /server_utc/i.test(sql)) return result([{ server_utc:new Date().toISOString().slice(0,19).replace('T',' ') }]);
   if (/\b(?:DROP|TRUNCATE)\b/i.test(sql)) throw new Error('Destructive SQL is forbidden in the verification fixture');
   if (/^(?:CREATE|ALTER|SET|DELETE)/i.test(sql)) return result({ affectedRows:0 });
   if (/GET_LOCK/i.test(sql)) return result([{ acquired:1 }]);
@@ -91,7 +92,7 @@ async function query(statement, parameters = []) {
   if (/FROM rfqs/i.test(sql) && /GROUP BY/i.test(sql)) return result([{status:'pending',count:1},{status:'rejected',count:1}]);
   if (/FROM rfqs/i.test(sql) && /COUNT/i.test(sql)) return result([{ total:rfqs.filter(row=>row.archived===Number(parameters[0]||0)).length, total_rfqs:rfqs.filter(row=>!row.archived).length, pending_rfqs:rfqs.filter(row=>!row.archived&&row.status==='pending').length, approved_rfqs:0, closed_rfqs:0 }]);
   if (/^SELECT \* FROM rfqs/i.test(sql)) return result(rfqs.filter(row=>row.archived===Number(parameters[0]||0)));
-  if (/FROM users/i.test(sql) && /WHERE (?:u\.)?id = \?/i.test(sql)) return result(users[parameters[0]] ? [users[parameters[0]]] : []);
+  if (/FROM users/i.test(sql) && /WHERE (?:u\.)?id\s*=\s*\?/i.test(sql)) return result(users[parameters[0]] ? [users[parameters[0]]] : []);
   if (/FROM users/i.test(sql) && !/COUNT|SUM\(/i.test(sql)) return result(Object.values(users));
   if (/FROM invoice_items/i.test(sql)) return result([{ id:1, invoice_id:91, description:invoice.description, quantity:2, unit_price:50, amount:100 }]);
   if (/FROM invoice_payments|FROM invoice_activity|FROM email_queue|FROM email_logs/i.test(sql) && !/COUNT|SUM\(/i.test(sql)) return result([]);

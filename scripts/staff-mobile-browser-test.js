@@ -76,7 +76,7 @@ function resetState() {
       is_read: index > 23 ? 1 : 0, created_at: new Date(Date.now() - index * 60000).toISOString()
     })),
     attendance: null, actionResults: new Map(), receiptRequests: [], timeline: [], breakStart: null,
-    serverNow: new Date('2026-10-13T00:00:00Z'), loseNextActionReply: false, corrections: [], correctionRequests: [], qrValidationRequests: []
+    serverNow: new Date('2026-10-13T00:00:00Z'), loseNextActionReply: false, corrections: [], correctionRequests: [], qrValidationRequests: [], delayedReplies: new Map()
   };
 }
 function attendanceState(state, userId = 9401) {
@@ -85,13 +85,27 @@ function attendanceState(state, userId = 9401) {
   const ongoingBreak = onBreak ? Math.floor((state.serverNow - state.breakStart) / 60000) : 0;
   const live = open ? Math.floor((state.serverNow - new Date(row.clock_in)) / 60000) - row.break_minutes - ongoingBreak : 0;
   const active = open ? { ...row, live_worked_minutes: live, live_break_minutes: ongoingBreak, recorded_break_minutes: row.break_minutes, overnight: false, allocated_work_date: row.work_date } : null;
-  return { attendance: active || row, sessions: row ? [{ ...row }] : [], status: open ? onBreak ? 'ON_BREAK' : 'WORKING' : row ? 'COMPLETED' : 'NOT_STARTED',
+  return { profile: { id: userId, name: identities.get(userId).name, department: 'Synthetic verification team' }, attendance: active || row, sessions: row ? [{ ...row }] : [], status: open ? onBreak ? 'ON_BREAK' : 'WORKING' : row ? 'COMPLETED' : 'NOT_STARTED',
     active_attendance: active, completed_attendance_id: row?.clock_out ? row.id : null,
     company_timezone: 'Australia/Sydney', work_date: '2026-10-13', server_time: state.serverNow.toISOString(),
     summary: { worked_minutes: row?.clock_out ? row.total_minutes : 0, live_worked_minutes: live, recorded_break_minutes: row?.break_minutes || 0, live_break_minutes: ongoingBreak, session_count: row ? 1 : 0, eligible_session_count: row?.clock_out ? 1 : 0, duplicate_session_count: 0, review_required: false },
     timeline: row ? state.timeline : [], next_roster: null, tasks: [], categories: [], qr_required: userId !== 9401,
     allowed_actions: open ? ['CHECK_OUT', onBreak ? 'BREAK_END' : 'BREAK_START'] : ['CHECK_IN'],
     break_policy: { mode: 'RECORDED_ACTUAL', automatic_deduction: false }, reporting_basis: 'WHOLE_SHIFT_LOCAL_START_DATE', review_issues: [] };
+}
+function holdNextReply(state, endpoint, userId) {
+  let entered, release;
+  const gate = { entered: new Promise(resolve => { entered = resolve; }), wait: new Promise(resolve => { release = resolve; }), release: () => release(), enter: payload => { gate.payload = payload; entered(); }, attempted: false };
+  state.delayedReplies.set(`${endpoint}:${userId}`, gate);
+  return gate;
+}
+async function deliverReply(state, req, res, payload) {
+  // Capture the actual synthetic owner's response before withholding transport;
+  // a switch never rewrites an old response to make the UI test pass.
+  const captured = JSON.parse(JSON.stringify(payload)), key = `${req.path}:${Number(req.user.id)}`;
+  const gate = state.delayedReplies.get(key);
+  if (gate) { state.delayedReplies.delete(key); gate.enter(captured); await gate.wait; gate.attempted = true; }
+  return res.json(captured);
 }
 async function makeServer(publicDirectory, photo) {
   const state = resetState(), app = express();
@@ -140,7 +154,7 @@ async function makeServer(publicDirectory, photo) {
     res.json({ notification: item, action_url: null, target_status: item.action_url ? 'UNAVAILABLE' : 'NONE', unread: unread(req), message: 'The synthetic target is unavailable.' });
   });
   app.get('/api/notifications/preferences', (_req, res) => res.json({ preferences: [] }));
-  app.get('/api/attendance/today', (req, res) => res.json(attendanceState(state, Number(req.user.id))));
+  app.get('/api/attendance/today', (req, res) => deliverReply(state, req, res, attendanceState(state, Number(req.user.id))));
   app.post('/api/attendance/qr/validate', (req, res) => {
     const qr = require('../services/attendanceQrService'), now = new Date();
     state.qrValidationRequests.push({ action: req.body.action, user_id: Number(req.user.id) });
@@ -155,7 +169,7 @@ async function makeServer(publicDirectory, photo) {
     const receipt = state.actionResults.get(`${req.user.id}:${req.query.request_id}`);
     res.json({ found: Boolean(receipt), receipt: receipt?.response || null, state: attendanceState(state, Number(req.user.id)) });
   });
-  app.post('/api/attendance/actions', (req, res) => {
+  app.post('/api/attendance/actions', async (req, res) => {
     const input = req.body, userId = Number(req.user.id), key = `${userId}:${input.request_id}`;
     assert(/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(input.request_id));
     state.receiptRequests.push({ ...input, user_id: userId });
@@ -177,19 +191,19 @@ async function makeServer(publicDirectory, photo) {
     const response = { request_id: input.request_id, action: input.action, attendance_id: state.attendance.id, attendance: { ...state.attendance }, existing: false, unchanged: false };
     state.actionResults.set(key, { semantic, response });
     if (state.loseNextActionReply) { state.loseNextActionReply = false; return res.set('X-Fixture-Expected', 'COMMIT_REPLY_INTERRUPTED').status(503).json({ message: 'Synthetic commit reply interrupted; reconcile the original receipt.' }); }
-    return res.json({ ...response, state: attendanceState(state, userId) });
+    return deliverReply(state, req, res, { ...response, state: attendanceState(state, userId) });
   });
   app.post('/api/attendance/sessions/:id/note', (req, res) => {
     const row = state.attendance;
     if (!row || row.user_id !== Number(req.user.id) || row.id !== Number(req.params.id) || !row.clock_out) return res.sendStatus(404);
     if (Number(req.body.expected_revision) !== row.revision) return res.status(409).json({ code: 'ATTENDANCE_REVISION_CONFLICT' });
     row.notes = req.body.notes; row.revision++; mutations.push({ type: 'checkout_note', attendance_id: row.id });
-    res.json({ attendance_id: row.id, attendance: { ...row }, state: attendanceState(state, Number(req.user.id)) });
+    res.json({ request_id: req.body.request_id, attendance_id: row.id, attendance: { ...row }, state: attendanceState(state, Number(req.user.id)) });
   });
   app.get('/api/attendance/week', (_req, res) => res.json({ attendance: [], timesheet: null, total_hours: 0 }));
   app.get('/api/attendance/my', (req, res) => {
     const rows = state.attendance?.user_id === Number(req.user.id) ? [{ ...state.attendance }] : [];
-    res.json({ attendance: rows, timesheets: [], page: 1, page_size: 20, total: rows.length, pages: 1 });
+    return deliverReply(state, req, res, { attendance: rows, timesheets: [], page: 1, page_size: 20, total: rows.length, pages: 1 });
   });
   app.get('/api/attendance/corrections', (req, res) => {
     if (req.query.scope && req.query.scope !== 'own') return res.sendStatus(403);
@@ -325,6 +339,92 @@ async function verifyEmulatedCameraCases(browser, fixture) {
   }
   return results;
 }
+async function verifyInPlaceAccountSwitchCases(browser, fixture) {
+  const results = [], privateNote = 'Synthetic account A private handover must never appear for account B';
+  for (const scenario of [{ name: 'today', endpoint: '/api/attendance/today' }, { name: 'history', endpoint: '/api/attendance/my' }, { name: 'committed-check-out', endpoint: '/api/attendance/actions', open: true }]) {
+    Object.assign(fixture.state, resetState()); fixture.state.photo = true;
+    fixture.state.attendance = { id: 9901, user_id: 9401, clock_in: '2026-10-12T23:00:00Z', clock_out: scenario.open ? null : '2026-10-13T00:00:00Z', work_date: '2026-10-13', timestamp_basis: 'UTC', clock_out_timestamp_basis: scenario.open ? null : 'UTC', recorded_timezone: 'Australia/Sydney', entry_source: 'CLOCK', break_minutes: 0, total_minutes: scenario.open ? 0 : 60, total_hours: scenario.open ? 0 : 1, revision: 1, review_required: false, notes: privateNote };
+    fixture.state.timeline = [{ id: 'synthetic-a-clock-in', type: 'CHECK_IN', attendance_id: 9901, at: fixture.state.attendance.clock_in, allocated_work_date: '2026-10-13' }];
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' }); context.setDefaultTimeout(15000);
+    await context.addCookies([{ name: 'vv_session', value: userSession(9401), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
+    const page = await context.newPage(), errors = [], authOwners = [], responseReads = [];
+    let gate, timeout;
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('response', response => { if (new URL(response.url()).pathname === '/api/auth/me') responseReads.push(response.json().then(body => authOwners.push(Number(body.user?.id)))); });
+    try {
+      await page.goto(fixture.origin + '/portal/staff', { waitUntil: 'networkidle' });
+      await page.locator('#staffHomePrimaryAction:not([disabled])').waitFor();
+      await page.waitForFunction(() => document.getElementById('sidebarStaffName')?.textContent.includes('Synthetic Staff Fixture') && document.querySelector('#sidebarAvatar img')?.naturalWidth > 0);
+      assert.equal(await page.locator('#staffHomeStatus').getAttribute('data-state'), scenario.open ? 'WORKING' : 'COMPLETED');
+      const originalTimeOrigin = await page.evaluate(() => performance.timeOrigin);
+      if (scenario.name === 'history') {
+        await page.locator('#staffHomeHistory').click();
+        await page.locator('.staff-session-card').filter({ hasText: privateNote }).waitFor();
+        await page.keyboard.press('Escape');
+      }
+      // Deliberately emulate a transport that completes after cancellation. The
+      // request still uses real HTTP, cookies, auth and CSP; response ownership
+      // and epoch checks must protect B even when abort cannot stop A's reply.
+      await page.evaluate(endpoint => {
+        const realFetch = window.fetch.bind(window); window.__lateAccountReply = { delivered: 0, cancellationIgnored: 0 };
+        window.fetch = (input, options = {}) => {
+          const pathname = new URL(typeof input === 'string' ? input : input.url, location.origin).pathname;
+          let owner = null; try { owner = Number(JSON.parse(localStorage.getItem('user') || 'null')?.id); } catch {}
+          if (pathname === endpoint && owner === 9401) {
+            const transport = { ...options }; delete transport.signal; window.__lateAccountReply.cancellationIgnored++;
+            return realFetch(input, transport).then(async response => {
+              // Complete the body before releasing fetch to the application's
+              // continuation; an early stale-owner guard may skip its json().
+              await response.clone().json(); window.__lateAccountReply.delivered++; return response;
+            });
+          }
+          return realFetch(input, options);
+        };
+      }, scenario.endpoint);
+      gate = holdNextReply(fixture.state, scenario.endpoint, 9401);
+      if (scenario.name === 'today') await page.evaluate(() => { void window.VoxelStaffHome.refresh(); });
+      else if (scenario.name === 'history') await page.locator('#staffHomeHistory').click();
+      else { await page.locator('#staffHomePrimaryAction').click(); await page.locator('#staffAttendanceConfirm').click(); }
+      await Promise.race([gate.entered, new Promise((_resolve, reject) => { timeout = setTimeout(() => reject(new Error('The real UI did not request the delayed ' + scenario.endpoint)), 12000); })]); clearTimeout(timeout);
+      const capturedOwner = Number(gate.payload.profile?.id || gate.payload.state?.profile?.id || gate.payload.attendance?.[0]?.user_id);
+      assert.equal(capturedOwner, 9401, 'The withheld response must retain A as its real authenticated owner.');
+      if (scenario.open) { assert.equal(fixture.state.receiptRequests.length, 1); assert(fixture.state.attendance.clock_out, 'Check-out was committed for A before its reply was delayed.'); }
+      await context.addCookies([{ name: 'vv_session', value: userSession(9402), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
+      const cleared = await page.evaluate(() => {
+        window.dispatchEvent(new CustomEvent('vv:auth-changed'));
+        return { stateCleared: window.VoxelStaffHome.state === null, overlayHidden: document.getElementById('staffAttendanceOverlay').hidden, sheetEmpty: document.getElementById('staffAttendanceBody').childElementCount === 0,
+          oldPhotoCleared: [...document.querySelectorAll('[data-avatar-self] img')].every(image => image.hidden || !image.getAttribute('src')), privateNameVisible: document.body.innerText.includes('Synthetic Staff Fixture') };
+      });
+      assert.deepEqual(cleared, { stateCleared: true, overlayHidden: true, sheetEmpty: true, oldPhotoCleared: true, privateNameVisible: false }, 'Account boundary immediately removes A attendance, sheets, identity and photos.');
+      await page.waitForFunction(() => document.getElementById('sidebarStaffName')?.textContent.includes('Synthetic Other Fixture') && window.VoxelStaffHome.state?.profile?.id === 9402 && document.getElementById('staffHomeStatus')?.getAttribute('data-state') === 'NOT_STARTED');
+      gate.release();
+      await page.waitForFunction(() => window.__lateAccountReply.delivered >= 1);
+      // All response continuations have run before checking that A cannot reopen
+      // its checkout note/history or replace B's authoritative attendance.
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      const after = await page.evaluate(note => ({ owner: window.VoxelStaffHome.state?.profile?.id, sessions: window.VoxelStaffHome.state?.sessions?.length,
+        status: document.getElementById('staffHomeStatus')?.getAttribute('data-state'), overlayHidden: document.getElementById('staffAttendanceOverlay').hidden,
+        sheetEmpty: document.getElementById('staffAttendanceBody').childElementCount === 0, oldPrivateVisible: document.body.innerText.includes('Synthetic Staff Fixture') || document.body.innerText.includes(note),
+        pendingOwner: JSON.parse(sessionStorage.getItem('voxelveda:attendance-pending') || 'null')?.user_id || null, late: window.__lateAccountReply, timeOrigin: performance.timeOrigin }), privateNote);
+      assert.equal(after.owner, 9402); assert.equal(after.sessions, 0); assert.equal(after.status, 'NOT_STARTED');
+      assert.equal(after.overlayHidden, true); assert.equal(after.sheetEmpty, true); assert.equal(after.oldPrivateVisible, false);
+      assert.notEqual(after.pendingOwner, 9401); assert.equal(after.late.cancellationIgnored, 1); assert.equal(after.timeOrigin, originalTimeOrigin, 'This account switch must stay in the same live document.');
+      assert.equal(gate.attempted, true); assert.equal(new URL(page.url()).pathname, '/portal/staff');
+      await page.locator('#staffHomeHistory').click(); await page.locator('#staffAttendanceBody').getByText('No recorded sessions match these filters.', { exact: true }).waitFor();
+      assert.equal(await page.locator('.staff-session-card').count(), 0); assert.equal(await page.locator('#staffAttendanceBody').getByText(privateNote, { exact: false }).count(), 0);
+      await page.keyboard.press('Escape'); await Promise.all(responseReads);
+      assert(authOwners.includes(9401) && authOwners.includes(9402), 'The same-page switch must verify both owners through the real /auth/me controller.');
+      assert.deepEqual(errors, []);
+      await page.screenshot({ path: path.join(output, 'after-account-switch-inflight-' + scenario.name + '.png'), fullPage: true, animations: 'disabled' });
+      results.push({ scenario: scenario.name, syntheticTransportDelay: true, cancellationDeliberatelyIgnored: true, capturedOwner, verifiedOwners: authOwners, finalOwner: after.owner, finalSessions: after.sessions, lateRepliesDelivered: after.late.delivered, oldPrivateVisible: false, sameDocument: true, committedActionCount: fixture.state.receiptRequests.length });
+    } catch (error) {
+      await page.screenshot({ path: path.join(output, 'account-switch-' + scenario.name + '-failure.png'), fullPage: true, animations: 'disabled' }).catch(() => {});
+      throw new Error('In-place account boundary scenario failed: ' + scenario.name, { cause: error });
+    } finally { clearTimeout(timeout); gate?.release(); await context.close(); }
+  }
+  return results;
+}
+
 async function run() {
   fs.mkdirSync(output, { recursive: true });
   const baselineDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'voxel-staff-before-'));
@@ -475,10 +575,11 @@ async function run() {
       }
     }
     const cameraEmulation = afterFixture ? await verifyEmulatedCameraCases(browser, afterFixture) : [];
+    const inPlaceAccountSwitch = afterFixture ? await verifyInPlaceAccountSwitchCases(browser, afterFixture) : [];
     const unauthorized = await fetch(`http://127.0.0.1:${servers.at(-1).address().port}/api/profile`);
     assert.equal(unauthorized.status, 401, 'anonymous callers must fail actual API authentication');
     fs.writeFileSync(path.join(output, 'staff-mobile-proof.json'), JSON.stringify({ baselineRef, baselineSource: useSavedArchive ? 'Explicit local preserved byte-equivalent ea5 archive' : 'Pinned remote Git baseline', fixtureOnly: true,
-      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, results }, null, 2));
+      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, inPlaceAccountSwitch, results }, null, 2));
     console.log('Staff mobile browser before/after screenshots and actual cookie/JWT/CSP fixture passed: ' + output);
   } catch (error) {
     if (diagnosticPage && !diagnosticPage.isClosed()) await diagnosticPage.screenshot({ path: path.join(output, 'failure.png'), fullPage: true, animations: 'disabled' }).catch(() => {});

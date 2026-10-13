@@ -32,7 +32,7 @@ router.post('/clock-out', auth, attend, bodyContract(actionFields,{required:['re
 
 router.get('/today', auth, attend, attendanceController.todayAttendance);
 
-router.get('/week', auth, attendanceController.weekAttendance);
+router.get('/week', auth, requireAnyPermission('VIEW_ATTENDANCE','VIEW_OWN_TIMESHEET'), attendanceController.weekAttendance);
 
 router.get('/my', auth, attend, attendanceController.myAttendance);
 router.get('/sessions', auth, attend, attendanceController.sessions);

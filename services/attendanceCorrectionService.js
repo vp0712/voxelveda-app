@@ -13,7 +13,7 @@ async function canReview(user,target,db=pool){if(Number(user.id)===Number(target
 function scopedWhere(user,scope='own'){
  const global=hasPermission(user,'EDIT_ATTENDANCE')||hasPermission(user,'APPROVE_ALL_TIMESHEETS');
  if(scope==='all'){if(!global)throw p.fail('All-staff correction access is not enabled.','ATTENDANCE_CORRECTION_ACCESS_DENIED',403);return{sql:'1=1',params:[]};}
- if(scope==='team'){if(!global&&!hasPermission(user,'APPROVE_TEAM_TIMESHEET'))throw p.fail('Team correction access is not enabled.','ATTENDANCE_CORRECTION_ACCESS_DENIED',403);return{sql:'u.manager_id=? AND c.user_id<>?',params:[Number(user.id),Number(user.id)]};}
+ if(scope==='team'){if(!global&&!hasPermission(user,'APPROVE_TEAM_TIMESHEET'))throw p.fail('Team correction access is not enabled.','ATTENDANCE_CORRECTION_ACCESS_DENIED',403);return{sql:'u.manager_id=? AND c.user_id<>? AND u.active=1 AND u.deleted_at IS NULL',params:[Number(user.id),Number(user.id)]};}
  if(scope!=='own')throw p.fail('Choose own, team or all corrections.','ATTENDANCE_FILTER_INVALID');return{sql:'c.user_id=?',params:[Number(user.id)]};
 }
 async function getCorrection({user,id,db=pool}){
@@ -47,7 +47,7 @@ async function requestCorrection({user,input,req,now=new Date()}){
   const beforeSnapshot=before?{...p.publicAttendance(before),break_intervals:breaks.map(row=>({...row,started_at:p.instant(row.started_at_utc_text).toISO(),ended_at:p.instant(row.ended_at_utc_text)?.toISO()||null}))}:null;
   const [insert]=await db.query('INSERT INTO attendance_correction_requests(user_id,attendance_id,request_id,payload_sha256,attendance_revision,reason,proposed_json,before_json,created_at) VALUES(?,?,?,?,?,?,?,?,?)',[userId,attendanceId,requestId,payloadHash,before?Number(before.revision):null,reason,JSON.stringify(proposed),JSON.stringify(beforeSnapshot),attendanceTime.sqlUtc(p.utcNow(now))]);
   await logAudit(db,{...p.auditMeta(user,req),action:'ATTENDANCE_CORRECTION_REQUESTED',recordId:attendanceId||`correction:${insert.insertId}`,oldValue:beforeSnapshot,newValue:{correction_id:insert.insertId,correction_type:kind,proposed,reason}});
-  const [[manager]]=await db.query('SELECT m.id,m.role,m.permissions,m.permission_boundary FROM users u JOIN users m ON m.id=u.manager_id WHERE u.id=? AND m.active=1 AND m.deleted_at IS NULL',[userId]);
+  const [[manager]]=await db.query('SELECT m.id,m.role,m.permissions FROM users u JOIN users m ON m.id=u.manager_id WHERE u.id=? AND m.active=1 AND m.deleted_at IS NULL',[userId]);
   if(manager&&await canReview(manager,userId,db))await createNotification(db,{userId:manager.id,type:'ATTENDANCE_CORRECTION',category:'HR',title:'Attendance correction needs review',message:'An assigned team member requested a correction to recorded attendance.',linkedModule:'ATTENDANCE_CORRECTIONS',linkedRecordId:insert.insertId,actionUrl:'/dashboard?view=attendance',dedupeKey:`attendance-correction:${insert.insertId}:requested`});
   const [[saved]]=await db.query('SELECT * FROM attendance_correction_requests WHERE id=?',[insert.insertId]);output={correction:publicCorrection(saved),existing:false};await db.commit();
  }catch(error){await db.rollback();throw error;}finally{db.release();}return output;

@@ -148,7 +148,7 @@ async function assertApproved(db, row, label) {
 
 async function notifyPermission(db, permission, notification, excludeUserId = null) {
   const [users] = await db.query(
-    'SELECT id, role, permissions, temporary_permissions, permission_boundary FROM users WHERE active = 1 AND deleted_at IS NULL'
+    'SELECT id, role, permissions FROM users WHERE active = 1 AND deleted_at IS NULL'
   );
   let count = 0;
   for (const user of users) {

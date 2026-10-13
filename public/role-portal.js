@@ -133,6 +133,9 @@
   }
 
   function applyRoleExperience(){
+    // The staff home verifies the session and owns its header and daily layout.
+    // Existing permission-gated navigation remains in the original dashboard.
+    if (window.VoxelStaffHome) return;
     const role = normalizedRole();
 
     if (['viewer','view_only','client','customer'].includes(role)) {
