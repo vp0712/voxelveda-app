@@ -29,7 +29,7 @@ async function loadShiftTerminalQr(force = false) {
     if (!res.ok) throw new Error(data.message || 'QR terminal unavailable');
 
     const qrData = data.qr_data || data.token;
-    image.src = `/api/qr?data=${encodeURIComponent(qrData)}&v=${Date.now()}`;
+    image.src = `/api/qr?data=${encodeURIComponent(qrData)}`;
     setTerminalText('terminalStatus', 'Auto refresh');
     setTerminalText('terminalTokenState', '');
     startTerminalCountdown(data.expires_in_seconds || data.refresh_seconds || 20);

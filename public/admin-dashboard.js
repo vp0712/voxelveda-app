@@ -2689,6 +2689,33 @@ function openManualInvoiceDialog() {
   });
 }
 
+const pendingInvoiceActions = new Map();
+async function invoiceAction(invoiceId, action) {
+  const id = Number(invoiceId);
+  if (!Number.isSafeInteger(id) || id < 1 || !['approve', 'paid', 'delete'].includes(action)) return showToast('Select a valid invoice action');
+  const permission = action === 'delete' ? 'VOID_TRANSACTION' : 'POST_TRANSACTION';
+  if (!hasCurrentPermission(permission)) return showToast('You do not have permission for this invoice action');
+  if (pendingInvoiceActions.has(id)) return;
+  pendingInvoiceActions.set(id, action);
+  try {
+    // Settlement records an actual receipt through the original payment form.
+    if (action === 'paid') return await openInvoicePaymentDialog(id);
+    if (action === 'delete' && !confirm('Archive this invoice? Its original records and payment history will be preserved.')) return;
+    const res = await fetch(`/api/invoice/${action}`, {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ invoice_id: id })
+    });
+    const data = await safeJson(res);
+    if (!res.ok) return showToast(data.message || 'Invoice update failed');
+    showToast(data.message || (action === 'delete' ? 'Invoice archived' : 'Invoice approved'));
+    const refreshed = await Promise.allSettled([loadInvoices(), loadDashboardStats()]);
+    if (refreshed.some(result => result.status === 'rejected')) showToast('Invoice saved. Refresh the register to see the latest records.');
+  } catch (error) {
+    showToast('Invoice outcome could not be confirmed. Refresh the register before retrying.');
+  } finally {
+    pendingInvoiceActions.delete(id);
+  }
+}
+
 async function loadInvoices() {
   const tbody = document.getElementById('invoiceTableBody');
   if (!tbody) return;
@@ -2728,14 +2755,14 @@ async function loadInvoices() {
         <td class="${Number(invoice.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(invoice.balance_due))}</td>
         <td>${statusBadge(invoice.status)}</td>
         <td class="register-action-cell invoice-action-cell">
-          <button class="small-btn" onclick="return invoiceAction(${invoice.id}, 'approve')">Approve</button>
+          ${hasCurrentPermission('POST_TRANSACTION') ? `<button class="small-btn" onclick="return invoiceAction(${invoice.id}, 'approve')">Approve</button>` : ''}
           <button class="small-btn" onclick="return openSendInvoiceDialog(${invoice.id})">Send</button>
           <button class="small-btn" onclick="return openInvoicePaymentDialog(${invoice.id})">Payment</button>
-          <button class="small-btn" onclick="return invoiceAction(${invoice.id}, 'paid')">Paid</button>
+          ${hasCurrentPermission('POST_TRANSACTION') ? `<button class="small-btn" onclick="return invoiceAction(${invoice.id}, 'paid')">Record paid balance</button>` : ''}
           <button class="secondary-btn" onclick="return openEditInvoiceDialog(${invoice.id})">Edit</button>
           <button class="secondary-btn" onclick="return openInvoicePdf(${invoice.id})">PDF</button>
           <button class="secondary-btn" onclick="return openInvoiceQrDialog(${invoice.id})">QR</button>
-          <button class="danger-btn" onclick="return invoiceAction(${invoice.id}, 'delete')">Delete</button>
+          ${hasCurrentPermission('VOID_TRANSACTION') ? `<button class="danger-btn" onclick="return invoiceAction(${invoice.id}, 'delete')">Archive</button>` : ''}
         </td>
       </tr>
     `
@@ -3246,6 +3273,45 @@ function openSendInvoiceDialog(invoiceId) {
     },
     'Send Invoice'
   );
+}
+
+async function loadCustomers() {
+  const tbody = document.getElementById('customerTableBody');
+  if (!tbody) return;
+
+  const res = await fetch('/api/customers', {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  const data = await safeJson(res);
+
+  if (!res.ok) {
+    tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load customers')}</td></tr>`;
+    return;
+  }
+
+  customerCache = chronologicalRows(data.customers || []);
+  renderRegisterPage({
+    key: 'customers',
+    tbody,
+    rows: customerCache,
+    colspan: 7,
+    emptyMessage: 'No customers saved yet.',
+    onChange: loadCustomers,
+    rowRenderer: (customer) => {
+      const fileLink = safeDocumentHref(customer.file_link);
+      return `
+        <tr>
+          <td><strong>${escapeHtml(customer.company_name)}</strong><br><span class="muted-text">${escapeHtml(customer.address || '-')}</span></td>
+          <td>${escapeHtml(customer.contact_name || '-')}</td>
+          <td>${escapeHtml(customer.email || '-')}<br><span class="muted-text">${escapeHtml(customer.phone || '-')}</span></td>
+          <td><strong>${escapeHtml(customer.order_count || 0)}</strong></td>
+          <td><strong>${escapeHtml(formatMoney(customer.total_spend))}</strong></td>
+          <td>${fileLink ? `<a href="${escapeHtml(fileLink)}" target="_blank" rel="noopener noreferrer">Open file</a><br>` : ''}<span class="muted-text">${escapeHtml(customer.notes || '-')}</span></td>
+          <td><button class="icon-btn" onclick="return openCustomerDialog(${Number(customer.id)})">Edit</button><button class="icon-btn danger-icon" onclick="return deleteCustomer(${Number(customer.id)})">Delete</button></td>
+        </tr>
+      `;
+    }
+  });
 }
 
 function openCustomerDialog(id = null) {
@@ -6112,7 +6178,7 @@ async function loadShiftQr() {
     }
 
     const qrData = data.qr_data || data.token;
-    image.src = `/api/qr?data=${encodeURIComponent(qrData)}&v=${Date.now()}`;
+    image.src = `/api/qr?data=${encodeURIComponent(qrData)}`;
     if (tokenText) tokenText.innerText = 'Live scan token active.';
 
     startShiftQrCountdown(data.expires_in_seconds || data.refresh_seconds || 20);
@@ -6186,7 +6252,7 @@ function renderQrCode() {
       : type === 'custom'
         ? 'Custom QR Link'
         : 'Customer RFQ Form';
-  const qrSrc = `/api/qr?data=${encodeURIComponent(target)}&v=20260608-local-qr`;
+  const qrSrc = `/api/qr?data=${encodeURIComponent(target)}`;
   image.src = qrSrc;
   download.href = qrSrc;
   download.download = `${label.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-qr.png`;

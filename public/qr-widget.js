@@ -6,7 +6,7 @@
   }
 
   function qrImageUrl(target) {
-    return `/api/qr?data=${encodeURIComponent(target)}&v=20260608-local-qr`;
+    return `/api/qr?data=${encodeURIComponent(target)}`;
   }
 
   function closeQrWidget(event) {
