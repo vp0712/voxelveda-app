@@ -34,6 +34,7 @@ jobs:
         env:
           NODE_ENV: production
           MALWARE_SCANNER_REQUIRED: 'true'
+          OBJECT_STORAGE_PROVIDER: s3
         run: npm run build
       - name: Build the packaged source without Git metadata
         shell: bash
