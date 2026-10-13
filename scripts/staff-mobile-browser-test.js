@@ -417,7 +417,14 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
         }
         throw new Error('The preparatory staff page scroll did not settle before opening notifications.');
       });
-      await page.locator('#staffNotificationBell').click(); await page.locator('#staffNotificationPanel').waitFor({ state: 'visible' });
+      const bell = await page.locator('#staffNotificationBell').boundingBox();
+      assert(bell, 'The loaded staff notification bell must have a real visible box.');
+      const pointer = { x: bell.x + bell.width / 2, y: bell.y + bell.height / 2 };
+      assert(pointer.x >= 0 && pointer.y >= 0 && pointer.x < viewport.width && pointer.y < viewport.height);
+      assert.equal(await page.evaluate(point => document.elementFromPoint(point.x, point.y)?.closest('#staffNotificationBell')?.id || null, pointer), 'staffNotificationBell', 'The actual pointer must hit the unobstructed visible bell.');
+      // Locator.click performs an additional automatic scroll before real input.
+      // A physical click at this hit-tested point preserves the settled origin.
+      await page.mouse.click(pointer.x, pointer.y); await page.locator('#staffNotificationPanel').waitFor({ state: 'visible' });
       await page.waitForFunction(() => document.querySelectorAll('#staffNotificationPanel [data-notification-id]').length > 0);
       const panel = await page.locator('#staffNotificationPanel').boundingBox();
       assert(panel.x >= -1 && panel.y >= -1 && panel.x + panel.width <= viewport.width + 1 && panel.y + panel.height <= viewport.height + 1, 'Notification panel must fit ' + name + '.');
@@ -431,6 +438,11 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
       assert.equal(restored.scrollX, beforeOverlay.scrollX); assert(Math.abs(restored.scrollY - beforeOverlay.scrollY) <= 1, 'Escape must preserve the underlying staff page scroll position.');
       assert.deepEqual(errors, []); assert.deepEqual(apiFailures, []); assert.equal(fixture.state.receiptRequests.length, 0);
       overlayTrace = await page.evaluate(() => window.__matrixOverlayTrace || []);
+      const down = overlayTrace.find(event => event.type === 'pointerdown' && event.target === 'staffNotificationBell');
+      const closed = overlayTrace.find(event => event.type === 'vv:overlay-closed' && event.id === 'notifications');
+      assert(down && closed, 'The real pointer and overlay close must appear in the trace.');
+      assert.equal(down.scrollX, beforeOverlay.scrollX); assert.equal(down.scrollY, beforeOverlay.scrollY, 'Real pointer input must begin at the settled staff page position.');
+      assert.equal(closed.scrollX, beforeOverlay.scrollX); assert.equal(closed.scrollY, beforeOverlay.scrollY, 'The real overlay close must preserve that same position.');
       results.push({ fixtureOnly: true, viewport, mode, canonicalOwner: 9401, visibleAppReady: true, layout, panel, panelStyle, beforeOverlay, restored, overlayTrace, attendanceWrites: 0 });
       fs.writeFileSync(path.join(output, 'staff-responsive-matrix.json'), JSON.stringify({ fixtureOnly: true, scope, complete: results.length === 8, results }, null, 2));
     } catch (error) {
