@@ -47,6 +47,7 @@ jobs:
           composer install --working-dir=deployment/wordpress --classmap-authoritative --no-interaction
           PDF_FIXTURE_PATH=/tmp/voxel-pdf-evidence/invoice.pdf php scripts/wordpress-pdf-relay-test.php
       - name: Install isolated browser verification tooling
+        id: browser-tools
         run: |
           npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
           "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install chromium
@@ -73,6 +74,7 @@ jobs:
           path: ${{ runner.temp }}/procurement-import-proof
           retention-days: 30
       - name: Test staff attendance, avatars and notifications with before/after responsive evidence
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/staff-mobile-proof

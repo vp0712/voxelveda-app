@@ -1106,6 +1106,8 @@ async function testAttendanceCorrections() {
   const input = { request_id: crypto.randomUUID(), attendance_id: first.id, expected_revision: first.revision, clock_in: '2026-10-04T01:40:00+10:00', clock_out: '2026-10-04T04:30:00+11:00', break_minutes: 10, notes: 'Synthetic reviewed correction', reason: 'Synthetic actual start and break correction' };
   const requested = await corrections.requestCorrection({ user, input, req, now });
   assert.equal(requested.correction.status, 'PENDING');
+  assert.equal(requested.correction.proposed.clock_in, '2026-10-03T15:40:00Z');
+  assert.equal(requested.correction.proposed.clock_out, '2026-10-03T17:30:00Z');
   const [[unchanged]] = await pool.query('SELECT * FROM staff_attendance WHERE id=?', [first.id]);
   assert.deepEqual(unchanged, first, 'A correction request preserves original attendance until authorised approval.');
   assert.equal((await corrections.requestCorrection({ user, input, req, now })).correction.id, requested.correction.id);
@@ -1117,12 +1119,24 @@ async function testAttendanceCorrections() {
   assert.equal((await corrections.listCorrections({ user: mobileUsers.outsideManager, query: { scope: 'team' } })).total, 0);
   await assert.rejects(() => corrections.getCorrection({ user: mobileUsers.outsideManager, id: requested.correction.id }), { code: 'ATTENDANCE_CORRECTION_NOT_FOUND' });
   await assert.rejects(() => corrections.listCorrections({ user, query: { scope: 'all' } }), { code: 'ATTENDANCE_CORRECTION_ACCESS_DENIED' });
+  // An already-retained pending proposal serialized exact whole seconds as
+  // .000Z. Review must recover it without a broad migration or rewriting its
+  // original proposal bytes; genuine fractional instants remain rejected.
+  const [[pendingSource]] = await pool.query('SELECT proposed_json FROM attendance_correction_requests WHERE id=?', [requested.correction.id]);
+  const legacyProposal = JSON.parse(pendingSource.proposed_json);
+  legacyProposal.clock_in = legacyProposal.clock_in.replace(/Z$/, '.000Z');
+  legacyProposal.clock_out = legacyProposal.clock_out.replace(/Z$/, '.000Z');
+  const legacyProposalBytes = JSON.stringify(legacyProposal);
+  await pool.query('UPDATE attendance_correction_requests SET proposed_json=? WHERE id=?', [legacyProposalBytes, requested.correction.id]);
+  await assert.rejects(() => corrections.requestCorrection({ user, input: { ...input, request_id: crypto.randomUUID(), clock_in: '2026-10-03T15:40:00.001Z' }, req, now }), { code: 'ATTENDANCE_TIME_INVALID' });
   const decision = { expected_revision: requested.correction.revision, reason: 'Synthetic supervisor verified actual times' };
   const approved = await Promise.all([0, 1].map(() => corrections.decideCorrection({ user: mobileUsers.manager, id: requested.correction.id, input: decision, decision: 'APPROVED', req, now })));
   assert.equal(approved.filter(result => result.existing).length, 1);
   assert.equal(approved[0].attendance.total_minutes, 100);
   assert.equal(approved[0].attendance.entry_source, 'MANUAL'); assert.equal(approved[0].attendance.manual_authorised_by, mobileUsers.manager.id);
   assert.equal(approved[0].attendance.timestamp_basis, 'UTC'); assert.equal(approved[0].attendance.recorded_timezone, 'Australia/Sydney');
+  const [[retainedProposal]] = await pool.query('SELECT proposed_json FROM attendance_correction_requests WHERE id=?', [requested.correction.id]);
+  assert.equal(retainedProposal.proposed_json, legacyProposalBytes, 'Approval leaves retained .000Z proposal bytes intact while establishing the exact worked seconds.');
   const [preservedBreaks] = await pool.query('SELECT id,started_at,ended_at,start_request_id,end_request_id FROM attendance_break_intervals WHERE attendance_id=? ORDER BY id', [first.id]);
   assert.deepEqual(preservedBreaks, originalBreaks, 'Approved corrections supersede break evidence without rewriting its original timestamps or request IDs.');
   const [[effectiveBreaks]] = await pool.query('SELECT COUNT(*) count FROM attendance_break_intervals WHERE attendance_id=? AND superseded_at IS NULL', [first.id]);

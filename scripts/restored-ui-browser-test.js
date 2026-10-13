@@ -91,6 +91,8 @@ async function query(statement, parameters = []) {
   if (/FROM rfqs/i.test(sql) && /WHERE id = \?/i.test(sql)) return result(rfqs.filter(row => row.id===Number(parameters[0]) && (!/archived = \?/i.test(sql) || row.archived===Number(parameters[1]))));
   if (/FROM rfqs/i.test(sql) && /GROUP BY/i.test(sql)) return result([{status:'pending',count:1},{status:'rejected',count:1}]);
   if (/FROM rfqs/i.test(sql) && /COUNT/i.test(sql)) return result([{ total:rfqs.filter(row=>row.archived===Number(parameters[0]||0)).length, total_rfqs:rfqs.filter(row=>!row.archived).length, pending_rfqs:rfqs.filter(row=>!row.archived&&row.status==='pending').length, approved_rfqs:0, closed_rfqs:0 }]);
+  if (/^SELECT u\.\*,.* FROM users u\b/i.test(sql)) return result(Object.values(users));
+  if (/\bFROM users WHERE deleted_at IS NULL ORDER BY id ASC$/i.test(sql)) return result(Object.values(users));
   if (/^SELECT \* FROM rfqs/i.test(sql)) return result(rfqs.filter(row=>row.archived===Number(parameters[0]||0)));
   if (/FROM users/i.test(sql) && /WHERE (?:u\.)?id\s*=\s*\?/i.test(sql)) return result(users[parameters[0]] ? [users[parameters[0]]] : []);
   if (/FROM users/i.test(sql) && !/COUNT|SUM\(/i.test(sql)) return result(Object.values(users));

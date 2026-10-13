@@ -54,20 +54,22 @@
     binding.cacheKey=cacheKey;
     let cached=photos.get(cacheKey);
     if(!cached){
-      const controller=new AbortController();cached={controller,userId:binding.userId,url:null,promise:null};photos.set(cacheKey,cached);
+      const controller=new AbortController();cached={controller,userId:binding.userId,url:null,promise:null,state:'pending',error:null};photos.set(cacheKey,cached);
       const timer=setTimeout(()=>controller.abort(),8000);
       cached.promise=(async()=>{
         const response=await fetch(validUrl(reference,binding.userId,binding.self),{credentials:'same-origin',cache:'no-store',headers:{...headers(),Accept:'image/jpeg,image/png,image/webp'},signal:controller.signal});
         if(response.status===401){if(expectedGeneration===generation && expectedIdentity===checkIdentity()){clear();window.dispatchEvent(new CustomEvent('vv:avatar-auth-required'));}throw new Error('Sign in again to load your profile photo.');}
-        if(response.status===404){if(binding.self)throw new Error('Your saved photo is unavailable. Retry loading it or upload a new photo.');return null;}
+        if(response.status===404){if(binding.self)throw new Error('Your saved photo is unavailable. Retry loading it or upload a new photo.');cached.state='missing';return null;}
         if(!response.ok)throw new Error('Photo could not be loaded. Retry from My Profile.');
         const mime=(response.headers.get('content-type')||'').split(';')[0].toLowerCase();
         if(!['image/jpeg','image/png','image/webp'].includes(mime))throw new Error('The photo service returned an unsupported image.');
         const blob=await response.blob();if(!blob.size||blob.size>5*1024*1024)throw new Error('The profile photo is empty or too large.');
         if(expectedGeneration!==generation || expectedIdentity!==checkIdentity() || photos.get(cacheKey)!==cached)return null;
-        cached.url=URL.createObjectURL(blob);return cached.url;
-      })().finally(()=>clearTimeout(timer));
+        cached.url=URL.createObjectURL(blob);cached.state='ready';return cached.url;
+      })().catch(error=>{cached.state='failed';cached.error=error;throw error;}).finally(()=>clearTimeout(timer));
     }
+    if(cached.state==='missing'){fallback(binding,'missing');return;}
+    if(cached.state==='failed'){fallback(binding,'failed',cached.error?.name==='AbortError'?'Photo loading timed out. Retry from My Profile.':cached.error?.message);return;}
     if(cached.url && binding.url===cached.url && binding.state==='loaded')return;
     notify(binding,'loading');
     try{
@@ -80,17 +82,20 @@
         if(binding.url!==url || expectedGeneration!==generation)return;
         binding.image.hidden=false;binding.image.style.display='block';binding.fallback.hidden=true;binding.fallback.style.display='none';binding.target.classList.add('vv-avatar-has-photo');notify(binding,'loaded');
       };
-      binding.image.onerror=()=>{if(binding.url===url)fallback(binding,'failed','This photo could not be displayed. Retry from My Profile.');};
+      binding.image.onerror=()=>{if(binding.url===url){cached.state='failed';cached.error=new Error('This photo could not be displayed. Retry from My Profile.');fallback(binding,'failed',cached.error.message);}};
       binding.image.src=url;
     }catch(error){if(expectedGeneration===generation && bindings.get(binding.target)===binding)fallback(binding,'failed',error.name==='AbortError'?'Photo loading timed out. Retry from My Profile.':error.message);}
   }
   function render(binding) {
     if(binding.self){
-      if(!profile){fallback(binding,'missing');return;}
+      if(!profile){binding.name='';fallback(binding,'missing');return;}
       binding.userId=Number(profile.id);binding.name=profile.name || profile.username || '';const label=initials(binding.name);if(binding.state!=='loading' && binding.fallback.textContent!==label)binding.fallback.textContent=label;
       if(!profile.has_profile_photo || !profile.profile_photo_url){fallback(binding,'missing');return;}
       fetchPhoto(binding,profile.profile_photo_url,profile.profile_photo_revision || profile.profile_photo_updated_at);
-    }else fetchPhoto(binding,`/api/profile/staff/${binding.userId}/photo${binding.revision?'?v='+encodeURIComponent(binding.revision):''}`,binding.revision);
+    }else {
+      if(!Number.isSafeInteger(binding.userId)||binding.userId<1){fallback(binding,'missing');return;}
+      fetchPhoto(binding,`/api/profile/staff/${binding.userId}/photo${binding.revision?'?v='+encodeURIComponent(binding.revision):''}`,binding.revision);
+    }
   }
   function mount(target, options={}) {
     if(!target)return null;styles();checkIdentity();let binding=bindings.get(target);
@@ -98,7 +103,8 @@
     const image=options.image || document.createElement('img'),initial=options.fallback || document.createElement('span');
     image.classList.add('vv-avatar-photo');image.alt='';image.decoding='async';image.hidden=true;initial.classList.add('vv-avatar-initials');
     if(!options.image)target.replaceChildren(image,initial);
-    binding={target,image,fallback:initial,self:options.self!==false,userId:Number(options.userId||profile?.id||0),name:options.name||'',revision:options.revision||null,onState:options.onState,url:null,cacheKey:null,defaultTitle:binding?.defaultTitle||target.title||'',failureTitle:null,state:'missing'};
+    const self=options.self!==false;
+    binding={target,image,fallback:initial,self,userId:self?Number(options.userId||profile?.id||0):Number(options.userId),name:options.name||'',revision:options.revision||null,onState:options.onState,url:null,cacheKey:null,defaultTitle:binding?.defaultTitle||target.title||'',failureTitle:null,state:'missing'};
     bindings.set(target,binding);render(binding);return binding;
   }
   function mountAll() {

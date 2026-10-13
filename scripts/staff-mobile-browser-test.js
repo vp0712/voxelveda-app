@@ -20,7 +20,8 @@ assert(['before', 'after', 'both'].includes(selectedPhase), 'Choose before, afte
 const output = process.env.UI_PROOF_DIR || path.join(os.tmpdir(), 'voxelveda-staff-mobile-proof');
 const identities = new Map([
   [9401, { id: 9401, name: 'Synthetic Staff Fixture', username: 'synthetic.staff', email: 'synthetic-staff@example.invalid', role: 'staff', active: 1, account_status: 'ACTIVE', session_version: 1, mfa_enabled: 0, permissions: ['VIEW_ATTENDANCE', 'VIEW_OWN_JOBS', 'VIEW_OWN_TIMESHEET', 'attendance_qr_bypass'] }],
-  [9402, { id: 9402, name: 'Synthetic Other Fixture', username: 'synthetic.other', email: 'synthetic-other@example.invalid', role: 'staff', active: 1, account_status: 'ACTIVE', session_version: 1, mfa_enabled: 0, permissions: ['VIEW_ATTENDANCE', 'VIEW_OWN_JOBS', 'VIEW_OWN_TIMESHEET'] }]
+  [9402, { id: 9402, name: 'Synthetic Other Fixture', username: 'synthetic.other', email: 'synthetic-other@example.invalid', role: 'staff', active: 1, account_status: 'ACTIVE', session_version: 1, mfa_enabled: 0, permissions: ['VIEW_ATTENDANCE', 'VIEW_OWN_JOBS', 'VIEW_OWN_TIMESHEET'] }],
+  [9403, { id: 9403, name: 'Synthetic Directory Reviewer', username: 'synthetic.directory', email: 'synthetic-directory@example.invalid', role: 'integration_fixture', active: 1, account_status: 'ACTIVE', session_version: 1, mfa_enabled: 0, permissions: ['VIEW_STAFF_HR'] }]
 ]);
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = crypto.randomBytes(48).toString('hex');
@@ -76,7 +77,7 @@ function resetState() {
       is_read: index > 23 ? 1 : 0, created_at: new Date(Date.now() - index * 60000).toISOString()
     })),
     attendance: null, actionResults: new Map(), receiptRequests: [], timeline: [], breakStart: null,
-    serverNow: new Date('2026-10-13T00:00:00Z'), loseNextActionReply: false, corrections: [], correctionRequests: [], qrValidationRequests: [], delayedReplies: new Map()
+    serverNow: new Date('2026-10-13T00:00:00Z'), loseNextActionReply: false, corrections: [], correctionRequests: [], qrValidationRequests: [], delayedReplies: new Map(), directoryPhotoRequests: []
   };
 }
 function attendanceState(state, userId = 9401) {
@@ -88,8 +89,8 @@ function attendanceState(state, userId = 9401) {
   return { profile: { id: userId, name: identities.get(userId).name, department: 'Synthetic verification team' }, attendance: active || row, sessions: row ? [{ ...row }] : [], status: open ? onBreak ? 'ON_BREAK' : 'WORKING' : row ? 'COMPLETED' : 'NOT_STARTED',
     active_attendance: active, completed_attendance_id: row?.clock_out ? row.id : null,
     company_timezone: 'Australia/Sydney', work_date: '2026-10-13', server_time: state.serverNow.toISOString(),
-    summary: { worked_minutes: row?.clock_out ? row.total_minutes : 0, live_worked_minutes: live, recorded_break_minutes: row?.break_minutes || 0, live_break_minutes: ongoingBreak, session_count: row ? 1 : 0, eligible_session_count: row?.clock_out ? 1 : 0, duplicate_session_count: 0, review_required: false },
-    timeline: row ? state.timeline : [], next_roster: null, tasks: [], categories: [], qr_required: userId !== 9401,
+    summary: { first_check_in: row?.clock_in || null, latest_check_out: row?.clock_out || null, break_recording_status: row ? 'RECORDED' : 'NOT_RECORDED', recorded_break_session_count: row ? 1 : 0, worked_minutes: row?.clock_out ? row.total_minutes : 0, live_worked_minutes: live, recorded_break_minutes: row?.break_minutes || 0, live_break_minutes: ongoingBreak, session_count: row ? 1 : 0, eligible_session_count: row?.clock_out ? 1 : 0, duplicate_session_count: 0, review_required: false },
+    timeline: row ? state.timeline.map(event => ({ ...event, verification_status: 'VERIFIED' })) : [], next_roster: null, tasks: [], categories: [], qr_required: userId !== 9401,
     allowed_actions: open ? ['CHECK_OUT', onBreak ? 'BREAK_END' : 'BREAK_START'] : ['CHECK_IN'],
     break_policy: { mode: 'RECORDED_ACTUAL', automatic_deduction: false }, reporting_basis: 'WHOLE_SHIFT_LOCAL_START_DATE', review_issues: [] };
 }
@@ -115,6 +116,12 @@ async function makeServer(publicDirectory, photo) {
   for (const [route, file] of [['/portal/staff', 'staff-dashboard.html'], ['/profile', 'profile.html'], ['/admin', 'admin-dashboard.html']]) {
     app.get(route, pageAuth(), (_req, res) => res.set('Cache-Control', 'private, no-store').type('html').send(brand.injectGlobalBrand(fs.readFileSync(path.join(publicDirectory, file), 'utf8'))));
   }
+  app.get('/synthetic-fixtures/avatar-observer', pageAuth(), (_req, res) => res.set('Cache-Control', 'private, no-store').type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Synthetic avatar observer fixture</title><script src="/profile-avatar.js" defer></script></head><body>
+    <h1>Synthetic authorised directory component fixture</h1><p>Every account and photo outcome on this fixture is synthetic.</p>
+    <div id="avatarObserverMissing" data-avatar-user-id="9401" data-avatar-name="Synthetic Staff Fixture"></div>
+    <div id="avatarObserverFailed" data-avatar-user-id="9402" data-avatar-name="Synthetic Other Fixture"></div>
+    <div id="avatarObserverInvalid" data-avatar-user-id="NaN" data-avatar-name="Synthetic malformed fixture"></div>
+    <button id="avatarObserverResponsive" type="button">Check responsiveness</button><output id="avatarObserverClicks">0</output><div id="avatarObserverUnrelated"></div></body></html>`));
   app.post('/api/security/csp-report', (_req, res) => res.sendStatus(204));
   app.use('/api', auth);
   app.get('/api/auth/me', authController.me);
@@ -128,6 +135,14 @@ async function makeServer(publicDirectory, photo) {
   app.get('/api/profile/photo', (req, res) => {
     if (Number(req.user.id) !== 9401 || !state.photo || state.photoFailure) return res.sendStatus(404);
     return res.set('Cache-Control', 'private, no-store').type('png').send(photo);
+  });
+  app.get('/api/profile/staff/:userId/photo', (req, res) => {
+    const { hasAnyPermission } = require('../services/authorizationService');
+    const target = Number(req.params.userId);
+    if (!hasAnyPermission(req.user, ['MANAGE_USERS', 'VIEW_STAFF_HR']) || !identities.has(target)) return res.sendStatus(404);
+    const status = target === 9401 ? 404 : 503;
+    state.directoryPhotoRequests.push({ actor: Number(req.user.id), target, status });
+    return res.set('X-Fixture-Expected', 'DIRECTORY_PHOTO_OUTCOME').status(status).json({ message: status === 404 ? 'Synthetic directory account has no photo' : 'Synthetic temporary photo failure' });
   });
   const own = req => state.notifications.filter(item => item.user_id === Number(req.user.id));
   const unread = req => own(req).filter(item => !item.is_read).length;
@@ -339,6 +354,64 @@ async function verifyEmulatedCameraCases(browser, fixture) {
   }
   return results;
 }
+async function verifyDirectoryAvatarObserver(browser, fixture) {
+  Object.assign(fixture.state, resetState());
+  const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' });
+  context.setDefaultTimeout(12000); context.setDefaultNavigationTimeout(15000);
+  await context.addCookies([{ name: 'vv_session', value: userSession(9403), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
+  const page = await context.newPage(), errors = [], photoResponses = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('response', response => { if (/^\/api\/profile\/staff\/[^/]+\/photo$/.test(new URL(response.url()).pathname)) photoResponses.push({ path: new URL(response.url()).pathname, status: response.status() }); });
+  try {
+    const me = await context.request.get(fixture.origin + '/api/auth/me'); assert.equal(me.status(), 200);
+    const canonical = (await me.json()).user;
+    assert.equal(Number(canonical.id), 9403); assert(canonical.permissions.includes('VIEW_STAFF_HR'), 'Directory fixture must hold the original global staff-photo permission.');
+    await page.addInitScript(user => {
+      localStorage.setItem('user', JSON.stringify(user));
+      window.__avatarObserverProof = { mutations: 0, clicks: 0, frames: 0 };
+      document.addEventListener('DOMContentLoaded', () => {
+        // This is the real browser observer, alongside the unchanged component's
+        // real observer. Record total activity before checking avatar changes.
+        new MutationObserver(records => { window.__avatarObserverProof.mutations += records.length; }).observe(document.body, { childList: true, subtree: true });
+        document.getElementById('avatarObserverResponsive').addEventListener('click', () => { document.getElementById('avatarObserverClicks').textContent = String(++window.__avatarObserverProof.clicks); });
+      }, { once: true });
+    }, canonical);
+    const response = await page.goto(fixture.origin + '/synthetic-fixtures/avatar-observer', { waitUntil: 'networkidle' });
+    assert.equal(response.status(), 200); assert(response.headers()['content-security-policy'].includes("default-src 'self'"));
+    await page.waitForFunction(() => document.getElementById('avatarObserverMissing')?.dataset.avatarState === 'missing' && document.getElementById('avatarObserverFailed')?.dataset.avatarState === 'failed' && document.getElementById('avatarObserverInvalid')?.dataset.avatarState === 'missing');
+    const stable = await page.evaluate(async () => {
+      const targets = ['avatarObserverMissing', 'avatarObserverFailed', 'avatarObserverInvalid'].map(id => document.getElementById(id));
+      const snapshot = () => targets.map(target => ({ id: target.id, state: target.dataset.avatarState, text: target.textContent, busy: target.getAttribute('aria-busy'), photoHidden: [...target.querySelectorAll('img')].every(image => image.hidden || !image.getAttribute('src')) }));
+      const initial = snapshot(), changed = [];
+      // Unrelated real DOM changes repeatedly invoke the shared mountAll path.
+      // Cached 404/503 outcomes must never re-enter loading or flip text.
+      const observer = new MutationObserver(records => changed.push(...records.map(record => record.target.parentElement?.id || record.target.id || 'child')));
+      targets.forEach(target => observer.observe(target, { childList: true, subtree: true }));
+      for (let index = 0; index < 12; index++) {
+        document.getElementById('avatarObserverUnrelated').textContent = 'Synthetic unrelated DOM update ' + index;
+        window.VoxelAvatar.mountAll();
+        await new Promise(resolve => requestAnimationFrame(() => { window.__avatarObserverProof.frames++; resolve(); }));
+        document.getElementById('avatarObserverResponsive').click();
+      }
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      observer.disconnect(); return { initial, final: snapshot(), avatarChildMutations: changed.length, observer: { ...window.__avatarObserverProof }, clicks: document.getElementById('avatarObserverClicks').textContent };
+    });
+    assert.deepEqual(stable.final, stable.initial, 'Real MutationObserver remounts leave settled directory initials and failure state unchanged.');
+    assert.equal(stable.avatarChildMutations, 0, 'Cached missing/failed outcomes cannot cycle loading ellipses and initials.');
+    assert.equal(stable.observer.frames, 12); assert.equal(stable.observer.clicks, 12); assert.equal(stable.clicks, '12');
+    assert(stable.final.every(target => target.busy === 'false' && target.photoHidden && target.text !== '…'));
+    assert(stable.observer.mutations < 100, 'Actual observer activity must remain bounded and allow scheduled frames and user controls.');
+    assert.deepEqual([...fixture.state.directoryPhotoRequests].sort((a, b) => a.target - b.target), [{ actor: 9403, target: 9401, status: 404 }, { actor: 9403, target: 9402, status: 503 }], 'Each permitted directory photo is fetched once; malformed IDs never reach HTTP.');
+    assert.deepEqual(photoResponses.sort((a, b) => a.path.localeCompare(b.path)), [{ path: '/api/profile/staff/9401/photo', status: 404 }, { path: '/api/profile/staff/9402/photo', status: 503 }]);
+    assert.deepEqual(errors, []);
+    await page.screenshot({ path: path.join(output, 'after-directory-avatar-observer.png'), fullPage: true, animations: 'disabled' });
+    return { fixtureOnly: true, actualChromiumMutationObserver: true, canonicalOwner: Number(canonical.id), outcomes: photoResponses, photoRequests: fixture.state.directoryPhotoRequests.length, invalidIdRequests: 0, ...stable };
+  } catch (error) {
+    await page.screenshot({ path: path.join(output, 'directory-avatar-observer-failure.png'), fullPage: true, animations: 'disabled', timeout: 5000 }).catch(() => {});
+    throw new Error('Real directory avatar MutationObserver scenario failed', { cause: error });
+  } finally { await context.close(); }
+}
+
 async function verifyInPlaceAccountSwitchCases(browser, fixture) {
   const results = [], privateNote = 'Synthetic account A private handover must never appear for account B';
   for (const scenario of [{ name: 'today', endpoint: '/api/attendance/today' }, { name: 'history', endpoint: '/api/attendance/my' }, { name: 'committed-check-out', endpoint: '/api/attendance/actions', open: true }]) {
@@ -576,10 +649,11 @@ async function run() {
     }
     const cameraEmulation = afterFixture ? await verifyEmulatedCameraCases(browser, afterFixture) : [];
     const inPlaceAccountSwitch = afterFixture ? await verifyInPlaceAccountSwitchCases(browser, afterFixture) : [];
+    const directoryAvatarObserver = afterFixture ? await verifyDirectoryAvatarObserver(browser, afterFixture) : null;
     const unauthorized = await fetch(`http://127.0.0.1:${servers.at(-1).address().port}/api/profile`);
     assert.equal(unauthorized.status, 401, 'anonymous callers must fail actual API authentication');
     fs.writeFileSync(path.join(output, 'staff-mobile-proof.json'), JSON.stringify({ baselineRef, baselineSource: useSavedArchive ? 'Explicit local preserved byte-equivalent ea5 archive' : 'Pinned remote Git baseline', fixtureOnly: true,
-      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, inPlaceAccountSwitch, results }, null, 2));
+      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, inPlaceAccountSwitch, directoryAvatarObserver, results }, null, 2));
     console.log('Staff mobile browser before/after screenshots and actual cookie/JWT/CSP fixture passed: ' + output);
   } catch (error) {
     if (diagnosticPage && !diagnosticPage.isClosed()) await diagnosticPage.screenshot({ path: path.join(output, 'failure.png'), fullPage: true, animations: 'disabled' }).catch(() => {});
