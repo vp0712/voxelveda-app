@@ -147,17 +147,14 @@ async function run() {
   for (const key of ['SMTP_HOST','SMTP_USER','SMTP_PASS','SMTP_PASSWORD','MAIL_HOST','MAIL_USER','MAIL_PASS','RESEND_API_KEY']) delete process.env[key];
   let app;
   const server=http.createServer((req,res)=>app(req,res));
-  await new Promise((resolve,reject)=>{ server.once('error',reject); server.listen(0,'127.0.0.1',resolve); });
-  const origin='http://127.0.0.1:'+server.address().port;
-  process.env.ALLOWED_ORIGINS=origin; process.env.APP_URL=origin; process.env.APP_ORIGIN=origin;
-  app=require('../app');
-  const executablePath = process.env.CHROMIUM_PATH || (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
-  const browser=await chromium.launch({ headless:true, ...(executablePath ? { executablePath } : {}), args:['--no-sandbox'], timeout:20000 });
-  fs.mkdirSync(outputDir,{recursive:true});
+  // CI installs Chromium for the locked Playwright version. Native Chromium is
+  // a local convenience only; an explicit path remains authoritative anywhere.
+  const executablePath=process.env.CHROMIUM_PATH || (!process.env.CI && fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : undefined);
+  let browser;
   const evidence=[];
   const errors=[]; const apiCalls=[]; const apiResponses=[]; const apiResponseReads=[]; const browserErrors=[];
   let diagnosticPage;
-  let stage='admin_dashboard';
+  let stage='fixture_server';
   function observePage(page) {
     diagnosticPage=page;
     page.on('pageerror',error=>errors.push(error.message));
@@ -175,6 +172,15 @@ async function run() {
     });
   }
   try {
+    fs.mkdirSync(outputDir,{recursive:true});
+    await new Promise((resolve,reject)=>{ server.once('error',reject); server.listen(0,'127.0.0.1',resolve); });
+    const origin='http://127.0.0.1:'+server.address().port;
+    process.env.ALLOWED_ORIGINS=origin; process.env.APP_URL=origin; process.env.APP_ORIGIN=origin;
+    stage='application_load';
+    app=require('../app');
+    stage='browser_launch';
+    browser=await chromium.launch({ headless:true, ...(executablePath ? { executablePath } : {}), args:['--no-sandbox'], timeout:20000 });
+    stage='admin_dashboard';
     const context=await browser.newContext({ viewport:{width:1366,height:900} });
     context.setDefaultTimeout(15000);
     await context.addInitScript(()=>{
@@ -467,14 +473,21 @@ async function run() {
         weekly_body:document.getElementById('weeklyDeliveryBody')?.innerText || null
       })).catch(pageError=>({capture_error:pageError.message})) : null,
       document_sql:statements.filter(entry=>/^SELECT/i.test(entry.sql) && /invoices|invoice_items|weekly_timesheet_deliver/i.test(entry.sql)).slice(-40)};
-    fs.writeFileSync(path.join(outputDir,'failure.json'),JSON.stringify(diagnostics,null,2));
+    try {
+      fs.writeFileSync(path.join(outputDir,'failure.json'),JSON.stringify(diagnostics,null,2));
+    } catch(captureError) {
+      console.error('Could not save restored browser failure evidence: '+captureError.message);
+    }
     if(diagnosticPage)await diagnosticPage.screenshot({path:path.join(outputDir,'failure.png'),fullPage:true,animations:'disabled'}).catch(()=>{});
     console.error('Restored browser failure diagnostics: '+JSON.stringify(diagnostics));
     throw error;
   } finally {
-    await browser.close();
-    await new Promise(resolve=>server.close(resolve));
-    Module._load=originalLoad;
+    try {
+      if(browser)await browser.close();
+    } finally {
+      Module._load=originalLoad;
+      if(server.listening)await new Promise(resolve=>{server.close(resolve);server.closeAllConnections?.();});
+    }
   }
 }
 run().catch(error=>{console.error(error);process.exitCode=1;});
