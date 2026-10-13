@@ -117,6 +117,30 @@ Module._load = function fixtureLoad(request,parent,isMain) {
   return originalLoad.apply(this,arguments);
 };
 
+async function settleVisualState(page) {
+  await page.evaluate(async()=>{
+    const frame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+    const finiteAnimations=()=>document.getAnimations().filter(animation=>
+      (animation.playState==='running' || animation.pending) &&
+      Number.isFinite(animation.effect?.getComputedTiming().endTime));
+    let timer;
+    const settle=async()=>{
+      await document.fonts.ready;
+      await frame();await frame();
+      for(let attempt=0;attempt<10;attempt++){
+        const animations=finiteAnimations();
+        if(animations.length)await Promise.all(animations.map(animation=>animation.finished.catch(()=>{})));
+        await frame();await frame();
+        if(!finiteAnimations().length)return;
+      }
+      throw new Error('Finite visual transitions kept restarting.');
+    };
+    try {
+      await Promise.race([settle(),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error('Visual transitions did not settle within five seconds.')),5000);})]);
+    } finally {clearTimeout(timer);}
+  });
+}
+
 async function run() {
   process.env.NODE_ENV='test'; process.env.RATE_LIMIT_STORE='memory'; process.env.RATE_LIMIT_MAX='100000';
   process.env.TIMESHEET_TIMEZONE='Australia/Sydney'; process.env.WEEKLY_TIMESHEET_EMAIL_TIMEZONE='Australia/Sydney';
@@ -253,7 +277,7 @@ async function run() {
         weekly_sql:statements.filter(entry=>/weekly_timesheet_deliver/i.test(entry.sql))
       };
       fs.writeFileSync(path.join(outputDir,'weekly-delivery-failure.json'),JSON.stringify(diagnostics,null,2));
-      await page.screenshot({path:path.join(outputDir,'weekly-delivery-failure.png'),fullPage:true});
+      await page.screenshot({path:path.join(outputDir,'weekly-delivery-failure.png'),fullPage:true,animations:'disabled'});
       console.error('Weekly delivery browser diagnostics: '+JSON.stringify(diagnostics));
       throw error;
     }
@@ -311,6 +335,8 @@ async function run() {
         await page.evaluate(value=>window.VoxelTheme.set(value),mode);
         assert.equal(await page.evaluate(()=>document.documentElement.dataset.colorMode),mode);
         await page.evaluate(()=>window.goSection('dashboardSection'));
+        await page.mouse.move(0,0);
+        await settleVisualState(page);
         assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name}/${mode}: no horizontal page overflow`);
         assert.ok(await page.evaluate(()=>{
           const card=document.querySelector('.supplier-orbit-card');
@@ -353,7 +379,8 @@ async function run() {
           assert.equal(await page.locator('.sidebar').getAttribute('aria-hidden'),'true');
         }
         const filename=`${name}-${mode}.png`;
-        await page.screenshot({path:path.join(outputDir,filename),fullPage:true});
+        await settleVisualState(page);
+        await page.screenshot({path:path.join(outputDir,filename),fullPage:true,animations:'disabled'});
         evidence.push({viewport:name,mode,screenshot:filename});
       }
     }
@@ -390,9 +417,10 @@ async function run() {
     const staffPage=await staff.newPage(); observePage(staffPage); stage='staff_portal';
     await staffPage.goto(origin+'/dashboard'); await staffPage.waitForURL('**/portal/staff*');
     await staffPage.waitForFunction(()=>document.getElementById('staffInfo')?.textContent.includes('Staff fixture'));
+    await settleVisualState(staffPage);
     assert.ok(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'staff phone page has no horizontal overflow');
     assert.equal(await staffPage.locator('a[href*="finance-intelligence"]').count(),0);
-    await staffPage.screenshot({path:path.join(outputDir,'staff-phone.png'),fullPage:true});
+    await staffPage.screenshot({path:path.join(outputDir,'staff-phone.png'),fullPage:true,animations:'disabled'});
     stage='staff_qms';
     const [commandCentreResponse]=await Promise.all([
       staffPage.waitForResponse(response=>new URL(response.url()).pathname==='/api/qms/enterprise/command-centre'),
@@ -410,13 +438,15 @@ async function run() {
     assert.deepEqual((await ncrResponse.json()).ncrs,ncrs);
     await staffPage.waitForFunction(()=>document.getElementById('apiOutput')?.textContent !== 'Loading…');
     assert.match(await staffPage.locator('#apiOutput').innerText(),/NCR-FIXTURE-0101/,'the actual successful NCR response is rendered in the staff register');
-    await staffPage.screenshot({path:path.join(outputDir,'staff-qms-phone.png'),fullPage:true});
+    await settleVisualState(staffPage);
+    await staffPage.screenshot({path:path.join(outputDir,'staff-qms-phone.png'),fullPage:true,animations:'disabled'});
     const client=await browser.newContext({viewport:{width:390,height:844},extraHTTPHeaders:{'x-fixture-role':'client'}});
     const clientPage=await client.newPage(); observePage(clientPage); stage='client_portal';
     await clientPage.goto(origin+'/dashboard'); await clientPage.waitForURL('**/client*');
     await clientPage.locator('#clientProfileName').getByText('Client fixture').waitFor();
+    await settleVisualState(clientPage);
     assert.ok(await clientPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'client phone page has no horizontal overflow');
-    await clientPage.screenshot({path:path.join(outputDir,'client-phone.png'),fullPage:true});
+    await clientPage.screenshot({path:path.join(outputDir,'client-phone.png'),fullPage:true,animations:'disabled'});
     assert.deepEqual(errors,[],'restored browser workflows have no uncaught JavaScript errors');
     assert.ok(!statements.some(entry=>/FROM (?:finance_|banking_|erp_)/i.test(entry.sql)),'original reads never load retired schema');
     const checksum=crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'public/logo.png'))).digest('hex');
@@ -438,7 +468,7 @@ async function run() {
       })).catch(pageError=>({capture_error:pageError.message})) : null,
       document_sql:statements.filter(entry=>/^SELECT/i.test(entry.sql) && /invoices|invoice_items|weekly_timesheet_deliver/i.test(entry.sql)).slice(-40)};
     fs.writeFileSync(path.join(outputDir,'failure.json'),JSON.stringify(diagnostics,null,2));
-    if(diagnosticPage)await diagnosticPage.screenshot({path:path.join(outputDir,'failure.png'),fullPage:true}).catch(()=>{});
+    if(diagnosticPage)await diagnosticPage.screenshot({path:path.join(outputDir,'failure.png'),fullPage:true,animations:'disabled'}).catch(()=>{});
     console.error('Restored browser failure diagnostics: '+JSON.stringify(diagnostics));
     throw error;
   } finally {
