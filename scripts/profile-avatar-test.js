@@ -1,7 +1,8 @@
 'use strict';
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {createCanvas,loadImage}=require('@napi-rs/canvas');
-const state={profiles:new Map(),objects:new Map(),audits:[],s3:false,auditFailure:false,lostCommit:false,deletedObjects:[],columns:[],scannerFailure:false};
+const state={profiles:new Map(),objects:new Map(),audits:[],s3:false,auditFailure:false,lostCommit:false,deletedObjects:[],columns:[],scannerConfigured:true,scannerFailure:false,scannedFiles:[]};
 const users=new Map([[1,{id:1,role:'staff',department:'Operations',manager_id:3,access_scope:{}}],[2,{id:2,role:'staff',department:'Sales',manager_id:4,access_scope:{}}],[3,{id:3,role:'manager',department:'Operations',access_scope:{}}],[4,{id:4,role:'manager',department:'Sales',access_scope:{}}],[8,{id:8,role:'hr',access_scope:{departments:['Operations']}}],[9,{id:9,role:'customer',department:'Operations',access_scope:{}}]]);
 const cloneProfiles=()=>new Map([...state.profiles].map(([id,row])=>[id,{...row,profile_photo:row.profile_photo?Buffer.from(row.profile_photo):null}]));
 const db={async query(sql,params=[]){const text=sql.replace(/\s+/g,' ').trim();
@@ -19,7 +20,11 @@ const db={async query(sql,params=[]){const text=sql.replace(/\s+/g,' ').trim();
 function mock(name,value){const id=require.resolve(name);require.cache[id]={id,filename:id,loaded:true,exports:value};}
 mock('../config/db',db);
 mock('../services/objectStorageService',{isConfigured:()=>state.s3,async putObject(key,bytes){state.objects.set(key,Buffer.from(bytes));},async getObject(key){return state.objects.get(key);},async deleteObject(key){state.deletedObjects.push(key);state.objects.delete(key);}});
-mock('../services/malwareScannerService',{scannerConfig:()=>({failClosed:true}),configured:()=>state.scannerFailure,async scanFile(){throw Object.assign(new Error('Unavailable fixture scanner'),{code:'MALWARE_SCANNER_UNAVAILABLE'});}});
+mock('../services/malwareScannerService',{scannerConfig:()=>({failClosed:true}),configured:()=>state.scannerConfigured,async scanFile(filename){
+ const bytes=await fs.promises.readFile(filename),stat=await fs.promises.stat(filename);assert(bytes.length>0);assert.equal(stat.mode&0o777,0o600,'Photo scanning uses a private temporary source file');state.scannedFiles.push(filename);
+ if(state.scannerFailure)throw Object.assign(new Error('Unavailable fixture scanner'),{code:'MALWARE_SCANNER_UNAVAILABLE'});
+ return {clean:true,infected:false,signature:null};
+}});
 mock('../services/securityGovernanceSchema',{async ensureSecurityGovernanceSchema(){}});
 mock('../services/hrAdministrationSchema',{async ensureHrAdministrationSchema(){}});
 mock('../services/sessionService',{async logSecurityEvent(){}});
@@ -47,9 +52,9 @@ async function main(){
  for(const [buffer,mimetype] of [[Buffer.from('<svg></svg>'),'image/png'],[jpeg,'image/png'],[Buffer.from([255,216,255,1,0,0]),'image/jpeg']])await assert.rejects(()=>service.normaliseProfilePhoto({buffer,mimetype}));
  const huge=Buffer.from(png);huge.writeUInt32BE(100000,16);assert.throws(()=>service._test.inspectPhoto(huge,'image/png'),{code:'PROFILE_PHOTO_DIMENSIONS_INVALID'});
  await assert.rejects(()=>service.normaliseProfilePhoto(file,{zoom:4}),{code:'PROFILE_PHOTO_CROP_INVALID'});
- const oldNodeEnv=process.env.NODE_ENV,oldRequired=process.env.MALWARE_SCANNER_REQUIRED;process.env.NODE_ENV='production';process.env.MALWARE_SCANNER_REQUIRED='true';
- try{await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'MALWARE_SCANNER_REQUIRED'});}finally{oldNodeEnv===undefined?delete process.env.NODE_ENV:process.env.NODE_ENV=oldNodeEnv;oldRequired===undefined?delete process.env.MALWARE_SCANNER_REQUIRED:process.env.MALWARE_SCANNER_REQUIRED=oldRequired;}
- state.scannerFailure=true;try{await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'MALWARE_SCANNER_UNAVAILABLE'});}finally{state.scannerFailure=false;}
+ const oldNodeEnv=process.env.NODE_ENV,oldRequired=process.env.MALWARE_SCANNER_REQUIRED,oldConfigured=state.scannerConfigured;process.env.NODE_ENV='production';process.env.MALWARE_SCANNER_REQUIRED='true';state.scannerConfigured=false;
+ try{const before=state.scannedFiles.length;await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'MALWARE_SCANNER_REQUIRED'});assert.equal(state.scannedFiles.length,before,'A required but unconfigured scanner blocks before accepting the photo');}finally{state.scannerConfigured=oldConfigured;oldNodeEnv===undefined?delete process.env.NODE_ENV:process.env.NODE_ENV=oldNodeEnv;oldRequired===undefined?delete process.env.MALWARE_SCANNER_REQUIRED:process.env.MALWARE_SCANNER_REQUIRED=oldRequired;}
+ state.scannerConfigured=true;state.scannerFailure=true;try{const before=state.scannedFiles.length;await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'MALWARE_SCANNER_UNAVAILABLE'});assert.equal(state.scannedFiles.length,before+1,'An unavailable configured scanner fails closed after attempting the source scan');}finally{state.scannerFailure=false;state.scannerConfigured=oldConfigured;}
  const first=service.normaliseProfilePhoto(file),second=service.normaliseProfilePhoto(file);await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'PROFILE_PHOTO_BUSY'});await Promise.all([first,second]);
  const req=request();const saved=await service.saveProfilePhoto(1,file,req);const original=await service.getProfilePhoto(1);assert.deepEqual(original.buffer,saved.buffer);assert.equal(state.audits.length,1);
  const duplicate=await service.saveProfilePhoto(1,file,req);assert.equal(duplicate.unchanged,true);assert.equal(state.audits.length,1);
@@ -62,6 +67,7 @@ async function main(){
  assert.equal(await controller._test.mayViewStaffPhoto({id:9,role:'customer',permissions:['VIEW_STAFF_HR']},1,db),false);assert.equal(await controller._test.mayViewStaffPhoto({id:1,role:'staff',permissions:['VIEW_CONFIDENTIAL_FILES']},2,db),false);assert.equal(await controller._test.mayViewStaffPhoto({id:1,role:'staff'},1,db),true);
  state.auditFailure=true;await assert.rejects(()=>service.removeProfilePhoto(1,req));assert.ok(await service.getProfilePhoto(1));state.auditFailure=false;await service.removeProfilePhoto(1,req);assert.equal(await service.getProfilePhoto(1),null);assert.ok(state.objects.has(committedKey),'Removal revokes access while preserving historical private bytes');
  assert.equal(state.columns.length,4);assert(state.columns.every(sql=>! /DROP|DELETE|UPDATE|TRUNCATE/.test(sql)));
- console.log('Profile avatar tests passed: genuine JPG/PNG/WebP decode; EXIF pixel orientation; chosen square crop; predecode dimension/magic bounds; durable DB and private object references; safe duplicate save; atomic audit rollback; lost-commit preservation; own/team/department/customer boundaries; authorised image metadata; archive without historical byte deletion.');
+ assert(state.scannedFiles.length>10,'Valid image workflows exercise the configured scanner instead of skipping security checks');assert(state.scannedFiles.every(filename=>!fs.existsSync(filename)),'Successful and failed scans clean private temporary source files');
+ console.log('Profile avatar tests passed: genuine JPG/PNG/WebP decode; EXIF pixel orientation; chosen square crop; predecode dimension/magic bounds; configured clean scans and required/unavailable fail-closed checks; private scan-file cleanup; durable DB and private object references; safe duplicate save; atomic audit rollback; lost-commit preservation; own/team/department/customer boundaries; authorised image metadata; archive without historical byte deletion.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

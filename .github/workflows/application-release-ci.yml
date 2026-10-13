@@ -33,6 +33,7 @@ jobs:
       - name: Run the complete build with production HTTPS enforcement
         env:
           NODE_ENV: production
+          MALWARE_SCANNER_REQUIRED: 'true'
         run: npm run build
       - name: Build the packaged source without Git metadata
         shell: bash
