@@ -196,7 +196,14 @@ async function main() {
   const normalSource = await extractImportFile(file('normal-formula-source.xlsx', workbook({ Data: sourceSheet })));
   const formulaOnlyRow = normalSource.sheets[0].rows.find(row => row.sourceRow === 4);
   assert.ok(formulaOnlyRow, 'A formula-only source row must have an explicit outcome instead of disappearing.');
-  assert.equal(normalizeImportRow(formulaOnlyRow, baseOptions).status, 'REVIEW_REQUIRED');
+  const formulaOnlyOutcome = normalizeImportRow(formulaOnlyRow, baseOptions);
+  assert.equal(formulaOnlyOutcome.status, 'REJECTED', 'An invalid or absent cache with missing mandatory values must not become importable by generic review.');
+  assert.ok(formulaOnlyOutcome.errors.length, 'The source cache error must remain an explicit rejected-row outcome.');
+  assert.equal(formulaOnlyOutcome.values.description, null); assert.equal(formulaOnlyOutcome.values.quantity, null);
+  for (const field of ['description', 'quantity']) assert.ok([...formulaOnlyOutcome.errors, ...formulaOnlyOutcome.warnings].some(value => value.field === field && value.code === 'IMPORT_REQUIRED_VALUE_MISSING'), `Missing ${field} requires explicit correction.`);
+  assert.ok(formulaOnlyOutcome.warnings.some(value => value.code === 'IMPORT_FORMULA_REVIEW_REQUIRED'));
+  assert.equal(formulaOnlyRow.cellMeta[0].cachedValueAvailable, false);
+  assert.ok(formulaOnlyRow.cells.every(value => typeof value !== 'number' || Number.isFinite(value)), 'No NaN or infinite cache value is retained.');
   assert.equal(normalSource.sheets[0].sourceRows, undefined, 'Complete source-row preservation remains an explicit preview option.');
   const leap = XLSX.utils.aoa_to_sheet([['Description', 'Qty', 'Date'], ['Fixture invalid Excel leap date', 2, 60]]); leap.C2.z = 'yyyy-mm-dd';
   const leapResult = await extractImportFile(file('excel-leap-day.xlsx', workbook({ Data: leap })));

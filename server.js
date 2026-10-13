@@ -144,6 +144,8 @@ async function initializeServices() {
     }
   }
 
+  console.log('Procurement OCR runtime capabilities',JSON.stringify(require('./services/procurementLocalOcrService').ocrCapability()));
+
   const backupMetadataConfigured = String(process.env.BACKUP_STATUS_PROVIDER || '').toLowerCase() === 'configured';
   const backupTelemetryConfigured = Boolean(String(process.env.BACKUP_STATUS_URL || '').trim());
   if (!backupMetadataConfigured || !backupTelemetryConfigured) {

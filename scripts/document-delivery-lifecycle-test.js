@@ -5,7 +5,7 @@ const queuePath=require.resolve('../services/emailQueue');
 const pdfPath=require.resolve('../services/documentPdfService');
 const actualPdf=require(pdfPath);
 const crypto=require('node:crypto');
-const requests=new Map(),messages=[];let failRender=false,failBookkeeping=false,sendCount=0;
+const requests=new Map(),messages=[];let failRender=false,failBookkeeping=false,sendCount=0,queueStatus='SENT';
 const db={async query(sql,values=[]){
   if(/^(CREATE TABLE|ALTER TABLE)/.test(sql))return [{}];
   if(sql.startsWith('INSERT INTO document_delivery_requests')){
@@ -14,7 +14,7 @@ const db={async query(sql,values=[]){
   }
   if(sql.startsWith('SELECT * FROM document_delivery_requests'))return [[requests.get(values[0])]];
   if(sql.startsWith('SELECT attachments_json')){const part=messages[values[0]-1].attachments[0],bytes=part.content;return [[{attachments_json:JSON.stringify([{filename:part.filename,content:bytes.toString('base64'),encoding:'base64',byteLength:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')}])}]];}
-  if(sql.startsWith('SELECT id,status'))return [[{id:values[0],status:'SENT',message_id:'fixture-provider-acceptance'}]];
+  if(sql.startsWith('SELECT id,status'))return [[{id:values[0],status:queueStatus,message_id:queueStatus==='SENT'?'fixture-provider-acceptance':null,last_error:queueStatus==='FAILED'?'Fixture transport failure':null}]];
   const request=[...requests.values()].find(row=>row.id===values[values.length-1]);
   if(sql.includes("generation_status='GENERATING'")){
     if(!['PENDING','GENERATION_FAILED'].includes(request.generation_status))return [{affectedRows:0}];
@@ -27,7 +27,7 @@ const db={async query(sql,values=[]){
 require.cache[dbPath]={id:dbPath,filename:dbPath,loaded:true,exports:db};
 require.cache[queuePath]={id:queuePath,filename:queuePath,loaded:true,exports:{restoreAttachments:items=>items.map(item=>({...item,content:Buffer.from(item.content,'base64')})),async queueEmail(message){messages.push(message);return ++sendCount;}}};
 require.cache[pdfPath]={id:pdfPath,filename:pdfPath,loaded:true,exports:{...actualPdf,async createDocumentPdf(data){if(failRender)throw Object.assign(new Error('Fixture renderer failed.'),{code:'PDF_GENERATION_FAILED'});return actualPdf.createDocumentPdf(data);}}};
-const {queueDocumentEmail}=require('../services/documentDeliveryService');
+const {queueDocumentEmail,deliveryMessage}=require('../services/documentDeliveryService');
 async function main(){
  const data={title:'DELIVERY FIXTURE',reference:'FIXTURE-RETRY-1',issueDate:'2026-10-11',columns:[{label:'Expected field',width:1},{label:'Value',width:1}],rows:[['Identity','FIXTURE-RETRY-1']],notes:['Authorised automated fixture; no business records.']};
  const message={module:'invoices',recordId:'fixture',data,to:['fixture@example.invalid'],subject:'Fixture only',text:'Validated fixture PDF is attached.',createdBy:4};
@@ -36,6 +36,9 @@ async function main(){
  failRender=false;const delivery=await queueDocumentEmail(message);assert.equal(sendCount,1);assert.equal(delivery.generation_status,'VALIDATED');assert.equal(delivery.email_status,'PENDING');assert.equal(delivery.provider_accepted,false);assert.equal(delivery.recipient_verified,false);
  assert.ok([...requests.values()][0].pdf_pages>0);assert.ok([...requests.values()][0].pdf_sha256);
  const duplicate=await queueDocumentEmail(message);assert.equal(sendCount,1);assert.equal(duplicate.email_status,'SENT');assert.equal(duplicate.provider_accepted,true);assert.equal(duplicate.recipient_verified,false);assert.equal(duplicate.existing,true);
+ queueStatus='FAILED';const failed=await queueDocumentEmail(message);assert.equal(sendCount,1);assert.equal(failed.email_queued,false);assert.equal(failed.provider_accepted,false);assert.equal(failed.last_error,'Fixture transport failure');assert.match(deliveryMessage(failed),/failed/);assert.doesNotMatch(deliveryMessage(failed),/validated and queued/);
+ queueStatus='REVIEW_REQUIRED';const uncertain=await queueDocumentEmail(message);assert.equal(sendCount,1);assert.equal(uncertain.email_queued,false);assert.equal(uncertain.provider_accepted,false);assert.match(deliveryMessage(uncertain),/requires review/);assert.match(deliveryMessage(uncertain),/No automatic resend/);
+ queueStatus='SENT';
  await actualPdf.validatePdf(messages[0].attachments[0].content,{expectedText:['FIXTURE-RETRY-1']});
  assert.equal(messages[0].attachments.length,1);assert.equal(messages[0].attachments[0].contentType,'application/pdf');assert.match(messages[0].attachments[0].filename,/\.pdf$/);assert.equal(messages[0].attachments[0].path,undefined);
  const changed={...message,data:{...data,reference:'FIXTURE-RETRY-2',rows:[['Identity','FIXTURE-RETRY-2']]}};

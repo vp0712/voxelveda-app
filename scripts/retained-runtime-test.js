@@ -72,6 +72,7 @@ async function testStartup() {
       }) },
       './services/malwareScannerService': {},
       './services/objectStorageService': {},
+      './services/procurementLocalOcrService': {ocrCapability:()=>({enabled:false,available:false,runtimeVerified:false})},
       './services/webhookSecurityService': {},
       './config/backupRestoreAssurance': {},
       './services/backgroundJobService': { backgroundJobService: {
