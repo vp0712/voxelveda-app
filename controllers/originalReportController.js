@@ -228,6 +228,14 @@ exports.download = async (req, res, next) => {
   try {
     if (!req.user) throw reportError('Authentication required.', 401);
     const type = String(req.params.type || '');
+    if (type === 'procurement') {
+      const { download = '0', source: procurementSource = 'entries', ...filters } = req.query || {};
+      if (!['0', '1'].includes(String(download))) throw reportError('Download must be 0 or 1.');
+      const procurementReports = require('../services/procurementReportService');
+      const snapshot = await procurementReports.createSnapshot({ user: req.user, input: { type: 'register', source: procurementSource, filters }, req });
+      const saved = await procurementReports.getSnapshot({ user: req.user, snapshotId: snapshot.snapshot_id });
+      return await sendPdfResponse(res, await procurementReports.snapshotArtifact(saved), String(download) === '1');
+    }
     let source, query;
     if (type === 'timesheets') { query = requestQuery(req, null, true); source = await attendanceReport(req); }
     else {

@@ -165,7 +165,8 @@ async function initializeRetainedSchemas() {
     ['employeeIdentitySchema', 'ensureEmployeeIdentitySchema'], ['qmsSchema', 'ensureQmsSchema'],
     ['qmsAdvancedSchema', 'ensureQmsAdvancedSchema'], ['qmsQualityGovernanceSchema', 'ensureQmsQualityGovernanceSchema'],
     ['qmsEnterpriseCompletionSchema', 'ensureQmsEnterpriseCompletionSchema'],
-    ['assuranceSchema', 'ensureAssuranceSchema'], ['enterpriseControlPlaneSchema', 'ensureEnterpriseControlPlaneSchema']
+    ['assuranceSchema', 'ensureAssuranceSchema'], ['enterpriseControlPlaneSchema', 'ensureEnterpriseControlPlaneSchema'],
+    ['procurementImportSchema', 'ensureProcurementImportSchema'], ['procurementReportService', 'ensureProcurementReportSchema']
   ];
   const controllers = [
     ['invoice', 'ensureInvoiceColumns'], ['customer', 'ensureCustomerTable'], ['stock', 'ensureStockTable'],
@@ -570,6 +571,297 @@ async function testWeeklyDelivery() {
   facts.push('real worked-only weekly scheduling/locks/PDF linkage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
 }
 
+async function testProcurementRecordsAndSnapshots() {
+  const entries = require('../services/procurementEntryService');
+  const reports = require('../services/procurementReportService');
+  const { validatePdf } = require('../services/documentPdfService');
+  const owner = { id: 20, role: 'integration_fixture', permissions: ['VIEW_PROCUREMENT', 'IMPORT_PROCUREMENT'] };
+  const other = { id: 21, role: 'integration_fixture', permissions: ['VIEW_PROCUREMENT', 'IMPORT_PROCUREMENT'] };
+  const manager = { id: 22, role: 'integration_fixture', permissions: ['VIEW_PROCUREMENT', 'MANAGE_PROCUREMENT_RECORDS'] };
+  const request = (key = null) => ({ ip: '127.0.0.1', id: 'disposable-procurement-regression', get: (name) => String(name).toLowerCase() === 'idempotency-key' ? key : 'Synthetic MySQL integration fixture' });
+  const firstInput = { classification: 'PLAN', title: 'Exact decimal procurement fixture', category: 'Materials', priority: 'HIGH', phase: 'Preparation', reference: 'FIXTURE-PRC-001', supplier_name: 'Synthetic supplier', date: '2026-10-12', currency: 'AUD', description: 'Exact decimal quantity', quantity: '1.005', unit: 'kg', unit_price: '1.00', tax_rate: '0' };
+  const created = await entries.createEntry({ user: owner, input: firstInput, req: request('mysql-procurement-repeat-1') });
+  assert.match(created.entry.record_no, /^PRC-\d{4}-\d{6,}$/);
+  const repeated = await entries.createEntry({ user: owner, input: firstInput, req: request('mysql-procurement-repeat-1') });
+  assert.equal(repeated.existing, true);
+  assert.equal(repeated.entry.id, created.entry.id);
+  assert.equal(String(created.entry.total), '1.01');
+  await assert.rejects(() => entries.createEntry({ user: owner, input: { ...firstInput, title: 'Conflicting retry' }, req: request('mysql-procurement-repeat-1') }), { code: 'IDEMPOTENCY_CONFLICT' });
+  await assert.rejects(() => entries.createEntry({ user: owner, input: { ...firstInput, quantity: '1.0001' }, req: request() }), { code: 'ENTRY_VALIDATION_FAILED' });
+  await assert.rejects(() => entries.getEntry({ user: other, id: created.entry.id }), { code: 'PROCUREMENT_RECORD_NOT_FOUND' });
+  assert.equal((await entries.getEntry({ user: manager, id: created.entry.id })).id, created.entry.id);
+  await entries.createEntry({ user: other, input: { ...firstInput, title: 'Other owner private procurement fixture', quantity: '100', unit_price: '100' }, req: request() });
+  const secondInput = { ...firstInput, reference: 'FIXTURE-PRC-002', title: 'Tax-inclusive procurement fixture', description: 'Recorded procurement units', quantity: '2', unit: 'ea', unit_price: '10', tax_rate: '10', date: '2026-10-13' };
+  const second = await entries.createEntry({ user: owner, input: secondInput, req: request() });
+  for (let index = 1; index <= 30; index++) {
+    await entries.createEntry({ user: owner, input: { ...firstInput, title: `Full register fixture item ${String(index).padStart(2, '0')}`, description: `Full register fixture item ${String(index).padStart(2, '0')}`, reference: `FIXTURE-FULL-${index}`, quantity: '1', unit: 'ea', unit_price: '1', date: '2026-10-13' }, req: request() });
+  }
+  await entries.createEntry({ user: owner, input: { ...firstInput, classification: 'QUOTATION', title: 'Excluded quotation fixture', quantity: '7', unit_price: '2' }, req: request() });
+  const filters = { classification: 'PLAN', category: 'Materials', priority: 'HIGH', phase: 'Preparation', status: 'DRAFT', currency: 'AUD', from_date: '2026-10-12', to_date: '2026-10-13', sort: 'date_asc' };
+  const listing = await entries.listEntries({ user: owner, filters: { ...filters, page: 1, page_size: 1 } });
+  assert.equal(listing.entries.length, 1);
+  assert.equal(listing.total, 32);
+  assert.equal(listing.pages, 32);
+  assert.equal(listing.summary.record_count, 32);
+  assert.equal(listing.summary.currency_totals.length, 1);
+  assert.equal(String(listing.summary.currency_totals[0].total), '53.01', 'Filtered totals cover all matching records, independently of the visible page and other owners.');
+  assert.deepEqual(listing.summary.quantity_totals.map((group) => [group.unit, String(group.quantity)]).sort(), [['ea', '32.000'], ['kg', '1.005']], 'Different recorded units remain separate in full filtered totals.');
+  const input = { type: 'register', source: 'entries', filters };
+  const snapshots = await Promise.all([reports.createSnapshot({ user: owner, input, req: request() }), reports.createSnapshot({ user: owner, input, req: request() })]);
+  assert.equal(snapshots[0].snapshot_id, snapshots[1].snapshot_id, 'Real snapshot uniqueness shares one immutable request under competing generation.');
+  const snapshot = await reports.getSnapshot({ user: owner, snapshotId: snapshots[0].snapshot_id });
+  assert.equal(snapshot.generation_status, 'VALIDATED');
+  assert.equal(snapshot.record_count, 32);
+  const source = JSON.parse(snapshot.source_json);
+  assert.equal(source.records.length, 32);
+  assert.ok(source.records.every((record) => Number(record.owner_user_id) === owner.id && record.classification === 'PLAN'));
+  const artifact = await reports.snapshotArtifact(snapshot);
+  await validatePdf(artifact.buffer, { expectedText: [snapshot.reference, 'Full register fixture item 30', 'AUD 53.01'] });
+  await assert.rejects(() => reports.getSnapshot({ user: other, snapshotId: snapshot.id }), { code: 'PROCUREMENT_REPORT_NOT_FOUND' });
+  await assert.rejects(() => reports.createSnapshot({ user: owner, input: { type: 'selected', source: 'entries', ids: [created.entry.id, '00000000-0000-4000-8000-000000000001'] }, req: request() }), { code: 'PROCUREMENT_SELECTION_UNAVAILABLE' });
+  const beforeMutation = { source: snapshot.source_json, hash: snapshot.pdf_sha256, bytes: Buffer.from(artifact.buffer) };
+  const roundTripEdit = await entries.getEntry({ user: owner, id: created.entry.id });
+  assert.equal(roundTripEdit.tax_rate, '0', 'A DECIMAL tax rate read from MySQL must remain valid when the public DTO is edited.');
+  const edits = await Promise.allSettled([
+    entries.editEntry({ user: owner, id: created.entry.id, input: { ...roundTripEdit, title: 'First competing edit', expected_revision: roundTripEdit.revision }, req: request() }),
+    entries.editEntry({ user: owner, id: created.entry.id, input: { ...roundTripEdit, title: 'Second competing edit', expected_revision: roundTripEdit.revision }, req: request() })
+  ]);
+  assert.equal(edits.filter((result) => result.status === 'fulfilled').length, 1);
+  assert.equal(edits.find((result) => result.status === 'rejected').reason.code, 'REVISION_CONFLICT');
+  const revised = await entries.getEntry({ user: owner, id: created.entry.id });
+  assert.equal(revised.revision, 2);
+  await assert.rejects(() => entries.editEntry({ user: other, id: created.entry.id, input: { ...firstInput, expected_revision: 2 }, req: request() }), { code: 'PROCUREMENT_RECORD_NOT_FOUND' });
+  const archived = await entries.archiveEntry({ user: owner, id: second.entry.id, input: { expected_revision: 1, reason: 'Archive synthetic duplicate document' }, req: request() });
+  assert.equal(archived.entry.status, 'ARCHIVED');
+  assert.equal((await entries.listEntries({ user: owner, filters: { ...filters, status: 'ARCHIVED' } })).total, 1);
+  const restored = await entries.archiveEntry({ user: owner, id: second.entry.id, input: { expected_revision: 2 }, req: request(), restore: true });
+  assert.equal(restored.entry.id, second.entry.id);
+  assert.equal(restored.entry.revision, 3);
+  assert.equal(restored.entry.status, 'DRAFT');
+  const history = (await entries.getEntry({ user: owner, id: second.entry.id })).history;
+  assert.deepEqual(history.map((version) => version.action), ['RESTORED', 'ARCHIVED', 'CREATED']);
+  delete require.cache[require.resolve('../services/procurementReportService')];
+  const restartedReports = require('../services/procurementReportService');
+  const retained = await restartedReports.getSnapshot({ user: owner, snapshotId: snapshot.id });
+  assert.equal(retained.source_json, beforeMutation.source);
+  assert.equal(retained.pdf_sha256, beforeMutation.hash);
+  assert.deepEqual((await restartedReports.snapshotArtifact(retained)).buffer, beforeMutation.bytes, 'Source edits, archive/restore and a module restart never replace accepted snapshot PDF bytes.');
+  const repeatedSnapshot = await restartedReports.createSnapshot({ user: owner, input, req: request() });
+  assert.notEqual(repeatedSnapshot.snapshot_id, snapshot.id, 'A changed source revision creates a distinct snapshot rather than mutating the previous artifact.');
+  const leaseInput = { ...input, type: 'summary' }, leaseId = crypto.randomUUID(), leaseReference = 'PRPT-SYNTHETIC-LEASE-20261013';
+  const leaseConnection = await pool.getConnection();
+  let leaseSource;
+  try {
+    await leaseConnection.beginTransaction();
+    leaseSource = await restartedReports._test.loadSource(restartedReports._test.parseRequest(leaseInput), owner, leaseConnection);
+    await leaseConnection.commit();
+  } catch (error) { await leaseConnection.rollback(); throw error; }
+  finally { leaseConnection.release(); }
+  const leaseHash = restartedReports._test.sourceHash(leaseSource);
+  const leaseKey = restartedReports._test.sourceHash({ user: owner.id, source_hash: leaseHash });
+  const frozenLeaseDocument = JSON.stringify(restartedReports._test.documentData(leaseSource, leaseReference, new Date('2026-10-13T00:00:00Z')));
+  await pool.query(`INSERT INTO procurement_report_snapshots(id,reference,request_key,created_by,report_type,source_kind,source_sha256,source_json,document_json,record_count,generation_status,claim_token,claim_expires_at)
+    VALUES(?,?,?,?,?,?,?,?,?,?,'GENERATING',?,DATE_SUB(NOW(),INTERVAL 1 SECOND))`, [leaseId, leaseReference, leaseKey, owner.id, 'summary', 'entries', leaseHash, JSON.stringify(leaseSource), frozenLeaseDocument, leaseSource.records.length, crypto.randomUUID()]);
+  const expiredLease = await restartedReports.getSnapshot({ user: owner, snapshotId: leaseId });
+  await assert.rejects(() => restartedReports.snapshotArtifact(expiredLease), { code: 'PROCUREMENT_PDF_PENDING' });
+  const recoveredLease = await restartedReports.createSnapshot({ user: owner, input: leaseInput, req: request() });
+  assert.equal(recoveredLease.snapshot_id, leaseId, 'An expired generation lease reuses the frozen request identity.');
+  assert.equal(recoveredLease.generation_status, 'VALIDATED');
+  const completedLease = await restartedReports.getSnapshot({ user: owner, snapshotId: leaseId });
+  assert.equal(completedLease.reference, leaseReference);
+  assert.equal(completedLease.document_json, frozenLeaseDocument, 'Generation retry uses the original frozen document and reference.');
+  assert.equal(completedLease.claim_token, null);
+  assert.equal(completedLease.claim_expires_at, null);
+  await validatePdf((await restartedReports.snapshotArtifact(completedLease)).buffer, { expectedText: [leaseReference, 'AUD 53.01'] });
+  facts.push('real procurement request uniqueness, owner/all scope, competing edits, archive/restore history, 32-record filtered totals/full PDF, immutable snapshot dedup/restart and expired generation lease retry');
+}
+
+async function testProcurementImports() {
+  const XLSX = require('xlsx');
+  const extraction = require('../services/procurementImportExtractionService');
+  const storage = require('../services/objectStorageService');
+  const originalConfigured = storage.isConfigured;
+  const originalProvider = process.env.OBJECT_STORAGE_PROVIDER;
+  // This fresh local database proves the durable LONGBLOB path without touching
+  // configured object storage. The isolated workflow fixture covers private S3.
+  storage.isConfigured = () => false;
+  delete process.env.OBJECT_STORAGE_PROVIDER;
+  const owner = { id: 20, role: 'integration_fixture', permissions: ['VIEW_PROCUREMENT', 'IMPORT_PROCUREMENT'] };
+  const other = { id: 21, role: 'integration_fixture', permissions: ['VIEW_PROCUREMENT', 'IMPORT_PROCUREMENT'] };
+  const request = (key = null) => ({ ip: '127.0.0.1', id: 'disposable-procurement-import', get: (name) => String(name).toLowerCase() === 'idempotency-key' ? key : 'Synthetic import SQL fixture' });
+  const fields = [...extraction.IMPORT_FIELDS];
+  const values = (reference, description, quantity, price, notes = '') => ({ supplier_name: 'Synthetic imported supplier', reference, date: '2026-10-13', currency: 'AUD', description, quantity, unit: 'ea', unit_price: price, tax_rate: '0', notes, category: 'Materials', priority: 'HIGH', phase: 'Preparation' });
+  const alpha = values('IMPORT-ALPHA', 'Imported Alpha fixture', '2', '3');
+  const beta = values('IMPORT-BETA', 'Imported Beta fixture', '3', '4', 'Retain, this quoted CSV cell');
+  const rejected = values('IMPORT-REJECTED', 'Correct this rejected source row', '0', '1');
+  const csvCell = (value) => /[",\r\n]/.test(String(value)) ? `"${String(value).replace(/"/g, '""')}"` : String(value);
+  const csv = Buffer.from([fields, ...[alpha, rejected, alpha, beta].map((row) => fields.map((field) => row[field] ?? ''))].map((row) => row.map(csvCell).join(',')).join('\r\n'));
+  const workbook = XLSX.utils.book_new();
+  const workbookValues = values('IMPORT-WORKBOOK', 'Imported workbook fixture', 1.005, 1);
+  const sheet = XLSX.utils.aoa_to_sheet([fields, fields.map((field) => workbookValues[field] ?? '')]);
+  sheet[XLSX.utils.encode_cell({ r: 1, c: fields.indexOf('unit_price') })].f = '1+0';
+  XLSX.utils.book_append_sheet(workbook, sheet, 'Reviewed quotes');
+  const xlsx = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+  const malformedPdf = Buffer.from('%PDF-1.7\nThe original unparseable source must remain durable.');
+  const originals = [
+    ['procurement-source.csv', csv, 'text/csv'],
+    ['procurement-source.xlsx', xlsx, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+    ['unparseable-source.pdf', malformedPdf, 'application/pdf'],
+    ['unsupported-source.exe', Buffer.from('This unsupported file is rejected before durable acceptance.'), 'application/octet-stream']
+  ];
+  const uploadFiles = async (sources = originals) => Promise.all(sources.map(async ([name, body, mime]) => ({ ...await fileFixture(name, body), mimetype: mime })));
+  let imports;
+  try {
+    delete require.cache[require.resolve('../services/procurementImportService')];
+    imports = require('../services/procurementImportService');
+    const staged = await uploadFiles();
+    const uploaded = await imports.createUpload({ user: owner, files: staged, req: request('mysql-import-same-request') });
+    assert.equal(uploaded.files.length, 4);
+    assert.equal(uploaded.counts.stored_files, 3);
+    assert.equal(uploaded.counts.rejected_files, 1);
+    assert.ok(staged.every((file) => !fs.existsSync(file.path)), 'Only durable bytes remain after the upload staging files are removed.');
+    const replayed = await imports.createUpload({ user: owner, files: await uploadFiles(), req: request('mysql-import-same-request') });
+    assert.equal(replayed.batch.id, uploaded.batch.id);
+    assert.equal(replayed.existing, true);
+    await assert.rejects(() => uploadFiles([['different-source.csv', Buffer.from('description,quantity\nChanged source,1'), 'text/csv']]).then((files) => imports.createUpload({ user: owner, files, req: request('mysql-import-same-request') })), { code: 'IDEMPOTENCY_CONFLICT' });
+    const csvFile = uploaded.files.find((file) => file.name.endsWith('.csv'));
+    const workbookFile = uploaded.files.find((file) => file.name.endsWith('.xlsx'));
+    const failedFile = uploaded.files.find((file) => file.name.endsWith('.pdf'));
+    for (const file of uploaded.files.filter((source) => source.durable)) {
+      const original = originals.find(([name]) => name === file.name)[1];
+      const stored = await imports.readSourceFile({ user: owner, fileId: file.id });
+      assert.deepEqual(stored.buffer, original);
+      assert.equal(stored.sha256, digest(original));
+      await assert.rejects(() => imports.readSourceFile({ user: other, fileId: file.id }), { code: 'PROCUREMENT_RECORD_NOT_FOUND' });
+    }
+    delete require.cache[require.resolve('../services/procurementImportService')];
+    imports = require('../services/procurementImportService');
+    await imports.processPendingImports();
+    let detail = await imports.getImport({ user: owner, id: uploaded.batch.id, query: { page_size: 100 } });
+    assert.equal(detail.total, 5);
+    assert.equal(detail.files.find((file) => file.id === failedFile.id).status, 'EXTRACTION_FAILED');
+    assert.equal(detail.files.find((file) => file.id === failedFile.id).error_code, 'IMPORT_PDF_INVALID');
+    assert.deepEqual((await imports.readSourceFile({ user: owner, fileId: failedFile.id })).buffer, malformedPdf);
+    const mapping = Object.fromEntries(fields.map((field, index) => [field, index]));
+    detail = await imports.previewImport({ user: owner, id: detail.batch.id, input: { expected_revision: detail.revision, file_id: csvFile.id, sheet_name: 'CSV', header_row: 1, mapping, classification: 'PLAN', date_order: 'ISO' }, req: request() });
+    assert.equal(detail.counts.validated, 2);
+    assert.equal(detail.counts.rejected, 1);
+    assert.equal(detail.counts.duplicate, 1);
+    const alphaRow = detail.rows.find((row) => row.values.reference === 'IMPORT-ALPHA' && row.status === 'VALIDATED');
+    const rejectedRow = detail.rows.find((row) => row.status === 'REJECTED');
+    const confirmation = { expected_revision: detail.revision, preview_token: detail.preview_token, row_ids: [alphaRow.id], reviewed_row_ids: [alphaRow.id] };
+    const partial = await imports.commitImport({ user: owner, id: detail.batch.id, input: confirmation, req: request() });
+    assert.equal(partial.batch.status, 'PARTIALLY_COMMITTED');
+    assert.equal(partial.entries.length, 1);
+    assert.equal(partial.entries[0].status, 'DRAFT');
+    assert.equal(partial.entries[0].import_file_id, csvFile.id);
+    assert.equal(partial.entries[0].import_row_id, alphaRow.id);
+    const confirmationReplay = await imports.commitImport({ user: owner, id: detail.batch.id, input: confirmation, req: request() });
+    assert.equal(confirmationReplay.existing, true);
+    assert.equal(confirmationReplay.entries[0].id, partial.entries[0].id);
+    await assert.rejects(() => imports.commitImport({ user: owner, id: detail.batch.id, input: { ...confirmation, row_ids: [rejectedRow.id], reviewed_row_ids: [rejectedRow.id] }, req: request() }), { code: 'CONFIRMATION_CONFLICT' });
+    await assert.rejects(() => imports.getImport({ user: other, id: detail.batch.id }), { code: 'PROCUREMENT_RECORD_NOT_FOUND' });
+    const correctedValues = { ...rejectedRow.values, quantity: '1', title: 'Explicitly corrected rejected source row', reference: 'IMPORT-CORRECTED' };
+    detail = await imports.editImportRow({ user: owner, id: detail.batch.id, rowId: rejectedRow.id, input: { expected_revision: rejectedRow.revision, values: correctedValues, reviewed: true }, req: request() });
+    await assert.rejects(() => imports.editImportRow({ user: owner, id: detail.batch.id, rowId: rejectedRow.id, input: { expected_revision: rejectedRow.revision, values: correctedValues, reviewed: true }, req: request() }), { code: 'REVISION_CONFLICT' });
+    detail = await imports.previewImport({ user: owner, id: detail.batch.id, input: { expected_revision: detail.revision, file_id: workbookFile.id, sheet_name: 'Reviewed quotes', header_row: 1, mapping, classification: 'QUOTATION', date_order: 'ISO' }, req: request() });
+    const formulaRow = detail.rows.find((row) => row.file_id === workbookFile.id);
+    assert.equal(formulaRow.status, 'REVIEW_REQUIRED');
+    assert.ok(formulaRow.warnings.some((warning) => warning.code === 'IMPORT_FORMULA_REVIEW_REQUIRED'));
+    await assert.rejects(() => imports.commitImport({ user: owner, id: detail.batch.id, input: { expected_revision: detail.revision, preview_token: detail.preview_token, row_ids: [formulaRow.id] }, req: request() }), { code: 'IMPORT_REVIEW_REQUIRED' });
+    const remaining = detail.rows.filter((row) => ['VALIDATED', 'REVIEW_REQUIRED'].includes(row.status));
+    const completed = await imports.commitImport({ user: owner, id: detail.batch.id, input: { expected_revision: detail.revision, preview_token: detail.preview_token, row_ids: remaining.map((row) => row.id), reviewed_row_ids: remaining.map((row) => row.id) }, req: request() });
+    assert.equal(completed.entries.length, 3);
+    assert.equal(completed.counts.accepted, 4);
+    assert.equal(completed.counts.duplicate, 1);
+    assert.equal(completed.counts.rejected, 0);
+    assert.equal(completed.counts.failed_files, 1);
+    assert.equal(completed.entries.find((entry) => entry.reference === 'IMPORT-BETA').notes, beta.notes);
+    const [[savedCount]] = await pool.query('SELECT COUNT(*) count FROM procurement_records WHERE import_batch_id=?', [detail.batch.id]);
+    assert.equal(savedCount.count, 4);
+    const report = await imports.readImportReport({ user: owner, batchId: detail.batch.id });
+    assert.equal(report.files.length, 4);
+    assert.equal(report.rows.length, 5);
+    assert.equal(report.counts.accepted, 4);
+    const repeatedUpload = await imports.createUpload({ user: owner, files: await uploadFiles([originals[0]]), req: request('mysql-new-upload-same-source') });
+    assert.equal(repeatedUpload.files[0].duplicate_of_file_id, csvFile.id);
+    await imports.processPendingImports();
+    const duplicateDetail = await imports.getImport({ user: owner, id: repeatedUpload.batch.id, query: { page_size: 100 } });
+    const duplicatePreview = await imports.previewImport({ user: owner, id: duplicateDetail.batch.id, input: { expected_revision: duplicateDetail.revision, file_id: repeatedUpload.files[0].id, header_row: 1, mapping, classification: 'PLAN', date_order: 'ISO' }, req: request() });
+    assert.equal(duplicatePreview.counts.validated, 0, 'Repeated source rows already linked to this owner cannot silently create more drafts.');
+    assert.equal(duplicatePreview.counts.duplicate, 3);
+    const ownOther = await imports.createUpload({ user: other, files: await uploadFiles([originals[0]]), req: request('mysql-other-owner-same-source') });
+    assert.equal(ownOther.files[0].duplicate_of_file_id, null, 'File deduplication never exposes another owner source identity.');
+    assert.equal((await imports.listImports({ user: other, query: { page_size: 100 } })).total, 1);
+    const failedBefore = await imports.getImport({ user: owner, id: uploaded.batch.id });
+    await imports.retryExtraction({ user: owner, id: uploaded.batch.id, input: { expected_revision: failedBefore.revision, reason: 'Controlled retry of retained source parsing' }, req: request() });
+    const deadline = Date.now() + 20000;
+    for (;;) {
+      const [[file]] = await pool.query('SELECT status,attempts FROM procurement_import_files WHERE id=?', [failedFile.id]);
+      if (file.status === 'EXTRACTION_FAILED' && file.attempts === 1) break;
+      assert.ok(Date.now() < deadline, 'Controlled extraction retry must settle without replacing the retained source.');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.deepEqual((await imports.readSourceFile({ user: owner, fileId: failedFile.id })).buffer, malformedPdf);
+    const afterRetry = await imports.readImportReport({ user: owner, batchId: uploaded.batch.id });
+    assert.equal(afterRetry.counts.accepted, 4);
+    const outcome = await require('../services/procurementReportService').createSnapshot({ user: owner, input: { type: 'import-outcomes', source: 'entries', batch_id: uploaded.batch.id }, req: request() });
+    const outcomeSnapshot = await require('../services/procurementReportService').getSnapshot({ user: owner, snapshotId: outcome.snapshot_id });
+    const outcomePdf = await require('../services/procurementReportService').snapshotArtifact(outcomeSnapshot);
+    await require('../services/documentPdfService').validatePdf(outcomePdf.buffer, { expectedText: ['PROCUREMENT IMPORT OUTCOMES', 'procurement-source.csv', 'unparseable-source.pdf', 'unsupported-source.exe'] });
+
+    // Replace a committed extraction claim while its parser is paused. A stale
+    // completion must not publish rows or clear the replacement worker lease.
+    const claimBytes = Buffer.from('Description,Quantity,Unit price\nClaim fencing fixture,1,2\n');
+    const claimedUpload = await imports.createUpload({ user: owner, files: await uploadFiles([['mysql-claim-fence.csv', claimBytes, 'text/csv']]), req: request('mysql-extraction-claim-fence') });
+    const claimedId = claimedUpload.files[0].id;
+    const originalExtract = extraction.extractImportFile;
+    let arrived, release;
+    const started = new Promise((resolve) => { arrived = resolve; });
+    const gate = new Promise((resolve) => { release = resolve; });
+    extraction.extractImportFile = async function (file, options) {
+      if (file.filename === 'mysql-claim-fence.csv') { arrived(); await gate; }
+      return originalExtract(file, options);
+    };
+    try {
+      const running = imports.processPendingImports();
+      await Promise.race([started, running.then(() => assert.fail('The MySQL extraction fixture must claim its retained source.'))]);
+      const [[activeClaim]] = await pool.query('SELECT status,processing_claim_token,attempts FROM procurement_import_files WHERE id=?', [claimedId]);
+      assert.equal(activeClaim.status, 'EXTRACTING');
+      assert.ok(activeClaim.processing_claim_token);
+      assert.equal(activeClaim.attempts, 1);
+      const replacementClaim = crypto.randomUUID();
+      const [replaced] = await pool.query('UPDATE procurement_import_files SET processing_claim_token=? WHERE id=? AND processing_claim_token=?', [replacementClaim, claimedId, activeClaim.processing_claim_token]);
+      assert.equal(replaced.affectedRows, 1);
+      release(); await running;
+      const [[preservedClaim]] = await pool.query('SELECT status,processing_claim_token FROM procurement_import_files WHERE id=?', [claimedId]);
+      assert.equal(preservedClaim.status, 'EXTRACTING');
+      assert.equal(preservedClaim.processing_claim_token, replacementClaim);
+      const [[beforeReclaim]] = await pool.query('SELECT COUNT(*) count FROM procurement_import_rows WHERE file_id=?', [claimedId]);
+      assert.equal(beforeReclaim.count, 0, 'A stale worker cannot insert source rows after losing its claim.');
+      extraction.extractImportFile = originalExtract;
+      await pool.query('UPDATE procurement_import_files SET processing_expires_at=DATE_SUB(NOW(),INTERVAL 1 SECOND) WHERE id=? AND processing_claim_token=?', [claimedId, replacementClaim]);
+      await imports.processPendingImports();
+      const [[reclaimed]] = await pool.query('SELECT status,processing_claim_token,attempts FROM procurement_import_files WHERE id=?', [claimedId]);
+      assert.equal(reclaimed.status, 'EXTRACTED');
+      assert.equal(reclaimed.processing_claim_token, null);
+      assert.equal(reclaimed.attempts, 2);
+      const [[retainedRows]] = await pool.query('SELECT COUNT(*) count FROM procurement_import_rows WHERE file_id=?', [claimedId]);
+      assert.equal(retainedRows.count, 1);
+      assert.deepEqual((await imports.readSourceFile({ user: owner, fileId: claimedId })).buffer, claimBytes);
+    } finally {
+      release(); extraction.extractImportFile = originalExtract;
+    }
+    assert.deepEqual(await historicalState(), historicalRows, 'Imports and reports never write historical original ledgers, stock, RFQs or retired snapshots.');
+    facts.push('real CSV/XLSX source persistence/restart, every file outcome, exact source bytes and owner isolation, mapped validation/duplicates/formula review, partial commit receipts/rejected-row correction, repeated upload dedup, controlled retry and atomic extraction claim fencing/reclaim');
+  } finally {
+    await imports?.stopProcurementImportWorker?.();
+    storage.isConfigured = originalConfigured;
+    if (originalProvider === undefined) delete process.env.OBJECT_STORAGE_PROVIDER;
+    else process.env.OBJECT_STORAGE_PROVIDER = originalProvider;
+  }
+}
+
 async function main() {
   await prepareFixtures();
   await initializeRetainedSchemas();
@@ -578,6 +870,8 @@ async function main() {
   await testDocuments();
   await testQueue();
   await testWeeklyDelivery();
+  await testProcurementRecordsAndSnapshots();
+  await testProcurementImports();
   await testArchivedRetention();
   assert.deepEqual(await historicalState(), historicalRows, 'All restored workflows preserve original and retired historical records.');
   console.log(`MYSQL_RETAINED_OK: ${facts.join('; ')}.`);

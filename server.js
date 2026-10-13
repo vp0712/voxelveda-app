@@ -25,6 +25,7 @@ const { verifyBackupRestoreProvider } = require('./config/backupRestoreAssurance
 const { backgroundJobService } = require('./services/backgroundJobService');
 const {startWeeklyTimesheetScheduler,stopWeeklyTimesheetScheduler,getWeeklyTimesheetSchedule}=require('./services/weeklyTimesheetScheduler');
 const {startWorkflowSlaScheduler,stopWorkflowSlaScheduler}=require('./services/workflowEscalationService');
+const {startProcurementImportWorker,stopProcurementImportWorker}=require('./services/procurementImportService');
 const { ensureSecuritySchema } = require('./services/securitySchema');
 const { ensureSecurityOperationsSchema } = require('./services/securityOperationsSchema');
 const { ensureOperationalTrustSchema } = require('./services/operationalTrustSchema');
@@ -77,7 +78,8 @@ async function initializeCriticalSchemas() {
     ['rfqSchema','ensureRfqSchema'],['hrAdministrationSchema','ensureHrAdministrationSchema'],
     ['workforceSchema','ensureWorkforceSchema'],['notificationSchema','ensureNotificationSchema'],
     ['trashSchema','ensureTrashSchema'],['workflowSchema','ensureWorkflowSchema'],
-    ['procurementSchema','ensureProcurementSchema'],['careersSchema','ensureCareersSchema'],
+    ['procurementSchema','ensureProcurementSchema'],['procurementImportSchema','ensureProcurementImportSchema'],
+    ['procurementReportService','ensureProcurementReportSchema'],['careersSchema','ensureCareersSchema'],
     ['employeeIdentitySchema','ensureEmployeeIdentitySchema'],['qmsSchema','ensureQmsSchema'],
     ['qmsAdvancedSchema','ensureQmsAdvancedSchema'],['qmsQualityGovernanceSchema','ensureQmsQualityGovernanceSchema'],
     ['qmsEnterpriseCompletionSchema','ensureQmsEnterpriseCompletionSchema']
@@ -141,6 +143,8 @@ async function initializeServices() {
       addWarning('Malware scanner provider health could not be verified at runtime');
     }
   }
+
+  console.log('Procurement OCR runtime capabilities',JSON.stringify(require('./services/procurementLocalOcrService').ocrCapability()));
 
   const backupMetadataConfigured = String(process.env.BACKUP_STATUS_PROVIDER || '').toLowerCase() === 'configured';
   const backupTelemetryConfigured = Boolean(String(process.env.BACKUP_STATUS_URL || '').trim());
@@ -224,7 +228,10 @@ async function initializeWorkers() {
   const framework = await backgroundJobService.initialize();
   const weeklySchedule=getWeeklyTimesheetSchedule();
   const emailStarted=startEmailQueueWorker(),weeklyStarted=startWeeklyTimesheetScheduler(),workflowStarted=startWorkflowSlaScheduler();
-  const started = [emailStarted,weeklyStarted,workflowStarted].filter(Boolean).length;
+  const importStarted=startProcurementImportWorker();
+  setCriticalService('procurement_import_worker',importStarted?CONTROL_STATES.OPERATIONAL:CONTROL_STATES.DEGRADED,
+    'Durable source extraction registered with bounded parsers and fenced per-file leases; no automatic business-record confirmation');
+  const started = [emailStarted,weeklyStarted,workflowStarted,importStarted].filter(Boolean).length;
   setCriticalService('weekly_timesheet_worker',weeklyStarted?CONTROL_STATES.OPERATIONAL:CONTROL_STATES.DEGRADED,
     `Worked-only weekly PDF job ${weeklyStarted?'registered and scheduled':'disabled'}; ${weeklySchedule.timezone}; next due ${weeklySchedule.next_due_utc || 'none'}`);
   console.log('Weekly timesheet runtime configuration',JSON.stringify(weeklySchedule));
@@ -288,6 +295,7 @@ async function bootstrap() {
     try {
       const verification=await require('./services/releasePdfVerificationService').queueAuthorisedReleasePdf();
       if(verification.enabled)console.log(`Release PDF verification: request_id=${verification.request_id} generation_status=${verification.generation_status} email_queue_id=${verification.email_queue_id||'none'} email_status=${verification.email_status}; recipient receipt remains unverified.`);
+      if(verification.evidence)console.log('Release PDF retained queue evidence',JSON.stringify(verification.evidence));
     } catch(error) {
       addWarning('Authorised release PDF verification is pending controlled retry: '+(error.code||'PDF_VERIFICATION_FAILED'));
       console.warn('Release PDF verification pending: '+(error.code||'PDF_VERIFICATION_FAILED'));
@@ -308,6 +316,7 @@ async function bootstrap() {
     stopEmailQueueWorker();
     stopWeeklyTimesheetScheduler();
     stopWorkflowSlaScheduler();
+    await stopProcurementImportWorker();
     await getRateLimitService().close().catch(() => {});
     await pool.end().catch(() => {});
     const migrationContext = error?.details?.migration_id
@@ -325,6 +334,7 @@ async function shutdown(signal = 'shutdown', exitCode = 0) {
   stopEmailQueueWorker();
   stopWeeklyTimesheetScheduler();
   stopWorkflowSlaScheduler();
+  await stopProcurementImportWorker();
   await getRateLimitService().close().catch(() => {});
   if (server?.listening) await new Promise((resolve) => server.close(resolve));
   await pool.end().catch(() => {});

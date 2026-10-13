@@ -136,3 +136,206 @@ tr { background:var(--surface) !important; }
   .hero .state :is(span,strong), .hero .kicker { color:var(--nav-text); }
 }
 @media print { .sidebar, .mobile-bottom-nav, .topbar, .toast { display:none !important; } .app-shell > .main { width:100% !important; margin:0 !important; padding:0 !important; } }
+
+/* Procurement records, retained source files and the import review workspace. */
+[data-procurement-root],
+[data-procurement-root] :is(.procurement-workspace,.procurement-toolbar,.procurement-list) {
+  min-width:0;
+  max-width:100%;
+}
+[data-procurement-root] .procurement-section-head { align-items:flex-start; }
+[data-procurement-root] .procurement-section-head > div:first-child { min-width:0; }
+.procurement-head-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; min-width:0; }
+.procurement-head-actions .section-actions { margin:0; }
+.procurement-head-actions .section-actions:empty { display:none; }
+[data-procurement-root] .procurement-tabs {
+  flex:1 1 auto;
+  max-width:100%;
+  padding:4px;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+}
+[data-procurement-root] .procurement-tabs button { min-height:44px; }
+[data-procurement-root] .procurement-tabs .procurement-tab-primary { font-weight:850; }
+[data-procurement-root] .procurement-tabs .procurement-tab-secondary { font-weight:650; }
+.procurement-tab-separator { flex:0 0 1px; align-self:stretch; margin:6px; background:var(--border); }
+[data-procurement-root] .procurement-toolbar > [data-procurement-refresh] { flex:0 0 auto; }
+[data-procurement-root] [data-procurement-list] > :is(.procurement-panel,.procurement-upload-folder,.procurement-inline-error,.procurement-busy,.procurement-empty) {
+  grid-column:1 / -1;
+}
+.procurement-panel {
+  display:grid;
+  gap:16px;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  padding:18px;
+  box-sizing:border-box;
+  border:1px solid var(--border);
+  border-radius:10px;
+  background:var(--surface);
+  color:var(--text-primary);
+}
+.procurement-panel > * { min-width:0; max-width:100%; }
+.procurement-panel :is(h3,h4,p) { margin:0; overflow-wrap:anywhere; }
+.procurement-panel :is(small,.procurement-form-note) { color:var(--text-secondary); }
+.procurement-panel :is(label,fieldset) { min-width:0; }
+.procurement-panel label { display:grid; gap:6px; }
+.procurement-panel label > span { color:var(--text-secondary); font-size:14px; font-weight:700; }
+.procurement-panel :is(input,select,textarea) {
+  width:100%;
+  min-width:0;
+  min-height:44px;
+  box-sizing:border-box;
+  padding:9px 10px;
+  border:1px solid var(--control-border);
+  border-radius:6px;
+  background:var(--surface);
+  color:var(--text-primary);
+}
+.procurement-panel :is(input[type="checkbox"],input[type="radio"]) { width:20px; min-height:20px; margin:0; padding:0; }
+.procurement-panel input[type="file"] { padding:8px; overflow:hidden; }
+.procurement-panel input[type="file"]::file-selector-button {
+  min-height:36px;
+  margin-right:10px;
+  padding:6px 10px;
+  border:1px solid var(--control-border);
+  border-radius:5px;
+  background:var(--surface-muted);
+  color:var(--text-primary);
+  font:inherit;
+  cursor:pointer;
+}
+.procurement-entry-toolbar { display:flex; flex-wrap:wrap; align-items:flex-end; gap:12px; min-width:0; }
+.procurement-entry-toolbar > * { min-width:0; }
+.procurement-entry-toolbar > label { flex:1 1 180px; }
+.procurement-entry-toolbar > label:has(input[type="search"]) { flex-basis:280px; }
+.procurement-entry-toolbar :is(.procurement-actions,.section-actions) { display:flex; flex-wrap:wrap; gap:8px; margin:0; }
+.procurement-table-wrap {
+  width:100%;
+  min-width:0;
+  max-width:100%;
+  box-sizing:border-box;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:var(--surface);
+}
+:is(.procurement-entry-table,.procurement-review-table) {
+  width:100%;
+  min-width:900px;
+  border-collapse:collapse;
+  color:var(--text-primary);
+  font-size:14px;
+}
+:is(.procurement-entry-table,.procurement-review-table) caption {
+  padding:10px 12px;
+  color:var(--text-secondary);
+  text-align:left;
+}
+:is(.procurement-entry-table,.procurement-review-table) :is(th,td) {
+  max-width:320px;
+  padding:12px;
+  border-bottom:1px solid var(--border);
+  text-align:left;
+  vertical-align:top;
+  overflow-wrap:anywhere;
+}
+:is(.procurement-entry-table,.procurement-review-table) th { background:var(--surface-muted); font-weight:750; white-space:nowrap; }
+:is(.procurement-entry-table,.procurement-review-table) tbody tr:last-child td { border-bottom:0; }
+:is(.procurement-entry-table,.procurement-review-table) td :is(input,select,textarea) { min-width:120px; }
+:is(.procurement-entry-table,.procurement-review-table) td .procurement-actions { display:flex; flex-wrap:wrap; justify-content:flex-start; gap:8px; }
+:is(.procurement-entry-table,.procurement-review-table) td .procurement-actions > * { flex:0 0 auto; }
+:is(.procurement-entry-table,.procurement-review-table) td :is(input[type="checkbox"],input[type="radio"]) { min-width:20px; }
+.procurement-pagination { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; color:var(--text-secondary); }
+.procurement-pagination > div { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+.procurement-pagination :is(button,select) { width:auto; }
+.procurement-upload-folder { display:grid; gap:12px; min-width:0; margin:0; padding:0; list-style:none; }
+.procurement-upload-item {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:start;
+  gap:12px;
+  min-width:0;
+  padding:16px;
+  border:1px solid var(--border);
+  border-left:3px solid var(--control-border);
+  border-radius:8px;
+  background:var(--surface-muted);
+  color:var(--text-primary);
+}
+.procurement-upload-item > * { min-width:0; }
+.procurement-upload-item :is(h3,h4,p,strong,a,span,small) { overflow-wrap:anywhere; }
+.procurement-upload-item :is(h3,h4,p) { margin:0; }
+.procurement-upload-item :is(small,.procurement-form-note) { color:var(--text-secondary); }
+.procurement-upload-item .procurement-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; }
+.procurement-import-steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:0; padding:0; list-style:none; }
+.procurement-import-step {
+  min-width:0;
+  padding:10px 12px;
+  border:1px solid var(--border);
+  border-radius:6px;
+  background:var(--surface-muted);
+  color:var(--text-secondary);
+  font-size:14px;
+  font-weight:700;
+  overflow-wrap:anywhere;
+}
+.procurement-import-step:is(.active,.is-current,[aria-current="step"]) { border-color:var(--primary); color:var(--primary); }
+.procurement-import-step:is(.complete,.is-complete) { border-color:var(--success); background:var(--success-bg); color:var(--success); }
+.procurement-mapping-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; min-width:0; }
+.procurement-mapping-grid > * { min-width:0; }
+.procurement-mapping-grid label { display:grid; gap:6px; padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-muted); }
+.procurement-mapping-grid :is(span,small,p) { overflow-wrap:anywhere; }
+.procurement-inline-error {
+  padding:12px 14px;
+  border:1px solid var(--danger);
+  border-radius:6px;
+  background:var(--danger-bg);
+  color:var(--danger);
+  overflow-wrap:anywhere;
+}
+.procurement-inline-error:empty { display:none; }
+.procurement-inline-error :is(p,ul) { margin:0; }
+.procurement-inline-error :is(p,ul) + :is(p,ul) { margin-top:8px; }
+.procurement-inline-error :is(button,a) { margin-top:8px; }
+.procurement-batch-outcomes { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.procurement-batch-outcomes > * { min-width:0; padding:12px; border:1px solid var(--border); border-radius:6px; background:var(--surface-muted); overflow-wrap:anywhere; }
+.procurement-batch-outcomes > .procurement-inline-error { border-color:var(--danger); background:var(--danger-bg); color:var(--danger); }
+.procurement-source-status {
+  display:inline-flex;
+  align-items:center;
+  max-width:100%;
+  padding:4px 8px;
+  border:1px solid var(--control-border);
+  border-radius:6px;
+  background:var(--surface);
+  color:var(--text-secondary);
+  font-size:13px;
+  font-weight:750;
+  overflow-wrap:anywhere;
+}
+.procurement-source-status:is(.good,.is-success) { border-color:var(--success); background:var(--success-bg); color:var(--success); }
+.procurement-source-status:is(.pending,.is-pending) { border-color:var(--warning); background:var(--warning-bg); color:var(--warning); }
+.procurement-source-status:is(.danger,.is-error) { border-color:var(--danger); background:var(--danger-bg); color:var(--danger); }
+.procurement-busy { cursor:progress; }
+.procurement-busy:disabled,
+.procurement-busy :disabled,
+.procurement-panel [aria-busy="true"]:disabled { cursor:progress; }
+@media(max-width:767px) {
+  .procurement-head-actions { width:100%; justify-content:flex-start; }
+  .procurement-head-actions .section-actions { flex:1 1 180px; }
+  .procurement-panel { padding:14px; }
+  .procurement-upload-item { grid-template-columns:minmax(0,1fr); padding:14px; }
+  .procurement-upload-item .procurement-actions { justify-content:flex-start; }
+  .procurement-import-steps { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media(max-width:600px) {
+  .procurement-entry-toolbar { align-items:stretch; }
+  .procurement-entry-toolbar > :is(label,button,.procurement-actions,.section-actions) { flex:1 1 100%; }
+  .procurement-entry-toolbar :is(.procurement-actions,.section-actions) > * { flex:1 1 auto; }
+  .procurement-mapping-grid { grid-template-columns:minmax(0,1fr); }
+  .procurement-pagination { align-items:flex-start; }
+  .procurement-pagination > div { width:100%; }
+}

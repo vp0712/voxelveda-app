@@ -72,6 +72,7 @@ async function testStartup() {
       }) },
       './services/malwareScannerService': {},
       './services/objectStorageService': {},
+      './services/procurementLocalOcrService': {ocrCapability:()=>({enabled:false,available:false,runtimeVerified:false})},
       './services/webhookSecurityService': {},
       './config/backupRestoreAssurance': {},
       './services/backgroundJobService': { backgroundJobService: {
@@ -82,7 +83,7 @@ async function testStartup() {
     for (const [filename, method] of Object.entries(schemas)) {
       dependencies[`./services/${filename}`] = { [method]: async () => calls.push(filename) };
     }
-    const originalSchemas={rfqSchema:'ensureRfqSchema',hrAdministrationSchema:'ensureHrAdministrationSchema',workforceSchema:'ensureWorkforceSchema',notificationSchema:'ensureNotificationSchema',trashSchema:'ensureTrashSchema',workflowSchema:'ensureWorkflowSchema',procurementSchema:'ensureProcurementSchema',careersSchema:'ensureCareersSchema',employeeIdentitySchema:'ensureEmployeeIdentitySchema',qmsSchema:'ensureQmsSchema',qmsAdvancedSchema:'ensureQmsAdvancedSchema',qmsQualityGovernanceSchema:'ensureQmsQualityGovernanceSchema',qmsEnterpriseCompletionSchema:'ensureQmsEnterpriseCompletionSchema'};
+    const originalSchemas={rfqSchema:'ensureRfqSchema',hrAdministrationSchema:'ensureHrAdministrationSchema',workforceSchema:'ensureWorkforceSchema',notificationSchema:'ensureNotificationSchema',trashSchema:'ensureTrashSchema',workflowSchema:'ensureWorkflowSchema',procurementSchema:'ensureProcurementSchema',procurementImportSchema:'ensureProcurementImportSchema',procurementReportService:'ensureProcurementReportSchema',careersSchema:'ensureCareersSchema',employeeIdentitySchema:'ensureEmployeeIdentitySchema',qmsSchema:'ensureQmsSchema',qmsAdvancedSchema:'ensureQmsAdvancedSchema',qmsQualityGovernanceSchema:'ensureQmsQualityGovernanceSchema',qmsEnterpriseCompletionSchema:'ensureQmsEnterpriseCompletionSchema'};
     const originalControllers={invoice:'ensureInvoiceColumns',customer:'ensureCustomerTable',stock:'ensureStockTable',material:'ensureMaterialTable',supplier:'ensureSupplierTables',meeting:'ensureMeetingTable',task:'ensureTaskTables',roster:'ensureRosterTable',attendance:'ensureAttendanceTables',expense:'ensureExpenseTables',compliance:'ensureComplianceTables',dashboard:'ensureDashboardTables'};
     for(const [name,method] of Object.entries(originalSchemas))dependencies['./services/'+name]={[method]:async()=>calls.push(name)};
     for(const [name,method] of Object.entries(originalControllers))dependencies['./controllers/'+name+'Controller']={[method]:async()=>calls.push(name)};
@@ -91,6 +92,7 @@ async function testStartup() {
     dependencies['./services/documentDeliveryService']={ensureDocumentDeliverySchema:async()=>calls.push('documentDeliverySchema')};
     dependencies['./services/weeklyTimesheetDeliverySchema']={ensureWeeklyTimesheetDeliverySchema:async()=>calls.push('weeklyTimesheetDeliverySchema')};
     dependencies['./services/workflowEscalationService']={startWorkflowSlaScheduler:()=>{calls.push('workflow.start');return false},stopWorkflowSlaScheduler:()=>calls.push('workflow.stop')};
+    dependencies['./services/procurementImportService']={startProcurementImportWorker:()=>{calls.push('import.start');return true},stopProcurementImportWorker:()=>calls.push('import.stop')};
     dependencies['./services/releasePdfVerificationService']={queueAuthorisedReleasePdf:async()=>({enabled:false})};
     const server = load(path.join(root, 'server.js'), dependencies, { NODE_ENV: 'production' });
     if (databaseFails) {
@@ -103,17 +105,17 @@ async function testStartup() {
       await server.bootstrap();
       assert.deepEqual(calls, [
         'database', 'capacity', 'migrations', 'original.preflight', ...Object.keys(schemas), ...Object.keys(originalSchemas),...Object.keys(originalControllers),'documentDeliverySchema','weeklyTimesheetDeliverySchema','original.preflight',
-        'attestation', 'limiter', 'jobs', 'email.start', 'timesheet.start','workflow.start', 'listen'
+        'attestation', 'limiter', 'jobs', 'email.start', 'timesheet.start','workflow.start','import.start', 'listen'
       ]);
       assert.equal(runtime.publicReadiness().ready, true);
       assert.deepEqual(Object.keys(runtime.publicReadiness().critical_services).sort(), [
-        'background_workers', 'weekly_timesheet_worker', 'database', 'migrations', 'rate_limiter',
+        'background_workers', 'weekly_timesheet_worker', 'procurement_import_worker', 'database', 'migrations', 'rate_limiter',
         'schema_email_queue', 'schema_operational_trust', 'schema_security',
         'schema_security_governance', 'schema_security_operations'
       ].sort());
       assert.equal(runtime.publicReadiness().critical_services.weekly_timesheet_worker,'OPERATIONAL');
       await server.shutdown();
-      assert.deepEqual(calls.slice(-5), ['email.stop','timesheet.stop','workflow.stop', 'limiter.close', 'pool.close']);
+      assert.deepEqual(calls.slice(-6), ['email.stop','timesheet.stop','workflow.stop','import.stop', 'limiter.close', 'pool.close']);
     }
   }
 }

@@ -279,7 +279,7 @@ async function assertRelayPdfCapability() {
     });
     let health = {};
     try { health = await response.json(); } catch {}
-    if (!response.ok || Number(health.attachment_contract_version) < 3 || health.pdf_bytes_validated !== true || health.attachment_filename_preserved !== true) {
+    if (!response.ok || !health || typeof health !== 'object' || Array.isArray(health) || health.ok === false || Number(health.attachment_contract_version) < 3 || health.pdf_bytes_validated !== true || health.attachment_filename_preserved !== true) {
       throw Object.assign(new Error('The company email relay must support validated PDF bytes and original .pdf filenames before document email can be sent. The request is retained for controlled retry.'), { code: 'PDF_RELAY_CONTRACT_REQUIRED' });
     }
     return health;
@@ -333,6 +333,9 @@ async function verifyConnection() {
       }
       let health = {};
       try { health = await response.json(); } catch {}
+      if (!health || typeof health !== 'object' || Array.isArray(health) || health.ok !== true) {
+        throw Object.assign(new Error('The company relay did not return a valid successful JSON health response. Connectivity and PDF capability remain unverified.'), {code:'EMAIL_HTTPS_RELAY_FAILED'});
+      }
       relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay', pdf_attachment_contract_version: Number(health.attachment_contract_version || 0), pdf_attachments_supported: Number(health.attachment_contract_version || 0) >= 3 && health.pdf_bytes_validated === true && health.attachment_filename_preserved === true, recipient_verified: false };
       let relayEndpoint='configured';
       try {
@@ -525,10 +528,19 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
     let result = {};
     try { result = raw ? JSON.parse(raw) : {}; } catch { result = {}; }
     if (!response.ok || result.sent !== true) {
-      const error = new Error(result.message || `WordPress mail relay returned ${response.status}`);
-      error.code = ['DELIVERY_REVIEW_REQUIRED','PDF_RELAY_VALIDATION_FAILED'].includes(result.code) ? result.code : 'EMAIL_HTTPS_RELAY_FAILED';
+      const knownAcceptance = result.sent === true || result.provider_accepted === true || result.data?.provider_accepted === true;
+      // A proxy/receiver may emit an error or HTML after the provider accepted
+      // the request. Only its explicit pre-transport validation rejection is
+      // definitive; all other POST outcomes require review before another send.
+      const definitiveRejection = !response.ok && !knownAcceptance && ['PDF_RELAY_VALIDATION_FAILED','INVALID_REQUEST_ID'].includes(result.code);
+      const error = new Error(definitiveRejection
+        ? result.message || 'The relay rejected this request before mail transport. Repair it before a controlled retry.'
+        : result.code === 'DELIVERY_REVIEW_REQUIRED' && result.message
+          ? result.message
+          : 'The relay did not confirm the outcome of this attempted mail transaction. Review provider logs before retry; no automatic resend is permitted.');
+      error.code = definitiveRejection ? 'PDF_RELAY_VALIDATION_FAILED' : 'DELIVERY_REVIEW_REQUIRED';
       error.responseCode = response.status;
-      error.providerAccepted = result.provider_accepted === true || result.data?.provider_accepted === true;
+      error.providerAccepted = knownAcceptance;
       throw error;
     }
     if(attachments.length){
@@ -550,7 +562,7 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
       receivedVerified: false
     };
   } catch (error) {
-    if(attempted && (!error.code || error.name==='AbortError' || ['ECONNRESET','ECONNECTION','ETIMEDOUT'].includes(error.code))){error.code='DELIVERY_REVIEW_REQUIRED';error.message='The relay transaction outcome is uncertain. Review provider logs before retry to prevent duplicate delivery.';}
+    if(attempted && !['DELIVERY_REVIEW_REQUIRED','PDF_RELAY_VALIDATION_FAILED'].includes(error.code)){error.code='DELIVERY_REVIEW_REQUIRED';error.message='The relay transaction outcome is uncertain. Review provider logs before retry to prevent duplicate delivery.';}
     if(!error.code)error.code='EMAIL_HTTPS_RELAY_FAILED';
     throw error;
   } finally {

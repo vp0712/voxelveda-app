@@ -186,6 +186,14 @@ exports.templates = async (_req, res) => res.json({
 
 async function mayViewDelivery(user,request,db=pool){
  if(!user || !Number.isSafeInteger(Number(user.id)) || Number(user.id)<1)return false;
+ if(request.related_module==='procurement' && String(request.related_record_id).startsWith('report:')) {
+  try { await require('../services/procurementReportService').getSnapshot({user,snapshotId:String(request.related_record_id).slice(7),db}); return true; }
+  catch { return false; }
+ }
+ if(request.related_module==='procurement' && String(request.related_record_id).startsWith('entry:')) {
+  try { await require('../services/procurementEntryService').getEntry({user,id:String(request.related_record_id).slice(6),db}); return true; }
+  catch { return false; }
+ }
  const {mayViewDocument}=require('../services/documentSecurityService');
  const {customerScoped,ownsCustomerRecord}=require('../services/customerRecordScope');
  if(customerScoped(user) && request.related_module==='invoices' && String(request.related_record_id).startsWith('statement:')) {

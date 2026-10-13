@@ -23,6 +23,7 @@ async function main(){
  }
  assert.equal(ready?.body?.deployment_sha,expected,'Production must run this release, not an older healthy deployment');
  assert.equal(ready.status,200);assert.equal(ready.body.ready,true);
+ assert.equal(ready.body.critical_services?.procurement_import_worker,'OPERATIONAL','Durable procurement extraction worker must be registered and running');
  assert.equal(ready.body.critical_services?.weekly_timesheet_worker,'OPERATIONAL','Worked-only weekly scheduler must be registered and running');
  const health=await getJson('/api/health');assert.equal(health.status,200);
  proof.ready=ready;proof.health=health;
@@ -31,7 +32,7 @@ async function main(){
  for(const route of ['/dashboard','/profile','/security','/workspace.html','/admin','/client','/portal/staff','/quality','/shop-floor','/careers-admin','/employee-id','/invoice/view']){
   const response=await fetch(origin+route,{redirect:'follow',signal:AbortSignal.timeout(15000)});const final=new URL(response.url);assert.equal(final.pathname,'/login',route+' requires login');assert.ok(final.searchParams.get('returnTo')||final.searchParams.get('next'),'Login preserves destination');proof.checks.push({route,login_redirect:final.pathname,return_to:final.searchParams.get('returnTo')||final.searchParams.get('next')});
  }
- for(const route of ['/api/rfq','/api/invoice','/api/stock','/api/materials','/api/suppliers','/api/attendance','/api/roster','/api/tasks','/api/qms/dashboard','/api/procurement/overview','/api/email/documents/1']){
+ for(const route of ['/api/rfq','/api/invoice','/api/stock','/api/materials','/api/suppliers','/api/attendance','/api/roster','/api/tasks','/api/qms/dashboard','/api/procurement/overview','/api/procurement/imports','/api/procurement/entries','/api/procurement/reports/snapshots/00000000-0000-4000-8000-000000000001','/api/email/documents/1']){
   const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000)});
   assert.equal(response.status,401,route+' is restored and still requires an authenticated session');
   proof.checks.push({route,status:401,restored_authentication_boundary:true});

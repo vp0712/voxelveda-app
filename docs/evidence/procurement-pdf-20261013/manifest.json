@@ -1,0 +1,116 @@
+{
+  "generated_at": "2026-10-13T11:18:19.847Z",
+  "fixture_only": true,
+  "real_email_sent": false,
+  "recipient_opening_verified": false,
+  "documents": [
+    {
+      "fixture": "individual",
+      "pages": 1,
+      "bytes": 1652626,
+      "sha256": "85bd0ff4e3e2f5648babcbf645f101ddf63b31d4b29f226f0f19f46cd0f45b17",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "multi",
+      "pages": 9,
+      "bytes": 1669223,
+      "sha256": "af456b47537aa572253e69f410485f559c1e9cd42746bcf2f55ac1734e08e80c",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "imported",
+      "pages": 1,
+      "bytes": 1652309,
+      "sha256": "e28744a7b0c9ccb3d8cddea205b206d05909a5793b3923f8d9c4863265131d6c",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "nativePo",
+      "pages": 1,
+      "bytes": 1650176,
+      "sha256": "c31b925217b25d399c0dfe19a614eb6942598daae684fa1327596fc147e7792f",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "nativeItems",
+      "pages": 1,
+      "bytes": 1653254,
+      "sha256": "f6d4567961370129fdb78a9aaa1c3b0ac979fb27aaf6a3f5e9a867e1b86ef551",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "csv",
+      "pages": 1,
+      "bytes": 1650177,
+      "sha256": "e17d728ec74e49111d6eea9aca768c4666ff917a7fe061fd085361972a39a39d",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "xlsx",
+      "pages": 1,
+      "bytes": 1649718,
+      "sha256": "1b5a6a3f4aa021f61ff6ed9ab1fb36a8a42eb95fe4304c7b02c1869f8d9102d8",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    },
+    {
+      "fixture": "formula",
+      "pages": 1,
+      "bytes": 1649664,
+      "sha256": "48a58842620f57132a8e18569b3cc2b2dd2af619d437d9d629261cea8f963622",
+      "pdf_parser": "PDF.js complete-page parse",
+      "source": "scripts/procurement-report-pdf-test.js"
+    }
+  ],
+  "renders": [
+    {
+      "file": "individual.png",
+      "sha256": "88b3cc15ad90c464b33f79e262372063c3f2a30f5fbf5bc1d60a39a45f6a177c",
+      "renderer": "Poppler pdftoppm, 100 dpi",
+      "visually_inspected": true
+    },
+    {
+      "file": "register-first.png",
+      "sha256": "d332d22b39f7d55aa14d8e77bf0c704ff8bf30486740e2fd5d4f3cd9f4cfba33",
+      "renderer": "Poppler pdftoppm, 100 dpi",
+      "visually_inspected": true
+    },
+    {
+      "file": "register-last.png",
+      "sha256": "6e6311d941c98e3787dbdbf5801a2e66e6f036afac56ec9f0caa53ada5fd0a93",
+      "renderer": "Poppler pdftoppm, 100 dpi",
+      "visually_inspected": true
+    },
+    {
+      "file": "import-outcomes.png",
+      "sha256": "fe67cb40ea8fd0491871f07d1b67e654d4a556e194aec0ce3a3e343b910ac7a0",
+      "renderer": "Poppler pdftoppm, 100 dpi",
+      "visually_inspected": true
+    },
+    {
+      "file": "native-po.png",
+      "sha256": "95cb15d25aaf74055822ee6dfa8675c092ba11fe3dc3d68a302eb8e5e817f862",
+      "renderer": "Poppler pdftoppm, 100 dpi",
+      "visually_inspected": true
+    },
+    {
+      "file": "native-quantities.png",
+      "sha256": "2aa28f0e63673e22d37aba63f25088e5c8af4367b17e04510630ff5c79f84e78",
+      "renderer": "Poppler pdftoppm, 100 dpi",
+      "visually_inspected": true
+    },
+    {
+      "file": "source-formatted.png",
+      "sha256": "d976dce941be25dec30c614be0fdbe4251c023cbfb97f5876ae43fae2bc09e43",
+      "renderer": "Poppler pdftoppm, 100 dpi",
+      "visually_inspected": true
+    }
+  ]
+}

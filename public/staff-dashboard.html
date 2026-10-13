@@ -18,7 +18,7 @@
   <meta property="og:image:height" content="1254" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" />  <link rel="stylesheet" href="/original-role-layout.css?v=20260926-role-portals" />
-<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261011-restored"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script></head>
+<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script></head>
 
 <body class="staff-portal">
   <button class="mobile-menu-btn" type="button" aria-label="Open menu" aria-controls="primarySidebar" aria-expanded="false" data-mobile-menu-action="open">
@@ -953,9 +953,12 @@
           <div>
             <span class="panel-kicker">Source to Pay</span>
             <h2>Procurement Control</h2>
-            <p>Requisitions, supplier quotes, purchase orders, receiving and bill matching in one governed workflow.</p>
+            <p>Saved entries hold your editable procurement records. Original uploads stay separately in Uploaded files.</p>
           </div>
-          <div class="section-actions" data-procurement-primary-actions></div>
+          <div class="procurement-head-actions">
+            <div class="section-actions" data-procurement-global-actions></div>
+            <div class="section-actions" data-procurement-primary-actions></div>
+          </div>
         </div>
         <div class="procurement-summary" aria-label="Procurement summary">
           <article><span>Requisitions pending</span><strong data-procurement-count="requisitions_pending">0</strong></article>
@@ -967,17 +970,20 @@
         </div>
         <div class="procurement-workspace">
           <div class="procurement-toolbar">
-            <div class="procurement-tabs" role="tablist" aria-label="Procurement stages">
-              <button type="button" class="active" data-procurement-tab="requisitions">Requisitions</button>
-              <button type="button" data-procurement-tab="sourcing">Sourcing</button>
-              <button type="button" data-procurement-tab="orders">Purchase Orders</button>
-              <button type="button" data-procurement-tab="receiving">Receiving</button>
-              <button type="button" data-procurement-tab="matches">Bill Match</button>
-              <button type="button" data-procurement-tab="returns">Returns</button>
+            <div class="procurement-tabs" role="tablist" aria-label="Procurement workspace">
+              <button type="button" id="procurementTabEntries" class="procurement-tab-primary active" role="tab" aria-selected="true" aria-controls="procurementWorkspacePanel" data-procurement-tab="entries">Saved entries</button>
+              <button type="button" id="procurementTabUploads" class="procurement-tab-primary" role="tab" aria-selected="false" aria-controls="procurementWorkspacePanel" tabindex="-1" data-procurement-tab="uploads">Uploaded files</button>
+              <span class="procurement-tab-separator" aria-hidden="true"></span>
+              <button type="button" id="procurementTabRequisitions" role="tab" aria-selected="false" aria-controls="procurementWorkspacePanel" tabindex="-1" data-procurement-tab="requisitions">Requisitions</button>
+              <button type="button" id="procurementTabSourcing" role="tab" aria-selected="false" aria-controls="procurementWorkspacePanel" tabindex="-1" data-procurement-tab="sourcing">Sourcing</button>
+              <button type="button" id="procurementTabOrders" role="tab" aria-selected="false" aria-controls="procurementWorkspacePanel" tabindex="-1" data-procurement-tab="orders">Purchase Orders</button>
+              <button type="button" id="procurementTabReceiving" role="tab" aria-selected="false" aria-controls="procurementWorkspacePanel" tabindex="-1" data-procurement-tab="receiving">Receiving</button>
+              <button type="button" id="procurementTabMatches" role="tab" aria-selected="false" aria-controls="procurementWorkspacePanel" tabindex="-1" data-procurement-tab="matches">Bill Match</button>
+              <button type="button" id="procurementTabReturns" role="tab" aria-selected="false" aria-controls="procurementWorkspacePanel" tabindex="-1" data-procurement-tab="returns">Returns</button>
             </div>
             <button type="button" class="secondary-btn" data-procurement-refresh>Refresh</button>
           </div>
-          <div class="procurement-list" data-procurement-list><div class="empty-state">Open Procurement to load the workspace.</div></div>
+          <div id="procurementWorkspacePanel" class="procurement-list" role="tabpanel" aria-labelledby="procurementTabEntries" tabindex="0" data-procurement-list><div class="empty-state">Open Procurement to load saved entries and uploaded files.</div></div>
         </div>
       </section>
 
@@ -1246,9 +1252,9 @@
   </div>
 
   <script src="/step-up.js?v=20260905"></script>
-  <script src="/staff.js?v=20261011-restored"></script>
+  <script src="/staff.js?v=20261013-procurement-pdf"></script>
   <script src="/workflow-ui.js?v=20261011-restored"></script>
   <script src="/role-portal.js?v=20260926-role-portals"></script>
-  <script src="/procurement-ui.js?v=20261011-restored"></script>
+  <script src="/procurement-ui.js?v=20261013-procurement-pdf"></script>
 </body>
 </html>
