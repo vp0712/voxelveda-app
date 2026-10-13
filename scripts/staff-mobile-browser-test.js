@@ -363,14 +363,25 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
     await context.addCookies([{ name: 'vv_session', value: userSession(9401), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
     const page = await context.newPage(), errors = [], apiFailures = [];
     const name = viewport.name + '-' + mode;
-    let beforeOverlay = null, restored = null;
+    let beforeOverlay = null, restored = null, overlayTrace = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => { const pathname = new URL(response.url()).pathname; if (pathname.startsWith('/api/') && response.status() >= 400) apiFailures.push({ path: pathname, status: response.status() }); });
-    await page.addInitScript(preference => { localStorage.setItem('voxelveda:color-mode', preference); }, mode);
+    await page.addInitScript(preference => {
+      localStorage.setItem('voxelveda:color-mode', preference); window.__matrixOverlayTrace = [];
+      const record = event => {
+        if (window.__matrixOverlayTrace.length >= 100) return;
+        window.__matrixOverlayTrace.push({ type: event.type, at: Math.round(performance.now()), target: event.target?.closest?.('button')?.id || event.target?.id || null,
+          activeElement: document.activeElement?.id || null, scrollX, scrollY, overlay: window.VoxelOverlay?.active || null,
+          brandBusy: document.body?.classList.contains('vv-brand-busy') || false, overflow: document.body?.style.overflow || '', id: event.detail?.id || null });
+      };
+      for (const type of ['pointerdown','mousedown','focusin','click']) document.addEventListener(type, record, true);
+      for (const type of ['vv:overlay-open','vv:overlay-closed']) window.addEventListener(type, record);
+    }, mode);
     try {
       const response = await page.goto(fixture.origin + '/portal/staff', { waitUntil: 'domcontentloaded' }); assert.equal(response.status(), 200);
       await page.locator('#staffHomePrimaryAction:not([disabled])').waitFor();
       await page.waitForFunction(() => window.VoxelStaffHome.state?.profile?.id === 9401 && document.getElementById('sidebarProfileName')?.textContent.includes('Synthetic Staff Fixture') && document.querySelector('#sidebarAvatar img')?.naturalWidth > 0 && !document.querySelector('#sidebarAvatar img')?.hidden);
+      await page.waitForFunction(() => { const loader = document.getElementById('vvGlobalBrandLoader'); return document.readyState === 'complete' && loader && !loader.classList.contains('is-visible') && loader.getAttribute('aria-hidden') === 'true' && !document.body.classList.contains('vv-brand-busy'); });
       const me = await context.request.get(fixture.origin + '/api/auth/me'); assert.equal(me.status(), 200); assert.equal(Number((await me.json()).user.id), 9401);
       const layout = await page.evaluate(() => {
         const nav = document.querySelector('.staff-mobile-bottom-nav'), photo = document.querySelector('#sidebarAvatar img');
@@ -419,13 +430,16 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
       assert.equal(restored.overflow, beforeOverlay.overflow); assert.equal(restored.overscroll, beforeOverlay.overscroll);
       assert.equal(restored.scrollX, beforeOverlay.scrollX); assert(Math.abs(restored.scrollY - beforeOverlay.scrollY) <= 1, 'Escape must preserve the underlying staff page scroll position.');
       assert.deepEqual(errors, []); assert.deepEqual(apiFailures, []); assert.equal(fixture.state.receiptRequests.length, 0);
-      results.push({ fixtureOnly: true, viewport, mode, canonicalOwner: 9401, layout, panel, panelStyle, beforeOverlay, restored, attendanceWrites: 0 });
+      overlayTrace = await page.evaluate(() => window.__matrixOverlayTrace || []);
+      results.push({ fixtureOnly: true, viewport, mode, canonicalOwner: 9401, visibleAppReady: true, layout, panel, panelStyle, beforeOverlay, restored, overlayTrace, attendanceWrites: 0 });
       fs.writeFileSync(path.join(output, 'staff-responsive-matrix.json'), JSON.stringify({ fixtureOnly: true, scope, complete: results.length === 8, results }, null, 2));
     } catch (error) {
+      overlayTrace = await page.evaluate(() => window.__matrixOverlayTrace || []).catch(() => []);
       const uiState = await page.evaluate(() => ({ path: location.pathname, theme: document.documentElement.dataset.colorMode, owner: window.VoxelStaffHome?.state?.profile?.id || null,
+        brandBusy: document.body.classList.contains('vv-brand-busy'), loaderVisible: document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible') || false,
         homeError: document.getElementById('staffHomeErrorText')?.textContent || null, viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollX, scrollY },
         nav: [...document.querySelectorAll('.staff-mobile-bottom-nav button')].map(button => ({ label: button.textContent, textOverflow: getComputedStyle(button).textOverflow, fontSize: getComputedStyle(button).fontSize, width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height, scrollWidth: button.scrollWidth, clientWidth: button.clientWidth })) })).catch(() => null);
-      fs.writeFileSync(path.join(output, 'staff-responsive-matrix-failure.json'), JSON.stringify({ fixtureOnly: true, scope, viewport, mode, message: error.message, beforeOverlay, restored, uiState, errors, apiFailures, completed: results }, null, 2));
+      fs.writeFileSync(path.join(output, 'staff-responsive-matrix-failure.json'), JSON.stringify({ fixtureOnly: true, scope, viewport, mode, message: error.message, beforeOverlay, restored, overlayTrace, uiState, errors, apiFailures, completed: results }, null, 2));
       await page.screenshot({ path: path.join(output, 'responsive-' + name + '-failure.png'), animations: 'disabled', timeout: 5000 }).catch(() => {});
       throw new Error('Actual staff responsive matrix failed: ' + name, { cause: error });
     } finally { await context.close(); }
