@@ -1,5 +1,6 @@
 const express = require('express');
 const notificationController = require('../controllers/notificationController');
+const { bodyContract } = require('../middleware/requestContractMiddleware');
 
 const router = express.Router();
 
@@ -10,6 +11,8 @@ router.patch('/preferences', notificationController.updatePreference);
 router.post('/mark-all-read', notificationController.markAllRead);
 router.delete('/read', notificationController.clearRead);
 router.delete('/all', notificationController.clearAll);
+router.get('/:id/target', notificationController.target);
+router.post('/:id/open', bodyContract([], { allowEmpty: true }), notificationController.open);
 router.patch('/:id/read', notificationController.markRead);
 router.patch('/:id/unread', notificationController.markUnread);
 router.delete('/:id', notificationController.remove);

@@ -374,6 +374,7 @@ module.exports = { latestCompletedWeek: policy.latestCompletedWeek, queueClosedW
   stopWeeklyTimesheetScheduler: () => scheduler.stop(), validateQueuedWeeklyDelivery, markWeeklyDeliveryResult,
   queueWeeklyTimesheetRevision,
   ensureWeeklyTimesheetDeliverySchema, periodBounds,
+  loadWorkedAttendance:attendanceForPeriod,
   getWeeklyTimesheetSchedule: policy.scheduleDetails,
   documentDataForSnapshot,
   _test: { reserveDelivery, checkReservedDelivery, queueReservedDelivery, attendanceForPeriod, currentSnapshot, reviewProof } };

@@ -27,6 +27,7 @@ async function createNotificationSchema() {
       linked_module VARCHAR(80) NULL,
       linked_record_id VARCHAR(80) NULL,
       action_url VARCHAR(500) NULL,
+      event_key CHAR(64) NULL,
       is_read TINYINT(1) NOT NULL DEFAULT 0,
       read_at DATETIME NULL,
       dismissed_at DATETIME NULL,
@@ -37,6 +38,7 @@ async function createNotificationSchema() {
       expires_at DATETIME NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_notification_event_key (event_key),
       INDEX idx_notifications_user_active (user_id, deleted_at, created_at),
       INDEX idx_notifications_unread (user_id, is_read, deleted_at),
       INDEX idx_notifications_category (user_id, category, created_at),
@@ -59,6 +61,7 @@ async function createNotificationSchema() {
   await addIndex('INDEX idx_notifications_unread (user_id, is_read, deleted_at)');
   await addIndex('INDEX idx_notifications_category (user_id, category, created_at)');
   await addIndex('INDEX idx_notifications_priority (user_id, priority, created_at)');
+  await addIndex('INDEX idx_notifications_visible (user_id, deleted_at, dismissed_at, is_read, created_at, id)');
 
   await pool.query(`
     CREATE TABLE IF NOT EXISTS notification_preferences (

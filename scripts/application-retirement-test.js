@@ -94,6 +94,7 @@ function applicationFixture() {
   const dependencies = {
     express, cors: require('cors'), qrcode:{toBuffer:async()=>Buffer.from('fixture')},
     './middleware/permissionMiddleware':()=>pass,
+    './middleware/attendanceAccessMiddleware':pass,
     './services/authorizationService':require('../services/authorizationService'),
     './middleware/publicEndpointProtection':Object.fromEntries(['publicRfqContract','aiLeadContract','shiftQrContract','cocVerificationContract','qrGenerationContract'].map(name=>[name,pass])),
     './services/botChallengeService':{botChallenge:()=>pass},

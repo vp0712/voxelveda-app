@@ -6,6 +6,7 @@ const vm = require('node:vm');
 const money = require('../utils/money');
 const dates = require('../utils/dateOnly');
 const paymentDomain = require('../services/expensePaymentDomain');
+const crypto = require('node:crypto');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 function plain(value) { return JSON.parse(JSON.stringify(value)); }
 function response() { return { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = plain(body); return this; } }; }
@@ -16,21 +17,28 @@ function load(file, dependencies) {
   return fixture.exports;
 }
 function fixture(type) {
-  const state = { records: type === 'tasks' ? [{ id: 1, assigned_to: 4, status: 'pending', deleted: 0 }] : [], payments: [], audits: [], queries: [], auditFailure: false, refreshFailure: false, commits: 0, rollbacks: 0 };
+  const state = { records: type === 'tasks' ? [{ id: 1, assigned_to: 4, status: 'pending', deleted: 0 }] : [], payments: [], receipts: [], audits: [], queries: [], auditFailure: false, refreshFailure: false, commits: 0, rollbacks: 0 };
   async function query(sql, params = [], transaction = false) {
     const text = sql.replace(/\s+/g, ' ').trim(); state.queries.push({ sql: text, params: [...params], transaction });
     if (/^(CREATE|ALTER)/.test(text)) return [[]];
+    if(/SELECT DATE_FORMAT\(UTC_TIMESTAMP/.test(text))return [[{server_utc:new Date().toISOString().slice(0,19).replace('T',' ')}]];
     if (/SELECT permissions FROM users/.test(text)) return [[{ permissions: '["attendance_qr_bypass"]' }]];
+    if (/SELECT id,active,deleted_at FROM users/.test(text)) return [[{id:params[0],active:1,deleted_at:null}]];
+    if (/SELECT id,name,role,active,deleted_at,account_status,employee_number FROM users/.test(text))return [[{id:params[0],name:'Fixture staff',role:'staff',active:1,account_status:'ACTIVE',deleted_at:null}]];
     if (/SELECT id FROM users/.test(text)) return [[{ id: params[0] }]];
     if (type === 'attendance') {
+      if(/SELECT \* FROM attendance_action_receipts/.test(text))return [[...state.receipts.filter(row=>row.user_id===params[0]&&row.request_id===params[1]).map(plain)]];
+      if(/INSERT INTO attendance_action_receipts/.test(text)){assert(transaction);const row={id:state.receipts.length+1};['user_id','request_id','action','attendance_id','payload_sha256','response_json'].forEach((key,i)=>row[key]=params[i]);state.receipts.push(row);return[{insertId:row.id}];}
+      if(/FROM attendance_break_intervals/.test(text))return [[]];
+      if(/SELECT id FROM staff_attendance.*clock_in</.test(text))return [[...state.records.filter(row=>row.user_id===params[0]&&!row.deleted&&row.id!==params[1]&&row.clock_in<params[2]&&(!row.clock_out||row.clock_out>params[3])).map(plain)]];
       if (/SELECT id,user_id FROM staff_attendance/.test(text)) return [[...state.records.filter(row=>!row.clock_out&&!row.deleted&&!row.review_required).map(plain)]];
       if (/SELECT id, status, total_hours/.test(text)) { if (state.refreshFailure) throw new Error('Refresh unavailable'); return [[{ id: 1, status: 'DRAFT' }]]; }
       if (/UPDATE weekly_timesheets/.test(text)) return [{ affectedRows: 1 }];
       if (/SELECT/.test(text) && /FROM staff_attendance/.test(text)) {
         let rows = state.records;
-        if (/WHERE id\s*=/.test(text)) rows = rows.filter((row) => row.id === params[0]);
+        if (/WHERE (?:a\.)?id\s*=/.test(text)) rows = rows.filter((row) => row.id === params[0] && (!/a\.user_id=/.test(text)||row.user_id===params[1]));
         else if (/WHERE.*user_id\s*=/.test(text)) rows = rows.filter((row) => row.user_id === params[0]);
-        if (/deleted, 0\) = 0/.test(text)) rows = rows.filter((row) => !row.deleted);
+        if (/deleted, ?0\) ?= ?0/.test(text)) rows = rows.filter((row) => !row.deleted);
         if (/clock_out IS NULL/.test(text)) rows = rows.filter((row) => !row.clock_out);
         if (/clock_out <=>/.test(text)) rows=rows.filter(row=>row.clock_in===params[1]&&row.clock_out===params[2]&&row.total_minutes===params[3]&&row.notes===params[4]);
         if (/id <>/.test(text)) rows = rows.filter((row) => row.id !== params[1]);
@@ -38,14 +46,16 @@ function fixture(type) {
         return [[...rows.map(plain)]];
       }
       if (/INSERT INTO staff_attendance/.test(text)) {
-        assert(transaction); const row = { id: state.records.length + 1, deleted: 0 };
+        assert(transaction); const row = { id: state.records.length + 1, deleted: 0, revision:1 };
         if (/VALUES \(\?, UTC_TIMESTAMP\(\)/.test(text)) Object.assign(row, { user_id: params[0], clock_in: '2026-10-11 08:00:00', clock_out: null, work_date: params[1], total_minutes: 0, total_hours: 0,timestamp_basis:'UTC',recorded_timezone:params[2],entry_source:'CLOCK' });
+        else if(/entry_source,timestamp_basis,recorded_timezone,attendance_status,revision/.test(text))Object.assign(row,{user_id:params[0],clock_in:params[1],work_date:params[2],total_minutes:0,total_hours:0,entry_source:'CLOCK',timestamp_basis:'UTC',recorded_timezone:params[3],attendance_status:'INCOMPLETE',clock_out:null,clock_in_utc_text:params[1]});
         else text.match(/staff_attendance \(([^)]+)/)[1].split(',').map(key=>key.trim()).forEach((key, i) => row[key] = params[i]);
         state.records.push(row); return [{ insertId: row.id }];
       }
+      if (/UPDATE staff_attendance SET clock_out=\?/.test(text)){assert(transaction);const row=state.records.find(row=>row.id===params.at(-1));Object.assign(row,{clock_out:params[0],clock_out_utc_text:params[0],clock_out_timestamp_basis:'UTC',total_minutes:params[1],total_hours:params[2],break_minutes:params[3],checkout_task_id:params[4],checkout_category:params[5],notes:params[6]??row.notes,attendance_status:params[7],review_required:params[8],review_reason:params[9],revision:Number(row.revision||1)+1});return[{affectedRows:1}];}
       if (/UPDATE staff_attendance SET clock_out=UTC_TIMESTAMP/.test(text)) {assert(transaction);const row=state.records.find(row=>row.id===params[0]);Object.assign(row,{clock_out:'2026-10-12 01:00:00',clock_out_timestamp_basis:'UTC',review_required:1,review_reason:'ATTENDANCE_TIMEZONE_UNVERIFIED',attendance_status:'REVIEW_REQUIRED'});return[{affectedRows:1}];}
       if (/UPDATE staff_attendance SET review_required/.test(text)){state.records.filter(row=>params[0].includes(row.id)&&!row.clock_out).forEach(row=>Object.assign(row,{review_required:1,review_reason:'INCOMPLETE_SHIFT_REQUIRES_REVIEW'}));return[{affectedRows:1}];}
-      if (/UPDATE staff_attendance SET user_id=/.test(text)) { assert(transaction); const row=state.records.find(entry=>entry.id===params.at(-1));text.match(/SET (.+) WHERE/)[1].split(',').map(part=>part.split('=')[0].trim()).forEach((key,i)=>row[key]=params[i]);return[{affectedRows:1}];}
+      if (/UPDATE staff_attendance SET user_id=/.test(text)) { assert(transaction); const row=state.records.find(entry=>entry.id===params.at(-1));let cursor=0;text.match(/SET (.+) WHERE/)[1].split(',').forEach(part=>{const [key,value]=part.split('=').map(v=>v.trim());if(value==='?')row[key]=params[cursor++];else if(value==='NULL')row[key]=null;else if(value==='revision+1')row[key]=Number(row[key]||1)+1;});return[{affectedRows:1}];}
       if (/UPDATE staff_attendance SET deleted/.test(text)) { assert(transaction); state.records.find((row) => row.id === params[1]).deleted = params[0]; return [{ affectedRows: 1 }]; }
     }
     if (type === 'expenses') {
@@ -93,9 +103,9 @@ function fixture(type) {
     let snapshot, releaseLock, transaction = false;
     return { query: (sql, params) => query(sql, params, transaction), async beginTransaction() {
       const previous = queue; queue = new Promise((resolve) => { releaseLock = resolve; }); await previous;
-      snapshot = plain({ records: state.records, payments: state.payments, audits: state.audits }); transaction = true;
+      snapshot = plain({ records: state.records, payments: state.payments, receipts:state.receipts, audits: state.audits }); transaction = true;
     }, async commit() { state.commits += 1; transaction = false; releaseLock?.(); }, async rollback() {
-      if (transaction) { state.records = snapshot.records; state.payments = snapshot.payments; state.audits = snapshot.audits; state.rollbacks += 1; transaction = false; releaseLock(); }
+      if (transaction) { state.records = snapshot.records; state.payments = snapshot.payments; state.receipts=snapshot.receipts; state.audits = snapshot.audits; state.rollbacks += 1; transaction = false; releaseLock(); }
     }, release() { assert(!transaction, 'a controller must release its transaction'); } };
   } };
   const auth = { hasPermission: (user, permission) => (user.permissions || []).includes(permission), hasAnyPermission: (user, permissions) => permissions.some((permission) => (user.permissions || []).includes(permission)), isManagerOf: async (_manager, userId) => userId === 4 };
@@ -103,6 +113,21 @@ function fixture(type) {
     '../services/authorizationService': auth, '../services/trashService': {}, '../services/notificationService': {}, '../utils/dateOnly': dates, '../utils/money': money,
     '../services/expensePaymentDomain': paymentDomain, '../services/expenseRegisterFilters': {}, '../services/sessionService': {}, '../services/documentSecurityService': {}, '../services/documentPdfService': {},
     luxon:require('luxon'),'../services/attendanceTimeService':require('../services/attendanceTimeService'),'../services/attendanceRecordedTotals':require('../services/attendanceRecordedTotals'),'./weeklyTimesheetDeliveryController':{legacySend:()=>{}},'../services/weeklyTimesheetDeliverySchema':{ensureWeeklyTimesheetDeliverySchema:async()=>{}},'../services/workforceSchema': { async ensureWorkforceSchema() {} }, '../services/documentDeliveryService': {}, '../services/timesheetDocumentService': {}, '../services/emailService': {} };
+  if(type==='attendance'){
+    const actionService=load('services/attendanceActionService.js',{
+      '../config/db':db,'./attendanceMobileSchema':{ensureAttendanceMobileSchema:async()=>{}},
+      './attendanceTimeService':require('../services/attendanceTimeService'),'./attendanceQrService':{},
+      './attendanceCorrectionService':{assertMutablePeriod:async()=>{}},
+      './attendanceMobilePolicy':require('../services/attendanceMobilePolicy'),'./authorizationService':auth,'../utils/dateOnly':dates,
+      './auditService':dependencies['../services/auditService'],
+      './attendanceDailyService':{readToday:async()=>({status:state.records.some(row=>!row.clock_out&&!row.deleted)?'WORKING':'COMPLETED'})}
+    });
+    dependencies['../services/attendanceVerifiedSummaryService']=require('../services/attendanceVerifiedSummaryService');
+    dependencies['../services/attendanceActionService']=actionService;
+    dependencies['../services/attendanceDailyService']={};dependencies['../services/attendanceQrService']={};
+    dependencies['../services/attendanceMobileSchema']={ensureAttendanceMobileSchema:async()=>{}};
+    dependencies['../services/attendanceCorrectionService']={assertMutablePeriod:async()=>{},effectiveBreaks:async()=>[],supersedeBreaks:async()=>[]};
+  }
   const controller = load('controllers/' + ({ expenses: 'expense', attendance: 'attendance', tasks: 'task', suppliers: 'supplier' }[type]) + 'Controller.js', dependencies);
   async function call(method, body = {}, options = {}) {
     const res = response(); const headers = options.headers || {};
@@ -145,15 +170,17 @@ async function attendanceSafety() {
   assert.equal(state.queries.length,0,'invalid attendance input cannot write records');
   const saved = await call('saveAttendance',body); assert.equal(saved.statusCode,200); assert.equal(state.records[0].total_minutes,240); assert.equal(state.records[0].total_hours,4);assert.equal(state.records[0].clock_in,'2026-10-10 21:00:00');assert.equal(state.records[0].work_date,'2026-10-11');assert.equal(state.records[0].manual_authorised_by,99);assert.equal(state.records[0].timestamp_basis,'UTC');const retry=await call('saveAttendance',body);assert.equal(retry.body.unchanged,true);assert.equal(state.records.length,1);
   const beforeFailure = plain(state.records); state.auditFailure = true;
-  assert.equal((await call('saveAttendance',{...body,clock_out:'2026-10-11T13:00'})).statusCode,500); assert.deepEqual(state.records,beforeFailure); state.auditFailure = false;
+  assert.equal((await call('saveAttendance',{...body,clock_in:'2026-10-11T14:00',clock_out:'2026-10-11T15:00'})).statusCode,500); assert.deepEqual(state.records,beforeFailure); state.auditFailure = false;
   state.refreshFailure = true;
   const archived = await call('deleteAttendance',{id:1}); assert.equal(archived.statusCode,200); assert.equal(archived.body.timesheet_status,'pending_refresh'); assert.equal(state.records[0].deleted,1,'saved archive survives reporting refresh failure');
   const archivedList = await call('allAttendance',{}, {query:{archived:'true'}}); assert.equal(archivedList.body.attendance.length,1);
   assert.equal((await call('restoreAttendance',{id:1})).statusCode,200); assert.equal(state.records[0].deleted,0); assert.equal(state.records[0].id,1);
   state.refreshFailure = false;
   const staff = {user:{id:4,permissions:['VIEW_ATTENDANCE']}};
-  const legacy=fixture('attendance');legacy.state.records.push({id:1,user_id:4,clock_in:'2020-01-01 08:00:00',clock_out:null,total_minutes:15,total_hours:.25,work_date:'2020-01-01',deleted:0,timestamp_basis:null});const legacyEnded=await legacy.call('clockOut',{},staff);assert.equal(legacyEnded.statusCode,200);assert.equal(legacyEnded.body.review_required,true);assert.equal(legacy.state.records[0].clock_out_timestamp_basis,'UTC');assert.equal(legacy.state.records[0].timestamp_basis,null);assert.equal(legacy.state.records[0].clock_in,'2020-01-01 08:00:00');assert.equal(legacy.state.records[0].total_minutes,15);assert.equal(legacy.state.records[0].total_hours,.25);assert.equal(legacy.state.audits[0].action,'CLOCK_OUT_REVIEW_REQUIRED');
-  const [clock1, clock2] = await Promise.all([call('clockIn',{},staff),call('clockIn',{},staff)]); assert.equal(clock1.statusCode,200); assert.equal(clock2.statusCode,200); assert.equal(clock1.body.attendance_id,clock2.body.attendance_id); assert.equal(state.records.filter((row)=>!row.clock_out&&!row.deleted).length,1);
+  const legacy=fixture('attendance');legacy.state.records.push({id:1,user_id:4,clock_in:'2020-01-01 08:00:00',clock_out:null,total_minutes:15,total_hours:.25,work_date:'2020-01-01',deleted:0,timestamp_basis:null});const legacyEnded=await legacy.call('clockOut',{request_id:crypto.randomUUID(),attendance_id:1},staff);assert.equal(legacyEnded.statusCode,200);assert.equal(legacyEnded.body.attendance.review_required,true);assert.equal(legacy.state.records[0].clock_out_timestamp_basis,'UTC');assert.equal(legacy.state.records[0].timestamp_basis,null);assert.equal(legacy.state.records[0].clock_in,'2020-01-01 08:00:00');assert.equal(legacy.state.records[0].total_minutes,15);assert.equal(legacy.state.records[0].total_hours,.25);assert.equal(legacy.state.audits[0].action,'CHECK_OUT');
+  assert.equal((await call('clockIn',{},staff)).statusCode,422,'legacy clock-in must require a durable retry ID');
+  assert.equal((await call('clockOut',{request_id:crypto.randomUUID()},staff)).statusCode,422,'legacy clock-out must name its exact session');
+  const request_id=crypto.randomUUID();const [clock1, clock2] = await Promise.all([call('clockIn',{request_id},staff),call('clockIn',{request_id},staff)]); assert.equal(clock1.statusCode,200); assert.equal(clock2.statusCode,200); assert.equal(clock1.body.attendance_id,clock2.body.attendance_id); assert.equal(state.records.filter((row)=>!row.clock_out&&!row.deleted).length,1);
   assert.equal((await call('saveAttendance',{...body,clock_out:''})).statusCode,409,'a second active shift must not be created');
   assert(!state.queries.some((entry)=>/clock_out = DATE_ADD|total_minutes = 720|total_hours = 12/.test(entry.sql)),'incomplete clocks must never create fabricated 12-hour worked shifts');assert(!state.queries.some((entry)=>/^DELETE|^DROP|^TRUNCATE/.test(entry.sql))); assert(state.audits.every((entry)=>[4,99].includes(entry.actorId)));
 }

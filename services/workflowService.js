@@ -103,7 +103,8 @@ async function notify(db, user, notification) {
     priority: notification.priority || 'HIGH',
     linkedModule: 'WORKFLOW',
     linkedRecordId: notification.instanceId,
-    actionUrl: approvalUrl(user)
+    actionUrl: approvalUrl(user),
+    dedupeKey: notification.dedupeKey
   });
 }
 
@@ -155,7 +156,8 @@ async function createAssignments(db, instance, step) {
       title: 'Approval required',
       message: `${instance.title} is waiting for your review.`,
       priority: 'HIGH',
-      instanceId: instance.id
+      instanceId: instance.id,
+      dedupeKey: `workflow-assignment:${instance.id}:step:${step.id}`
     });
   }
   const minimum = Math.max(1, Number(step.minimum_approvals || 1));

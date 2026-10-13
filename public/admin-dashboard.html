@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
   <title>Voxel Veda Operations</title>
 <link rel="stylesheet" href="/original-layout.css?v=20261011-restored">
 <link rel="stylesheet" href="/expense-payments.css?v=20260904"/>
@@ -21,7 +21,7 @@
   <meta property="og:image:width" content="1254" />
   <meta property="og:image:height" content="1254" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /><link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script></head>
+  <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /><link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css?v=20261013-staff-mobile"><link rel="stylesheet" href="/notification-center.css?v=20261013-staff-mobile"><script src="/workspace-overlays.js?v=20261013-staff-mobile"></script></head>
 
 <body>
   <div class="mobile-sidebar-backdrop" data-mobile-menu-action="close" aria-hidden="true"></div>
@@ -117,43 +117,15 @@
         <div class="topbar-actions">
           <button class="topbar-quick-action" data-permission="invoices_input" type="button" onclick="return goSection('invoiceSection')">New Invoice</button>
           <div class="notification-center">
-            <button id="notificationBell" class="notification-bell" type="button" aria-label="Open notifications" aria-expanded="false" onclick="return toggleNotificationPanel(event)">
-              <span class="bell-mark">!</span>
+            <button id="notificationBell" class="notification-bell" data-notification-toggle type="button" aria-label="Open notifications" aria-expanded="false" onclick="return toggleNotificationPanel(event)">
+              <span class="bell-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg></span>
               <span id="notificationBadge" class="notification-badge hidden-section">0</span>
             </button>
-            <div id="notificationPanel" class="notification-panel" hidden>
-              <div class="notification-panel-head">
-                <strong>Notification Centre</strong>
-                <span id="notificationPanelCount">0 new</span>
-              </div>
-              <div class="notification-tabs" role="tablist" aria-label="Notification filters">
-                <button class="active" type="button" data-notification-tab="all" onclick="return setNotificationTab('all')">All</button>
-                <button type="button" data-notification-tab="unread" onclick="return setNotificationTab('unread')">Unread</button>
-                <button type="button" data-notification-tab="important" onclick="return setNotificationTab('important')">Important</button>
-              </div>
-              <div class="notification-tabs notification-category-tabs" role="tablist" aria-label="Notification categories">
-                <button class="active" type="button" data-notification-category="" onclick="return setNotificationCategory('')">Every area</button>
-                <button type="button" data-notification-category="FINANCE" onclick="return setNotificationCategory('FINANCE')">Finance</button>
-                <button type="button" data-notification-category="PRODUCTION" onclick="return setNotificationCategory('PRODUCTION')">Production</button>
-                <button type="button" data-notification-category="QUALITY" onclick="return setNotificationCategory('QUALITY')">Quality</button>
-                <button type="button" data-notification-category="SECURITY" onclick="return setNotificationCategory('SECURITY')">Security</button>
-                <button type="button" data-notification-category="HR" onclick="return setNotificationCategory('HR')">HR</button>
-                <button type="button" data-notification-category="TASKS" onclick="return setNotificationCategory('TASKS')">Tasks</button>
-                <button type="button" data-notification-category="SYSTEM" onclick="return setNotificationCategory('SYSTEM')">System</button>
-              </div>
-              <div class="notification-toolbar">
-                <button type="button" onclick="return markAllNotificationsRead()">Mark all read</button>
-                <button type="button" onclick="return clearNotifications('read')">Clear read</button>
-                <button type="button" onclick="return clearNotifications('all')">Clear all</button>
-                <button type="button" onclick="return openNotificationPreferences()">Preferences</button>
-              </div>
-              <div id="notificationList" class="notification-list"></div>
-              <div id="notificationEmpty" class="notification-empty">No new notifications</div>
-            </div>
+            <div id="notificationPanel" class="notification-panel" data-notification-panel hidden tabindex="-1"></div>
           </div>
-          <button class="profile-chip" type="button" onclick="return goSection('staffSection')">
-            <span id="profileInitial" class="profile-initial">A</span>
-            <span id="profileNameLabel">Admin</span>
+          <button class="profile-chip" type="button" onclick="window.location.assign('/profile')" aria-label="Open my profile">
+            <span id="profileInitial" class="profile-initial" data-avatar-self></span>
+            <span id="profileNameLabel">My profile</span>
           </button>
           <span class="live-pill">System Active</span>
         </div>
@@ -880,7 +852,7 @@
           <div class="section-head">
             <div>
               <h3>Staff Timesheet Lookup</h3>
-              <p>Select a staff member and view their full weekly or monthly timesheet history.</p>
+              <p>Select a staff member to review saved weekly or monthly attendance history. Historical hours can include unverified records; use the reviewed timesheet for verified worked hours.</p>
             </div>
             <button onclick="return loadSelectedStaffTimesheets()" class="primary-btn">View Timesheet</button>
           </div>
@@ -895,14 +867,14 @@
             </select>
           </div>
 
-          <h3 id="selectedTimesheetTitle">Selected Staff Timesheet</h3>
+          <h3 id="selectedTimesheetTitle">Selected Staff Attendance History</h3>
           <table>
             <thead>
               <tr>
                 <th>Period Start</th>
                 <th>Period End</th>
                 <th>Shifts</th>
-                <th>Total Hours</th>
+                <th>Saved historical hours</th>
                 <th>First Shift</th>
                 <th>Last Shift</th>
               </tr>
@@ -1585,13 +1557,16 @@
     <button type="button" class="nav-btn" data-section="dashboardSection">Home</button>
     <button type="button" class="nav-btn" data-section="attendanceSection">Workforce</button>
     <button type="button" class="nav-btn" data-section="taskSection">Tasks</button>
-    <button type="button" onclick="return toggleNotificationPanel(event)">Alerts</button>
+    <button type="button" data-notification-toggle onclick="return toggleNotificationPanel(event)">Alerts</button>
     <button type="button" data-mobile-menu-action="open">More</button>
   </nav>
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260919-access-fix"></script>
-  <script src="/admin-dashboard.js?v=20261013-procurement-pdf"></script>
+  <script src="/admin-dashboard.js?v=20261013-staff-mobile"></script>
+  <script src="/profile-avatar.js?v=20261013-staff-mobile"></script>
+  <script src="/dashboard-profile-avatar.js?v=20261013-staff-mobile"></script>
+  <script src="/notification-center.js?v=20261013-staff-mobile"></script>
   <script src="/workflow-ui.js?v=20261011-restored"></script>
   <script src="/procurement-ui.js?v=20261013-procurement-pdf"></script>
   <script src="/expense-payments.js?v=20260904"></script>

@@ -8,7 +8,10 @@ function inputError(field, message, code = 'ATTENDANCE_TIME_INVALID') {
 function companyTimezone(env = process.env) { return configuration(env).timezone; }
 function sqlUtc(instant) { return instant.toUTC().toFormat('yyyy-MM-dd HH:mm:ss'); }
 function parseAttendanceTime(value, field, timezone) {
-  const text = typeof value === 'string' ? value.trim() : '';
+  // Older correction proposals were serialized by Luxon with an exact .000Z
+  // suffix. Preserve their second precision on review; nonzero fractions are
+  // rejected because the attendance table records whole SQL seconds.
+  const text = typeof value === 'string' ? value.trim().replace(/(\d{2}:\d{2}:\d{2})\.000Z$/, '$1Z') : '';
   if (!text) return null;
   const explicit = /(?:Z|[+-]\d{2}:\d{2})$/.test(text);
   if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?$/.test(text)) throw inputError(field, 'Enter a valid date and time.');

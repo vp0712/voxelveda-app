@@ -91,6 +91,7 @@ async function testStartup() {
     dependencies['./services/weeklyTimesheetScheduler']={getWeeklyTimesheetSchedule:()=>({timezone:'Australia/Sydney',next_due_utc:'2026-10-19T20:00:00Z'}),startWeeklyTimesheetScheduler:()=>{calls.push('timesheet.start');return true},stopWeeklyTimesheetScheduler:()=>calls.push('timesheet.stop')};
     dependencies['./services/documentDeliveryService']={ensureDocumentDeliverySchema:async()=>calls.push('documentDeliverySchema')};
     dependencies['./services/weeklyTimesheetDeliverySchema']={ensureWeeklyTimesheetDeliverySchema:async()=>calls.push('weeklyTimesheetDeliverySchema')};
+    dependencies['./services/profilePhotoService']={ensureProfilePhotoSchema:async()=>calls.push('profilePhotoSchema')};
     dependencies['./services/workflowEscalationService']={startWorkflowSlaScheduler:()=>{calls.push('workflow.start');return false},stopWorkflowSlaScheduler:()=>calls.push('workflow.stop')};
     dependencies['./services/procurementImportService']={startProcurementImportWorker:()=>{calls.push('import.start');return true},stopProcurementImportWorker:()=>calls.push('import.stop')};
     dependencies['./services/releasePdfVerificationService']={queueAuthorisedReleasePdf:async()=>({enabled:false})};
@@ -104,7 +105,7 @@ async function testStartup() {
     } else {
       await server.bootstrap();
       assert.deepEqual(calls, [
-        'database', 'capacity', 'migrations', 'original.preflight', ...Object.keys(schemas), ...Object.keys(originalSchemas),...Object.keys(originalControllers),'documentDeliverySchema','weeklyTimesheetDeliverySchema','original.preflight',
+        'database', 'capacity', 'migrations', 'original.preflight', ...Object.keys(schemas), ...Object.keys(originalSchemas),'profilePhotoSchema',...Object.keys(originalControllers),'documentDeliverySchema','weeklyTimesheetDeliverySchema','original.preflight',
         'attestation', 'limiter', 'jobs', 'email.start', 'timesheet.start','workflow.start','import.start', 'listen'
       ]);
       assert.equal(runtime.publicReadiness().ready, true);

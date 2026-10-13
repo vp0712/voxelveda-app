@@ -1,0 +1,73 @@
+'use strict';
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const path=require('node:path');
+const vm=require('node:vm');
+const {DateTime}=require('luxon');
+const policy=require('../services/weeklyTimesheetEligibility');
+const summary=require('../services/attendanceVerifiedSummaryService');
+const attendanceTime=require('../services/attendanceTimeService');
+const env={TIMESHEET_TIMEZONE:'Australia/Sydney',ATTENDANCE_STORAGE_TIMEZONE:''};
+const staff={id:17,name:'Fixture employee',role:'staff',active:1,account_status:'ACTIVE',deleted_at:null};
+const now=new Date('2026-10-13T01:00:00Z');
+const start='2026-10-05',end='2026-10-11';
+const row=(id,extra={})=>({id,user_id:17,work_date:'2026-10-06',clock_in:'2026-10-05T22:00:00Z',clock_out:'2026-10-05T23:00:00Z',total_minutes:60,total_hours:1,break_minutes:0,timestamp_basis:'UTC',recorded_timezone:'Australia/Sydney',entry_source:'CLOCK',notes:'',deleted:0,...extra});
+const assess=records=>summary.assessVerifiedAttendance({staff,records,fromDate:start,toDate:end,now,env});
+function loadScheduler(){
+ const module={exports:{}};
+ const deps={'node:crypto':require('node:crypto'),luxon:require('luxon'),'../config/db':{},'./documentDeliveryService':{},'./timesheetDocumentService':{},'./weeklyTimesheetDeliverySchema':{},'./backgroundJobService':{backgroundJobService:{createScheduler:()=>({})}},'./authorizationService':{},'./auditService':{},'./weeklyTimesheetEligibility':policy};
+ const filename=path.join(__dirname,'../services/weeklyTimesheetScheduler.js');
+ new vm.Script(fs.readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,process:{env},Date,console,Buffer,require(name){if(!Object.hasOwn(deps,name))throw new Error('Unexpected scheduler fixture dependency '+name);return deps[name];}});
+ return module.exports;
+}
+async function legacyDailyActions(){
+ const employee={...staff,permissions:['VIEW_ATTENDANCE'],permission_boundary:['VIEW_ATTENDANCE']};
+ const active={...row(91),work_date:'2026-10-13',clock_in:'2026-10-12 22:00:00',clock_in_utc_text:'2026-10-12 22:00:00',clock_out:null,clock_out_utc_text:null,timestamp_basis:null,total_minutes:0,total_hours:0,revision:1};
+ let intervals=[];
+ const db={async query(sql){if(/SELECT id,name,role,department/.test(sql))return [[employee]];if(/FROM staff_attendance a WHERE/.test(sql))return [[active]];if(/FROM attendance_break_intervals b/.test(sql))return [intervals];if(/FROM roster_shifts/.test(sql)||/SELECT DISTINCT checkout_category/.test(sql))return [[]];if(/SELECT permissions FROM users/.test(sql))return [[{permissions:'[]'}]];throw new Error('Unexpected legacy daily fixture query '+sql);}};
+ const deps={'../config/db':{},luxon:require('luxon'),'./attendanceMobileSchema':{ensureAttendanceMobileSchema:async()=>{}},'./attendanceTimeService':attendanceTime,'./weeklyTimesheetEligibility':policy,'../utils/dateOnly':require('../utils/dateOnly'),'./authorizationService':require('../services/authorizationService'),'./attendanceMobilePolicy':require('../services/attendanceMobilePolicy')};
+ const module={exports:{}},filename=path.join(__dirname,'../services/attendanceDailyService.js');
+ new vm.Script(fs.readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,process:{env},Date,console,require(name){if(!Object.hasOwn(deps,name))throw new Error('Unexpected daily fixture dependency '+name);return deps[name];}});
+ const legacy=await module.exports.readToday({user:employee,db,now});
+ assert.deepEqual(Array.from(legacy.allowed_actions),['CHECK_OUT'],'A retained unverified legacy shift advertises safe checkout but cannot offer unsupported break start');
+ assert.equal(legacy.summary.review_required,true);assert.equal(legacy.active_attendance.live_worked_minutes,null);
+ intervals=[{id:94,attendance_id:91,user_id:17,started_at:'2026-10-13 00:45:00',started_at_utc_text:'2026-10-13 00:45:00',ended_at:null}];
+ const withBreak=await module.exports.readToday({user:employee,db,now});
+ assert.deepEqual(Array.from(withBreak.allowed_actions),['CHECK_OUT','BREAK_END'],'An existing effective break can still be ended against its exact legacy session');
+ intervals=[];active.timestamp_basis='UTC';
+ assert.deepEqual(Array.from((await module.exports.readToday({user:employee,db,now})).allowed_actions),['CHECK_OUT','BREAK_START'],'Verified UTC sessions retain actual break start');
+}
+async function main(){
+ const source=[row(1),row(2),row(3,{attendance_status:'REJECTED',total_minutes:120,total_hours:2}),row(4,{attendance_status:'CANCELLED',total_minutes:180,total_hours:3}),row(5,{timestamp_basis:null,clock_in:'2026-10-06 12:00:00',clock_out:'2026-10-06 16:00:00',total_minutes:240,total_hours:4})];
+ const original=JSON.stringify(source),mixed=assess(source);
+ assert.equal(mixed.totalMinutes,60);assert.equal(mixed.actualHours,1);assert.equal(mixed.historicalSavedHours,11);assert.equal(mixed.duplicates,1);assert.equal(mixed.reviewRequired,true);assert.equal(mixed.eligibleRecords.length,1);assert.equal(mixed.reviewIssues[0].code,'ATTENDANCE_TIMEZONE_UNVERIFIED');
+ assert.throws(()=>summary.assertReviewResolved(mixed),{code:'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED'});assert.equal(JSON.stringify(source),original,'assessment preserves every original record and saved value');
+ assert.equal(assess([row(1,{total_hours:null})]).historicalSavedHours,null,'an unknown saved total is not displayed as zero');
+ assert.equal(assess([row(1,{clock_out:null,total_minutes:0,total_hours:0})]).reviewRequired,true,'an incomplete clock is reviewed rather than filled with hours');
+ assert.equal(assess([row(1,{work_date:'2026-10-20'})]).actualHours,1,'verified reporting uses the actual local shift start, never a misdated saved label');
+ assert.equal(assess([row(1,{clock_in:'2026-10-11T13:00:00Z',clock_out:'2026-10-11T14:00:00Z'})]).actualHours,0,'a Monday local shift cannot enter the prior week through its Sunday UTC date');
+ const manual=row(7,{clock_in:null,clock_out:null,total_minutes:75,total_hours:1.25,break_minutes:null,entry_source:'MANUAL',manual_authorised_by:99,manual_authorised_at:'2026-10-07T01:00:00Z'});
+ assert.equal(assess([manual]).actualHours,1.25);assert.equal(assess([{...manual,manual_authorised_by:null}]).reviewRequired,true);
+ const requested=attendanceTime.manualWorkedEntry({clock_in:'2026-10-04T01:40:00+10:00',clock_out:'2026-10-04T04:30:00+11:00',break_minutes:10},17,now,env);
+ const proposed={clock_in:DateTime.fromSQL(requested.clock_in,{zone:'UTC'}).toISO({suppressMilliseconds:true}),clock_out:DateTime.fromSQL(requested.clock_out,{zone:'UTC'}).toISO({suppressMilliseconds:true}),break_minutes:requested.break_minutes};
+ assert.deepEqual([proposed.clock_in,proposed.clock_out],['2026-10-03T15:40:00Z','2026-10-03T17:30:00Z']);
+ const approvedCorrection=attendanceTime.manualWorkedEntry(proposed,99,now,env);
+ assert.equal(approvedCorrection.total_minutes,100);assert.equal(approvedCorrection.clock_in,requested.clock_in);assert.equal(approvedCorrection.clock_out,requested.clock_out);assert.equal(approvedCorrection.manual_authorised_by,99);
+ assert.deepEqual(attendanceTime.manualWorkedEntry({...proposed,clock_in:proposed.clock_in.replace('Z','.000Z'),clock_out:proposed.clock_out.replace('Z','.000Z')},99,now,env),approvedCorrection,'already retained exact .000Z proposals round-trip without changing clock bytes or minutes');
+ for(const clock_in of ['2026-10-03T15:40:00.001Z','2026-10-03T15:40:00.100Z','2026-10-03T15:40:00.000+00:00','2026-10-04T01:40:00.000','2026-10-03T15:40:00.000ZZ'])assert.throws(()=>attendanceTime.manualWorkedEntry({...proposed,clock_in},99,now,env),{code:'ATTENDANCE_TIME_INVALID'},'noncanonical fractions and malformed timestamps remain invalid');
+ const scheduler=loadScheduler(),period={start,end,timezone:'Australia/Sydney',startUtc:DateTime.fromISO(start,{zone:'Australia/Sydney'}).startOf('day').toUTC().toISO(),endExclusiveUtc:DateTime.fromISO(end,{zone:'Australia/Sydney'}).plus({days:1}).startOf('day').toUTC().toISO()};
+ let selected;
+ await scheduler.loadWorkedAttendance({async query(sql,params){selected={sql,params};return [[]];}},17,period,true);
+ assert.match(selected.sql,/FOR UPDATE/);assert.match(selected.sql,/OR \(a\.work_date BETWEEN \? AND \?\)/);assert.deepEqual(Array.from(selected.params),[17,'2026-10-03 23:00:00','2026-10-12 03:00:00',start,end],'UI/workflow reuse the PDF candidate query and its UTC ±14-hour legacy-review boundary');
+ const clean=assess([row(1),row(2)]),assessment=policy.assessWorkedAttendance(staff,[row(1),row(2)],period,policy.configuration(env),now);
+ const approved={id:31,status:'APPROVED',version_no:2,approved_by:99,approved_at:'2026-10-12T01:00:00Z',total_hours:1,approved_hours:1};
+ const snapshot={attendance:clean.eligibleRecords,source_attendance:clean.records,verification:summary.diagnostics(clean)};
+ const readVersion={async query(){return [[{created_by:99,snapshot_json:JSON.stringify(snapshot)}]];}};
+ assert.equal((await scheduler._test.reviewProof(readVersion,approved,assessment,policy.configuration(env))).verified,true,'new canonical approval attendance is valid for the unchanged weekly PDF proof despite a separately retained duplicate source row');
+ snapshot.attendance[0].total_minutes=59;
+ assert.equal((await scheduler._test.reviewProof(readVersion,approved,assessment,policy.configuration(env))).verified,false,'source identity/duration changes invalidate the approval proof');
+ assert.equal(JSON.stringify(source),original);
+ await legacyDailyActions();
+ console.log('PASS verified attendance summaries: completed minute totals, duplicate/excluded/legacy diagnostics, null/manual/misdated sources, original preservation, shared candidate boundary and exact weekly approval proof. Fixtures only; no transport.');
+}
+main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,4 +1,3 @@
-const crypto = require('crypto');
 const pool = require('../config/db');
 const { ensureWorkforceSchema } = require('../services/workforceSchema');
 const { hasPermission } = require('../services/authorizationService');
@@ -6,10 +5,13 @@ const { dateOnly } = require('../utils/dateOnly');
 const { DateTime } = require('luxon');
 const attendanceTime = require('../services/attendanceTimeService');
 const { ensureWeeklyTimesheetDeliverySchema } = require('../services/weeklyTimesheetDeliverySchema');
-const { attendanceRecordedHours } = require('../services/attendanceRecordedTotals');
+const verifiedAttendance = require('../services/attendanceVerifiedSummaryService');
 
-const SHIFT_QR_WINDOW_SECONDS = 20;
-const SHIFT_QR_PREFIX = 'VVSHIFT';
+const mobileActions = require('../services/attendanceActionService');
+const dailyAttendance = require('../services/attendanceDailyService');
+const corrections = require('../services/attendanceCorrectionService');
+const qr = require('../services/attendanceQrService');
+const { ensureAttendanceMobileSchema } = require('../services/attendanceMobileSchema');
 
 function todayDate() {
   return DateTime.now().setZone(attendanceTime.companyTimezone()).toISODate();
@@ -44,99 +46,6 @@ function normalizeDateTime(value) {
 
 function isAdmin(req) {
   return hasPermission(req.user, 'EDIT_ATTENDANCE');
-}
-
-function shiftQrSecret() {
-  const secret = process.env.SHIFT_QR_SIGNING_KEY || (process.env.NODE_ENV === 'production' ? '' : process.env.JWT_SECRET);
-  if (!secret) throw new Error('SHIFT_QR_SIGNING_KEY is not configured');
-  return secret;
-}
-
-function signShiftPeriod(period) {
-  return crypto
-    .createHmac('sha256', shiftQrSecret())
-    .update(`${SHIFT_QR_PREFIX}:${period}`)
-    .digest('hex')
-    .slice(0, 18);
-}
-
-function currentShiftPeriod() {
-  return Math.floor(Date.now() / (SHIFT_QR_WINDOW_SECONDS * 1000));
-}
-
-function createShiftQrToken(period = currentShiftPeriod()) {
-  return `${SHIFT_QR_PREFIX}:${period}:${signShiftPeriod(period)}`;
-}
-
-function extractShiftQrToken(value) {
-  const text = String(value || '').trim();
-  if (!text) return '';
-
-  if (text.startsWith(`${SHIFT_QR_PREFIX}:`)) return text;
-
-  try {
-    const url = new URL(text);
-    return url.searchParams.get('shift_qr_token')
-      || url.searchParams.get('shift_qr')
-      || url.searchParams.get('qr_token')
-      || url.searchParams.get('token')
-      || text;
-  } catch {
-    return text;
-  }
-}
-
-function isValidShiftQrToken(value) {
-  const token = extractShiftQrToken(value);
-  const parts = token.split(':');
-  if (parts.length !== 3 || parts[0] !== SHIFT_QR_PREFIX) return false;
-
-  const period = Number(parts[1]);
-  const signature = parts[2];
-  if (!Number.isInteger(period) || !signature) return false;
-
-  const current = currentShiftPeriod();
-  const allowedPeriods = [current, current - 1, current + 1];
-  return allowedPeriods.some((allowed) => {
-    return period === allowed && signature === signShiftPeriod(period);
-  });
-}
-
-function parsePermissions(value) {
-  if (!value) return [];
-  if (Array.isArray(value)) return value;
-
-  try {
-    const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-async function canBypassShiftQr(req) {
-  const userId = Number(req.user?.id || 0);
-  if (!userId) return false;
-
-  const [rows] = await pool.query(
-    'SELECT permissions FROM users WHERE id = ? LIMIT 1',
-    [userId]
-  );
-
-  return parsePermissions(rows[0]?.permissions).includes('attendance_qr_bypass');
-}
-
-async function requireValidShiftQr(req, res) {
-  if (await canBypassShiftQr(req)) return true;
-
-  const token = req.body?.shift_qr_token || req.body?.qr_token || req.body?.token;
-  if (isValidShiftQrToken(token)) return true;
-
-  res.status(403).json({
-    message: 'Please scan the current shift QR code before starting or ending your shift.',
-    qr_required: true
-  });
-  return false;
 }
 
 let originalSchemaPromise;
@@ -193,158 +102,68 @@ async function createAttendanceTablesStructures() {
   await pool.query(`ALTER TABLE weekly_timesheets ADD COLUMN updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP`).catch(() => {});
   await ensureWorkforceSchema();
   await ensureWeeklyTimesheetDeliverySchema();
+  await ensureAttendanceMobileSchema();
 
 }
 
-async function markIncompleteShiftsForReview(userId = null) {
+async function incompleteShiftsForReview(userId = null) {
   await ensureAttendanceTables();
   const params = userId ? [userId] : [];
   const [rows] = await pool.query(`SELECT id,user_id FROM staff_attendance
     WHERE IFNULL(deleted,0)=0 AND clock_out IS NULL
       AND TIMESTAMPDIFF(MINUTE,clock_in,UTC_TIMESTAMP())>=720
       AND IFNULL(review_required,0)=0 ${userId ? 'AND user_id=?' : ''}`, params);
-  if (rows.length) await pool.query(`UPDATE staff_attendance SET review_required=1,
-    review_reason='INCOMPLETE_SHIFT_REQUIRES_REVIEW',attendance_status='INCOMPLETE'
-    WHERE id IN (?) AND clock_out IS NULL AND IFNULL(deleted,0)=0`, [rows.map((row) => row.id)]);
-  // Review metadata only: preserve the absent clock-out, original minutes and
-  // historical notes. Reading attendance never manufactures completed hours.
+  // Detection is read-only. Stored review flags and locked attendance revisions
+  // remain untouched; eligible-work assessment reports the incomplete source.
   return rows;
 }
 
-/* ================= CLOCK IN ================= */
-
-exports.clockIn = async (req, res) => {
-  let connection;
+/* ================= SERVER-AUTHORITATIVE MOBILE ACTIONS ================= */
+function mobileFailure(res, error) {
+  if (!error.statusCode) console.error('Attendance operation failed:', error.code || error.name);
+  const retryable = ['ER_LOCK_DEADLOCK','ER_LOCK_WAIT_TIMEOUT'].includes(error.code);
+  return res.status(error.statusCode || (retryable ? 409 : 500)).json({
+    message: error.statusCode ? error.message : retryable ? 'Another attendance action is being saved. Reconcile your request before retrying.' : 'Attendance could not be confirmed. Reconcile the same request before retrying.',
+    code: error.code || 'ATTENDANCE_OPERATION_FAILED', fields: error.fields || null, qr_required: Boolean(error.qr_required)
+  });
+}
+async function runMobileAction(req, res, forcedAction) {
   try {
     await ensureAttendanceTables();
-    if (!(await requireValidShiftQr(req, res))) return;
-    const userId = Number(req.user.id);
-    await markIncompleteShiftsForReview(userId);
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-    await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
-    const [[open]] = await connection.query(`SELECT id, clock_in FROM staff_attendance
-      WHERE user_id = ? AND IFNULL(deleted, 0) = 0 AND clock_out IS NULL ORDER BY id DESC LIMIT 1 FOR UPDATE`, [userId]);
-    if (open) { await connection.commit(); return res.json({ message: 'Your active clock-in was returned safely', attendance_id: open.id, unchanged: true }); }
-    const [result] = await connection.query(`INSERT INTO staff_attendance
-      (user_id, clock_in, work_date, total_minutes, total_hours,entry_source,timestamp_basis,recorded_timezone,attendance_status)
-      VALUES (?, UTC_TIMESTAMP(), ?, 0, 0,'CLOCK','UTC',?,'INCOMPLETE')`, [userId, todayDate(),attendanceTime.companyTimezone()]);
-    await require('../services/auditService').logAudit(connection, {
-      actorId: userId, action: 'CLOCK_IN', module: 'Attendance', recordType: 'staff_attendance', recordId: result.insertId,
-      newValue: { user_id: userId, work_date: todayDate(), timestamp_basis: 'UTC', recorded_timezone: attendanceTime.companyTimezone(), entry_source: 'CLOCK' },
-      ipAddress: req.ip, userAgent: req.get?.('user-agent')
-    });
-    await connection.commit();
-    return res.json({ message: 'Clocked in successfully', attendance_id: result.insertId, unchanged: false });
-  } catch (error) {
-    if (connection) await connection.rollback().catch(() => {});
-    console.error('Clock-in failed:', error.code || error.name);
-    return res.status(500).json({ message: 'Clock-in could not be saved. Refresh your shift before retrying.', code: 'CLOCK_IN_FAILED' });
-  } finally { if (connection) connection.release(); }
-};
-
-exports.clockOut = async (req, res) => {
-  let connection;
-  try {
-    await ensureAttendanceTables();
-    if (!(await requireValidShiftQr(req, res))) return;
-    const userId = Number(req.user.id);
-    await markIncompleteShiftsForReview(userId);
-    connection = await pool.getConnection();
-    await connection.beginTransaction();
-    await connection.query('SELECT id FROM users WHERE id = ? FOR UPDATE', [userId]);
-    const [[attendance]] = await connection.query(`SELECT * FROM staff_attendance
-      WHERE user_id = ? AND IFNULL(deleted, 0) = 0 AND clock_out IS NULL ORDER BY id DESC LIMIT 1 FOR UPDATE`, [userId]);
-    if (!attendance) { await connection.rollback(); return res.status(409).json({ message: 'No active clock-in was found. Refresh your shift.', code: 'NO_ACTIVE_SHIFT' }); }
-    if (attendance.timestamp_basis !== 'UTC') {
-      await connection.query(`UPDATE staff_attendance SET clock_out=UTC_TIMESTAMP(),clock_out_timestamp_basis='UTC',
-        review_required=1,review_reason='ATTENDANCE_TIMEZONE_UNVERIFIED',attendance_status='REVIEW_REQUIRED'
-        WHERE id=? AND clock_out IS NULL AND IFNULL(deleted,0)=0`, [attendance.id]);
-      const [[review]] = await connection.query('SELECT * FROM staff_attendance WHERE id = ?', [attendance.id]);
-      await require('../services/auditService').logAudit(connection, {
-        actorId: userId, action: 'CLOCK_OUT_REVIEW_REQUIRED', module: 'Attendance', recordType: 'staff_attendance', recordId: attendance.id,
-        oldValue: { clock_in: attendance.clock_in, clock_out: attendance.clock_out, total_minutes: attendance.total_minutes, total_hours: attendance.total_hours, timestamp_basis: attendance.timestamp_basis },
-        newValue: { clock_out: review.clock_out, clock_out_timestamp_basis: 'UTC', total_minutes: review.total_minutes, total_hours: review.total_hours, review_required: true, review_reason: 'ATTENDANCE_TIMEZONE_UNVERIFIED' },
-        ipAddress: req.ip, userAgent: req.get?.('user-agent')
-      });
-      await connection.commit();
-      return res.json({ message: 'Clock-out recorded. This older shift needs an authorised timezone correction before worked hours can be confirmed; its saved amounts are preserved.', code: 'ATTENDANCE_TIMEZONE_UNVERIFIED', attendance: review, review_required: true, timesheet_status: 'pending_review' });
+    const result = await mobileActions.performAction({user:req.user,input:{...(req.body || {}),...(forcedAction?{action:forcedAction}:{})},req});
+    let timesheetStatus = 'unchanged';
+    if (result.action === 'CHECK_OUT') {
+      try { await refreshWeekForDate(req.user.id, result.attendance.work_date); timesheetStatus = 'refreshed'; }
+      catch (error) { timesheetStatus = 'pending_refresh'; console.error('Attendance timesheet refresh pending:', error.code || error.name); }
     }
-    await connection.query(`UPDATE staff_attendance SET clock_out = UTC_TIMESTAMP(),
-      total_minutes = GREATEST(0, TIMESTAMPDIFF(MINUTE, clock_in, UTC_TIMESTAMP())-COALESCE(break_minutes,0)),
-      total_hours = GREATEST(0, ROUND((TIMESTAMPDIFF(MINUTE, clock_in, UTC_TIMESTAMP())-COALESCE(break_minutes,0)) / 60, 2)),
-      attendance_status='WORKED',clock_out_timestamp_basis='UTC'
-      WHERE id = ? AND clock_out IS NULL AND IFNULL(deleted, 0) = 0`, [attendance.id]);
-    const [[updated]] = await connection.query('SELECT * FROM staff_attendance WHERE id = ?', [attendance.id]);
-    await require('../services/auditService').logAudit(connection, {
-      actorId: userId, action: 'CLOCK_OUT', module: 'Attendance', recordType: 'staff_attendance', recordId: attendance.id,
-      oldValue: { clock_in: attendance.clock_in, clock_out: attendance.clock_out },
-      newValue: { clock_out: updated.clock_out, total_minutes: updated.total_minutes, total_hours: updated.total_hours },
-      ipAddress: req.ip, userAgent: req.get?.('user-agent')
-    });
-    await connection.commit();
-    connection.release(); connection = null;
-    let timesheetStatus = 'refreshed';
-    try { await refreshWeekForDate(userId, updated.work_date); }
-    catch (error) { timesheetStatus = 'pending_refresh'; console.error('Timesheet refresh pending:', error.code || error.name); }
-    return res.json({ message: 'Clocked out successfully', attendance: updated, timesheet_status: timesheetStatus });
-  } catch (error) {
-    if (connection) await connection.rollback().catch(() => {});
-    console.error('Clock-out failed:', error.code || error.name);
-    return res.status(500).json({ message: 'Clock-out could not be saved. Refresh your shift before retrying.', code: 'CLOCK_OUT_FAILED' });
-  } finally { if (connection) connection.release(); }
-};
-
-/* ================= TODAY ATTENDANCE ================= */
-
-exports.todayAttendance = async (req, res) => {
+    return res.json({...result,timesheet_status:timesheetStatus});
+  } catch (error) { return mobileFailure(res,error); }
+}
+exports.action = (req,res) => runMobileAction(req,res);
+// Legacy routes use the identical durable action service. A missing stable
+// request ID fails clearly rather than guessing a toggle or creating a retry.
+exports.clockIn = (req,res) => runMobileAction(req,res,'CHECK_IN');
+exports.clockOut = (req,res) => runMobileAction(req,res,'CHECK_OUT');
+exports.todayAttendance = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await dailyAttendance.readToday({user:req.user})); } catch(error) { return mobileFailure(res,error); } };
+exports.reconcile = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await mobileActions.reconcileAction({user:req.user,requestId:req.query.request_id})); } catch(error) { return mobileFailure(res,error); } };
+exports.validateQr = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await mobileActions.resolveQr({user:req.user,input:req.body || {}})); } catch(error) { return mobileFailure(res,error); } };
+exports.saveCheckoutNote = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await mobileActions.saveCheckoutNote({user:req.user,attendanceId:req.params.id,input:req.body || {},req})); } catch(error) { return mobileFailure(res,error); } };
+exports.requestCorrection = async (req,res) => { try { await ensureAttendanceTables(); const result=await corrections.requestCorrection({user:req.user,input:req.body || {},req}); return res.status(result.existing?200:201).json(result); } catch(error) { return mobileFailure(res,error); } };
+exports.listCorrections = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await corrections.listCorrections({user:req.user,query:req.query})); } catch(error) { return mobileFailure(res,error); } };
+exports.correctionDetail = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await corrections.getCorrection({user:req.user,id:req.params.id})); } catch(error) { return mobileFailure(res,error); } };
+async function decideCorrection(req,res,decision) {
   try {
     await ensureAttendanceTables();
-
-    const userId = Number(req.user?.id);
-    const workDate = todayDate();
-
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized user' });
+    const result=await corrections.decideCorrection({user:req.user,id:req.params.id,input:req.body || {},decision,req});
+    if (decision==='APPROVED' && !result.existing) {
+      try { if(result.previous_work_date)await refreshWeekForDate(result.user_id,result.previous_work_date); await refreshWeekForDate(result.user_id,result.work_date); result.timesheet_status='refreshed'; }
+      catch(error) { result.timesheet_status='pending_refresh'; console.error('Corrected timesheet refresh pending:',error.code || error.name); }
     }
-
-    await markIncompleteShiftsForReview(userId);
-
-    const [rows] = await pool.query(
-      `
-      SELECT
-        id,
-        user_id,
-        clock_in,
-        clock_out,
-        total_minutes,
-        total_hours,
-        work_date,
-        notes,
-        break_minutes,entry_source,timestamp_basis,clock_out_timestamp_basis,recorded_timezone,attendance_status,review_required,review_reason,
-        DATE_FORMAT(clock_in,'%Y-%m-%d %H:%i:%s') AS clock_in_utc_text,
-        DATE_FORMAT(clock_out,'%Y-%m-%d %H:%i:%s') AS clock_out_utc_text,
-        created_at
-      FROM staff_attendance
-      WHERE IFNULL(deleted, 0) = 0 AND user_id = ?
-      AND work_date = ?
-      ORDER BY id DESC
-      LIMIT 1
-      `,
-      [userId, workDate]
-    );
-
-    res.json({
-      attendance: rows[0] || null, company_timezone: attendanceTime.companyTimezone()
-    });
-  } catch (err) {
-    console.error('TODAY ATTENDANCE ERROR FULL:', err);
-    res.status(500).json({
-      message: 'Failed to load today attendance',
-      error: err.message
-    });
-  }
-};
+    return res.json(result);
+  } catch(error) { return mobileFailure(res,error); }
+}
+exports.approveCorrection = (req,res) => decideCorrection(req,res,'APPROVED');
+exports.rejectCorrection = (req,res) => decideCorrection(req,res,'REJECTED');
 
 /* ================= WEEK ATTENDANCE ================= */
 
@@ -358,7 +177,7 @@ exports.weekAttendance = async (req, res) => {
       return res.status(401).json({ message: 'Unauthorized user' });
     }
 
-    await markIncompleteShiftsForReview(userId);
+    await incompleteShiftsForReview(userId);
 
     const start = weekStartDate();
     const end = weekEndDate();
@@ -371,6 +190,7 @@ exports.weekAttendance = async (req, res) => {
       week_start: start,
       week_end: end,
       total_hours: data.totalHours,
+      verified_total_minutes:data.verified_total_minutes,historical_saved_hours:data.historical_saved_hours,verification_status:data.verification_status,review_required:data.review_required,review_issues:data.review_issues,duplicate_records:data.duplicate_records,
       attendance: data.rows,
       timesheet, company_timezone: attendanceTime.companyTimezone()
     });
@@ -384,52 +204,9 @@ exports.weekAttendance = async (req, res) => {
 };
 
 /* ================= MY ATTENDANCE ================= */
-
-exports.myAttendance = async (req, res) => {
-  try {
-    await ensureAttendanceTables();
-
-    const userId = Number(req.user?.id);
-
-    if (!userId) {
-      return res.status(401).json({ message: 'Unauthorized user' });
-    }
-
-    await markIncompleteShiftsForReview(userId);
-
-    const [rows] = await pool.query(
-      `
-      SELECT
-        id,
-        user_id,
-        clock_in,
-        clock_out,
-        total_minutes,
-        total_hours,
-        work_date,
-        notes,
-        break_minutes,entry_source,timestamp_basis,clock_out_timestamp_basis,recorded_timezone,attendance_status,review_required,review_reason,
-        DATE_FORMAT(clock_in,'%Y-%m-%d %H:%i:%s') AS clock_in_utc_text,
-        DATE_FORMAT(clock_out,'%Y-%m-%d %H:%i:%s') AS clock_out_utc_text,
-        created_at
-      FROM staff_attendance
-      WHERE IFNULL(deleted, 0) = 0 AND user_id = ?
-      ORDER BY work_date ASC, clock_in ASC
-      `,
-      [userId]
-    );
-
-    res.json({
-      attendance: rows, company_timezone: attendanceTime.companyTimezone()
-    });
-  } catch (err) {
-    console.error('MY ATTENDANCE ERROR FULL:', err);
-    res.status(500).json({
-      message: 'Failed to load attendance',
-      error: err.message
-    });
-  }
-};
+exports.myAttendance = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await dailyAttendance.listMySessions({user:req.user,query:req.query})); } catch(error) { return mobileFailure(res,error); } };
+exports.sessions = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await dailyAttendance.listSessions({user:req.user,query:req.query})); } catch(error) { return mobileFailure(res,error); } };
+exports.team = async (req,res) => { try { await ensureAttendanceTables(); return res.json(await dailyAttendance.listSessions({user:req.user,query:{...req.query,scope:'team'}})); } catch(error) { return mobileFailure(res,error); } };
 
 /* ================= ALL ATTENDANCE ADMIN ================= */
 
@@ -441,7 +218,7 @@ exports.allAttendance = async (req, res) => {
       return res.status(403).json({ message: 'Admin only' });
     }
 
-    await markIncompleteShiftsForReview();
+    const incomplete = new Set((await incompleteShiftsForReview()).map(row => Number(row.id)));
 
     const archived = String(req.query?.archived || '').toLowerCase() === 'true';
 
@@ -472,7 +249,7 @@ exports.allAttendance = async (req, res) => {
     );
 
     res.json({
-      attendance: rows, company_timezone: attendanceTime.companyTimezone()
+      attendance: rows.map(row => ({...row, computed_review_required: incomplete.has(Number(row.id)), computed_review_reason: incomplete.has(Number(row.id)) ? 'INCOMPLETE_SHIFT_REQUIRES_REVIEW' : null})), company_timezone: attendanceTime.companyTimezone()
     });
   } catch (err) {
     console.error('ALL ATTENDANCE ERROR FULL:', err);
@@ -557,47 +334,14 @@ exports.updateWeeklyTimesheetStatus = async (req, res) => {
     });
   }
 };
-function buildShiftQrPayload() {
-  const period = currentShiftPeriod();
-  const token = createShiftQrToken(period);
-  const expiresAtMs = (period + 1) * SHIFT_QR_WINDOW_SECONDS * 1000;
-
-  return {
-    token,
-    qr_data: token,
-    expires_in_seconds: Math.max(1, Math.ceil((expiresAtMs - Date.now()) / 1000)),
-    refresh_seconds: SHIFT_QR_WINDOW_SECONDS,
-    manual_bypass_enabled: false
-  };
-}
-
-exports.shiftQrToken = async (req, res) => {
-  try {
-    if (!isAdmin(req)) {
-      return res.status(403).json({ message: 'Admin access required' });
-    }
-
-    res.json(buildShiftQrPayload());
-  } catch (err) {
-    console.error('SHIFT QR TOKEN ERROR FULL:', err);
-    res.status(500).json({
-      message: 'Failed to generate shift QR',
-      error: err.message
-    });
-  }
+function buildShiftQrPayload() { return qr.createSiteToken(); }
+exports.shiftQrToken = async (req,res) => {
+  try { if (!isAdmin(req)) return res.status(403).json({message:'Attendance administration is required.'}); res.setHeader('Cache-Control','no-store, max-age=0'); return res.json(buildShiftQrPayload()); }
+  catch(error) { return mobileFailure(res,error); }
 };
-
-exports.publicShiftQrToken = async (_req, res) => {
-  try {
-    res.setHeader('Cache-Control', 'no-store, max-age=0');
-    res.json(buildShiftQrPayload());
-  } catch (err) {
-    console.error('PUBLIC SHIFT QR TOKEN ERROR FULL:', err);
-    res.status(500).json({
-      message: 'Failed to generate shift QR',
-      error: err.message
-    });
-  }
+exports.publicShiftQrToken = async (_req,res) => {
+  try { res.setHeader('Cache-Control','no-store, max-age=0'); return res.json(buildShiftQrPayload()); }
+  catch(error) { return mobileFailure(res,error); }
 };
 
 exports.userTimesheets = async (req, res) => {
@@ -615,7 +359,7 @@ exports.userTimesheets = async (req, res) => {
       return res.status(400).json({ message: 'Staff user is required' });
     }
 
-    await markIncompleteShiftsForReview(userId);
+    await incompleteShiftsForReview(userId);
 
     const groupStart = period === 'monthly'
       ? "DATE_FORMAT(a.work_date, '%Y-%m-01')"
@@ -702,6 +446,10 @@ exports.saveAttendance = async (req, res) => {
       previous = row;
       if (!Object.hasOwn(req.body, 'break_minutes')) entry = attendanceTime.manualWorkedEntry({ ...req.body, break_minutes: previous.break_minutes }, req.user.id);
     }
+    await corrections.assertMutablePeriod(connection,userId,[entry.work_date]);
+    if(previous)await corrections.assertMutablePeriod(connection,previous.user_id,[require('../utils/dateOnly').dateOnly(previous.work_date)]);
+    const previousBreaks=previous?await corrections.effectiveBreaks(connection,previous.id):[];
+    if(previousBreaks.some(interval=>!interval.ended_at))throw Object.assign(new Error('End the active break or use the supervised correction request before manually changing this session.'),{statusCode:409,code:'ATTENDANCE_BREAK_PENDING'});
     if (!entry.clock_out) {
       const [[open]] = await connection.query('SELECT id FROM staff_attendance WHERE user_id = ? AND IFNULL(deleted, 0) = 0 AND clock_out IS NULL AND id <> ? LIMIT 1', [userId, id]);
       if (open) { await connection.rollback(); return res.status(409).json({ message: 'This staff member already has an active shift', code: 'ACTIVE_SHIFT_CONFLICT' }); }
@@ -712,16 +460,21 @@ exports.saveAttendance = async (req, res) => {
         [userId, entry.clock_in, entry.clock_out, entry.total_minutes, notes]);
       if (duplicate) { await connection.commit(); return res.json({ message: 'This worked attendance entry is already saved', attendance_id: duplicate.id, unchanged: true }); }
     }
+    const [overlapping]=await connection.query('SELECT id FROM staff_attendance WHERE user_id=? AND IFNULL(deleted,0)=0 AND id<>? AND clock_in<? AND (clock_out IS NULL OR clock_out>?) FOR UPDATE',[userId,id,entry.clock_out||attendanceTime.sqlUtc(DateTime.utc()),entry.clock_in]);
+    if(overlapping.length)throw Object.assign(new Error('This interval overlaps another retained attendance session. Review both records before saving.'),{statusCode:409,code:'ATTENDANCE_CORRECTION_OVERLAP'});
     const fields = ['clock_in','clock_out','work_date','total_minutes','total_hours','break_minutes','entry_source','timestamp_basis','clock_out_timestamp_basis','recorded_timezone','manual_authorised_by','manual_authorised_at','attendance_status','review_required','review_reason'];
     const values = fields.map((field) => entry[field]);
-    if (id) await connection.query(`UPDATE staff_attendance SET user_id=?,${fields.map((field) => field+'=?').join(',')},notes=? WHERE id=? AND IFNULL(deleted,0)=0`, [userId,...values,notes,id]);
+    if (id) {
+      await corrections.supersedeBreaks(connection,{attendanceId:id,actorId:req.user.id,attendanceRevision:Number(previous.revision)+1});
+      await connection.query(`UPDATE staff_attendance SET user_id=?,${fields.map((field) => field+'=?').join(',')},notes=?,break_tracking_base_minutes=NULL,revision=revision+1 WHERE id=? AND IFNULL(deleted,0)=0`, [userId,...values,notes,id]);
+    }
     else {
       const [result] = await connection.query(`INSERT INTO staff_attendance (user_id,${fields.join(',')},notes) VALUES (${Array(fields.length+2).fill('?').join(',')})`, [userId,...values,notes]);
       recordId = result.insertId;
     }
     await require('../services/auditService').logAudit(connection, {
       actorId: req.user.id, action: id ? 'ATTENDANCE_UPDATED' : 'ATTENDANCE_CREATED', module: 'Attendance', recordType: 'staff_attendance', recordId,
-      oldValue: previous, newValue: { user_id: userId, ...entry, notes },
+      oldValue: previous?{...previous,break_intervals:previousBreaks}:null, newValue: { user_id: userId, ...entry, notes, superseded_break_ids:previousBreaks.map(interval=>interval.id) },
       ipAddress: req.ip, userAgent: req.get?.('user-agent')
     });
     await connection.commit(); connection.release(); connection = null;
@@ -753,11 +506,14 @@ async function archiveAttendance(req, res, archived) {
     if (!row) { await connection.rollback(); return res.status(404).json({ message: 'Attendance record not found' }); }
     if (Number(row.user_id) !== Number(identity.user_id)) { await connection.rollback(); return res.status(409).json({ message: 'The employee for this shift changed. Refresh and retry.', code: 'ATTENDANCE_EDIT_CONFLICT' }); }
     if (Boolean(Number(row.deleted)) === archived) { await connection.commit(); return res.json({ message: 'Attendance archive state already saved', attendance_id: id, archived, unchanged: true }); }
+    await corrections.assertMutablePeriod(connection,row.user_id,[require('../utils/dateOnly').dateOnly(row.work_date)]);
+    const breakIntervals=await corrections.effectiveBreaks(connection,row.id);
+    if(breakIntervals.some(interval=>!interval.ended_at))throw Object.assign(new Error('End the active break or use a supervised attendance correction before archiving this session.'),{statusCode:409,code:'ATTENDANCE_BREAK_PENDING'});
     if (!archived && !row.clock_out) {
       const [[open]] = await connection.query('SELECT id FROM staff_attendance WHERE user_id = ? AND IFNULL(deleted, 0) = 0 AND clock_out IS NULL LIMIT 1', [row.user_id]);
       if (open) { await connection.rollback(); return res.status(409).json({ message: 'Close the active shift before restoring an unfinished shift', code: 'ACTIVE_SHIFT_CONFLICT' }); }
     }
-    await connection.query('UPDATE staff_attendance SET deleted = ? WHERE id = ?', [archived ? 1 : 0, id]);
+    await connection.query('UPDATE staff_attendance SET deleted = ?, revision=revision+1 WHERE id = ?', [archived ? 1 : 0, id]);
     await require('../services/auditService').logAudit(connection, { actorId: req.user.id, action: archived ? 'ATTENDANCE_ARCHIVED' : 'ATTENDANCE_RESTORED', module: 'Attendance', recordType: 'staff_attendance', recordId: id,
       oldValue: { deleted: row.deleted }, newValue: { deleted: archived ? 1 : 0 }, ipAddress: req.ip, userAgent: req.get?.('user-agent') });
     await connection.commit(); connection.release(); connection = null;
@@ -766,6 +522,7 @@ async function archiveAttendance(req, res, archived) {
     return res.json({ message: archived ? 'Attendance archived; its ID and audit history remain available' : 'Attendance restored', attendance_id: id, archived, timesheet_status: timesheetStatus });
   } catch (error) {
     if (connection) await connection.rollback().catch(() => {});
+    if(error.statusCode&&error.statusCode<500)return res.status(error.statusCode).json({message:error.message,code:error.code,fields:error.fields});
     console.error('Attendance archive failed:', error.code || error.name);
     return res.status(500).json({ message: 'Attendance archive state could not be saved' });
   } finally { if (connection) connection.release(); }
@@ -776,35 +533,8 @@ exports.restoreAttendance = (req, res) => archiveAttendance(req, res, false);
 /* ================= HELPERS ================= */
 
 async function getWeekAttendance(userId, start, end) {
-  const [rows] = await pool.query(
-    `
-    SELECT
-      id,
-      user_id,
-      clock_in,
-      clock_out,
-      total_minutes,
-      total_hours,
-      work_date,
-      notes,
-      break_minutes,entry_source,timestamp_basis,clock_out_timestamp_basis,recorded_timezone,attendance_status,review_required,review_reason,
-      DATE_FORMAT(clock_in,'%Y-%m-%d %H:%i:%s') AS clock_in_utc_text,
-      DATE_FORMAT(clock_out,'%Y-%m-%d %H:%i:%s') AS clock_out_utc_text,
-      created_at
-    FROM staff_attendance
-    WHERE IFNULL(deleted, 0) = 0 AND user_id = ?
-    AND work_date BETWEEN ? AND ?
-    ORDER BY work_date ASC, clock_in ASC
-    `,
-    [userId, start, end]
-  );
-
-  const totalHours = attendanceRecordedHours(rows);
-
-  return {
-    rows,
-    totalHours: Number(totalHours.toFixed(2))
-  };
+  const summary=await verifiedAttendance.loadVerifiedSummary({db:pool,userId,fromDate:start,toDate:end});
+  return {rows:summary.records,totalHours:summary.actualHours,...verifiedAttendance.diagnostics(summary)};
 }
 
 async function refreshCurrentWeekTimesheet(userId) {
@@ -900,5 +630,6 @@ async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
 exports.sendTimesheetSummary = require('./weeklyTimesheetDeliveryController').legacySend;
 
 exports.ensureAttendanceTables = ensureAttendanceTables;
+exports.refreshWeekForDate = refreshWeekForDate;
 
 exports._test = { normalizeDateTime };

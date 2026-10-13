@@ -6,7 +6,8 @@ const {
   updateMyProfile,
   uploadMyProfilePhoto,
   getMyProfilePhoto,
-  deleteMyProfilePhoto
+  deleteMyProfilePhoto,
+  getStaffProfilePhoto
 } = require('../controllers/profileController');
 
 const router = express.Router();
@@ -32,6 +33,7 @@ function singlePhoto(req, res, next) {
 router.get('/', getMyProfile);
 router.post('/', bodyContract(['name', 'mobile_number', 'timesheet_delivery_email'], { required: ['name'] }), updateMyProfile);
 router.get('/photo', getMyProfilePhoto);
+router.get('/staff/:id/photo',getStaffProfilePhoto);
 router.post('/photo', singlePhoto, uploadMyProfilePhoto);
 router.delete('/photo', deleteMyProfilePhoto);
 

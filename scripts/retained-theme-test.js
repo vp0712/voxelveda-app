@@ -57,7 +57,7 @@ assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root, 
 const listeners = {};
 const documentListeners = {};
 const meta = { content:'' };
-const toggle = { textContent:'', attributes:{}, setAttribute(name, value) { this.attributes[name] = value; }, addEventListener() {} };
+const toggle = { textContent:'', attributes:{}, hasAttribute(name) { return Object.hasOwn(this.attributes, name); }, setAttribute(name, value) { this.attributes[name] = value; }, addEventListener() {} };
 let stored = 'dark';
 const context = {
   localStorage: { getItem() { return stored; }, setItem(key, value) { stored = value; } },
@@ -72,6 +72,11 @@ vm.runInNewContext(read('public/workspace-theme.js'), context);
 assert.equal(context.document.documentElement.dataset.colorMode, 'dark');
 assert.equal(meta.content, '#101827');
 assert.equal(toggle.textContent, 'Light theme');
+toggle.setAttribute('data-theme-compact', '');
+context.window.VoxelTheme.set('dark');
+assert.equal(toggle.textContent, '☀', 'Compact mobile controls retain an accessible theme action');
+assert.equal(toggle.attributes['aria-label'], 'Use light theme');
+delete toggle.attributes['data-theme-compact'];
 context.window.VoxelTheme.set('light');
 assert.equal(stored, 'light');
 assert.equal(meta.content, '#F7F8FA');

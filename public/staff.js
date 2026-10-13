@@ -1,5 +1,6 @@
 const token = '';
-localStorage.removeItem('token');
+window.VoxelAvatar?.clear();
+    localStorage.removeItem('token');
 let currentUser = {};
 try { currentUser = JSON.parse(localStorage.getItem('user') || '{}'); } catch { localStorage.removeItem('user'); }
 let currentRole = String(currentUser.role || localStorage.getItem('role') || '').trim().toLowerCase();
@@ -62,7 +63,8 @@ function authHeaders() {
 function redirectToLogin(message = 'Your session expired. Please login again.') {
   if (redirectingToLogin) return;
   redirectingToLogin = true;
-  ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
+  window.VoxelAvatar?.clear();
+    ['user', 'role', 'token'].forEach(key => localStorage.removeItem(key));
   const params = new URLSearchParams({ message });
   window.location.replace(`/login?${params.toString()}`);
   throw new Error('Redirecting to login');
@@ -76,6 +78,7 @@ async function logout() {
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });
   } finally {
+    window.VoxelAvatar?.clear();
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('role');
@@ -1467,24 +1470,52 @@ function normalizeShiftQrToken(value) {
 }
 
 function loadExternalScript(src) {
+  const attendanceDecoder = src === 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
   return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', reject, { once: true });
-      if (existing.dataset.loaded === 'true') resolve();
-      return;
+    let script = document.querySelector(`script[src="${src}"]`);
+    if (attendanceDecoder && script?.dataset.decoderLoadState === 'failed') {
+      script.remove();
+      script = null;
     }
-
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.onload = () => {
-      script.dataset.loaded = 'true';
-      resolve();
+    const created = !script;
+    if (!script) {
+      script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+    }
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      script.removeEventListener('load', loaded);
+      script.removeEventListener('error', failed);
     };
-    script.onerror = reject;
-    document.head.appendChild(script);
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (error) {
+        if (attendanceDecoder) {
+          script.dataset.decoderLoadState = 'failed';
+          script.remove();
+        }
+        reject(error);
+      } else {
+        script.dataset.loaded = 'true';
+        if (attendanceDecoder) script.dataset.decoderLoadState = 'loaded';
+        resolve();
+      }
+    };
+    const failed = () => finish(Object.assign(new Error('QR decoder download failed. Retry camera to try again.'), { code: attendanceDecoder ? 'QR_DECODER_LOAD_FAILED' : 'EXTERNAL_SCRIPT_LOAD_FAILED' }));
+    const loaded = () => {
+      if (attendanceDecoder && typeof window.jsQR !== 'function') { failed(); return; }
+      finish();
+    };
+    const timer = setTimeout(() => finish(Object.assign(new Error('QR decoder loading timed out. Retry camera to try again.'), { code: attendanceDecoder ? 'QR_DECODER_LOAD_FAILED' : 'EXTERNAL_SCRIPT_LOAD_FAILED' })), 8000);
+    script.addEventListener('load', loaded, { once: true });
+    script.addEventListener('error', failed, { once: true });
+    if (script.dataset.loaded === 'true' || attendanceDecoder && typeof window.jsQR === 'function') { loaded(); return; }
+    if (attendanceDecoder) script.dataset.decoderLoadState = 'loading';
+    if (created) document.head.appendChild(script);
   });
 }
 
@@ -1500,7 +1531,12 @@ async function getShiftQrDecoder() {
     shiftQrDecoderPromise = loadExternalScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
   }
 
-  await shiftQrDecoderPromise;
+  const loading = shiftQrDecoderPromise;
+  try { await loading; }
+  catch (error) {
+    if (shiftQrDecoderPromise === loading) shiftQrDecoderPromise = null;
+    throw error;
+  }
 
   if (typeof window.jsQR !== 'function') {
     throw new Error('QR decoder unavailable');
@@ -1843,7 +1879,8 @@ function renderStaffProfile(user) {
   });
 
   document.querySelectorAll('#profileAvatar, #sidebarAvatar').forEach((el) => {
-    el.textContent = initials;
+    if (window.VoxelAvatar) window.VoxelAvatar.mount(el, { self: true, name: displayName });
+    else el.textContent = initials;
   });
 }
 
@@ -3206,6 +3243,7 @@ function staffNotificationAge(value) {
 }
 
 function renderStaffNotifications() {
+  if (window.VoxelNotificationCenter) return;
   const list = document.getElementById('staffNotificationList');
   const empty = document.getElementById('staffNotificationEmpty');
   const badge = document.getElementById('staffNotificationBadge');
@@ -3227,6 +3265,7 @@ function renderStaffNotifications() {
 }
 
 async function loadStaffNotifications() {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.refresh();
   if (staffNotificationState.loading) return;
   staffNotificationState.loading = true;
   renderStaffNotifications();
@@ -3250,12 +3289,14 @@ async function loadStaffNotifications() {
 }
 
 function closeStaffNotificationPanel() {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.close();
   const panel = document.getElementById('staffNotificationPanel');
   if (panel) panel.hidden = true;
   document.getElementById('staffNotificationBell')?.setAttribute('aria-expanded', 'false');
 }
 
 function toggleStaffNotificationPanel(event) {
+  if (window.VoxelNotificationCenter) return window.VoxelNotificationCenter.toggle(event);
   event?.stopPropagation?.();
   const panel = document.getElementById('staffNotificationPanel');
   if (!panel) return;
@@ -3388,6 +3429,7 @@ async function openStaffNotificationPreferences() {
 }
 
 document.addEventListener('click', (event) => {
+  if (window.VoxelNotificationCenter) return;
   if (!event.target.closest?.('.notification-center')) closeStaffNotificationPanel();
 });
 

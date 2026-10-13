@@ -382,7 +382,7 @@
     manageButton.addEventListener('click', openDefinitionManager);
   }
 
-  window.VoxelWorkflowUI = { load, openComposer };
+  window.VoxelWorkflowUI = { load, openComposer, openDetail };
   document.addEventListener('DOMContentLoaded', () => {
     if (new URLSearchParams(window.location.search).get('view') === 'approvals') load();
   });
