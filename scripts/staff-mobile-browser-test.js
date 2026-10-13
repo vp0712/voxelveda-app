@@ -370,7 +370,7 @@ async function verifyDecoderProviderRetry(browser, fixture) {
   });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.addInitScript(() => { Object.defineProperty(window, 'BarcodeDetector', { configurable: true, value: undefined }); });
+  await page.addInitScript(() => { delete window.BarcodeDetector; if ('BarcodeDetector' in window) throw new Error('Synthetic decoder fixture could not disable the native detector.'); });
   try {
     await page.goto(fixture.origin + '/portal/staff', { waitUntil: 'networkidle' }); await page.locator('#staffHomePrimaryAction:not([disabled])').waitFor();
     await page.evaluate(providerUrl => {

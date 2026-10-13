@@ -1086,6 +1086,7 @@ async function testDurableAttendanceActions() {
   assert.equal(overnightComplete.attendance.total_minutes, 90); assert.equal(overnightComplete.attendance.work_date, '2026-10-04');
   const [legacy] = await pool.query("INSERT INTO staff_attendance(user_id,clock_in,work_date,total_minutes,total_hours,notes) VALUES(?,'2026-10-10 09:00:00','2026-10-10',120,2,'Synthetic unverified legacy session')", [other.id]);
   const legacyEnd = new Date('2026-10-10T01:30:00Z');
+  assert.deepEqual((await daily.readToday({ user: other, now: legacyEnd })).allowed_actions, ['CHECK_OUT'], 'An unverified active legacy session permits controlled checkout without advertising an unsupported new break.');
   const legacyProof = await actions.resolveQr({ user: other, input: { action: 'CHECK_OUT', attendance_id: legacy.insertId, token: qr.createSiteToken(legacyEnd).token }, now: legacyEnd });
   const legacyClosed = await actions.performAction({ user: other, input: { action: 'CHECK_OUT', attendance_id: legacy.insertId, request_id: crypto.randomUUID(), qr_proof: legacyProof.qr_proof }, req, now: legacyEnd });
   assert.equal(legacyClosed.attendance.review_required, true); assert.equal(legacyClosed.attendance.review_reason, 'ATTENDANCE_TIMEZONE_UNVERIFIED');
