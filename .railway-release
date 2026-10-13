@@ -1,6 +1,6 @@
-application-release: 20261013-original-application-restoration-private-weekly-pdf
-candidate-commit: fdbadb23a296004db237db843bce594dc23248cb
-merged-commit: 69d063cb792032f6264898535a6062868363874e
+application-release: 20261013-original-application-restoration-private-weekly-pdf-verified-browser-runner
+candidate-commit: b9d676e3616e045aa6bbf25db128987e262fe814
+merged-commit: 58942b6473453f26b923ed666b59c30e956137d1
 production-branch: main
 scope: original-role-dashboards-rfq-quotations-invoices-recorded-payments-customers-suppliers-procurement-stock-materials-production-qms-staff-hr-attendance-rosters-timesheets-tasks-meetings-notifications-documents-compliance-careers; added-banking-finance-os-and-separate-erp-portal-remain-retired
 restoration-boundary: selective-history-backed-module-and-dependency-restoration; docs/RESTORATION-MATRIX.md
@@ -8,15 +8,18 @@ preserved: unchanged-original-company-logo; navy-light-dark-theme; current-authe
 weekly-delivery: actual-completed-or-authorised-manual-work-only; audited-designated-staff-email-required; exactly-one-To-no-CC-no-BCC-no-manager-copy; account-recipient-source-rechecked; immutable-staff-week-version-and-document-hash; durable-claims-leases-and-atomic-queue-claims
 weekly-schedule: configured-Australian-IANA-timezone; default-Monday-0700-Australia-Sydney-bounded-120-minute-window; latest-completed-local-week-only; no-zero-hour-email-or-historical-backfill; unverified-legacy-timestamps-require-review; sent-corrections-require-explicit-authorised-revision
 pdf-delivery: genuine-parser-validated-PDF-pages-and-document-identity; safe-pdf-filename-application-pdf-download-and-MIME-metadata; exact-preview-download-queue-bytes; non-PDF-or-generation-failure-blocked; provider-acceptance-distinct-from-recipient-receipt
-ci: exact-candidate-five-checks-success; merged-main-seven-workflows-success; 58-mandatory-suites-normal-production-HTTPS-and-packaged-source-builds; real-disposable-MySQL; native-PHP-PDF-parser-PHPMailer-MIME; account-and-restored-responsive-Chromium-workflows; protected-invoice-actions; actual-QR-QMS-responses; settled-geometry-and-contrast-proof
-ci-candidate-release-run: 38332860688
-ci-merged-release-run: 38333083626
+ci: original-restoration-candidate-five-checks-success; original-merged-main-seven-workflows-success; CI-cleanup-candidate-four-checks-success; CI-cleanup-merged-main-five-workflows-success; 58-mandatory-suites-normal-production-HTTPS-and-packaged-source-builds; real-disposable-MySQL; native-PHP-PDF-parser-PHPMailer-MIME; account-and-restored-responsive-Chromium-workflows; protected-invoice-actions; actual-QR-QMS-responses; settled-geometry-and-contrast-proof
+ci-candidate-release-run: 38334983323
+ci-merged-release-run: 38348436661
 configuration: existing-app-service-custom-domain-database-object-storage-and-company-email-transport; unchanged-three-shared-predeploy-guards; registered-email-queue-and-worked-only-weekly-timesheet-scheduler
 authorised-email-test: one-idempotent-release-verification-fixture-through-existing-configured-company-transport; no-real-staff-customer-or-supplier-test-delivery
 external-limits: WordPress-receiver-v3-installation-pending-secure-host-connection; provider-acceptance-and-recipient-Gmail-opening-not-claimed; private-production-role-sessions-not-impersonated; actual-workspace-subscription-unavailable-in-OAuth-metadata; no-provider-switch-or-plan-purchase
 verification: exact-marker-SHA-live-health-ready-weekly-worker-restored-authenticated-routes-retired-banking-erp-real-PDF-download-headers-bytes-and-responsive-public-assets-to-be-verified-after-rollout
-rollback-deployment: e15b0b3a-7c04-4f4e-bcb1-aa2be0dbb3a1
-rollback-commit: 7c556ddf69b43b5ba119a08d04156a052a3859c7
+rollback-deployment: d22b5713-4e31-4b05-9966-66f0286b30a8
+rollback-commit: f7bf48d939841a4b0833952dc6e7ab2095c4d16b
 rollback: prior-successful-code-release-without-schema-data-attachment-audit-or-key-reversal; no-DNS-or-hosting-change
 policy: single-marker-controlled-production-deployment-after-candidate-PR-and-merged-main-CI
 ci-runner-note: merged-main-browser-launch-failed-on-native-Chromium-in-first-attempt; isolated-rerun-succeeded-in-attempt-2; production-application-code-unchanged
+
+previous-restored-live-proof: f7bf48d939841a4b0833952dc6e7ab2095c4d16b; deployment-d22b5713-4e31-4b05-9966-66f0286b30a8; production-proof-workflow-38334321103-success; live-PDF-1671324-bytes-one-valid-page-correct-application-pdf-and-pdf-filename; release-email-request-1-validated-queue-157-blocked-before-provider-by-PDF_RELAY_CONTRACT_REQUIRED
+ci-runner-repair: pinned-Playwright-Chromium-on-CI; fixture-server-and-browser-cleanup-on-launch-failure; bounded-test-timeout; original-regression-assertions-preserved; forced-invalid-browser-exits-1-and-normal-browser-exits-0
