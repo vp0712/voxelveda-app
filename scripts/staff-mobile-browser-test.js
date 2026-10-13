@@ -215,7 +215,7 @@ async function makeServer(publicDirectory, photo) {
     row.notes = req.body.notes; row.revision++; mutations.push({ type: 'checkout_note', attendance_id: row.id });
     res.json({ request_id: req.body.request_id, attendance_id: row.id, attendance: { ...row }, state: attendanceState(state, Number(req.user.id)) });
   });
-  app.get('/api/attendance/week', (_req, res) => res.json({ attendance: [], timesheet: null, total_hours: 0 }));
+  app.get('/api/attendance/week', (req, res) => { const owned = attendanceState(state, Number(req.user.id)); return res.json({ attendance: owned.sessions, timesheet: null, total_hours: owned.summary.worked_minutes / 60 }); });
   app.get('/api/attendance/my', (req, res) => {
     const rows = state.attendance?.user_id === Number(req.user.id) ? [{ ...state.attendance }] : [];
     return deliverReply(state, req, res, { attendance: rows, timesheets: [], page: 1, page_size: 20, total: rows.length, pages: 1 });
@@ -742,6 +742,7 @@ async function run() {
           assert(fixture.state.attendance.clock_out, 'Saving an optional note retains the already confirmed check-out');
           await page.reload({ waitUntil: 'networkidle' });
           await page.waitForFunction(() => document.getElementById('staffHomeStatus')?.getAttribute('data-state') === 'COMPLETED');
+          await page.waitForFunction(() => document.getElementById('staffHomeWeekHours')?.textContent === '0.03 hrs');
           assert.equal(fixture.state.receiptRequests.length, 4, 'Refreshing does not repeat any attendance action');
           const beforeMissingRequest = JSON.stringify(fixture.state.attendance);
           await page.locator('#staffHomeHistory').click(); await page.locator('#staffRequestMissingSession').click();
