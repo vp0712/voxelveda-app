@@ -354,6 +354,76 @@ async function verifyEmulatedCameraCases(browser, fixture) {
   }
   return results;
 }
+async function verifyResponsiveStaffMatrix(browser, fixture) {
+  const results = [], viewports = [{ name: 'phone-portrait', width: 375, height: 812 }, { name: 'phone-landscape', width: 812, height: 375 }, { name: 'tablet', width: 768, height: 1024 }, { name: 'desktop', width: 1440, height: 1000 }];
+  const scope = 'After product staff DOM, canonical synthetic owner/photo and notifications; four viewports in the existing light/dark preference. Attendance writes are covered separately.';
+  for (const viewport of viewports) for (const mode of ['light','dark']) {
+    Object.assign(fixture.state, resetState()); fixture.state.photo = true;
+    const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' }); context.setDefaultTimeout(12000);
+    await context.addCookies([{ name: 'vv_session', value: userSession(9401), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
+    const page = await context.newPage(), errors = [], apiFailures = [];
+    const name = viewport.name + '-' + mode;
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('response', response => { const pathname = new URL(response.url()).pathname; if (pathname.startsWith('/api/') && response.status() >= 400) apiFailures.push({ path: pathname, status: response.status() }); });
+    await page.addInitScript(preference => { localStorage.setItem('voxelveda:color-mode', preference); }, mode);
+    try {
+      const response = await page.goto(fixture.origin + '/portal/staff', { waitUntil: 'domcontentloaded' }); assert.equal(response.status(), 200);
+      await page.locator('#staffHomePrimaryAction:not([disabled])').waitFor();
+      await page.waitForFunction(() => window.VoxelStaffHome.state?.profile?.id === 9401 && document.getElementById('sidebarProfileName')?.textContent.includes('Synthetic Staff Fixture') && document.querySelector('#sidebarAvatar img')?.naturalWidth > 0 && !document.querySelector('#sidebarAvatar img')?.hidden);
+      const me = await context.request.get(fixture.origin + '/api/auth/me'); assert.equal(me.status(), 200); assert.equal(Number((await me.json()).user.id), 9401);
+      const layout = await page.evaluate(() => {
+        const nav = document.querySelector('.staff-mobile-bottom-nav'), photo = document.querySelector('#sidebarAvatar img');
+        return { theme: document.documentElement.dataset.colorMode, owner: window.VoxelStaffHome.state.profile.id,
+          width: document.documentElement.clientWidth, scrollWidth: document.documentElement.scrollWidth, photoLoaded: Boolean(photo && !photo.hidden && photo.naturalWidth > 0),
+          mobileNavVisible: Boolean(nav && getComputedStyle(nav).display !== 'none'),
+          nav: [...(nav?.querySelectorAll('button') || [])].filter(button => getComputedStyle(button).display !== 'none').map(button => {
+            const box = button.getBoundingClientRect(), style = getComputedStyle(button);
+            return { label: button.textContent.trim(), width: box.width, height: box.height, fontSize: style.fontSize, textOverflow: style.textOverflow,
+              clientWidth: button.clientWidth, scrollWidth: button.scrollWidth, clientHeight: button.clientHeight, scrollHeight: button.scrollHeight };
+          }) };
+      });
+      assert.equal(layout.theme, mode); assert.equal(layout.owner, 9401); assert.equal(layout.photoLoaded, true);
+      assert(layout.scrollWidth <= layout.width, 'Staff home must fit ' + name + ' without horizontal overflow.');
+      if (viewport.width < 1024) {
+        assert.equal(layout.mobileNavVisible, true); assert.deepEqual(layout.nav.map(button => button.label), ['Home','Shifts','Timesheets','Tasks','Profile']);
+        for (const button of layout.nav) {
+          assert(button.width >= 44 && button.height >= 44, name + ': ' + button.label + ' must retain a 44px touch target.');
+          assert.notEqual(button.textOverflow, 'ellipsis', name + ': the complete ' + button.label + ' label must be readable.');
+          assert(button.scrollWidth <= button.clientWidth + 1 && button.scrollHeight <= button.clientHeight + 1, name + ': ' + button.label + ' text must fit its actual button.');
+          assert(!button.label.includes('…') && !button.label.includes('...'));
+        }
+      } else assert.equal(layout.mobileNavVisible, false);
+      await page.screenshot({ path: path.join(output, 'after-responsive-' + name + '-home.png'), animations: 'disabled' });
+      await page.evaluate(() => window.scrollTo(0, Math.min(80, Math.max(0, document.documentElement.scrollHeight - innerHeight))));
+      await page.locator('#staffNotificationBell').scrollIntoViewIfNeeded();
+      const beforeOverlay = await page.evaluate(() => ({ scrollX, scrollY, overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior }));
+      await page.locator('#staffNotificationBell').click(); await page.locator('#staffNotificationPanel').waitFor({ state: 'visible' });
+      await page.waitForFunction(() => document.querySelectorAll('#staffNotificationPanel [data-notification-id]').length > 0);
+      const panel = await page.locator('#staffNotificationPanel').boundingBox();
+      assert(panel.x >= -1 && panel.y >= -1 && panel.x + panel.width <= viewport.width + 1 && panel.y + panel.height <= viewport.height + 1, 'Notification panel must fit ' + name + '.');
+      const panelStyle = await page.locator('#staffNotificationPanel').evaluate(target => ({ background: getComputedStyle(target).backgroundColor, color: getComputedStyle(target).color, scrollWidth: document.documentElement.scrollWidth, viewportWidth: document.documentElement.clientWidth }));
+      assert(panelStyle.scrollWidth <= panelStyle.viewportWidth, 'Opening notifications cannot add horizontal overflow.');
+      await page.screenshot({ path: path.join(output, 'after-responsive-' + name + '-notifications.png'), animations: 'disabled' });
+      await page.keyboard.press('Escape'); await page.locator('#staffNotificationPanel').waitFor({ state: 'hidden' });
+      const restored = await page.evaluate(() => ({ activeElement: document.activeElement?.id, scrollX, scrollY, overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior, overlayOpen: document.body.classList.contains('vv-overlay-open') }));
+      assert.equal(restored.activeElement, 'staffNotificationBell'); assert.equal(restored.overlayOpen, false);
+      assert.equal(restored.overflow, beforeOverlay.overflow); assert.equal(restored.overscroll, beforeOverlay.overscroll);
+      assert.equal(restored.scrollX, beforeOverlay.scrollX); assert(Math.abs(restored.scrollY - beforeOverlay.scrollY) <= 1, 'Escape must preserve the underlying staff page scroll position.');
+      assert.deepEqual(errors, []); assert.deepEqual(apiFailures, []); assert.equal(fixture.state.receiptRequests.length, 0);
+      results.push({ fixtureOnly: true, viewport, mode, canonicalOwner: 9401, layout, panel, panelStyle, beforeOverlay, restored, attendanceWrites: 0 });
+      fs.writeFileSync(path.join(output, 'staff-responsive-matrix.json'), JSON.stringify({ fixtureOnly: true, scope, complete: results.length === 8, results }, null, 2));
+    } catch (error) {
+      const uiState = await page.evaluate(() => ({ path: location.pathname, theme: document.documentElement.dataset.colorMode, owner: window.VoxelStaffHome?.state?.profile?.id || null,
+        homeError: document.getElementById('staffHomeErrorText')?.textContent || null, viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth },
+        nav: [...document.querySelectorAll('.staff-mobile-bottom-nav button')].map(button => ({ label: button.textContent, textOverflow: getComputedStyle(button).textOverflow, fontSize: getComputedStyle(button).fontSize, width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height, scrollWidth: button.scrollWidth, clientWidth: button.clientWidth })) })).catch(() => null);
+      fs.writeFileSync(path.join(output, 'staff-responsive-matrix-failure.json'), JSON.stringify({ fixtureOnly: true, scope, viewport, mode, message: error.message, uiState, errors, apiFailures, completed: results }, null, 2));
+      await page.screenshot({ path: path.join(output, 'responsive-' + name + '-failure.png'), animations: 'disabled', timeout: 5000 }).catch(() => {});
+      throw new Error('Actual staff responsive matrix failed: ' + name, { cause: error });
+    } finally { await context.close(); }
+  }
+  return { scope, results };
+}
+
 async function verifyDecoderProviderRetry(browser, fixture) {
   Object.assign(fixture.state, resetState());
   const provider = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
@@ -413,9 +483,13 @@ async function verifyDirectoryAvatarObserver(browser, fixture) {
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' });
   context.setDefaultTimeout(12000); context.setDefaultNavigationTimeout(15000);
   await context.addCookies([{ name: 'vv_session', value: userSession(9403), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
-  const page = await context.newPage(), errors = [], photoResponses = [];
+  const page = await context.newPage(), errors = [], photoResponses = [], responses = [], failedRequests = [], requestOffset = requests.length;
   page.on('pageerror', error => errors.push(error.message));
-  page.on('response', response => { if (/^\/api\/profile\/staff\/[^/]+\/photo$/.test(new URL(response.url()).pathname)) photoResponses.push({ path: new URL(response.url()).pathname, status: response.status() }); });
+  page.on('response', response => {
+    const item = { path: new URL(response.url()).pathname, status: response.status() }; responses.push(item);
+    if (/^\/api\/profile\/staff\/[^/]+\/photo$/.test(item.path)) photoResponses.push(item);
+  });
+  page.on('requestfailed', request => failedRequests.push({ path: new URL(request.url()).pathname, error: request.failure()?.errorText || null }));
   try {
     const me = await context.request.get(fixture.origin + '/api/auth/me'); assert.equal(me.status(), 200);
     const canonical = (await me.json()).user;
@@ -430,7 +504,10 @@ async function verifyDirectoryAvatarObserver(browser, fixture) {
         document.getElementById('avatarObserverResponsive').addEventListener('click', () => { document.getElementById('avatarObserverClicks').textContent = String(++window.__avatarObserverProof.clicks); });
       }, { once: true });
     }, canonical);
-    const response = await page.goto(fixture.origin + '/synthetic-fixtures/avatar-observer', { waitUntil: 'networkidle' });
+    // Await the document, then prove explicit component readiness and actual
+    // frame/control responsiveness. HTTP quietness is not this regression's
+    // readiness contract and cannot substitute for these DOM assertions.
+    const response = await page.goto(fixture.origin + '/synthetic-fixtures/avatar-observer', { waitUntil: 'domcontentloaded' });
     assert.equal(response.status(), 200); assert(response.headers()['content-security-policy'].includes("default-src 'self'"));
     await page.waitForFunction(() => document.getElementById('avatarObserverMissing')?.dataset.avatarState === 'missing' && document.getElementById('avatarObserverFailed')?.dataset.avatarState === 'failed' && document.getElementById('avatarObserverInvalid')?.dataset.avatarState === 'missing');
     const stable = await page.evaluate(async () => {
@@ -461,6 +538,17 @@ async function verifyDirectoryAvatarObserver(browser, fixture) {
     await page.screenshot({ path: path.join(output, 'after-directory-avatar-observer.png'), fullPage: true, animations: 'disabled' });
     return { fixtureOnly: true, actualChromiumMutationObserver: true, canonicalOwner: Number(canonical.id), outcomes: photoResponses, photoRequests: fixture.state.directoryPhotoRequests.length, invalidIdRequests: 0, ...stable };
   } catch (error) {
+    let timer, uiState;
+    try {
+      uiState = await Promise.race([page.evaluate(() => ({ path: location.pathname, readyState: document.readyState,
+        componentLoaded: Boolean(window.VoxelAvatar), observer: window.__avatarObserverProof ? { ...window.__avatarObserverProof } : null,
+        targets: ['avatarObserverMissing','avatarObserverFailed','avatarObserverInvalid'].map(id => { const target = document.getElementById(id); return { id, exists: Boolean(target), state: target?.dataset.avatarState || null, text: target?.textContent || null, busy: target?.getAttribute('aria-busy') || null }; }),
+        resources: performance.getEntriesByType('resource').map(entry => ({ path: new URL(entry.name).pathname, initiator: entry.initiatorType, responseEnd: entry.responseEnd })) })).catch(() => null),
+        new Promise(resolve => { timer = setTimeout(() => resolve(null), 3000); })]);
+    } finally { clearTimeout(timer); }
+    fs.writeFileSync(path.join(output, 'directory-avatar-observer-failure.json'), JSON.stringify({ fixtureOnly: true, message: error.message,
+      uiState, errors, responses, failedRequests, directoryPhotoRequests: fixture.state.directoryPhotoRequests,
+      requests: requests.slice(requestOffset).map(request => ({ path: request.path, method: request.method })) }, null, 2));
     await page.screenshot({ path: path.join(output, 'directory-avatar-observer-failure.png'), fullPage: true, animations: 'disabled', timeout: 5000 }).catch(() => {});
     throw new Error('Real directory avatar MutationObserver scenario failed', { cause: error });
   } finally { await context.close(); }
@@ -710,11 +798,12 @@ async function run() {
     const cameraEmulation = afterFixture ? await verifyEmulatedCameraCases(browser, afterFixture) : [];
     const decoderProviderRetry = afterFixture ? await verifyDecoderProviderRetry(browser, afterFixture) : null;
     const inPlaceAccountSwitch = afterFixture ? await verifyInPlaceAccountSwitchCases(browser, afterFixture) : [];
+    const responsiveMatrix = afterFixture ? await verifyResponsiveStaffMatrix(browser, afterFixture) : null;
     const directoryAvatarObserver = afterFixture ? await verifyDirectoryAvatarObserver(browser, afterFixture) : null;
     const unauthorized = await fetch(`http://127.0.0.1:${servers.at(-1).address().port}/api/profile`);
     assert.equal(unauthorized.status, 401, 'anonymous callers must fail actual API authentication');
     fs.writeFileSync(path.join(output, 'staff-mobile-proof.json'), JSON.stringify({ baselineRef, baselineSource: useSavedArchive ? 'Explicit local preserved byte-equivalent ea5 archive' : 'Pinned remote Git baseline', fixtureOnly: true,
-      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, decoderProviderRetry, inPlaceAccountSwitch, directoryAvatarObserver, results }, null, 2));
+      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, decoderProviderRetry, inPlaceAccountSwitch, responsiveMatrix, directoryAvatarObserver, results }, null, 2));
     console.log('Staff mobile browser before/after screenshots and actual cookie/JWT/CSP fixture passed: ' + output);
   } catch (error) {
     let uiState = null;
