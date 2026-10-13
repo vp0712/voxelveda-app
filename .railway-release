@@ -1,20 +1,24 @@
-application-release: 20261013-original-procurement-import-private-pdf-release
-candidate-commit: a21ae06abd3995a79ba9ea7814d4e35314ff8209
-merged-commit: 1f08206c277ee940bac04a20cda45a6d8c136cfa
+application-release: 20261013-staff-mobile-attendance-private-avatars-notifications
+candidate-commit: 5a571ea5cbfe6d1c58a3d3c103999265eea3f122
+merged-commit: d3706b6b5a209eb2720c6844752836695b0f3ed2
 production-branch: main
-previous-live-commit: 033d44412b181ae97f6da98ce7bef603c05902fe
-scope: original-procurement-upload-extraction-mapping-review-draft-import-record-management-and-complete-PDF-reports; original-application-functions-retained; added-Banking-Finance-OS-and-separate-ERP-portal-remain-retired
-preserved: unchanged-original-logo-and-navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-startup-and-historical-migration-checksums
-procurement-import: private-durable-S3-first-source-storage; file-hash-and-row-duplicate-detection; every-file-outcomes; exact-original-P1-P2-P3-P4-priorities; spreadsheet-date-decimal-percentage-formula-review; bounded-local-OCR-no-external-provider; explicit-selected-row-draft-confirmation-and-safe-partial-retries
-procurement-records: owner-or-explicit-management-scope; field-validation; database-persistence; optimistic-revisions; stable-references; audit-history; recoverable-archive-restore; sources-preserved-separately
-procurement-reports: complete-authorised-filtered-register-and-item-supplier-selected-individual-import-outcome-and-native-PO-reports; currencies-units-estimates-commitments-historical-values-and-recorded-received-outstanding-quantities-separated
-pdf-delivery: immutable-source-and-validated-PDF-bytes-hash-version; complete-parser-page-and-identity-validation; application-pdf-safe-pdf-filename-and-disposition; non-PDF-and-error-downloads-rejected; uncertain-relay-POST-outcomes-held-for-review
-weekly-delivery: worked-shifts-only; audited-designated-staff-email-required; exactly-one-To-no-CC-no-BCC-no-fallback-or-manager-copy; eligibility-and-source-rechecked; durable-staff-week-idempotency-and-explicit-sent-revisions
-weekly-schedule: default-Monday-0700-Australia-Sydney-bounded-current-completed-week; no-zero-hour-email-or-historical-backfill
-ci: exact-final-candidate-four-workflows-success; exact-merged-main-six-workflows-success; 63-mandatory-normal-production-and-packaged-source-regressions; real-disposable-MySQL; real-local-OCR; real-PHP-PDF-parser-PHPMailer-MIME; account-original-and-procurement-responsive-Chromium
-ci-candidate-release-run: 38389831690
-ci-merged-release-run: 38390359913
-configuration: existing-app-service-domain-database-private-object-storage-and-info-at-voxelveda-company-WordPress-HTTPS-transport; unchanged-three-predeploy-guards; registered-import-email-queue-and-private-weekly-workers; local-OCR-runtime-tools-only
-authorised-email-test: existing-idempotent-request-1-queue-157-retained; no-blind-resend-or-real-staff-customer-supplier-test-delivery
-relay-status: PDF_RELAY_CONTRACT_REQUIRED-preflight-failure; existing-WordPress-host-inspection-backup-receiver-install-and-recipient-verification-blocked-by-missing-secure-host-connection; provider-acceptance-and-recipient-opening-unverified
-rollback: last-known-approved-033d444-Railway-deployment-3f6c8c16-5754-45a2-9fba-04df3f8e1558; additive-schema-records-retained
+previous-live-commit: a0d0b4298666775d5db35cb63b8eca292897398b
+scope: existing-original-staff-home-attendance-roster-timesheets-profile-and-notifications; original-business-and-procurement-PDF-workflows-preserved; only-added-Banking-Finance-OS-and-separate-ERP-portal-remain-retired
+preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
+notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
+avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
+attendance: authoritative-original-staff-attendance-and-weekly-timesheet-records; signed-expiring-site-purpose-user-session-QR-proof; explicit-clock-actions-with-server-time; durable-UUID-receipts-user-locks-and-reconciliation; actual-breaks; no-location-selfie-biometric-collection
+staff-workflows: own-home-timeline-roster-tasks-history; independent-completed-session-notes; missing-session-and-correction-review-with-current-team-authority-original-values-revisions-and-audit; no-self-approval-or-approved-payroll-period-overwrite
+totals: shared-verified-completed-session-minute-policy; duplicate-rejected-unverified-records-excluded-and-preserved-for-review; established-whole-shift-local-start-allocation; daily-weekly-review-and-PDF-source-agree; historical-hours-labelled-and-unchanged
+mobile: compact-shared-header-and-saved-photo; five-primary-staff-actions; full-readable-navigation-labels-and-touch-targets; exclusive-safe-area-sheets; explicit-focus-body-scroll-and-page-position-restoration; bounded-camera-decoder-failure-and-user-retry
+weekly-delivery: worked-shifts-only; audited-designated-timesheet-email-required; exactly-one-To-no-CC-no-BCC-no-login-email-fallback-or-manager-copy; eligibility-and-source-rechecked; durable-staff-week-idempotency-and-explicit-sent-revisions
+weekly-schedule: retained-Monday-0700-Australia-Sydney-default-and-configured-Australian-IANA-timezone; bounded-latest-completed-week; no-zero-hour-email-or-historical-backfill
+pdf-delivery: retained-immutable-source-and-parser-validated-PDF-bytes-hash-version; at-least-one-valid-page-and-identity; application-pdf-safe-pdf-filename-and-disposition; non-PDF-and-error-downloads-rejected; uncertain-provider-outcomes-held-for-review
+ci: exact-final-candidate-five-workflows-success; exact-merged-main-seven-workflows-success; 70-mandatory-normal-production-HTTPS-and-packaged-source-regressions; real-disposable-MySQL; real-PHP-PDF-parser-PHPMailer-MIME; retained-account-original-procurement-and-staff-Chromium
+ci-candidate-release-run: 38433633956
+ci-merged-release-run: 38434477370
+browser-evidence: pinned-published-before-baseline-a0d0b4298666775d5db35cb63b8eca292897398b; after-four-viewports-both-themes; ten-emulated-camera-cases; real-loader-provider-failure-retry; three-in-flight-account-switch-cases; actual-native-MutationObserver-12-frames-controls-zero-avatar-child-mutations
+verification-limits: synthetic-accounts-only-for-private-workflow-tests; no-real-staff-attendance-or-business-email-tests; native-iOS-Android-camera-and-authenticated-production-private-workflows-not-claimed; received-PDF-opening-unverified
+configuration: same-Railway-app-service-domain-database-private-storage-and-info-at-voxelveda-company-WordPress-HTTPS-transport; no-provider-DNS-or-billing-change; unchanged-three-predeploy-guards; registered-import-email-queue-and-private-weekly-workers
+relay-status: existing-PDF_RELAY_CONTRACT_REQUIRED-preflight-failure-retained; user-secure-connection-approval-received-but-REST-non-JSON-and-no-registered-site; working-administrator-REST-and-plugin-install-or-host-file-deployment-capability-required; no-host-mutation-or-blind-request-1-queue-157-resend
+rollback: prior-approved-a0d0b4298666775d5db35cb63b8eca292897398b-Railway-b5c926b1-d5db-4408-905a-7e48c8764064; additive-schema-and-records-retained
