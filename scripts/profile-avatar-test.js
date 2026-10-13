@@ -2,7 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {createCanvas,loadImage}=require('@napi-rs/canvas');
-const state={profiles:new Map(),objects:new Map(),audits:[],s3:false,auditFailure:false,lostCommit:false,deletedObjects:[],columns:[],scannerConfigured:true,scannerFailure:false,scannedFiles:[]};
+const state={profiles:new Map(),objects:new Map(),audits:[],s3:false,auditFailure:false,lostCommit:false,deletedObjects:[],columns:[],profileWrites:0,connections:0,scannerConfigured:true,scannerFailure:false,scannedFiles:[]};
 const users=new Map([[1,{id:1,role:'staff',department:'Operations',manager_id:3,access_scope:{}}],[2,{id:2,role:'staff',department:'Sales',manager_id:4,access_scope:{}}],[3,{id:3,role:'manager',department:'Operations',access_scope:{}}],[4,{id:4,role:'manager',department:'Sales',access_scope:{}}],[8,{id:8,role:'hr',access_scope:{departments:['Operations']}}],[9,{id:9,role:'customer',department:'Operations',access_scope:{}}]]);
 const cloneProfiles=()=>new Map([...state.profiles].map(([id,row])=>[id,{...row,profile_photo:row.profile_photo?Buffer.from(row.profile_photo):null}]));
 const db={async query(sql,params=[]){const text=sql.replace(/\s+/g,' ').trim();
@@ -13,10 +13,10 @@ const db={async query(sql,params=[]){const text=sql.replace(/\s+/g,' ').trim();
  if(text.startsWith('SELECT id,role,department,manager_id FROM users'))return [[users.get(Number(params[0]))].filter(Boolean)];
  if(text.startsWith('SELECT access_scope FROM users'))return [[users.get(Number(params[0]))].filter(Boolean)];
  if(text.startsWith('SELECT profile_photo'))return [[state.profiles.get(Number(params[0]))].filter(Boolean)];
- if(text.startsWith('INSERT INTO user_profiles')){const [id,buffer,mime,size,key,hash,width,height]=params;state.profiles.set(id,{profile_photo:buffer?Buffer.from(buffer):null,profile_photo_mime:mime,profile_photo_size:size,profile_photo_object_key:key,profile_photo_sha256:hash,profile_photo_width:width,profile_photo_height:height});return [{affectedRows:1}];}
- if(text.startsWith('UPDATE user_profiles SET profile_photo=NULL')){state.profiles.set(params[0],{});return [{affectedRows:1}];}
+ if(text.startsWith('INSERT INTO user_profiles')){state.profileWrites++;const [id,buffer,mime,size,key,hash,width,height]=params;state.profiles.set(id,{profile_photo:buffer?Buffer.from(buffer):null,profile_photo_mime:mime,profile_photo_size:size,profile_photo_object_key:key,profile_photo_sha256:hash,profile_photo_width:width,profile_photo_height:height});return [{affectedRows:1}];}
+ if(text.startsWith('UPDATE user_profiles SET profile_photo=NULL')){state.profileWrites++;state.profiles.set(params[0],{});return [{affectedRows:1}];}
  throw new Error('Unexpected avatar fixture SQL: '+text);
-},async getConnection(){let snapshot,active=false;return {query:db.query,async beginTransaction(){active=true;snapshot=cloneProfiles();},async commit(){active=false;if(state.lostCommit){state.lostCommit=false;throw new Error('Lost commit reply');}},async rollback(){if(active)state.profiles=snapshot;active=false;},release(){}};}};
+},async getConnection(){state.connections++;let snapshot,active=false;return {query:db.query,async beginTransaction(){active=true;snapshot=cloneProfiles();},async commit(){active=false;if(state.lostCommit){state.lostCommit=false;throw new Error('Lost commit reply');}},async rollback(){if(active)state.profiles=snapshot;active=false;},release(){}};}};
 function mock(name,value){const id=require.resolve(name);require.cache[id]={id,filename:id,loaded:true,exports:value};}
 mock('../config/db',db);
 mock('../services/objectStorageService',{isConfigured:()=>state.s3,async putObject(key,bytes){state.objects.set(key,Buffer.from(bytes));},async getObject(key){return state.objects.get(key);},async deleteObject(key){state.deletedObjects.push(key);state.objects.delete(key);}});
@@ -56,9 +56,21 @@ async function main(){
  try{const before=state.scannedFiles.length;await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'MALWARE_SCANNER_REQUIRED'});assert.equal(state.scannedFiles.length,before,'A required but unconfigured scanner blocks before accepting the photo');}finally{state.scannerConfigured=oldConfigured;oldNodeEnv===undefined?delete process.env.NODE_ENV:process.env.NODE_ENV=oldNodeEnv;oldRequired===undefined?delete process.env.MALWARE_SCANNER_REQUIRED:process.env.MALWARE_SCANNER_REQUIRED=oldRequired;}
  state.scannerConfigured=true;state.scannerFailure=true;try{const before=state.scannedFiles.length;await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'MALWARE_SCANNER_UNAVAILABLE'});assert.equal(state.scannedFiles.length,before+1,'An unavailable configured scanner fails closed after attempting the source scan');}finally{state.scannerFailure=false;state.scannerConfigured=oldConfigured;}
  const first=service.normaliseProfilePhoto(file),second=service.normaliseProfilePhoto(file);await assert.rejects(()=>service.normaliseProfilePhoto(file),{code:'PROFILE_PHOTO_BUSY'});await Promise.all([first,second]);
- const req=request();const saved=await service.saveProfilePhoto(1,file,req);const original=await service.getProfilePhoto(1);assert.deepEqual(original.buffer,saved.buffer);assert.equal(state.audits.length,1);
- const duplicate=await service.saveProfilePhoto(1,file,req);assert.equal(duplicate.unchanged,true);assert.equal(state.audits.length,1);
- state.auditFailure=true;await assert.rejects(()=>service.saveProfilePhoto(1,{buffer:png,mimetype:'image/png'},req,{x:0}));assert.deepEqual((await service.getProfilePhoto(1)).buffer,saved.buffer);state.auditFailure=false;
+ const req=request(),oldProvider=process.env.OBJECT_STORAGE_PROVIDER;let saved;
+ try{
+  // Exercise the retained legacy database store deliberately, independently of
+  // the deployment's selected private object provider. Production policy is
+  // separately checked below and the inherited provider is always restored.
+  delete process.env.OBJECT_STORAGE_PROVIDER;
+  saved=await service.saveProfilePhoto(1,file,req);const original=await service.getProfilePhoto(1);assert.deepEqual(original.buffer,saved.buffer);assert.equal(state.audits.length,1);
+  const duplicate=await service.saveProfilePhoto(1,file,req);assert.equal(duplicate.unchanged,true);assert.equal(state.audits.length,1);
+  state.auditFailure=true;try{await assert.rejects(()=>service.saveProfilePhoto(1,{buffer:png,mimetype:'image/png'},req,{x:0}));assert.deepEqual((await service.getProfilePhoto(1)).buffer,saved.buffer);}finally{state.auditFailure=false;}
+  process.env.OBJECT_STORAGE_PROVIDER='s3';
+  const previous=cloneProfiles(),before={audits:state.audits.length,writes:state.profileWrites,connections:state.connections,objects:state.objects.size};
+  await assert.rejects(()=>service.saveProfilePhoto(1,file,req,{x:1}),{code:'PROFILE_PHOTO_STORAGE_UNAVAILABLE'});
+  assert.deepEqual(state.profiles,previous,'Unavailable selected storage cannot replace the saved photo or reference');assert.deepEqual((await service.getProfilePhoto(1)).buffer,saved.buffer);
+  assert.deepEqual({audits:state.audits.length,writes:state.profileWrites,connections:state.connections,objects:state.objects.size},before,'Unavailable selected storage cannot write profiles, emit a successful audit, acquire a write connection or create objects');
+ }finally{oldProvider===undefined?delete process.env.OBJECT_STORAGE_PROVIDER:process.env.OBJECT_STORAGE_PROVIDER=oldProvider;}
  state.s3=true;const changed=await service.saveProfilePhoto(1,file,req,{x:0});assert.equal(state.profiles.get(1).profile_photo,null);assert.ok(state.profiles.get(1).profile_photo_object_key);assert.deepEqual((await service.getProfilePhoto(1)).buffer,changed.buffer);
  const historicalKey=state.profiles.get(1).profile_photo_object_key;state.auditFailure=true;await assert.rejects(()=>service.saveProfilePhoto(1,file,req,{x:1}));assert.ok(state.objects.has(historicalKey));assert.equal(state.objects.size,1,'Fresh rejected object is cleaned while historical object remains');state.auditFailure=false;
  state.lostCommit=true;await assert.rejects(()=>service.saveProfilePhoto(1,file,req,{x:1}));const committedKey=state.profiles.get(1).profile_photo_object_key;assert.ok(state.objects.has(committedKey),'Lost commit reply cannot erase referenced photo bytes');
@@ -68,6 +80,6 @@ async function main(){
  state.auditFailure=true;await assert.rejects(()=>service.removeProfilePhoto(1,req));assert.ok(await service.getProfilePhoto(1));state.auditFailure=false;await service.removeProfilePhoto(1,req);assert.equal(await service.getProfilePhoto(1),null);assert.ok(state.objects.has(committedKey),'Removal revokes access while preserving historical private bytes');
  assert.equal(state.columns.length,4);assert(state.columns.every(sql=>! /DROP|DELETE|UPDATE|TRUNCATE/.test(sql)));
  assert(state.scannedFiles.length>10,'Valid image workflows exercise the configured scanner instead of skipping security checks');assert(state.scannedFiles.every(filename=>!fs.existsSync(filename)),'Successful and failed scans clean private temporary source files');
- console.log('Profile avatar tests passed: genuine JPG/PNG/WebP decode; EXIF pixel orientation; chosen square crop; predecode dimension/magic bounds; configured clean scans and required/unavailable fail-closed checks; private scan-file cleanup; durable DB and private object references; safe duplicate save; atomic audit rollback; lost-commit preservation; own/team/department/customer boundaries; authorised image metadata; archive without historical byte deletion.');
+ console.log('Profile avatar tests passed: genuine JPG/PNG/WebP decode; EXIF pixel orientation; chosen square crop; predecode dimension/magic bounds; configured clean scans and required/unavailable fail-closed checks; private scan-file cleanup; durable DB and private object references; unavailable selected storage preserves photo without writes; safe duplicate save; atomic audit rollback; lost-commit preservation; own/team/department/customer boundaries; authorised image metadata; archive without historical byte deletion.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
