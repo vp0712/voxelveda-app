@@ -75,7 +75,7 @@ async function notificationTarget(req,res,markRead) {
     const [[row]]=await connection.query(`SELECT id,type,category,title,message,priority,linked_module,linked_record_id,action_url,is_read,read_at,created_at FROM notifications WHERE id=? AND ${scope.sql}${markRead?' FOR UPDATE':''}`,[id,...scope.params]);
     if(!row){if(markRead)await connection.rollback();return res.status(404).json({message:'This notification is no longer available.'});}
     const target=await resolveNotificationTarget(connection,row,req.user);
-    if(markRead){await connection.query(`UPDATE notifications SET is_read=1,read_at=COALESCE(read_at,NOW()) WHERE id=? AND ${scope.sql}`,[id,...scope.params]);await connection.commit();row.is_read=1;}
+    if(markRead){await connection.query(`UPDATE notifications SET is_read=1,read_at=COALESCE(read_at,NOW()) WHERE id=? AND ${scope.sql}`,[id,...scope.params]);const [[saved]]=await connection.query(`SELECT is_read,read_at FROM notifications WHERE id=? AND ${scope.sql}`,[id,...scope.params]);if(!saved || !Number(saved.is_read))throw Object.assign(new Error('This notification is no longer available.'),{status:404});await connection.commit();row.is_read=1;row.read_at=saved.read_at;}
     return res.json({notification:{...row,...target},...target,unread:await unreadFor(pool,req.user)});
   }catch(error){if(markRead && connection)await connection.rollback().catch(()=>{});return respondError(res,error);}finally{if(markRead)connection?.release();}
 }

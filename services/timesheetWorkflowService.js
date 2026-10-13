@@ -347,7 +347,8 @@ async function approveTimesheet(id, user, options = {}, req) {
     await createNotification(connection, {
       userId: timesheet.user_id, type: 'TIMESHEET_APPROVED', title: 'Timesheet approved',
       message: `Your timesheet for ${timesheet.week_start} to ${timesheet.week_end} was approved for ${approvedHours.toFixed(2)} hours.`,
-      category: 'HR', priority: 'normal', linkedModule: 'timesheets', linkedRecordId: id, actionUrl: '/dashboard?view=timesheets'
+      category: 'HR', priority: 'normal', linkedModule: 'timesheets', linkedRecordId: id, actionUrl: '/dashboard?view=timesheets',
+      dedupeKey: `timesheet:${id}:version:${versionNo}:status:APPROVED`
     });
     await connection.commit();
 
@@ -408,7 +409,8 @@ async function reviewTimesheet(id, user, action, comments, req) {
     });
     await createNotification(connection, {
       userId: timesheet.user_id, type: `TIMESHEET_${toStatus}`, title: toStatus === 'REJECTED' ? 'Timesheet rejected' : 'Timesheet correction required',
-      message: comments, category: 'HR', priority: 'high', linkedModule: 'timesheets', linkedRecordId: id, actionUrl: '/dashboard?view=timesheets'
+      message: comments, category: 'HR', priority: 'high', linkedModule: 'timesheets', linkedRecordId: id, actionUrl: '/dashboard?view=timesheets',
+      dedupeKey: `timesheet:${id}:version:${versionNo}:status:${toStatus}:comment:${comments}`
     });
     await connection.commit();
 

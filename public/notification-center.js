@@ -1,7 +1,7 @@
 (() => {
   'use strict';
   const state={open:false,items:[],unread:null,page:1,pages:1,loading:false,error:'',moreError:'',notice:'',pending:new Set(),request:null,returnFocus:null};
-  let panel,list,status,markAll,count,backdrop,started=false,countRequest=null;
+  let panel,list,status,markAll,count,backdrop,started=false,countRequest=null,countRevision=0;
   const escape=value=>String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
   const triggers=()=>[...document.querySelectorAll('[data-notification-toggle],#notificationBell,#staffNotificationBell')];
   function headers(){return {'Content-Type':'application/json',...(typeof window.authHeaders==='function'?window.authHeaders():{})};}
@@ -35,7 +35,7 @@
     list.replaceChildren();
     for(const item of state.items){
       const article=document.createElement('li');article.className='vv-notification-item '+(Number(item.is_read)?'is-read':'is-unread');
-      const button=document.createElement('button');button.type='button';button.className='vv-notification-entry';button.disabled=state.pending.has(String(item.id));button.dataset.notificationId=String(item.id);button.setAttribute('aria-label',`${item.title || 'Notification'}, ${Number(item.is_read)?'read':'unread'}`);
+      const button=document.createElement('button');button.type='button';button.className='vv-notification-entry';button.disabled=state.loading || state.pending.has(String(item.id));button.dataset.notificationId=String(item.id);button.setAttribute('aria-label',`${item.title || 'Notification'}, ${Number(item.is_read)?'read':'unread'}`);
       const dot=document.createElement('span');dot.className='vv-notification-dot';dot.setAttribute('aria-hidden','true');
       const content=document.createElement('span');content.className='vv-notification-copy';
       const title=document.createElement('strong');title.textContent=item.title || 'Notification';const message=document.createElement('span');message.className='vv-notification-message';message.textContent=item.message || '';
@@ -49,14 +49,14 @@
     if(!init())return;
     if(!state.open && !more)return refreshCount();
     if(state.request)return state.request;
-    state.loading=true;state.error='';state.moreError='';state.notice='';render();
+    countRevision+=1;state.loading=true;state.error='';state.moreError='';state.notice='';render();
     state.request=(async()=>{try{const next=more?state.page+1:1,data=await api(`?page=${next}&limit=30`);if(!Array.isArray(data.notifications) || !Number.isSafeInteger(Number(data.unread)))throw new Error('Notification status is unavailable. Please retry.');state.items=more?[...new Map([...state.items,...data.notifications].map(item=>[String(item.id),item])).values()]:data.notifications;state.page=Number(data.page || next);state.pages=Number(data.pages || 1);acceptCount(data.unread);}catch(error){if(more)state.moreError=error.message;else state.error=error.message;}finally{state.loading=false;state.request=null;render();}})();
     return state.request;
   }
   async function refreshCount() {
     if(state.open)return refresh();
     if(countRequest)return countRequest;
-    countRequest=(async()=>{try{const data=await api('/unread-count');acceptCount(data.unread);badges();}catch{ /* Keep the last known count; opening the center exposes a retry state. */ }finally{countRequest=null;}})();return countRequest;
+    const revision=++countRevision;countRequest=(async()=>{try{const data=await api('/unread-count');if(revision===countRevision){acceptCount(data.unread);badges();}}catch{ /* Keep the last known count; opening the center exposes a retry state. */ }finally{countRequest=null;}})();return countRequest;
   }
   function position() {
     if(!panel || innerWidth<=640)return;
@@ -144,7 +144,7 @@
     if(location.pathname!=='/profile' || document.getElementById('notifications'))return;
     const section=document.createElement('section');section.id='notifications';section.className='vv-notification-preferences card';section.innerHTML='<h2>Notification preferences</h2><p>Choose which categories appear in your notification center.</p><form data-notification-preferences></form><p data-preference-status role="status">Loading preferences…</p>';document.querySelector('main.shell,main')?.append(section);
     const form=section.querySelector('form'),message=section.querySelector('[data-preference-status]');
-    async function load(){try{const data=await api('/preferences'),saved=new Map((data.preferences || []).map(row=>[row.category,row]));form.replaceChildren();for(const category of ['FINANCE','PRODUCTION','QUALITY','SECURITY','HR','TASKS','SYSTEM']){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.name=category;input.checked=Number(saved.get(category)?.in_app_enabled ?? 1)!==0;label.append(input,document.createTextNode(category.toLowerCase().replace(/\b\w/g,char=>char.toUpperCase())));form.append(label);}const button=document.createElement('button');button.type='submit';button.textContent='Save preferences';form.append(button);message.textContent='';form.onsubmit=async event=>{event.preventDefault();button.disabled=true;const controls=[...form.querySelectorAll('input')];controls.forEach(input=>{input.disabled=true;});try{await Promise.all(controls.map(input=>api('/preferences',{method:'PATCH',body:JSON.stringify({...saved.get(input.name),category:input.name,in_app_enabled:input.checked})})));message.textContent='Preferences saved.';}catch(error){message.textContent=error.message;}finally{button.disabled=false;controls.forEach(input=>{input.disabled=false;});}};}catch(error){message.textContent=error.message;const retry=document.createElement('button');retry.type='button';retry.textContent='Retry';retry.addEventListener('click',load);message.append(retry);}}
+    async function load(){try{const data=await api('/preferences'),saved=new Map((data.preferences || []).map(row=>[row.category,row]));form.replaceChildren();for(const category of ['FINANCE','PRODUCTION','QUALITY','SECURITY','HR','TASKS','SYSTEM']){const label=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.name=category;input.checked=Number(saved.get(category)?.in_app_enabled ?? 1)!==0;label.append(input,document.createTextNode(category==='FINANCE'?'Invoices and expenses':category.toLowerCase().replace(/\b\w/g,char=>char.toUpperCase())));form.append(label);}const button=document.createElement('button');button.type='submit';button.textContent='Save preferences';form.append(button);message.textContent='';form.onsubmit=async event=>{event.preventDefault();if(button.disabled)return;button.disabled=true;const controls=[...form.querySelectorAll('input')];controls.forEach(input=>{input.disabled=true;});try{await Promise.all(controls.map(input=>api('/preferences',{method:'PATCH',body:JSON.stringify({...saved.get(input.name),category:input.name,in_app_enabled:input.checked})})));message.textContent='Preferences saved.';}catch(error){message.textContent=error.message;}finally{button.disabled=false;controls.forEach(input=>{input.disabled=false;});}};}catch(error){message.textContent=error.message;const retry=document.createElement('button');retry.type='button';retry.textContent='Retry';retry.addEventListener('click',load);message.append(retry);}}
     await load();if(location.hash==='#notifications')section.scrollIntoView({block:'start'});
   }
   window.VoxelNotificationCenter={open,toggle,close,refresh,refreshCount,get ready(){return Boolean(panel);}};

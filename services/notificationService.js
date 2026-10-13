@@ -23,7 +23,7 @@ function normaliseActionUrl(value) {
 }
 function eventKey(notification,userId) {
   const explicit=notification.dedupeKey ?? notification.eventId;
-  const identity=explicit ?? (notification.linkedRecordId==null?null:[String(notification.type || 'system'),String(notification.linkedModule || '').toUpperCase(),String(notification.linkedRecordId),String(notification.title || '').trim(),String(notification.message || '')]);
+  const identity=explicit ?? (notification.linkedRecordId==null?null:[String(notification.type || 'system').trim().slice(0,80),String(notification.linkedModule || '').trim().toUpperCase(),String(notification.linkedRecordId).slice(0,80),String(notification.title || '').trim().slice(0,180),notification.message?String(notification.message).slice(0,5000):'']);
   return identity===null?null:crypto.createHash('sha256').update(JSON.stringify([userId,identity])).digest('hex');
 }
 async function createNotification(db,notification) {
@@ -91,15 +91,16 @@ function visibleNotificationWhere(user,{alias='notifications',respectPreferences
     const modules=names.map(value=>`'${value}'`).join(',');
     clauses.push(`(${module} NOT IN (${modules})${enabled?` OR (${scope || '1=1'})`:''})`);if(enabled)params.push(...scopeParams);
   }
-  const finance=hasPermission(user,'VIEW_FINANCE');
-  rule(['INVOICE','INVOICES','FINANCE'],finance,customerScoped(user)?`(${linkedId} IS NULL OR EXISTS (SELECT 1 FROM invoices ni WHERE ni.id=${linkedId} AND LOWER(ni.customer_email)=?))`:'',[customerEmail(user)].filter(()=>customerScoped(user)));
+  const finance=hasPermission(user,'VIEW_FINANCE') && (!customerScoped(user) || Boolean(customerEmail(user)));
+  rule(['INVOICE','INVOICES','FINANCE'],finance,customerScoped(user)?`(${linkedId} IS NULL OR EXISTS (SELECT 1 FROM invoices ni WHERE ni.id=${linkedId} AND LOWER(TRIM(ni.customer_email))=?))`:'',[customerEmail(user)].filter(()=>customerScoped(user)));
   rule(['EXPENSE','EXPENSES'],finance && !customerScoped(user));
   const jobsAll=hasPermission(user,'MANAGE_JOBS'),jobsTeam=hasPermission(user,'MANAGE_TEAM_JOBS'),jobsOwn=hasPermission(user,'VIEW_OWN_JOBS');
   const taskScope=jobsAll?'':`(${linkedId} IS NULL OR NOT EXISTS (SELECT 1 FROM tasks nt WHERE nt.id=${linkedId}) OR EXISTS (SELECT 1 FROM tasks nt LEFT JOIN users nu ON nu.id=nt.assigned_to WHERE nt.id=${linkedId} AND (nt.assigned_to=?${jobsTeam?' OR nu.manager_id=?':''})))`;
   rule(['TASK','TASKS'],jobsAll || jobsTeam || jobsOwn,taskScope,jobsAll?[]:jobsTeam?[actor,actor]:[actor]);
   const tsAll=hasPermission(user,'VIEW_ALL_TIMESHEETS'),tsTeam=hasPermission(user,'VIEW_TEAM_TIMESHEET'),tsOwn=hasPermission(user,'VIEW_OWN_TIMESHEET');
-  const tsScope=tsAll?'':`(${linkedId} IS NULL OR NOT EXISTS (SELECT 1 FROM weekly_timesheets nw WHERE nw.id=${linkedId}) OR EXISTS (SELECT 1 FROM weekly_timesheets nw LEFT JOIN users nu ON nu.id=nw.user_id WHERE nw.id=${linkedId} AND (nw.user_id=?${tsTeam?' OR nu.manager_id=?':''})))`;
-  rule(['TIMESHEET','TIMESHEETS','ATTENDANCE'],hasPermission(user,'VIEW_ATTENDANCE') && (tsAll || tsTeam || tsOwn),tsScope,tsAll?[]:tsTeam?[actor,actor]:[actor]);
+  const tsScopes=[],tsParams=[];if(tsOwn){tsScopes.push('nw.user_id=?');tsParams.push(actor);}if(tsTeam){tsScopes.push('nu.manager_id=?');tsParams.push(actor);}
+  const tsScope=tsAll?'':`(${linkedId} IS NULL OR NOT EXISTS (SELECT 1 FROM weekly_timesheets nw WHERE nw.id=${linkedId}) OR EXISTS (SELECT 1 FROM weekly_timesheets nw LEFT JOIN users nu ON nu.id=nw.user_id WHERE nw.id=${linkedId} AND (${tsScopes.join(' OR ') || '0=1'})))`;
+  rule(['TIMESHEET','TIMESHEETS','ATTENDANCE'],hasPermission(user,'VIEW_ATTENDANCE') && (tsAll || tsTeam || tsOwn),tsScope,tsAll?[]:tsParams);
   const correctionAll=hasAnyPermission(user,['EDIT_ATTENDANCE','APPROVE_ALL_TIMESHEETS']),correctionTeam=hasPermission(user,'APPROVE_TEAM_TIMESHEET');
   rule(['ATTENDANCE_CORRECTIONS'],hasPermission(user,'VIEW_ATTENDANCE'),correctionAll?'':`EXISTS (SELECT 1 FROM attendance_correction_requests nc JOIN users nu ON nu.id=nc.user_id WHERE nc.id=${linkedId} AND (nc.user_id=?${correctionTeam?' OR nu.manager_id=?':''}))`,correctionAll?[]:correctionTeam?[actor,actor]:[actor]);
   const workflowAll=hasPermission(user,'MANAGE_WORKFLOWS');
@@ -108,7 +109,7 @@ function visibleNotificationWhere(user,{alias='notifications',respectPreferences
   rule(['PROCUREMENT','PURCHASE_ORDER','PURCHASE_ORDERS','PURCHASE_REQUISITION'],hasPermission(user,'VIEW_PROCUREMENT'),hasPermission(user,'MANAGE_PROCUREMENT_RECORDS')?'':`(${linkedId} IS NULL OR ${linkedId} NOT REGEXP '^[a-fA-F0-9]{8}-' OR EXISTS (SELECT 1 FROM procurement_records pr WHERE pr.id=${linkedId} AND pr.owner_user_id=?))`,hasPermission(user,'MANAGE_PROCUREMENT_RECORDS')?[]:[actor]);
   rule(['STAFF_MESSAGES','STAFF_WORK_REQUESTS'],jobsAll);
   rule(['QMS','QUALITY'],hasAnyPermission(user,['VIEW_QMS','VIEW_COMPLIANCE']));
-  rule(['RFQ','RFQS','QUOTATION','QUOTATIONS'],hasPermission(user,'VIEW_RFQS'),customerScoped(user)?`(${linkedId} IS NULL OR EXISTS (SELECT 1 FROM rfqs nr WHERE nr.id=${linkedId} AND LOWER(nr.email)=?))`:'',customerScoped(user)?[customerEmail(user)]:[]);
+  rule(['RFQ','RFQS','QUOTATION','QUOTATIONS'],hasPermission(user,'VIEW_RFQS'),customerScoped(user)?`(${linkedId} IS NULL OR EXISTS (SELECT 1 FROM rfqs nr WHERE nr.id=${linkedId} AND LOWER(TRIM(nr.email))=?))`:'',customerScoped(user)?[customerEmail(user)]:[]);
   return {sql:clauses.join(' AND '),params};
 }
 function recordId(row) {
@@ -188,6 +189,7 @@ async function resolveNotificationTarget(db,row,user) {
     if(day(record.starts_at)>today || day(record.expires_at)<today)return unavailable;
     return allowed('dashboard',{id:record.id,title:record.title,description:record.message,priority:record.priority});
   }
+  if(id)return unavailable;
   const url=normaliseActionUrl(row.action_url);
   if(url){const parsed=new URL(url,'https://app.voxelveda.com');if(['/profile','/security'].includes(parsed.pathname))return {action_url:parsed.pathname,target_status:'AVAILABLE'};const view=parsed.searchParams.get('view');const views={customers:'VIEW_CUSTOMERS',suppliers:'VIEW_SUPPLIERS',stock:'VIEW_INVENTORY',meetings:'VIEW_MEETINGS',compliance:'VIEW_COMPLIANCE',roster:'VIEW_OWN_ROSTER'};if(view && views[view] && hasPermission(user,views[view]))return allowed(view);if([base,'/dashboard'].includes(parsed.pathname) && !view)return {action_url:base,target_status:'AVAILABLE'};}
   return {action_url:null,target_status:'NONE'};

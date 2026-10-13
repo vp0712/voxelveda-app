@@ -24,6 +24,7 @@ const identities = new Map([
 ]);
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = crypto.randomBytes(48).toString('hex');
+process.env.SHIFT_QR_SIGNING_KEY = crypto.randomBytes(48).toString('hex');
 process.env.RATE_LIMIT_STORE = 'memory';
 process.env.MFA_REQUIRED_ROLES = 'super_admin,admin';
 const sessions = new Map(), requests = [], mutations = [];
@@ -75,7 +76,7 @@ function resetState() {
       is_read: index > 23 ? 1 : 0, created_at: new Date(Date.now() - index * 60000).toISOString()
     })),
     attendance: null, actionResults: new Map(), receiptRequests: [], timeline: [], breakStart: null,
-    serverNow: new Date('2026-10-13T00:00:00Z'), loseNextActionReply: false, corrections: [], correctionRequests: []
+    serverNow: new Date('2026-10-13T00:00:00Z'), loseNextActionReply: false, corrections: [], correctionRequests: [], qrValidationRequests: []
   };
 }
 function attendanceState(state, userId = 9401) {
@@ -140,6 +141,16 @@ async function makeServer(publicDirectory, photo) {
   });
   app.get('/api/notifications/preferences', (_req, res) => res.json({ preferences: [] }));
   app.get('/api/attendance/today', (req, res) => res.json(attendanceState(state, Number(req.user.id))));
+  app.post('/api/attendance/qr/validate', (req, res) => {
+    const qr = require('../services/attendanceQrService'), now = new Date();
+    state.qrValidationRequests.push({ action: req.body.action, user_id: Number(req.user.id) });
+    try {
+      qr.validateSiteToken(req.body.token, now);
+      return res.json(qr.createActionProof({ userId: Number(req.user.id), action: req.body.action, attendanceId: req.body.attendance_id ?? null, priorAttendanceId: state.attendance?.id ?? null, siteToken: req.body.token, now }));
+    } catch (error) {
+      return res.set('X-Fixture-Expected', 'QR_REJECTED').status(error.statusCode || 403).json({ message: error.message, code: error.code, fields: error.fields, qr_required: true });
+    }
+  });
   app.get('/api/attendance/reconcile', (req, res) => {
     const receipt = state.actionResults.get(`${req.user.id}:${req.query.request_id}`);
     res.json({ found: Boolean(receipt), receipt: receipt?.response || null, state: attendanceState(state, Number(req.user.id)) });
@@ -214,6 +225,106 @@ async function makeServer(publicDirectory, photo) {
   process.env.ALLOWED_ORIGINS = [...new Set([...(process.env.ALLOWED_ORIGINS || '').split(',').filter(Boolean), origin])].join(',');
   return { server, state, origin };
 }
+
+async function verifyEmulatedCameraCases(browser, fixture) {
+  // These checks exercise the real scanner and staff confirmation UI. Device
+  // capture and decoded-token input are emulated; native camera/QR recognition
+  // is not claimed. Signature, expiry and site responses use the real service.
+  const qr = require('../services/attendanceQrService'), results = [];
+  const scenarios = [
+    { name: 'permission-denied', mode: 'denied', message: 'Camera permission was denied', calls: 1 },
+    { name: 'camera-not-found', mode: 'unavailable', message: 'No camera is available', calls: 2 },
+    { name: 'media-api-unavailable', mode: 'unsupported', message: 'Camera scanning is unavailable', calls: 0 },
+    { name: 'decoder-unavailable', mode: 'decoder-unavailable', message: 'camera or QR decoder is unavailable', calls: 1, tracks: 1 },
+    { name: 'allowed-camera-close', mode: 'no-token', calls: 1, tracks: 1 },
+    { name: 'allowed-valid-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date()).token, calls: 1, tracks: 1, valid: true },
+    { name: 'invalid-signed-token', mode: 'token', token: () => 'synthetic-invalid-signed-token', calls: 1, tracks: 1, code: 'ATTENDANCE_QR_INVALID' },
+    { name: 'expired-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date(Date.now() - 120000)).token, calls: 1, tracks: 1, code: 'ATTENDANCE_QR_EXPIRED' },
+    { name: 'wrong-site-signed-token', mode: 'token', token: () => {
+      const previous = process.env.SHIFT_QR_SITE_ID;
+      try { process.env.SHIFT_QR_SITE_ID = 'synthetic-different-attendance-site'; return qr.createSiteToken(new Date()).token; }
+      finally { if (previous === undefined) delete process.env.SHIFT_QR_SITE_ID; else process.env.SHIFT_QR_SITE_ID = previous; }
+    }, calls: 1, tracks: 1, code: 'ATTENDANCE_QR_WRONG_SITE' },
+    { name: 'permission-result-after-close', mode: 'late', calls: 1, tracks: 1 }
+  ];
+  for (const scenario of scenarios) {
+    Object.assign(fixture.state, resetState());
+    const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' });
+    context.setDefaultTimeout(12000);
+    await context.addCookies([{ name: 'vv_session', value: userSession(9402), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
+    const page = await context.newPage(), errors = [], qrResponses = [], reads = [];
+    page.on('pageerror', error => errors.push(error.message));
+    page.on('response', response => {
+      if (new URL(response.url()).pathname === '/api/attendance/qr/validate') reads.push(response.json().then(body => { qrResponses.push({ status: response.status(), code: body.code || null, valid: body.valid === true }); }));
+    });
+    try {
+      await page.goto(fixture.origin + '/portal/staff', { waitUntil: 'networkidle' });
+      await page.locator('#staffHomePrimaryAction:not([disabled])').waitFor();
+      await page.evaluate(({ mode, decodedToken }) => {
+        const state = window.__emulatedAttendanceCamera = { calls: 0, stops: 0, tracks: [], decoded: 0, release: null };
+        if (mode === 'unsupported') Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: undefined });
+        else Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
+          async getUserMedia() {
+            state.calls++;
+            if (mode === 'denied') throw new DOMException('Synthetic camera permission denial', 'NotAllowedError');
+            if (mode === 'unavailable') throw new DOMException('Synthetic camera not found', 'NotFoundError');
+            const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
+            const drawing = canvas.getContext('2d'); drawing.fillStyle = '#165b82'; drawing.fillRect(0, 0, 64, 64);
+            const stream = canvas.captureStream(5);
+            drawing.fillRect(0, 0, 64, 64); stream.getVideoTracks().forEach(track => track.requestFrame?.());
+            for (const track of stream.getTracks()) {
+              const stop = track.stop.bind(track); track.stop = () => { state.stops++; stop(); }; state.tracks.push(track);
+            }
+            if (mode === 'late') return new Promise(resolve => { state.release = () => resolve(stream); });
+            return stream;
+          }
+        } });
+        window.getShiftQrDecoder = async () => {
+          if (mode === 'decoder-unavailable') throw new Error('Synthetic decoder unavailable');
+          return { type: 'emulated-token-input' };
+        };
+        if (mode === 'decoder-unavailable') window.jsQR = undefined;
+        window.loadExternalScript = async () => { throw new Error('External decoder is unavailable in this device emulation'); };
+        window.detectShiftQr = async () => { state.decoded++; return mode === 'token' ? decodedToken : null; };
+      }, { mode: scenario.mode, decodedToken: scenario.token?.() || null });
+      assert.equal(fixture.state.receiptRequests.length, 0);
+      await page.locator('#staffHomePrimaryAction').click();
+      await page.locator('#staffAttendanceOverlay').waitFor({ state: 'visible' });
+      if (scenario.message) await page.locator('#staffAttendanceScanStatus').filter({ hasText: scenario.message }).waitFor();
+      else if (scenario.valid) await page.locator('#staffAttendanceConfirm').waitFor();
+      else if (scenario.code) {
+        await page.waitForFunction(() => document.getElementById('staffAttendanceScanStatus')?.getAttribute('data-error') === 'true');
+        const message = await page.locator('#staffAttendanceScanStatus').textContent();
+        assert(message.includes('No attendance was changed.'));
+        if (scenario.code === 'ATTENDANCE_QR_EXPIRED') assert(message.includes('expired'));
+        if (scenario.code === 'ATTENDANCE_QR_WRONG_SITE') assert(message.includes('different attendance site'));
+        if (scenario.code === 'ATTENDANCE_QR_INVALID') assert(message.includes('current workplace QR'));
+      }
+      else if (scenario.mode === 'late') await page.waitForFunction(() => window.__emulatedAttendanceCamera?.calls === 1);
+      else await page.waitForFunction(() => document.getElementById('staffAttendanceVideo')?.readyState >= 2 && window.__emulatedAttendanceCamera?.decoded > 0);
+      assert.equal(fixture.state.receiptRequests.length, 0, 'Opening camera, decoding and QR verification cannot clock a user in.');
+      if (!scenario.valid) assert.equal(await page.locator('#staffAttendanceConfirm').count(), 0, 'A failed or unfinished scan cannot enable confirmation.');
+      if (scenario.valid) await page.locator('#staffAttendanceCancel').click();
+      else await page.locator('#staffAttendanceScanCancel').click();
+      if (scenario.mode === 'late') await page.evaluate(() => window.__emulatedAttendanceCamera.release());
+      await page.locator('#staffAttendanceOverlay').waitFor({ state: 'hidden' });
+      if (scenario.tracks) await page.waitForFunction(() => window.__emulatedAttendanceCamera.tracks.every(track => track.readyState === 'ended'));
+      const device = await page.evaluate(() => ({ calls: window.__emulatedAttendanceCamera.calls, stopped: window.__emulatedAttendanceCamera.stops, tracks: window.__emulatedAttendanceCamera.tracks.length, states: window.__emulatedAttendanceCamera.tracks.map(track => track.readyState) }));
+      assert.equal(device.calls, scenario.calls); assert.equal(device.tracks, scenario.tracks || 0); assert.equal(device.stopped, scenario.tracks || 0);
+      await Promise.all(reads);
+      if (scenario.code) { assert.equal(qrResponses.length, 1); assert.equal(qrResponses[0].code, scenario.code); assert.equal(qrResponses[0].status, 403); }
+      else if (scenario.valid) { assert.deepEqual(qrResponses, [{ status: 200, code: null, valid: true }]); }
+      else assert.deepEqual(qrResponses, []);
+      assert.equal(fixture.state.receiptRequests.length, 0); assert.equal(fixture.state.attendance, null);
+      assert.deepEqual(errors, []);
+      results.push({ scenario: scenario.name, hardwareEmulated: true, nativeHardwareVerified: false, device, qrResponses, actionsPosted: 0 });
+    } catch (error) {
+      await page.screenshot({ path: path.join(output, 'scanner-' + scenario.name + '-failure.png'), fullPage: true, animations: 'disabled' }).catch(() => {});
+      throw new Error('Emulated camera scenario failed: ' + scenario.name, { cause: error });
+    } finally { await context.close(); }
+  }
+  return results;
+}
 async function run() {
   fs.mkdirSync(output, { recursive: true });
   const baselineDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'voxel-staff-before-'));
@@ -228,11 +339,12 @@ async function run() {
   drawing.fillStyle = '#165b82'; drawing.fillRect(0, 0, 96, 96);
   const photo = await canvas.encode('png');
   const servers = [], results = [];
-  let browser, diagnosticPage, diagnosticDetails = {};
+  let browser, diagnosticPage, diagnosticDetails = {}, afterFixture;
   try {
     browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_PATH || process.env.VV_BROWSER_EXECUTABLE || undefined, args: ['--no-sandbox'], timeout: 20000 });
     for (const phase of selectedPhase === 'both' ? ['before', 'after'] : [selectedPhase]) {
       const fixture = await makeServer(phase === 'before' ? path.join(baselineDirectory, 'public') : path.join(project, 'public'), photo); servers.push(fixture.server);
+      if (phase === 'after') afterFixture = fixture;
       for (const viewport of [{ name: 'phone', width: 375, height: 812 }, { name: 'desktop', width: 1440, height: 1000 }]) {
         Object.assign(fixture.state, resetState());
         const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' });
@@ -362,10 +474,11 @@ async function run() {
         await context.close();
       }
     }
+    const cameraEmulation = afterFixture ? await verifyEmulatedCameraCases(browser, afterFixture) : [];
     const unauthorized = await fetch(`http://127.0.0.1:${servers.at(-1).address().port}/api/profile`);
     assert.equal(unauthorized.status, 401, 'anonymous callers must fail actual API authentication');
     fs.writeFileSync(path.join(output, 'staff-mobile-proof.json'), JSON.stringify({ baselineRef, baselineSource: useSavedArchive ? 'Explicit local preserved byte-equivalent ea5 archive' : 'Pinned remote Git baseline', fixtureOnly: true,
-      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The synthetic UI account carries the explicit stored attendance_qr_bypass flag. The real MySQL suite proves signed QR and exact-session enforcement.', results }, null, 2));
+      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, results }, null, 2));
     console.log('Staff mobile browser before/after screenshots and actual cookie/JWT/CSP fixture passed: ' + output);
   } catch (error) {
     if (diagnosticPage && !diagnosticPage.isClosed()) await diagnosticPage.screenshot({ path: path.join(output, 'failure.png'), fullPage: true, animations: 'disabled' }).catch(() => {});
