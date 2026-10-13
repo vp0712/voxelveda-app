@@ -4,10 +4,12 @@
   let bodyState = null;
   function unlock() {
     if (!bodyState || !document.body) return;
-    document.body.style.overflow = bodyState.overflow;
-    document.body.style.overscrollBehavior = bodyState.overscroll;
+    const saved = bodyState;
+    document.body.style.overflow = saved.overflow;
+    document.body.style.overscrollBehavior = saved.overscroll;
     document.body.classList.remove('vv-overlay-open');
     bodyState = null;
+    window.scrollTo?.({ left: saved.scrollX, top: saved.scrollY, behavior: 'instant' });
   }
   function close(id, reason = 'closed') {
     if (!active || (id && active.id !== id)) return false;
@@ -35,7 +37,8 @@
     next.returnFocus ||= document.activeElement;
     active = next;
     if (document.body) {
-      bodyState ||= { overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior };
+      bodyState ||= { overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior,
+        scrollX: window.scrollX || 0, scrollY: window.scrollY || 0 };
       document.body.style.overflow = 'hidden';
       document.body.style.overscrollBehavior = 'none';
       document.body.classList.add('vv-overlay-open');

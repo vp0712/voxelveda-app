@@ -363,6 +363,7 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
     await context.addCookies([{ name: 'vv_session', value: userSession(9401), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
     const page = await context.newPage(), errors = [], apiFailures = [];
     const name = viewport.name + '-' + mode;
+    let beforeOverlay = null, restored = null;
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => { const pathname = new URL(response.url()).pathname; if (pathname.startsWith('/api/') && response.status() >= 400) apiFailures.push({ path: pathname, status: response.status() }); });
     await page.addInitScript(preference => { localStorage.setItem('voxelveda:color-mode', preference); }, mode);
@@ -394,9 +395,17 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
         }
       } else assert.equal(layout.mobileNavVisible, false);
       await page.screenshot({ path: path.join(output, 'after-responsive-' + name + '-home.png'), animations: 'disabled' });
-      await page.evaluate(() => window.scrollTo(0, Math.min(80, Math.max(0, document.documentElement.scrollHeight - innerHeight))));
+      await page.evaluate(() => window.scrollTo({ left: 0, top: Math.min(80, Math.max(0, document.documentElement.scrollHeight - innerHeight)), behavior: 'instant' }));
       await page.locator('#staffNotificationBell').scrollIntoViewIfNeeded();
-      const beforeOverlay = await page.evaluate(() => ({ scrollX, scrollY, overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior }));
+      beforeOverlay = await page.evaluate(async () => {
+        let stable = 0, lastX = scrollX, lastY = scrollY;
+        for (let frame = 0; frame < 120; frame++) {
+          await new Promise(resolve => requestAnimationFrame(resolve));
+          stable = scrollX === lastX && scrollY === lastY ? stable + 1 : 0; lastX = scrollX; lastY = scrollY;
+          if (stable >= 3) return { scrollX, scrollY, overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior };
+        }
+        throw new Error('The preparatory staff page scroll did not settle before opening notifications.');
+      });
       await page.locator('#staffNotificationBell').click(); await page.locator('#staffNotificationPanel').waitFor({ state: 'visible' });
       await page.waitForFunction(() => document.querySelectorAll('#staffNotificationPanel [data-notification-id]').length > 0);
       const panel = await page.locator('#staffNotificationPanel').boundingBox();
@@ -405,7 +414,7 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
       assert(panelStyle.scrollWidth <= panelStyle.viewportWidth, 'Opening notifications cannot add horizontal overflow.');
       await page.screenshot({ path: path.join(output, 'after-responsive-' + name + '-notifications.png'), animations: 'disabled' });
       await page.keyboard.press('Escape'); await page.locator('#staffNotificationPanel').waitFor({ state: 'hidden' });
-      const restored = await page.evaluate(() => ({ activeElement: document.activeElement?.id, scrollX, scrollY, overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior, overlayOpen: document.body.classList.contains('vv-overlay-open') }));
+      restored = await page.evaluate(() => ({ activeElement: document.activeElement?.id, scrollX, scrollY, overflow: document.body.style.overflow, overscroll: document.body.style.overscrollBehavior, overlayOpen: document.body.classList.contains('vv-overlay-open') }));
       assert.equal(restored.activeElement, 'staffNotificationBell'); assert.equal(restored.overlayOpen, false);
       assert.equal(restored.overflow, beforeOverlay.overflow); assert.equal(restored.overscroll, beforeOverlay.overscroll);
       assert.equal(restored.scrollX, beforeOverlay.scrollX); assert(Math.abs(restored.scrollY - beforeOverlay.scrollY) <= 1, 'Escape must preserve the underlying staff page scroll position.');
@@ -414,9 +423,9 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
       fs.writeFileSync(path.join(output, 'staff-responsive-matrix.json'), JSON.stringify({ fixtureOnly: true, scope, complete: results.length === 8, results }, null, 2));
     } catch (error) {
       const uiState = await page.evaluate(() => ({ path: location.pathname, theme: document.documentElement.dataset.colorMode, owner: window.VoxelStaffHome?.state?.profile?.id || null,
-        homeError: document.getElementById('staffHomeErrorText')?.textContent || null, viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth },
+        homeError: document.getElementById('staffHomeErrorText')?.textContent || null, viewport: { width: innerWidth, height: innerHeight, scrollWidth: document.documentElement.scrollWidth, scrollX, scrollY },
         nav: [...document.querySelectorAll('.staff-mobile-bottom-nav button')].map(button => ({ label: button.textContent, textOverflow: getComputedStyle(button).textOverflow, fontSize: getComputedStyle(button).fontSize, width: button.getBoundingClientRect().width, height: button.getBoundingClientRect().height, scrollWidth: button.scrollWidth, clientWidth: button.clientWidth })) })).catch(() => null);
-      fs.writeFileSync(path.join(output, 'staff-responsive-matrix-failure.json'), JSON.stringify({ fixtureOnly: true, scope, viewport, mode, message: error.message, uiState, errors, apiFailures, completed: results }, null, 2));
+      fs.writeFileSync(path.join(output, 'staff-responsive-matrix-failure.json'), JSON.stringify({ fixtureOnly: true, scope, viewport, mode, message: error.message, beforeOverlay, restored, uiState, errors, apiFailures, completed: results }, null, 2));
       await page.screenshot({ path: path.join(output, 'responsive-' + name + '-failure.png'), animations: 'disabled', timeout: 5000 }).catch(() => {});
       throw new Error('Actual staff responsive matrix failed: ' + name, { cause: error });
     } finally { await context.close(); }
