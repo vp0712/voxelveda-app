@@ -84,9 +84,14 @@ function visibleNotificationWhere(user,{alias='notifications',respectPreferences
     WHEN ${rawModule} IN ('RFQ','RFQS','QUOTATION','QUOTATIONS') OR ${rawUrl} REGEXP '(^/rfqs([?]|$)|[?&]view=rfqs(&|$))' THEN 'RFQ'
     ELSE ${rawModule} END)`;
   const linkedId=`COALESCE(NULLIF(${n}.linked_record_id,''),CASE WHEN ${rawUrl} REGEXP '[?&](id|record_id|instance_id|correction_id)=' THEN SUBSTRING_INDEX(SUBSTRING_INDEX(${n}.action_url,'id=',-1),'&',1) END)`;
+  // Retained tables may inherit different database collations. Convert only
+  // the comparison operand, leaving indexed record IDs unchanged and keeping
+  // the existing case-insensitive UUID/category matching behavior.
+  const compatibleText=value=>`(CONVERT(${value} USING utf8mb4) COLLATE utf8mb4_unicode_ci)`;
+  const linkedText=compatibleText(linkedId);
   const clauses=[`${n}.user_id=?`,`${n}.deleted_at IS NULL`,`${n}.dismissed_at IS NULL`,`(${n}.expires_at IS NULL OR ${n}.expires_at>NOW())`,`${module}<>'RETIRED'`,
     `NOT (LOWER(COALESCE(${n}.action_url,'')) REGEXP '^/(api/(banking|finance|high-risk-finance|erp)|banking([/.]|$)|erp([/.]|$)|finance([-/.]|$)|personal-finance([/.]|$)|financial-years([/.]|$))')`,`NOT (${rawUrl} REGEXP '[?&]view=(finance|banking|erp|personal-finance|financial-years)([-_&]|$)')`];
-  if(respectPreferences)clauses.push(`NOT EXISTS (SELECT 1 FROM notification_preferences np WHERE np.user_id=${n}.user_id AND UPPER(np.category)=UPPER(${n}.category) AND np.in_app_enabled=0)`);
+  if(respectPreferences)clauses.push(`NOT EXISTS (SELECT 1 FROM notification_preferences np WHERE np.user_id=${n}.user_id AND UPPER(np.category)=${compatibleText(`UPPER(${n}.category)`)} AND np.in_app_enabled=0)`);
   function rule(names,enabled,scope='',scopeParams=[]) {
     const modules=names.map(value=>`'${value}'`).join(',');
     clauses.push(`(${module} NOT IN (${modules})${enabled?` OR (${scope || '1=1'})`:''})`);if(enabled)params.push(...scopeParams);
@@ -104,9 +109,9 @@ function visibleNotificationWhere(user,{alias='notifications',respectPreferences
   const correctionAll=hasAnyPermission(user,['EDIT_ATTENDANCE','APPROVE_ALL_TIMESHEETS']),correctionTeam=hasPermission(user,'APPROVE_TEAM_TIMESHEET');
   rule(['ATTENDANCE_CORRECTIONS'],hasPermission(user,'VIEW_ATTENDANCE'),correctionAll?'':`EXISTS (SELECT 1 FROM attendance_correction_requests nc JOIN users nu ON nu.id=nc.user_id WHERE nc.id=${linkedId} AND (nc.user_id=?${correctionTeam?' OR nu.manager_id=?':''}))`,correctionAll?[]:correctionTeam?[actor,actor]:[actor]);
   const workflowAll=hasPermission(user,'MANAGE_WORKFLOWS');
-  const workflowScope=`(${linkedId} IS NULL OR NOT EXISTS (SELECT 1 FROM workflow_instances wi WHERE wi.id=${linkedId}) OR EXISTS (SELECT 1 FROM workflow_instances wi WHERE wi.id=${linkedId} AND UPPER(wi.module) NOT IN ('FINANCE','BANKING','ERP','PERSONAL_FINANCE')${workflowAll?'':' AND (wi.requester_id=? OR EXISTS (SELECT 1 FROM workflow_assignments wa WHERE wa.instance_id=wi.id AND wa.assignee_user_id=?))'}))`;
+  const workflowScope=`(${linkedId} IS NULL OR NOT EXISTS (SELECT 1 FROM workflow_instances wi WHERE wi.id=${linkedText}) OR EXISTS (SELECT 1 FROM workflow_instances wi WHERE wi.id=${linkedText} AND UPPER(wi.module) NOT IN ('FINANCE','BANKING','ERP','PERSONAL_FINANCE')${workflowAll?'':` AND (wi.requester_id=? OR EXISTS (SELECT 1 FROM workflow_assignments wa WHERE wa.instance_id=${compatibleText('wi.id')} AND wa.assignee_user_id=?))`}))`;
   rule(['WORKFLOW','APPROVAL','APPROVALS'],hasPermission(user,'VIEW_APPROVALS'),workflowScope,workflowAll?[]:[actor,actor]);
-  rule(['PROCUREMENT','PURCHASE_ORDER','PURCHASE_ORDERS','PURCHASE_REQUISITION'],hasPermission(user,'VIEW_PROCUREMENT'),hasPermission(user,'MANAGE_PROCUREMENT_RECORDS')?'':`(${linkedId} IS NULL OR ${linkedId} NOT REGEXP '^[a-fA-F0-9]{8}-' OR EXISTS (SELECT 1 FROM procurement_records pr WHERE pr.id=${linkedId} AND pr.owner_user_id=?))`,hasPermission(user,'MANAGE_PROCUREMENT_RECORDS')?[]:[actor]);
+  rule(['PROCUREMENT','PURCHASE_ORDER','PURCHASE_ORDERS','PURCHASE_REQUISITION'],hasPermission(user,'VIEW_PROCUREMENT'),hasPermission(user,'MANAGE_PROCUREMENT_RECORDS')?'':`(${linkedId} IS NULL OR ${linkedId} NOT REGEXP '^[a-fA-F0-9]{8}-' OR EXISTS (SELECT 1 FROM procurement_records pr WHERE pr.id=${linkedText} AND pr.owner_user_id=?))`,hasPermission(user,'MANAGE_PROCUREMENT_RECORDS')?[]:[actor]);
   rule(['STAFF_MESSAGES','STAFF_WORK_REQUESTS'],jobsAll);
   rule(['QMS','QUALITY'],hasAnyPermission(user,['VIEW_QMS','VIEW_COMPLIANCE']));
   rule(['RFQ','RFQS','QUOTATION','QUOTATIONS'],hasPermission(user,'VIEW_RFQS'),customerScoped(user)?`(${linkedId} IS NULL OR EXISTS (SELECT 1 FROM rfqs nr WHERE nr.id=${linkedId} AND LOWER(TRIM(nr.email))=?))`:'',customerScoped(user)?[customerEmail(user)]:[]);

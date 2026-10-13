@@ -852,7 +852,7 @@
           <div class="section-head">
             <div>
               <h3>Staff Timesheet Lookup</h3>
-              <p>Select a staff member and view their full weekly or monthly timesheet history.</p>
+              <p>Select a staff member to review saved weekly or monthly attendance history. Historical hours can include unverified records; use the reviewed timesheet for verified worked hours.</p>
             </div>
             <button onclick="return loadSelectedStaffTimesheets()" class="primary-btn">View Timesheet</button>
           </div>
@@ -867,14 +867,14 @@
             </select>
           </div>
 
-          <h3 id="selectedTimesheetTitle">Selected Staff Timesheet</h3>
+          <h3 id="selectedTimesheetTitle">Selected Staff Attendance History</h3>
           <table>
             <thead>
               <tr>
                 <th>Period Start</th>
                 <th>Period End</th>
                 <th>Shifts</th>
-                <th>Total Hours</th>
+                <th>Saved historical hours</th>
                 <th>First Shift</th>
                 <th>Last Shift</th>
               </tr>

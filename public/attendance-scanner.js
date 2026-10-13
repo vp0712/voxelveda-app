@@ -20,7 +20,7 @@
       stream=opened;video.srcObject=stream;video.muted=true;video.playsInline=true;await video.play();
       let decoder,nativeFallbackTried=false;
       try{decoder=await window.getShiftQrDecoder();}
-      catch(error){if(typeof window.jsQR!=='function')await window.loadExternalScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');if(typeof window.jsQR!=='function')throw error;decoder={type:'canvas'};}
+      catch(error){if(error?.code==='QR_DECODER_LOAD_FAILED')throw error;if(typeof window.jsQR!=='function')await window.loadExternalScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');if(typeof window.jsQR!=='function')throw error;decoder={type:'canvas'};}
       if(run!==generation)return;
       onStatus('Position the current workplace QR code inside the frame. Scanning does not change your attendance.');
       const scan=async()=>{

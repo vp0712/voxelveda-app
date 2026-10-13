@@ -880,6 +880,7 @@ async function main() {
   await testAttendancePeriodActionGuards();
   await testVerifiedAttendanceTotals();
   await testOriginalGoodsReceiptNotifications();
+  await testMixedCollationNotificationOwnership();
   await testArchivedRetention();
   assert.deepEqual(await historicalState(), historicalRows, 'All restored workflows preserve original and retired historical records.');
   console.log(`MYSQL_RETAINED_OK: ${facts.join('; ')}.`);
@@ -1350,6 +1351,8 @@ async function testOriginalGoodsReceiptNotifications() {
   assert.ok(events.every(event => event.message.includes(receipt.receipt_no) && !event.message.includes('Synthetic private order note') && !event.message.includes('@example.invalid')), 'Inspection alerts carry the supported receipt reference without private order or account data.');
   const notificationController = require('../controllers/notificationController'), own = response(), other = response();
   await notificationController.list({ user: inspector, query: { limit: 30, page: 1 } }, own); assert.equal(own.statusCode, 200); assert.ok(own.body.notifications.some(event => event.linked_record_id === String(receipt.id)));
+  const numericUnread = response(); await notificationController.unreadCount({ user: inspector }, numericUnread);
+  assert.equal(numericUnread.statusCode, 200); assert.equal(numericUnread.body.unread, events.filter(event => event.user_id === inspector.id).length);
   await notificationController.list({ user: observer, query: { limit: 30, page: 1 } }, other); assert.equal(other.statusCode, 200); assert.ok(other.body.notifications.every(event => event.linked_record_id !== String(receipt.id)), 'An unrelated viewer does not receive another recipient inspection event.');
   const beforeFailure = { receipts: (await pool.query('SELECT * FROM goods_receipts WHERE purchase_order_id=? ORDER BY id', [order.insertId]))[0], lines: (await pool.query('SELECT * FROM purchase_order_items WHERE purchase_order_id=? ORDER BY id', [order.insertId]))[0], events };
   await assert.rejects(() => procurement.receiveGoods({ user: receiver, input: { ...input, items: [{ purchase_order_item_id: line.insertId, quantity_received: '7' }] }, req }), { code: 'OVER_RECEIPT' });
@@ -1366,6 +1369,41 @@ async function testOriginalGoodsReceiptNotifications() {
   const [[receiptCount]] = await pool.query('SELECT COUNT(*) count FROM goods_receipts WHERE purchase_order_id=?', [order.insertId]); assert.equal(receiptCount.count, 2);
   assert.deepEqual(await historicalState(), historicalRows, 'Original receiving never writes the preserved bank, Finance OS, RFQ, stock or historical supplier data.');
   facts.push('real original approved PO/workflow goods receiving, partial/full order totals, scoped persisted inspection events with actual account columns, approval/over-receipt rollback and historical record preservation');
+}
+
+async function testMixedCollationNotificationOwnership() {
+  const entries = require('../services/procurementEntryService'), notifications = require('../services/notificationService'), controller = require('../controllers/notificationController');
+  const owner = { id: 166, role: 'integration_fixture', permissions: ['VIEW_PROCUREMENT'] }, foreign = { id: 167, role: 'integration_fixture', permissions: ['VIEW_PROCUREMENT'] };
+  for (const [user, label] of [[owner, 'owner'], [foreign, 'foreign']]) await pool.query('INSERT INTO users(id,name,username,email,password,role,permissions,active) VALUES(?,?,?,?,?,?,?,1)',
+    [user.id, `Synthetic collation ${label} fixture`, `synthetic-collation-${label}`, `synthetic-collation-${label}@example.invalid`, 'not-a-login-hash', user.role, JSON.stringify([...user.permissions, 'IMPORT_PROCUREMENT'])]);
+  const input = { classification: 'PLAN', title: 'Synthetic notification UUID owner fixture', date: '2026-10-13', currency: 'AUD', description: 'Synthetic scoped procurement entry', quantity: '1', unit: 'ea', unit_price: '1', tax_rate: '0' };
+  const ownRecord = await entries.createEntry({ user: { ...owner, permissions: [...owner.permissions, 'IMPORT_PROCUREMENT'] }, input, req: { ip: '127.0.0.1' } });
+  const foreignRecord = await entries.createEntry({ user: { ...foreign, permissions: [...foreign.permissions, 'IMPORT_PROCUREMENT'] }, input: { ...input, title: 'Synthetic foreign UUID private title' }, req: { ip: '127.0.0.1' } });
+  await pool.query('UPDATE users SET permissions=? WHERE id IN (?,?)', [JSON.stringify(owner.permissions), owner.id, foreign.id]);
+  const [[savedOwner]] = await pool.query('SELECT role,permissions FROM users WHERE id=?', [owner.id]);
+  assert.deepEqual(Array.isArray(savedOwner.permissions) ? savedOwner.permissions : JSON.parse(savedOwner.permissions), ['VIEW_PROCUREMENT'], 'Current persisted scope has no import, all-record or management permission.');
+  const columnTypes = (await pool.query(`SELECT TABLE_NAME,COLUMN_NAME,COLLATION_NAME FROM information_schema.columns WHERE table_schema=DATABASE()
+    AND ((table_name='procurement_records' AND column_name='id') OR (table_name='notifications' AND column_name='linked_record_id')) ORDER BY TABLE_NAME`))[0];
+  assert.equal(columnTypes.length, 2); assert(columnTypes.every(column => /^utf8mb4_/.test(column.COLLATION_NAME)));
+  assert.notEqual(columnTypes[0].COLLATION_NAME, columnTypes[1].COLLATION_NAME, 'This real MySQL regression retains the two original helper collations.');
+  // Keep the helpers' real defaults. This is intentionally not repaired by
+  // changing old tables or test columns to a common collation.
+  const ownedId = await notifications.createNotification(pool, { userId: owner.id, type: 'SYNTHETIC_UUID_OWNER', category: 'SYSTEM', title: 'Synthetic owned UUID event', linkedModule: 'PROCUREMENT', linkedRecordId: ownRecord.entry.id, actionUrl: '/procurement', dedupeKey: 'synthetic-collation-owner' });
+  const upperId = await notifications.createNotification(pool, { userId: owner.id, type: 'SYNTHETIC_UUID_UPPER', category: 'SYSTEM', title: 'Synthetic uppercased UUID event', linkedModule: 'PROCUREMENT', linkedRecordId: ownRecord.entry.id.toUpperCase(), actionUrl: '/procurement', dedupeKey: 'synthetic-collation-upper' });
+  const hiddenId = await notifications.createNotification(pool, { userId: owner.id, type: 'SYNTHETIC_UUID_FOREIGN', category: 'SYSTEM', title: 'Synthetic foreign-owner UUID event', linkedModule: 'PROCUREMENT', linkedRecordId: foreignRecord.entry.id, actionUrl: '/procurement', dedupeKey: 'synthetic-collation-foreign' });
+  const [[hiddenBefore]] = await pool.query('SELECT * FROM notifications WHERE id=?', [hiddenId]);
+  const listed = response(); await controller.list({ user: owner, query: { limit: 30, page: 1 } }, listed); assert.equal(listed.statusCode, 200);
+  assert.deepEqual(listed.body.notifications.map(event => event.id).sort((a,b) => a-b), [ownedId, upperId].sort((a,b) => a-b));
+  const unread = response(); await controller.unreadCount({ user: owner }, unread); assert.equal(unread.statusCode, 200); assert.equal(unread.body.unread, 2);
+  for (const id of [ownedId, upperId]) {
+    const target = response(); await controller.target({ user: owner, params: { id } }, target);
+    assert.equal(target.statusCode, 200); assert.equal(target.body.target_status, 'AVAILABLE'); assert.equal(target.body.target.record_id, ownRecord.entry.id);
+  }
+  for (const operation of ['target','open','markRead']) {
+    const denied = response(); await controller[operation]({ user: owner, params: { id: hiddenId } }, denied); assert.equal(denied.statusCode, 404, 'A notification recipient still cannot access a foreign-owner UUID.');
+  }
+  const [[hiddenAfter]] = await pool.query('SELECT * FROM notifications WHERE id=?', [hiddenId]); assert.deepEqual(hiddenAfter, hiddenBefore);
+  facts.push('real helper/default mixed-collation notification joins for numeric receipts and saved owned/uppercase/foreign UUIDs, current view-only recipient scope and fail-closed foreign read/open preservation');
 }
 
 async function testArchivedRetention() {

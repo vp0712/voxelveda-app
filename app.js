@@ -132,7 +132,7 @@ const originalModules=[
 // authenticated quality router; it exposes verification, not quality records.
 app.get('/api/qms/coc/:no/verify',rateLimitPolicy('coc_verification'),cocVerificationContract,require('./controllers/qms/qualityReleaseController').verifyCoc);
 const routeFiles={rfq:'rfq',invoice:'invoice',customers:'customer',suppliers:'supplier',materials:'material',meetings:'meeting',expenses:'expense',competitors:'competitor'};
-for(const [module,permission] of originalModules)app.use('/api/'+module,auth,requirePermission(permission),require('./routes/'+(routeFiles[module]||module)+'Routes'));
+for(const [module,permission] of originalModules)app.use('/api/'+module,auth,module==='attendance'?require('./middleware/attendanceAccessMiddleware'):requirePermission(permission),require('./routes/'+(routeFiles[module]||module)+'Routes'));
 for(const [module,file] of Object.entries({dashboard:'dashboard',tasks:'task',procurement:'procurement',qms:'qms',notifications:'notification',workflows:'workflow',trash:'trash',upload:'upload',email:'email','employee-identities':'employeeIdentity','access-attempts':'accessAttempt'}))app.use('/api/'+module,auth,require('./routes/'+file+'Routes'));
 app.use('/api/careers',auth,adminCareersRoutes);
 app.use('/api/public/careers',publicCareersRoutes);

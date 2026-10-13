@@ -7618,7 +7618,7 @@ async function loadSelectedStaffTimesheets() {
 
   const selectedStaff = staffCache.find((u) => Number(u.id) === userId);
   if (title) {
-    title.innerText = `${selectedStaff?.name || 'Staff'} ${period === 'monthly' ? 'Monthly' : 'Weekly'} Timesheet`;
+    title.innerText = `${selectedStaff?.name || 'Staff'} ${period === 'monthly' ? 'Monthly' : 'Weekly'} Attendance History`;
   }
 
   summaryBody.innerHTML = `<tr><td colspan="6">Loading selected staff timesheet...</td></tr>`;

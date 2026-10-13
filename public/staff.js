@@ -1470,24 +1470,52 @@ function normalizeShiftQrToken(value) {
 }
 
 function loadExternalScript(src) {
+  const attendanceDecoder = src === 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
   return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${src}"]`);
-    if (existing) {
-      existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', reject, { once: true });
-      if (existing.dataset.loaded === 'true') resolve();
-      return;
+    let script = document.querySelector(`script[src="${src}"]`);
+    if (attendanceDecoder && script?.dataset.decoderLoadState === 'failed') {
+      script.remove();
+      script = null;
     }
-
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.onload = () => {
-      script.dataset.loaded = 'true';
-      resolve();
+    const created = !script;
+    if (!script) {
+      script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+    }
+    let settled = false;
+    const cleanup = () => {
+      clearTimeout(timer);
+      script.removeEventListener('load', loaded);
+      script.removeEventListener('error', failed);
     };
-    script.onerror = reject;
-    document.head.appendChild(script);
+    const finish = (error) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      if (error) {
+        if (attendanceDecoder) {
+          script.dataset.decoderLoadState = 'failed';
+          script.remove();
+        }
+        reject(error);
+      } else {
+        script.dataset.loaded = 'true';
+        if (attendanceDecoder) script.dataset.decoderLoadState = 'loaded';
+        resolve();
+      }
+    };
+    const failed = () => finish(Object.assign(new Error('QR decoder download failed. Retry camera to try again.'), { code: attendanceDecoder ? 'QR_DECODER_LOAD_FAILED' : 'EXTERNAL_SCRIPT_LOAD_FAILED' }));
+    const loaded = () => {
+      if (attendanceDecoder && typeof window.jsQR !== 'function') { failed(); return; }
+      finish();
+    };
+    const timer = setTimeout(() => finish(Object.assign(new Error('QR decoder loading timed out. Retry camera to try again.'), { code: attendanceDecoder ? 'QR_DECODER_LOAD_FAILED' : 'EXTERNAL_SCRIPT_LOAD_FAILED' })), 8000);
+    script.addEventListener('load', loaded, { once: true });
+    script.addEventListener('error', failed, { once: true });
+    if (script.dataset.loaded === 'true' || attendanceDecoder && typeof window.jsQR === 'function') { loaded(); return; }
+    if (attendanceDecoder) script.dataset.decoderLoadState = 'loading';
+    if (created) document.head.appendChild(script);
   });
 }
 
@@ -1503,7 +1531,12 @@ async function getShiftQrDecoder() {
     shiftQrDecoderPromise = loadExternalScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
   }
 
-  await shiftQrDecoderPromise;
+  const loading = shiftQrDecoderPromise;
+  try { await loading; }
+  catch (error) {
+    if (shiftQrDecoderPromise === loading) shiftQrDecoderPromise = null;
+    throw error;
+  }
 
   if (typeof window.jsQR !== 'function') {
     throw new Error('QR decoder unavailable');

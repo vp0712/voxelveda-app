@@ -20,6 +20,23 @@ function loadScheduler(){
  new vm.Script(fs.readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,process:{env},Date,console,Buffer,require(name){if(!Object.hasOwn(deps,name))throw new Error('Unexpected scheduler fixture dependency '+name);return deps[name];}});
  return module.exports;
 }
+async function legacyDailyActions(){
+ const employee={...staff,permissions:['VIEW_ATTENDANCE'],permission_boundary:['VIEW_ATTENDANCE']};
+ const active={...row(91),work_date:'2026-10-13',clock_in:'2026-10-12 22:00:00',clock_in_utc_text:'2026-10-12 22:00:00',clock_out:null,clock_out_utc_text:null,timestamp_basis:null,total_minutes:0,total_hours:0,revision:1};
+ let intervals=[];
+ const db={async query(sql){if(/SELECT id,name,role,department/.test(sql))return [[employee]];if(/FROM staff_attendance a WHERE/.test(sql))return [[active]];if(/FROM attendance_break_intervals b/.test(sql))return [intervals];if(/FROM roster_shifts/.test(sql)||/SELECT DISTINCT checkout_category/.test(sql))return [[]];if(/SELECT permissions FROM users/.test(sql))return [[{permissions:'[]'}]];throw new Error('Unexpected legacy daily fixture query '+sql);}};
+ const deps={'../config/db':{},luxon:require('luxon'),'./attendanceMobileSchema':{ensureAttendanceMobileSchema:async()=>{}},'./attendanceTimeService':attendanceTime,'./weeklyTimesheetEligibility':policy,'../utils/dateOnly':require('../utils/dateOnly'),'./authorizationService':require('../services/authorizationService'),'./attendanceMobilePolicy':require('../services/attendanceMobilePolicy')};
+ const module={exports:{}},filename=path.join(__dirname,'../services/attendanceDailyService.js');
+ new vm.Script(fs.readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,process:{env},Date,console,require(name){if(!Object.hasOwn(deps,name))throw new Error('Unexpected daily fixture dependency '+name);return deps[name];}});
+ const legacy=await module.exports.readToday({user:employee,db,now});
+ assert.deepEqual(Array.from(legacy.allowed_actions),['CHECK_OUT'],'A retained unverified legacy shift advertises safe checkout but cannot offer unsupported break start');
+ assert.equal(legacy.summary.review_required,true);assert.equal(legacy.active_attendance.live_worked_minutes,null);
+ intervals=[{id:94,attendance_id:91,user_id:17,started_at:'2026-10-13 00:45:00',started_at_utc_text:'2026-10-13 00:45:00',ended_at:null}];
+ const withBreak=await module.exports.readToday({user:employee,db,now});
+ assert.deepEqual(Array.from(withBreak.allowed_actions),['CHECK_OUT','BREAK_END'],'An existing effective break can still be ended against its exact legacy session');
+ intervals=[];active.timestamp_basis='UTC';
+ assert.deepEqual(Array.from((await module.exports.readToday({user:employee,db,now})).allowed_actions),['CHECK_OUT','BREAK_START'],'Verified UTC sessions retain actual break start');
+}
 async function main(){
  const source=[row(1),row(2),row(3,{attendance_status:'REJECTED',total_minutes:120,total_hours:2}),row(4,{attendance_status:'CANCELLED',total_minutes:180,total_hours:3}),row(5,{timestamp_basis:null,clock_in:'2026-10-06 12:00:00',clock_out:'2026-10-06 16:00:00',total_minutes:240,total_hours:4})];
  const original=JSON.stringify(source),mixed=assess(source);
@@ -50,6 +67,7 @@ async function main(){
  snapshot.attendance[0].total_minutes=59;
  assert.equal((await scheduler._test.reviewProof(readVersion,approved,assessment,policy.configuration(env))).verified,false,'source identity/duration changes invalidate the approval proof');
  assert.equal(JSON.stringify(source),original);
+ await legacyDailyActions();
  console.log('PASS verified attendance summaries: completed minute totals, duplicate/excluded/legacy diagnostics, null/manual/misdated sources, original preservation, shared candidate boundary and exact weekly approval proof. Fixtures only; no transport.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});
