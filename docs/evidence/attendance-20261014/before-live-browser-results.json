@@ -1,0 +1,40 @@
+{
+  "phase": "before",
+  "transport": "curl with CA-verified HTTPS via managed proxy; response replay into Chromium",
+  "real_device": false,
+  "checks": [
+    {
+      "name": "phone",
+      "metrics": {
+        "natural_width": 1024,
+        "width": 240.390625,
+        "height": 240.390625
+      },
+      "decoded": true,
+      "payload_length": 203,
+      "payload_is_url": false
+    },
+    {
+      "name": "tablet",
+      "metrics": {
+        "natural_width": 1024,
+        "width": 350,
+        "height": 350
+      },
+      "decoded": true,
+      "payload_length": 203,
+      "payload_is_url": false
+    },
+    {
+      "name": "desktop",
+      "metrics": {
+        "natural_width": 1024,
+        "width": 350,
+        "height": 350
+      },
+      "decoded": true,
+      "payload_length": 203,
+      "payload_is_url": false
+    }
+  ]
+}

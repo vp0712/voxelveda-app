@@ -36,6 +36,7 @@ const checks = [
   'notification-center-test.js',
   'notification-center-component-test.js',
   'attendance-qr-test.js',
+  'attendance-gate-test.js',
   'retained-boundaries-test.js',
   'retained-migration-policy-test.js',
   'retained-document-boundary-test.js',

@@ -109,6 +109,7 @@ function applicationFixture() {
     './controllers/readinessController': actualReadiness,
     './middleware/auth': pass, './middleware/pageAuth': actualPageAuth,
     './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
+    './services/attendanceGateAccess': require('../services/attendanceGateAccess'),
     './config/urls': require('../config/urls'),
     './middleware/securityMiddleware': {
       corsOptions: () => ({ origin: 'https://app.voxelveda.com' }),

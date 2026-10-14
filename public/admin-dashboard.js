@@ -6150,32 +6150,16 @@ function startShiftQrCountdown(seconds) {
   }, 1000);
 }
 
+let attendanceGateController;
 async function loadShiftQr() {
-  const image = document.getElementById('shiftQrImage');
-  const tokenText = document.getElementById('shiftQrTokenText');
-  if (!image) return;
-
-  try {
-    const res = await fetch('/api/attendance/shift-qr', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    const data = await safeJson(res);
-
-    if (!res.ok) {
-      if (tokenText) tokenText.innerText = data.message || 'Unable to load shift QR.';
-      return;
-    }
-
-    const qrData = data.qr_data || data.token;
-    image.src = `/api/qr?data=${encodeURIComponent(qrData)}`;
-    if (tokenText) tokenText.innerText = 'Live scan token active.';
-
-    startShiftQrCountdown(data.expires_in_seconds || data.refresh_seconds || 20);
-    clearTimeout(shiftQrTimer);
-    shiftQrTimer = setTimeout(loadShiftQr, Number(data.refresh_seconds || 20) * 1000);
-  } catch {
-    if (tokenText) tokenText.innerText = 'Server error loading shift QR.';
-  }
+  if(!window.VoxelGate)return;
+  if(attendanceGateController)return attendanceGateController.refresh();
+  attendanceGateController=window.VoxelGate({imageId:'shiftQrImage',countdownId:'shiftQrCountdown',statusId:'shiftQrStatus',detailId:'shiftQrTokenText',siteId:'shiftQrSite',endpoint:'/api/attendance/shift-qr',headers:()=>authHeaders()});
+}
+async function createAttendanceGateLink(){
+  const res=await fetch('/api/attendance/gate-access',{method:'POST',headers:authHeaders()});
+  const data=await safeJson(res);if(!res.ok)return showToast(data.message||'Unable to authorise this gate.');
+  const target=document.getElementById('attendanceGateLink');target.href=data.url;target.hidden=false;target.textContent='Open authorised gate (valid for 12 hours)';
 }
 
 function openSystemPage(path) {

@@ -28,14 +28,12 @@ async function main(){
  assert.equal(ready.body.critical_services?.weekly_timesheet_worker,'OPERATIONAL','Worked-only weekly scheduler must be registered and running');
  const health=await getJson('/api/health');assert.equal(health.status,200);
  proof.ready=ready;proof.health=health;
- const liveQr=await getJson('/api/public/shift-qr');assert.equal(liveQr.status,200,'Existing production QR signing must be operational');
- const qrParts=String(liveQr.body.token||'').split('.');assert.equal(qrParts.length,3);assert.equal(qrParts[0],'VVATT1');assert.equal(Buffer.from(qrParts[2],'base64url').length,32);
- const qrClaims=JSON.parse(Buffer.from(qrParts[1],'base64url').toString('utf8'));assert.equal(qrClaims.v,1);assert.equal(qrClaims.purpose,'ATTENDANCE_SITE');assert.equal(qrClaims.user_id,null);assert.equal(qrClaims.site_id,liveQr.body.site_id);
- assert.ok(qrClaims.exp>Math.floor(Date.now()/1000)&&qrClaims.exp-qrClaims.iat<=60,'Production returns a current, bounded attendance-site token');
- proof.checks.push({route:'/api/public/shift-qr',status:200,configured_signing_operational:true,token_format:'VVATT1',site_id:liveQr.body.site_id,site_kind:liveQr.body.site_kind,expires_at:liveQr.body.expires_at,read_only:true,signature_verified_with_secret:false});
+ const liveQr=await getJson('/api/public/shift-qr');assert.equal(liveQr.status,401,'Gate issuance requires an authorised display or administrator session');
+ proof.checks.push({route:'/api/public/shift-qr',status:401,gate_issuance_not_public:true,authenticated_live_attendance_unverified:true});
+
  const retired=['/finance','/banking','/erp','/erp-workspace','/finance/reports/RPT_d2bbc70-ab0e-4f40-aa02-18fe722beab1/view','/api/finance/accounts','/api/banking/accounts','/api/erp/dashboard','/erp-workspace.js','/banking.js'];
  for(const route of retired){const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000)});assert.equal(response.status,410,route+' must be retired');const body=await response.text();assert.ok(!body.includes('account_number')&&!body.includes('transaction_amount'),'No archived records returned');proof.checks.push({route,status:410});}
- for(const route of ['/dashboard','/profile','/security','/workspace.html','/admin','/client','/portal/staff','/quality','/shop-floor','/careers-admin','/employee-id','/invoice/view']){
+ for(const route of ['/dashboard','/profile','/security','/workspace.html','/admin','/client','/portal/staff','/quality','/shop-floor','/careers-admin','/employee-id','/invoice/view','/attendance-terminal','/a?t=invalid']){
   const response=await fetch(origin+route,{redirect:'follow',signal:AbortSignal.timeout(15000)});const final=new URL(response.url);assert.equal(final.pathname,'/login',route+' requires login');assert.ok(final.searchParams.get('returnTo')||final.searchParams.get('next'),'Login preserves destination');proof.checks.push({route,login_redirect:final.pathname,return_to:final.searchParams.get('returnTo')||final.searchParams.get('next')});
  }
  for(const route of ['/api/rfq','/api/invoice','/api/stock','/api/materials','/api/suppliers','/api/attendance','/api/roster','/api/tasks','/api/qms/dashboard','/api/procurement/overview','/api/procurement/imports','/api/procurement/entries','/api/procurement/reports/snapshots/00000000-0000-4000-8000-000000000001','/api/email/documents/1']){
@@ -47,7 +45,7 @@ async function main(){
  for(const route of ['/api/profile','/api/profile/photo','/api/profile/staff/1/photo','/api/notifications','/api/notifications/unread-count','/api/attendance/today','/api/attendance/my','/api/attendance/reconcile','/api/attendance/corrections']){
   const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000)});assert.equal(response.status,401,route+' retains authentication');proof.checks.push({route,status:401,staff_mobile_authentication_boundary:true});
  }
- for(const name of ['staff-home.js','staff-home.css','attendance-scanner.js','staff.js','admin-dashboard.js','profile.js','workflow-ui.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js','role-portal.js']){
+ for(const name of ['staff-home.js','staff-home.css','attendance-scanner.js','staff.js','admin-dashboard.js','profile.js','workflow-ui.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js','role-portal.js','shift-qr-terminal.js','attendance-gate.css','entry-home.css','portal-profile-menu.js','client-portal.js','admin-home.css']){
   const response=await fetch(origin+'/'+name,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,name+' is deployed');
   const bytes=Buffer.from(await response.arrayBuffer()),digest=buffer=>crypto.createHash('sha256').update(buffer).digest('hex');
   assert.equal(digest(bytes),digest(fs.readFileSync(path.join(__dirname,'../public',name))),name+' matches exact release bytes');

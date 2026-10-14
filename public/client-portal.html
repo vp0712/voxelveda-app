@@ -23,20 +23,25 @@
     .client-form input{width:100%;}.client-form textarea{width:100%;}.client-status{min-height:22px;color:var(--text-primary);}.client-profile-row{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--border);}
     @media(max-width:850px){.client-grid{grid-template-columns:1fr;}.client-actions{grid-template-columns:1fr;}.client-form{grid-template-columns:1fr;}.client-form textarea{grid-column:auto;}.client-top{align-items:flex-start;}}
   </style>
-<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261011-restored"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script></head>
+<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261011-restored"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css"><link rel="stylesheet" href="/notification-center.css"><script src="/workspace-overlays.js"></script></head>
 <body data-vv-role="viewer">
   <main class="client-shell">
-    <header class="client-top">
-      <div class="client-brand">
-        <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda Logo" />
-        <div><h1>Voxel Veda Client Portal</h1><p id="clientWelcome">Secure project and RFQ workspace</p></div>
+    <header class="client-top vv-topbar">
+      <button class="staff-icon-button" type="button" aria-label="Open navigation" onclick="document.getElementById('clientNavigation').hidden=!document.getElementById('clientNavigation').hidden">☰</button>
+      <div class="client-brand"><img src="/logo.png" alt="Voxel Veda"><div><h1>Client home</h1><p id="clientWelcome">Loading your account…</p></div></div>
+      <div class="topbar-actions">
+        <button id="notificationBell" class="notification-bell" data-notification-toggle type="button" aria-label="Open notifications" aria-expanded="false"><span class="bell-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z"/><path d="M10 21h4"/></svg></span><span id="notificationBadge" class="notification-badge" hidden>0</span></button>
+        <div id="notificationPanel" class="notification-panel" data-notification-panel hidden tabindex="-1"></div>
+        <button class="profile-chip" data-profile-menu-toggle type="button" aria-label="Open profile menu" aria-expanded="false"><span class="profile-initial" data-avatar-self></span></button>
+        <div id="portalProfileMenu" class="portal-profile-menu" hidden><a href="/profile">My profile</a><a href="/security">Account security</a><button type="button" data-theme-toggle>Dark theme</button><button type="button" onclick="clientLogout()">Log out</button></div>
       </div>
-      <button type="button" class="logout-btn" onclick="return clientLogout()">Logout</button>
     </header>
+    <nav id="clientNavigation" class="client-home-nav" hidden><a href="#new-rfq">New RFQ</a><a href="/profile">My profile</a><a href="/support">Support</a></nav>
+    <section id="clientRecords" class="client-card" hidden><h2>Your enquiries and documents</h2><div id="clientRecordList"></div></section>
 
     <section class="client-hero">
       <p class="eyebrow">Client Workspace</p>
-      <h2>Projects start with a clean engineering brief.</h2>
+      <h2>Your enquiries, in one place.</h2>
       <p>Submit a new RFQ, prepare the technical information our engineering team needs, or contact the team about an existing enquiry.</p>
       <div class="client-actions">
         <a class="client-action" href="#new-rfq"><strong>New RFQ</strong><span>Submit scope, material, quantity and requirements.</span></a>
@@ -69,7 +74,7 @@
         <div class="client-profile-row"><span>Name</span><strong id="clientProfileName">Loading...</strong></div>
         <div class="client-profile-row"><span>Email</span><strong id="clientProfileEmail">-</strong></div>
         <div class="client-profile-row"><span>Portal</span><strong>Client</strong></div>
-        <div class="client-profile-row"><span>Access</span><strong>Client-safe functions only</strong></div>
+
         <div style="margin-top:18px;">
           <p class="eyebrow">RFQ checklist</p>
           <ul>
@@ -84,5 +89,5 @@
     </div>
   </main>
   <script src="/client-portal.js?v=20260926-role-portals"></script>
-</body>
+<script src="/profile-avatar.js"></script><script src="/dashboard-profile-avatar.js"></script><script src="/notification-center.js"></script><script src="/portal-profile-menu.js"></script></body>
 </html>

@@ -21,7 +21,7 @@
   <meta property="og:image:width" content="1254" />
   <meta property="og:image:height" content="1254" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /><link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css?v=20261013-staff-mobile"><link rel="stylesheet" href="/notification-center.css?v=20261013-staff-mobile"><script src="/workspace-overlays.js?v=20261013-staff-mobile"></script></head>
+  <meta name="twitter:image" content="https://app.voxelveda.com/og-image.png?v=20260703-brand" /><link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261013-procurement-pdf"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css?v=20261013-staff-mobile"><link rel="stylesheet" href="/notification-center.css?v=20261013-staff-mobile"><script src="/workspace-overlays.js?v=20261013-staff-mobile"></script><link rel="stylesheet" href="/attendance-gate.css"><link rel="stylesheet" href="/admin-home.css"></head>
 
 <body>
   <div class="mobile-sidebar-backdrop" data-mobile-menu-action="close" aria-hidden="true"></div>
@@ -123,32 +123,23 @@
             </button>
             <div id="notificationPanel" class="notification-panel" data-notification-panel hidden tabindex="-1"></div>
           </div>
-          <button class="profile-chip" type="button" onclick="window.location.assign('/profile')" aria-label="Open my profile">
+          <button class="profile-chip" type="button" data-profile-menu-toggle aria-label="Open profile menu" aria-expanded="false">
             <span id="profileInitial" class="profile-initial" data-avatar-self></span>
             <span id="profileNameLabel">My profile</span>
           </button>
-          <span class="live-pill">System Active</span>
+          <div id="portalProfileMenu" class="portal-profile-menu" hidden><a href="/profile">My profile</a><a href="/security">Account security</a><button type="button" data-theme-toggle>Dark theme</button></div>
         </div>
       </header>
 
 
       <!-- OVERVIEW -->
       <section id="dashboardSection" class="page-section">
-        <div class="home-command-hero">
-          <div class="home-command-copy">
-            <span class="panel-kicker">Operations Core</span>
-            <h1>Voxel Veda Control Room</h1>
-            <div class="home-command-actions">
-              <button class="primary-btn" onclick="return goSection('invoiceSection')">Create / Review Invoice</button>
-              <button class="secondary-btn" onclick="return goSection('expenseSection')">Expense Register</button>
-              <button class="secondary-btn" onclick="return goSection('stockSection')">Inventory Control</button>
-            </div>
-          </div>
-          <div class="home-command-orb">
-            <div class="command-ring"></div>
-            <img src="/Frame 1.png?v=20260703-brand" alt="Voxel Veda">
-            <span>System Active</span>
-          </div>
+        <div class="admin-home-heading"><p class="panel-kicker">Voxel Veda</p><h1>Operations home</h1><p>Review today’s work, attendance and business records.</p></div>
+        <div class="admin-home-actions">
+          <button class="secondary-btn" data-permission="attendance" onclick="goSection('attendanceSection')">Attendance & exceptions</button>
+          <button class="secondary-btn" data-permission="approvals" onclick="goSection('approvalsSection')">Approvals</button>
+          <button class="secondary-btn" data-permission="tasks" onclick="goSection('taskSection')">Tasks</button>
+          <button class="secondary-btn" data-permission="staff" onclick="goSection('staffSection')">Staff & access</button>
         </div>
         <div class="dashboard-action-row">
           <button class="quick-pill command-pill" onclick="return goSection('invoiceSection')"><span>01</span>Invoices</button>
@@ -162,12 +153,12 @@
         </div>
 
 
-        <div class="vv-suite-panel admin-suite-panel">
+        <details class="vv-suite-panel admin-suite-panel"><summary>More operational tools</summary>
           <div class="vv-suite-head">
             <div>
-              <span class="panel-kicker">Workforce OS</span>
-              <h2>Admin Feature Command Centre</h2>
-              <p>Connect rostering, time clock, forms, tasks, messages, staff records and compliance from one operations layer.</p>
+              <span class="panel-kicker">Operations</span>
+              <h2>Workforce tools</h2>
+              <p>Open the existing workforce and document workflows.</p>
             </div>
             <button class="secondary-btn" type="button" onclick="return goSection('staffSection')">Manage Access</button>
           </div>
@@ -183,7 +174,7 @@
             <button type="button" class="vv-suite-card" onclick="return goSection('meetingSection')"><span>Events</span><strong>Meetings & inspections</strong><small>Visitors, conference, audits and reminder schedule.</small></button>
             <button type="button" class="vv-suite-card" onclick="return goSection('companyFormsSection')"><span>HR & Training</span><strong>Forms, training, recognition</strong><small>Company records, onboarding packs and staff milestones.</small></button>
           </div>
-        </div>
+        </details>
         <div class="metric-grid command-status-grid">
           <div class="card command-status-card">
             <h3>RFQs</h3>
@@ -725,33 +716,14 @@
           <button onclick="return openSystemPage('/attendance-terminal')" class="primary-btn">Open Attendance Gate</button>
         </div>
 
-        <div class="shift-qr-console">
-          <div class="card shift-qr-card">
-            <div class="qr-command-head">
-              <span class="scan-live-dot"></span>
-              <h3>Live Attendance QR</h3>
-            </div>
-            <div class="branded-qr-frame shift-qr-frame">
-              <img id="shiftQrImage" alt="Live shift QR code" />
-            </div>
-            <div class="shift-qr-countdown">
-              <span>Refreshes in</span>
-              <strong id="shiftQrCountdown">20s</strong>
-            </div>
-            <p id="shiftQrTokenText" class="shift-token-text">Loading secure shift token...</p>
-          </div>
-
-          <div class="card shift-qr-instructions">
-            <h3>Shift Access</h3>
-            <div class="system-action-grid">
-              <button class="system-action" onclick="return goSection('staffSection')">
-                <strong>User QR Bypass</strong>
-              </button>
-              <button class="system-action" onclick="return loadAttendance()">
-                <strong>Open Timesheets</strong>
-              </button>
-            </div>
-          </div>
+        <div class="attendance-admin-gate">
+          <h3>Voxel Veda Attendance</h3><p id="shiftQrSite"></p>
+          <p>Open your staff portal and scan to check in or out.</p>
+          <div class="gate-code"><img id="shiftQrImage" alt="Current workplace attendance QR with the Voxel Veda logo" hidden></div>
+          <p class="gate-status"><span id="shiftQrStatus">Connecting…</span><span>Code expires in <strong id="shiftQrCountdown">—</strong></span></p>
+          <p id="shiftQrTokenText" role="status"></p>
+          <button class="secondary-btn" onclick="loadShiftQr()">Refresh code</button>
+          <details class="gate-settings"><summary>Gate settings</summary><p>Use an authorised display link on the kiosk. This grants display access only, without an administrator account. The link expires after 12 hours.</p><button class="secondary-btn" onclick="createAttendanceGateLink()">Create kiosk link</button><a id="attendanceGateLink" hidden target="_blank" rel="noopener noreferrer"></a></details>
         </div>
       </section>
 
@@ -1563,12 +1535,13 @@
   <div id="toast" class="toast"></div>
 
   <script src="/step-up.js?v=20260919-access-fix"></script>
-  <script src="/admin-dashboard.js?v=20261013-staff-mobile"></script>
+  <script src="/shift-qr-terminal.js"></script>
+<script src="/admin-dashboard.js?v=20261013-staff-mobile"></script>
   <script src="/profile-avatar.js?v=20261013-staff-mobile"></script>
   <script src="/dashboard-profile-avatar.js?v=20261013-staff-mobile"></script>
   <script src="/notification-center.js?v=20261013-staff-mobile"></script>
   <script src="/workflow-ui.js?v=20261011-restored"></script>
   <script src="/procurement-ui.js?v=20261013-procurement-pdf"></script>
   <script src="/expense-payments.js?v=20260904"></script>
-</body>
+<script src="/portal-profile-menu.js"></script></body>
 </html>

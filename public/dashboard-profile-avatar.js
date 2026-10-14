@@ -2,7 +2,7 @@
   'use strict';
   function bindProfileChips() {
     for(const chip of document.querySelectorAll('.profile-chip')){
-      chip.onclick=event=>{event.preventDefault();window.location.assign('/profile');};
+      if(!chip.hasAttribute('data-profile-menu-toggle'))chip.onclick=event=>{event.preventDefault();window.location.assign('/profile');};
       chip.title='My Profile';chip.setAttribute('aria-label','Open my profile');
     }
     window.VoxelAvatar?.mountAll();window.VoxelAvatar?.refreshSelf();

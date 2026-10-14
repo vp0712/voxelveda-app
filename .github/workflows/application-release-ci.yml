@@ -81,6 +81,19 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/staff-mobile-proof
         run: timeout --signal=TERM --kill-after=10s 240s node scripts/staff-mobile-browser-test.js
+      - name: Decode the actual branded attendance gate through rotation, outage and responsive layouts
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          GATE_PROOF_DIR: ${{ runner.temp }}/attendance-gate-proof
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/attendance-gate-browser-test.js
+      - name: Preserve branded gate evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-gate-browser-${{ github.sha }}
+          path: ${{ runner.temp }}/attendance-gate-proof
+          retention-days: 30
       - name: Preserve staff mobile before/after browser evidence
         if: always()
         uses: actions/upload-artifact@v4
