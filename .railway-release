@@ -1,9 +1,9 @@
-application-release: 20261013-staff-mobile-attendance-required-scanner-private-storage-verified
-candidate-commit: 3b7ee76b4d3aedca08f77db76ab00bdf07d44b5d
-merged-commit: 909dcdd9f7705034d90228a3754bfeea70b2a98a
+application-release: 20261014-branded-attendance-qr-safe-camera-entry-focused-role-homes
+candidate-commit: e28306edd26d7b0cf1524fe4000e8aadffc29889
+merged-commit: cb15783097bcaaaefaebf0f789e28f7997ebc436
 production-branch: main
-previous-live-commit: a0d0b4298666775d5db35cb63b8eca292897398b
-scope: existing-original-staff-home-attendance-roster-timesheets-profile-and-notifications; original-business-and-procurement-PDF-workflows-preserved; only-added-Banking-Finance-OS-and-separate-ERP-portal-remain-retired
+previous-live-commit: 235cc208e1425f0c9cdedc1e210c7725526a0b01
+scope: original-attendance-gate-safe-camera-login-entry-and-existing-staff-manager-supervisor-HR-production-sales-client-admin-homes; original-workflows-records-grants-procurement-and-weekly-PDF-delivery-preserved; Banking-Finance-OS-and-separate-added-ERP-remain-retired
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
 avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
@@ -14,13 +14,17 @@ mobile: compact-shared-header-and-saved-photo; five-primary-staff-actions; full-
 weekly-delivery: worked-shifts-only; audited-designated-timesheet-email-required; exactly-one-To-no-CC-no-BCC-no-login-email-fallback-or-manager-copy; eligibility-and-source-rechecked; durable-staff-week-idempotency-and-explicit-sent-revisions
 weekly-schedule: retained-Monday-0700-Australia-Sydney-default-and-configured-Australian-IANA-timezone; bounded-latest-completed-week; no-zero-hour-email-or-historical-backfill
 pdf-delivery: retained-immutable-source-and-parser-validated-PDF-bytes-hash-version; at-least-one-valid-page-and-identity; application-pdf-safe-pdf-filename-and-disposition; non-PDF-and-error-downloads-rejected; uncertain-provider-outcomes-held-for-review
-ci: exact-repaired-candidate-four-applicable-workflows-success; exact-merged-main-five-applicable-workflows-success; original-implementation-branding-and-gates-already-verified; 70-mandatory-normal-production-HTTPS-required-scanner-selected-S3-and-packaged-source-regressions; real-disposable-MySQL; real-PHP-PDF-parser-PHPMailer-MIME; retained-account-original-procurement-and-staff-Chromium
-ci-candidate-release-run: 38438575187
-ci-merged-release-run: 38439218651
+ci: 71-mandatory-regressions; normal-production-required-scanner-S3-and-packaged-builds; disposable-MySQL-concurrent-durable-attendance-DST-summary-corrections; real-PHP-PDF-parser-MIME; responsive-original-workflows-and-actual-branded-scanner-path
+ci-candidate-release-run: 38539506573; branch-release-38539500564; security-38539506604; consolidation-38539506748; mysql-38539506677; logo-38539506668; all-success-exact-e28306ed
+ci-merged-release-run: 38540318262; security-38540318382; consolidation-38540318472; mysql-38540318276; logo-38540318522; audit-38540318219; all-success-exact-cb157830
 failed-release-attempt: a886e793e9247fa5406a2d71e83d38a8376a682b-Railway-4f7e2ee5-2378-430f-bc41-665b38b152eb; build-fixture-mocked-unconfigured-scanner; repaired-clean-scanner-fixture-and-required-production-CI; production-upload-security-unchanged
 failed-private-storage-attempt: 618f0cd79796a2458d7065347a7bedcb6acc1da3-Railway-65dbe8f2-76e2-42b3-a06e-51da11bdbc1c; legacy-database-fixture-inherited-selected-private-provider; scoped-environment-restoration-and-explicit-unavailable-storage-rejection-verified; production-private-storage-guard-unchanged
-browser-evidence: pinned-published-before-baseline-a0d0b4298666775d5db35cb63b8eca292897398b; after-four-viewports-both-themes; ten-emulated-camera-cases; real-loader-provider-failure-retry; three-in-flight-account-switch-cases; actual-native-MutationObserver-12-frames-controls-zero-avatar-child-mutations
-verification-limits: synthetic-accounts-only-for-private-workflow-tests; no-real-staff-attendance-or-business-email-tests; native-iOS-Android-camera-and-authenticated-production-private-workflows-not-claimed; received-PDF-opening-unverified
+browser-evidence: current-live-235cc208-public-gate-entry-before; pinned-235cc208-staff-admin-client-before; both-themes-four-viewports; 60-rotations-240-real-jsQR-checks; actual-rendered-image-screen-decoding; delayed-image-swap-outage-reconnect; genuine-local-jsQR-on-emulated-video-through-authenticated-confirmation-and-fixture-persistence; valid-expired-login-intent-revalidation; supported-role-home-matrix
+verification-limits: no-physical-iPhone-Android-WebView-camera; no-designated-production-test-account-supplied; original-private-device-failure-not-conclusively-attributed; authenticated-live-private-attendance-avatar-notifications-unverified; no-fake-real-employee-attendance-or-business-email-created; relay-delivery-not-claimed
 configuration: same-Railway-app-service-domain-database-private-storage-and-info-at-voxelveda-company-WordPress-HTTPS-transport; no-provider-DNS-or-billing-change; unchanged-three-predeploy-guards; registered-import-email-queue-and-private-weekly-workers
 relay-status: existing-PDF_RELAY_CONTRACT_REQUIRED-preflight-failure-retained; user-secure-connection-approval-received-but-REST-non-JSON-and-no-registered-site; working-administrator-REST-and-plugin-install-or-host-file-deployment-capability-required; no-host-mutation-or-blind-request-1-queue-157-resend
-rollback: prior-approved-a0d0b4298666775d5db35cb63b8eca292897398b-Railway-b5c926b1-d5db-4408-905a-7e48c8764064; additive-schema-and-records-retained
+rollback: 235cc208e1425f0c9cdedc1e210c7725526a0b01-Railway-d60d0abd-575b-4eb1-97fe-f4a0fd19bc42; no-schema-data-or-provider-changes
+qr-gate: 104-byte-canonical-HTTPS-url; VVATT2-full-SHA256-HMAC-site-binding-and-existing-bounded-expiration; original-logo-embedded-in-every-integer-module-H-QR; four-module-quiet-zone; load-complete-before-swap; server-clock-expiry-and-stale-code-hide; 12-hour-site-bound-display-only-HttpOnly-kiosk-cookie; authenticated-EDIT_ATTENDANCE-issuance
+camera-entry: protected-GET-safe-login-return; authenticated-POST-token-and-current-clock-state-revalidation; explicit-confirmation-and-durable-request-id-required; never-public-GET-attendance
+public-entry: Log-in-and-Sign-up-only-plus-Privacy-Terms; unchanged-viewer-customer-signup-and-administrator-employee-invitation; no-public-role-grant
+evidence: docs/ATTENDANCE-GATE-20261014.md; docs/evidence/attendance-20261014; PR-318; candidate-and-main-artifacts-bound-to-exact-heads
