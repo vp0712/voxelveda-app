@@ -152,7 +152,7 @@
   "checks": [
     "Read-only Close performs no write request",
     "Failure shows Retry/Close and no partial invoice; retry loads complete data",
-    "Editable Cancel/Escape asks to discard; decline retains form; discard leaves saved RFQ unchanged",
+    "First-frame edit followed by blur remains dirty; Cancel/Escape asks to discard; decline retains form; discard leaves saved RFQ unchanged",
     "Business Close RFQ is a separate reasoned action; dialog Cancel makes no write",
     "Malformed successful HTTP response is an uncertain outcome, never false business success",
     "Security dialog owns keyboard focus; malformed verification does not bypass MFA; Escape restores invoice focus",
