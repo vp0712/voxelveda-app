@@ -108,7 +108,7 @@
   function renderActions(){
     const primary=$('staffHomePrimaryAction'),secondary=$('staffHomeBreakAction');if(!primary||!secondary)return;
     const action=allowed('CHECK_OUT')?'CHECK_OUT':allowed('CHECK_IN')?'CHECK_IN':null;
-    primary.dataset.attendanceAction=action||'';primary.textContent=action?actionLabels[action]:today?.status==='REVIEW_REQUIRED'?'Attendance needs review':homeFailed?'Attendance unavailable':'Checking attendance...';primary.disabled=submitBusy||homeFailed||!action||Boolean(pending);
+    primary.dataset.attendanceAction=action||'';primary.textContent=action?(today.qr_required!==false?'Scan to '+actionLabels[action].toLowerCase():actionLabels[action]):today?.status==='REVIEW_REQUIRED'?'Attendance needs review':homeFailed?'Attendance unavailable':'Checking attendance...';primary.disabled=submitBusy||homeFailed||!action||Boolean(pending);
     const breakAction=allowed('BREAK_END')?'BREAK_END':allowed('BREAK_START')?'BREAK_START':null;secondary.hidden=!breakAction;secondary.dataset.attendanceAction=breakAction||'';secondary.textContent=breakAction?actionLabels[breakAction]:'';secondary.disabled=submitBusy||homeFailed||!breakAction||Boolean(pending);
     if(pending){primary.textContent='Check pending attendance';primary.disabled=submitBusy;primary.dataset.attendanceAction='RECONCILE';secondary.hidden=true;}
   }
