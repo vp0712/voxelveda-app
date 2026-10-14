@@ -11,8 +11,8 @@ const REPORTS = Object.freeze({
     filters: ['q', 'status', 'archived'], sorts: ['id', 'customer', 'status', 'created', 'quantity'],
     columns: [['Customer', 'customer_name', 2.5], ['Email', 'email', 2.5], ['Material', 'material', 2], ['Qty', 'quantity', 1, 'number'], ['Status', 'status', 1], ['Created', 'created_at', 1.6, 'date']] },
   invoices: { title: 'Invoice register', module: 'invoice', method: 'getInvoices', key: 'invoices', permission: 'VIEW_FINANCE', paginated: true,
-    filters: ['search', 'status', 'payment_state'], sorts: ['id', 'date', 'customer', 'total', 'balance', 'reference'],
-    columns: [['Reference', 'invoice_no', 2], ['Customer', 'customer_name', 2.5], ['Status', 'status', 1.2], ['Total (AUD)', 'total', 1.8, 'money'], ['Created', 'created_at', 1.7, 'date']], total: ['Invoice value', 'total'] },
+    filters: ['search', 'status', 'payment_state', 'from','to','archived'], sorts: ['id', 'date', 'customer', 'total', 'balance', 'reference'],
+    columns: [['Reference', 'invoice_no', 2], ['Customer', 'customer_name', 2.5], ['Status', 'status', 1.2], ['Total (AUD)', 'total', 1.8, 'moneyReview'],['Paid (AUD)','paid_amount',1.8,'moneyReview'],['Outstanding (AUD)','balance_due',1.8,'moneyReview'],['Payment','payment_state',1.8,'paymentState'], ['Created', 'created_at', 1.7, 'date']], total: ['Invoice value', 'total'] },
   customers: { title: 'Customer register', module: 'customer', method: 'getCustomers', key: 'customers', permission: 'VIEW_CUSTOMERS', paginated: true,
     filters: ['search'], sorts: ['id', 'company_name', 'contact_name', 'created_at', 'order_count', 'total_spend'],
     columns: [['Company', 'company_name', 3], ['Contact', 'contact_name', 2], ['Email', 'email', 3], ['Phone', 'phone', 2]] },
@@ -202,8 +202,10 @@ function sumMoney(rows, field) {
 }
 function formatCell(row, column, timezone) {
   const [, key, , format] = column, value = row[key];
-  if (value === undefined || value === null || value === '') return '—';
+  if (value === undefined || value === null || value === '') return format==='moneyReview'?'Requires review':'—';
   if (format === 'materialType') return value === 'packaging' ? 'Packaging' : value === 'raw_material' ? 'Raw material' : String(value);
+  if(format==='moneyReview')return value===null||value===undefined?'Requires review':money(numeric(value,key),'AUD');
+  if(format==='paymentState')return {review_required:'Payment details require review',paid:'Paid',partial:'Partially paid',unpaid:'Unpaid'}[value]||'Not recorded';
   if (format === 'money') return money(numeric(value, key), 'AUD');
   if (format === 'number' || format === 'hours') return numeric(value, key).toLocaleString('en-AU', { maximumFractionDigits: 3, ...(format === 'hours' ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {}) });
   if (format === 'time') {
@@ -269,7 +271,7 @@ exports.download = async (req, res, next) => {
       const from = date(query.from_date || query.from, 'start'), to = date(query.to_date || query.to, 'end');
       source = { title: definition.title, rows, columns: definition.columns,
         period: periodText(from, to, 'Current authorised records matching the selected filters'),
-        totals: definition.total ? [{ label: definition.total[0], value: money(sumMoney(rows, definition.total[1]), 'AUD') }] : [] };
+        totals: definition.total ? [{ label: definition.total[0], value: type==='invoices'&&rows.some(row=>row.total==null)?'Requires review':money(sumMoney(rows, definition.total[1]), 'AUD') },...(type==='invoices'?[...['paid_amount','balance_due'].map(field=>({label:field==='paid_amount'?'Paid amount':'Outstanding',value:rows.some(row=>row[field]==null)?'Requires review':money(sumMoney(rows,field),'AUD')})),{label:'Payment reviews',value:String(rows.filter(row=>row.payment_review_required).length)}]:[])] : [] };
     }
     const reference = type.toUpperCase() + '-' + new Date().toISOString().slice(0, 10).replace(/-/g, '');
     const artifact = await createDocumentPdf({ title: source.title, reference, issueDate: new Date(), period: source.period,

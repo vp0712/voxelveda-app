@@ -36,7 +36,10 @@ const rfqs = [
   { id:72, customer_name:'Another fixture', email:'other@example.invalid', material:'Fixture aluminium', phone:'', quantity:4, application:'Separate fixture brief', status:'rejected', archived:0, revision:0, created_at:'2026-10-09T10:00:00.000Z' }
 ];
 const invoice = { id:91, invoice_no:'INV-TEST-0091', rfq_id:71, customer_name:'Restoration fixture', customer_email:'fixture@example.invalid', description:'Test-only engineering fixture', quantity:2, unit_price:50, gst_rate:10, subtotal:100, gst_amount:10, total:110, paid_amount:0, balance_due:110, status:'draft', deleted:0, created_at:'2026-10-10T10:00:00.000Z' };
+const invoiceFixturePayments=[],invoiceFixtureActivity=[],invoiceFixtureItems=[{id:1,invoice_id:91,description:invoice.description,quantity:2,unit_price:50,amount:100}];
+if(process.env.VV_INVOICE_DETAIL_PROOF){Object.assign(invoice,{invoice_no:'INV-823166',customer_name:'Synthetic invoice-review customer',gst_rate:10,subtotal:2463.73,gst_amount:246.37,total:2710.10,balance_due:2710.10,paid_amount:0,status:'paid',document_revision:1});invoiceFixtureItems.splice(0,1,{id:1,invoice_id:91,description:'Synthetic engineering item with a long specification and reference. No production invoice was read or modified.',quantity:1,unit_price:2000,amount:2000},{id:2,invoice_id:91,description:'Synthetic measured item',quantity:0.5,unit:'kg',unit_price:927.46,amount:463.73});invoiceFixtureActivity.push({id:1,invoice_id:91,action_type:'paid',notes:'Invoice marked as paid',created_by:null,created_at:'2026-10-10T10:00:00.000Z'});}
 const invoiceRecords=process.env.VV_RESPONSIVE_MATRIX==='after'?Array.from({length:75},(_,i)=>({...invoice,id:91+i,invoice_no:i===0?invoice.invoice_no:'INV-LONG-REFERENCE-'+String(i).padStart(5,'0')+'-MANUFACTURING-2026',customer_name:i%3?'Synthetic customer '+i:'Synthetic international manufacturing customer with a very long registered company name and project reference '+i,customer_email:'synthetic-long-customer-address-'+i+'@example.invalid',status:i%2?'approved':'draft',document_revision:1,total:i===74?null:110+i,paid_amount:i%2?10:0,balance_due:i===74?null:110+i-(i%2?10:0)})):[invoice];
+if(!process.env.VV_INVOICE_DETAIL_PROOF)for(const row of invoiceRecords)if(row.paid_amount>0)invoiceFixturePayments.push({id:row.id,invoice_id:row.id,amount:row.paid_amount,payment_date:'2026-10-10',method:'Fixture receipt',reference:'FIXTURE-'+row.id,voided_at:null});
 function selectedInvoices(sql,parameters){let rows=invoiceRecords.filter(row=>Number(row.deleted)=== (/i.deleted=1/.test(sql)?1:0)),i=0;if(/LOWER\(customer_email\)=\?/.test(sql))rows=rows.filter(row=>row.customer_email===parameters[i++]);if(/invoice_no LIKE/.test(sql)){const search=String(parameters[i]||'').replaceAll('%','').toLowerCase();i+=3;rows=rows.filter(row=>[row.invoice_no,row.customer_name,row.customer_email].some(v=>String(v).toLowerCase().includes(search)));}if(/status=\?/.test(sql))rows=rows.filter(row=>row.status===parameters[i++]);const column=sql.match(/ORDER BY ([a-z_]+)/)?.[1]||'id',direction=/ORDER BY.*DESC/.test(sql)?-1:1;return rows.sort((a,b)=>String(a[column]).localeCompare(String(b[column]),'en',{numeric:true})*direction);}
 const users = {
   901:{ id:901, name:'Admin fixture', username:'fixture-admin', email:'admin@example.invalid', role:'super_admin', permissions:[], active:1, account_status:'ACTIVE', mfa_enabled:1 },
@@ -77,13 +80,14 @@ async function query(statement, parameters = []) {
   if (/^SELECT COUNT\(\*\) n FROM /i.test(sql)) return result([{n:/FROM ncrs\b/i.test(sql)?ncrs.filter(row=>row.status!=='CLOSED').length:0}]);
   if (/^SELECT \* FROM ncrs ORDER BY/i.test(sql)) return result(ncrs);
   if (/FROM customers c\b/i.test(sql)) return result(/^SELECT COUNT\(/i.test(sql) ? [{total:customers.length}] : customers);
+  if(/^SELECT COUNT\(\*\) AS total_invoices/.test(sql))return result([{total_invoices:invoiceRecords.length,draft_invoices:1,approved_invoices:0,sent_invoices:0,paid_invoices:0,payment_review_count:invoiceRecords.filter(r=>r.status==='paid'&&r.paid_amount<r.total).length,paid_revenue:invoiceRecords.some(r=>r.status==='paid'&&r.paid_amount<r.total)?null:0,total_invoice_value:invoiceRecords.reduce((n,r)=>n+(r.total||0),0)}]);
   // Match the outer invoice query before its nested payment SUM/GROUP BY.
   // The aggregate join does not turn the invoice list or detail into an empty
   // aggregation result, and COUNT must always return its scalar row.
   if (/FROM invoices i\b/i.test(sql) && /^SELECT COUNT\(\*\) total FROM \(/i.test(sql)) return result([{total:selectedInvoices(sql,parameters).length}]);
   if (/FROM invoices i\b/i.test(sql) && /^SELECT \* FROM \(/i.test(sql)){const rows=selectedInvoices(sql,parameters),limit=Number(parameters.at(-2)),offset=Number(parameters.at(-1));return result(rows.slice(offset,offset+limit));}
   if (/FROM invoices i\b/i.test(sql) && /^SELECT i\.\*,/i.test(sql))return result(invoiceRecords.filter(row=>row.id===Number(parameters[0])));
-  if(/^SELECT SUM\(total\) total_value/.test(sql)){const rows=selectedInvoices(sql,parameters);return result([{total_value:rows.reduce((n,r)=>n+(r.total||0),0),paid_value:rows.reduce((n,r)=>n+(r.paid_amount||0),0),balance_value:rows.reduce((n,r)=>n+(r.balance_due||0),0),missing_total:rows.filter(r=>r.total==null).length,missing_paid:0,missing_balance:rows.filter(r=>r.balance_due==null).length}]);}
+  if(/^SELECT SUM\(total\) total_value/.test(sql)){const rows=selectedInvoices(sql,parameters);return result([{total_value:rows.reduce((n,r)=>n+(r.total||0),0),paid_value:rows.reduce((n,r)=>n+(r.paid_amount||0),0),balance_value:rows.reduce((n,r)=>n+(r.balance_due||0),0),missing_total:rows.filter(r=>r.total==null).length,missing_paid:rows.filter(r=>r.total==null||(process.env.VV_INVOICE_DETAIL_PROOF==='after'&&r.status==='paid'&&r.paid_amount<r.total)).length,missing_balance:rows.filter(r=>r.balance_due==null||(process.env.VV_INVOICE_DETAIL_PROOF==='after'&&r.status==='paid'&&r.paid_amount<r.total)).length}]);}
   if (/FROM audit_logs/i.test(sql)) return result(/integrity_hash FROM/i.test(sql) ? audits.slice(0,1) : audits);
   if (/FROM competitors/i.test(sql)) return result(historicalCompetitors);
   if (/FROM compliance_entries/i.test(sql)) return result(historicalCompliance);
@@ -99,7 +103,9 @@ async function query(statement, parameters = []) {
   if (/^SELECT \* FROM rfqs/i.test(sql)) return result(rfqs.filter(row=>row.archived===Number(parameters[0]||0)));
   if (/FROM users/i.test(sql) && /WHERE (?:u\.)?id\s*=\s*\?/i.test(sql)) return result(users[parameters[0]] ? [users[parameters[0]]] : []);
   if (/FROM users/i.test(sql) && !/COUNT|SUM\(/i.test(sql)) return result(Object.values(users));
-  if (/FROM invoice_items/i.test(sql)) return result([{ id:1, invoice_id:91, description:invoice.description, quantity:2, unit_price:50, amount:100 }]);
+  if (/FROM invoice_items/i.test(sql)) return result(invoiceFixtureItems.map(row=>({...row})));
+  if(/FROM invoice_payments/i.test(sql)&&!(/COUNT|SUM\(/i.test(sql)))return result(invoiceFixturePayments.filter(row=>(row.invoice_id===Number(parameters[0])||sql.includes(' IN ('))&&(!sql.includes('voided_at IS NULL')||!row.voided_at)).map(row=>({...row})));
+  if(process.env.VV_INVOICE_DETAIL_PROOF&&/FROM invoice_activity/i.test(sql))return result(invoiceFixtureActivity.map(row=>({...row})));
   if (/FROM invoice_payments|FROM invoice_activity|FROM email_queue|FROM email_logs/i.test(sql) && !/COUNT|SUM\(/i.test(sql)) return result([]);
   if (/FROM invoices/i.test(sql) && /rfq_id = \?/i.test(sql)) return result(parameters[0]===71 ? [invoice] : []);
   if (/FROM invoices/i.test(sql) && /GROUP BY/i.test(sql)) return result([]);
@@ -207,7 +213,8 @@ async function run() {
     await page.waitForURL('**/admin*');
     await page.waitForFunction(()=>document.getElementById('adminInfo')?.textContent.includes('Admin fixture'));
     await page.waitForFunction(()=>!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
-    if(process.env.VV_RESPONSIVE_MATRIX){await require('./responsive-workspace-scenario').run({page,context,origin,out:outputDir,phase:process.env.VV_RESPONSIVE_MATRIX,records:invoiceRecords});return;}
+    if(process.env.VV_INVOICE_DETAIL_PROOF){await require('./invoice-dialog-browser-scenario').run({page,context,origin,out:outputDir,phase:process.env.VV_INVOICE_DETAIL_PROOF,invoice,items:invoiceFixtureItems,payments:invoiceFixturePayments,activity:invoiceFixtureActivity});return;}
+    if(process.env.VV_RESPONSIVE_MATRIX){await require('./responsive-workspace-scenario').run({page,context,origin,out:outputDir,phase:process.env.VV_RESPONSIVE_MATRIX,records:invoiceRecords,payments:invoiceFixturePayments});return;}
     stage='settings_qr_renderer';
     await page.waitForFunction(()=>{const image=document.getElementById('qrPreviewImage');return image?.complete && image.naturalWidth>0;});
     const qrUrl=new URL(await page.locator('#qrPreviewImage').getAttribute('src'),origin);

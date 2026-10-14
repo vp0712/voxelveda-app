@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  const invoiceId = new URLSearchParams(location.search).get('id');
+  const query=new URLSearchParams(location.search),invoiceId=query.get('id'),version=query.get('version');
   const status = document.getElementById('status');
   const frame = document.getElementById('preview');
   const download = document.getElementById('download');
@@ -14,7 +14,7 @@
     loading = true; download.disabled = true; retry.hidden = true;
     status.className = ''; status.textContent = 'Generating the official invoice PDF…';
     try {
-      const response = await fetch(`/api/invoice/${encodeURIComponent(invoiceId)}/pdf?download=1`, { credentials:'same-origin', cache:'no-store' });
+      const response = await fetch(`/api/invoice/${encodeURIComponent(invoiceId)}/pdf?download=1${version?'&version='+encodeURIComponent(version):''}`, { credentials:'same-origin', cache:'no-store' });
       if (response.status === 401) { location.replace('/login?returnTo=' + encodeURIComponent(location.pathname + location.search)); return; }
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));

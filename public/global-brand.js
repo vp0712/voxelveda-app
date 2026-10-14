@@ -9,6 +9,7 @@
   const body = document.body;
   const contextNode = document.getElementById('vvGlobalBrandLoaderContext');
   let active = 0;
+  let suspensions = 0;
   let showTimer = null;
   let hideTimer = null;
   let failSafeTimer = null;
@@ -31,6 +32,7 @@
     clearTimeout(showTimer);
     clearTimeout(hideTimer);
     if (visible) {
+      if (suspensions) return;
       if (loader.classList.contains('is-visible')) return;
       visibleSince = Date.now();
       loader.classList.add('is-visible');
@@ -46,7 +48,7 @@
 
     clearTimeout(failSafeTimer);
     const elapsed = visibleSince ? Date.now() - visibleSince : MIN_VISIBLE_MS;
-    const wait = Math.max(0, MIN_VISIBLE_MS - elapsed);
+    const wait = suspensions ? 0 : Math.max(0, MIN_VISIBLE_MS - elapsed);
     hideTimer = setTimeout(() => {
       loader.classList.remove('is-visible');
       loader.setAttribute('aria-hidden', 'true');
@@ -59,7 +61,7 @@
   function begin({ delay = API_DELAY_MS, context = 'Loading securely…' } = {}) {
     active += 1;
     setContext(context);
-    if (!loader.classList.contains('is-visible')) {
+    if (!suspensions && !loader.classList.contains('is-visible')) {
       clearTimeout(showTimer);
       showTimer = setTimeout(() => {
         if (active > 0) setVisible(true);
@@ -295,6 +297,25 @@
 
   window.VoxelVedaBrandLoader = Object.freeze({
     begin,
+    suspend() {
+      suspensions += 1;
+      clearTimeout(showTimer);
+      clearTimeout(hideTimer);
+      clearTimeout(failSafeTimer);
+      loader.classList.remove('is-visible');
+      loader.setAttribute('aria-hidden', 'true');
+      body?.classList.remove('vv-brand-busy');
+      visibleSince = 0;
+      let resumed = false;
+      return () => {
+        if (resumed) return;
+        resumed = true;
+        suspensions = Math.max(0, suspensions - 1);
+        if (!suspensions && active > 0) {
+          showTimer = setTimeout(() => { if (active > 0) setVisible(true); }, API_DELAY_MS);
+        }
+      };
+    },
     hide: hideAll,
     show(context = 'Loading securely…') { return begin({ delay: 0, context }); },
     async withPromise(promise, options = {}) {

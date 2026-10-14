@@ -131,7 +131,7 @@ function openPhotoViewer() {
   viewerImageEl.src = objectUrl;
   photoViewerEl.hidden = false;
   photoViewerEl.setAttribute('aria-hidden', 'false');
-  window.VoxelOverlay?.open({id:'profilePhotoViewer',element:photoViewerEl,onClose:()=>closePhotoViewer(true),returnFocus:avatarWrapEl});
+  if(window.VoxelOverlay?.open({id:'profilePhotoViewer',element:photoViewerEl,onClose:()=>closePhotoViewer(true),returnFocus:avatarWrapEl})===false){photoViewerEl.hidden=true;photoViewerEl.setAttribute('aria-hidden','true');return;}
   document.body.style.overflow = 'hidden';
   $('viewerClose')?.focus?.({ preventScroll: true });
 }
@@ -359,7 +359,7 @@ function choosePhotoCrop(image){
     [x,y,zoom].forEach(control=>control.addEventListener('input',render));
     dialog.querySelector('#profileCropCancel').onclick=()=>finish(null);dialog.querySelector('#profileCropConfirm').onclick=()=>finish(value());
     dialog.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();finish(null);}else if(event.key==='Tab'){const controls=[...dialog.querySelectorAll('button,input')];const first=controls[0],last=controls.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first.focus();}}});
-    if(window.VoxelOverlay)window.VoxelOverlay.open({id:'profilePhotoCrop',element:dialog,onClose:()=>finish(null),returnFocus:$('choosePhotoBtn')});
+    if(window.VoxelOverlay&&window.VoxelOverlay.open({id:'profilePhotoCrop',element:dialog,onClose:()=>finish(null),returnFocus:$('choosePhotoBtn')})===false){finish(null);return;}
     render();dialog.querySelector('#profileCropConfirm').focus();
   });
 }

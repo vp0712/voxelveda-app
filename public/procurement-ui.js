@@ -141,7 +141,7 @@
         <div class="procurement-record-head"><div><span>${escapeHtml(row.requisition_no)}</span><h3>${escapeHtml(row.title)}</h3></div>${statusChip(status)}</div>
         <dl><div><dt>Requester</dt><dd>${escapeHtml(row.requester_name || 'Team member')}</dd></div><div><dt>Required</dt><dd>${displayDate(row.required_date)}</dd></div><div><dt>Estimate</dt><dd>${formatMoney(row.estimated_total, row.currency)}</dd></div></dl>
         <ul class="procurement-lines">${itemSummary(row.items)}</ul>
-        <div class="procurement-actions">${canSubmit ? actionButton('submit-requisition', row.id, 'Submit for Approval', 'CREATE_PURCHASE_REQUISITION', 'primary-btn') : ''}${canCancel ? actionButton('cancel-requisition', row.id, 'Cancel', 'CREATE_PURCHASE_REQUISITION', 'danger-btn') : ''}</div>
+        <div class="procurement-actions">${canSubmit ? actionButton('submit-requisition', row.id, 'Submit for Approval', 'CREATE_PURCHASE_REQUISITION', 'primary-btn') : ''}${canCancel ? actionButton('cancel-requisition', row.id, 'Cancel requisition', 'CREATE_PURCHASE_REQUISITION', 'danger-btn') : ''}</div>
       </article>`;
     }).join('');
   }
@@ -166,7 +166,7 @@
         <div class="procurement-record-head"><div><span>${escapeHtml(row.po_number)} · ${escapeHtml(row.requisition_no)}</span><h3>${escapeHtml(row.supplier_name)}</h3></div>${statusChip(status)}</div>
         <dl><div><dt>Issued</dt><dd>${displayDate(row.issue_date)}</dd></div><div><dt>Expected</dt><dd>${displayDate(row.expected_date)}</dd></div><div><dt>Total</dt><dd>${formatMoney(row.total_amount, row.currency)}</dd></div></dl>
         <ul class="procurement-lines">${itemSummary(row.items, 'unit_price')}</ul>
-        <div class="procurement-actions">${canSubmit ? actionButton('submit-po', row.id, 'Submit for Approval', 'CREATE_PURCHASE_ORDER', 'primary-btn') : ''}${canCancel ? actionButton('cancel-po', row.id, 'Cancel', 'CREATE_PURCHASE_ORDER', 'danger-btn') : ''}<button type="button" class="secondary-btn" data-procurement-action="report-po" data-id="${Number(row.id)}">Purchase order PDF</button></div>
+        <div class="procurement-actions">${canSubmit ? actionButton('submit-po', row.id, 'Submit for Approval', 'CREATE_PURCHASE_ORDER', 'primary-btn') : ''}${canCancel ? actionButton('cancel-po', row.id, 'Cancel purchase order', 'CREATE_PURCHASE_ORDER', 'danger-btn') : ''}<button type="button" class="secondary-btn" data-procurement-action="report-po" data-id="${Number(row.id)}">Purchase order PDF</button></div>
       </article>`;
     }).join('');
   }
@@ -769,7 +769,7 @@
       if(action==='uploads-page'){state.uploadFilters.page=Math.max(1,Number(id));return load();}
       if(action==='review-import' || action==='refresh-import')return await readImport(id || state.importDetail?.batch?.id,1);
       if(action==='review-page')return await readImport(state.importDetail.batch.id,Number(id),true);
-      if(action==='close-import'){state.importReadSequence+=1;state.importDetail=null;state.error='';render();return;}
+      if(action==='close-import'){if(state.mappingDirty&&!window.confirm('Discard unsaved import mapping changes? The original uploaded files are preserved.'))return;state.importReadSequence+=1;state.importDetail=null;state.error='';render();return;}
       if(action==='retry-extraction'){
         const batch=state.importDetail?.batch;
         return showDialog('Retry failed extraction',`<form id="procurementEntryForm" class="procurement-form"><p>The retained originals are reused. Already saved entries remain linked to their source rows.</p><label>Retry reason<textarea name="reason" required maxlength="1000"></textarea></label><p id="procurementEntryError" class="procurement-inline-error" role="alert"></p></form>`,async()=>{
@@ -846,7 +846,7 @@
           const path = action === 'cancel-requisition' ? `/requisitions/${id}/cancel` : `/purchase-orders/${id}/cancel`;
           const result = await api(path, { method: 'POST', body: JSON.stringify({ reason: current.reason.value }) });
           hideDialog(); toast(result.message); await load();
-        }, 'Confirm Cancellation');
+        }, action === 'cancel-requisition' ? 'Cancel requisition' : 'Cancel purchase order');
       }
     } catch (error) { toast(error.message); }
   }

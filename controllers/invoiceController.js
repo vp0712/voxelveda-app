@@ -7,6 +7,9 @@ const { validateRecipients } = require('../services/emailService');
 const { randomUUID, createHash } = require('node:crypto');
 const {hasPermission}=require('../services/authorizationService');
 const urls = require('../config/urls');
+const invoiceSummary=require('../services/invoiceSummaryService');
+const centsMoney=require('../utils/money');
+const {companyProfile}=require('../config/companyProfile');
 const {dateOnly}=require('../utils/dateOnly');
 const {
   emailFailureDetails,
@@ -169,27 +172,7 @@ async function rememberManualInvoiceCustomer(conn, { customerName, customerEmail
   );
 }
 
-function invoiceReceivableSelect(whereClause = 'WHERE i.deleted = 0 OR i.deleted IS NULL') {
-  return `
-    SELECT
-      i.*,
-      COALESCE(p.paid_amount, 0) AS paid_amount,
-      CASE WHEN i.total IS NULL THEN NULL ELSE GREATEST(i.total - COALESCE(p.paid_amount, 0), 0) END AS balance_due,
-      CASE
-        WHEN COALESCE(p.paid_amount, 0) <= 0 THEN 'unpaid'
-        WHEN COALESCE(p.paid_amount, 0) >= COALESCE(i.total, 0) THEN 'paid'
-        ELSE 'partial'
-      END AS payment_state
-    FROM invoices i
-    LEFT JOIN (
-      SELECT invoice_id, SUM(amount) AS paid_amount
-      FROM invoice_payments
-      WHERE voided_at IS NULL
-      GROUP BY invoice_id
-    ) p ON p.invoice_id = i.id
-    ${whereClause}
-  `;
-}
+function invoiceReceivableSelect(whereClause){return invoiceSummary.receivableSelect(whereClause);}
 
 async function getInvoiceWithReceivables(invoiceId, db = pool) {
   const [[invoice]] = await db.query(
@@ -231,7 +214,7 @@ async function buildCustomerStatementData({ search = '', customer_email = '', cu
     throw new Error('Customer name, email, or search text is required');
   }
 
-  const [invoices] = await pool.query(
+  const [storedInvoices] = await pool.query(
     `
     SELECT *
     FROM (${invoiceReceivableSelect()}) receivables
@@ -241,6 +224,7 @@ async function buildCustomerStatementData({ search = '', customer_email = '', cu
     params
   );
 
+  const invoices=storedInvoices.map(invoiceSummary.applyPaymentSummary);
   const identities=new Set(invoices.map(invoice=>String(invoice.customer_email || `name:${invoice.customer_name || ''}`).trim().toLowerCase()));
   if(identities.size>1)throw Object.assign(new Error('Select one customer from the search matches before generating a statement.'),{status:422,code:'STATEMENT_CUSTOMER_AMBIGUOUS'});
 
@@ -262,12 +246,8 @@ async function buildCustomerStatementData({ search = '', customer_email = '', cu
     payments = rows;
   }
 
-  const totals = invoices.reduce((acc, invoice) => {
-    acc.invoice_value += Number(invoice.total || 0);
-    acc.paid += Number(invoice.paid_amount || 0);
-    acc.balance_due += Number(invoice.balance_due || 0);
-    return acc;
-  }, { invoice_value: 0, paid: 0, balance_due: 0 });
+  const totals={};for(const [key,field]of [['invoice_value','total'],['paid','paid_amount'],['balance_due','balance_due']])totals[key]=invoices.some(row=>invoiceSummary.amount(row[field])===null)?null:centsMoney.add(...invoices.map(row=>row[field]));
+  totals.review_count=invoices.filter(row=>row.payment_review_required).length;
 
   const first = invoices[0] || {};
   return {
@@ -302,7 +282,7 @@ exports.createInvoice = async (req,res) => {
     if(!validDecimal(quantity,3,999999999.999,false))errors.quantity='The RFQ quantity must be positive with at most three decimal places.';
     if(req.body.gst_rate==='' || !validDecimal(rate,2,100))errors.gst_rate='Enter a GST rate from 0 to 100 with at most two decimal places.';
     if(Object.keys(errors).length){await conn.rollback();return res.status(422).json({message:'Check the RFQ invoice values.',errors});}
-    const subtotal=Math.round(quantity*price*100)/100,total=Math.round((subtotal+Math.round(subtotal*rate)/100)*100)/100;
+    const subtotal=Number(centsMoney.multiplyQuantity(price,quantity)),total=Number(centsMoney.add(subtotal,centsMoney.percentageOf(subtotal,rate)));
     if(!Number.isFinite(total)||total>9999999999.99){await conn.rollback();return res.status(422).json({message:'The RFQ invoice total exceeds the supported amount.',errors:{total:'Review the RFQ quantity and approved price.'}});}
     const reference=`INV-${Date.now()}-${randomUUID().slice(0,6).toUpperCase()}`,description=rfq.application || rfq.material;
     const [insert]=await conn.query(`INSERT INTO invoices(invoice_no,rfq_id,customer_name,customer_email,description,quantity,unit_price,gst_rate,total,status) VALUES(?,?,?,?,?,?,?,?,?,'draft')`,[reference,id,rfq.customer_name,rfq.email,description,quantity,price,rate,total]);
@@ -321,7 +301,7 @@ function cleanInvoiceInput(body,editing=false) {
   const errors={},name=String(body.customer_name || '').trim(),email=String(body.customer_email || '').trim(),rate=Number(body.gst_rate ?? 10);
   if(!name || name.length>180)errors.customer_name='Enter a customer name of up to 180 characters.';
   if(email.length>180 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))errors.customer_email='Enter a valid customer email address of up to 180 characters.';
-  if(body.gst_rate==='' || !validDecimal(rate,2,100))errors.gst_rate='Enter a GST rate from 0 to 100 with at most two decimal places.';
+  if(body.gst_rate===null || body.gst_rate==='' || !validDecimal(rate,2,100))errors.gst_rate='Enter a GST rate from 0 to 100 with at most two decimal places.';
   const source=Array.isArray(body.items)?body.items:[];
   if(!source.length||source.length>100)errors.items='Provide between 1 and 100 invoice items.';
   const items=source.slice(0,100).map((item,index)=>{
@@ -329,11 +309,11 @@ function cleanInvoiceInput(body,editing=false) {
     if(!description || description.length>2000)errors[`items.${index}.description`]='Enter a description of up to 2,000 characters.';
     if(!validDecimal(quantity,3,999999999.999,false))errors[`items.${index}.quantity`]='Enter a positive quantity with at most three decimal places.';
     if(item?.unit_price===undefined || item?.unit_price===null || item?.unit_price==='' || !validDecimal(unitPrice,2,99999999.99))errors[`items.${index}.unit_price`]='Enter a nonnegative unit price with at most two decimal places.';
-    const amount=Math.round(quantity*unitPrice*100)/100;
+    const amount=validDecimal(quantity,3,999999999.999,false)&&validDecimal(unitPrice,2,99999999.99)?Number(centsMoney.multiplyQuantity(unitPrice,quantity)):NaN;
     if(!Number.isFinite(amount)||amount>9999999999.99)errors[`items.${index}.amount`]='This line exceeds the supported invoice amount.';
     return {description,quantity,unitPrice,amount};
   });
-  const subtotal=Math.round(items.reduce((sum,item)=>sum+item.amount,0)*100)/100,gst=Math.round(subtotal*rate)/100,total=Math.round((subtotal+gst)*100)/100;
+  const subtotal=items.every(item=>Number.isFinite(item.amount))?Number(centsMoney.add(...items.map(item=>item.amount))):NaN,gst=Number.isFinite(subtotal)&&validDecimal(rate,2,100)?Number(centsMoney.percentageOf(subtotal,rate)):NaN,total=Number.isFinite(subtotal)&&Number.isFinite(gst)?Number(centsMoney.add(subtotal,gst)):NaN;
   if(!Number.isFinite(total)||total>9999999999.99)errors.total='Invoice total exceeds the supported amount.';
   if(Object.keys(errors).length)throw Object.assign(new Error('Check the invoice fields.'),{status:422,errors});
   return {name,email,rate,items,subtotal,total};
@@ -396,7 +376,7 @@ exports.getInvoices = async (req, res) => {
     const [[totals]] = await pool.query(`SELECT SUM(total) total_value,SUM(paid_amount) paid_value,SUM(balance_due) balance_value,SUM(total IS NULL) missing_total,SUM(paid_amount IS NULL) missing_paid,SUM(balance_due IS NULL) missing_balance FROM (${select}) records ${where}`,params);
     const [rows] = await pool.query(`SELECT * FROM (${select}) records ${where} ORDER BY ${sort} ${direction},id ${direction} LIMIT ? OFFSET ?`, [...params, limit, (page-1)*limit]);
     const summary={};for(const [field,missing]of [['total_value','missing_total'],['paid_value','missing_paid'],['balance_value','missing_balance']])summary[field]=Number(count.total)===0?0:Number(totals[missing])>0||totals[field]==null?null:Number(totals[field]);
-    return res.json({ invoices: rows, total: Number(count.total), page, limit,summary });
+    return res.json({ invoices: rows.map(invoiceSummary.applyPaymentSummary), total: Number(count.total), page, limit,summary });
   } catch (error) { return invoiceError(res,error); }
 };
 
@@ -420,13 +400,21 @@ exports.getInvoiceDetails = async (req, res) => {
     );
 
     const [payments] = await pool.query(
-      'SELECT * FROM invoice_payments WHERE invoice_id = ? AND voided_at IS NULL ORDER BY payment_date ASC, id ASC',
+      'SELECT * FROM invoice_payments WHERE invoice_id = ? ORDER BY payment_date ASC, id ASC',
       [id]
     );
 
     const [activity] = await pool.query('SELECT * FROM invoice_activity WHERE invoice_id=? ORDER BY created_at DESC,id DESC LIMIT 100', [id]);
     const [delivery] = await pool.query("SELECT id,status,attempts,last_error,message_id,sent_at FROM email_queue WHERE related_module='invoices' AND related_record_id=? ORDER BY id DESC LIMIT 10", [String(id)]);
-    res.json({ invoice, items, payments, activity, delivery });
+    const summary=invoiceSummary.invoiceSummary(invoice,items,payments);
+    const actors=[...new Set([...activity,...payments].map(row=>Number(row.created_by)).filter(id=>Number.isSafeInteger(id)&&id>0))];
+    let names=new Map();if(actors.length&&!customerScoped(req.user)){const [people]=await pool.query(`SELECT id,name FROM users WHERE id IN (${actors.map(()=>'?').join(',')})`,actors);names=new Map(people.map(p=>[Number(p.id),p.name]));}
+    const company_timezone=require('../services/attendanceTimeService').companyTimezone(),company=companyProfile(),payment_version=invoiceSummary.paymentVersion(invoice,payments);
+    const document_version=invoiceSummary.version({invoice,items,company,summary,company_timezone});
+    const presented=invoiceSummary.applyPaymentSummary({...invoice,recorded_payment_amount:summary.recorded_payment_amount,invalid_payment_count:summary.recorded_payment_amount===null?1:0});
+    res.set('Cache-Control','no-store').json({invoice:presented,items,summary,company,company_timezone,document_version,payment_version,
+      payments:payments.map(row=>({id:row.id,amount:row.amount,payment_date:row.payment_date,method:row.method,reference:row.reference,notes:row.notes,voided_at:row.voided_at||null,actor_name:names.get(Number(row.created_by))||null})),
+      activity:activity.map(row=>invoiceSummary.publicActivity({...row,actor_name:names.get(Number(row.created_by))||null})),delivery});
   } catch (err) {
     console.error('GET INVOICE DETAILS ERROR FULL:', err);
     invoiceError(res,err);
@@ -439,6 +427,37 @@ exports.paymentReceipt=async(req,res)=>{
  const identity=requestIdentity(req,`invoice-payment:${id}`,{});const [[payment]]=await pool.query('SELECT id,amount,voided_at FROM invoice_payments WHERE invoice_id=? AND request_key=? LIMIT 1',[id,identity.requestKey]);
  res.set('Cache-Control','no-store').json({confirmed:Boolean(payment),payment_id:payment?.id||null,voided:Boolean(payment?.voided_at),invoice});
  }catch(error){return invoiceError(res,error);}
+};
+exports.reviewInvoicePayments=async(req,res)=>{
+ let conn;
+ try{
+  if(!hasPermission(req.user,'VOID_TRANSACTION')||!hasPermission(req.user,'POST_TRANSACTION'))return res.status(403).json({message:'Invoice payment review requires payment and correction authority.'});
+  const id=Number(req.params.id),body=req.body||{},reason=String(body.reason||'').trim(),evidence=String(body.evidence_reference||'').trim();
+  if(!Number.isSafeInteger(id)||id<1||!['confirm_register','record_payment'].includes(body.decision))return res.status(422).json({message:'Choose a valid invoice review action.'});
+  if(reason.length<8||reason.length>1000||evidence.length<3||evidence.length>160||body.acknowledged!==true||!/^[a-f0-9]{64}$/.test(body.expected_version||'')||!req.get('Idempotency-Key'))return res.status(422).json({message:'Provide verified source evidence, a correction reason and confirmation.',errors:{reason:'Describe the verified evidence and correction.',evidence_reference:'Identify the reviewed source record.'}});
+  const identity=requestIdentity(req,`invoice-payment-review:${id}`,body);
+  await ensureInvoiceColumns();conn=await pool.getConnection();await conn.beginTransaction();
+  const [[invoice]]=await conn.query('SELECT * FROM invoices WHERE id=? AND IFNULL(deleted,0)=0 FOR UPDATE',[id]);
+  if(!invoice){await conn.rollback();return res.status(404).json({message:'Active invoice not found.'});}assertCustomerRecord(req.user,invoice.customer_email);
+  const [reviews]=await conn.query("SELECT * FROM invoice_activity WHERE invoice_id=? AND action_type='payment_review_resolved' ORDER BY id DESC",[id]);
+  for(const row of reviews){let previous;try{previous=JSON.parse(row.notes);}catch{continue;}if(previous.request_key===identity.requestKey){await conn.commit();if(previous.payload_hash!==identity.payloadHash)return res.status(409).json({message:'The review request identity was used for different evidence.'});return res.json({confirmed:true,existing:true,message:'The original payment review was recorded.',payment_id:previous.payment_id||null});}}
+  const [payments]=await conn.query('SELECT * FROM invoice_payments WHERE invoice_id = ? ORDER BY payment_date ASC, id ASC',[id]);
+  if(invoiceSummary.paymentVersion(invoice,payments)!==body.expected_version){await conn.rollback();return res.status(409).json({message:'The invoice or payment register changed. Reload and review the current records.',code:'INVOICE_PAYMENT_REVIEW_CONFLICT'});}
+  const summary=invoiceSummary.paymentSummary(invoice,payments);
+  if(!summary.review_required||summary.total===null||summary.recorded_payment_amount===null){await conn.rollback();return res.status(409).json({message:'This review cannot be applied. Invalid payment rows must be corrected through their audited void action first.'});}
+  const total=centsMoney.toCents(summary.total),recorded=centsMoney.toCents(summary.recorded_payment_amount);let paymentId=null,nextPaid=recorded;
+  if(body.decision==='record_payment'){
+   const value=invoiceSummary.amount(body.amount),date=body.payment_date?paymentDate(body.payment_date):null,method=String(body.method||'').trim(),reference=String(body.reference||'').trim();
+   if(value===null||value<=0n||value>total-recorded||!date||!method||method.length>80||!reference||reference.length>120){await conn.rollback();return res.status(422).json({message:'Enter the verified amount, payment date, method and source reference.',errors:{amount:'Use the evidenced amount within the remaining recorded balance.'}});}
+   const [insert]=await conn.query('INSERT INTO invoice_payments(invoice_id,amount,payment_date,method,reference,notes,created_by,request_key,request_payload_sha256) VALUES(?,?,?,?,?,?,?,?,?)',[id,centsMoney.fromCents(value),date,method,reference,reason,req.user.id,identity.requestKey,identity.payloadHash]);paymentId=insert.insertId;nextPaid+=value;
+  }
+  if(nextPaid>total){await conn.rollback();return res.status(422).json({message:'Recorded payments exceed the total. Review or void the incorrect payment with evidence.'});}
+  const [lifecycle]=await conn.query("SELECT action_type FROM invoice_activity WHERE invoice_id=? AND action_type IN ('approved','sent') ORDER BY created_at DESC,id DESC LIMIT 1",[id]);
+  const status=nextPaid===total&&total>0n?'paid':(['approved','sent'].includes(lifecycle[0]?.action_type)?lifecycle[0].action_type:'draft');
+  await conn.query('UPDATE invoices SET status=?,document_revision=document_revision+1 WHERE id=?',[status,id]);
+  await logInvoiceActivity(id,'payment_review_resolved',JSON.stringify({request_key:identity.requestKey,payload_hash:identity.payloadHash,decision:body.decision,payment_id:paymentId,evidence_reference:evidence,reason,before:{status:invoice.status,recorded_amount:summary.recorded_payment_amount},after:{status,paid_amount:centsMoney.fromCents(nextPaid),balance_due:centsMoney.fromCents(total-nextPaid)},register_complete_confirmed:true}),req.user.id,conn);
+  await conn.commit();return res.json({confirmed:true,existing:false,payment_id:paymentId,status,message:status==='draft'?'Verified payment review recorded; approval evidence is unavailable, so the invoice is Draft for review.':'Verified payment review recorded; the evidenced invoice state is preserved.'});
+ }catch(error){if(conn)await conn.rollback();return invoiceError(res,error);}finally{conn?.release();}
 };
 
 exports.searchCustomerStatements = async (req, res) => {
@@ -569,14 +588,18 @@ async function savePayment(req,res,settle=false) {
     if(!invoice){await conn.rollback();return res.status(404).json({message:'Active invoice not found.'});}
     const [[existing]]=await conn.query('SELECT id,amount,request_payload_sha256,voided_at FROM invoice_payments WHERE request_key=? LIMIT 1',[identity.requestKey]);
     if(existing){await conn.commit();if(existing.request_payload_sha256!==identity.payloadHash)return res.status(409).json({message:'This request key was used for different payment data.'});return res.json({message:existing.voided_at?'This payment request was previously voided. Start a new request to record another payment.':'Payment already recorded.',payment_id:existing.id,existing:true});}
-    const [[paid]]=await conn.query('SELECT COALESCE(SUM(amount),0) amount FROM invoice_payments WHERE invoice_id=? AND voided_at IS NULL',[id]);
-    const balance=Math.round((Number(invoice.total)-Number(paid.amount))*100)/100;
+    const [[paid]]=await conn.query('SELECT COALESCE(SUM(amount),0) amount,SUM(amount IS NULL OR amount<=0) invalid_count FROM invoice_payments WHERE invoice_id=? AND voided_at IS NULL',[id]);
+    const totalCents=invoiceSummary.amount(invoice.total),paidCents=invoiceSummary.amount(paid.amount);
+    if(totalCents===null||paidCents===null||Number(paid.invalid_count)>0||paidCents>totalCents)throw Object.assign(new Error('Payment details require review before recording another payment.'),{status:409});
+    const balanceCents=totalCents-paidCents,balance=Number(centsMoney.fromCents(balanceCents));
     if(settle && balance<=0){await conn.commit();return res.json({message:'Invoice is already fully paid.',status:invoice.status,existing:true});}
     if(!['approved','sent'].includes(invoice.status)){await conn.rollback();return res.status(409).json({message:'Only approved or sent invoices can receive payment.'});}
-    const recorded=settle?balance:amount;
-    if(recorded>balance+0.009){await conn.rollback();return res.status(422).json({message:`Payment exceeds the balance due of ${money(balance)}.`,errors:{amount:'Payment cannot exceed the remaining balance.'}});}
+    const recordedCents=settle?balanceCents:invoiceSummary.amount(req.body.amount);
+    if(recordedCents===null||recordedCents<=0n)throw Object.assign(new Error('Enter a positive amount with at most two decimal places.'),{status:422});
+    const recorded=Number(centsMoney.fromCents(recordedCents));
+    if(recordedCents>balanceCents){await conn.rollback();return res.status(422).json({message:`Payment exceeds the balance due of ${money(balance)}.`,errors:{amount:'Payment cannot exceed the remaining balance.'}});}
     const [insert]=await conn.query('INSERT INTO invoice_payments(invoice_id,amount,payment_date,method,reference,notes,created_by,request_key,request_payload_sha256) VALUES(?,?,?,?,?,?,?,?,?)',[id,recorded,date,method,reference,notes,req.user?.id,identity.requestKey,identity.payloadHash]);
-    const remaining=Math.round((balance-recorded)*100)/100,status=remaining<=0.009?'paid':invoice.status;
+    const remainingCents=balanceCents-recordedCents,remaining=Number(centsMoney.fromCents(remainingCents)),status=remainingCents===0n?'paid':invoice.status;
     await conn.query('UPDATE invoices SET status=? WHERE id=?',[status,id]);
     await logInvoiceActivity(id,'payment',JSON.stringify({payment_id:insert.insertId,amount:recorded,date,method,reference,previous_balance:balance,balance_due:remaining,status}),req.user?.id,conn);
     await conn.commit();return res.json({message:status==='paid'?'Payment recorded; invoice fully paid.':'Payment recorded; balance updated.',payment_id:insert.insertId,status,balance_due:remaining,existing:false});
@@ -597,7 +620,7 @@ exports.deleteInvoicePayment=async(req,res)=>{
   if(payment.voided_at){await conn.commit();return res.json({message:'Payment is already voided.',existing:true});}
   await conn.query('UPDATE invoice_payments SET voided_at=NOW(),voided_by=? WHERE id=?',[req.user?.id,paymentId]);
   if(invoice.status==='paid')await conn.query("UPDATE invoices SET status='approved' WHERE id=?",[id]);
-  await logInvoiceActivity(id,'payment_voided',JSON.stringify({payment_id:paymentId,amount:payment.amount,reference:payment.reference,previous_status:invoice.status}),req.user?.id,conn);
+  await logInvoiceActivity(id,'payment_voided',JSON.stringify({payment_id:paymentId,amount:payment.amount,reference:payment.reference,previous_status:invoice.status,reason:String(req.body.reason||'').trim().slice(0,1000)}),req.user?.id,conn);
   await conn.commit();return res.json({message:'Payment voided and preserved in audit history.',status:invoice.status==='paid'?'approved':invoice.status});
  }catch(error){if(conn)await conn.rollback();return invoiceError(res,error);}finally{if(conn)conn.release();}
 };
@@ -663,13 +686,17 @@ async function loadInvoiceDocument(id, user) {
     if(!invoice)throw Object.assign(new Error('Invoice not found'),{status:404});
     assertCustomerRecord(user, invoice.customer_email);
     const [items]=await conn.query('SELECT * FROM invoice_items WHERE invoice_id=? AND IFNULL(deleted,0)=0 ORDER BY id ASC',[id]);
-    const data=invoiceDocumentData(invoice,items);
-    await conn.commit();return {invoice,data};
+    const [payments]=await conn.query('SELECT * FROM invoice_payments WHERE invoice_id = ? ORDER BY payment_date ASC, id ASC',[id]);
+    const summary=invoiceSummary.invoiceSummary(invoice,items,payments),company=companyProfile(),company_timezone=require('../services/attendanceTimeService').companyTimezone();
+    const document_version=invoiceSummary.version({invoice,items,company,summary,company_timezone});
+    const data=invoiceDocumentData(invoice,items,summary);
+    await conn.commit();return {invoice,data,document_version};
   }catch(error){await conn.rollback();throw error;}finally{conn.release();}
 }
 exports.viewInvoicePdf = async (req, res) => {
   try {
-    const { data } = await loadInvoiceDocument(req.params.id, req.user);
+    const { data,document_version } = await loadInvoiceDocument(req.params.id, req.user);
+    if(req.query.version&&(!/^[a-f0-9]{64}$/.test(String(req.query.version))||req.query.version!==document_version))return res.status(409).json({message:'The invoice changed after you opened it. Return to the invoice and review the current version before viewing or downloading its PDF.',code:'PDF_DOCUMENT_CHANGED'});
     return await sendPdfResponse(res, await createDocumentPdf(data), Boolean(req.query.download));
   } catch (error) { return res.status(error.status || 500).json({ message: error.message, code: error.code || 'PDF_GENERATION_FAILED' }); }
 };

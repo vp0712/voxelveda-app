@@ -51,6 +51,7 @@ function response() {
     json(body) { this.body = body; return this; },
     headers: {},
     setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
+    set(name,value){this.setHeader(name,value);return this;},
     cookie(name, value, options) { this.sessionCookie = { name, value, options }; },
     send(body) { this.body = body; return this; },
     end(body) { this.body = body; return this; }
@@ -862,10 +863,37 @@ async function testProcurementImports() {
   }
 }
 
+async function testInvoicePaymentReview(){
+ const controller=require('../controllers/invoiceController'),admin={id:1,role:'admin'},id=840001;
+ await pool.query("INSERT INTO invoices(id,invoice_no,customer_name,customer_email,quantity,unit_price,gst_rate,total,status,deleted,document_revision) VALUES(?,'INVOICE-REVIEW-FIXTURE','Synthetic review customer','invoice-review@example.invalid',1,2463.73,10,2710.10,'paid',0,1)",[id]);
+ await pool.query('INSERT INTO invoice_items(invoice_id,description,quantity,unit_price,amount) VALUES(?,?,?,?,?)',[id,'Disposable reviewed invoice fixture',1,2463.73,2463.73]);
+ await pool.query("INSERT INTO invoice_activity(invoice_id,action_type,notes) VALUES(?,'paid','Invoice marked as paid')",[id]);
+ const read=async()=>{const res=response();await controller.getInvoiceDetails({params:{id},query:{},user:admin},res);assert.equal(res.statusCode,200,JSON.stringify(res.body));return res.body;};
+ const before=digest((await pool.query('SELECT * FROM invoices WHERE id=?',[id]))[0]),view=await read();assert.equal(view.invoice.paid_amount,null);assert.equal(view.invoice.balance_due,null);assert.equal(view.summary.tax_amount,'246.37');assert.equal(view.summary.subtotal,'2463.73');assert.equal(view.summary.payment_state,'review_required');assert.equal(view.payments.length,0);assert.equal(digest((await pool.query('SELECT * FROM invoices WHERE id=?',[id]))[0]),before,'Viewing cannot rewrite historical claims');
+ const list=response();await controller.getInvoices({query:{search:'INVOICE-REVIEW-FIXTURE'},user:admin},list);assert.equal(list.body.total,1);assert.equal(list.body.summary.paid_value,null);assert.equal(list.body.summary.balance_value,null);assert.equal(list.body.invoices[0].paid_amount,null);
+ const call=async(body,key,user=admin)=>{const res=response();await controller.reviewInvoicePayments({params:{id},body,user,get:name=>name==='Idempotency-Key'?key:undefined},res);return res;};
+ const correction={decision:'confirm_register',reason:'Verified source record confirms the register is complete and no payment was received.',evidence_reference:'DISPOSABLE-UNPAID-RECORD',acknowledged:true,expected_version:view.payment_version};
+ assert.equal((await call(correction,'invoice-review-denied',{id:30,role:'viewer'})).statusCode,403);
+ assert.equal((await call({...correction,acknowledged:false},'invoice-review-unconfirmed')).statusCode,422);
+ const results=await Promise.all([call(correction,'invoice-review-request'),call(correction,'invoice-review-request')]);assert(results.every(r=>r.statusCode===200&&r.body.confirmed));assert.equal(results.filter(r=>r.body.existing).length,1);
+ const reviewed=await read();assert.equal(reviewed.invoice.status,'draft');assert.equal(reviewed.summary.payment_state,'unpaid');assert.equal(reviewed.summary.paid_amount,'0.00');assert.equal(reviewed.summary.balance_due,'2710.10');assert.equal(reviewed.payments.length,0,'Confirming the register must not manufacture payments');
+ const [[audit]]=await pool.query("SELECT COUNT(*) count FROM invoice_activity WHERE invoice_id=? AND action_type='payment_review_resolved'",[id]);assert.equal(Number(audit.count),1);
+ assert.equal((await call(correction,'invoice-review-stale')).statusCode,409);assert.equal((await call({...correction,reason:'Different evidence using the original identity'},'invoice-review-request')).statusCode,409);
+ await pool.query("UPDATE invoices SET status='paid' WHERE id=?",[id]);const paymentView=await read(),payment={...correction,decision:'record_payment',reason:'Verified the complete source payment receipt against this invoice.',evidence_reference:'DISPOSABLE-RECEIPT',amount:'2710.10',payment_date:'2026-10-14',method:'Verified source receipt',reference:'DISPOSABLE-PAID-RECEIPT',expected_version:paymentView.payment_version};
+ const paidResults=await Promise.all([call(payment,'invoice-review-paid'),call(payment,'invoice-review-paid')]);assert(paidResults.every(r=>r.body.confirmed));assert.equal(paidResults.filter(r=>r.body.existing).length,1);const paid=await read();assert.equal(paid.payments.length,1);assert.equal(paid.summary.paid_amount,'2710.10');assert.equal(paid.summary.balance_due,'0.00');assert.equal(paid.invoice.status,'paid');
+ const pdf=await controller._test.loadInvoiceDocument(id,admin);assert.equal(pdf.document_version,paid.document_version);assert(pdf.data.totals.some(t=>t.label==='Paid amount'&&t.value==='AUD 2,710.10'));
+ const voidResponse=response();await controller.deleteInvoicePayment({body:{invoice_id:id,payment_id:paid.payments[0].id,reason:'Verified correction: source receipt was reversed.'},user:admin},voidResponse);assert.equal(voidResponse.statusCode,200);const reversed=await read();assert.equal(reversed.payments.length,1);assert(reversed.payments[0].voided_at);assert.equal(reversed.summary.paid_amount,'0.00');assert.equal(reversed.summary.balance_due,'2710.10');
+ await pool.query("INSERT INTO invoice_activity(invoice_id,action_type,notes) VALUES(?,'sent','Disposable confirmed delivery history')",[id]);
+ await pool.query("UPDATE invoices SET status='paid' WHERE id=?",[id]);
+ const lifecycleReview=await read();const lifecycleResult=await call({...correction,expected_version:lifecycleReview.payment_version},'invoice-review-lifecycle');assert.equal(lifecycleResult.statusCode,200);assert.equal((await read()).invoice.status,'sent','Evidence-based review preserves the existing document lifecycle');
+ facts.push('invoice SQL projection, detail and PDF agree; legacy settlement remains unknown without writes; authorised evidenced review is locked/audited/idempotent under concurrent requests; no synthetic receipt on register confirmation; real receipt and historical reversal preserve amounts/history; evidenced sent lifecycle survives payment review');
+}
+
 async function main() {
   await prepareFixtures();
   await initializeRetainedSchemas();
   await testAudit();
+  await testInvoicePaymentReview();
   await testIdentityAndProfile();
   await testDocuments();
   await testQueue();

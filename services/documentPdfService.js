@@ -76,7 +76,7 @@ async function createDocumentPdf(data) {
     text(data.reference || '', 160, referenceY, width - 118, { align: 'right' });
     const referenceHeight=doc.heightOfString(data.reference || '',{width:width-118,lineGap:2});
     const dateY=referenceY+referenceHeight+3;
-    text(continued ? 'Continued' : `Issued ${dateLabel(data.issueDate || new Date())}`, 160, dateY, width - 118, { align: 'right' });
+    text(continued ? 'Continued' : `${data.issueLabel || 'Issued'} ${dateLabel(data.issueDate || new Date())}`, 160, dateY, width - 118, { align: 'right' });
     const headerEnd=Math.max(94,dateY+22);
     doc.moveTo(left, headerEnd).lineTo(left + width, headerEnd).strokeColor('#d9e1ec').stroke();
     y = headerEnd+14;

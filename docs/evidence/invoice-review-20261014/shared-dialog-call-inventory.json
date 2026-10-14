@@ -1,0 +1,634 @@
+[
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 490,
+    "caller": "showDialog",
+    "title": "'Notification Preferences'",
+    "primary": "'Save Preferences'",
+    "handler": "async () => {\n    const rows = [...document.querySelectorAll('[data-preference-category]')];\n    con"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 769,
+    "caller": "showDialog",
+    "title": "'Net result · '+label",
+    "primary": "'Close'",
+    "handler": "()=>hideDialog()"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 1325,
+    "caller": "showDialog",
+    "title": "record ? `Edit ${form.title}` : `Fill ${form.title}`",
+    "primary": "record ? 'Update Digital Form' : 'Save Digital Form'",
+    "handler": "saveCompanyFormRecord"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 1412,
+    "caller": "showDialog",
+    "title": "`${form.title} Entries`",
+    "primary": "'New Entry'",
+    "handler": "() => openCompanyFormFiller(formKey)"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2226,
+    "caller": "showDialog",
+    "title": "`RFQ #${Number(rfq.id)}`",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2236,
+    "caller": "showDialog",
+    "title": "`Edit RFQ #${Number(id)}`",
+    "primary": "'Save Changes'",
+    "handler": "async () => {\n    const form = document.getElementById('originalRfqEditForm'); if (!form.reportValid"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2253,
+    "caller": "showDialog",
+    "title": "restore ? 'Restore RFQ' : 'Archive RFQ'",
+    "primary": "restore ? 'Restore' : 'Archive'",
+    "handler": "async () => {\n    const response = await fetch(`/api/rfq/${Number(id)}/${restore ? 'restore' : 'arch"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2278,
+    "caller": "showDialog",
+    "title": "'Close RFQ'",
+    "primary": "'Close RFQ'",
+    "handler": "async()=>{const reason=document.getElementById('rfqClosureReason');if(!reason.reportValidity())retur"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2322,
+    "caller": "showDialog",
+    "title": "'Create Invoice From RFQ'",
+    "primary": "rfqs.length ? 'Create Invoice' : 'Close'",
+    "handler": "async () => {\n      const rfqId = Number(document.getElementById('dialogRfqId')?.value);\n      if (!"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2605,
+    "caller": "showDialog",
+    "title": "'Manual Invoice'",
+    "primary": "'Create Invoice'",
+    "handler": "async () => {\n      const body = {\n        customer_name: document.getElementById('manualInvoiceCust"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2763,
+    "caller": "showDialog",
+    "title": "cached?.invoice_no||'Invoice'",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2767,
+    "caller": "showDialog",
+    "title": "data.invoice.invoice_no||'Invoice details'",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2768,
+    "caller": "showDialog",
+    "title": "'Invoice unavailable'",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2774,
+    "caller": "showDialog",
+    "title": "'Review invoice payment details'",
+    "primary": "'Record verified correction'",
+    "handler": "async()=>{\n  const form=document.getElementById('invoicePaymentReviewForm');if(!original&&!form.repo"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2781,
+    "caller": "showDialog",
+    "title": "'Void recorded payment'",
+    "primary": "'Void payment'",
+    "handler": "async()=>{const field=document.getElementById('invoiceVoidReason');if(!field.reportValidity())return"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 2820,
+    "caller": "showDialog",
+    "title": "`Payments: ${invoice.invoice_no || 'Invoice'}`",
+    "primary": "'Save Payment'",
+    "handler": "async () => {\n      const amount = Number(document.getElementById('paymentAmount')?.value || 0);\n   "
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3024,
+    "caller": "showDialog",
+    "title": "'Customer Payment Statement'",
+    "primary": "'Close'",
+    "handler": "() => hideDialog()"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3049,
+    "caller": "showDialog",
+    "title": "`Send Statement: ${match.customer_name || 'Customer'}`",
+    "primary": "'Send Statement'",
+    "handler": "async () => {\n      const body = {\n        customer_name: match.customer_name || '',\n        custome"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3116,
+    "caller": "showDialog",
+    "title": "`Invoice QR - ${escapeHtml(invoiceNo)}`",
+    "primary": "'Close'",
+    "handler": "() => hideDialog()"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3152,
+    "caller": "showDialog",
+    "title": "`Edit ${invoice.invoice_no || 'Invoice'}`",
+    "primary": "'Update Invoice'",
+    "handler": "async () => {\n      const body = {\n        invoice_id: invoiceId,\n        ...(Number.isSafeInteger(N"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3215,
+    "caller": "showDialog",
+    "title": "'Send Invoice'",
+    "primary": "'Send Invoice'",
+    "handler": "async () => {\n      const sendButton = document.getElementById('dialogPrimaryBtn');\n\n      const ema"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3327,
+    "caller": "showDialog",
+    "title": "id ? 'Edit Customer' : 'Add Customer'",
+    "primary": "id ? 'Update Customer' : 'Save Customer'",
+    "handler": "async () => {\n      const body = {\n        id: customer.id,\n        company_name: document.getElemen"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3506,
+    "caller": "showDialog",
+    "title": "id ? 'Edit Supplier Profile' : 'Add Supplier Profile'",
+    "primary": "id ? 'Update Supplier' : 'Save Supplier'",
+    "handler": "async () => {\n      const body = {\n        id: supplier.id,\n        supplier_name: document.getEleme"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3568,
+    "caller": "showDialog",
+    "title": "`Upload Supplier File`",
+    "primary": "'Upload File'",
+    "handler": "async () => {\n      const fileInput = document.getElementById('supplierFileInput');\n      if (!fileI"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3819,
+    "caller": "showDialog",
+    "title": "id ? 'Edit Expense' : 'Add Expense'",
+    "primary": "id ? 'Update Expense' : 'Save Expense'",
+    "handler": "async () => {\n      const body = {\n        id: expense.id,\n        expense_date: document.getElement"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 3991,
+    "caller": "showDialog",
+    "title": "'Expense Bills & Photos'",
+    "primary": "'Upload Bill'",
+    "handler": "async () => {\n      const file = document.getElementById('expenseBillFile')?.files?.[0];\n      if (!"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 4228,
+    "caller": "showDialog",
+    "title": "id ? `Edit Competitor: ${item.company_name}` : 'Add Competitor / Industry Company'",
+    "primary": "id ? 'Update Company' : 'Save Company'",
+    "handler": "async () => {\n      const body = {\n        id: item.id,\n        company_name: document.getElementByI"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 4476,
+    "caller": "showDialog",
+    "title": "id ? 'Edit / Fill Compliance Entry' : 'Add Compliance Entry'",
+    "primary": "id ? 'Update Entry' : 'Save Entry'",
+    "handler": "async () => {\n      const body = {\n        id: entry.id,\n        title: document.getElementById('com"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 4560,
+    "caller": "showDialog",
+    "title": "'Upload Compliance File'",
+    "primary": "'Upload File'",
+    "handler": "async () => {\n      const fileInput = document.getElementById('complianceFileInput');\n      if (!fil"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 4768,
+    "caller": "showDialog",
+    "title": "'Edit Task'",
+    "primary": "'Update Task'",
+    "handler": "async () => {\n      const body = {\n        task_id: task.id,\n        title: document.getElementById("
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 4900,
+    "caller": "showDialog",
+    "title": "id ? 'Edit Announcement' : 'New Announcement'",
+    "primary": "id ? 'Update' : 'Publish'",
+    "handler": "async () => {\n      const audience = document.getElementById('announcementAudience')?.value || 'sele"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5188,
+    "caller": "showDialog",
+    "title": "config.title",
+    "primary": "'Save Entry'",
+    "handler": "() => saveAdminWorkHubEntry(type)"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5324,
+    "caller": "showDialog",
+    "title": "'Staff Messages'",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5425,
+    "caller": "showDialog",
+    "title": "'Add Staff Member'",
+    "primary": "'Send Secure Invitation'",
+    "handler": "async () => {\n      const name = document.getElementById('dialogStaffName')?.value.trim();\n      con"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5561,
+    "caller": "showDialog",
+    "title": "`Edit Staff: ${user.name}`",
+    "primary": "'Update Staff'",
+    "handler": "async () => {\n      const name = document.getElementById('editStaffName')?.value.trim();\n      const"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5689,
+    "caller": "showDialog",
+    "title": "`Access Control: ${user.name}`",
+    "primary": "'Update Access'",
+    "handler": "async () => {\n      const primaryBtn = document.getElementById('dialogPrimaryBtn');\n      const stat"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5826,
+    "caller": "showDialog",
+    "title": "'Send Password Reset'",
+    "primary": "'Send Reset Link'",
+    "handler": "async () => {\n      const res = await fetch(`/api/users/${userId}/reset-password`, {\n        method:"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5865,
+    "caller": "showDialog",
+    "title": "`Terminate Access: ${user.name || user.email}`",
+    "primary": "'Terminate Access'",
+    "handler": "async () => {\n      const confirmation = document.getElementById('deleteStaffConfirmation')?.value.t"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 5938,
+    "caller": "showDialog",
+    "title": "`Security Actions: ${user.name || user.email}`",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 6380,
+    "caller": "showDialog",
+    "title": "id ? `Edit ${materialLabel(type)}` : `Add ${materialLabel(type)}`",
+    "primary": "id ? 'Update Item' : 'Save Item'",
+    "handler": "async () => {\n      const body = {\n        id: item.id,\n        inventory_type: type,\n        item_n"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 6687,
+    "caller": "showDialog",
+    "title": "stock ? 'Edit Stock Item' : 'Add Stock Item'",
+    "primary": "stock ? 'Update' : 'Save'",
+    "handler": "async () => {\n      const body = {\n        id: item.id,\n        product_name: document.getElementByI"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 6766,
+    "caller": "showDialog",
+    "title": "movement ? 'Edit Stock Out' : 'Minus Stock'",
+    "primary": "movement ? 'Update Usage' : 'Save Usage'",
+    "handler": "async () => {\n      const body = {\n        stock_id: Number(document.getElementById('issueStockId')?"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 7051,
+    "caller": "showDialog",
+    "title": "record ? 'Edit Staff Timesheet' : 'Add / Fix Staff Timesheet'",
+    "primary": "record ? 'Update Timesheet' : 'Save Timesheet'",
+    "handler": "async () => {\n      const body = {\n        id: record?.id,\n        user_id: Number(document.getEleme"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 7233,
+    "caller": "showDialog",
+    "title": "id ? `Edit Meeting: ${meeting.title}` : 'Schedule Meeting / Inspection'",
+    "primary": "id ? 'Update Meeting' : 'Schedule Meeting'",
+    "handler": "async () => {\n      const body = {\n        id: meeting.id,\n        title: document.getElementById('m"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 7465,
+    "caller": "showDialog",
+    "title": "id ? 'Edit Roster Shift' : 'Add Roster Shift'",
+    "primary": "id ? 'Update Shift' : 'Save Shift'",
+    "handler": "async () => {\n      const body = {\n        id: shift.id,\n        user_id: Number(document.getElement"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 7768,
+    "caller": "showDialog",
+    "title": "id ? 'Edit Roster Shift' : 'Add Roster Shift'",
+    "primary": "id ? 'Update Shift' : 'Save Shift'",
+    "handler": "async function() {\n    var body = { id: shift.id, user_id: Number(document.getElementById('singleRos"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 7789,
+    "caller": "showDialog",
+    "title": "'Smart Roster Builder'",
+    "primary": "'Prepare Draft'",
+    "handler": "async function() {\n    document.getElementById('rosterLocation').value = document.getElementById('sm"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 7910,
+    "caller": "showDialog",
+    "title": "'Timesheet Review'",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 7944,
+    "caller": "showDialog",
+    "title": "title",
+    "primary": "buttonText",
+    "handler": "async () => {\n    const comments = document.getElementById('timesheetDecisionComments')?.value.trim("
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 8096,
+    "caller": "showDialog",
+    "title": "'Individual weekly delivery history'",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/admin-dashboard.js",
+    "line": 8103,
+    "caller": "showDialog",
+    "title": "retryGeneration ? 'Retry individual PDF generation' : 'Authorise corrected weekly PDF'",
+    "primary": "retryGeneration ? 'Retry generation' : 'Authorise revision'",
+    "handler": "async () => {\n    const reason = document.getElementById('weeklyRevisionReason')?.value.trim();\n    "
+  },
+  {
+    "file": "public/staff.js",
+    "line": 1635,
+    "caller": "showStaffDialog",
+    "title": "``",
+    "primary": "Save",
+    "handler": null
+  },
+  {
+    "file": "public/staff.js",
+    "line": 2114,
+    "caller": "showStaffDialog",
+    "title": "stockId ? 'Edit Stock In' : 'Add Stock In'",
+    "primary": "stockId ? 'Update Stock' : 'Save Stock'",
+    "handler": "async () => {\n      const body = {\n        id: item.id,\n        product_name: document.getElementByI"
+  },
+  {
+    "file": "public/staff.js",
+    "line": 2245,
+    "caller": "showStaffDialog",
+    "title": "movement ? 'Edit Stock Out' : 'Stock Out'",
+    "primary": "movement ? 'Update Stock Out' : 'Save Stock Out'",
+    "handler": "async () => {\n      const body = {\n        stock_id: Number(document.getElementById('staffOutStockId"
+  },
+  {
+    "file": "public/staff.js",
+    "line": 3367,
+    "caller": "showStaffDialog",
+    "title": "'Notification Preferences'",
+    "primary": "'Save Preferences'",
+    "handler": "async () => {\n    const rows = [...document.querySelectorAll('[data-staff-preference-category]')];\n "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 410,
+    "caller": "showDialog",
+    "title": "'New Purchase Requisition'",
+    "primary": "'Save Requisition'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const result = await "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 432,
+    "caller": "showDialog",
+    "title": "'Issue Supplier RFQ'",
+    "primary": "'Issue RFQ'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const supplierIds = ["
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 450,
+    "caller": "showDialog",
+    "title": "'Record Supplier Quote'",
+    "primary": "'Record Quote'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const result = await "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 466,
+    "caller": "showDialog",
+    "title": "'Select Supplier'",
+    "primary": "'Award RFQ'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const result = await "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 479,
+    "caller": "showDialog",
+    "title": "'New Purchase Order'",
+    "primary": "'Save Purchase Order'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const result = await "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 508,
+    "caller": "showDialog",
+    "title": "'Receive Goods'",
+    "primary": "'Record Receipt'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const items = [...cur"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 526,
+    "caller": "showDialog",
+    "title": "'Inspect Goods Receipt'",
+    "primary": "'Complete Inspection'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const result = await "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 539,
+    "caller": "showDialog",
+    "title": "'Three-Way Bill Match'",
+    "primary": "'Run Match'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const result = await "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 551,
+    "caller": "showDialog",
+    "title": "'Record Purchase Return'",
+    "primary": "'Record Return'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const items = [...cur"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 563,
+    "caller": "showDialog",
+    "title": "'Record Supplier Credit Note'",
+    "primary": "'Record Credit'",
+    "handler": "async () => {\n      const current = requireForm(); if (!current) return;\n      const result = await "
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 601,
+    "caller": "showDialog",
+    "title": "row?'Edit and review source row':entry?'Edit saved entry':'Add saved entry'",
+    "primary": "row?'Save reviewed values':'Save entry'",
+    "handler": "async()=>{\n      const current=document.getElementById('procurementEntryForm');\n      if(!current?.r"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 661,
+    "caller": "showDialog",
+    "title": "'Upload procurement files'",
+    "primary": "'Save uploaded files'",
+    "handler": "async()=>{\n      if(state.busy.has('upload'))return;\n      if(!document.getElementById('procurementU"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 694,
+    "caller": "showDialog",
+    "title": "'Choose procurement PDF report'",
+    "primary": "'Generate PDF'",
+    "handler": "async()=>{\n      const current=document.getElementById('procurementReportOptions');if(current?.repor"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 716,
+    "caller": "showDialog",
+    "title": "'Procurement PDF snapshot'",
+    "primary": "'Close'",
+    "handler": "hideDialog"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 775,
+    "caller": "showDialog",
+    "title": "'Retry failed extraction'",
+    "primary": "'Retry extraction'",
+    "handler": "async()=>{\n          const current=document.getElementById('procurementEntryForm');if(!current?.repo"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 802,
+    "caller": "showDialog",
+    "title": "verb==='archive'?'Archive saved entry':'Restore saved entry'",
+    "primary": "verb==='archive'?'Archive entry':'Restore entry'",
+    "handler": "async()=>{\n          const current=document.getElementById('procurementEntryForm');if(!current?.repo"
+  },
+  {
+    "file": "public/procurement-ui.js",
+    "line": 844,
+    "caller": "showDialog",
+    "title": "`Cancel ${label}`",
+    "primary": "'Confirm Cancellation'",
+    "handler": "async () => {\n          const current = requireForm(); if (!current) return;\n          const path = "
+  },
+  {
+    "file": "public/workflow-ui.js",
+    "line": 164,
+    "caller": "showPortalDialog",
+    "title": "'Create Approval Request'",
+    "primary": "'Submit Request'",
+    "handler": "submitComposer"
+  },
+  {
+    "file": "public/workflow-ui.js",
+    "line": 204,
+    "caller": "showPortalDialog",
+    "title": "'Approval Details'",
+    "primary": "'Close'",
+    "handler": "hidePortalDialog"
+  },
+  {
+    "file": "public/workflow-ui.js",
+    "line": 219,
+    "caller": "showPortalDialog",
+    "title": "statusLabel(action)",
+    "primary": "statusLabel(action)",
+    "handler": "() => submitAction(instanceId, action)"
+  },
+  {
+    "file": "public/workflow-ui.js",
+    "line": 240,
+    "caller": "showPortalDialog",
+    "title": "'Cancel Approval Request'",
+    "primary": "'Cancel Request'",
+    "handler": "() => submitCancel(instanceId)"
+  },
+  {
+    "file": "public/workflow-ui.js",
+    "line": 262,
+    "caller": "showPortalDialog",
+    "title": "'Assign Reviewer'",
+    "primary": "'Assign'",
+    "handler": "() => submitReassign(instanceId)"
+  },
+  {
+    "file": "public/workflow-ui.js",
+    "line": 307,
+    "caller": "showPortalDialog",
+    "title": "'Workflow Definitions'",
+    "primary": "'Close'",
+    "handler": "hidePortalDialog"
+  },
+  {
+    "file": "public/workflow-ui.js",
+    "line": 316,
+    "caller": "showPortalDialog",
+    "title": "definition ? 'Publish Workflow Version' : 'Create Workflow'",
+    "primary": "definition ? 'Publish Version' : 'Create Workflow'",
+    "handler": "submitDefinition"
+  }
+]

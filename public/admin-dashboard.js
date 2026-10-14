@@ -1023,33 +1023,14 @@ async function loadAccessAttempts() {
   });
 }
 
-function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
-  const backdrop = document.getElementById('dialogBackdrop');
-  const panel = document.querySelector('.dialog-panel');
-  const titleEl = document.getElementById('dialogTitle');
-  const bodyEl = document.getElementById('dialogBody');
-  const primaryBtn = document.getElementById('dialogPrimaryBtn');
-
-  if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
-
-  const returnFocus=document.activeElement;
-  panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog', 'finance-dialog', 'workflow-dialog', 'procurement-dialog');
-  titleEl.innerText = title;
-  bodyEl.innerHTML = bodyHtml;
-  primaryBtn.innerText = primaryText;
-  primaryBtn.onclick = async () => { if (primaryBtn.disabled) return; primaryBtn.disabled = true; primaryBtn.setAttribute('aria-busy', 'true'); try { await onPrimary?.(); } catch (error) { showToast(error.message || 'The action failed. Review the fields and retry.'); } finally { primaryBtn.disabled = false; primaryBtn.removeAttribute('aria-busy'); } };
-  normalizeActionButtons(bodyEl);
-  enhanceResponsiveTables();
-  backdrop.classList.add('active');panel?.setAttribute('role','dialog');panel?.setAttribute('aria-modal','true');panel?.setAttribute('aria-labelledby','dialogTitle');if(panel){panel.tabIndex=-1;panel.focus();}window.VoxelOverlay?.open('record-dialog',()=>backdrop.classList.remove('active'),returnFocus);
+function showDialog(title,bodyHtml,onPrimary,primaryText='Save',options={}){
+ const panel=document.querySelector('#dialogBackdrop .dialog-panel');
+ panel?.classList.remove('wide-dialog','material-dialog','supplier-dialog','compliance-dialog','manual-invoice-dialog','staff-access-dialog','admin-workhub-dialog','finance-dialog','workflow-dialog','procurement-dialog');
+ const opened=window.VoxelDialog?.open({id:'record-dialog',backdrop:'dialogBackdrop',title:'dialogTitle',body:'dialogBody',primary:'dialogPrimaryBtn',secondary:'dialogCancelBtn',heading:title,html:bodyHtml,onPrimary,primaryText,...options});
+ if(opened){normalizeActionButtons(document.getElementById('dialogBody'));enhanceResponsiveTables();}return opened;
 }
-
-function hideDialog() {
-  document.getElementById('dialogBackdrop')?.classList.remove('active');window.VoxelOverlay?.close('record-dialog');
-}
-
-function closeDialog(event) {
-  if (event?.target?.id === 'dialogBackdrop') hideDialog();
-}
+function hideDialog(user=false){return window.VoxelDialog?.close('record-dialog',{user:user===true});}
+function closeDialog(event){if(event?.target?.id==='dialogBackdrop')hideDialog(true);}
 
 function setupNavigation() {
   document.querySelectorAll('.nav-btn').forEach((btn) => {
@@ -1728,7 +1709,7 @@ async function loadDashboardStats() {
   });
 
   const data = await safeJson(res);
-  if (!res.ok) return;
+  if (!res.ok) {for(const id of ['rfqStatus','invoiceStatus','homeRfqSignal','homeInvoiceSignal','homePipelineSignal','dashboardRevenueValue','dashboardExpenseValue','dashboardNetWorthValue','homeCashPulse','dashInvoiceValue'])setText(id,'Not available');return;}
   dashboardStatsCache = data;
   renderNotificationDropdown();
 
@@ -1743,9 +1724,9 @@ async function loadDashboardStats() {
 
   if (invoiceStatus) {
     invoiceStatus.innerText =
-      `${data.invoices.total_invoices || 0} total | ${formatMoney(data.invoices.paid_revenue || 0)} paid`;
+      `${data.invoices.total_invoices || 0} total | ${formatMoney(data.invoices.paid_revenue)} paid`;
   }
-  setText('homeInvoiceSignal', `${data.invoices.sent_invoices || 0} sent | ${data.invoices.paid_invoices || 0} paid`);
+  setText('homeInvoiceSignal', `${data.invoices.sent_invoices ?? '—'} sent | ${data.invoices.paid_invoices ?? '—'} verified paid${Number(data.invoices.payment_review_count)>0?' | '+Number(data.invoices.payment_review_count)+' require review':''}`);
   setText('homePipelineSignal', `FY ${data.finance?.financial_year || '-'} | GST position ${formatMoney(data.finance?.gst_position || 0)}`);
 
   setText('dashboardRevenueValue', formatMoney(data.finance?.revenue));
@@ -1762,24 +1743,25 @@ async function loadDashboardWidgets() {
   try {
     const [invoiceRes, stockRes, rawRes, packagingRes] = await Promise.all([
       fetch('/api/invoice', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/stock', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/materials?type=raw_material', { headers: { Authorization: `Bearer ${token}` } }),
-      fetch('/api/materials?type=packaging', { headers: { Authorization: `Bearer ${token}` } })
+      fetchCompleteRegister('/api/stock','stock'),
+      fetchCompleteRegister('/api/materials?type=raw_material','materials'),
+      fetchCompleteRegister('/api/materials?type=packaging','materials')
     ]);
 
     const invoiceData = await safeJson(invoiceRes);
-    const stockData = await safeJson(stockRes);
-    const rawData = await safeJson(rawRes);
-    const packagingData = await safeJson(packagingRes);
+    const stockData = stockRes.data;
+    const rawData = rawRes.data;
+    const packagingData = packagingRes.data;
 
     const invoices = invoiceData.invoices || [];
     const stock = stockData.stock || [];
     const raw = rawData.materials || [];
     const packaging = packagingData.materials || [];
 
-    const invoiceValue = invoices.reduce((sum, row) => sum + Number(row.total || 0), 0);
-    const stockWorth = stock.reduce((sum, row) => sum + Number(row.current_value || 0), 0);
-    const materialWorth = [...raw, ...packaging].reduce((sum, row) => sum + Number(row.current_value || 0), 0);
+    const invoiceValue = invoiceRes.ok?invoiceData.summary?.total_value:null;
+    const valueOf=rows=>rows.some(row=>row.current_value===null||row.current_value===undefined||!Number.isFinite(Number(row.current_value)))?null:rows.reduce((sum,row)=>sum+Number(row.current_value),0);
+    const stockWorth=stockRes.res.ok?valueOf(stock):null;
+    const materialWorth=rawRes.res.ok&&packagingRes.res.ok?valueOf([...raw,...packaging]):null;
 
     const invoiceValueEl = document.getElementById('dashboardInvoiceValue');
     const stockWorthEl = document.getElementById('dashboardStockWorth');
@@ -2217,7 +2199,7 @@ async function loadRFQs() {
           ${canEdit && ['pending','rejected'].includes(status) ? `<button class="small-btn" onclick="return updateRFQ(${Number(r.id)}, 'approve')">Approve</button>` : ''}
           ${canEdit && ['pending','approved'].includes(status) ? `<button class="secondary-btn" onclick="return updateRFQ(${Number(r.id)}, 'reject')">Reject</button>` : ''}
           ${canInvoice ? `<button class="small-btn" onclick="return createInvoiceFromRFQ(${r.id})">${status === 'quoted' ? 'Open Invoice' : 'Invoice'}</button>` : ''}
-          ${canEdit && !['closed'].includes(status) ? `<button class="secondary-btn" onclick="return updateRFQ(${Number(r.id)}, 'close')">Close</button>` : ''}
+          ${canEdit && !['closed'].includes(status) ? `<button class="secondary-btn" onclick="return updateRFQ(${Number(r.id)}, 'close')">Close RFQ</button>` : ''}
           ${canEdit && ['pending','rejected','closed'].includes(status) ? `<button class="secondary-btn" onclick="return archiveOriginalRfq(${Number(r.id)},false)">Archive</button>` : ''}
           ${archived && hasCurrentPermission('rfqs_input') ? `<button class="secondary-btn" onclick="return archiveOriginalRfq(${Number(r.id)},true)">Restore</button>` : ''}
         </td>
@@ -2275,22 +2257,26 @@ function archiveOriginalRfq(id, restore) {
   }, restore ? 'Restore' : 'Archive');
 }
 
-async function updateRFQ(rfqId, action) {
+async function updateRFQ(rfqId,action){
+ const perform=async(reason='')=>{
   const res = await fetch(`/api/rfq/${action}`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ rfq_id: rfqId })
+    body: JSON.stringify({ rfq_id: rfqId,reason })
   });
 
   const data = await safeJson(res);
 
   if (!res.ok) {
     showToast(data.message || 'RFQ update failed');
-    return;
+    return false;
   }
 
-  await loadRFQs();
-  await loadDashboardStats();
+  await Promise.allSettled([loadRFQs(),loadDashboardStats()]);
+  return data;
+  };
+ if(action==='close')return showDialog('Close RFQ',`<p>This closes RFQ #${Number(rfqId)}. It does not dismiss a view. Its original record and audit history are preserved.</p><label>Closure reason<textarea id="rfqClosureReason" minlength="8" maxlength="1000" required></textarea></label>`,async()=>{const reason=document.getElementById('rfqClosureReason');if(!reason.reportValidity())return;const result=await perform(reason.value);if(result){hideDialog();showToast(result.message||'RFQ closed.');}},'Close RFQ');
+ return perform();
 }
 
 async function createInvoiceFromRFQ(rfqId) {
@@ -2399,7 +2385,7 @@ function invoiceItemRows(items = [{ description: '', quantity: 1, unit_price: 0 
       </label>
       <label>
         <span>Unit price</span>
-        <input class="invoiceItemPrice" type="number" min="0" step="0.01" placeholder="Unit price" value="${escapeHtml(item.unit_price || 0)}" oninput="updateManualInvoiceSummary()" />
+        <input class="invoiceItemPrice" type="number" min="0" step="0.01" placeholder="Unit price" required value="${escapeHtml(item.unit_price ?? '')}" oninput="updateManualInvoiceSummary()" />
       </label>
       <button type="button" class="secondary-btn invoice-remove-btn" onclick="return removeInvoiceItemRow(this)">Remove</button>
     </div>
@@ -2427,7 +2413,7 @@ function collectInvoiceItems() {
   return Array.from(document.querySelectorAll('[data-invoice-item-row]')).map((row) => ({
     description: row.querySelector('.invoiceItemDescription')?.value.trim(),
     quantity: Number(row.querySelector('.invoiceItemQty')?.value || 0),
-    unit_price: Number(row.querySelector('.invoiceItemPrice')?.value || 0)
+    unit_price: row.querySelector('.invoiceItemPrice')?.value.trim()===''?null:Number(row.querySelector('.invoiceItemPrice')?.value)
   }));
 }
 
@@ -2435,7 +2421,7 @@ function manualInvoiceGstRate() {
   const gstEnabled = document.getElementById('manualInvoiceGstEnabled')?.checked ?? true;
   const input = document.getElementById('manualInvoiceGst');
   if (!gstEnabled) return 0;
-  return Math.max(Number(input?.value || 0), 0);
+  return input?.value.trim()===''?null:Math.max(Number(input?.value),0);
 }
 
 function toggleManualInvoiceGst() {
@@ -2664,7 +2650,7 @@ function openManualInvoiceDialog() {
         items: collectInvoiceItems()
       };
 
-      const invalidItem = body.items.find((item) => !item.description || Number(item.quantity) <= 0 || Number(item.unit_price) < 0);
+      const invalidItem = body.items.find((item) => !item.description || !Number.isFinite(Number(item.quantity)) || Number(item.quantity)<=0 || item.unit_price===null || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price)<0);
       if (!body.customer_name || !body.items.length || invalidItem) {
         showToast('Please fill required fields');
         return;
@@ -2742,7 +2728,7 @@ function invoiceActions(invoice){
   if(archived)return hasCurrentPermission('VOID_TRANSACTION')?`<button type="button" class="secondary-btn" onclick="invoiceAction(${id},'restore')">Restore</button>`:'';
   return `${pendingReceipt?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Check payment request</button>`:''}${hasCurrentPermission('POST_TRANSACTION')&&['draft','rejected'].includes(status)?`<button class="secondary-btn" onclick="invoiceAction(${id},'approve')">Approve</button>`:''}
   ${hasCurrentPermission('EDIT_FINANCE')&&['approved','sent'].includes(status)?`<button class="secondary-btn" onclick="openSendInvoiceDialog(${id})">Send</button>`:''}
-  ${hasCurrentPermission('POST_TRANSACTION')&&['approved','sent'].includes(status)&&Number(invoice.balance_due)>0?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Record payment</button>`:''}
+  ${!invoice.payment_review_required&&hasCurrentPermission('POST_TRANSACTION')&&['approved','sent'].includes(status)&&Number(invoice.balance_due)>0?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Record payment</button>`:''}
   ${hasCurrentPermission('EDIT_FINANCE')&&['draft','rejected','approved'].includes(status)?`<button class="secondary-btn" onclick="openEditInvoiceDialog(${id})">Edit</button>`:''}
   <button class="secondary-btn" onclick="openInvoiceQrDialog(${id})">Invoice link QR</button>
   ${hasCurrentPermission('VOID_TRANSACTION')?`<button class="danger-btn" onclick="invoiceAction(${id},'delete')">Archive</button>`:''}`;
@@ -2760,7 +2746,7 @@ async function loadInvoices() {
   invoiceCache=data.invoices;renderNotificationDropdown();
   renderRegisterPage({key:'invoices',tbody,rows:invoiceCache,colspan:10,emptyMessage:'No invoices match these filters.',onChange:loadInvoices,remoteMeta:{total:Number(data.total)},rowRenderer:invoice=>`<tr data-invoice-id="${Number(invoice.id)}">
    <td class="invoice-number">${Number(invoice.id)}</td><td class="invoice-reference"><strong>${escapeHtml(invoice.invoice_no||'Reference not available')}</strong></td><td class="invoice-customer">${escapeHtml(invoice.customer_name||'Customer not available')}</td><td class="invoice-rfq">${invoice.rfq_id?`<button class="icon-btn" onclick="openRecordRegister('rfqs',{search:String(${Number(invoice.rfq_id)})})">RFQ #${Number(invoice.rfq_id)}</button>`:'Manual'}</td><td class="invoice-date">${escapeHtml(String(invoice.created_at||'Date not available').slice(0,10))}</td>
-   <td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.total))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.paid_amount))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.balance_due))}</td><td class="invoice-status">${statusBadge(Number(invoice.deleted)===1?'archived':invoice.status||'unknown')}</td>
+   <td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.total))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.paid_amount))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.balance_due))}</td><td class="invoice-status">${statusBadge(Number(invoice.deleted)===1?'archived':invoice.status||'unknown')}${invoice.payment_review_required?'<span class="invoice-review-label">Payment details require review</span>':''}</td>
    <td class="register-action-cell invoice-action-cell"><div class="invoice-actions"><button class="primary-btn" onclick="openInvoiceDetail(${Number(invoice.id)})">View invoice</button>${Number(invoice.deleted)!==1?`<button class="secondary-btn" onclick="openInvoicePdf(${Number(invoice.id)})">PDF</button>`:''}<details class="record-action-menu"><summary>More</summary><div>${invoiceActions(invoice)}</div></details></div></td></tr>`});
   const sum=data.summary;
   updateInvoiceMetrics(invoiceCache,sum);
@@ -2771,11 +2757,28 @@ async function loadInvoices() {
 function updateInvoiceMetrics(invoices,summary){
  setText('invoiceTotalValue',summary?invoiceMoney(summary.total_value):'Not available');setText('invoiceUnpaidValue',summary?invoiceMoney(summary.balance_value):'Not available');setText('invoiceSentPaidCount',summary?invoiceMoney(summary.paid_value):'Not available');
 }
+let invoiceDetailSequence=0;
 async function openInvoiceDetail(id){
- const cached=invoiceCache.find(row=>Number(row.id)===Number(id));
- const res=await fetch('/api/invoice/'+Number(id)+(Number(cached?.deleted)===1?'?archived=true':''),{headers:authHeaders(),cache:'no-store'}),data=await safeJson(res);if(!res.ok)return showToast(data.message||'Invoice could not be loaded.');const invoice=data.invoice;if(!invoice)return;
- showDialog(invoice.invoice_no||'Invoice details',`<p>${escapeHtml(invoice.customer_name||'Customer not available')}</p><p>${escapeHtml(invoice.customer_email||'')}</p>${statusBadge(Number(invoice.deleted)===1?'archived':invoice.status||'unknown')}<div class="invoice-detail-grid"><div><span>Total</span><strong>${escapeHtml(invoiceMoney(invoice.total))}</strong></div><div><span>Paid</span><strong>${escapeHtml(invoiceMoney(invoice.paid_amount))}</strong></div><div><span>Outstanding</span><strong>${escapeHtml(invoiceMoney(invoice.balance_due))}</strong></div><div><span>Date</span><strong>${escapeHtml(String(invoice.created_at||'Date not available').slice(0,10))}</strong></div></div><div class="invoice-detail-actions">${Number(invoice.deleted)!==1?`<button class="primary-btn" onclick="openInvoicePdf(${Number(id)})">Preview / download PDF</button>`:''}${invoice.rfq_id?`<button class="secondary-btn" onclick="hideDialog();openRecordRegister('rfqs',{search:'${Number(invoice.rfq_id)}'})">Related RFQ</button>`:''}${invoiceActions(invoice)}</div><h4>Line items</h4>${(data.items||[]).map(item=>`<p>${escapeHtml(item.description||'Description not available')} · ${escapeHtml(item.quantity??'Quantity not available')} · ${escapeHtml(invoiceMoney(item.amount))}</p>`).join('')||'<p>No line items available.</p>'}<h4>Payment history</h4>${(data.payments||[]).map(row=>`<p>${escapeHtml(row.payment_date)} · ${escapeHtml(invoiceMoney(row.amount))} · ${escapeHtml(row.reference||row.method||'Recorded payment')}</p>`).join('')||'<p>No recorded payments.</p>'}<h4>History</h4>${(data.activity||data.activities||[]).map(row=>`<p>${escapeHtml(row.created_at||'')} · ${escapeHtml(row.action||'')} · ${escapeHtml(row.notes||'')}</p>`).join('')||'<p>No history available.</p>'}`,hideDialog,'Close');
+ const sequence=++invoiceDetailSequence,cached=invoiceCache.find(row=>Number(row.id)===Number(id));
+ if(!showDialog(cached?.invoice_no||'Invoice', '<p class="invoice-load-state" role="status">Loading the complete invoice…</p>',hideDialog,'Close',{mode:'readonly',name:'invoice:'+Number(id)}))return;
+ try{const res=await fetch('/api/invoice/'+Number(id)+(Number(cached?.deleted)===1?'?archived=true':''),{headers:authHeaders(),cache:'no-store'}),data=await safeJson(res);
+  if(sequence!==invoiceDetailSequence||window.VoxelDialog?.active?.name!=='invoice:'+Number(id))return;
+  if(!res.ok||!data.invoice||!data.summary||!Array.isArray(data.summary.lines)||!Array.isArray(data.payments)||!Array.isArray(data.activity))throw new Error(data.message||'The complete invoice could not be loaded.');
+  if(!showDialog(data.invoice.invoice_no||'Invoice details',window.VoxelInvoiceView.render(data,invoiceActions(data.invoice)+(data.invoice.rfq_id&&hasCurrentPermission('VIEW_RFQS')?`<button class="secondary-btn" onclick="hideDialog();viewOriginalRfq(${Number(data.invoice.rfq_id)})">Related RFQ</button>`:'')+(data.summary.review_required&&Number(data.invoice.deleted)!==1&&hasCurrentPermission('VOID_TRANSACTION')&&hasCurrentPermission('POST_TRANSACTION')?`<button class="secondary-btn" onclick="openInvoicePaymentReview(${Number(id)})">Review payment details</button>`:'')),hideDialog,'Close',{mode:'readonly',name:'invoice:'+Number(id)}))return;
+ }catch(error){if(sequence!==invoiceDetailSequence||window.VoxelDialog?.active?.name!=='invoice:'+Number(id))return;showDialog('Invoice unavailable',`<div class="invoice-load-state"><p role="alert">${escapeHtml(error.message)}</p><button class="secondary-btn" onclick="openInvoiceDetail(${Number(id)})">Retry</button></div>`,hideDialog,'Close',{mode:'readonly',name:'invoice:'+Number(id)});}
 }
+async function downloadInvoicePdf(id,version){try{return await window.VoxelOperations.openPdf('/api/invoice/'+Number(id)+'/pdf?download=1'+(version?'&version='+encodeURIComponent(version):''),{download:true});}catch(error){showToast(error.message);}}
+async function openInvoicePaymentReview(id){
+ const response=await fetch('/api/invoice/'+Number(id),{headers:authHeaders(),cache:'no-store'}),data=await safeJson(response);if(!response.ok||!data.summary?.review_required)return showToast(data.message||'Refresh the invoice to check its current payment state.');
+ const key=crypto.randomUUID();let original=null;const uncertain=form=>{document.getElementById('invoiceReviewOutcome').textContent='The response is uncertain. Retry checks the same review request and cannot repeat a committed correction.';for(const field of form.elements)field.disabled=true;document.getElementById('dialogPrimaryBtn').textContent='Check original review';};
+ showDialog('Review invoice payment details',`<form id="invoicePaymentReviewForm" class="form-grid"><p class="full-width">Check the authoritative source records before correcting this invoice. The last evidenced approved/sent state is restored; without approval evidence, the invoice returns to Draft for review. Existing records and history are preserved.</p><label>Correction<select name="decision"><option value="confirm_register">Confirm the existing payment register is complete</option><option value="record_payment">Record an evidenced missing payment</option></select></label><label>Evidence reference<input name="evidence_reference" maxlength="160" minlength="3" required></label><label class="full-width">Review reason<textarea name="reason" minlength="8" maxlength="1000" required></textarea></label><label>Verified amount (AUD)<input name="amount" type="number" step="0.01" min="0.01"></label><label>Actual payment date<input name="payment_date" type="date"></label><label>Payment method<input name="method" maxlength="80"></label><label>Payment reference<input name="reference" maxlength="120"></label><label class="full-width"><input name="acknowledged" type="checkbox" required> I verified the evidence and confirm the resulting payment register is complete.</label><p id="invoiceReviewOutcome" class="full-width" role="status"></p></form>`,async()=>{
+  const form=document.getElementById('invoicePaymentReviewForm');if(!original&&!form.reportValidity())return;
+  if(!original){const values=Object.fromEntries(new FormData(form));original={decision:values.decision,evidence_reference:values.evidence_reference,reason:values.reason,amount:values.amount,payment_date:values.payment_date,method:values.method,reference:values.reference,acknowledged:form.elements.acknowledged.checked,expected_version:data.payment_version};}
+  try{const res=await fetch('/api/invoice/'+Number(id)+'/payment-review',{method:'POST',headers:{...authHeaders(),'Idempotency-Key':key},body:JSON.stringify(original)}),result=await safeJson(res);if(!res.ok){if(res.status<500)original=null;else uncertain(form);return showToast(result.message||'The review was not confirmed.');}if(result.confirmed!==true)return showToast('The review result was not confirmed.');hideDialog();showToast(result.message);await loadInvoices();}
+  catch{uncertain(form);}
+ },'Record verified correction');
+}
+function openVoidInvoicePaymentDialog(invoiceId,paymentId){showDialog('Void recorded payment',`<p>The payment stays in history with its reversal and actor. This changes the invoice balance.</p><label>Correction reason<textarea id="invoiceVoidReason" minlength="8" maxlength="1000" required></textarea></label>`,async()=>{const field=document.getElementById('invoiceVoidReason');if(!field.reportValidity())return;const response=await fetch('/api/invoice/payment/delete',{method:'POST',headers:authHeaders(),body:JSON.stringify({invoice_id:Number(invoiceId),payment_id:Number(paymentId),reason:field.value})}),result=await safeJson(response);if(!response.ok)return showToast(result.message||'Payment was not voided.');hideDialog();showToast(result.message);await loadInvoices();},'Void payment');}
 
 function paymentHistoryRows(payments, invoiceId) {
   if (!payments.length) {
@@ -3099,9 +3102,9 @@ function openCustomerStatementSendDialog(index) {
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
 }
 
-function openInvoicePdf(invoiceId) {
+function openInvoicePdf(invoiceId,version) {
   const id=Number(invoiceId);if(!Number.isSafeInteger(id)||id<1)return;
-  window.location.assign('/invoice/view?id='+id);
+  window.location.assign('/invoice/view?id='+id+(version?'&version='+encodeURIComponent(version):''));
 }
 
 async function openInvoiceQrDialog(invoiceId) {
@@ -6699,7 +6702,7 @@ function openStockDialog(stock = null) {
           <h4>Quantity & Value</h4>
           <div class="split-grid">
             <input id="stockUnitQty" type="number" min="0" placeholder="Unit Quantity" value="${escapeHtml(item.unit_qty || 0)}" oninput="updateStockTotalPreview()" />
-            <input id="stockUnitPrice" type="number" min="0" step="0.01" placeholder="Unit Price" value="${escapeHtml(item.unit_price || 0)}" oninput="updateStockTotalPreview()" />
+            <input id="stockUnitPrice" type="number" min="0" step="0.01" placeholder="Unit Price" required value="${escapeHtml(item.unit_price ?? '')}" oninput="updateStockTotalPreview()" />
           </div>
           <p class="muted-text">Total inventory value: <strong id="stockTotalPreview">${escapeHtml(formatMoney((Number(item.unit_qty || 0) * Number(item.unit_price || 0))))}</strong></p>
           ${stock ? `<p class="muted-text">Available now: <strong>${escapeHtml(item.current_unit_qty || 0)} pcs</strong>. Editing input keeps already issued stock counted separately.</p>` : ''}

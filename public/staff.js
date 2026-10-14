@@ -1162,36 +1162,12 @@ function sendNativeMobileNotification(title, body) {
   return true;
 }
 
-function showStaffDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
-  const backdrop = document.getElementById('staffDialogBackdrop');
-  const panel = document.querySelector('#staffDialogBackdrop .dialog-panel');
-  const titleEl = document.getElementById('staffDialogTitle');
-  const bodyEl = document.getElementById('staffDialogBody');
-  const primaryBtn = document.getElementById('staffDialogPrimaryBtn');
-
-  if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
-
-  panel?.classList.remove('workflow-dialog');
-  titleEl.innerText = title;
-  bodyEl.innerHTML = bodyHtml;
-  primaryBtn.innerText = primaryText;
-  primaryBtn.onclick = async () => { if (primaryBtn.disabled) return; primaryBtn.disabled = true; primaryBtn.setAttribute('aria-busy', 'true'); try { await onPrimary?.(); } catch (error) { showToast(error.message || 'The action failed. Review the fields and retry.'); } finally { primaryBtn.disabled = false; primaryBtn.removeAttribute('aria-busy'); } };
-  primaryBtn.style.display = typeof onPrimary === 'function' ? 'inline-block' : 'none';
-  document.body.classList.add('staff-dialog-open');
-  backdrop.classList.add('active');
+function showStaffDialog(title,bodyHtml,onPrimary,primaryText='Save',options={}){
+ document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('workflow-dialog','procurement-dialog');
+ return window.VoxelDialog?.open({id:'staff-record-dialog',backdrop:'staffDialogBackdrop',title:'staffDialogTitle',body:'staffDialogBody',primary:'staffDialogPrimaryBtn',secondary:'staffDialogCancelBtn',heading:title,html:bodyHtml,onPrimary,primaryText,onClosed:()=>{stopShiftQrScanner();document.body.classList.remove('staff-dialog-open','shift-qr-dialog-open');document.getElementById('staffDialogBackdrop')?.classList.remove('shift-qr-dialog-backdrop');document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('shift-qr-dialog-panel','workflow-dialog','procurement-dialog');},...options});
 }
-
-function hideStaffDialog() {
-  stopShiftQrScanner();
-  document.body.classList.remove('staff-dialog-open', 'shift-qr-dialog-open');
-  document.getElementById('staffDialogBackdrop')?.classList.remove('shift-qr-dialog-backdrop');
-  document.querySelector('#staffDialogBackdrop .dialog-panel')?.classList.remove('shift-qr-dialog-panel', 'workflow-dialog', 'procurement-dialog');
-  document.getElementById('staffDialogBackdrop')?.classList.remove('active');
-}
-
-function closeStaffDialog(event) {
-  if (event?.target?.id === 'staffDialogBackdrop') hideStaffDialog();
-}
+function hideStaffDialog(user=false){return window.VoxelDialog?.close('staff-record-dialog',{user:user===true});}
+function closeStaffDialog(event){if(event?.target?.id==='staffDialogBackdrop')hideStaffDialog(true);}
 
 function pickMessage(messages) {
   return messages[Math.floor(Math.random() * messages.length)];
@@ -1416,10 +1392,7 @@ function showShiftDialog(title, message, subtext) {
     return;
   }
 
-  titleEl.innerText = title;
-  messageEl.innerText = message;
-  subtextEl.innerText = subtext;
-  dialog.classList.add('active');
+  showStaffDialog(title,`<p>${escapeHtml(message)}</p><p class="status-note">${escapeHtml(subtext||'')}</p>`,hideStaffDialog,'Close',{mode:'readonly',name:'shift-update'});
 }
 
 function updateShiftButtons(attendance) {
@@ -1692,6 +1665,7 @@ async function submitShiftQr(mode, qrToken) {
 }
 
 function hideShiftDialog() {
+  if(window.VoxelDialog?.active?.name==='shift-update')hideStaffDialog(true);
   document.getElementById('shiftDialog')?.classList.remove('active');
 }
 

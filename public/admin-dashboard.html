@@ -197,45 +197,45 @@
         <div class="metric-grid dashboard-kpis">
           <div class="card kpi-teal">
             <h3>Invoice Value</h3>
-            <p><button type="button" class="vv-summary-link" onclick="return openRecordRegister('invoices',{})"><strong id="dashboardInvoiceValue">$0.00</strong></button></p>
+            <p><button type="button" class="vv-summary-link" onclick="return openRecordRegister('invoices',{})"><strong id="dashboardInvoiceValue">Loading…</strong></button></p>
             <span>All active invoices · gross AUD</span>
           </div>
           <div class="card kpi-blue">
             <h3>Stock Worth</h3>
-            <p><strong id="dashboardStockWorth">$0.00</strong></p>
+            <p><strong id="dashboardStockWorth">Loading…</strong></p>
             <span>Finished inventory left</span>
           </div>
           <div class="card kpi-green">
             <h3>Raw + Packaging</h3>
-            <p><strong id="dashboardMaterialWorth">$0.00</strong></p>
+            <p><strong id="dashboardMaterialWorth">Loading…</strong></p>
             <span>Material value left</span>
           </div>
           <div class="card kpi-blue">
             <h3>Revenue</h3>
-            <p><button type="button" class="vv-summary-link" onclick="return openDashboardRegister('invoices','issued')"><strong id="dashboardRevenueValue">$0.00</strong></button></p>
+            <p><button type="button" class="vv-summary-link" onclick="return openDashboardRegister('invoices','issued')"><strong id="dashboardRevenueValue">Loading…</strong></button></p>
             <span>Issued invoices · gross AUD this FY</span>
           </div>
           <div class="card kpi-teal">
             <h3>Expenses</h3>
-            <p><button type="button" class="vv-summary-link" onclick="return openDashboardRegister('expenses')"><strong id="dashboardExpenseValue">$0.00</strong></button></p>
+            <p><button type="button" class="vv-summary-link" onclick="return openDashboardRegister('expenses')"><strong id="dashboardExpenseValue">Loading…</strong></button></p>
             <span>Recorded bills · gross AUD this FY</span>
           </div>
           <div class="card kpi-green">
             <h3>Net Result</h3>
-            <p><button type="button" class="vv-summary-link" onclick="return openFinancialResult()"><strong id="dashboardNetWorthValue">$0.00</strong></button></p>
+            <p><button type="button" class="vv-summary-link" onclick="return openFinancialResult()"><strong id="dashboardNetWorthValue">Loading…</strong></button></p>
             <span>Revenue minus expenses</span>
           </div>
         </div>
 
         <div class="command-insight-strip">
           <button type="button" class="command-insight-card" onclick="return goSection('invoiceSection')">
-            <span>Cashflow Pulse</span>
-            <strong id="homeCashPulse">$0.00</strong>
-            <small>Collected this FY</small>
+            <span>Recorded payments</span>
+            <strong id="homeCashPulse">Loading…</strong>
+            <small>Recorded entries this FY</small>
           </button>
           <button type="button" class="command-insight-card" onclick="return goSection('stockSection')">
             <span>Inventory Pulse</span>
-            <strong id="homeInventoryPulse">$0.00</strong>
+            <strong id="homeInventoryPulse">Loading…</strong>
             <small>Finished stock worth</small>
           </button>
           <button type="button" class="command-insight-card danger-signal" onclick="return goSection('expenseSection')">
@@ -261,7 +261,7 @@
 
           <div class="card command-chart-card">
             <div class="mini-head">
-              <h3>Invoice Status</h3>
+              <h3>Saved invoice statuses</h3>
               <span>Register flow</span>
             </div>
             <canvas id="invoiceChart"></canvas>
@@ -1519,7 +1519,7 @@
       <h3 id="dialogTitle">Action</h3>
       <div id="dialogBody"></div>
       <div class="dialog-actions">
-        <button type="button" class="secondary-btn" onclick="return hideDialog()">Cancel</button>
+        <button type="button" id="dialogCancelBtn" class="secondary-btn" onclick="return hideDialog(true)">Cancel</button>
         <button type="button" class="primary-btn" id="dialogPrimaryBtn">Save</button>
       </div>
     </section>

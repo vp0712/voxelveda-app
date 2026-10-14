@@ -1,5 +1,6 @@
 const pool = require('../config/db');
 const money=require('../utils/money');
+const {receivableSelect}=require('../services/invoiceSummaryService');
 const {paymentSql}=require('../services/expensePaymentDomain');
 const {hasPermission}=require('../services/authorizationService');
 
@@ -116,11 +117,11 @@ exports.getDashboardStats = async (req, res) => {
         SUM(LOWER(status) = 'draft') AS draft_invoices,
         SUM(LOWER(status) = 'approved') AS approved_invoices,
         SUM(LOWER(status) = 'sent') AS sent_invoices,
-        SUM(LOWER(status) = 'paid') AS paid_invoices,
-        COALESCE(SUM(CASE WHEN LOWER(status) = 'paid' THEN total ELSE 0 END), 0) AS paid_revenue,
+        SUM(payment_state = 'paid') AS paid_invoices,
+        SUM(payment_state='review_required') AS payment_review_count,
+        CASE WHEN SUM(paid_amount IS NULL)>0 THEN NULL ELSE COALESCE(SUM(paid_amount),0) END AS paid_revenue,
         COALESCE(SUM(total), 0) AS total_invoice_value
-      FROM invoices
-      WHERE deleted = 0 OR deleted IS NULL
+      FROM (${receivableSelect()}) verified_invoices
     `);
 
     const [rfqStatuses]=await pool.query("SELECT LOWER(COALESCE(status,'unknown')) AS status,COUNT(*) AS count FROM rfqs WHERE IFNULL(archived, 0) = 0 GROUP BY 1 ORDER BY 1");
@@ -128,7 +129,7 @@ exports.getDashboardStats = async (req, res) => {
     const [[issuedStats]]=await pool.query("SELECT COALESCE(SUM(total),0) AS revenue FROM invoices WHERE (deleted=0 OR deleted IS NULL) AND LOWER(status) IN ('approved','sent','paid','partially_paid','overdue') AND created_at>=? AND created_at<DATE_ADD(?,INTERVAL 1 DAY)",[fyStart,fyEnd]);
 
     const [[paymentStats]] = await pool.query(`
-      SELECT COALESCE(SUM(ip.amount), 0) AS collected_revenue
+      SELECT CASE WHEN SUM(ip.amount IS NULL OR ip.amount<=0)>0 THEN NULL ELSE COALESCE(SUM(ip.amount), 0) END AS collected_revenue
       FROM invoice_payments ip JOIN invoices i ON i.id=ip.invoice_id
       WHERE ip.voided_at IS NULL AND (i.deleted=0 OR i.deleted IS NULL) AND ip.payment_date BETWEEN ? AND ?
     `, [fyStart, fyEnd]);
@@ -247,7 +248,7 @@ exports.getDashboardStats = async (req, res) => {
 
     `, [fyStart, fyEnd]);
 
-    const collectedRevenue=paymentStats.collected_revenue||'0.00';
+    const collectedRevenue=paymentStats.collected_revenue===null?null:(paymentStats.collected_revenue??'0.00');
     const revenue=issuedStats.revenue||'0.00';
     const expenses=expenseStats.total_expense_value||'0.00';
     rfqStats.statuses=rfqStatuses; invoiceStats.statuses=invoiceStatuses;
