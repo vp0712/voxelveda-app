@@ -105,6 +105,7 @@ function appLimiterFixture() {
     },
     './middleware/auth': pass, './middleware/pageAuth': () => pass,
     './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
+    './services/attendanceGateAccess': require('../services/attendanceGateAccess'),
     './config/urls': require('../config/urls'),
     './middleware/securityMiddleware': require('../middleware/securityMiddleware'),
     './services/applicationRetirement': require('../services/applicationRetirement'),

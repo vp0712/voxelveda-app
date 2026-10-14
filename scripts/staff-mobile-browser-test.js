@@ -13,7 +13,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { chromium } = require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
 const project = path.resolve(__dirname, '..');
-const baselineRef = process.env.VV_STAFF_BASELINE_REF || 'a0d0b4298666775d5db35cb63b8eca292897398b';
+const baselineRef = process.env.VV_STAFF_BASELINE_REF || '235cc208e1425f0c9cdedc1e210c7725526a0b01';
 assert(/^[a-f0-9]{40}$/.test(baselineRef), 'Before screenshots require an exact preserved Git commit.');
 const selectedPhase = process.env.VV_STAFF_PROOF_PHASE || 'both';
 assert(['before', 'after', 'both'].includes(selectedPhase), 'Choose before, after or both for staff proof.');
@@ -23,6 +23,7 @@ const identities = new Map([
   [9402, { id: 9402, name: 'Synthetic Other Fixture', username: 'synthetic.other', email: 'synthetic-other@example.invalid', role: 'staff', active: 1, account_status: 'ACTIVE', session_version: 1, mfa_enabled: 0, permissions: ['VIEW_ATTENDANCE', 'VIEW_OWN_JOBS', 'VIEW_OWN_TIMESHEET'] }],
   [9403, { id: 9403, name: 'Synthetic Directory Reviewer', username: 'synthetic.directory', email: 'synthetic-directory@example.invalid', role: 'integration_fixture', active: 1, account_status: 'ACTIVE', session_version: 1, mfa_enabled: 0, permissions: ['VIEW_STAFF_HR'] }]
 ]);
+for(const [i,role]of ['manager','supervisor','hr','production','sales'].entries())identities.set(9404+i,{id:9404+i,name:'Synthetic '+role,username:'synthetic.'+role,email:'synthetic-'+role+'@example.invalid',role,active:1,account_status:'ACTIVE',session_version:1,mfa_enabled:0,permissions:[]});
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = crypto.randomBytes(48).toString('hex');
 process.env.SHIFT_QR_SIGNING_KEY = crypto.randomBytes(48).toString('hex');
@@ -266,12 +267,12 @@ async function verifyEmulatedCameraCases(browser, fixture) {
     { name: 'media-api-unavailable', mode: 'unsupported', message: 'Camera scanning is unavailable', calls: 0 },
     { name: 'decoder-unavailable', mode: 'decoder-unavailable', message: 'camera or QR decoder is unavailable', calls: 1, tracks: 1 },
     { name: 'allowed-camera-close', mode: 'no-token', calls: 1, tracks: 1 },
-    { name: 'allowed-valid-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date()).token, calls: 1, tracks: 1, valid: true },
+    { name: 'allowed-valid-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date()).qr_data, calls: 1, tracks: 1, valid: true },
     { name: 'invalid-signed-token', mode: 'token', token: () => 'synthetic-invalid-signed-token', calls: 1, tracks: 1, code: 'ATTENDANCE_QR_INVALID' },
-    { name: 'expired-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date(Date.now() - 120000)).token, calls: 1, tracks: 1, code: 'ATTENDANCE_QR_EXPIRED' },
+    { name: 'expired-signed-token', mode: 'token', token: () => qr.createSiteToken(new Date(Date.now() - 120000)).qr_data, calls: 1, tracks: 1, code: 'ATTENDANCE_QR_EXPIRED' },
     { name: 'wrong-site-signed-token', mode: 'token', token: () => {
       const previous = process.env.SHIFT_QR_SITE_ID;
-      try { process.env.SHIFT_QR_SITE_ID = 'synthetic-different-attendance-site'; return qr.createSiteToken(new Date()).token; }
+      try { process.env.SHIFT_QR_SITE_ID = 'synthetic-different-attendance-site'; return qr.createSiteToken(new Date()).qr_data; }
       finally { if (previous === undefined) delete process.env.SHIFT_QR_SITE_ID; else process.env.SHIFT_QR_SITE_ID = previous; }
     }, calls: 1, tracks: 1, code: 'ATTENDANCE_QR_WRONG_SITE' },
     { name: 'permission-result-after-close', mode: 'late', calls: 1, tracks: 1 }
@@ -461,33 +462,33 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
 
 async function verifyDecoderProviderRetry(browser, fixture) {
   Object.assign(fixture.state, resetState());
-  const provider = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-  const token = require('../services/attendanceQrService').createSiteToken(new Date()).token;
+  const provider = fixture.origin + '/vendor/jsQR.js';
+  const token = require('../services/attendanceQrService').createSiteToken(new Date()).qr_data;
+  const branded = await require('../services/attendanceQrRenderer').renderAttendanceQr(token);
+  const cameraImage = 'data:image/png;base64,' + branded.buffer.toString('base64');
   const context = await browser.newContext({ viewport: { width: 375, height: 812 }, reducedMotion: 'reduce' }); context.setDefaultTimeout(12000);
   await context.addCookies([{ name: 'vv_session', value: userSession(9402), url: fixture.origin, httpOnly: true, sameSite: 'Lax' }]);
   let providerRequests = 0;
   await context.route(provider, async route => {
     providerRequests++;
     if (providerRequests === 1) return route.fulfill({ status: 503, contentType: 'application/javascript', body: '// Synthetic decoder provider unavailable.' });
-    // The existing provider URL and real loader are exercised; decoded-token
-    // input is deliberately emulated and signature/site validation stays real.
-    return route.fulfill({ status: 200, contentType: 'application/javascript', body: 'window.jsQR = function () { return { data: ' + JSON.stringify(token) + ' }; };' });
+    return route.fulfill({ status: 200, contentType: 'application/javascript', body: fs.readFileSync(path.join(project,'node_modules/jsqr/dist/jsQR.js'),'utf8') });
   });
   const page = await context.newPage(), errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.addInitScript(() => { delete window.BarcodeDetector; if ('BarcodeDetector' in window) throw new Error('Synthetic decoder fixture could not disable the native detector.'); });
   try {
     await page.goto(fixture.origin + '/portal/staff', { waitUntil: 'networkidle' }); await page.locator('#staffHomePrimaryAction:not([disabled])').waitFor();
-    await page.evaluate(providerUrl => {
+    await page.evaluate(({providerUrl,cameraImage}) => {
       const state = window.__realDecoderRetry = { calls: 0, stops: 0, tracks: [], unrelated: [...document.scripts].filter(script => script.src !== providerUrl) };
       Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { async getUserMedia() {
-        state.calls++; const canvas = document.createElement('canvas'); canvas.width = 64; canvas.height = 64;
-        const drawing = canvas.getContext('2d'); drawing.fillStyle = '#165b82'; drawing.fillRect(0, 0, 64, 64);
-        const stream = canvas.captureStream(5); drawing.fillRect(0, 0, 64, 64);
+        state.calls++; const image=new Image();image.src=cameraImage;await image.decode();const canvas = document.createElement('canvas'); canvas.width = image.naturalWidth; canvas.height = image.naturalHeight;
+        const drawing = canvas.getContext('2d');drawing.drawImage(image,0,0);
+        const stream = canvas.captureStream(5);drawing.drawImage(image,0,0);
         for (const track of stream.getTracks()) { track.requestFrame?.(); const stop = track.stop.bind(track); track.stop = () => { state.stops++; stop(); }; state.tracks.push(track); }
         return stream;
       } } });
-    }, provider);
+    }, {providerUrl:provider,cameraImage});
     await page.locator('#staffHomePrimaryAction').click();
     await page.waitForFunction(() => document.getElementById('staffAttendanceScanStatus')?.dataset.error === 'true');
     const firstMessage = await page.locator('#staffAttendanceScanStatus').textContent();
@@ -500,17 +501,41 @@ async function verifyDecoderProviderRetry(browser, fixture) {
     assert.equal(providerRequests, 2, 'Explicit retry must recover the real cached decoder promise and request one fresh provider script.');
     assert.equal(fixture.state.qrValidationRequests.length, 1); assert.equal(fixture.state.qrValidationRequests[0].user_id, 9402);
     assert.equal(fixture.state.receiptRequests.length, 0, 'Successful camera/provider retry and QR verification still require explicit attendance confirmation.');
-    await page.locator('#staffAttendanceCancel').click(); await page.locator('#staffAttendanceOverlay').waitFor({ state: 'hidden' });
+    await page.locator('#staffAttendanceConfirm').click();await page.waitForFunction(()=>window.VoxelStaffHome?.state?.status==='WORKING');await page.locator('#staffAttendanceOverlay').waitFor({ state: 'hidden' });
+    assert.equal(fixture.state.receiptRequests.length,1);assert.equal(fixture.state.attendance.user_id,9402);
     const final = await page.evaluate(providerUrl => ({ calls: window.__realDecoderRetry.calls, stops: window.__realDecoderRetry.stops,
       states: window.__realDecoderRetry.tracks.map(track => track.readyState), unrelatedPreserved: window.__realDecoderRetry.unrelated.every(script => script.isConnected),
       providerScripts: [...document.scripts].filter(script => script.src === providerUrl).map(script => script.dataset.decoderLoadState) }), provider);
     assert.deepEqual(final, { calls: 2, stops: 2, states: ['ended','ended'], unrelatedPreserved: true, providerScripts: ['loaded'] });
-    assert.deepEqual(errors, []); assert.equal(fixture.state.attendance, null);
-    return { hardwareEmulated: true, decoderProviderEmulated: true, nativeQrRecognitionVerified: false, realLoaderAndScanner: true, providerRequests, firstMessage, final, actionsPosted: 0 };
+    assert.deepEqual(errors, []);assert.ok(fixture.state.attendance);
+    return { hardwareEmulated: true, decoderProviderEmulated: false, nativeQrRecognitionVerified: false, realBrandedGateImageDecoded:true,realLoaderAndScanner: true, providerRequests, firstMessage, final, actionsPosted: 1,fixturePersistenceConfirmed:true };
   } catch (error) {
     await page.screenshot({ path: path.join(output, 'decoder-provider-retry-failure.png'), fullPage: true, animations: 'disabled', timeout: 5000 }).catch(() => {});
     throw new Error('Actual decoder provider and camera retry scenario failed', { cause: error });
   } finally { await context.close(); }
+}
+
+async function verifyCameraUrlIntent(browser,fixture){
+  const results=[];
+  for(const expired of [false,true]){
+    Object.assign(fixture.state,resetState());const context=await browser.newContext({viewport:{width:390,height:844}});context.setDefaultTimeout(12000);await context.addCookies([{name:'vv_session',value:userSession(9402),url:fixture.origin,httpOnly:true,sameSite:'Lax'}]);
+    try{const issued=require('../services/attendanceQrService').createSiteToken(new Date(Date.now()-(expired?120000:0))),intent=new URL(issued.qr_data).searchParams.get('t'),page=await context.newPage();await page.goto(fixture.origin+'/portal/staff?attendance_intent='+encodeURIComponent(intent));
+      if(expired){await page.waitForFunction(()=>document.getElementById('staffAttendanceScanStatus')?.dataset.error==='true');assert.match(await page.locator('#staffAttendanceScanStatus').textContent(),/expired/i);assert.equal(await page.locator('#staffAttendanceConfirm').count(),0);}
+      else{await page.locator('#staffAttendanceConfirm').waitFor();assert.equal(fixture.state.qrValidationRequests.length,1);await page.locator('#staffAttendanceCancel').click();}
+      assert.equal(new URL(page.url()).searchParams.has('attendance_intent'),false);assert.equal(fixture.state.receiptRequests.length,0);results.push({expired,intentRevalidated:true,urlCleared:true,attendanceWrites:0});
+    }finally{await context.close();}
+  }
+  return results;
+}
+
+async function verifyRoleHomes(browser,fixture){
+  const results=[];
+  for(const id of [9402,9404,9405,9406,9407,9408]){
+    Object.assign(fixture.state,resetState());const context=await browser.newContext({viewport:{width:390,height:844}});context.setDefaultTimeout(12000);await context.addCookies([{name:'vv_session',value:userSession(id),url:fixture.origin,httpOnly:true,sameSite:'Lax'}]);
+    try{const page=await context.newPage();await page.goto(fixture.origin+'/portal/staff',{waitUntil:'networkidle'});await page.waitForFunction(expected=>window.VoxelStaffHome?.state?.profile?.id===expected,id);const role=identities.get(id).role,labels=await page.locator('#staffRoleWork button').allTextContents();if(role==='staff')assert.equal(await page.locator('#staffRoleWork').isVisible(),false);else assert.ok(labels.length>0,role+' must have a focused permitted home');assert.equal(await page.locator('button:has-text("Create kiosk link")').count(),0);await page.screenshot({path:path.join(output,'after-role-'+role+'-phone.png'),fullPage:true});results.push({role,labels,ownAttendanceUser:id,managementGateNotExposed:true});}
+    finally{await context.close();}
+  }
+  return results;
 }
 
 async function verifyDirectoryAvatarObserver(browser, fixture) {
@@ -810,7 +835,7 @@ async function run() {
           const image = document.querySelector('#sidebarAvatar img');
           return Boolean(image && !image.hidden && image.naturalWidth > 0 && getComputedStyle(image).display !== 'none');
         });
-        if (phase === 'before') assert.equal(sidebarPhotoRendered, false, 'the pinned baseline captures the unloaded staff avatar defect');
+        if (phase === 'before') assert.equal(sidebarPhotoRendered, baselineRef === '235cc208e1425f0c9cdedc1e210c7725526a0b01', 'The current-release baseline preserves its repaired saved avatar; older baselines retain their documented defect.');
         violations.push(...await page.evaluate(() => window.__fixtureCspViolations));
         if (phase === 'after') {
           assert.equal(sidebarPhotoRendered, true, 'after staff photo is loaded before its proof screenshot');
@@ -835,11 +860,13 @@ async function run() {
     const decoderProviderRetry = afterFixture ? await verifyDecoderProviderRetry(browser, afterFixture) : null;
     const inPlaceAccountSwitch = afterFixture ? await verifyInPlaceAccountSwitchCases(browser, afterFixture) : [];
     const responsiveMatrix = afterFixture ? await verifyResponsiveStaffMatrix(browser, afterFixture) : null;
+    const cameraUrlIntent = afterFixture ? await verifyCameraUrlIntent(browser,afterFixture) : null;
+    const roleHomes = afterFixture ? await verifyRoleHomes(browser,afterFixture) : null;
     const directoryAvatarObserver = afterFixture ? await verifyDirectoryAvatarObserver(browser, afterFixture) : null;
     const unauthorized = await fetch(`http://127.0.0.1:${servers.at(-1).address().port}/api/profile`);
     assert.equal(unauthorized.status, 401, 'anonymous callers must fail actual API authentication');
     fs.writeFileSync(path.join(output, 'staff-mobile-proof.json'), JSON.stringify({ baselineRef, baselineSource: useSavedArchive ? 'Explicit local preserved byte-equivalent ea5 archive' : 'Pinned remote Git baseline', fixtureOnly: true,
-      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. Separate QR-required scanner cases emulate camera access and decoded-token input, with real signed-token validation; native hardware is not claimed.', cameraEmulation, decoderProviderRetry, inPlaceAccountSwitch, responsiveMatrix, directoryAvatarObserver, results }, null, 2));
+      identity: 'Synthetic staff fixture accounts, example.invalid addresses and synthetic sessions only.', attendanceUiQrPolicy: 'The screenshot action account carries explicit stored QR bypass. QR-required scanner cases include the actual branded gate image in an emulated video stream, the real jsQR decoder, signed-token validation, explicit confirmation and fixture persistence; native hardware is not claimed.', cameraEmulation, decoderProviderRetry, inPlaceAccountSwitch, responsiveMatrix, cameraUrlIntent, roleHomes, directoryAvatarObserver, results }, null, 2));
     console.log('Staff mobile browser before/after screenshots and actual cookie/JWT/CSP fixture passed: ' + output);
   } catch (error) {
     let uiState = null;

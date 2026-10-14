@@ -1470,7 +1470,7 @@ function normalizeShiftQrToken(value) {
 }
 
 function loadExternalScript(src) {
-  const attendanceDecoder = src === 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
+  const attendanceDecoder = src === '/vendor/jsQR.js';
   return new Promise((resolve, reject) => {
     let script = document.querySelector(`script[src="${src}"]`);
     if (attendanceDecoder && script?.dataset.decoderLoadState === 'failed') {
@@ -1528,7 +1528,7 @@ async function getShiftQrDecoder() {
   }
 
   if (!shiftQrDecoderPromise) {
-    shiftQrDecoderPromise = loadExternalScript('https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js');
+    shiftQrDecoderPromise = loadExternalScript('/vendor/jsQR.js');
   }
 
   const loading = shiftQrDecoderPromise;

@@ -88,7 +88,16 @@ for(const [route,file,permissions] of [
  ['/careers-admin','careers-admin.html',['VIEW_STAFF_HR','MANAGE_USERS']],
  ['/invoice/view','invoice-pdf.html',['VIEW_FINANCE']]
 ])app.get(route,noIndex,pageAuth(),pagePermissions(permissions),sendPage(file));
-app.get('/attendance-terminal',noIndex,sendPage('shift-qr.html'));
+const gateAccess=require('./services/attendanceGateAccess');
+const gatePageAuth=pageAuth(),gateApiAuth=auth,gatePermission=pagePermissions(['EDIT_ATTENDANCE']);
+function gatePage(req,res,next){if(gateAccess.hasAccess(req))return next();return gatePageAuth(req,res,()=>gatePermission(req,res,next));}
+function gateApi(req,res,next){if(gateAccess.hasAccess(req))return next();return gateApiAuth(req,res,()=>requirePermission('EDIT_ATTENDANCE')(req,res,next));}
+app.get('/attendance-terminal',noIndex,gateAccess.exchange,gatePage,sendPage('shift-qr.html'));
+app.get(['/a','/attendance/scan'],noIndex,pageAuth(),pagePermissions(['VIEW_ATTENDANCE']),(req,res)=>{
+ try{const token=req.query.shift_qr_token||req.query.t;require('./services/attendanceQrService').validateSiteToken(token);return res.redirect(303,portalPath(req.user)+'?attendance_intent='+encodeURIComponent(token));}
+ catch(error){return res.redirect(303,portalPath(req.user)+'?attendance_code_expired=1');}
+});
+app.post('/api/attendance/gate-access',rateLimitPolicy('shift_qr'),auth,requirePermission('EDIT_ATTENDANCE'),(req,res)=>res.set('Cache-Control','no-store').json({url:urls.app+'/attendance-terminal?access='+encodeURIComponent(gateAccess.createAccess()),expires_in_seconds:12*3600}));
 app.get('/employee/verify/:token',noIndex,sendPage('employee-verify.html'));
 for(const [alias,target] of Object.entries({'/quality.html':'/quality','/shop-floor.html':'/shop-floor','/employee-id.html':'/employee-id','/careers-admin.html':'/careers-admin','/invoice-pdf.html':'/invoice/view'}))app.get(alias,noIndex,pageAuth(),redirect(target));
 app.get(['/rfqs','/quotations','/invoices','/customers','/suppliers','/procurement','/stock','/inventory','/raw-material','/packaging','/expenses','/workforce','/timesheets','/roster','/staff','/compliance','/forms','/settings','/meetings','/tasks','/trash','/approvals'],noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPath(req.user)+'?view='+encodeURIComponent(req.path.slice(1))));
@@ -139,7 +148,10 @@ app.use('/api/public/careers',publicCareersRoutes);
 const rfqController=require('./controllers/rfqController'),attendanceController=require('./controllers/attendanceController');
 app.post('/api/public/rfq',rateLimitPolicy('public_rfq'),publicRfqContract,botChallenge('public_rfq'),publicSubmissionDedupe({submissionType:'public_rfq'}),rfqController.createRFQ);
 app.post('/api/public/ai-lead',rateLimitPolicy('ai_lead'),aiLeadContract,botChallenge('ai_lead'),publicSubmissionDedupe({submissionType:'ai_lead'}),require('./controllers/aiLeadController').createLead);
-app.get('/api/public/shift-qr',rateLimitPolicy('shift_qr'),shiftQrContract,attendanceController.publicShiftQrToken);
+app.get('/api/public/shift-qr',rateLimitPolicy('shift_qr'),gateApi,shiftQrContract,attendanceController.publicShiftQrToken);
+app.get('/api/attendance-gate/image',rateLimitPolicy('qr_generation'),gateApi,async(req,res,next)=>{
+ try{const service=require('./services/attendanceQrService');service.validateSiteToken(req.query.data);const rendered=await require('./services/attendanceQrRenderer').renderAttendanceQr(String(req.query.data));res.type('png').set('Cache-Control','private, no-store').set('X-QR-Modules',String(rendered.modules)).send(rendered.buffer);}catch(error){next(error)}
+});
 app.get('/api/public/employee-id/:token/verify',rateLimitPolicy('coc_verification'),require('./controllers/employeeIdentityController').verify);
 app.get('/api/public/qms/coc/:no/verify',rateLimitPolicy('coc_verification'),cocVerificationContract,require('./controllers/qms/qualityReleaseController').verifyCoc);
 app.get('/api/qr',rateLimitPolicy('qr_generation'),qrGenerationContract,async(req,res,next)=>{try{res.type('png').set('Cache-Control','private, no-store').send(await QRCode.toBuffer(String(req.query.data||'').trim(),{width:1024,margin:8,errorCorrectionLevel:'H'}))}catch(error){next(error)}});

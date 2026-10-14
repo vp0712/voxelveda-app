@@ -1,0 +1,17 @@
+'use strict';
+// Browser screenshots of production bytes fetched by curl with normal CA/TLS
+// verification through the managed proxy. No TLS bypass and no private session.
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),{execFile}=require('node:child_process'),{promisify}=require('node:util');
+const {chromium}=require(process.env.VV_BROWSER_MODULE_PATH||'playwright');
+const {createCanvas,loadImage}=require('@napi-rs/canvas'),jsQR=require('jsqr');
+const exec=promisify(execFile),origin='https://app.voxelveda.com',out=process.env.GATE_PROOF_DIR||'/tmp/voxel-gate-proof',phase=process.env.PROOF_PHASE||'before';fs.mkdirSync(out,{recursive:true});
+async function main(){const browser=await chromium.launch({headless:true}),context=await browser.newContext();const evidence={phase,transport:'curl with CA-verified HTTPS via managed proxy; response replay into Chromium',real_device:false,checks:[]};
+try{
+ await context.route('https://app.voxelveda.com/**',async route=>{const request=route.request();if(request.method()!=='GET')return route.abort();const id=crypto.randomUUID(),header=path.join(out,id+'.headers'),body=path.join(out,id+'.body');try{await exec('curl',['--silent','--show-error','--max-time','20','--dump-header',header,'--output',body,request.url()],{maxBuffer:1024*1024});const blocks=fs.readFileSync(header,'utf8').trim().split(/\r?\n\r?\n/),last=blocks.filter(x=>/^HTTP\//.test(x)).at(-1),lines=last.split(/\r?\n/),status=Number(lines[0].split(' ')[1]),headers={};for(const line of lines.slice(1)){const colon=line.indexOf(':');if(colon>0){const key=line.slice(0,colon).toLowerCase();if(!['content-length','transfer-encoding','content-encoding','connection'].includes(key))headers[key]=line.slice(colon+1).trim();}}await route.fulfill({status,headers,body:fs.readFileSync(body)});}catch(e){await route.abort();}finally{fs.rmSync(header,{force:true});fs.rmSync(body,{force:true});}});
+ const page=await context.newPage();for(const [name,viewport]of [['phone',{width:390,height:844}],['tablet',{width:820,height:1180}],['desktop',{width:1440,height:900}]]){
+  await page.setViewportSize(viewport);await page.goto(origin+'/');await page.waitForTimeout(1000);await page.screenshot({path:path.join(out,`${phase}-live-entry-${name}.png`),fullPage:true});
+  if(phase==='before'){await page.goto(origin+'/attendance-terminal');await page.waitForFunction(()=>document.getElementById('terminalQrImage')?.naturalWidth>0);await page.waitForTimeout(1200);await page.screenshot({path:path.join(out,`${phase}-live-gate-${name}.png`),fullPage:true});const metrics=await page.locator('#terminalQrImage').evaluate(n=>({natural_width:n.naturalWidth,width:n.getBoundingClientRect().width,height:n.getBoundingClientRect().height}));const bytes=await page.locator('#terminalQrImage').screenshot(),image=await loadImage(bytes),canvas=createCanvas(image.width,image.height),ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);const pixels=ctx.getImageData(0,0,image.width,image.height),decoded=jsQR(new Uint8ClampedArray(pixels.data),image.width,image.height);evidence.checks.push({name,metrics,decoded:Boolean(decoded),payload_length:decoded?.data.length,payload_is_url:Boolean(decoded?.data.startsWith('https://'))});}
+ }
+ fs.writeFileSync(path.join(out,`${phase}-live-browser-results.json`),JSON.stringify(evidence,null,2));console.log('PUBLIC_LIVE_BROWSER_BRIDGE_OK '+phase);
+}finally{await browser.close();}}
+main().catch(e=>{console.error(e);process.exitCode=1;});

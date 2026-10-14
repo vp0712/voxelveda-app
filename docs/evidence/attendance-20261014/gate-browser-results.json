@@ -1,0 +1,56 @@
+{
+  "fixture_only": true,
+  "real_device": false,
+  "actual_application_routes": true,
+  "checks": [
+    "Anonymous gate issuance rejected",
+    {
+      "role": "staff",
+      "gate_status": 403
+    },
+    {
+      "role": "manager",
+      "gate_status": 403
+    },
+    {
+      "role": "supervisor",
+      "gate_status": 403
+    },
+    {
+      "role": "hr",
+      "gate_status": 403
+    },
+    {
+      "role": "production",
+      "gate_status": 403
+    },
+    {
+      "role": "sales",
+      "gate_status": 403
+    },
+    {
+      "role": "viewer",
+      "gate_status": 403
+    },
+    {
+      "role": "admin",
+      "gate_status": 200
+    },
+    "Kiosk exchanged to HttpOnly display cookie without administrator session; user API rejected",
+    "Five distinct real gate payloads decoded from displayed image across refreshes",
+    "Prior complete logo-bearing QR stays visible while the next image loads",
+    "Suspension/offline expiration hides stale code and reconnection restores a decodable branded image",
+    "Real page authentication preserves safe camera intent; authenticated GET redirects to confirmation and does not transact",
+    "Public entry contains exactly login, signup and unobtrusive privacy/terms"
+  ],
+  "screenshots": [
+    "after-gate-phone-light.png",
+    "after-gate-phone-dark.png",
+    "after-gate-landscape-light.png",
+    "after-gate-landscape-dark.png",
+    "after-gate-tablet-light.png",
+    "after-gate-tablet-dark.png",
+    "after-gate-desktop-light.png",
+    "after-gate-desktop-dark.png"
+  ]
+}

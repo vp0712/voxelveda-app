@@ -175,6 +175,21 @@
     if(retainedRequest&&action!=='CHECK_IN'&&String(retainedRequest.attendance_id)!==String(activeId())){sheetError('The original session is no longer active. Check the original request again; a different session will not be changed.');return;}
     try{const proof=await api('/api/attendance/qr/validate',{method:'POST',body:JSON.stringify({token,action,...(action==='CHECK_OUT'?{attendance_id:activeId()}:{})})});assertCurrent(lease);assertResult(proof);if(proof.valid!==true||proof.action!==action||!proof.qr_proof||String(proof.attendance_id??'')!==String(action==='CHECK_OUT'?activeId()??'':''))throw new Error('The QR does not match this attendance action. Scan a current workplace QR.');if(overlayKind!=='scan')return;confirmAction(action,proof.qr_proof,proof,retainedRequest);}catch(error){if(error.staleAccount||!current(lease))return;if(overlayKind==='scan'){setText('staffAttendanceScanStatus',`${error.message} No attendance was changed.`);$('staffAttendanceScanStatus')?.setAttribute('data-error','true');}}
   }
+  let attendanceIntentHandled=false;
+  async function acceptCameraIntent(){
+    if(attendanceIntentHandled)return;
+    const url=new URL(location.href),token=url.searchParams.get('attendance_intent'),expired=url.searchParams.has('attendance_code_expired');
+    if(!token&&!expired)return;
+    attendanceIntentHandled=true;url.searchParams.delete('attendance_intent');url.searchParams.delete('attendance_code_expired');window.history.replaceState(null,'',url.pathname+url.search+url.hash);
+    if(expired){showError('This workplace code expired during sign-in. Scan the current gate code. No attendance was changed.');return;}
+    if(!await verifyIdentity()||!await refresh())return;
+    if(pending)return reconcileView();
+    const action=allowed('CHECK_OUT')?'CHECK_OUT':allowed('CHECK_IN')?'CHECK_IN':null;
+    if(!action){showError('Attendance is unavailable for your current state. No attendance was changed.');return;}
+    openSheet('Verify workplace code',`<p id="staffAttendanceScanStatus" role="status">Checking the code…</p><div class="staff-sheet-actions">${button('staffAttendanceIntentCancel','Cancel','secondary-btn')}</div>`,'scan');
+    $('staffAttendanceIntentCancel').onclick=close;
+    await verifyQr(action,token);
+  }
   async function openAction(action){
     if(submitBusy)return;if(pending)return reconcileView();
     const previous=identity?account():null;
@@ -300,7 +315,21 @@
   function applyIdentity(user){
     const switched=identity&&String(identity.id)!==String(user.id);identity=user;
     if(switched){historySequence++;today=null;history=[];corrections=[];clearPending();close();clearError();['staffHomeWorked','staffHomeBreak','staffHomeSessions','staffHomeFirstCheckIn','staffHomeLastCheckOut','weekHoursCount','staffHomeWeekHours'].forEach(id=>setText(id,'—'));setText('staffHomeStatus','Checking...');setText('staffHomeDate','Checking workplace time...');setText('staffHomeAttendanceNote','');setText('staffHomeWorkedDetail','Loading your attendance record');$('staffHomeTimeline').innerHTML='<li class="staff-home-empty">Loading your sessions...</li>';setText('staffHomeNextShift','Loading your next shift...');setText('staffHomeTasks','Loading assigned work...');}
-    hydratePending();greeting();renderActions();$('staffHomeAccountOnly').hidden=window.hasPermission?.('attendance')!==false;
+    hydratePending();greeting();renderRoleWork(user);renderActions();$('staffHomeAccountOnly').hidden=window.hasPermission?.('attendance')!==false;
+  }
+  function renderRoleWork(user){
+    let panel=$('staffRoleWork');if(!panel){panel=document.createElement('section');panel.id='staffRoleWork';panel.className='staff-role-work';$('staffHomeError').after(panel);}
+    const roles={
+      manager:['Team work',[['Team attendance','VIEW_TEAM_TIMESHEET','timesheetSection'],['Approvals','VIEW_APPROVALS','approvalsSection'],['Tasks','tasks','tasksSection'],['Procurement','VIEW_PROCUREMENT','procurementSection']]],
+      supervisor:['Team work',[['Team attendance','VIEW_TEAM_TIMESHEET','timesheetSection'],['Approvals','VIEW_APPROVALS','approvalsSection'],['Tasks','tasks','tasksSection'],['Quality','VIEW_QMS','formsSection']]],
+      hr:['People & roster',[['Staff documents','VIEW_STAFF_HR','formsSection'],['Attendance review','EDIT_ATTENDANCE','timesheetSection'],['Roster','VIEW_ATTENDANCE','rosterSection'],['Documents','VIEW_COMPLIANCE','formsSection']]],
+      production:['Production work',[['Assigned jobs & stages','tasks','tasksSection'],['Materials','VIEW_INVENTORY','rawMaterialSection'],['Quality records','VIEW_QMS','formsSection']]],
+      sales:['Customer work',[['RFQs & quotations','VIEW_RFQS','staffRfqSection'],['Customers','VIEW_CUSTOMERS','staffCustomerSection'],['Meetings','VIEW_MEETINGS','meetingsSection']]]
+    };
+    const config=roles[user.role];panel.replaceChildren();panel.hidden=!config;if(!config)return;
+    const title=document.createElement('h2');title.textContent=config[0];panel.append(title);const actions=document.createElement('div');actions.className='staff-role-actions';panel.append(actions);
+    for(const [label,permission,section]of config[1]){if(!window.hasPermission?.(permission)||!$(section))continue;const item=document.createElement('button');item.type='button';item.className='secondary-btn';item.textContent=label;item.onclick=()=>section==='timesheetSection'&&permission==='VIEW_TEAM_TIMESHEET'?openHistory('team'):section==='timesheetSection'&&permission==='EDIT_ATTENDANCE'?openHistory('all'):navigate(section);actions.append(item);}
+    panel.hidden=!actions.childElementCount;
   }
   function install(){
     if(!$('staffHomeGreeting'))return;
@@ -318,7 +347,7 @@
     window.addEventListener('vv:avatar-auth-required',()=>boundary());
     window.addEventListener('vv:avatar-profile',event=>{const id=event.detail?.profile?.id;if(!Number.isSafeInteger(Number(id))||Number(id)<1)return;if(identity&&String(identity.id)!==String(id))boundary();else if(!identity&&!identityPromise&&!loading){clearTimeout(boundaryTimer);boundaryTimer=setTimeout(()=>{void refresh();},0);}});
     window.addEventListener('pagehide',()=>boundary({refreshAgain:false}));
-    window.addEventListener('pageshow',()=>{void refresh();});window.addEventListener('focus',()=>{void refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
+    window.addEventListener('pageshow',()=>{void refresh();void acceptCameraIntent();});window.addEventListener('focus',()=>{void refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
   }
   const oldProfile=window.renderStaffProfile;if(typeof oldProfile==='function')window.renderStaffProfile=function(){void refresh();};
   window.refreshStaffSession=verifyIdentity;
@@ -326,6 +355,6 @@
   // All legacy attendance entry points now use the explicit, server-backed flow.
   window.loadAttendanceStatus=refresh;window.openShiftQrScanner=mode=>openAction(mode==='out'?'CHECK_OUT':'CHECK_IN');window.openMissionShiftScanner=()=>openAction(allowed('CHECK_OUT')?'CHECK_OUT':'CHECK_IN');
   window.clockIn=()=>openAction('CHECK_IN');window.clockOut=()=>openAction('CHECK_OUT');window.submitShiftQr=(mode,token)=>verifyQr(mode==='out'?'CHECK_OUT':'CHECK_IN',token);
-  window.VoxelStaffHome={refresh,openAction,openHistory,closeOverlay,close,reconcile:reconcileView,get state(){return today;}};
+  window.VoxelStaffHome={refresh,openAction,acceptCameraIntent,openHistory,closeOverlay,close,reconcile:reconcileView,get state(){return today;}};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })();
