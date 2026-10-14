@@ -1,0 +1,637 @@
+{
+  "source": "Actual retained account assets with local fixture identity/profile/security endpoints. No production authentication, account writes, financial cards or business workflows.",
+  "results": [
+    {
+      "viewport": {
+        "name": "phone",
+        "width": 320,
+        "height": 844
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "viewport": {
+        "name": "width-360",
+        "width": 360,
+        "height": 844
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "viewport": {
+        "name": "width-390",
+        "width": 390,
+        "height": 844
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "viewport": {
+        "name": "width-430",
+        "width": 430,
+        "height": 844
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "viewport": {
+        "name": "width-768",
+        "width": 768,
+        "height": 844
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "viewport": {
+        "name": "width-1024",
+        "width": 1024,
+        "height": 844
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "viewport": {
+        "name": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    },
+    {
+      "viewport": {
+        "name": "desktop",
+        "width": 1440,
+        "height": 1000
+      },
+      "overflow": false,
+      "pageErrors": [],
+      "assetFailures": [],
+      "identity": true,
+      "profileNavigation": true,
+      "securityNavigation": true,
+      "refresh": true,
+      "publicLayouts": [
+        {
+          "route": "/",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "light",
+          "overflow": false
+        },
+        {
+          "route": "/",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/login",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/register",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/forgot-password",
+          "theme": "dark",
+          "overflow": false
+        },
+        {
+          "route": "/reset-password",
+          "theme": "dark",
+          "overflow": false
+        }
+      ],
+      "apiCalls": [
+        "/api/auth/me",
+        "/api/profile",
+        "/api/notifications/preferences",
+        "/api/auth/me",
+        "/api/auth/sessions",
+        "/api/auth/mfa/status",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me",
+        "/api/auth/me"
+      ],
+      "fixtureOnly": true
+    }
+  ]
+}

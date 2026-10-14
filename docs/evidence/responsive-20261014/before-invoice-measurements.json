@@ -1,0 +1,5089 @@
+{
+  "fixtureOnly": true,
+  "baseline": "62ace8be4287ef083c344174739378b8de9a7660",
+  "api": {
+    "invoices": [
+      {
+        "id": 91,
+        "invoice_no": "INV-TEST-0091",
+        "rfq_id": 71,
+        "customer_name": "Restoration fixture",
+        "customer_email": "fixture@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 110,
+        "paid_amount": 0,
+        "balance_due": 110,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "limit": 50
+  },
+  "checks": [
+    {
+      "theme": "light",
+      "width": 320,
+      "height": 844,
+      "scrollWidth": 320,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 320,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "height": 844,
+      "scrollWidth": 320,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 320,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 360,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 360,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 390,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 390,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 430,
+      "height": 844,
+      "scrollWidth": 430,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 430,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 430,
+      "height": 844,
+      "scrollWidth": 430,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 706,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 57,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1156,
+          "height": 247,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1215
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1215
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1203
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1203
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1201
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 624
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1203
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 624
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 430,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 844,
+      "scrollWidth": 768,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 642,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 75,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 159,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1217
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1194
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1194
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 768,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 844,
+      "scrollWidth": 768,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 642,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 75,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 159,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1217
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1194
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1194
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 768,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "height": 844,
+      "scrollWidth": 1024,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1180,
+        "height": 194.1875,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1180,
+        "height": 65,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 536.796875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 536.796875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1505.5625
+        },
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1505.5625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1105.453125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1236.15625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1366.859375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1497.5625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1105.453125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1236.15625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1366.859375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1497.5625
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "height": 844,
+      "scrollWidth": 1024,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1180,
+        "height": 194.1875,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1180,
+        "height": 65,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 536.796875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 536.796875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1505.5625
+        },
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1505.5625
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1505.5625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1105.453125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1236.15625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1366.859375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1497.5625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1105.453125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1236.15625
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1366.859375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1497.5625
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 844,
+      "scrollWidth": 1440,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1180,
+        "height": 194.1875,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1180,
+        "height": 65,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 536.796875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 536.796875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1515
+        },
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1515
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1507
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1507
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 844,
+      "scrollWidth": 1440,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1180,
+        "height": 194.1875,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1180,
+        "height": 65,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 536.796875,
+          "height": 65,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 98.609375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 121.359375,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 93.65625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86.875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.03125,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 83.765625,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 536.796875,
+          "height": 129.1875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1515
+        },
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1515
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1515
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1507
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1507
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 844,
+      "height": 390,
+      "scrollWidth": 844,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 642,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 75,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 159,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1217
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1194
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1194
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 844,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 844,
+      "height": 390,
+      "scrollWidth": 844,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 1180,
+        "height": 642,
+        "font": "14px",
+        "minWidth": "1180px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "1",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Restoration fixture",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 75,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 54,
+          "font": "14px",
+          "minWidth": "auto",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Approve\nSend\nPayment\nRecord paid balance\nEdit\nPDF\nQR\nArchive",
+          "tag": "TD",
+          "display": "grid",
+          "width": 1150,
+          "height": 159,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "responsive-table",
+          "right": 1217
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1217
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "icon-btn",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-positive",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "money-danger",
+          "right": 1202
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "",
+          "right": 1202
+        },
+        {
+          "tag": "SPAN",
+          "id": "",
+          "class": "badge",
+          "right": 1192
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1202
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "small-btn",
+          "right": 1194
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 910
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1194
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 844,
+        "height": 69,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    }
+  ],
+  "workflows": []
+}

@@ -9,6 +9,8 @@ async function query(sql,values=[]){
  if(q.startsWith('UPDATE email_queue SET status='))return [{affectedRows:0}];
  if(q.startsWith('SELECT id,invoice_no,total,request_payload_sha256 FROM invoices'))return [[...state.invoices.filter(row=>row.request_key===values[0]).map(copy)]];
  if(q.startsWith('SELECT * FROM invoices WHERE id='))return [[...state.invoices.filter(row=>row.id===values[0]&&(!q.includes('IFNULL(deleted')||!row.deleted)).map(copy)]];
+ if(q.startsWith('SELECT i.*, COALESCE(p.paid_amount'))return [[...state.invoices.filter(row=>row.id===values[0]&&!row.deleted).map(row=>{const paid=state.payments.filter(p=>p.invoice_id===row.id&&!p.voided_at).reduce((n,p)=>n+p.amount,0);return {...copy(row),paid_amount:paid,balance_due:row.total-paid};})]];
+ if(q.startsWith('SELECT id,amount,voided_at FROM invoice_payments'))return [[...state.payments.filter(row=>row.invoice_id===values[0]&&row.request_key===values[1]).map(copy)]];
  if(q.startsWith('SELECT id FROM invoices WHERE invoice_no='))return [[...state.invoices.filter(row=>row.invoice_no===values[0]&&row.id!==values[1]&&!row.deleted).map(copy)]];
  if(q.startsWith('INSERT INTO invoices(')){
   const [reference,name,email,description,quantity,unit_price,gst_rate,total,request_key,request_payload_sha256]=values;
@@ -40,6 +42,7 @@ async function call(method,body,key='fixture-request'){
  const req={body,user:{id:9,role:'admin'},get:name=>name==='Idempotency-Key'?key:undefined};const res={statusCode:200,status(code){this.statusCode=code;return this;},json(value){this.body=value;return this;}};
  await controller[method](req,res);return res;
 }
+async function receipt(id,key,user={id:9,role:'admin'}){const req={params:{id:String(id)},user,get:name=>name==='Idempotency-Key'?key:undefined},res={statusCode:200,status(code){this.statusCode=code;return this;},set(){return this;},json(value){this.body=value;return this;}};await controller.paymentReceipt(req,res);return res;}
 async function main(){
  const body={customer_name:'Fixture Customer',customer_email:'fixture@example.invalid',gst_rate:10,items:[{description:'Fixture line',quantity:2,unit_price:20},{description:'Fixture second line',quantity:1,unit_price:10}]};
  const invalid=await call('createManualInvoice',{...body,items:[{description:'Bad fixture',quantity:1,unit_price:Infinity}]});assert.equal(invalid.statusCode,422);assert.ok(invalid.body.errors['items.0.unit_price']);assert.equal(state.invoices.length,0);
@@ -49,14 +52,18 @@ async function main(){
  failAudit=true;const failed=await call('createManualInvoice',body,'fixture-failed-audit');assert.equal(failed.statusCode,500);assert.equal(state.invoices.length,1);assert.equal(state.items.length,2);assert.equal(state.customers.length,1);failAudit=false;
  const approved=await call('approveInvoice',{invoice_id:id});assert.equal(approved.body.status,'approved');assert.equal(state.invoices[0].status,'approved');
  const oldId=state.items[0].id;const edit=await call('editInvoice',{...body,invoice_id:id,invoice_no:first.body.invoice_no,status:'approved',items:[{description:'Updated fixture line',quantity:2,unit_price:25}]});assert.equal(edit.body.status,'draft');assert.equal(state.invoices[0].total,55);assert.equal(state.invoices[0].document_revision,2);assert.equal(state.items[0].id,oldId);assert.equal(state.items[1].deleted,1);assert.equal(state.items.length,2);assert.match(state.audit.at(-1).notes,/Updated fixture line/);
+ const staleEdit=await call('editInvoice',{...body,invoice_id:id,invoice_no:first.body.invoice_no,status:'draft',expected_revision:1});assert.equal(staleEdit.statusCode,409);assert.equal(staleEdit.body.code,'INVOICE_REVISION_CONFLICT');assert.equal(state.invoices[0].document_revision,2);
  const draftPayment=await call('recordInvoicePayment',{invoice_id:id,amount:10,payment_date:'2026-10-11'},'draft-payment');assert.equal(draftPayment.statusCode,409);assert.equal(state.payments.length,0);
  await call('approveInvoice',{invoice_id:id});
  const payment=await call('recordInvoicePayment',{invoice_id:id,amount:30,payment_date:'2026-10-11',reference:'FIXTURE-PAY-1'},'fixture-payment');assert.equal(payment.body.balance_due,25);assert.equal(state.payments.length,1);
  const paymentAgain=await call('recordInvoicePayment',{invoice_id:id,amount:30,payment_date:'2026-10-11',reference:'FIXTURE-PAY-1'},'fixture-payment');assert.equal(paymentAgain.body.existing,true);assert.equal(state.payments.length,1);
+ const confirmed=await receipt(id,'fixture-payment');assert.equal(confirmed.body.confirmed,true);assert.equal(confirmed.body.payment_id,payment.body.payment_id);assert.equal(confirmed.body.invoice.balance_due,25);
+ assert.equal((await receipt(id,'not-committed')).body.confirmed,false);assert.equal((await receipt(id,'fixture-payment',{id:10,role:'admin'})).body.confirmed,false);assert.equal((await receipt(id,undefined)).statusCode,422);assert.equal(state.payments.length,1);
  const overpay=await call('recordInvoicePayment',{invoice_id:id,amount:26,payment_date:'2026-10-11'},'fixture-overpay');assert.equal(overpay.statusCode,422);assert.equal(state.payments.length,1);
  const settle=await call('markInvoicePaid',{invoice_id:id},'fixture-settle');assert.equal(settle.body.status,'paid');assert.equal(state.payments.length,2);assert.equal(state.payments[1].amount,25);
  const illegalEdit=await call('editInvoice',{...body,invoice_id:id,invoice_no:first.body.invoice_no,status:'paid'});assert.equal(illegalEdit.statusCode,409);
  const voided=await call('deleteInvoicePayment',{invoice_id:id,payment_id:payment.body.payment_id});assert.equal(voided.body.status,'approved');assert.equal(state.payments.length,2);assert.equal(state.payments[0].voided_by,9);assert.ok(state.payments[0].voided_at);
+ assert.equal((await receipt(id,'fixture-payment')).body.voided,true);
  await call('deleteInvoice',{invoice_id:id});assert.equal(state.invoices[0].deleted,1);assert.equal(state.items.length,2);await call('restoreInvoice',{invoice_id:id});assert.equal(state.invoices[0].deleted,0);
  assert.ok(rollbackCount>0);assert.ok(state.audit.every(row=>row.created_by===9));
  console.log('Invoice regression tests passed: field validation; durable idempotent manual creation; reused-key conflict; full rollback on audit failure; approval authority transitions; approved edit reapproval; stable item IDs and archived removed lines; atomic payments and duplicate prevention; overpayment rejection; historical payment void; invoice archive/restore.');

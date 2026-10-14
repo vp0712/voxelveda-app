@@ -21026,32 +21026,7 @@ table tbody tr:hover td{
   color: var(--text-primary) !important;
 }
 
-#invoiceSection table{
-  min-width: 1180px !important;
-}
-
-#invoiceSection table th{
-  color: var(--text-primary) !important;
-  background:var(--surface-muted)!important;
-}
-
-#invoiceSection .invoice-action-cell{
-  display: grid !important;
-  grid-template-columns: repeat(4, minmax(66px, 1fr)) !important;
-  align-items: stretch !important;
-  min-width: 330px !important;
-  gap: 6px !important;
-}
-
-#invoiceSection .invoice-action-cell button{
-  width: 100% !important;
-  min-width: 0 !important;
-  min-height: 36px !important;
-  margin: 0 !important;
-  padding: 7px 8px !important;
-  border-radius: 6px !important;
-  font-size:14px!important;
-}
+/* Invoice register layout is owned by responsive-foundation.css. */
 
 @media (max-width: 1023px) {
   .staff-portal .app-shell{

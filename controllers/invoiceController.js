@@ -7,6 +7,7 @@ const { validateRecipients } = require('../services/emailService');
 const { randomUUID, createHash } = require('node:crypto');
 const {hasPermission}=require('../services/authorizationService');
 const urls = require('../config/urls');
+const {dateOnly}=require('../utils/dateOnly');
 const {
   emailFailureDetails,
   isEmailTransportError
@@ -173,7 +174,7 @@ function invoiceReceivableSelect(whereClause = 'WHERE i.deleted = 0 OR i.deleted
     SELECT
       i.*,
       COALESCE(p.paid_amount, 0) AS paid_amount,
-      GREATEST(COALESCE(i.total, 0) - COALESCE(p.paid_amount, 0), 0) AS balance_due,
+      CASE WHEN i.total IS NULL THEN NULL ELSE GREATEST(i.total - COALESCE(p.paid_amount, 0), 0) END AS balance_due,
       CASE
         WHEN COALESCE(p.paid_amount, 0) <= 0 THEN 'unpaid'
         WHEN COALESCE(p.paid_amount, 0) >= COALESCE(i.total, 0) THEN 'paid'
@@ -377,17 +378,25 @@ exports.getInvoices = async (req, res) => {
     await ensureInvoiceColumns();
     const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1), limit = Math.max(1, Math.min(100, Number.parseInt(req.query.limit, 10) || 50));
     const filters = [], params = [];
+    const archived=req.query.archived==='true';
+    if(archived&&!hasPermission(req.user,'VOID_TRANSACTION'))return res.status(403).json({message:'Archived invoice access is not permitted.'});
     if (customerScoped(req.user)) { filters.push('LOWER(customer_email)=?'); params.push(customerEmail(req.user) || 'no-authorised-customer'); }
     if (req.query.search) { filters.push('(invoice_no LIKE ? OR customer_name LIKE ? OR customer_email LIKE ?)'); params.push(...Array(3).fill(`%${String(req.query.search).slice(0, 120)}%`)); }
     if (req.query.status) { filters.push('status=?'); params.push(String(req.query.status).toLowerCase()); }
     if (req.query.payment_state) { filters.push('payment_state=?'); params.push(String(req.query.payment_state)); }
+    if(req.query.from){if(dateOnly(req.query.from)!==req.query.from)return res.status(422).json({message:'Enter a valid start date.',errors:{from:'Enter a valid calendar date.'}});filters.push('DATE(created_at)>=?');params.push(req.query.from);}
+    if(req.query.to){if(dateOnly(req.query.to)!==req.query.to)return res.status(422).json({message:'Enter a valid end date.',errors:{to:'Enter a valid calendar date.'}});filters.push('DATE(created_at)<=?');params.push(req.query.to);}
+    if(req.query.from&&req.query.to&&req.query.from>req.query.to)return res.status(422).json({message:'Start date must not follow end date.',errors:{to:'Choose an end date on or after the start date.'}});
     const where = filters.length ? `WHERE ${filters.join(' AND ')}` : '';
-    const sorts = { date: 'created_at', customer: 'customer_name', total: 'total', balance: 'balance_due', reference: 'invoice_no' };
+    const select=invoiceReceivableSelect(archived?'WHERE i.deleted=1':undefined);
+    const sorts = { date: 'created_at', customer: 'customer_name', total: 'total', balance: 'balance_due', reference: 'invoice_no',status:'status' };
     const sort = Object.hasOwn(sorts,req.query.sort) ? sorts[req.query.sort] : 'id';
     const direction = String(req.query.direction).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
-    const [[count]] = await pool.query(`SELECT COUNT(*) total FROM (${invoiceReceivableSelect()}) records ${where}`, params);
-    const [rows] = await pool.query(`SELECT * FROM (${invoiceReceivableSelect()}) records ${where} ORDER BY ${sort} ${direction},id ${direction} LIMIT ? OFFSET ?`, [...params, limit, (page-1)*limit]);
-    return res.json({ invoices: rows, total: Number(count.total), page, limit });
+    const [[count]] = await pool.query(`SELECT COUNT(*) total FROM (${select}) records ${where}`, params);
+    const [[totals]] = await pool.query(`SELECT SUM(total) total_value,SUM(paid_amount) paid_value,SUM(balance_due) balance_value,SUM(total IS NULL) missing_total,SUM(paid_amount IS NULL) missing_paid,SUM(balance_due IS NULL) missing_balance FROM (${select}) records ${where}`,params);
+    const [rows] = await pool.query(`SELECT * FROM (${select}) records ${where} ORDER BY ${sort} ${direction},id ${direction} LIMIT ? OFFSET ?`, [...params, limit, (page-1)*limit]);
+    const summary={};for(const [field,missing]of [['total_value','missing_total'],['paid_value','missing_paid'],['balance_value','missing_balance']])summary[field]=Number(count.total)===0?0:Number(totals[missing])>0||totals[field]==null?null:Number(totals[field]);
+    return res.json({ invoices: rows, total: Number(count.total), page, limit,summary });
   } catch (error) { return invoiceError(res,error); }
 };
 
@@ -398,7 +407,9 @@ exports.getInvoiceDetails = async (req, res) => {
     const id = Number(req.params.id || 0);
     if (!id) return res.status(400).json({ message: 'Invoice ID required' });
 
-    const invoice = await getInvoiceWithReceivables(id);
+    const archived=req.query.archived==='true';
+    if(archived&&!hasPermission(req.user,'VOID_TRANSACTION'))return res.status(403).json({message:'Archived invoice access is not permitted.'});
+    const invoice = archived?(await pool.query(`${invoiceReceivableSelect('WHERE i.id=? AND i.deleted=1')} LIMIT 1`,[id]))[0][0]:await getInvoiceWithReceivables(id);
 
     if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
     assertCustomerRecord(req.user, invoice.customer_email);
@@ -420,6 +431,14 @@ exports.getInvoiceDetails = async (req, res) => {
     console.error('GET INVOICE DETAILS ERROR FULL:', err);
     invoiceError(res,err);
   }
+};
+exports.paymentReceipt=async(req,res)=>{
+ try{await ensureInvoiceColumns();const id=Number(req.params.id);if(!Number.isSafeInteger(id)||id<1)return res.status(422).json({message:'Choose a valid invoice.'});
+ const invoice=await getInvoiceWithReceivables(id);if(!invoice)return res.status(404).json({message:'Invoice not found.'});assertCustomerRecord(req.user,invoice.customer_email);
+ if(!req.get('Idempotency-Key'))return res.status(422).json({message:'The original payment request identity is required.'});
+ const identity=requestIdentity(req,`invoice-payment:${id}`,{});const [[payment]]=await pool.query('SELECT id,amount,voided_at FROM invoice_payments WHERE invoice_id=? AND request_key=? LIMIT 1',[id,identity.requestKey]);
+ res.set('Cache-Control','no-store').json({confirmed:Boolean(payment),payment_id:payment?.id||null,voided:Boolean(payment?.voided_at),invoice});
+ }catch(error){return invoiceError(res,error);}
 };
 
 exports.searchCustomerStatements = async (req, res) => {
@@ -608,6 +627,7 @@ exports.editInvoice=async(req,res)=>{
   await ensureInvoiceColumns();conn=await pool.getConnection();await conn.beginTransaction();
   const [[before]]=await conn.query('SELECT * FROM invoices WHERE id=? AND IFNULL(deleted,0)=0 FOR UPDATE',[id]);
   if(!before){await conn.rollback();return res.status(404).json({message:'Active invoice not found.'});}
+  if(req.body.expected_revision!==undefined&&Number(req.body.expected_revision)!==Number(before.document_revision)){await conn.rollback();return res.status(409).json({message:'This invoice changed after you opened it. Reload the current invoice before saving.',code:'INVOICE_REVISION_CONFLICT'});}
   if(!['draft','rejected','approved'].includes(before.status)){await conn.rollback();return res.status(409).json({message:'Sent and paid invoices retain their issued content. Archive or resolve the issued record before creating a correction.'});}
   if(req.body.status && req.body.status!==before.status){await conn.rollback();return res.status(409).json({message:'Use the authorised approval, rejection or payment action to change invoice status.'});}
   const [[duplicate]]=await conn.query('SELECT id FROM invoices WHERE invoice_no=? AND id<>? AND IFNULL(deleted,0)=0 LIMIT 1',[reference,id]);

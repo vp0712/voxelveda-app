@@ -36,6 +36,8 @@ const rfqs = [
   { id:72, customer_name:'Another fixture', email:'other@example.invalid', material:'Fixture aluminium', phone:'', quantity:4, application:'Separate fixture brief', status:'rejected', archived:0, revision:0, created_at:'2026-10-09T10:00:00.000Z' }
 ];
 const invoice = { id:91, invoice_no:'INV-TEST-0091', rfq_id:71, customer_name:'Restoration fixture', customer_email:'fixture@example.invalid', description:'Test-only engineering fixture', quantity:2, unit_price:50, gst_rate:10, subtotal:100, gst_amount:10, total:110, paid_amount:0, balance_due:110, status:'draft', deleted:0, created_at:'2026-10-10T10:00:00.000Z' };
+const invoiceRecords=process.env.VV_RESPONSIVE_MATRIX==='after'?Array.from({length:75},(_,i)=>({...invoice,id:91+i,invoice_no:i===0?invoice.invoice_no:'INV-LONG-REFERENCE-'+String(i).padStart(5,'0')+'-MANUFACTURING-2026',customer_name:i%3?'Synthetic customer '+i:'Synthetic international manufacturing customer with a very long registered company name and project reference '+i,customer_email:'synthetic-long-customer-address-'+i+'@example.invalid',status:i%2?'approved':'draft',document_revision:1,total:i===74?null:110+i,paid_amount:i%2?10:0,balance_due:i===74?null:110+i-(i%2?10:0)})):[invoice];
+function selectedInvoices(sql,parameters){let rows=invoiceRecords.filter(row=>Number(row.deleted)=== (/i.deleted=1/.test(sql)?1:0)),i=0;if(/LOWER\(customer_email\)=\?/.test(sql))rows=rows.filter(row=>row.customer_email===parameters[i++]);if(/invoice_no LIKE/.test(sql)){const search=String(parameters[i]||'').replaceAll('%','').toLowerCase();i+=3;rows=rows.filter(row=>[row.invoice_no,row.customer_name,row.customer_email].some(v=>String(v).toLowerCase().includes(search)));}if(/status=\?/.test(sql))rows=rows.filter(row=>row.status===parameters[i++]);const column=sql.match(/ORDER BY ([a-z_]+)/)?.[1]||'id',direction=/ORDER BY.*DESC/.test(sql)?-1:1;return rows.sort((a,b)=>String(a[column]).localeCompare(String(b[column]),'en',{numeric:true})*direction);}
 const users = {
   901:{ id:901, name:'Admin fixture', username:'fixture-admin', email:'admin@example.invalid', role:'super_admin', permissions:[], active:1, account_status:'ACTIVE', mfa_enabled:1 },
   902:{ id:902, name:'Staff fixture', username:'fixture-staff', email:'staff@example.invalid', role:'staff', permissions:['VIEW_RFQS','VIEW_FINANCE','VIEW_CUSTOMERS','VIEW_SUPPLIERS','VIEW_INVENTORY','VIEW_PROCUREMENT','VIEW_QMS','VIEW_MEETINGS','VIEW_COMPLIANCE','VIEW_ATTENDANCE'], active:1, account_status:'ACTIVE', mfa_enabled:0 },
@@ -78,9 +80,10 @@ async function query(statement, parameters = []) {
   // Match the outer invoice query before its nested payment SUM/GROUP BY.
   // The aggregate join does not turn the invoice list or detail into an empty
   // aggregation result, and COUNT must always return its scalar row.
-  if (/FROM invoices i\b/i.test(sql) && /^SELECT COUNT\(\*\) total FROM \(/i.test(sql)) return result([{total:1}]);
-  if (/FROM invoices i\b/i.test(sql) && /^SELECT \* FROM \(/i.test(sql)) return result([invoice]);
-  if (/FROM invoices i\b/i.test(sql) && /^SELECT i\.\*,/i.test(sql)) return result(Number(parameters[0])===invoice.id ? [invoice] : []);
+  if (/FROM invoices i\b/i.test(sql) && /^SELECT COUNT\(\*\) total FROM \(/i.test(sql)) return result([{total:selectedInvoices(sql,parameters).length}]);
+  if (/FROM invoices i\b/i.test(sql) && /^SELECT \* FROM \(/i.test(sql)){const rows=selectedInvoices(sql,parameters),limit=Number(parameters.at(-2)),offset=Number(parameters.at(-1));return result(rows.slice(offset,offset+limit));}
+  if (/FROM invoices i\b/i.test(sql) && /^SELECT i\.\*,/i.test(sql))return result(invoiceRecords.filter(row=>row.id===Number(parameters[0])));
+  if(/^SELECT SUM\(total\) total_value/.test(sql)){const rows=selectedInvoices(sql,parameters);return result([{total_value:rows.reduce((n,r)=>n+(r.total||0),0),paid_value:rows.reduce((n,r)=>n+(r.paid_amount||0),0),balance_value:rows.reduce((n,r)=>n+(r.balance_due||0),0),missing_total:rows.filter(r=>r.total==null).length,missing_paid:0,missing_balance:rows.filter(r=>r.balance_due==null).length}]);}
   if (/FROM audit_logs/i.test(sql)) return result(/integrity_hash FROM/i.test(sql) ? audits.slice(0,1) : audits);
   if (/FROM competitors/i.test(sql)) return result(historicalCompetitors);
   if (/FROM compliance_entries/i.test(sql)) return result(historicalCompliance);
@@ -204,6 +207,7 @@ async function run() {
     await page.waitForURL('**/admin*');
     await page.waitForFunction(()=>document.getElementById('adminInfo')?.textContent.includes('Admin fixture'));
     await page.waitForFunction(()=>!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
+    if(process.env.VV_RESPONSIVE_MATRIX){await require('./responsive-workspace-scenario').run({page,context,origin,out:outputDir,phase:process.env.VV_RESPONSIVE_MATRIX,records:invoiceRecords});return;}
     stage='settings_qr_renderer';
     await page.waitForFunction(()=>{const image=document.getElementById('qrPreviewImage');return image?.complete && image.naturalWidth>0;});
     const qrUrl=new URL(await page.locator('#qrPreviewImage').getAttribute('src'),origin);
@@ -227,6 +231,7 @@ async function run() {
     await page.evaluate(()=>window.goSection('invoiceSection'));
     const invoiceRow=page.locator('#invoiceTableBody tr').filter({hasText:'INV-TEST-0091'});
     await invoiceRow.waitFor();
+    await invoiceRow.locator('.record-action-menu summary').click();
     const [approvalResponse]=await Promise.all([
       page.waitForResponse(response=>new URL(response.url()).pathname==='/api/invoice/approve' && response.request().method()==='POST'),
       invoiceRow.getByRole('button',{name:'Approve',exact:true}).click()
@@ -412,16 +417,10 @@ async function run() {
     const downloadSha256=crypto.createHash('sha256').update(downloaded).digest('hex');
     assert.ok(responsePdf,'preview fetched the real invoice PDF route');
     assert.equal(downloadSha256,responsePdf.sha256,'download retains the exact parsed PDF response bytes');
-    const previewSha256=await page.evaluate(async()=>{
-      const url=document.getElementById('preview').getAttribute('src');
-      const captured=window.__fixturePdfBlobBuffers.get(url);
-      if(!captured)throw new Error('The actual PDF preview Blob was not observed.');
-      const bytes=await captured;
-      return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))).map(byte=>byte.toString(16).padStart(2,'0')).join('');
-    });
+    const previewSha256=await page.evaluate(()=>window.VoxelPdfReader.sourceSha256);
     assert.equal(previewSha256,downloadSha256,'preview and download share the same parsed PDF bytes');
     fs.writeFileSync(path.join(outputDir,download.suggestedFilename()),downloaded);
-    assert.ok(await page.locator('#preview').getAttribute('src').then(value=>value.startsWith('blob:')),'preview uses exact validated download bytes');
+    assert.ok(await page.evaluate(()=>window.VoxelPdfReader?.url?.startsWith('blob:')),'reader retains the exact validated download bytes');
     const staff=await browser.newContext({viewport:{width:390,height:844},extraHTTPHeaders:{'x-fixture-role':'staff'}});
     const staffPage=await staff.newPage(); observePage(staffPage); stage='staff_portal';
     await staffPage.goto(origin+'/dashboard'); await staffPage.waitForURL('**/portal/staff*');

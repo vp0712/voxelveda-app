@@ -707,12 +707,13 @@ function ensureRegisterControls(key, tbody, onChange) {
 
   const table = tbody.closest('table');
   tableCard.insertBefore(controls, table || tableCard.firstChild);
-  const refreshLocal = () => registerRendererArgs[key] && renderRegisterPage(registerRendererArgs[key]);
+  let invoiceSearchTimer;
+  const refreshLocal = () => key==='invoices'?loadInvoices():registerRendererArgs[key] && renderRegisterPage(registerRendererArgs[key]);
   ['search', 'status', 'sort'].forEach(kind => {
     const input = controls.querySelector(`[data-register-${kind}="${key}"]`);
     input?.addEventListener(kind === 'search' ? 'input' : 'change', () => {
       registerPagerState[key] = { ...(registerPagerState[key] || {}), page:1, [kind]:input.value };
-      refreshLocal();
+      if(key==='invoices'&&kind==='search'){clearTimeout(invoiceSearchTimer);invoiceSearchTimer=setTimeout(refreshLocal,200);}else refreshLocal();
     });
   });
   onChange = refreshLocal;
@@ -793,12 +794,13 @@ function restoreAdminFilters() {
 restoreAdminFilters();
 window.addEventListener('popstate',event=>{restoringAdminNavigation=true;Object.keys(registerFilters).forEach(key=>registerFilters[key]=event.state?.filters?.[key]||{});restoreAdminFilters();const section=event.state?.section||requestedAdminSection();if(section)goSection(section);restoringAdminNavigation=false;});
 
-function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRenderer, onChange }) {
-  registerRendererArgs[key] = { key, tbody, rows, colspan, emptyMessage, rowRenderer, onChange };
+function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRenderer, onChange, remoteMeta }) {
+  registerRendererArgs[key] = { key, tbody, rows, colspan, emptyMessage, rowRenderer, onChange, remoteMeta };
   const viewState = registerPagerState[key] || {};
   const query = String(viewState.search || registerFilters[key]?.search || '').trim().toLowerCase();
   const filters=registerFilters[key]||{};
   const filteredRows=(rows||[]).filter(row=>{
+    if(remoteMeta)return true;
     if (query && !Object.values(row).some(value => typeof value !== 'object' && String(value ?? '').toLowerCase().includes(query))) return false;
     if (viewState.status && String(row.status || 'unknown').toLowerCase() !== viewState.status) return false;
     const status=String(row.status||'unknown').toLowerCase(),day=String(row.created_at||'').slice(0,10);
@@ -806,10 +808,10 @@ function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRender
     if(filters.status&&filters.status!=='issued'&&status!==filters.status)return false;
     return (!filters.from||day>=filters.from)&&(!filters.to||day<=filters.to);
   });
-  const orderedRows=chronologicalRows(filteredRows);
-  if (viewState.sort === 'newest') orderedRows.reverse();
-  if (viewState.sort === 'name') orderedRows.sort((a,b) => String(a.name || a.customer_name || a.supplier_name || a.title || a.description || '').localeCompare(String(b.name || b.customer_name || b.supplier_name || b.title || b.description || '')));
-  if (viewState.sort === 'status') orderedRows.sort((a,b) => String(a.status || '').localeCompare(String(b.status || '')));
+  const orderedRows=remoteMeta?filteredRows:chronologicalRows(filteredRows);
+  if (!remoteMeta && viewState.sort === 'newest') orderedRows.reverse();
+  if (!remoteMeta && viewState.sort === 'name') orderedRows.sort((a,b) => String(a.name || a.customer_name || a.supplier_name || a.title || a.description || '').localeCompare(String(b.name || b.customer_name || b.supplier_name || b.title || b.description || '')));
+  if (!remoteMeta && viewState.sort === 'status') orderedRows.sort((a,b) => String(a.status || '').localeCompare(String(b.status || '')));
   if(registerSections[key])registerFilterBanner(key,`${orderedRows.length} records`);
   registerPagerState[key] = {
     ...viewState,
@@ -822,17 +824,17 @@ function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRender
   const state = registerPagerState[key];
   const statusControl = document.querySelector(`[data-register-status="${key}"]`);
   if (statusControl) {
-    const statuses = [...new Set((rows || []).map(row => String(row.status || 'unknown').toLowerCase()))].sort();
+    const statuses = remoteMeta?['draft','approved','sent','paid','rejected']: [...new Set((rows || []).map(row => String(row.status || 'unknown').toLowerCase()))].sort();
     statusControl.innerHTML = '<option value="">All statuses</option>' + statuses.map(status => `<option value="${escapeHtml(status)}">${escapeHtml(status.replaceAll('_',' '))}</option>`).join('');
     statusControl.value = state.status || '';
   }
   const sortControl = document.querySelector(`[data-register-sort="${key}"]`);
   if (sortControl) sortControl.value = state.sort || 'oldest';
-  const totalPages = Math.max(1, Math.ceil(orderedRows.length / state.pageSize));
+  const totalPages = Math.max(1, Math.ceil((remoteMeta?remoteMeta.total:orderedRows.length) / state.pageSize));
   state.page = Math.min(Math.max(1, state.page), totalPages);
 
   const start = (state.page - 1) * state.pageSize;
-  const pageRows = orderedRows.slice(start, start + state.pageSize);
+  const pageRows = remoteMeta?orderedRows:orderedRows.slice(start, start + state.pageSize);
 
   const infoEl = document.querySelector(`[data-register-info="${key}"]`);
   const sizeEl = document.querySelector(`[data-register-size="${key}"]`);
@@ -841,9 +843,10 @@ function renderRegisterPage({ key, tbody, rows, colspan, emptyMessage, rowRender
 
   if (sizeEl) sizeEl.value = String(state.pageSize);
   if (infoEl) {
-    const from = orderedRows.length ? start + 1 : 0;
-    const to = Math.min(start + state.pageSize, orderedRows.length);
-    infoEl.textContent = `${from}-${to} of ${orderedRows.length} entries | ${state.sort === 'newest' ? 'newest first' : state.sort === 'name' ? 'name A–Z' : state.sort === 'status' ? 'status A–Z' : 'oldest first'}`;
+    const count=remoteMeta?remoteMeta.total:orderedRows.length;
+    const from = count ? start + 1 : 0;
+    const to = Math.min(start + pageRows.length, count);
+    infoEl.textContent = `${from}-${to} of ${remoteMeta?remoteMeta.total:orderedRows.length} matching entries | ${state.sort === 'newest' ? 'newest first' : state.sort === 'name' ? 'name A–Z' : state.sort === 'status' ? 'status A–Z' : 'oldest first'}`;
   }
   if (prevBtn) prevBtn.disabled = state.page <= 1;
   if (nextBtn) nextBtn.disabled = state.page >= totalPages;
@@ -1029,6 +1032,7 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
 
   if (!backdrop || !titleEl || !bodyEl || !primaryBtn) return;
 
+  const returnFocus=document.activeElement;
   panel?.classList.remove('wide-dialog', 'material-dialog', 'supplier-dialog', 'compliance-dialog', 'manual-invoice-dialog', 'staff-access-dialog', 'admin-workhub-dialog', 'finance-dialog', 'workflow-dialog', 'procurement-dialog');
   titleEl.innerText = title;
   bodyEl.innerHTML = bodyHtml;
@@ -1036,11 +1040,11 @@ function showDialog(title, bodyHtml, onPrimary, primaryText = 'Save') {
   primaryBtn.onclick = async () => { if (primaryBtn.disabled) return; primaryBtn.disabled = true; primaryBtn.setAttribute('aria-busy', 'true'); try { await onPrimary?.(); } catch (error) { showToast(error.message || 'The action failed. Review the fields and retry.'); } finally { primaryBtn.disabled = false; primaryBtn.removeAttribute('aria-busy'); } };
   normalizeActionButtons(bodyEl);
   enhanceResponsiveTables();
-  backdrop.classList.add('active');
+  backdrop.classList.add('active');panel?.setAttribute('role','dialog');panel?.setAttribute('aria-modal','true');panel?.setAttribute('aria-labelledby','dialogTitle');if(panel){panel.tabIndex=-1;panel.focus();}window.VoxelOverlay?.open('record-dialog',()=>backdrop.classList.remove('active'),returnFocus);
 }
 
 function hideDialog() {
-  document.getElementById('dialogBackdrop')?.classList.remove('active');
+  document.getElementById('dialogBackdrop')?.classList.remove('active');window.VoxelOverlay?.close('record-dialog');
 }
 
 function closeDialog(event) {
@@ -1970,7 +1974,8 @@ function todayISO(offsetDays = 0) {
 }
 
 function formatMoney(value) {
-  return Number(value || 0).toLocaleString('en-AU', {
+  if(value===null||value===undefined||value===''||!Number.isFinite(Number(value)))return 'Not available';
+  return Number(value).toLocaleString('en-AU', {
     style: 'currency',
     currency: 'AUD',
     minimumFractionDigits: 2,
@@ -2167,17 +2172,19 @@ async function submitRFQ() {
   await loadDashboardStats();
 }
 
+async function fetchCompleteRegister(endpoint,key){
+ try{let response,combined=[],expected=null;for(let page=1;;page++){
+  const url=new URL(endpoint,location.origin);url.searchParams.set('page',page);url.searchParams.set('limit','100');response=await fetch(url.pathname+url.search,{headers:authHeaders(),cache:'no-store',signal:AbortSignal.timeout(20000)});const data=await safeJson(response);if(!response.ok)return{res:response,data};const rows=data[key]||[];if(!Array.isArray(rows))throw new Error('The register response is incomplete.');const count=data.total??data.pagination?.total;if(expected===null)expected=count==null?rows.length:Number(count);if(!Number.isSafeInteger(expected)||expected<0)throw new Error('The register count could not be confirmed.');if(count!=null&&Number(count)!==expected)throw new Error('The register changed while loading. Refresh before continuing.');combined.push(...rows);if(combined.length>=expected)break;if(!rows.length)throw new Error('The remaining register records could not be loaded.');}
+  if(combined.length!==expected||new Set(combined.map(row=>String(row.id))).size!==combined.length)throw new Error('The register changed while loading. Refresh before continuing.');return{res:response,data:{[key]:combined,total:expected}};
+ }catch(error){return{res:{ok:false},data:{message:error.message||'The register could not be loaded.'}};}
+}
 async function loadRFQs() {
   const tbody = document.getElementById('rfqTableBody');
   if (!tbody) return;
   setRegisterLoading(tbody, 11, 'Loading RFQs...');
 
   const archived = Boolean(document.getElementById('rfqArchivedFilter')?.checked);
-  const res = await fetch('/api/rfq' + (archived ? '?archived=true' : ''), {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  const data = await safeJson(res);
+  const {res,data}=await fetchCompleteRegister('/api/rfq' + (archived ? '?archived=true' : ''),'rfqs');
 
   if (!res.ok) {
     tbody.innerHTML = `<tr><td colspan="7">Failed to load RFQs</td></tr>`;
@@ -2703,8 +2710,8 @@ function openManualInvoiceDialog() {
 const pendingInvoiceActions = new Map();
 async function invoiceAction(invoiceId, action) {
   const id = Number(invoiceId);
-  if (!Number.isSafeInteger(id) || id < 1 || !['approve', 'paid', 'delete'].includes(action)) return showToast('Select a valid invoice action');
-  const permission = action === 'delete' ? 'VOID_TRANSACTION' : 'POST_TRANSACTION';
+  if (!Number.isSafeInteger(id) || id < 1 || !['approve', 'paid', 'delete','restore'].includes(action)) return showToast('Select a valid invoice action');
+  const permission = ['delete','restore'].includes(action) ? 'VOID_TRANSACTION' : 'POST_TRANSACTION';
   if (!hasCurrentPermission(permission)) return showToast('You do not have permission for this invoice action');
   if (pendingInvoiceActions.has(id)) return;
   pendingInvoiceActions.set(id, action);
@@ -2727,72 +2734,47 @@ async function invoiceAction(invoiceId, action) {
   }
 }
 
-async function loadInvoices() {
-  const tbody = document.getElementById('invoiceTableBody');
-  if (!tbody) return;
-  setRegisterLoading(tbody, 9, 'Loading invoices...');
-
-  const res = await fetch('/api/invoice', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-
-  const data = await safeJson(res);
-
-  if (!res.ok) {
-    tbody.innerHTML = `<tr><td colspan="9">Failed to load invoices</td></tr>`;
-    return;
-  }
-
-  const invoices = chronologicalRows(data.invoices || []);
-  invoiceCache = invoices;
-  updateInvoiceMetrics(invoices);
-  renderNotificationDropdown();
-
-  renderRegisterPage({
-    key: 'invoices',
-    tbody,
-    rows: invoices,
-    colspan: 9,
-    emptyMessage: 'No invoices yet.',
-    onChange: loadInvoices,
-    rowRenderer: (invoice, index) => `
-      <tr>
-        <td>${escapeHtml(index + 1)}</td>
-        <td>${escapeHtml(invoice.invoice_no || '-')}</td>
-        <td>${escapeHtml(invoice.customer_name || '-')}</td>
-        <td>${invoice.rfq_id ? `<button type="button" class="icon-btn" onclick="return openRecordRegister('rfqs',{search:String(${Number(invoice.rfq_id)})})">RFQ #${escapeHtml(invoice.rfq_id)}</button>` : 'Manual'}</td>
-        <td>${escapeHtml(formatMoney(invoice.total))}</td>
-        <td class="money-positive">${escapeHtml(formatMoney(invoice.paid_amount))}</td>
-        <td class="${Number(invoice.balance_due || 0) > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(invoice.balance_due))}</td>
-        <td>${statusBadge(invoice.status)}</td>
-        <td class="register-action-cell invoice-action-cell">
-          ${hasCurrentPermission('POST_TRANSACTION') ? `<button class="small-btn" onclick="return invoiceAction(${invoice.id}, 'approve')">Approve</button>` : ''}
-          <button class="small-btn" onclick="return openSendInvoiceDialog(${invoice.id})">Send</button>
-          <button class="small-btn" onclick="return openInvoicePaymentDialog(${invoice.id})">Payment</button>
-          ${hasCurrentPermission('POST_TRANSACTION') ? `<button class="small-btn" onclick="return invoiceAction(${invoice.id}, 'paid')">Record paid balance</button>` : ''}
-          <button class="secondary-btn" onclick="return openEditInvoiceDialog(${invoice.id})">Edit</button>
-          <button class="secondary-btn" onclick="return openInvoicePdf(${invoice.id})">PDF</button>
-          <button class="secondary-btn" onclick="return openInvoiceQrDialog(${invoice.id})">QR</button>
-          ${hasCurrentPermission('VOID_TRANSACTION') ? `<button class="danger-btn" onclick="return invoiceAction(${invoice.id}, 'delete')">Archive</button>` : ''}
-        </td>
-      </tr>
-    `
-  });
+let invoiceLoadSequence=0;
+function invoiceMoney(value){return value===null||value===undefined||value===''||!Number.isFinite(Number(value))?'Not available':formatMoney(value)+' AUD';}
+function invoiceActions(invoice){
+  const id=Number(invoice.id),status=String(invoice.status||''),archived=Number(invoice.deleted)===1;
+  const pendingKey='voxelveda:invoice-payment:'+currentUser?.id+':'+id;let pendingReceipt=false;try{pendingReceipt=Boolean(sessionStorage.getItem(pendingKey));}catch{};
+  if(archived)return hasCurrentPermission('VOID_TRANSACTION')?`<button type="button" class="secondary-btn" onclick="invoiceAction(${id},'restore')">Restore</button>`:'';
+  return `${pendingReceipt?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Check payment request</button>`:''}${hasCurrentPermission('POST_TRANSACTION')&&['draft','rejected'].includes(status)?`<button class="secondary-btn" onclick="invoiceAction(${id},'approve')">Approve</button>`:''}
+  ${hasCurrentPermission('EDIT_FINANCE')&&['approved','sent'].includes(status)?`<button class="secondary-btn" onclick="openSendInvoiceDialog(${id})">Send</button>`:''}
+  ${hasCurrentPermission('POST_TRANSACTION')&&['approved','sent'].includes(status)&&Number(invoice.balance_due)>0?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Record payment</button>`:''}
+  ${hasCurrentPermission('EDIT_FINANCE')&&['draft','rejected','approved'].includes(status)?`<button class="secondary-btn" onclick="openEditInvoiceDialog(${id})">Edit</button>`:''}
+  <button class="secondary-btn" onclick="openInvoiceQrDialog(${id})">Invoice link QR</button>
+  ${hasCurrentPermission('VOID_TRANSACTION')?`<button class="danger-btn" onclick="invoiceAction(${id},'delete')">Archive</button>`:''}`;
 }
-
-function updateInvoiceMetrics(invoices) {
-  const totalEl = document.getElementById('invoiceTotalValue');
-  const unpaidEl = document.getElementById('invoiceUnpaidValue');
-  const sentPaidEl = document.getElementById('invoiceSentPaidCount');
-
-  const total = invoices.reduce((sum, invoice) => sum + Number(invoice.total || 0), 0);
-  const paidValue = invoices.reduce((sum, invoice) => sum + Number(invoice.paid_amount || 0), 0);
-  const unpaid = invoices.reduce((sum, invoice) => sum + Number(invoice.balance_due || 0), 0);
-  const paid = invoices.filter((invoice) => String(invoice.status || '').toLowerCase() === 'paid').length;
-
-  if (totalEl) totalEl.innerText = formatMoney(total);
-  if (unpaidEl) unpaidEl.innerText = formatMoney(unpaid);
-  if (sentPaidEl) sentPaidEl.innerText = `${formatMoney(paidValue)} / ${paid}`;
+async function loadInvoices() {
+ const tbody=document.getElementById('invoiceTableBody');if(!tbody)return;
+ const sequence=++invoiceLoadSequence;setRegisterLoading(tbody,10,'Loading invoices…');['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Loading…'));
+ const state=registerPagerState.invoices||{},filters=registerFilters.invoices||{},sort={oldest:['date','asc'],newest:['date','desc'],name:['customer','asc'],status:['status','asc']}[state.sort||'oldest'];
+ const query=new URLSearchParams({page:String(state.page||1),limit:String(state.pageSize||25),sort:sort[0],direction:sort[1]});
+ if(state.search||filters.search)query.set('search',state.search||filters.search);if(state.status||filters.status)query.set('status',state.status||filters.status);if(filters.from)query.set('from',filters.from);if(filters.to)query.set('to',filters.to);if(state.archived)query.set('archived','true');
+ try{
+  const res=await fetch('/api/invoice?'+query,{headers:authHeaders(),cache:'no-store'}),data=await safeJson(res);if(sequence!==invoiceLoadSequence)return;
+  if(!res.ok||!Array.isArray(data.invoices)||!Number.isFinite(Number(data.total)))throw new Error(data.message||'Invoices could not be loaded.');
+  const maxPage=Math.max(1,Math.ceil(Number(data.total)/Number(state.pageSize||25)));if(Number(state.page||1)>maxPage){registerPagerState.invoices={...state,page:maxPage};return loadInvoices();}
+  invoiceCache=data.invoices;renderNotificationDropdown();
+  renderRegisterPage({key:'invoices',tbody,rows:invoiceCache,colspan:10,emptyMessage:'No invoices match these filters.',onChange:loadInvoices,remoteMeta:{total:Number(data.total)},rowRenderer:invoice=>`<tr data-invoice-id="${Number(invoice.id)}">
+   <td class="invoice-number">${Number(invoice.id)}</td><td class="invoice-reference"><strong>${escapeHtml(invoice.invoice_no||'Reference not available')}</strong></td><td class="invoice-customer">${escapeHtml(invoice.customer_name||'Customer not available')}</td><td class="invoice-rfq">${invoice.rfq_id?`<button class="icon-btn" onclick="openRecordRegister('rfqs',{search:String(${Number(invoice.rfq_id)})})">RFQ #${Number(invoice.rfq_id)}</button>`:'Manual'}</td><td class="invoice-date">${escapeHtml(String(invoice.created_at||'Date not available').slice(0,10))}</td>
+   <td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.total))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.paid_amount))}</td><td class="invoice-amount">${escapeHtml(invoiceMoney(invoice.balance_due))}</td><td class="invoice-status">${statusBadge(Number(invoice.deleted)===1?'archived':invoice.status||'unknown')}</td>
+   <td class="register-action-cell invoice-action-cell"><div class="invoice-actions"><button class="primary-btn" onclick="openInvoiceDetail(${Number(invoice.id)})">View invoice</button>${Number(invoice.deleted)!==1?`<button class="secondary-btn" onclick="openInvoicePdf(${Number(invoice.id)})">PDF</button>`:''}<details class="record-action-menu"><summary>More</summary><div>${invoiceActions(invoice)}</div></details></div></td></tr>`});
+  const sum=data.summary;
+  updateInvoiceMetrics(invoiceCache,sum);
+  const controls=document.querySelector('[data-register-controls="invoices"]');let note=controls.querySelector('.register-filter-note');if(!note){note=document.createElement('p');note.className='register-filter-note';controls.append(note);}note.textContent=`Totals cover all ${Number(data.total)} matching records. ${query.get('search')||query.get('status')||state.archived?'Filters active.':'No active filters.'}`;
+  if(hasCurrentPermission('VOID_TRANSACTION')&&!controls.querySelector('[data-invoice-archive]')){const label=document.createElement('label');label.innerHTML='Records <select data-invoice-archive><option value="">Active</option><option value="archived">Archived</option></select>';controls.querySelector('.register-search-controls').append(label);label.querySelector('select').onchange=event=>{registerPagerState.invoices={...registerPagerState.invoices,page:1,archived:event.target.value==='archived'};loadInvoices();};}
+ }catch(error){if(sequence!==invoiceLoadSequence)return;tbody.innerHTML=`<tr><td colspan="10"><p role="alert">${escapeHtml(error.message)}</p><button class="secondary-btn" onclick="loadInvoices()">Retry invoices</button></td></tr>`;['invoiceTotalValue','invoiceUnpaidValue','invoiceSentPaidCount'].forEach(id=>setText(id,'Not available'));}
+}
+function updateInvoiceMetrics(invoices,summary){
+ setText('invoiceTotalValue',summary?invoiceMoney(summary.total_value):'Not available');setText('invoiceUnpaidValue',summary?invoiceMoney(summary.balance_value):'Not available');setText('invoiceSentPaidCount',summary?invoiceMoney(summary.paid_value):'Not available');
+}
+async function openInvoiceDetail(id){
+ const cached=invoiceCache.find(row=>Number(row.id)===Number(id));
+ const res=await fetch('/api/invoice/'+Number(id)+(Number(cached?.deleted)===1?'?archived=true':''),{headers:authHeaders(),cache:'no-store'}),data=await safeJson(res);if(!res.ok)return showToast(data.message||'Invoice could not be loaded.');const invoice=data.invoice;if(!invoice)return;
+ showDialog(invoice.invoice_no||'Invoice details',`<p>${escapeHtml(invoice.customer_name||'Customer not available')}</p><p>${escapeHtml(invoice.customer_email||'')}</p>${statusBadge(Number(invoice.deleted)===1?'archived':invoice.status||'unknown')}<div class="invoice-detail-grid"><div><span>Total</span><strong>${escapeHtml(invoiceMoney(invoice.total))}</strong></div><div><span>Paid</span><strong>${escapeHtml(invoiceMoney(invoice.paid_amount))}</strong></div><div><span>Outstanding</span><strong>${escapeHtml(invoiceMoney(invoice.balance_due))}</strong></div><div><span>Date</span><strong>${escapeHtml(String(invoice.created_at||'Date not available').slice(0,10))}</strong></div></div><div class="invoice-detail-actions">${Number(invoice.deleted)!==1?`<button class="primary-btn" onclick="openInvoicePdf(${Number(id)})">Preview / download PDF</button>`:''}${invoice.rfq_id?`<button class="secondary-btn" onclick="hideDialog();openRecordRegister('rfqs',{search:'${Number(invoice.rfq_id)}'})">Related RFQ</button>`:''}${invoiceActions(invoice)}</div><h4>Line items</h4>${(data.items||[]).map(item=>`<p>${escapeHtml(item.description||'Description not available')} · ${escapeHtml(item.quantity??'Quantity not available')} · ${escapeHtml(invoiceMoney(item.amount))}</p>`).join('')||'<p>No line items available.</p>'}<h4>Payment history</h4>${(data.payments||[]).map(row=>`<p>${escapeHtml(row.payment_date)} · ${escapeHtml(invoiceMoney(row.amount))} · ${escapeHtml(row.reference||row.method||'Recorded payment')}</p>`).join('')||'<p>No recorded payments.</p>'}<h4>History</h4>${(data.activity||data.activities||[]).map(row=>`<p>${escapeHtml(row.created_at||'')} · ${escapeHtml(row.action||'')} · ${escapeHtml(row.notes||'')}</p>`).join('')||'<p>No history available.</p>'}`,hideDialog,'Close');
 }
 
 function paymentHistoryRows(payments, invoiceId) {
@@ -2807,12 +2789,16 @@ function paymentHistoryRows(payments, invoiceId) {
       <td>${escapeHtml(payment.method || '-')}</td>
       <td>${escapeHtml(payment.reference || '-')}</td>
       <td>${escapeHtml(payment.notes || '-')}</td>
-      <td><button class="danger-btn" onclick="return deleteInvoicePayment(${invoiceId}, ${payment.id})">Delete</button></td>
+      <td><button class="danger-btn" onclick="return deleteInvoicePayment(${invoiceId}, ${payment.id})">Void payment</button></td>
     </tr>
   `).join('');
 }
 
 async function openInvoicePaymentDialog(invoiceId) {
+  const pendingStorage='voxelveda:invoice-payment:'+currentUser?.id+':'+Number(invoiceId);let saved;try{saved=JSON.parse(sessionStorage.getItem(pendingStorage)||'null');}catch{}
+  let retainedPayment=saved&&/^[0-9a-f-]{36}$/.test(saved.key)&&Number(saved.body?.invoice_id)===Number(invoiceId)?saved.body:null;const requestKey=retainedPayment?saved.key:crypto.randomUUID();
+  const clearPayment=()=>{retainedPayment=null;try{sessionStorage.removeItem(pendingStorage);}catch{}};
+  if(retainedPayment){const receipt=await fetch('/api/invoice/'+Number(invoiceId)+'/payment-request',{headers:{...authHeaders(),'Idempotency-Key':requestKey},cache:'no-store'}).then(async r=>r.ok?r.json():null).catch(()=>null);if(receipt?.confirmed){clearPayment();showToast(receipt.voided?'The original payment was subsequently voided.':'The original payment was recorded.');await loadInvoices();return;}}
   const res = await fetch(`/api/invoice/${invoiceId}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
@@ -2825,7 +2811,8 @@ async function openInvoicePaymentDialog(invoiceId) {
 
   const invoice = data.invoice || {};
   const payments = data.payments || [];
-  const balanceDue = Number(invoice.balance_due || 0);
+  if(invoice.balance_due==null||!Number.isFinite(Number(invoice.balance_due)))return showToast('The invoice balance is not available. Review the record before taking a payment.');
+  const balanceDue = Number(invoice.balance_due);
 
   showDialog(
     `Payments: ${invoice.invoice_no || 'Invoice'}`,
@@ -2833,15 +2820,15 @@ async function openInvoicePaymentDialog(invoiceId) {
       <div class="payment-summary-grid">
         <div class="payment-summary-card">
           <span>Invoice Total</span>
-          <strong>${escapeHtml(formatMoney(invoice.total))}</strong>
+          <strong>${escapeHtml(invoiceMoney(invoice.total))}</strong>
         </div>
         <div class="payment-summary-card">
           <span>Payment Taken</span>
-          <strong class="money-positive">${escapeHtml(formatMoney(invoice.paid_amount))}</strong>
+          <strong class="money-positive">${escapeHtml(invoiceMoney(invoice.paid_amount))}</strong>
         </div>
         <div class="payment-summary-card">
           <span>Debt / Balance Left</span>
-          <strong class="${balanceDue > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(formatMoney(balanceDue))}</strong>
+          <strong class="${balanceDue > 0 ? 'money-danger' : 'money-positive'}">${escapeHtml(invoiceMoney(balanceDue))}</strong>
         </div>
       </div>
 
@@ -2888,7 +2875,7 @@ async function openInvoicePaymentDialog(invoiceId) {
     `,
     async () => {
       const amount = Number(document.getElementById('paymentAmount')?.value || 0);
-      const body = {
+      const body = retainedPayment || {
         invoice_id: invoiceId,
         amount,
         payment_date: document.getElementById('paymentDate')?.value,
@@ -2898,35 +2885,47 @@ async function openInvoicePaymentDialog(invoiceId) {
       };
 
       if (amount <= 0) {
-        showToast('Enter payment amount');
+        window.VoxelOperations?.showFieldErrors({amount:'Enter a positive payment amount.'});
         return;
       }
 
+      retainedPayment=body;try{sessionStorage.setItem(pendingStorage,JSON.stringify({key:requestKey,body}));}catch{}
+      try {
       const payRes = await fetch('/api/invoice/payment', {
         method: 'POST',
-        headers: authHeaders(),
+        headers: {...authHeaders(),'Idempotency-Key':requestKey},
         body: JSON.stringify(body)
       });
       const payData = await safeJson(payRes);
 
       if (!payRes.ok) {
+        if(payRes.status>=500)throw new Error(payData.message||'The payment response was interrupted.');
+        if(payRes.status<500)clearPayment();
         showToast(payData.message || 'Payment save failed');
         return;
       }
 
       hideDialog();
-      showToast(payData.message || 'Payment saved');
+      clearPayment();showToast(payData.message || 'Payment saved');
       await loadInvoices();
       await loadDashboardStats();
+      }catch(error){
+        const check=await fetch('/api/invoice/'+Number(invoiceId)+'/payment-request',{headers:{...authHeaders(),'Idempotency-Key':requestKey},cache:'no-store'}).then(async res=>res.ok?res.json():null).catch(()=>null);
+        if(check?.confirmed){clearPayment();hideDialog();showToast(check.voided?'The original payment was subsequently voided.':'The original payment was recorded.');await loadInvoices();return;}
+        document.querySelectorAll('.payment-dialog-grid input,.payment-dialog-grid select,.payment-dialog-grid textarea').forEach(node=>node.disabled=true);
+        const primary=document.getElementById('dialogPrimaryBtn');if(primary)primary.textContent='Retry original payment';
+        let status=document.getElementById('paymentRequestStatus');if(!status){status=document.createElement('p');status.id='paymentRequestStatus';status.setAttribute('role','alert');document.getElementById('dialogBody').prepend(status);}status.textContent='The payment could not be confirmed. Check its history or retry this same request. The original payment details are retained to prevent duplicates.';
+      }
     },
     'Save Payment'
   );
 
+  if(retainedPayment){for(const [field,name]of [['paymentAmount','amount'],['paymentDate','payment_date'],['paymentMethod','method'],['paymentReference','reference'],['paymentNotes','notes']]){const node=document.getElementById(field);if(node){node.value=retainedPayment[name]??'';node.disabled=true;}}document.getElementById('dialogPrimaryBtn').textContent='Retry original payment';}
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
 }
 
 async function deleteInvoicePayment(invoiceId, paymentId) {
-  if (!confirm('Delete this payment entry?')) return;
+  if (!confirm('Void this payment? The original entry and audit history will be retained.')) return;
 
   const res = await fetch('/api/invoice/payment/delete', {
     method: 'POST',
@@ -3101,12 +3100,8 @@ function openCustomerStatementSendDialog(index) {
 }
 
 function openInvoicePdf(invoiceId) {
-  const url = `/invoice/view?id=${encodeURIComponent(invoiceId)}`;
-  const opened = window.open(url, '_blank', 'noopener');
-
-  if (!opened) {
-    window.location.href = url;
-  }
+  const id=Number(invoiceId);if(!Number.isSafeInteger(id)||id<1)return;
+  window.location.assign('/invoice/view?id='+id);
 }
 
 async function openInvoiceQrDialog(invoiceId) {
@@ -3179,6 +3174,7 @@ async function openEditInvoiceDialog(invoiceId) {
     async () => {
       const body = {
         invoice_id: invoiceId,
+        ...(Number.isSafeInteger(Number(invoice.document_revision))?{expected_revision:Number(invoice.document_revision)}:{}),
         invoice_no: document.getElementById('editInvoiceNo')?.value.trim(),
         customer_name: document.getElementById('editInvoiceCustomer')?.value.trim(),
         customer_email: document.getElementById('editInvoiceEmail')?.value.trim(),
@@ -3290,10 +3286,7 @@ async function loadCustomers() {
   const tbody = document.getElementById('customerTableBody');
   if (!tbody) return;
 
-  const res = await fetch('/api/customers', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  const data = await safeJson(res);
+  const {res,data}=await fetchCompleteRegister('/api/customers','customers');
 
   if (!res.ok) {
     tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load customers')}</td></tr>`;
@@ -3404,10 +3397,7 @@ async function loadSuppliers() {
   const tbody = document.getElementById('supplierTableBody');
   if (!tbody) return;
 
-  const res = await fetch('/api/suppliers', {
-    headers: { Authorization: `Bearer ${token}` }
-  });
-  const data = await safeJson(res);
+  const {res,data}=await fetchCompleteRegister('/api/suppliers','suppliers');
 
   if (!res.ok) {
     tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(data.message || 'Failed to load suppliers')}</td></tr>`;

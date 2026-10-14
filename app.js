@@ -74,6 +74,7 @@ function portalPath(user){
 }
 app.get('/dashboard',noIndex,pageAuth(),(req,res)=>res.redirect(302,portalPath(req.user)));
 app.get('/profile',noIndex,pageAuth(),sendPage('profile.html'));
+app.get('/document/view',noIndex,pageAuth(),sendPage('document-view.html'));
 app.get('/account',noIndex,pageAuth(),sendPage('workspace.html'));
 app.get('/admin',noIndex,pageAuth(),(req,res)=>portalPath(req.user)==='/admin'?sendPage('admin-dashboard.html')(req,res):res.redirect(302,portalPath(req.user)));
 app.get('/client',noIndex,pageAuth(),(req,res)=>portalPath(req.user)==='/client'?sendPage('client-portal.html')(req,res):res.redirect(302,portalPath(req.user)));
@@ -156,6 +157,9 @@ app.get('/api/public/employee-id/:token/verify',rateLimitPolicy('coc_verificatio
 app.get('/api/public/qms/coc/:no/verify',rateLimitPolicy('coc_verification'),cocVerificationContract,require('./controllers/qms/qualityReleaseController').verifyCoc);
 app.get('/api/qr',rateLimitPolicy('qr_generation'),qrGenerationContract,async(req,res,next)=>{try{res.type('png').set('Cache-Control','private, no-store').send(await QRCode.toBuffer(String(req.query.data||'').trim(),{width:1024,margin:8,errorCorrectionLevel:'H'}))}catch(error){next(error)}});
 app.get('/vendor/chart.umd.js',(req,res)=>res.type('js').sendFile(path.join(__dirname,'node_modules/chart.js/dist/chart.umd.js')));
+app.get('/vendor/pdf.mjs',(req,res)=>res.type('application/javascript').sendFile(path.join(__dirname,'node_modules/pdfjs-dist/legacy/build/pdf.mjs')));
+app.get('/vendor/pdf.worker.mjs',(req,res)=>res.type('application/javascript').sendFile(path.join(__dirname,'node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs')));
+app.use('/vendor/pdf-fonts',express.static(path.join(__dirname,'node_modules/pdfjs-dist/standard_fonts'),{index:false,dotfiles:'deny'}));
 app.get('/vendor/jsQR.js',(req,res)=>res.type('js').sendFile(path.join(__dirname,'node_modules/jsqr/dist/jsQR.js')));
 app.get('/forms/company/:filename',async(req,res,next)=>{
  try{
@@ -169,7 +173,7 @@ app.get('/forms/company/:filename',async(req,res,next)=>{
  }catch(error){next(error)}
 });
 const noStore=new Set(['workspace.html','workspace.js','workspace.css','workspace-theme.css','workspace-theme.js','style.css','global-brand.css','global-brand.js','public-pages.css','auth-entry.css','login.js','register.js','auth-lifecycle.js','mfa.js','security-page.js','profile.js','step-up.js','step-up.css','service-worker.js']);
-app.use(express.static(publicDir,{dotfiles:'deny',index:false,setHeaders(res,file){res.set('X-Content-Type-Options','nosniff');if(noStore.has(path.basename(file))||/\.(?:js|css|html)$/.test(file))res.set('Cache-Control','no-store, max-age=0')}}));
+app.use(express.static(publicDir,{dotfiles:'deny',index:false,setHeaders(res,file){res.set('X-Content-Type-Options','nosniff');if(noStore.has(path.basename(file))||/\.(?:js|mjs|css|html)$/.test(file))res.set('Cache-Control','no-store, max-age=0')}}));
 app.use((req,res)=>{if(!req.path.startsWith('/api/')&&req.accepts('html'))return sendPage('404.html',404)(req,res);return res.status(404).json({message:'Route not found'})});
 app.use(safeErrorHandler);
 module.exports=app;

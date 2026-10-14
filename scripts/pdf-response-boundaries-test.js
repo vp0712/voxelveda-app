@@ -61,9 +61,9 @@ async function browserChecks(artifact) {
   assert.ok(start>=0 && end>start);
   let opened=0,closed=0,created=0,clicked=0,response;
   const savedBlobs=[];
-  const context=vm.createContext({TextDecoder,Blob,fetch:async()=>response,
+  const context=vm.createContext({TextDecoder,Blob,setTimeout,clearTimeout,location:{origin:'https://fixture.invalid'},fetch:async()=>response,
     URL:{createObjectURL(blob){created++;savedBlobs.push(blob);return 'blob:fixture';},revokeObjectURL(){}},
-    window:{open(){opened++;return {document:{body:{}},close(){closed++;},location:{replace(){}},opener:null};},addEventListener(){}},
+    window:{open(){opened++;return {document:{body:{}},close(){closed++;},location:{replace(){}},opener:null};},addEventListener(){},removeEventListener(){}},
     document:{body:{append(){}},createElement(){return {click(){clicked++;},remove(){}};}}
   });
   vm.runInContext(source.slice(start,end)+'\nglobalThis.openPdf = openPdf;',context);

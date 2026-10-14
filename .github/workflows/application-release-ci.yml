@@ -63,6 +63,19 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/restored-application-proof
         run: timeout --signal=TERM --kill-after=10s 180s node scripts/restored-ui-browser-test.js
+      - name: Verify populated invoice cards, values, seven widths and controlled workflows
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_RESPONSIVE_MATRIX: after
+          UI_PROOF_DIR: ${{ runner.temp }}/responsive-invoice-proof
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/restored-ui-browser-test.js
+      - name: Preserve responsive invoice evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-invoices-${{ github.sha }}
+          path: ${{ runner.temp }}/responsive-invoice-proof
+          retention-days: 30
       - name: Test procurement import, records, reports and private source workflows in responsive browsers
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
@@ -80,7 +93,7 @@ jobs:
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/staff-mobile-proof
-        run: timeout --signal=TERM --kill-after=10s 240s node scripts/staff-mobile-browser-test.js
+        run: timeout --signal=TERM --kill-after=10s 360s node scripts/staff-mobile-browser-test.js
       - name: Decode the actual branded attendance gate through rotation, outage and responsive layouts
         if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:

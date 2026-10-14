@@ -1,0 +1,5417 @@
+{
+  "fixtureOnly": true,
+  "baseline": "62ace8be4287ef083c344174739378b8de9a7660",
+  "api": {
+    "invoices": [
+      {
+        "id": 165,
+        "invoice_no": "INV-LONG-REFERENCE-00074-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 74",
+        "customer_email": "synthetic-long-customer-address-74@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": null,
+        "paid_amount": 0,
+        "balance_due": null,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 164,
+        "invoice_no": "INV-LONG-REFERENCE-00073-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 73",
+        "customer_email": "synthetic-long-customer-address-73@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 183,
+        "paid_amount": 10,
+        "balance_due": 173,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 163,
+        "invoice_no": "INV-LONG-REFERENCE-00072-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 72",
+        "customer_email": "synthetic-long-customer-address-72@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 182,
+        "paid_amount": 0,
+        "balance_due": 182,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 162,
+        "invoice_no": "INV-LONG-REFERENCE-00071-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 71",
+        "customer_email": "synthetic-long-customer-address-71@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 181,
+        "paid_amount": 10,
+        "balance_due": 171,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 161,
+        "invoice_no": "INV-LONG-REFERENCE-00070-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 70",
+        "customer_email": "synthetic-long-customer-address-70@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 180,
+        "paid_amount": 0,
+        "balance_due": 180,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 160,
+        "invoice_no": "INV-LONG-REFERENCE-00069-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 69",
+        "customer_email": "synthetic-long-customer-address-69@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 179,
+        "paid_amount": 10,
+        "balance_due": 169,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 159,
+        "invoice_no": "INV-LONG-REFERENCE-00068-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 68",
+        "customer_email": "synthetic-long-customer-address-68@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 178,
+        "paid_amount": 0,
+        "balance_due": 178,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 158,
+        "invoice_no": "INV-LONG-REFERENCE-00067-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 67",
+        "customer_email": "synthetic-long-customer-address-67@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 177,
+        "paid_amount": 10,
+        "balance_due": 167,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 157,
+        "invoice_no": "INV-LONG-REFERENCE-00066-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 66",
+        "customer_email": "synthetic-long-customer-address-66@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 176,
+        "paid_amount": 0,
+        "balance_due": 176,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 156,
+        "invoice_no": "INV-LONG-REFERENCE-00065-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 65",
+        "customer_email": "synthetic-long-customer-address-65@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 175,
+        "paid_amount": 10,
+        "balance_due": 165,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 155,
+        "invoice_no": "INV-LONG-REFERENCE-00064-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 64",
+        "customer_email": "synthetic-long-customer-address-64@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 174,
+        "paid_amount": 0,
+        "balance_due": 174,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 154,
+        "invoice_no": "INV-LONG-REFERENCE-00063-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 63",
+        "customer_email": "synthetic-long-customer-address-63@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 173,
+        "paid_amount": 10,
+        "balance_due": 163,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 153,
+        "invoice_no": "INV-LONG-REFERENCE-00062-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 62",
+        "customer_email": "synthetic-long-customer-address-62@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 172,
+        "paid_amount": 0,
+        "balance_due": 172,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 152,
+        "invoice_no": "INV-LONG-REFERENCE-00061-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 61",
+        "customer_email": "synthetic-long-customer-address-61@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 171,
+        "paid_amount": 10,
+        "balance_due": 161,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 151,
+        "invoice_no": "INV-LONG-REFERENCE-00060-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 60",
+        "customer_email": "synthetic-long-customer-address-60@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 170,
+        "paid_amount": 0,
+        "balance_due": 170,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 150,
+        "invoice_no": "INV-LONG-REFERENCE-00059-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 59",
+        "customer_email": "synthetic-long-customer-address-59@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 169,
+        "paid_amount": 10,
+        "balance_due": 159,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 149,
+        "invoice_no": "INV-LONG-REFERENCE-00058-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 58",
+        "customer_email": "synthetic-long-customer-address-58@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 168,
+        "paid_amount": 0,
+        "balance_due": 168,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 148,
+        "invoice_no": "INV-LONG-REFERENCE-00057-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 57",
+        "customer_email": "synthetic-long-customer-address-57@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 167,
+        "paid_amount": 10,
+        "balance_due": 157,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 147,
+        "invoice_no": "INV-LONG-REFERENCE-00056-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 56",
+        "customer_email": "synthetic-long-customer-address-56@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 166,
+        "paid_amount": 0,
+        "balance_due": 166,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 146,
+        "invoice_no": "INV-LONG-REFERENCE-00055-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 55",
+        "customer_email": "synthetic-long-customer-address-55@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 165,
+        "paid_amount": 10,
+        "balance_due": 155,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 145,
+        "invoice_no": "INV-LONG-REFERENCE-00054-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 54",
+        "customer_email": "synthetic-long-customer-address-54@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 164,
+        "paid_amount": 0,
+        "balance_due": 164,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 144,
+        "invoice_no": "INV-LONG-REFERENCE-00053-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 53",
+        "customer_email": "synthetic-long-customer-address-53@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 163,
+        "paid_amount": 10,
+        "balance_due": 153,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 143,
+        "invoice_no": "INV-LONG-REFERENCE-00052-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 52",
+        "customer_email": "synthetic-long-customer-address-52@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 162,
+        "paid_amount": 0,
+        "balance_due": 162,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 142,
+        "invoice_no": "INV-LONG-REFERENCE-00051-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 51",
+        "customer_email": "synthetic-long-customer-address-51@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 161,
+        "paid_amount": 10,
+        "balance_due": 151,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 141,
+        "invoice_no": "INV-LONG-REFERENCE-00050-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 50",
+        "customer_email": "synthetic-long-customer-address-50@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 160,
+        "paid_amount": 0,
+        "balance_due": 160,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 140,
+        "invoice_no": "INV-LONG-REFERENCE-00049-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 49",
+        "customer_email": "synthetic-long-customer-address-49@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 159,
+        "paid_amount": 10,
+        "balance_due": 149,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 139,
+        "invoice_no": "INV-LONG-REFERENCE-00048-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 48",
+        "customer_email": "synthetic-long-customer-address-48@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 158,
+        "paid_amount": 0,
+        "balance_due": 158,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 138,
+        "invoice_no": "INV-LONG-REFERENCE-00047-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 47",
+        "customer_email": "synthetic-long-customer-address-47@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 157,
+        "paid_amount": 10,
+        "balance_due": 147,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 137,
+        "invoice_no": "INV-LONG-REFERENCE-00046-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 46",
+        "customer_email": "synthetic-long-customer-address-46@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 156,
+        "paid_amount": 0,
+        "balance_due": 156,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 136,
+        "invoice_no": "INV-LONG-REFERENCE-00045-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 45",
+        "customer_email": "synthetic-long-customer-address-45@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 155,
+        "paid_amount": 10,
+        "balance_due": 145,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 135,
+        "invoice_no": "INV-LONG-REFERENCE-00044-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 44",
+        "customer_email": "synthetic-long-customer-address-44@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 154,
+        "paid_amount": 0,
+        "balance_due": 154,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 134,
+        "invoice_no": "INV-LONG-REFERENCE-00043-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 43",
+        "customer_email": "synthetic-long-customer-address-43@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 153,
+        "paid_amount": 10,
+        "balance_due": 143,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 133,
+        "invoice_no": "INV-LONG-REFERENCE-00042-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 42",
+        "customer_email": "synthetic-long-customer-address-42@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 152,
+        "paid_amount": 0,
+        "balance_due": 152,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 132,
+        "invoice_no": "INV-LONG-REFERENCE-00041-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 41",
+        "customer_email": "synthetic-long-customer-address-41@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 151,
+        "paid_amount": 10,
+        "balance_due": 141,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 131,
+        "invoice_no": "INV-LONG-REFERENCE-00040-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 40",
+        "customer_email": "synthetic-long-customer-address-40@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 150,
+        "paid_amount": 0,
+        "balance_due": 150,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 130,
+        "invoice_no": "INV-LONG-REFERENCE-00039-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 39",
+        "customer_email": "synthetic-long-customer-address-39@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 149,
+        "paid_amount": 10,
+        "balance_due": 139,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 129,
+        "invoice_no": "INV-LONG-REFERENCE-00038-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 38",
+        "customer_email": "synthetic-long-customer-address-38@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 148,
+        "paid_amount": 0,
+        "balance_due": 148,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 128,
+        "invoice_no": "INV-LONG-REFERENCE-00037-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 37",
+        "customer_email": "synthetic-long-customer-address-37@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 147,
+        "paid_amount": 10,
+        "balance_due": 137,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 127,
+        "invoice_no": "INV-LONG-REFERENCE-00036-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 36",
+        "customer_email": "synthetic-long-customer-address-36@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 146,
+        "paid_amount": 0,
+        "balance_due": 146,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 126,
+        "invoice_no": "INV-LONG-REFERENCE-00035-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 35",
+        "customer_email": "synthetic-long-customer-address-35@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 145,
+        "paid_amount": 10,
+        "balance_due": 135,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 125,
+        "invoice_no": "INV-LONG-REFERENCE-00034-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 34",
+        "customer_email": "synthetic-long-customer-address-34@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 144,
+        "paid_amount": 0,
+        "balance_due": 144,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 124,
+        "invoice_no": "INV-LONG-REFERENCE-00033-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 33",
+        "customer_email": "synthetic-long-customer-address-33@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 143,
+        "paid_amount": 10,
+        "balance_due": 133,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 123,
+        "invoice_no": "INV-LONG-REFERENCE-00032-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 32",
+        "customer_email": "synthetic-long-customer-address-32@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 142,
+        "paid_amount": 0,
+        "balance_due": 142,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 122,
+        "invoice_no": "INV-LONG-REFERENCE-00031-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 31",
+        "customer_email": "synthetic-long-customer-address-31@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 141,
+        "paid_amount": 10,
+        "balance_due": 131,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 121,
+        "invoice_no": "INV-LONG-REFERENCE-00030-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 30",
+        "customer_email": "synthetic-long-customer-address-30@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 140,
+        "paid_amount": 0,
+        "balance_due": 140,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 120,
+        "invoice_no": "INV-LONG-REFERENCE-00029-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 29",
+        "customer_email": "synthetic-long-customer-address-29@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 139,
+        "paid_amount": 10,
+        "balance_due": 129,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 119,
+        "invoice_no": "INV-LONG-REFERENCE-00028-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 28",
+        "customer_email": "synthetic-long-customer-address-28@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 138,
+        "paid_amount": 0,
+        "balance_due": 138,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 118,
+        "invoice_no": "INV-LONG-REFERENCE-00027-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic international manufacturing customer with a very long registered company name and project reference 27",
+        "customer_email": "synthetic-long-customer-address-27@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 137,
+        "paid_amount": 10,
+        "balance_due": 127,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 117,
+        "invoice_no": "INV-LONG-REFERENCE-00026-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 26",
+        "customer_email": "synthetic-long-customer-address-26@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 136,
+        "paid_amount": 0,
+        "balance_due": 136,
+        "status": "draft",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      },
+      {
+        "id": 116,
+        "invoice_no": "INV-LONG-REFERENCE-00025-MANUFACTURING-2026",
+        "rfq_id": 71,
+        "customer_name": "Synthetic customer 25",
+        "customer_email": "synthetic-long-customer-address-25@example.invalid",
+        "description": "Test-only engineering fixture",
+        "quantity": 2,
+        "unit_price": 50,
+        "gst_rate": 10,
+        "subtotal": 100,
+        "gst_amount": 10,
+        "total": 135,
+        "paid_amount": 10,
+        "balance_due": 125,
+        "status": "approved",
+        "deleted": 0,
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "document_revision": 1
+      }
+    ],
+    "total": 75,
+    "page": 1,
+    "limit": 50,
+    "summary": {
+      "total_value": null,
+      "paid_value": 370,
+      "balance_value": null
+    }
+  },
+  "checks": [
+    {
+      "theme": "light",
+      "width": 320,
+      "height": 844,
+      "scrollWidth": 320,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 246,
+        "height": 9985.25,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 140.65625,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 216,
+          "height": 70,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 216,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 65.328125,
+          "height": 89,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 65.328125,
+          "height": 89,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 65.34375,
+          "height": 89,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 65.34375,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 216,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 320,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "height": 844,
+      "scrollWidth": 320,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 246,
+        "height": 9985.25,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 140.65625,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 216,
+          "height": 70,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 216,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 65.328125,
+          "height": 89,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 65.328125,
+          "height": 89,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 65.34375,
+          "height": 89,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 65.34375,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 216,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 320,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 286,
+        "height": 9152.75,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 167.328125,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 255.984375,
+          "height": 70,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 255.984375,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 78.65625,
+          "height": 72.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 78.671875,
+          "height": 72.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 78.65625,
+          "height": 72.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 78.65625,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 255.984375,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 360,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "height": 844,
+      "scrollWidth": 360,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 286,
+        "height": 9152.75,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 167.328125,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 255.984375,
+          "height": 70,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 255.984375,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 78.65625,
+          "height": 72.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 78.671875,
+          "height": 72.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 78.65625,
+          "height": 72.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 78.65625,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 255.984375,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 360,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 316,
+        "height": 8595.25,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 187.328125,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 285.984375,
+          "height": 52.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 285.984375,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 88.65625,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 88.671875,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 88.65625,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 88.65625,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 285.984375,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 390,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "height": 844,
+      "scrollWidth": 390,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 316,
+        "height": 8595.25,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 187.328125,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 285.984375,
+          "height": 52.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 285.984375,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 88.65625,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 88.671875,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 88.65625,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 88.65625,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 285.984375,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 390,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 430,
+      "height": 844,
+      "scrollWidth": 430,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 356,
+        "height": 8175.25,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 214,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 326,
+          "height": 52.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 326,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 102,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 102,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 102,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 102,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 326,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 430,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 430,
+      "height": 844,
+      "scrollWidth": 430,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 356,
+        "height": 8175.25,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "block",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "block",
+          "width": 214,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "block",
+          "width": 326,
+          "height": 52.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "none",
+          "width": 0,
+          "height": 0,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "block",
+          "width": 326,
+          "height": 16.25,
+          "font": "13px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 102,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 102,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "flex",
+          "width": 102,
+          "height": 56.5,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "block",
+          "width": 102,
+          "height": 26,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "block",
+          "width": 326,
+          "height": 96,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 430,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "height": 844,
+      "scrollWidth": 768,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 690,
+        "height": 5163.96875,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1078.875,
+        "height": 54.03125,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 82,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 82,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 979.203125
+        },
+        {
+          "tag": "DETAILS",
+          "id": "",
+          "class": "record-action-menu",
+          "right": 1105.875
+        },
+        {
+          "tag": "SUMMARY",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 768,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "height": 844,
+      "scrollWidth": 768,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 690,
+        "height": 5163.96875,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1078.875,
+        "height": 54.03125,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 82,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 82,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 979.203125
+        },
+        {
+          "tag": "DETAILS",
+          "id": "",
+          "class": "record-action-menu",
+          "right": 1105.875
+        },
+        {
+          "tag": "SUMMARY",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 768,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "height": 844,
+      "scrollWidth": 1024,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1082.875,
+        "height": 5172.9375,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1082.875,
+        "height": 63,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "invoice-table responsive-table",
+          "right": 1408.4375
+        },
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1408.4375
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1398.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 1145.09375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1271.765625
+        },
+        {
+          "tag": "DETAILS",
+          "id": "",
+          "class": "record-action-menu",
+          "right": 1398.4375
+        },
+        {
+          "tag": "SUMMARY",
+          "id": "",
+          "class": "",
+          "right": 1398.4375
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "",
+          "right": 1398.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1408.4375
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1398.4375
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "height": 844,
+      "scrollWidth": 1024,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1082.875,
+        "height": 5172.9375,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1082.875,
+        "height": 63,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "TABLE",
+          "id": "",
+          "class": "invoice-table responsive-table",
+          "right": 1408.4375
+        },
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1408.4375
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1398.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 1145.09375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1271.765625
+        },
+        {
+          "tag": "DETAILS",
+          "id": "",
+          "class": "record-action-menu",
+          "right": 1398.4375
+        },
+        {
+          "tag": "SUMMARY",
+          "id": "",
+          "class": "",
+          "right": 1398.4375
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "",
+          "right": 1398.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1396.4375
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1408.4375
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1408.4375
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1398.4375
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "height": 844,
+      "scrollWidth": 1440,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1082.875,
+        "height": 5172.9375,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1082.875,
+        "height": 63,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "height": 844,
+      "scrollWidth": 1440,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "table",
+        "width": 1082.875,
+        "height": 5172.9375,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1082.875,
+        "height": 63,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 86,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 63,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 86,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "none",
+        "width": 0,
+        "height": 0,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "light",
+      "width": 844,
+      "height": 390,
+      "scrollWidth": 844,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 766,
+        "height": 5163.96875,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1078.875,
+        "height": 54.03125,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 82,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 82,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 979.203125
+        },
+        {
+          "tag": "DETAILS",
+          "id": "",
+          "class": "record-action-menu",
+          "right": 1105.875
+        },
+        {
+          "tag": "SUMMARY",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 844,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    },
+    {
+      "theme": "dark",
+      "width": 844,
+      "height": 390,
+      "scrollWidth": 844,
+      "bodyOverflow": "visible",
+      "table": {
+        "tag": "TABLE",
+        "display": "block",
+        "width": 766,
+        "height": 5163.96875,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "auto"
+      },
+      "thead": {
+        "tag": "THEAD",
+        "display": "table-header-group",
+        "width": 1078.875,
+        "height": 54.03125,
+        "font": "14px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      },
+      "headers": [
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 95,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 82,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "tag": "TH",
+          "display": "table-cell",
+          "width": 390,
+          "height": 54.03125,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        }
+      ],
+      "cells": [
+        {
+          "text": "91",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 29.609375,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "INV-TEST-0091",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 95,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "95px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "Synthetic international manufacturing customer with a very long registered company name and project reference 0",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 100.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "RFQ #71",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 82,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "2026-10-10",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 56.953125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 66.046875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$0.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 55.8125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "$110.00 AUD",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 129.203125,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "draft",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 73.296875,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "0px",
+          "overflowX": "visible"
+        },
+        {
+          "text": "View invoice\nPDF\nMore",
+          "tag": "TD",
+          "display": "table-cell",
+          "width": 390,
+          "height": 275.71875,
+          "font": "14px",
+          "minWidth": "390px",
+          "overflowX": "visible"
+        }
+      ],
+      "offscreen": [
+        {
+          "tag": "THEAD",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TH",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TBODY",
+          "id": "invoiceTableBody",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 979.203125
+        },
+        {
+          "tag": "DETAILS",
+          "id": "",
+          "class": "record-action-menu",
+          "right": 1105.875
+        },
+        {
+          "tag": "SUMMARY",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "secondary-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "danger-btn",
+          "right": 1103.875
+        },
+        {
+          "tag": "TR",
+          "id": "",
+          "class": "",
+          "right": 1115.875
+        },
+        {
+          "tag": "TD",
+          "id": "",
+          "class": "register-action-cell invoice-action-cell",
+          "right": 1115.875
+        },
+        {
+          "tag": "DIV",
+          "id": "",
+          "class": "invoice-actions",
+          "right": 1105.875
+        },
+        {
+          "tag": "BUTTON",
+          "id": "",
+          "class": "primary-btn",
+          "right": 852.53125
+        }
+      ],
+      "bottomNav": {
+        "tag": "NAV",
+        "display": "flex",
+        "width": 844,
+        "height": 65,
+        "font": "16px",
+        "minWidth": "0px",
+        "overflowX": "visible"
+      }
+    }
+  ],
+  "workflows": [
+    "Real API pagination across 75 invoices; null is distinct from zero",
+    "Search and full-filtered totals agree with authorised backend",
+    "Detail controls reachable at 320px and enlarged layout",
+    "Keyboard-height simulation keeps edit input and Save/Cancel reachable; no native keyboard claimed",
+    "Failure with retry and genuine empty zero remain distinct from missing data",
+    "Real parser-validated invoice bytes rendered by local PDF.js with fit/zoom and safe download",
+    "Interrupted payment reply reconciles its stable request without a second submission; persisted fixture balance confirmed"
+  ]
+}

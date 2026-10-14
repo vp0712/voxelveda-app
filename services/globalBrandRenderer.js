@@ -41,6 +41,8 @@ function injectGlobalBrand(html) {
 
   if (!rendered.includes('id="vvGlobalBrandLoader"')) rendered = rendered.replace(/<body([^>]*)>/i, (match) => `${match}${loaderMarkup}`);
   if (!rendered.includes(BRAND_JS)) rendered = rendered.replace(/<\/body>/i, `  <script src="${BRAND_JS}" defer></script>\n</body>`);
+  if (!rendered.includes('/responsive-foundation.css')) rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/responsive-foundation.css">\n</head>');
+  if (!rendered.includes('/responsive-foundation.js')) rendered=rendered.replace(/<\/body>/i,'<script src="/responsive-foundation.js" defer></script>\n</body>');
 
   return rendered;
 }

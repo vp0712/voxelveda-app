@@ -13,7 +13,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { chromium } = require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
 const project = path.resolve(__dirname, '..');
-const baselineRef = process.env.VV_STAFF_BASELINE_REF || '235cc208e1425f0c9cdedc1e210c7725526a0b01';
+const baselineRef = process.env.VV_STAFF_BASELINE_REF || '62ace8be4287ef083c344174739378b8de9a7660';
 assert(/^[a-f0-9]{40}$/.test(baselineRef), 'Before screenshots require an exact preserved Git commit.');
 const selectedPhase = process.env.VV_STAFF_PROOF_PHASE || 'both';
 assert(['before', 'after', 'both'].includes(selectedPhase), 'Choose before, after or both for staff proof.');
@@ -110,12 +110,13 @@ async function deliverReply(state, req, res, payload) {
   return res.json(captured);
 }
 async function makeServer(publicDirectory, photo) {
+  let pageBrand=brand;if(publicDirectory!==path.join(project,'public')){const module={exports:{}};require('node:vm').runInNewContext(execFileSync('git',['show',baselineRef+':services/globalBrandRenderer.js'],{cwd:project,encoding:'utf8'}),{module,exports:module.exports});pageBrand=module.exports;}
   const state = resetState(), app = express();
   app.disable('x-powered-by'); app.use(security.securityHeaders); app.use(express.json()); app.use(security.csrfProtection);
   app.use((req, _res, next) => { requests.push({ path: req.path, method: req.method }); next(); });
   app.get('/login', (_req, res) => res.type('html').send('<!doctype html><title>Synthetic fixture sign in</title><h1>Sign in</h1>'));
   for (const [route, file] of [['/portal/staff', 'staff-dashboard.html'], ['/profile', 'profile.html'], ['/admin', 'admin-dashboard.html']]) {
-    app.get(route, pageAuth(), (_req, res) => res.set('Cache-Control', 'private, no-store').type('html').send(brand.injectGlobalBrand(fs.readFileSync(path.join(publicDirectory, file), 'utf8'))));
+    app.get(route, pageAuth(), (_req, res) => res.set('Cache-Control', 'private, no-store').type('html').send(pageBrand.injectGlobalBrand(fs.readFileSync(path.join(publicDirectory, file), 'utf8'))));
   }
   app.get('/synthetic-fixtures/avatar-observer', pageAuth(), (_req, res) => res.set('Cache-Control', 'private, no-store').type('html').send(`<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Synthetic avatar observer fixture</title><script src="/profile-avatar.js" defer></script></head><body>
     <h1>Synthetic authorised directory component fixture</h1><p>Every account and photo outcome on this fixture is synthetic.</p>
@@ -356,8 +357,8 @@ async function verifyEmulatedCameraCases(browser, fixture) {
   return results;
 }
 async function verifyResponsiveStaffMatrix(browser, fixture) {
-  const results = [], viewports = [{ name: 'phone-portrait', width: 375, height: 812 }, { name: 'phone-landscape', width: 812, height: 375 }, { name: 'tablet', width: 768, height: 1024 }, { name: 'desktop', width: 1440, height: 1000 }];
-  const scope = 'After product staff DOM, canonical synthetic owner/photo and notifications; four viewports in the existing light/dark preference. Attendance writes are covered separately.';
+  const results = [], viewports = [...[320,360,390,430,768,1024,1440].map(width=>({name:'width-'+width,width,height:844})),{name:'phone-landscape',width:844,height:390}];
+  const scope = 'After product staff DOM, canonical synthetic owner/photo and notifications; seven required widths plus landscape in the existing light/dark preference. Attendance writes are covered separately.';
   for (const viewport of viewports) for (const mode of ['light','dark']) {
     Object.assign(fixture.state, resetState()); fixture.state.photo = true;
     const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, reducedMotion: 'reduce' }); context.setDefaultTimeout(12000);
@@ -445,7 +446,7 @@ async function verifyResponsiveStaffMatrix(browser, fixture) {
       assert.equal(down.scrollX, beforeOverlay.scrollX); assert.equal(down.scrollY, beforeOverlay.scrollY, 'Real pointer input must begin at the settled staff page position.');
       assert.equal(closed.scrollX, beforeOverlay.scrollX); assert.equal(closed.scrollY, beforeOverlay.scrollY, 'The real overlay close must preserve that same position.');
       results.push({ fixtureOnly: true, viewport, mode, canonicalOwner: 9401, visibleAppReady: true, layout, panel, panelStyle, beforeOverlay, restored, overlayTrace, attendanceWrites: 0 });
-      fs.writeFileSync(path.join(output, 'staff-responsive-matrix.json'), JSON.stringify({ fixtureOnly: true, scope, complete: results.length === 8, results }, null, 2));
+      fs.writeFileSync(path.join(output, 'staff-responsive-matrix.json'), JSON.stringify({ fixtureOnly: true, scope, complete: results.length === viewports.length*2, results }, null, 2));
     } catch (error) {
       overlayTrace = await page.evaluate(() => window.__matrixOverlayTrace || []).catch(() => []);
       const uiState = await page.evaluate(() => ({ path: location.pathname, theme: document.documentElement.dataset.colorMode, owner: window.VoxelStaffHome?.state?.profile?.id || null,
@@ -835,7 +836,7 @@ async function run() {
           const image = document.querySelector('#sidebarAvatar img');
           return Boolean(image && !image.hidden && image.naturalWidth > 0 && getComputedStyle(image).display !== 'none');
         });
-        if (phase === 'before') assert.equal(sidebarPhotoRendered, baselineRef === '235cc208e1425f0c9cdedc1e210c7725526a0b01', 'The current-release baseline preserves its repaired saved avatar; older baselines retain their documented defect.');
+        if (phase === 'before') assert.equal(sidebarPhotoRendered, ['235cc208e1425f0c9cdedc1e210c7725526a0b01','62ace8be4287ef083c344174739378b8de9a7660'].includes(baselineRef), 'The current-release baseline preserves its repaired saved avatar; older baselines retain their documented defect.');
         violations.push(...await page.evaluate(() => window.__fixtureCspViolations));
         if (phase === 'after') {
           assert.equal(sidebarPhotoRendered, true, 'after staff photo is loaded before its proof screenshot');

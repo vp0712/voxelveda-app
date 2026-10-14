@@ -13,7 +13,7 @@ app.get('/api/notifications/preferences',(req,res)=>res.json({preferences:[]}));
 app.get('/api/auth/mfa/status',(req,res)=>res.json({enabled:false,required:false,recovery_codes_remaining:0,assurance_level:1}));
 app.get('/api/auth/sessions',(req,res)=>res.json({sessions:[{id:1,current:true,user_agent:'Local browser fixture',last_seen_at:'2026-10-09T12:00:00Z'}]}));
 app.post('/api/auth/logout',(req,res)=>res.json({message:'Signed out'}));
-for(const [route,file] of Object.entries({'/dashboard':'workspace.html','/profile':'profile.html','/security':'security.html','/':'index.html','/login':'login.html','/register':'register.html','/support':'support.html'})) app.get(route,(req,res)=>res.type('html').send(injectGlobalBrand(fs.readFileSync(path.join(project,'public',file),'utf8'))));
+for(const [route,file] of Object.entries({'/dashboard':'workspace.html','/profile':'profile.html','/security':'security.html','/':'index.html','/login':'login.html','/register':'register.html','/forgot-password':'forgot-password.html','/reset-password':'reset-password.html','/support':'support.html'})) app.get(route,(req,res)=>res.type('html').send(injectGlobalBrand(fs.readFileSync(path.join(project,'public',file),'utf8'))));
 app.use(express.static(path.join(project,'public')));
 (async()=>{
  const server=await new Promise(resolve=>{const instance=app.listen(0,'127.0.0.1',()=>resolve(instance));});
@@ -22,7 +22,7 @@ app.use(express.static(path.join(project,'public')));
  const results=[];
  try {
   browser=await chromium.launch({executablePath:process.env.VV_BROWSER_EXECUTABLE || undefined,headless:true,args:['--no-sandbox']});
-  for(const view of [{name:'phone',width:375,height:812},{name:'phone-landscape',width:812,height:375},{name:'tablet',width:768,height:1024},{name:'desktop',width:1440,height:1000}]){
+  for(const view of [{name:'phone',width:320,height:844},...[360,390,430,768,1024].map(width=>({name:'width-'+width,width,height:844})),{name:'phone-landscape',width:844,height:390},{name:'desktop',width:1440,height:1000}]){
    const context=await browser.newContext({viewport:{width:view.width,height:view.height}});
    const page=await context.newPage();const errors=[],apiCalls=[],assetFailures=[];
    page.on('response',response=>{const request=response.request();if(['script','stylesheet','image','font'].includes(request.resourceType())&&response.status()>=400)assetFailures.push({url:response.url(),status:response.status(),type:request.resourceType()});});
@@ -52,7 +52,17 @@ app.use(express.static(path.join(project,'public')));
    assert.deepEqual(errors,[]);
    assert.deepEqual(assetFailures,[],'All retained scripts, styles, images and fonts load successfully');
    assert.ok(apiCalls.every(api=>['/api/auth/me','/api/profile','/api/auth/mfa/status','/api/auth/sessions','/api/notifications/preferences'].includes(api)),'Only retained account and personal notification-settings APIs are called');
-   results.push({viewport:view,overflow:false,pageErrors:errors,assetFailures,identity:true,profileNavigation:true,securityNavigation:true,refresh:true,apiCalls,fixtureOnly:true});await context.close();
+   const publicLayouts=[];
+   await page.route('**/api/auth/me',route=>route.fulfill({status:401,contentType:'application/json',body:'{"message":"Login required"}'}));
+   for(const theme of ['light','dark'])for(const route of ['/','/login','/register','/forgot-password','/reset-password']){
+    await page.evaluate(mode=>localStorage.setItem('voxelveda:color-mode',mode),theme);
+    await page.goto(base+route,{waitUntil:'networkidle'});await page.getByRole('heading',{level:1}).waitFor();await inspectLayout(route+' '+theme);
+    if(route==='/')assert.deepEqual(await page.locator('a[href]').evaluateAll(nodes=>nodes.map(n=>n.getAttribute('href'))),['/login','/register','/privacy','/terms']);
+    for(const input of await page.locator('input:not([type="hidden"]):visible,button:visible').all()){const box=await input.boundingBox();assert(box.x>=0&&box.x+box.width<=view.width+1,'Public form controls fit the viewport');}
+    publicLayouts.push({route,theme,overflow:false});
+   }
+   assert.deepEqual(errors,[]);assert.deepEqual(assetFailures,[]);
+   results.push({viewport:view,overflow:false,pageErrors:errors,assetFailures,identity:true,profileNavigation:true,securityNavigation:true,refresh:true,publicLayouts,apiCalls,fixtureOnly:true});await context.close();
   }
 
  for(const filename of ["local-account-phone.png", "local-account-desktop.png"]){console.log('VV_SCREENSHOT '+JSON.stringify({filename,mime_type:'image/png',base64:fs.readFileSync(path.join(out,filename)).toString('base64')}));}
