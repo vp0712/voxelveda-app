@@ -1,0 +1,152 @@
+{
+  "baseline": "616f8ee9e5d54af1201389ca1b7690a66163d0ad",
+  "fixtureOnly": true,
+  "production_record_changed": false,
+  "phase": "before",
+  "cases": [
+    {
+      "theme": "light",
+      "width": 320,
+      "scroll": 320,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "scroll": 320,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 360,
+      "scroll": 360,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "scroll": 360,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "scroll": 390,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "scroll": 390,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 430,
+      "scroll": 430,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 430,
+      "scroll": 430,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "scroll": 768,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "scroll": 768,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "scroll": 1024,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 707.484375
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "scroll": 1024,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 707.484375
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "scroll": 1440,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 707.484375
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "scroll": 1440,
+      "footer": [
+        "Cancel",
+        "Close"
+      ],
+      "dialogHeight": 707.484375
+    }
+  ],
+  "checks": [
+    "Read-only Close performs no write request"
+  ],
+  "security_telemetry_posts": 2
+}

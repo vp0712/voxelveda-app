@@ -16,6 +16,7 @@ router.get('/blank/pdf', invoiceController.viewBlankInvoicePdf);
 
 router.get('/:id', invoiceController.getInvoiceDetails);
 router.get('/:id/payment-request',invoiceController.paymentReceipt);
+router.post('/:id/payment-review',requireAnyPermission('VOID_TRANSACTION'),requireStepUp('REVIEW_INVOICE_PAYMENT'),invoiceController.reviewInvoicePayments);
 
 /* ================= CREATE ================= */
 

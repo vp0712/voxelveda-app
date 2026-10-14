@@ -9,7 +9,7 @@ async function query(sql,values=[]){
  if(q.startsWith('UPDATE email_queue SET status='))return [{affectedRows:0}];
  if(q.startsWith('SELECT id,invoice_no,total,request_payload_sha256 FROM invoices'))return [[...state.invoices.filter(row=>row.request_key===values[0]).map(copy)]];
  if(q.startsWith('SELECT * FROM invoices WHERE id='))return [[...state.invoices.filter(row=>row.id===values[0]&&(!q.includes('IFNULL(deleted')||!row.deleted)).map(copy)]];
- if(q.startsWith('SELECT i.*, COALESCE(p.paid_amount'))return [[...state.invoices.filter(row=>row.id===values[0]&&!row.deleted).map(row=>{const paid=state.payments.filter(p=>p.invoice_id===row.id&&!p.voided_at).reduce((n,p)=>n+p.amount,0);return {...copy(row),paid_amount:paid,balance_due:row.total-paid};})]];
+ if(q.startsWith('SELECT i.*,CASE'))return [[...state.invoices.filter(row=>row.id===values[0]&&!row.deleted).map(row=>{const paid=state.payments.filter(p=>p.invoice_id===row.id&&!p.voided_at).reduce((n,p)=>n+p.amount,0);return {...copy(row),paid_amount:paid,balance_due:row.total-paid};})]];
  if(q.startsWith('SELECT id,amount,voided_at FROM invoice_payments'))return [[...state.payments.filter(row=>row.invoice_id===values[0]&&row.request_key===values[1]).map(copy)]];
  if(q.startsWith('SELECT id FROM invoices WHERE invoice_no='))return [[...state.invoices.filter(row=>row.invoice_no===values[0]&&row.id!==values[1]&&!row.deleted).map(copy)]];
  if(q.startsWith('INSERT INTO invoices(')){
@@ -29,7 +29,7 @@ async function query(sql,values=[]){
  if(q.startsWith('SELECT id FROM customers'))return [[]];
  if(q.startsWith('INSERT INTO customers')){state.customers.push({name:values[0],email:values[1]});return [{insertId:state.customers.length}];}
  if(q.startsWith('SELECT id,amount,request_payload_sha256,voided_at FROM invoice_payments'))return [[...state.payments.filter(row=>row.request_key===values[0]).map(copy)]];
- if(q.startsWith('SELECT COALESCE(SUM(amount),0) amount FROM invoice_payments'))return [[{amount:state.payments.filter(row=>row.invoice_id===values[0]&&!row.voided_at).reduce((sum,row)=>sum+row.amount,0)}]];
+ if(q.startsWith('SELECT COALESCE(SUM(amount),0) amount'))return [[{amount:state.payments.filter(row=>row.invoice_id===values[0]&&!row.voided_at).reduce((sum,row)=>sum+row.amount,0)}]];
  if(q.startsWith('INSERT INTO invoice_payments(')){const [invoice_id,amount,payment_date,method,reference,notes,created_by,request_key,request_payload_sha256]=values;const id=state.sequence++;state.payments.push({id,invoice_id,amount,payment_date,method,reference,notes,created_by,request_key,request_payload_sha256,voided_at:null});return [{insertId:id}];}
  if(q.startsWith('SELECT * FROM invoice_payments WHERE id='))return [[...state.payments.filter(row=>row.id===values[0]&&row.invoice_id===values[1]).map(copy)]];
  if(q.startsWith('UPDATE invoice_payments SET voided_at=')){const row=state.payments.find(row=>row.id===values[1]);row.voided_at='fixture-time';row.voided_by=values[0];return [{affectedRows:1}];}

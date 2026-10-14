@@ -76,6 +76,19 @@ jobs:
           name: responsive-invoices-${{ github.sha }}
           path: ${{ runner.temp }}/responsive-invoice-proof
           retention-days: 30
+      - name: Verify invoice review, structured views, one Close, discard and document versions
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_INVOICE_DETAIL_PROOF: after
+          UI_PROOF_DIR: ${{ runner.temp }}/invoice-dialog-proof
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/restored-ui-browser-test.js
+      - name: Preserve invoice and shared dialog evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: invoice-dialogs-${{ github.sha }}
+          path: ${{ runner.temp }}/invoice-dialog-proof
+          retention-days: 30
       - name: Test procurement import, records, reports and private source workflows in responsive browsers
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright

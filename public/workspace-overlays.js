@@ -14,6 +14,7 @@
   function close(id, reason = 'closed') {
     if (!active || (id && active.id !== id)) return false;
     const previous = active;
+    if(previous.beforeClose?.(reason)===false)return false;
     active = null;
     try { previous.onClose?.(reason); }
     finally {
@@ -28,8 +29,9 @@
     const next = typeof name === 'string' ? { id: name, onClose, returnFocus } : { ...name };
     if (!next.id || typeof next.onClose !== 'function') throw new Error('An overlay needs an identity and a close action.');
     if (active?.id === next.id) return active.id;
-    close(null, 'replacement');
-    if (active) close(null, 'replacement');
+    if(active&&!close(null, 'replacement'))return false;
+    if(active&&!close(null, 'replacement'))return false;
+    if(active)return false;
     if (document.body?.classList.contains('mobile-menu-open')) {
       if (typeof window.toggleMobileMenu === 'function') window.toggleMobileMenu(false);
       if (typeof window.toggleStaffMobileMenu === 'function') window.toggleStaffMobileMenu(false);

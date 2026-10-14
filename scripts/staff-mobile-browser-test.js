@@ -13,7 +13,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const { chromium } = require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
 const project = path.resolve(__dirname, '..');
-const baselineRef = process.env.VV_STAFF_BASELINE_REF || '62ace8be4287ef083c344174739378b8de9a7660';
+const baselineRef = process.env.VV_STAFF_BASELINE_REF || '616f8ee9e5d54af1201389ca1b7690a66163d0ad';
 assert(/^[a-f0-9]{40}$/.test(baselineRef), 'Before screenshots require an exact preserved Git commit.');
 const selectedPhase = process.env.VV_STAFF_PROOF_PHASE || 'both';
 assert(['before', 'after', 'both'].includes(selectedPhase), 'Choose before, after or both for staff proof.');
@@ -836,7 +836,7 @@ async function run() {
           const image = document.querySelector('#sidebarAvatar img');
           return Boolean(image && !image.hidden && image.naturalWidth > 0 && getComputedStyle(image).display !== 'none');
         });
-        if (phase === 'before') assert.equal(sidebarPhotoRendered, ['235cc208e1425f0c9cdedc1e210c7725526a0b01','62ace8be4287ef083c344174739378b8de9a7660'].includes(baselineRef), 'The current-release baseline preserves its repaired saved avatar; older baselines retain their documented defect.');
+        if (phase === 'before') assert.equal(sidebarPhotoRendered, ['235cc208e1425f0c9cdedc1e210c7725526a0b01','62ace8be4287ef083c344174739378b8de9a7660','616f8ee9e5d54af1201389ca1b7690a66163d0ad'].includes(baselineRef), 'The current-release baseline preserves its repaired saved avatar; older baselines retain their documented defect.');
         violations.push(...await page.evaluate(() => window.__fixtureCspViolations));
         if (phase === 'after') {
           assert.equal(sidebarPhotoRendered, true, 'after staff photo is loaded before its proof screenshot');

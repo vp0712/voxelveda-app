@@ -1,0 +1,164 @@
+{
+  "baseline": "616f8ee9e5d54af1201389ca1b7690a66163d0ad",
+  "fixtureOnly": true,
+  "production_record_changed": false,
+  "phase": "after",
+  "cases": [
+    {
+      "theme": "light",
+      "width": 320,
+      "scroll": 320,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 320,
+      "scroll": 320,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 360,
+      "scroll": 360,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 360,
+      "scroll": 360,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 390,
+      "scroll": 390,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 390,
+      "scroll": 390,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 430,
+      "scroll": 430,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "dark",
+      "width": 430,
+      "scroll": 430,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 824
+    },
+    {
+      "theme": "light",
+      "width": 768,
+      "scroll": 768,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "dark",
+      "width": 768,
+      "scroll": 768,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "light",
+      "width": 1024,
+      "scroll": 1024,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "dark",
+      "width": 1024,
+      "scroll": 1024,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "light",
+      "width": 1440,
+      "scroll": 1440,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "dark",
+      "width": 1440,
+      "scroll": 1440,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 820
+    },
+    {
+      "theme": "light",
+      "width": 844,
+      "scroll": 844,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 366
+    },
+    {
+      "theme": "dark",
+      "width": 844,
+      "scroll": 844,
+      "footer": [
+        "Close"
+      ],
+      "dialogHeight": 366
+    }
+  ],
+  "checks": [
+    "Read-only Close performs no write request",
+    "Failure shows Retry/Close and no partial invoice; retry loads complete data",
+    "Editable Cancel/Escape asks to discard; decline retains form; discard leaves saved RFQ unchanged",
+    "Business Close RFQ is a separate reasoned action; dialog Cancel makes no write",
+    "Malformed successful HTTP response is an uncertain outcome, never false business success",
+    "Security dialog owns keyboard focus; malformed verification does not bypass MFA; Escape restores invoice focus",
+    "Verified unpaid, partial and paid detail amounts agree with authorised API",
+    "Parser-valid PDF agrees with detail; stale document version is rejected",
+    "Long descriptions and 45-item invoice remain complete across PDF pages"
+  ],
+  "security_telemetry_posts": 3
+}

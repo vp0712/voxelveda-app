@@ -94,7 +94,7 @@
     state.returnFocus=trigger instanceof HTMLElement?trigger:document.activeElement;
     if(typeof window.toggleMobileMenu==='function')window.toggleMobileMenu(false);
     if(typeof window.toggleStaffMobileMenu==='function')window.toggleStaffMobileMenu(false);
-    if(window.VoxelOverlay)window.VoxelOverlay.open('notifications',hide,state.returnFocus);
+    if(window.VoxelOverlay&&window.VoxelOverlay.open('notifications',hide,state.returnFocus)===false)return;
     state.open=true;panel.hidden=false;backdrop.hidden=false;position();badges();
     requestAnimationFrame(()=>{if(state.open)panel.querySelector('[data-notification-close]')?.focus({preventScroll:true});});
     await refresh();
@@ -115,7 +115,7 @@
     let dismissed=false;
     const dismiss=()=>{if(dismissed)return;dismissed=true;cover.remove();document.removeEventListener('keydown',keyboard,true);notificationDialogClose=null;if(window.VoxelOverlay?.active==='notification-record')window.VoxelOverlay.close('notification-record');else if(!window.VoxelOverlay && returnFocus?.isConnected)returnFocus.focus({preventScroll:true});};
     const keyboard=event=>{if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();dismiss();}else if(event.key==='Tab'){const controls=[...dialog.querySelectorAll('button,[tabindex="0"]')],first=controls[0],last=controls.at(-1);if(event.shiftKey && (document.activeElement===first || !dialog.contains(document.activeElement))){event.preventDefault();last?.focus();}else if(!event.shiftKey && (document.activeElement===last || !dialog.contains(document.activeElement))){event.preventDefault();first?.focus();}}};
-    close('replacement');if(window.VoxelOverlay)window.VoxelOverlay.open('notification-record',dismiss,returnFocus);
+    close('replacement');if(window.VoxelOverlay&&window.VoxelOverlay.open('notification-record',dismiss,returnFocus)===false){cover.remove();return;}
     notificationDialogClose=dismiss;cover.append(dialog);document.body.append(cover);dialog.querySelector('[data-record-close]').addEventListener('click',dismiss);cover.addEventListener('click',event=>{if(event.target===cover)dismiss();});document.addEventListener('keydown',keyboard,true);dialog.querySelector('[data-record-close]').focus({preventScroll:true});
   }
   async function openSpecific(result,notificationId) {

@@ -152,7 +152,7 @@
   function close(){if(window.VoxelOverlay)window.VoxelOverlay.close('staff-attendance');else{closeOverlay();document.body.classList.remove('staff-attendance-open');overlayReturn?.focus?.();}}
   function openSheet(title,body,kind='attendance'){
     overlayReturn=document.activeElement;window.VoxelAttendanceScanner?.stop();window.closeStaffNotificationPanel?.();window.toggleMobileMenu?.(false);$('staffProfileMenu').hidden=true;$('staffProfileMenuToggle').setAttribute('aria-expanded','false');
-    if(window.VoxelOverlay)window.VoxelOverlay.open('staff-attendance',closeOverlay,overlayReturn);else document.body.classList.add('staff-attendance-open');
+    if(window.VoxelOverlay){if(window.VoxelOverlay.open('staff-attendance',closeOverlay,overlayReturn)===false)return;}else document.body.classList.add('staff-attendance-open');
     overlayKind=kind;setText('staffAttendanceTitle',title);$('staffAttendanceBody').innerHTML=body;$('staffAttendanceOverlay').hidden=false;document.querySelector('.staff-attendance-sheet')?.focus();
   }
   function sheetError(message,fields){
@@ -311,7 +311,7 @@
     };
   }
   function navigate(section){close();window.VoxelOverlay?.close('staff-profile');window.goStaffSection?.(section);setText('staffPageTitle',section==='dashboardSection'?'Home':document.querySelector(`.sidebar [data-section="${section}"]`)?.textContent?.trim()||'Workspace');}
-  function profileMenu(){const menu=$('staffProfileMenu'),toggle=$('staffProfileMenuToggle');if(!menu.hidden){window.VoxelOverlay?.close('staff-profile');menu.hidden=true;toggle.setAttribute('aria-expanded','false');return;}close();window.VoxelOverlay?.open('staff-profile',()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');},toggle);menu.hidden=false;toggle.setAttribute('aria-expanded','true');menu.querySelector('button')?.focus();}
+  function profileMenu(){const menu=$('staffProfileMenu'),toggle=$('staffProfileMenuToggle');if(!menu.hidden){window.VoxelOverlay?.close('staff-profile');menu.hidden=true;toggle.setAttribute('aria-expanded','false');return;}close();if(window.VoxelOverlay?.open('staff-profile',()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');},toggle)===false)return;menu.hidden=false;toggle.setAttribute('aria-expanded','true');menu.querySelector('button')?.focus();}
   function applyIdentity(user){
     const switched=identity&&String(identity.id)!==String(user.id);identity=user;
     if(switched){historySequence++;today=null;history=[];corrections=[];clearPending();close();clearError();['staffHomeWorked','staffHomeBreak','staffHomeSessions','staffHomeFirstCheckIn','staffHomeLastCheckOut','weekHoursCount','staffHomeWeekHours'].forEach(id=>setText(id,'—'));setText('staffHomeStatus','Checking...');setText('staffHomeDate','Checking workplace time...');setText('staffHomeAttendanceNote','');setText('staffHomeWorkedDetail','Loading your attendance record');$('staffHomeTimeline').innerHTML='<li class="staff-home-empty">Loading your sessions...</li>';setText('staffHomeNextShift','Loading your next shift...');setText('staffHomeTasks','Loading assigned work...');}

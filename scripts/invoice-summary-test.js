@@ -1,0 +1,22 @@
+'use strict';
+const assert=require('node:assert/strict'),domain=require('../services/invoiceSummaryService');
+const {invoiceDocumentData,statementDocumentData}=require('../services/invoiceDocumentService');
+const {createDocumentPdf}=require('../services/documentPdfService');
+(async()=>{
+ const invoice={id:823166,invoice_no:'INV-823166',customer_name:'Synthetic review fixture',customer_email:'review@example.invalid',status:'paid',created_at:'2026-10-14T00:00:00Z',gst_rate:'10.00',total:'2710.10',document_revision:1};
+ const items=[{description:'Synthetic stored amount; not production evidence',quantity:'1.000',unit_price:'2463.73',amount:'2463.73'}],before=JSON.stringify({invoice,items});
+ const legacy=domain.invoiceSummary(invoice,items,[]);assert.equal(legacy.payment_state,'review_required');assert.equal(legacy.paid_amount,null);assert.equal(legacy.balance_due,null);assert.equal(legacy.subtotal,'2463.73');assert.equal(legacy.tax_amount,'246.37');assert.equal(legacy.tax_verified,true);assert.equal(JSON.stringify({invoice,items}),before);
+ const pdf=await createDocumentPdf(invoiceDocumentData(invoice,items,legacy));assert.match(pdf.validation.text,/Payment details require review/);assert.match(pdf.validation.text,/AUD 2,710.10/);assert.doesNotMatch(pdf.validation.text,/Paid amount\s*AUD 0\.00/);
+ const unpaid=domain.invoiceSummary({...invoice,status:'approved'},items,[]);assert.equal(unpaid.paid_amount,'0.00');assert.equal(unpaid.balance_due,'2710.10');
+ const partial=domain.invoiceSummary({...invoice,status:'approved'},items,[{id:1,amount:'100.01',voided_at:null}]);assert.equal(partial.payment_state,'partial');assert.equal(partial.balance_due,'2610.09');
+ const paid=domain.invoiceSummary(invoice,items,[{id:1,amount:'2710.10',voided_at:null}]);assert.equal(paid.payment_state,'paid');assert.equal(paid.balance_due,'0.00');
+ const reversal=domain.invoiceSummary({...invoice,status:'approved'},items,[{id:1,amount:'2710.10',voided_at:'2026-10-14'}]);assert.equal(reversal.payment_state,'unpaid');assert.equal(reversal.recorded_payment_count,0);
+ for(const rows of [[{amount:'-1.00'}],[{amount:'2710.11'}],[{amount:null}],[{amount:'0.00'}]])assert.equal(domain.invoiceSummary(invoice,items,rows).review_required,true);
+ const inclusive=domain.invoiceSummary({...invoice,tax_inclusive:1,total:'110.00'},[{quantity:1,unit_price:'110.00',amount:'110.00'}],[]);assert.equal(inclusive.tax_verified,true);assert.equal(inclusive.subtotal,'100.00');assert.equal(inclusive.tax_amount,'10.00');
+ const zeroGst=domain.invoiceSummary({...invoice,status:'draft',gst_rate:0,total:'100.00'},[{quantity:1,unit_price:'100.00',amount:'100.00'}],[]);assert.equal(zeroGst.tax_amount,'0.00');assert.equal(zeroGst.tax_verified,true);
+ const unavailableTax=domain.invoiceSummary({...invoice,gst_rate:null},items,[]);assert.equal(unavailableTax.tax_amount,null);assert.equal(unavailableTax.tax_verified,false);
+ assert.throws(()=>invoiceDocumentData({...invoice,total:'1.00'},items),{code:'PDF_TOTAL_MISMATCH'});
+ const activity=domain.publicActivity({id:1,action_type:'edited',notes:JSON.stringify({before:{private_token:'do not expose'},after:{total:1}}),created_at:'2026-10-14',actor_name:'Authorised fixture actor'});assert.equal(activity.action_label,'Invoice edited');assert.doesNotMatch(JSON.stringify(activity),/private_token|before|after/);
+ const statement=statementDocumentData({customer:{name:'Fixture',email:'fixture@example.invalid'},issueDate:'2026-10-14',invoices:[{...invoice,paid_amount:null,balance_due:null}],payments:[],totals:{invoice_value:2710.10,paid:null,balance_due:null}});const statementPdf=await createDocumentPdf(statement);assert.match(statementPdf.validation.text,/Payment details require review/);assert.match(statementPdf.validation.text,/Requires review/);
+ console.log('Invoice summary tests passed: historical claims unknown; verified unpaid/partial/paid; void and invalid/overpayment review; exact cent arithmetic; explicit inclusive/exclusive and zero/missing GST; parser-valid consistent PDFs/statements; read calculations immutable and activity payloads private.');
+})().catch(error=>{console.error(error);process.exitCode=1;});

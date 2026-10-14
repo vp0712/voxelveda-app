@@ -1066,7 +1066,7 @@
       <h3 id="staffDialogTitle">Update</h3>
       <div id="staffDialogBody"></div>
       <div class="dialog-actions">
-        <button type="button" class="secondary-btn" onclick="return hideStaffDialog()">Cancel</button>
+        <button type="button" id="staffDialogCancelBtn" class="secondary-btn" onclick="return hideStaffDialog(true)">Cancel</button>
         <button type="button" class="primary-btn" id="staffDialogPrimaryBtn">Save</button>
       </div>
     </section>
@@ -1078,7 +1078,7 @@
       <p id="shiftMessage" class="shift-quote"></p>
       <p id="shiftSubtext" class="shift-subtext"></p>
       <div class="dialog-actions">
-        <button type="button" class="primary-btn" onclick="return hideShiftDialog()">Continue</button>
+        <button type="button" class="primary-btn" onclick="return hideShiftDialog()">Close</button>
       </div>
     </section>
   </div>
