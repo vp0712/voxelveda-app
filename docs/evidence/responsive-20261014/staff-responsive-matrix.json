@@ -1,0 +1,3223 @@
+{
+  "fixtureOnly": true,
+  "scope": "After product staff DOM, canonical synthetic owner/photo and notifications; seven required widths plus landscape in the existing light/dark preference. Attendance writes are covered separately.",
+  "complete": true,
+  "results": [
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-320",
+        "width": 320,
+        "height": 844
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 320,
+        "scrollWidth": 320,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 90,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 88,
+            "scrollWidth": 88,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 320,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 320,
+        "viewportWidth": 320
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 788,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 788,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 788,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 789,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 789,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 795,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 858,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 858,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-320",
+        "width": 320,
+        "height": 844
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 320,
+        "scrollWidth": 320,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 90,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 88,
+            "scrollWidth": 88,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 50,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 48,
+            "scrollWidth": 48,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 320,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 320,
+        "viewportWidth": 320
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 826,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 827,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 827,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 827,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 828,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 834,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 917,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 917,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-360",
+        "width": 360,
+        "height": 844
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 360,
+        "scrollWidth": 360,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 90,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 88,
+            "scrollWidth": 88,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 360,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 360,
+        "viewportWidth": 360
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 796,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 796,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 796,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 797,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 797,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 803,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 863,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 863,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-360",
+        "width": 360,
+        "height": 844
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 360,
+        "scrollWidth": 360,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 90,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 88,
+            "scrollWidth": 88,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 60,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 58,
+            "scrollWidth": 58,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 360,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 360,
+        "viewportWidth": 360
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 788,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 788,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 788,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 788,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 789,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 798,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 907,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 907,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-390",
+        "width": 390,
+        "height": 844
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 390,
+        "scrollWidth": 390,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 66.65625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 66.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 93.328125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 91,
+            "scrollWidth": 91,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 66.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 66.65625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 390,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 390,
+        "viewportWidth": 390
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 849,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 849,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 849,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 849,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 850,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 858,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 931,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 931,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-390",
+        "width": 390,
+        "height": 844
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 390,
+        "scrollWidth": 390,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 66.65625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 66.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 93.328125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 91,
+            "scrollWidth": 91,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 66.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 66.65625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 65,
+            "scrollWidth": 65,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 390,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 390,
+        "viewportWidth": 390
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 76,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 756,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 757,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 757,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 757,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 758,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 766,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 836,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 836,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 76,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-430",
+        "width": 430,
+        "height": 844
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 430,
+        "scrollWidth": 430,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 74.0625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 74.078125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 103.703125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 102,
+            "scrollWidth": 102,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 74.078125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 74.078125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 430,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 430,
+        "viewportWidth": 430
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 784,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 784,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 785,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 785,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 785,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 792,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 863,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 863,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-430",
+        "width": 430,
+        "height": 844
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 430,
+        "scrollWidth": 430,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 74.0625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 74.078125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 103.703125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 102,
+            "scrollWidth": 102,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 74.078125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 74.078125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 72,
+            "scrollWidth": 72,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 0,
+        "y": 204,
+        "width": 430,
+        "height": 640
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 430,
+        "viewportWidth": 430
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 781,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 781,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 782,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 782,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 782,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 792,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 863,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 863,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-768",
+        "width": 768,
+        "height": 844
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 768,
+        "scrollWidth": 768,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 136.65625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 136.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 191.328125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 189,
+            "scrollWidth": 189,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 136.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 136.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 231,
+        "y": 71,
+        "width": 400,
+        "height": 580
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 768,
+        "viewportWidth": 768
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 782,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 782,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 783,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 783,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 783,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 789,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 853,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 853,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-768",
+        "width": 768,
+        "height": 844
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 768,
+        "scrollWidth": 768,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 136.65625,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 136.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 191.328125,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 189,
+            "scrollWidth": 189,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 136.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 136.671875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 135,
+            "scrollWidth": 135,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 231,
+        "y": 71,
+        "width": 400,
+        "height": 580
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 768,
+        "viewportWidth": 768
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 75,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 806,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 806,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 806,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 806,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 807,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 817,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 913,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 914,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 75,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-1024",
+        "width": 1024,
+        "height": 844
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 1024,
+        "scrollWidth": 1024,
+        "photoLoaded": true,
+        "mobileNavVisible": false,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Shifts",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Timesheets",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Tasks",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Profile",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          }
+        ]
+      },
+      "panel": {
+        "x": 480.4375,
+        "y": 83,
+        "width": 400,
+        "height": 580
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 1024,
+        "viewportWidth": 1024
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 796,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 797,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 797,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 797,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 798,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 803,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 889,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 890,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-1024",
+        "width": 1024,
+        "height": 844
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 1024,
+        "scrollWidth": 1024,
+        "photoLoaded": true,
+        "mobileNavVisible": false,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Shifts",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Timesheets",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Tasks",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Profile",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          }
+        ]
+      },
+      "panel": {
+        "x": 480.4375,
+        "y": 83,
+        "width": 400,
+        "height": 580
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 1024,
+        "viewportWidth": 1024
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 809,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 809,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 809,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 809,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 810,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 817,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 904,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 904,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-1440",
+        "width": 1440,
+        "height": 844
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 1440,
+        "scrollWidth": 1440,
+        "photoLoaded": true,
+        "mobileNavVisible": false,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Shifts",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Timesheets",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Tasks",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Profile",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          }
+        ]
+      },
+      "panel": {
+        "x": 886.453125,
+        "y": 83,
+        "width": 400,
+        "height": 580
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 1440,
+        "viewportWidth": 1440
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 805,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 805,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 805,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 805,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 806,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 818,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 963,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 963,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "width-1440",
+        "width": 1440,
+        "height": 844
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 1440,
+        "scrollWidth": 1440,
+        "photoLoaded": true,
+        "mobileNavVisible": false,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Shifts",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Timesheets",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Tasks",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          },
+          {
+            "label": "Profile",
+            "width": 0,
+            "height": 0,
+            "fontSize": "14px",
+            "textOverflow": "clip",
+            "clientWidth": 0,
+            "scrollWidth": 0,
+            "clientHeight": 0,
+            "scrollHeight": 0
+          }
+        ]
+      },
+      "panel": {
+        "x": 886.453125,
+        "y": 83,
+        "width": 400,
+        "height": 580
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 1440,
+        "viewportWidth": 1440
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 80,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 867,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 867,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 867,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 868,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 868,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 877,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 976,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 976,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 80,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "mode": "light",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "light",
+        "owner": 9401,
+        "width": 844,
+        "scrollWidth": 844,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 211.046875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 209,
+            "scrollWidth": 209,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 307,
+        "y": 73,
+        "width": 400,
+        "height": 303
+      },
+      "panelStyle": {
+        "background": "rgb(255, 255, 255)",
+        "color": "rgb(21, 37, 68)",
+        "scrollWidth": 844,
+        "viewportWidth": 844
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 0,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 0,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 825,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 825,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 825,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 825,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 826,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 834,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 906,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 907,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    },
+    {
+      "fixtureOnly": true,
+      "viewport": {
+        "name": "phone-landscape",
+        "width": 844,
+        "height": 390
+      },
+      "mode": "dark",
+      "canonicalOwner": 9401,
+      "visibleAppReady": true,
+      "layout": {
+        "theme": "dark",
+        "owner": 9401,
+        "width": 844,
+        "scrollWidth": 844,
+        "photoLoaded": true,
+        "mobileNavVisible": true,
+        "nav": [
+          {
+            "label": "Home",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Shifts",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Timesheets",
+            "width": 211.046875,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 209,
+            "scrollWidth": 209,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Tasks",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          },
+          {
+            "label": "Profile",
+            "width": 150.734375,
+            "height": 48,
+            "fontSize": "12px",
+            "textOverflow": "clip",
+            "clientWidth": 149,
+            "scrollWidth": 149,
+            "clientHeight": 46,
+            "scrollHeight": 46
+          }
+        ]
+      },
+      "panel": {
+        "x": 307,
+        "y": 73,
+        "width": 400,
+        "height": 303
+      },
+      "panelStyle": {
+        "background": "rgb(24, 35, 55)",
+        "color": "rgb(245, 248, 255)",
+        "scrollWidth": 844,
+        "viewportWidth": 844
+      },
+      "beforeOverlay": {
+        "scrollX": 0,
+        "scrollY": 0,
+        "overflow": "",
+        "overscroll": ""
+      },
+      "restored": {
+        "activeElement": "staffNotificationBell",
+        "scrollX": 0,
+        "scrollY": 0,
+        "overflow": "",
+        "overscroll": "",
+        "overlayOpen": false
+      },
+      "overlayTrace": [
+        {
+          "type": "pointerdown",
+          "at": 792,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "mousedown",
+          "at": 792,
+          "target": "staffNotificationBell",
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "focusin",
+          "at": 792,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "click",
+          "at": 793,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-open",
+          "at": 794,
+          "target": null,
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 800,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": "notifications",
+          "brandBusy": false,
+          "overflow": "hidden",
+          "id": null
+        },
+        {
+          "type": "vv:overlay-closed",
+          "at": 870,
+          "target": null,
+          "activeElement": null,
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": "notifications"
+        },
+        {
+          "type": "focusin",
+          "at": 871,
+          "target": "staffNotificationBell",
+          "activeElement": "staffNotificationBell",
+          "scrollX": 0,
+          "scrollY": 0,
+          "overlay": null,
+          "brandBusy": false,
+          "overflow": "",
+          "id": null
+        }
+      ],
+      "attendanceWrites": 0
+    }
+  ]
+}

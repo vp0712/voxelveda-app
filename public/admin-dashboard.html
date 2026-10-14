@@ -377,45 +377,46 @@
 
       <!-- INVOICES -->
       <section id="invoiceSection" class="page-section hidden-section">
-        <div class="section-head">
+        <div class="invoice-register-header">
           <div>
-            <h2>Invoice Tracking</h2>
-            <p>Newest invoices are added at the bottom of the register</p>
+            <h2>Invoice register</h2>
           </div>
-          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <div class="invoice-register-actions">
             <button onclick="return openCustomerStatementDialog()" class="secondary-btn">Customer Statement</button>
-            <button onclick="return manualCreateInvoice()" class="secondary-btn">Create From RFQ</button>
-            <button onclick="return openManualInvoiceDialog()" class="primary-btn">Manual Invoice</button>
+            <details class="record-action-menu"><summary>Create invoice</summary><div>
+              <button onclick="return manualCreateInvoice()" class="secondary-btn">Create From RFQ</button>
+              <button onclick="return openManualInvoiceDialog()" class="primary-btn">Manual Invoice</button>
+            </div></details>
           </div>
         </div>
 
-        <div class="metric-grid">
+        <details class="invoice-summary-panel"><summary>Filtered totals</summary><div class="metric-grid invoice-list-summary">
           <div class="card">
             <h3>Total Invoice Value</h3>
-            <p><strong id="invoiceTotalValue">$0.00</strong></p>
+            <p><strong id="invoiceTotalValue">Loading…</strong></p>
           </div>
           <div class="card">
             <h3>Debt / Balance Left</h3>
-            <p><strong id="invoiceUnpaidValue">$0.00</strong></p>
+            <p><strong id="invoiceUnpaidValue">Loading…</strong></p>
           </div>
           <div class="card">
             <h3>Collected / Paid</h3>
-            <p><strong id="invoiceSentPaidCount">0 / 0</strong></p>
+            <p><strong id="invoiceSentPaidCount">Loading…</strong></p>
           </div>
         </div>
 
+        </details>
         <div class="card table-wrap">
-          <h3>Invoice Register</h3>
-          <table>
+          <table class="invoice-table">
             <thead>
               <tr>
                 <th>#</th>
                 <th>Invoice No</th>
                 <th>Customer</th>
                 <th>RFQ ID</th>
-                <th>Total AUD</th>
+                <th>Date</th><th>Total</th>
                 <th>Paid</th>
-                <th>Debt Left</th>
+                <th>Outstanding</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
@@ -1287,16 +1288,16 @@
             <div class="section-actions" data-procurement-primary-actions></div>
           </div>
         </div>
-        <div class="procurement-summary" aria-label="Procurement summary">
-          <article><span>Requisitions pending</span><strong data-procurement-count="requisitions_pending">0</strong></article>
-          <article><span>Supplier RFQs open</span><strong data-procurement-count="supplier_rfqs_open">0</strong></article>
-          <article><span>Purchase orders open</span><strong data-procurement-count="purchase_orders_open">0</strong></article>
-          <article><span>Awaiting inspection</span><strong data-procurement-count="receipts_waiting_inspection">0</strong></article>
-          <article><span>Bill exceptions</span><strong data-procurement-count="bill_exceptions">0</strong></article>
-          <article><span>Credits pending</span><strong data-procurement-count="credits_pending">0</strong></article>
-          <article><span>Master BOM items</span><strong data-procurement-count="bom_items">0</strong></article>
-          <article><span>Launch cap</span><strong data-procurement-count="launch_cap">0</strong></article>
-        </div>
+        <details class="procurement-overview"><summary>Operational totals</summary><div class="procurement-summary" aria-label="Procurement summary">
+          <article><span>Requisitions pending</span><strong data-procurement-count="requisitions_pending">Loading…</strong></article>
+          <article><span>Supplier RFQs open</span><strong data-procurement-count="supplier_rfqs_open">Loading…</strong></article>
+          <article><span>Purchase orders open</span><strong data-procurement-count="purchase_orders_open">Loading…</strong></article>
+          <article><span>Awaiting inspection</span><strong data-procurement-count="receipts_waiting_inspection">Loading…</strong></article>
+          <article><span>Bill exceptions</span><strong data-procurement-count="bill_exceptions">Loading…</strong></article>
+          <article><span>Credits pending</span><strong data-procurement-count="credits_pending">Loading…</strong></article>
+          <article><span>Master BOM items</span><strong data-procurement-count="bom_items">Loading…</strong></article>
+          <article><span>Launch cap</span><strong data-procurement-count="launch_cap">Loading…</strong></article>
+        </div></details>
         <div class="procurement-workspace">
           <div class="procurement-toolbar">
             <div class="procurement-tabs" role="tablist" aria-label="Procurement workspace">

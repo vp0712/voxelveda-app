@@ -1,0 +1,71 @@
+{
+  "verified_at": "2026-10-14T10:31:17.110Z",
+  "route_graph": "real app.js",
+  "data": "isolated in-memory SQL fixture",
+  "viewports": [
+    {
+      "viewport": "phone_portrait",
+      "mode": "light",
+      "screenshot": "phone_portrait-light.png"
+    },
+    {
+      "viewport": "phone_portrait",
+      "mode": "dark",
+      "screenshot": "phone_portrait-dark.png"
+    },
+    {
+      "viewport": "phone_landscape",
+      "mode": "light",
+      "screenshot": "phone_landscape-light.png"
+    },
+    {
+      "viewport": "phone_landscape",
+      "mode": "dark",
+      "screenshot": "phone_landscape-dark.png"
+    },
+    {
+      "viewport": "tablet",
+      "mode": "light",
+      "screenshot": "tablet-light.png"
+    },
+    {
+      "viewport": "tablet",
+      "mode": "dark",
+      "screenshot": "tablet-dark.png"
+    },
+    {
+      "viewport": "desktop",
+      "mode": "light",
+      "screenshot": "desktop-light.png"
+    },
+    {
+      "viewport": "desktop",
+      "mode": "dark",
+      "screenshot": "desktop-dark.png"
+    }
+  ],
+  "rfq_edit_refresh_archive_restore": true,
+  "stored_xss_fixture": true,
+  "weekly_diagnostics_and_explicit_uncertain_confirmation": true,
+  "company_timezone_and_legacy_wall_time": true,
+  "staff_client_qms": true,
+  "staff_qms": {
+    "command_centre_status": 200,
+    "ncr_status": 200,
+    "rendered_ncr_no": "NCR-FIXTURE-0101"
+  },
+  "qr_renderer": {
+    "status": 200,
+    "content_type": "image/png",
+    "sha256": "fe45bf9c19aa9ae8cebc4464a5724ffd0d7cec9ad070ad53ec0b0aec3d404828",
+    "decoded_image": true
+  },
+  "invoice_approval_step_up_retained": true,
+  "parser_valid_invoice_download": true,
+  "invoice_response_download_preview_sha256": "d6efc96d91319e16b5e1cb770107a2c52031c016a99c6644e89cd496b28f3ccb",
+  "pdf_pages": 1,
+  "logo_sha256": "ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312",
+  "uncaught_errors": [],
+  "retired_routes_checked": true,
+  "recipient_email_verification": false
+}

@@ -25,20 +25,12 @@
       const name = disposition.match(/filename="?([^";]+)"?/i)?.[1];
       if (!name || !/^[A-Za-z0-9._ -]+\.pdf$/.test(name)) throw new Error('The document service returned an invalid PDF filename. No file was downloaded.');
       const bytes = await response.arrayBuffer();
-      if (bytes.byteLength < 100 || new TextDecoder('ascii').decode(bytes.slice(0,5)) !== '%PDF-') throw new Error('The document service returned invalid PDF bytes. No file was downloaded.');
-      // The service parses every document before responding. Preview and download share these exact bytes.
-      if (documentUrl) URL.revokeObjectURL(documentUrl);
-      documentUrl = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
-      filename = name; frame.src = documentUrl; frame.hidden = false; download.disabled = false;
-      status.textContent = `${filename} · official PDF ready. Preview and download use the same document.`;
+      const reader=await import('/pdf-reader.mjs');await reader.load(bytes,name);
+      filename=name;download.disabled=false;
+
     } catch (error) { status.textContent = error.message; status.className = 'error'; retry.hidden = false; frame.hidden = true; }
     finally { loading = false; }
   }
-  download.onclick = () => {
-    if (!documentUrl || !filename || download.disabled) return;
-    const link = document.createElement('a'); link.href = documentUrl; link.download = filename;
-    document.body.append(link); link.click(); link.remove();
-  };
   retry.onclick = load;
   window.addEventListener('pagehide', () => { if (documentUrl) URL.revokeObjectURL(documentUrl); });
   load();

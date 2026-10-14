@@ -1,0 +1,901 @@
+{
+  "status": "PASS",
+  "boundary": "Isolated API contract/browser fixture. Backend MySQL, worker restart and live provider evidence are separate gates.",
+  "real_libraries": [
+    "retained procurement-ui.js and markup/theme",
+    "authorization middleware",
+    "security headers/CSP",
+    "extractImportFile/normalizeImportRow",
+    "createDocumentPdf/validatePdf/sourceArtifact"
+  ],
+  "proof": [
+    {
+      "flow": "isolated upload/map/edit/select/save/archive/restore/report",
+      "saved_entries": 1,
+      "retained_unselected_rows": 2,
+      "report_sha256": "516d94ba601061b1e62d1f78c00c22661f55e59abc8ff6409ab23817a083e106",
+      "email_attachment_sha256": "516d94ba601061b1e62d1f78c00c22661f55e59abc8ff6409ab23817a083e106",
+      "provider": "isolated status fixture; no provider contacted"
+    },
+    {
+      "source_pdf_pages": 3,
+      "unsupported_source_status": 422,
+      "raw_source_links": 0
+    },
+    {
+      "outcome_request_filters": {},
+      "retained_source_rows": 3
+    },
+    {
+      "filter_fields": [
+        "search",
+        "category",
+        "priority",
+        "phase"
+      ],
+      "sort": "title_asc",
+      "paginated_records": 26,
+      "page_size": 25,
+      "second_page_records": 1,
+      "unknown_currency": "exact 7.00 with currency not recorded",
+      "quantity_units": [
+        "pcs",
+        "lot"
+      ],
+      "preserved_priorities": [
+        "P1",
+        "P4"
+      ],
+      "original_priority_options": [
+        "P1",
+        "P2",
+        "P3",
+        "P4"
+      ]
+    },
+    {
+      "name": "width-320-light",
+      "viewport": 320,
+      "width": 320,
+      "localTableScroll": true,
+      "theme": "light"
+    },
+    {
+      "name": "width-320-dark",
+      "viewport": 320,
+      "width": 320,
+      "localTableScroll": true,
+      "theme": "dark"
+    },
+    {
+      "name": "width-360-light",
+      "viewport": 360,
+      "width": 360,
+      "localTableScroll": true,
+      "theme": "light"
+    },
+    {
+      "name": "width-360-dark",
+      "viewport": 360,
+      "width": 360,
+      "localTableScroll": true,
+      "theme": "dark"
+    },
+    {
+      "name": "width-390-light",
+      "viewport": 390,
+      "width": 390,
+      "localTableScroll": true,
+      "theme": "light"
+    },
+    {
+      "name": "width-390-dark",
+      "viewport": 390,
+      "width": 390,
+      "localTableScroll": true,
+      "theme": "dark"
+    },
+    {
+      "name": "width-430-light",
+      "viewport": 430,
+      "width": 430,
+      "localTableScroll": true,
+      "theme": "light"
+    },
+    {
+      "name": "width-430-dark",
+      "viewport": 430,
+      "width": 430,
+      "localTableScroll": true,
+      "theme": "dark"
+    },
+    {
+      "name": "width-768-light",
+      "viewport": 768,
+      "width": 768,
+      "localTableScroll": true,
+      "theme": "light"
+    },
+    {
+      "name": "width-768-dark",
+      "viewport": 768,
+      "width": 768,
+      "localTableScroll": true,
+      "theme": "dark"
+    },
+    {
+      "name": "width-1024-light",
+      "viewport": 1024,
+      "width": 1024,
+      "localTableScroll": true,
+      "theme": "light"
+    },
+    {
+      "name": "width-1024-dark",
+      "viewport": 1024,
+      "width": 1024,
+      "localTableScroll": true,
+      "theme": "dark"
+    },
+    {
+      "name": "width-1440-light",
+      "viewport": 1440,
+      "width": 1440,
+      "localTableScroll": false,
+      "theme": "light"
+    },
+    {
+      "name": "width-1440-dark",
+      "viewport": 1440,
+      "width": 1440,
+      "localTableScroll": false,
+      "theme": "dark"
+    },
+    {
+      "read_only_write_status": 403,
+      "source": "actual retained authorization middleware"
+    }
+  ],
+  "writes": [
+    {
+      "action": "upload",
+      "count": 2
+    },
+    {
+      "action": "preview",
+      "body": {
+        "expected_revision": 7,
+        "file_id": "d14575ef-cd84-4a85-851e-25569e91b676",
+        "sheet_name": "CSV",
+        "header_row": 1,
+        "mapping": {
+          "description": 0,
+          "quantity": 1,
+          "unit": 2,
+          "unit_price": 3,
+          "tax_rate": 4,
+          "currency": 5,
+          "category": 6,
+          "priority": 7,
+          "phase": 8
+        },
+        "classification": "PLAN",
+        "date_order": "ISO"
+      }
+    },
+    {
+      "action": "edit-source-row",
+      "body": {
+        "expected_revision": 2,
+        "values": {
+          "classification": "PLAN",
+          "title": "Needs quantity",
+          "category": "Hardware",
+          "priority": "NORMAL",
+          "phase": "Build",
+          "reference": "",
+          "supplier_id": "",
+          "supplier_name": "",
+          "date": "",
+          "due_date": "",
+          "currency": "AUD",
+          "description": "Needs quantity",
+          "item_code": "",
+          "quantity": "3",
+          "unit": "pcs",
+          "unit_price": "5",
+          "tax_rate": "0",
+          "net": "",
+          "tax": "",
+          "total": "",
+          "notes": ""
+        },
+        "reviewed": true
+      },
+      "prior_row_revision": 2,
+      "batch_revision": 8
+    },
+    {
+      "action": "commit",
+      "body": {
+        "expected_revision": 9,
+        "preview_token": "151ee0fc-a86f-4afa-b6e3-b1f2522130ad",
+        "row_ids": [
+          "828e409c-3658-4f52-91b1-e02fe17e804b"
+        ],
+        "reviewed_row_ids": [
+          "828e409c-3658-4f52-91b1-e02fe17e804b"
+        ]
+      }
+    },
+    {
+      "action": "edit-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Edited fixture brackets",
+        "category": "Hardware",
+        "priority": "P1",
+        "phase": "Build",
+        "reference": "",
+        "supplier_id": "",
+        "supplier_name": "",
+        "date": "",
+        "due_date": "",
+        "currency": "AUD",
+        "description": "Fixture brackets",
+        "item_code": "",
+        "quantity": "2",
+        "unit": "pcs",
+        "unit_price": "10",
+        "tax_rate": "10",
+        "net": "20",
+        "tax": "2",
+        "total": "22",
+        "notes": "",
+        "expected_revision": 1
+      }
+    },
+    {
+      "action": "archive",
+      "body": {
+        "expected_revision": 2,
+        "reason": "Fixture archive review"
+      }
+    },
+    {
+      "action": "restore",
+      "body": {
+        "expected_revision": 3,
+        "reason": "Fixture restore review"
+      }
+    },
+    {
+      "action": "report",
+      "body": {
+        "type": "selected",
+        "source": "entries",
+        "filters": {
+          "search": "",
+          "classification": "",
+          "category": "",
+          "priority": "",
+          "phase": "",
+          "status": "DRAFT",
+          "currency": "",
+          "supplier_id": "",
+          "from_date": "",
+          "to_date": "",
+          "sort": "created_desc",
+          "archived": false
+        },
+        "ids": [
+          "692a788e-04dc-489e-a591-3ab5ba8b65ba"
+        ]
+      }
+    },
+    {
+      "action": "send",
+      "body": {
+        "to": "reviewer@example.invalid"
+      }
+    },
+    {
+      "action": "report",
+      "body": {
+        "type": "import-outcomes",
+        "source": "entries",
+        "filters": {},
+        "batch_id": "f43b5669-eb25-43e5-bf6f-3ab9ebe8f202"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Manual source-linked plan",
+        "category": "",
+        "priority": "P4",
+        "phase": "",
+        "reference": "",
+        "supplier_id": "",
+        "supplier_name": "",
+        "date": "",
+        "due_date": "",
+        "currency": "",
+        "description": "Reviewed manual source-linked plan",
+        "item_code": "",
+        "quantity": "1",
+        "unit": "lot",
+        "unit_price": "7",
+        "tax_rate": "0",
+        "net": "",
+        "tax": "",
+        "total": "",
+        "notes": "",
+        "source_file_id": "d14575ef-cd84-4a85-851e-25569e91b676"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 01",
+        "description": "Paging control proof 1",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 02",
+        "description": "Paging control proof 2",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 03",
+        "description": "Paging control proof 3",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 04",
+        "description": "Paging control proof 4",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 05",
+        "description": "Paging control proof 5",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 06",
+        "description": "Paging control proof 6",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 07",
+        "description": "Paging control proof 7",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 08",
+        "description": "Paging control proof 8",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 09",
+        "description": "Paging control proof 9",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 10",
+        "description": "Paging control proof 10",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 11",
+        "description": "Paging control proof 11",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 12",
+        "description": "Paging control proof 12",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 13",
+        "description": "Paging control proof 13",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 14",
+        "description": "Paging control proof 14",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 15",
+        "description": "Paging control proof 15",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 16",
+        "description": "Paging control proof 16",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 17",
+        "description": "Paging control proof 17",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 18",
+        "description": "Paging control proof 18",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 19",
+        "description": "Paging control proof 19",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 20",
+        "description": "Paging control proof 20",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 21",
+        "description": "Paging control proof 21",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 22",
+        "description": "Paging control proof 22",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 23",
+        "description": "Paging control proof 23",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 24",
+        "description": "Paging control proof 24",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 25",
+        "description": "Paging control proof 25",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    },
+    {
+      "action": "create-entry",
+      "body": {
+        "classification": "PLAN",
+        "title": "Paging 26",
+        "description": "Paging control proof 26",
+        "quantity": "1",
+        "category": "Paging proof",
+        "unit": "pcs",
+        "currency": "AUD"
+      }
+    }
+  ],
+  "responses": [
+    {
+      "path": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports/f43b5669-eb25-43e5-bf6f-3ab9ebe8f202",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports/f43b5669-eb25-43e5-bf6f-3ab9ebe8f202/preview",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports/f43b5669-eb25-43e5-bf6f-3ab9ebe8f202/rows/6b3c430b-6cf5-48bc-980c-70eca290023f",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports/f43b5669-eb25-43e5-bf6f-3ab9ebe8f202/commit",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports/f43b5669-eb25-43e5-bf6f-3ab9ebe8f202",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/auth/me",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries/692a788e-04dc-489e-a591-3ab5ba8b65ba",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries/692a788e-04dc-489e-a591-3ab5ba8b65ba/archive",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries/692a788e-04dc-489e-a591-3ab5ba8b65ba/restore",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/reports/snapshots",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/reports/snapshots/6d19e595-806b-444d-a8da-7123b6951372/pdf",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/reports/snapshots/6d19e595-806b-444d-a8da-7123b6951372/pdf",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/reports/snapshots/6d19e595-806b-444d-a8da-7123b6951372/send",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/reports/snapshots/6d19e595-806b-444d-a8da-7123b6951372",
+      "status": 200
+    },
+    {
+      "path": "/api/email/documents/1",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports/files/d14575ef-cd84-4a85-851e-25569e91b676/pdf",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/reports/snapshots",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/imports",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/workspace",
+      "status": 200
+    },
+    {
+      "path": "/api/procurement/entries",
+      "status": 200
+    }
+  ]
+}

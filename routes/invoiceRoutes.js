@@ -15,6 +15,7 @@ router.post('/statement/send', requireAnyPermission('SEND_COMPANY_EMAIL'), invoi
 router.get('/blank/pdf', invoiceController.viewBlankInvoicePdf);
 
 router.get('/:id', invoiceController.getInvoiceDetails);
+router.get('/:id/payment-request',invoiceController.paymentReceipt);
 
 /* ================= CREATE ================= */
 

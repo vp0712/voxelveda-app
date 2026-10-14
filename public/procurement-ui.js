@@ -106,7 +106,8 @@
   function summary() {
     const values = state.data.summary || {};
     root.querySelectorAll('[data-procurement-count]').forEach((element) => {
-      element.textContent = String(values[element.dataset.procurementCount] || 0);
+      const value=values[element.dataset.procurementCount];
+      element.textContent = value===null||value===undefined?'Not available':String(value);
     });
   }
 

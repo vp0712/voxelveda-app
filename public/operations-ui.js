@@ -96,8 +96,8 @@
   async function openPdf(url, options = {}) {
     const { download = false, ...request } = options;
     // Open immediately for browser popup policy, then fill only after validation.
-    const preview = download ? null : window.open('about:blank', '_blank');
-    if (preview) preview.document.body.textContent = 'Generating the official PDF…';
+    const preview = download ? null : window.open('/document/view', '_blank');
+    let readyHandler,timer;const ready=preview?new Promise((resolve,reject)=>{readyHandler=event=>{if(event.source===preview&&event.origin===location.origin&&event.data?.type==='VV_PDF_VIEWER_READY')resolve();};window.addEventListener('message',readyHandler);timer=setTimeout(()=>reject(new Error('The preview could not be opened. Download the verified PDF instead.')),15000);}):null;ready?.catch(()=>{});
     try {
       const response = await fetch(url, { credentials:'same-origin', cache:'no-store', ...request });
       if (!response.ok) {
@@ -113,12 +113,12 @@
       if (download) {
         const link = document.createElement('a'); link.href = objectUrl; link.download = filename;
         document.body.append(link); link.click(); link.remove();
-      } else if (preview) { preview.opener = null; preview.location.replace(objectUrl); }
+      } else if (preview) { await ready;preview.postMessage({type:'VV_VERIFIED_PDF',filename,bytes},location.origin); }
       else { const link = document.createElement('a'); link.href = objectUrl; link.target = '_blank'; link.rel = 'noopener'; document.body.append(link); link.click(); link.remove(); }
       // Keep the bytes available for the browser PDF viewer's own download control.
       window.addEventListener('pagehide', () => URL.revokeObjectURL(objectUrl), { once:true });
       return { filename, bytes:bytes.byteLength };
-    } catch (error) { if (preview) preview.close(); throw error; }
+    } catch (error) { if (preview) preview.close(); throw error; }finally{if(readyHandler)window.removeEventListener('message',readyHandler);clearTimeout(timer);}
   }
   window.VoxelOperations = { showFieldErrors, openPdf };
 })();

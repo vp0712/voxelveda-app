@@ -33,7 +33,7 @@ async function main(){
 
  const retired=['/finance','/banking','/erp','/erp-workspace','/finance/reports/RPT_d2bbc70-ab0e-4f40-aa02-18fe722beab1/view','/api/finance/accounts','/api/banking/accounts','/api/erp/dashboard','/erp-workspace.js','/banking.js'];
  for(const route of retired){const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000)});assert.equal(response.status,410,route+' must be retired');const body=await response.text();assert.ok(!body.includes('account_number')&&!body.includes('transaction_amount'),'No archived records returned');proof.checks.push({route,status:410});}
- for(const route of ['/dashboard','/profile','/security','/workspace.html','/admin','/client','/portal/staff','/quality','/shop-floor','/careers-admin','/employee-id','/invoice/view','/attendance-terminal','/a?t=invalid']){
+ for(const route of ['/dashboard','/profile','/security','/workspace.html','/admin','/client','/portal/staff','/quality','/shop-floor','/careers-admin','/employee-id','/invoice/view','/attendance-terminal','/a?t=invalid','/document/view']){
   const response=await fetch(origin+route,{redirect:'follow',signal:AbortSignal.timeout(15000)});const final=new URL(response.url);assert.equal(final.pathname,'/login',route+' requires login');assert.ok(final.searchParams.get('returnTo')||final.searchParams.get('next'),'Login preserves destination');proof.checks.push({route,login_redirect:final.pathname,return_to:final.searchParams.get('returnTo')||final.searchParams.get('next')});
  }
  for(const route of ['/api/rfq','/api/invoice','/api/stock','/api/materials','/api/suppliers','/api/attendance','/api/roster','/api/tasks','/api/qms/dashboard','/api/procurement/overview','/api/procurement/imports','/api/procurement/entries','/api/procurement/reports/snapshots/00000000-0000-4000-8000-000000000001','/api/email/documents/1']){
@@ -45,7 +45,7 @@ async function main(){
  for(const route of ['/api/profile','/api/profile/photo','/api/profile/staff/1/photo','/api/notifications','/api/notifications/unread-count','/api/attendance/today','/api/attendance/my','/api/attendance/reconcile','/api/attendance/corrections']){
   const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000)});assert.equal(response.status,401,route+' retains authentication');proof.checks.push({route,status:401,staff_mobile_authentication_boundary:true});
  }
- for(const name of ['staff-home.js','staff-home.css','attendance-scanner.js','staff.js','admin-dashboard.js','profile.js','workflow-ui.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js','role-portal.js','shift-qr-terminal.js','attendance-gate.css','entry-home.css','portal-profile-menu.js','client-portal.js','admin-home.css']){
+ for(const name of ['staff-home.js','staff-home.css','attendance-scanner.js','staff.js','admin-dashboard.js','profile.js','workflow-ui.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js','role-portal.js','shift-qr-terminal.js','attendance-gate.css','entry-home.css','portal-profile-menu.js','client-portal.js','admin-home.css','responsive-foundation.css','responsive-foundation.js','document-reader.css','pdf-reader.mjs','document-preview.js','invoice-preview.js']){
   const response=await fetch(origin+'/'+name,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,name+' is deployed');
   const bytes=Buffer.from(await response.arrayBuffer()),digest=buffer=>crypto.createHash('sha256').update(buffer).digest('hex');
   assert.equal(digest(bytes),digest(fs.readFileSync(path.join(__dirname,'../public',name))),name+' matches exact release bytes');
@@ -68,7 +68,7 @@ async function main(){
  const worker=await fetch(origin+'/service-worker.js');assert.equal(worker.status,200);assert.match(await worker.text(),/voxel-veda-public-v6-restored-20261011/);proof.checks.push({service_worker:'v6-restored-20261011'});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  try{
-  for(const mode of ['light','dark'])for(const viewport of [{name:'phone',width:375,height:812},{name:'phone-landscape',width:812,height:375},{name:'tablet',width:768,height:1024},{name:'desktop',width:1440,height:1000}]){
+  for(const mode of ['light','dark'])for(const viewport of [...[320,360,390,430,768,1024,1440].map(width=>({name:'width-'+width,width,height:844})),{name:'phone-landscape',width:844,height:390}]){
    const context=await browser.newContext({viewport:{width:viewport.width,height:viewport.height},colorScheme:mode});const page=await context.newPage();const errors=[],assetFailures=[];
    await context.addInitScript(value=>localStorage.setItem('voxelveda:color-mode',value),mode);
    // Intentional retired-document HTTP410 is checked below. Asset errors are never allowed.
@@ -80,7 +80,7 @@ async function main(){
     await page.waitForFunction(()=>document.readyState==='complete'&&[...document.images].every(img=>img.complete&&img.naturalWidth>0)&&(!document.fonts||document.fonts.status==='loaded'));
     await page.locator('#vvGlobalBrandLoader').waitFor({state:'hidden'});
    };
-   for(const route of ['/','/login','/register','/support','/request-quote','/careers']){
+   for(const route of ['/','/login','/register','/forgot-password','/reset-password','/support','/request-quote','/careers']){
     const response=await page.goto(origin+route,{waitUntil:'domcontentloaded'});assert.equal(response.status(),200,route);
     await waitForSettledPage();
     const refreshed=await page.reload({waitUntil:'domcontentloaded'});assert.equal(refreshed.status(),200,route+' remains available after refresh');
@@ -98,7 +98,7 @@ async function main(){
    await page.goForward({waitUntil:'domcontentloaded'});await waitForSettledPage();assert.equal(new URL(page.url()).pathname,'/login','Browser Forward restores the intended page');
    proof.browser_navigation.push({viewport,mode,back:'/support',forward:'/login',passed:true});
    const retiredResponse=await page.goto(origin+'/finance',{waitUntil:'domcontentloaded'});assert.equal(retiredResponse.status(),410);await page.waitForFunction(()=>document.readyState==='complete'&&[...document.images].every(img=>img.complete&&img.naturalWidth>0));await page.getByRole('heading',{name:'This module is no longer available'}).waitFor();await page.locator('#vvGlobalBrandLoader').waitFor({state:'hidden'});
-   if(viewport.name==='phone'||viewport.name==='desktop')await page.screenshot({path:path.join(out,'live-retired-'+viewport.name+'-'+mode+'.png'),fullPage:true});
+   if(viewport.width===390||viewport.width===1440)await page.screenshot({path:path.join(out,'live-retired-'+viewport.name+'-'+mode+'.png'),fullPage:true});
    assert.deepEqual(errors,[],'No page JavaScript errors');
    assert.deepEqual(assetFailures,[],'Retired landing page assets also load successfully');await context.close();
   }
