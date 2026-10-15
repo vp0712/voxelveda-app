@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.Assert.*;
 import static androidx.test.espresso.intent.Intents.intending;
 import static androidx.test.espresso.Espresso.onView;
@@ -112,9 +113,16 @@ public class AndroidJourneyTest {
  private void staffSession()throws Exception{
   CountDownLatch latch=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->latch.countDown()));assertTrue(latch.await(10,TimeUnit.SECONDS));go("/login");login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&window.VoxelNativeApp&&window.VoxelOperations&&window.VoxelStaffHome?.state");
  }
+ private void waitKeyboard(boolean expected)throws Exception{
+  long end=System.currentTimeMillis()+15000;
+  while(System.currentTimeMillis()<end){AtomicBoolean visible=new AtomicBoolean();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{androidx.core.view.WindowInsetsCompat insets=androidx.core.view.ViewCompat.getRootWindowInsets(main.getWindow().getDecorView());visible.set(insets!=null&&insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()));});if(visible.get()==expected)return;Thread.sleep(150);}fail("Android keyboard visibility did not become "+expected);
+ }
  @Test public void nativeBackDiscardsOnlyAfterConfirmation()throws Exception{
   staffSession();go("/profile");
   waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");
+  js("document.getElementById('name').scrollIntoView({block:'center'})");Thread.sleep(200);
+  double x=Double.parseDouble(js("document.getElementById('name').getBoundingClientRect().left+document.getElementById('name').getBoundingClientRect().width/2")),y=Double.parseDouble(js("document.getElementById('name').getBoundingClientRect().top+document.getElementById('name').getBoundingClientRect().height/2")),cssWidth=Double.parseDouble(js("innerWidth"));int[] position=new int[2];AtomicReference<Integer> pixels=new AtomicReference<>();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{main.getBridge().getWebView().getLocationOnScreen(position);pixels.set(main.getBridge().getWebView().getWidth());});double scale=pixels.get()/cssWidth;device.click(position[0]+(int)Math.round(x*scale),position[1]+(int)Math.round(y*scale));waitKeyboard(true);
+  waitJs("document.activeElement?.id==='name'&&innerHeight>=160");js("document.getElementById('saveBtn').scrollIntoView({block:'center'})");waitJs("(()=>{const r=document.getElementById('saveBtn').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight})()");screenshot("profile-keyboard");device.pressBack();waitKeyboard(false);assertEquals("true",js("location.pathname==='/profile'"));js("document.getElementById('name').blur()");facts.add("Actual Android on-screen keyboard leaves the real profile Save action reachable; first Back dismisses the keyboard without leaving the form");
   js("document.getElementById('name').value='Unsaved Android fixture edit';document.getElementById('name').dispatchEvent(new Event('input',{bubbles:true}))");
   device.pressBack();waitNativeText("Unsaved changes",false);onView(withText("Keep editing")).perform(click());assertEquals("true",js("location.pathname==='/profile'&&document.getElementById('name').value==='Unsaved Android fixture edit'"));
   device.pressBack();onView(withText("Discard")).perform(click());waitJs("location.pathname==='/portal/staff'");go("/profile");waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");facts.add("Android Back offers Keep editing/Discard on the real profile form; cancellation retains unsaved input and discard performs no save");
