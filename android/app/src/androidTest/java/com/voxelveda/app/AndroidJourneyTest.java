@@ -125,6 +125,12 @@ public class AndroidJourneyTest {
   device.pressBack();waitNativeText("Unsaved changes",false);device.findObject(new UiSelector().resourceId("android:id/button2")).click();assertEquals("true",js("location.pathname==='/profile'&&document.getElementById('name').value==='Unsaved Android fixture edit'"));
   device.pressBack();device.findObject(new UiSelector().resourceId("android:id/button1")).click();waitJs("location.pathname==='/portal/staff'");go("/profile");waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");facts.add("Android Back offers Keep editing/Discard on the real profile form; cancellation retains unsaved input and discard performs no save");
  }
+ @Test public void coldProfileBackRequiresDiscardConsent()throws Exception{
+  staffSession();go("/profile");waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().clearHistory());
+  js("document.getElementById('name').value='Unsaved cold-profile fixture';document.getElementById('name').dispatchEvent(new Event('input',{bubbles:true}))");device.pressBack();waitNativeText("Unsaved changes",false);device.findObject(new UiSelector().resourceId("android:id/button2")).click();assertEquals("true",js("location.pathname==='/profile'&&document.getElementById('name').value==='Unsaved cold-profile fixture'"));
+  device.pressBack();waitNativeText("Unsaved changes",false);assertTrue(device.takeScreenshot(new File(evidence,"cold-profile-discard.png")));device.findObject(new UiSelector().resourceId("android:id/button1")).click();long deadline=System.currentTimeMillis()+15000;while(scenario.getState()!=Lifecycle.State.DESTROYED&&System.currentTimeMillis()<deadline)Thread.sleep(150);assertEquals("Consent closes the activity when there is no history",Lifecycle.State.DESTROYED,scenario.getState());
+  JSONObject state=new JSONObject(new String(control("/__fixture/state").bytes,StandardCharsets.UTF_8));JSONArray requests=state.getJSONArray("requests");for(int n=0;n<requests.length();n++){JSONObject request=requests.getJSONObject(n);assertFalse("Discard never writes the profile",request.getString("path").equals("/api/profile")&&!request.getString("method").equals("GET"));}facts.add("A cold profile with no WebView history keeps edits on cancel and closes only after explicit discard, with no profile write");
+ }
  @Test public void nativeCameraAndBrandedQr()throws Exception{
   staffSession();
   go("/portal/staff");waitJs("window.VoxelStaffHome?.state");
