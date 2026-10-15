@@ -69,7 +69,8 @@ function safeReturnTo(role, user = {}) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return home;
   // The server checks access for every restored protected destination.
   const path = value.split(/[?#]/, 1)[0];
-  return ['/dashboard', '/security', '/profile', '/admin', '/staff-dashboard', '/client-portal', '/quality', '/shop-floor', '/attendance-terminal'].includes(path) ? value : home;
+  const allowed=['/dashboard','/security','/profile','/admin','/client','/account','/quality','/shop-floor','/attendance-terminal','/a','/attendance/scan','/invoice/view','/document/view'];
+  return allowed.includes(path) || /^\/portal\/(staff|manager|supervisor|hr|production|sales)$/.test(path) ? value : home;
 }
 
 function showLoginMessageFromUrl() {

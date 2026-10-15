@@ -23,11 +23,7 @@ function escapeHtml(value) {
 }
 
 function publicAppUrl() {
-  return String(
-    process.env.PUBLIC_APP_URL
-      || process.env.APP_BASE_URL
-      || 'https://app.voxelveda.com'
-  ).replace(/\/+$/, '');
+  return require('../config/urls').app;
 }
 
 async function addApplicationEvent(applicationId, eventType, note) {

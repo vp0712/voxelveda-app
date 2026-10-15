@@ -103,7 +103,8 @@
   async function openPdf(url, options = {}) {
     const { download = false, ...request } = options;
     // Open immediately for browser popup policy, then fill only after validation.
-    const preview = download ? null : window.open('/document/view', '_blank');
+    const native=window.VoxelNativeApp;
+    const preview = download || native ? null : window.open('/document/view', '_blank');
     let readyHandler,timer;const ready=preview?new Promise((resolve,reject)=>{readyHandler=event=>{if(event.source===preview&&event.origin===location.origin&&event.data?.type==='VV_PDF_VIEWER_READY')resolve();};window.addEventListener('message',readyHandler);timer=setTimeout(()=>reject(new Error('The preview could not be opened. Download the verified PDF instead.')),15000);}):null;ready?.catch(()=>{});
     try {
       const response = await fetch(url, { credentials:'same-origin', cache:'no-store', ...request });
@@ -116,6 +117,7 @@
       if (!filename || !/^[A-Za-z0-9._ -]+\.pdf$/.test(filename)) throw new Error('The service returned an invalid PDF filename.');
       const bytes = await response.arrayBuffer();
       if (bytes.byteLength < 100 || new TextDecoder('ascii').decode(bytes.slice(0,5)) !== '%PDF-') throw new Error('The service returned invalid PDF bytes.');
+      if(native){await native.documentAction(bytes,filename,download);return {filename,bytes:bytes.byteLength};}
       const objectUrl = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
       if (download) {
         const link = document.createElement('a'); link.href = objectUrl; link.download = filename;

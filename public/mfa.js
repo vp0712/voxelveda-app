@@ -8,7 +8,8 @@
     const requested = sessionStorage.getItem('vv_mfa_return_to') || '';
     if (!requested.startsWith('/') || requested.startsWith('//') || requested.includes('\\')) return home;
     const path = requested.split(/[?#]/, 1)[0];
-    return ['/dashboard', '/security', '/profile'].includes(path) ? requested : home;
+    const allowed=['/dashboard','/security','/profile','/admin','/client','/account','/quality','/shop-floor','/attendance-terminal','/a','/attendance/scan','/invoice/view','/document/view'];
+    return allowed.includes(path)||/^\/portal\/(staff|manager|supervisor|hr|production|sales)$/.test(path)?requested:home;
   }
   function clearChallenge() {
     sessionStorage.removeItem('vv_mfa_challenge');

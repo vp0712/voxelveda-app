@@ -1,0 +1,83 @@
+apply plugin: 'com.android.application'
+
+def env = System.getenv()
+def requestedVersionCode = env['ANDROID_VERSION_CODE'] ?: '1'
+def requestedVersionName = env['ANDROID_VERSION_NAME'] ?: '0.0.0-dev'
+def sourceCommit = env['ANDROID_SOURCE_COMMIT'] ?: env['GITHUB_SHA'] ?: 'working-tree'
+def signingNames = ['ANDROID_KEYSTORE_PATH','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD']
+def hasSigning = signingNames.every { env[it] }
+
+android {
+    namespace = 'com.voxelveda.app'
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId 'com.voxelveda.app'
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode Integer.parseInt(requestedVersionCode)
+        versionName requestedVersionName
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        buildConfigField 'String', 'SOURCE_COMMIT', '"' + sourceCommit.replaceAll('[^A-Za-z0-9._-]', '') + '"'
+        aaptOptions { ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~' }
+    }
+    buildFeatures { buildConfig true }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_21; targetCompatibility JavaVersion.VERSION_21 }
+    signingConfigs {
+        if (hasSigning) {
+            release {
+                storeFile file(env['ANDROID_KEYSTORE_PATH'])
+                storePassword env['ANDROID_KEYSTORE_PASSWORD']
+                keyAlias env['ANDROID_KEY_ALIAS']
+                keyPassword env['ANDROID_KEY_PASSWORD']
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            if (hasSigning) signingConfig signingConfigs.release
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        verification {
+            initWith release
+            debuggable true
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
+        }
+    }
+    testBuildType 'verification'
+}
+
+tasks.register('verifyReleaseIdentity') {
+    doLast {
+        def required = signingNames + ['ANDROID_VERSION_CODE','ANDROID_VERSION_NAME','ANDROID_PLAY_MAX_VERSION_CODE','ANDROID_UPLOAD_CERT_SHA256','ANDROID_APP_SIGNING_SHA256']
+        if (!required.every { env[it] }) throw new GradleException('Release requires the existing secure signing identity, verified Play version and both upload/App Signing fingerprints. No production identity is inferred from a test build.')
+        int code = Integer.parseInt(env['ANDROID_VERSION_CODE'])
+        if (code <= Integer.parseInt(env['ANDROID_PLAY_MAX_VERSION_CODE']) || code > 2100000000) throw new GradleException('The release version code must exceed the verified highest Play version code.')
+        if (!(env['ANDROID_APP_SIGNING_SHA256'] ==~ /(?i)([0-9a-f]{2}:){31}[0-9a-f]{2}/)) throw new GradleException('A verified Play App Signing SHA256 fingerprint is required.')
+        def store = java.security.KeyStore.getInstance(java.security.KeyStore.getDefaultType())
+        file(env['ANDROID_KEYSTORE_PATH']).withInputStream { store.load(it, env['ANDROID_KEYSTORE_PASSWORD'].toCharArray()) }
+        def certificate = store.getCertificate(env['ANDROID_KEY_ALIAS'])
+        if (certificate == null) throw new GradleException('The expected upload certificate is unavailable.')
+        def actual = java.security.MessageDigest.getInstance('SHA-256').digest(certificate.encoded).collect { String.format('%02X',it & 255) }.join(':')
+        if (actual != env['ANDROID_UPLOAD_CERT_SHA256'].toUpperCase()) throw new GradleException('The secure key does not match the verified upload certificate; signing continuity is not established.')
+    }
+}
+tasks.configureEach { task -> if (task.name == 'preReleaseBuild') task.dependsOn 'verifyReleaseIdentity' }
+
+repositories { flatDir { dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs' } }
+dependencies {
+    implementation fileTree(include:['*.jar'],dir:'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-cordova-android-plugins')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation 'androidx.test:rules:1.7.0'
+    androidTestImplementation 'androidx.test.espresso:espresso-intents:3.7.0'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
+}
+apply from: 'capacitor.build.gradle'

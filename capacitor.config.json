@@ -1,9 +1,17 @@
 {
   "appId": "com.voxelveda.app",
   "appName": "Voxel Veda",
-  "webDir": "public",
+  "webDir": "native-shell",
   "server": {
     "url": "https://app.voxelveda.com",
-    "cleartext": false
-  }
+    "cleartext": false,
+    "allowNavigation": [
+      "app.voxelveda.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "loggingBehavior": "none"
 }

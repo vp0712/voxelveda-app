@@ -1,7 +1,7 @@
 const { sendMail } = require('./emailService');
 
 function appUrl(path) {
-  return new URL(path, process.env.APP_URL || 'https://app.voxelveda.com').toString();
+  return require('../config/urls').absolute(path);
 }
 
 async function queueSecurityLink({ user, token, type, createdBy }) {

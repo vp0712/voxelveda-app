@@ -32,6 +32,7 @@ const publicDir=path.join(__dirname,'public');
 const pageCache=new Map();
 const raw=(req,res,buffer)=>{req.rawBody=Buffer.from(buffer)};
 app.disable('x-powered-by');app.set('trust proxy',1);app.set('query parser','simple');
+app.use(require('./middleware/canonicalApplication').canonicalApplication);
 app.use(enforceHttps);app.use(securityHeaders);app.use(safeApiResponses);
 const applicationCors=cors(corsOptions());
 app.use((req,res,next)=>req.method==='POST'&&req.path==='/api/security/csp-report'&&req.headers.origin==='null'?next():applicationCors(req,res,next));
@@ -41,12 +42,7 @@ app.use(express.urlencoded({extended:false,limit:process.env.FORM_BODY_LIMIT||'1
 app.post('/api/security/csp-report',rateLimitPolicy('csp_report'),securityTelemetry.recordCspViolation);
 app.use(csrfProtection);
 app.get('/api/health',readiness.health);app.get('/api/ready',readiness.ready);
-app.use((req,res,next)=>{
- if(process.env.FORCE_CANONICAL_HOST!=='true'||['/api/health','/api/ready'].includes(req.path))return next();
- const host=String(req.hostname||'').toLowerCase(),canonical=new URL(urls.app).hostname;
- if(host!==String(process.env.RAILWAY_FALLBACK_HOST||'voxelveda-app-production.up.railway.app').toLowerCase()||host===canonical)return next();
- return res.redirect(302,new URL(req.originalUrl||'/',`${urls.app}/`).toString());
-});
+app.get('/.well-known/assetlinks.json',require('./services/androidAssociationService').serveAssociation);
 function noIndex(req,res,next){res.set('X-Robots-Tag','noindex, nofollow, noarchive').set('Cache-Control','private, no-store');next()}
 function sendPage(filename,status=200){return(req,res)=>{
  const source=path.join(publicDir,filename);let html=pageCache.get(source);

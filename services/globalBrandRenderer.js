@@ -46,6 +46,7 @@ function injectGlobalBrand(html) {
 
   if(!rendered.includes('/workspace-dialog.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/workspace-dialog.css"><script src="/workspace-dialog.js" defer></script>\n</head>');
   if(!rendered.includes('/invoice-detail.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/invoice-detail.css"><script src="/invoice-detail.js" defer></script>\n</head>');
+  if(!rendered.includes('/android-app.js'))rendered=rendered.replace(/<\/head>/i,'<script src="/android-app.js" defer></script>\n</head>');
   return rendered;
 }
 

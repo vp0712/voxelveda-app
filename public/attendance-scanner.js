@@ -3,7 +3,7 @@
   let stream=null,timer=null,generation=0,detecting=false,activeStatus=null;
   function stop(){generation++;clearTimeout(timer);timer=null;stream?.getTracks().forEach(track=>track.stop());stream=null;detecting=false;}
   function cameraMessage(error){
-    if(['NotAllowedError','PermissionDeniedError','SecurityError'].includes(error?.name))return 'Camera permission was denied. Allow camera access in your browser settings, then try again. No attendance was changed.';
+    if(['NotAllowedError','PermissionDeniedError','SecurityError'].includes(error?.name))return window.VoxelNativeApp?'Camera permission was denied. Open app camera settings, allow access, then select Retry camera. No attendance was changed.':'Camera permission was denied. Allow camera access in your browser settings, then try again. No attendance was changed.';
     if(['NotFoundError','DevicesNotFoundError'].includes(error?.name))return 'No camera is available on this device. Use a device with a camera or contact your supervisor. No attendance was changed.';
     if(['NotReadableError','TrackStartError'].includes(error?.name))return 'The camera is busy or unavailable. Close other camera apps and retry. No attendance was changed.';
     return 'The camera or QR decoder is unavailable. Check camera access and your connection, then retry. No attendance was changed.';

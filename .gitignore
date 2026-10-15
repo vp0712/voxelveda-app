@@ -27,3 +27,7 @@ Thumbs.db
 # Isolated browser evidence generated in CI or local verification
 account-foundation-proof/
 production-proof/
+
+# Native shell synchronization output
+native-shell/cordova.js
+native-shell/cordova_plugins.js

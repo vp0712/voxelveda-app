@@ -109,6 +109,8 @@ function applicationFixture() {
     './controllers/readinessController': actualReadiness,
     './middleware/auth': pass, './middleware/pageAuth': actualPageAuth,
     './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
+    './middleware/canonicalApplication':require('../middleware/canonicalApplication'),
+    './services/androidAssociationService':require('../services/androidAssociationService'),
     './services/attendanceGateAccess': require('../services/attendanceGateAccess'),
     './config/urls': require('../config/urls'),
     './middleware/securityMiddleware': {
