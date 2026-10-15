@@ -110,7 +110,7 @@ public class AndroidJourneyTest {
  }
 
  private void staffSession()throws Exception{
-  CountDownLatch latch=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->latch.countDown()));assertTrue(latch.await(10,TimeUnit.SECONDS));go("/login");login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&window.VoxelStaffHome?.state");
+  CountDownLatch latch=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->latch.countDown()));assertTrue(latch.await(10,TimeUnit.SECONDS));go("/login");login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&window.VoxelNativeApp&&window.VoxelOperations&&window.VoxelStaffHome?.state");
  }
  @Test public void nativeBackDiscardsOnlyAfterConfirmation()throws Exception{
   staffSession();go("/profile");
