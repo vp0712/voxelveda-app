@@ -2,10 +2,10 @@ name: Android installed application verification
 on:
   pull_request:
     branches: [main]
-    paths: ['android/**', 'native-shell/**', 'capacitor.config.json', 'public/**', 'scripts/android-*', 'scripts/staff-mobile-browser-test.js', 'services/globalBrandRenderer.js', '.github/workflows/android-application.yml']
+    paths: ['android/**', 'native-shell/**', 'capacitor.config.json', 'public/**', 'scripts/android-*', 'scripts/staff-mobile-browser-test.js', 'services/globalBrandRenderer.js', 'middleware/**', 'controllers/authController.js', 'controllers/mfaController.js', 'services/authSessionService.js', 'config/urls.js', '.github/workflows/android-application.yml']
   push:
     branches: [main, 'simplify-*']
-    paths: ['android/**', 'native-shell/**', 'capacitor.config.json', 'public/**', 'scripts/android-*', 'scripts/staff-mobile-browser-test.js', 'services/globalBrandRenderer.js', '.github/workflows/android-application.yml']
+    paths: ['android/**', 'native-shell/**', 'capacitor.config.json', 'public/**', 'scripts/android-*', 'scripts/staff-mobile-browser-test.js', 'services/globalBrandRenderer.js', 'middleware/**', 'controllers/authController.js', 'controllers/mfaController.js', 'services/authSessionService.js', 'config/urls.js', '.github/workflows/android-application.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -41,6 +41,8 @@ jobs:
         run: npx cap sync android
       - name: Build installed verification artifacts and native policy tests
         run: android/gradlew -p android --no-daemon :app:assembleVerification :app:assembleVerificationAndroidTest :app:testVerificationUnitTest
+      - name: Verify the actual APK identity, canonical bundled config and signature
+        run: node scripts/android-artifact-metadata.js android/app/build/outputs/apk/verification/app-verification.apk /tmp/voxelveda-android-proof/artifact-before-upgrade.json
       - name: Make the disposable runner's Android virtualisation device accessible
         run: sudo chmod 666 /dev/kvm
       - name: Run real installed WebView authentication, navigation and upgrade journeys

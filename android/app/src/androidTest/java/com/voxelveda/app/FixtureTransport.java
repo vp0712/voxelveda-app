@@ -24,7 +24,7 @@ final class FixtureTransport {
    socket.setSoTimeout(15000);OutputStream output=socket.getOutputStream();
    StringBuilder head=new StringBuilder(method+" "+route+" HTTP/1.1\r\nHost: app.voxelveda.com\r\nX-Forwarded-Proto: https\r\nOrigin: https://app.voxelveda.com\r\nConnection: close\r\nContent-Length: "+input.length+"\r\n");
    String cookie=CookieManager.getInstance().getCookie(NavigationPolicy.ORIGIN);if(cookie!=null)head.append("Cookie: ").append(cookie).append("\r\n");
-   for(Map.Entry<String,String> entry:headers.entrySet())if(!Arrays.asList("host","cookie","origin","content-length","connection","x-forwarded-proto").contains(entry.getKey().toLowerCase()))head.append(entry.getKey()).append(": ").append(entry.getValue()).append("\r\n");
+   for(Map.Entry<String,String> entry:headers.entrySet())if(!Arrays.asList("host","cookie","origin","content-length","connection","x-forwarded-proto","if-none-match","if-modified-since","range").contains(entry.getKey().toLowerCase()))head.append(entry.getKey()).append(": ").append(entry.getValue()).append("\r\n");
    output.write((head+"\r\n").getBytes(StandardCharsets.ISO_8859_1));output.write(input);output.flush();
    InputStream stream=socket.getInputStream();Reply result=new Reply();result.status=Integer.parseInt(line(stream).split(" ")[1]);String line;
    while(!(line=line(stream)).isEmpty()){int colon=line.indexOf(':');if(colon<1)continue;String key=line.substring(0,colon).toLowerCase(),value=line.substring(colon+1).trim();if(key.equals("set-cookie"))CookieManager.getInstance().setCookie(NavigationPolicy.ORIGIN,value);else result.headers.put(key,value);}

@@ -22,7 +22,8 @@ function parsePermissions(value) {
 function redirectToLogin(req, res) {
   clearSessionCookie(req, res);
   const returnTo = safeReturnTo(req.originalUrl, '/');
-  return res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo)}`);
+  const expired=getRequestToken(req)?'&message='+encodeURIComponent('Your session has ended. Please log in again.'):'';
+  return res.redirect(302, `/login?returnTo=${encodeURIComponent(returnTo)}${expired}`);
 }
 
 function pageAuth({ adminOnly = false, allowMfaSetup = false } = {}) {

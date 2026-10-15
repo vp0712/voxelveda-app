@@ -71,7 +71,7 @@ public class AndroidJourneyTest {
   if(upgrade){go("/dashboard");waitJs("location.pathname==='/portal/staff'&&document.body.textContent.includes('Synthetic Staff Fixture')");facts.add("APK upgrade preserves the real secure HttpOnly fixture cookie and server session; no login or browser relaunch");screenshot("upgrade-preserved-session");return;}
   CountDownLatch cleared=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->cleared.countDown()));assertTrue(cleared.await(10,TimeUnit.SECONDS));
   go("/");waitJs("document.querySelector('a[href=\"/login\"]')&&document.querySelector('a[href=\"/register\"]')");screenshot("cold-entry");facts.add("Cold launch presents the real branded Login/Sign up entry inside installed WebView");
-  js("document.querySelector('a[href=\"/login\"]').click()");waitJs("document.getElementById('loginForm')&&location.pathname==='/login'");
+  js("document.querySelector('a[href=\"/login\"]').click()");waitJs("document.getElementById('loginForm')&&document.getElementById('loginButton')?.disabled===false&&location.pathname==='/login'");
   login("synthetic-staff@example.invalid","IncorrectSyntheticPassword123!");waitJs("document.getElementById('loginStatus').textContent.includes('Invalid email or password')");facts.add("Failed login stays in app with an actual credential rejection");
   login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&document.body.textContent.includes('Synthetic Staff Fixture')");waitJs("window.VoxelNativeApp&&window.VoxelStaffHome?.state");screenshot("staff-home");facts.add("Real login handler, bcrypt, JWT, secure HttpOnly cookie, page authentication and permitted staff home complete in app");
   int identity=System.identityHashCode(main);scenario.moveToState(Lifecycle.State.CREATED);scenario.moveToState(Lifecycle.State.RESUMED);waitJs("location.pathname==='/portal/staff'");assertEquals(identity,System.identityHashCode(main));facts.add("Background/resume preserves the same activity and session");
@@ -106,7 +106,7 @@ public class AndroidJourneyTest {
  }
 
  @After public void finish()throws Exception{
-  if(evidence!=null){JSONObject result=new JSONObject();result.put("fixtureOnly",true);result.put("realProductionAccountUsed",false);result.put("physicalDevice",false);result.put("packageId","com.voxelveda.app");result.put("appSigningVerification","NOT_TESTED: real Play certificate/access unavailable");result.put("facts",new JSONArray(facts));try(FileOutputStream output=new FileOutputStream(new File(evidence,"result-"+InstrumentationRegistry.getArguments().getString("upgrade_only","false")+".json"))){output.write(result.toString(2).getBytes(StandardCharsets.UTF_8));}}
+  if(evidence!=null){try{screenshot("last-app-screen");}catch(Exception ignored){}JSONObject result=new JSONObject();result.put("fixtureOnly",true);result.put("realProductionAccountUsed",false);result.put("physicalDevice",false);result.put("packageId","com.voxelveda.app");result.put("appSigningVerification","NOT_TESTED: real Play certificate/access unavailable");result.put("facts",new JSONArray(facts));try(FileOutputStream output=new FileOutputStream(new File(evidence,"result-"+InstrumentationRegistry.getArguments().getString("upgrade_only","false")+".json"))){output.write(result.toString(2).getBytes(StandardCharsets.UTF_8));}}
   if(scenario!=null)scenario.close();device.unfreezeRotation();Intents.release();
  }
 }

@@ -58,7 +58,7 @@ public class PdfActivity extends AppCompatActivity {
             image.post(this::render);
         } catch (Exception error) { status.setText("This PDF could not be opened. Return to the record and retry."); download.setEnabled(false); controls.setVisibility(android.view.View.GONE); }
     }
-    private Button button(String label,Runnable action) { Button button=new Button(this);button.setText(label);button.setMinWidth(0);button.setMinHeight(48);button.setOnClickListener(v->action.run());return button; }
+    private Button button(String label,Runnable action) { Button button=new Button(this);button.setText(label);button.setMinWidth(0);button.setMinHeight(Math.round(48*getResources().getDisplayMetrics().density));button.setOnClickListener(v->action.run());return button; }
     private void render() {
         if (document==null) return;
         try (PdfRenderer.Page source=document.openPage(page)) {

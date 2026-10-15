@@ -1,6 +1,7 @@
 async function redirectSavedSession() {
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
   try {
-    const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin',signal:controller.signal });
     if (!res.ok) throw new Error('Saved session is no longer valid');
     const data = await res.json();
     const savedUser = data.user || {};
@@ -15,7 +16,7 @@ async function redirectSavedSession() {
     localStorage.removeItem('user');
     localStorage.removeItem('role');
     return false;
-  }
+  } finally { clearTimeout(timeout); }
 }
 
 function setLoginStatus(message, tone = 'error') {
@@ -84,7 +85,9 @@ function showLoginMessageFromUrl() {
   window.history.replaceState({}, document.title, cleanUrl);
 }
 
+let loginInFlight=false;
 async function login() {
+  if(loginInFlight)return;
   const email = document.getElementById('email')?.value.trim();
   const password = document.getElementById('password')?.value;
 
@@ -93,6 +96,7 @@ async function login() {
     return;
   }
 
+  loginInFlight=true;
   setLoginBusy(true);
   setLoginStatus('Authenticating...', 'info');
 
@@ -147,6 +151,7 @@ async function login() {
     console.error('LOGIN ERROR:', err);
     setLoginStatus('Unable to reach the secure sign-in service. Check your connection and try again.');
   } finally {
+    loginInFlight=false;
     setLoginBusy(false);
   }
 }
@@ -160,4 +165,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   const explicitMessage = params.get('message');
   if (!explicitMessage && await redirectSavedSession()) return;
   showLoginMessageFromUrl();
+  setLoginBusy(false);
 });

@@ -24,6 +24,8 @@ adb shell am instrument -w -r -e fixture_port "$VV_ANDROID_FIXTURE_PORT" -e clas
 if ! grep -q 'OK \(1 test\)' "$VV_ANDROID_PROOF_DIR/installed-journey.txt"; then exit 1; fi
 adb shell am force-stop com.voxelveda.app
 ANDROID_VERSION_CODE=3 ANDROID_VERSION_NAME=0.0.0-upgrade-fixture android/gradlew -p android --no-daemon :app:assembleVerification
+node scripts/android-artifact-metadata.js android/app/build/outputs/apk/verification/app-verification.apk "$VV_ANDROID_PROOF_DIR/artifact-after-upgrade.json"
+node -e 'const fs=require("fs"),p=process.env.VV_ANDROID_PROOF_DIR,a=JSON.parse(fs.readFileSync(p+"/artifact-before-upgrade.json")),b=JSON.parse(fs.readFileSync(p+"/artifact-after-upgrade.json"));if(a.packageId!==b.packageId||a.signingCertificateSha256!==b.signingCertificateSha256||b.versionCode<=a.versionCode)throw Error("Upgrade identity/version continuity failed")'
 adb install -r android/app/build/outputs/apk/verification/app-verification.apk
 adb shell am instrument -w -r -e fixture_port "$VV_ANDROID_FIXTURE_PORT" -e upgrade_only true -e class com.voxelveda.app.AndroidJourneyTest com.voxelveda.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$VV_ANDROID_PROOF_DIR/upgrade-journey.txt"
 if ! grep -q 'OK \(1 test\)' "$VV_ANDROID_PROOF_DIR/upgrade-journey.txt"; then exit 1; fi

@@ -40,7 +40,8 @@ public class MainActivity extends BridgeActivity {
         getBridge().setWebViewClient(new ApplicationWebViewClient(getBridge(), this));
         web.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         web.getSettings().setAllowFileAccess(false);
-        web.getSettings().setAllowContentAccess(false);
+        // Keep user-selected photo/document chooser URIs working; main-frame content/file URLs remain blocked.
+        web.getSettings().setAllowContentAccess(true);
         web.getSettings().setJavaScriptCanOpenWindowsAutomatically(false);
         web.getSettings().setSupportMultipleWindows(true);
         web.setWebChromeClient(new BridgeWebChromeClient(getBridge()) {
