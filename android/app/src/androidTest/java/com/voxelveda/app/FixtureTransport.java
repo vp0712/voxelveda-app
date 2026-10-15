@@ -14,9 +14,11 @@ import java.util.*;
 /** Instrumentation-only loopback transport; never packaged in the application APK. */
 final class FixtureTransport {
  final int port;
+ volatile boolean offline;
  FixtureTransport(int port){this.port=port;}
  static class Reply {int status;Map<String,String> headers=new HashMap<>();byte[] bytes;}
  Reply relay(String url,String method,String body,Map<String,String> headers)throws Exception{
+  if(offline)throw new IOException("Synthetic fixture connection interruption");
   if(!NavigationPolicy.isApplication(url))throw new IOException("Fixture rejects non-application origin");
   Uri uri=Uri.parse(url);String route=uri.getEncodedPath()+(uri.getEncodedQuery()==null?"":"?"+uri.getEncodedQuery());
   byte[] input=body.getBytes(StandardCharsets.UTF_8);
