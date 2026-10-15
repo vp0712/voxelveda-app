@@ -99,8 +99,19 @@ public class MainActivity extends BridgeActivity {
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
             int keyboard = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom;
-            view.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, keyboard));
+            // adjustResize can already remove the IME-covered area from this view.
+            // Reserve only the remaining overlap, rather than subtracting the keyboard twice.
+            android.graphics.Rect visible = new android.graphics.Rect();
+            view.getWindowVisibleDisplayFrame(visible);
+            int[] location = new int[2];
+            view.getLocationOnScreen(location);
+            int overlap = Math.max(0, location[1] + view.getHeight() - visible.bottom);
+            int keyboardPadding = Math.min(keyboard, overlap);
+            view.setPadding(bars.left, bars.top, bars.right, Math.max(bars.bottom, keyboardPadding));
             return insets;
+        });
+        content.addOnLayoutChangeListener((view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+            if (bottom - top != oldBottom - oldTop) ViewCompat.requestApplyInsets(view);
         });
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
