@@ -55,7 +55,7 @@ public class AndroidJourneyTest {
   android.util.Log.e("AndroidFixture", "Condition failed: "+expression+"; "+js("JSON.stringify({path:location.pathname,ready:document.readyState,loginHandler:typeof login,status:document.getElementById('loginStatus')?.textContent})"));
   fail("Expected application condition was not reached: "+expression);
  }
- private void go(String path)throws Exception{InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+path));waitJs("document.readyState==='complete'&&("+(path.equals("/dashboard")?"['/dashboard','/portal/staff','/admin','/login'].includes(location.pathname)":"location.pathname==="+JSONObject.quote(path.split("\\?",2)[0]))+")");}
+ private void go(String path)throws Exception{String leaving=UUID.randomUUID().toString();js("window.__androidTestLeaving="+JSONObject.quote(leaving));InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+path));waitJs("window.__androidTestLeaving!=="+JSONObject.quote(leaving)+"&&document.readyState==='complete'&&("+(path.equals("/dashboard")?"['/dashboard','/portal/staff','/admin','/login'].includes(location.pathname)":"location.pathname==="+JSONObject.quote(path.split("\\?",2)[0]))+")");}
  private void screenshot(String name)throws Exception{waitJs("[...document.images].every(image=>!image.getAttribute('src')||image.hidden||!image.getClientRects().length||(image.complete&&image.naturalWidth>0))&&!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible')");Thread.sleep(400);device.waitForIdle(1000);assertTrue(device.takeScreenshot(new File(evidence,name+".png")));}
  private void login(String email,String password)throws Exception{waitJs("document.getElementById('loginButton')?.disabled===false");js("document.getElementById('email').value="+JSONObject.quote(email)+";document.getElementById('password').value="+JSONObject.quote(password)+";document.getElementById('loginForm').requestSubmit();");}
  private FixtureTransport.Reply control(String route)throws Exception{return transport.relay(NavigationPolicy.ORIGIN+route,route.endsWith("expire")?"POST":"GET","",Collections.emptyMap());}
@@ -122,7 +122,7 @@ public class AndroidJourneyTest {
  @Test public void nativeCameraAndBrandedQr()throws Exception{
   staffSession();
   go("/portal/staff");waitJs("window.VoxelStaffHome?.state");
-  js("window.VoxelStaffHome.openAction('CHECK_IN')");waitJs("document.getElementById('staffAttendanceVideo')");
+  js("window.__cameraOpen='pending';window.VoxelStaffHome.openAction('CHECK_IN').then(()=>window.__cameraOpen='done').catch(error=>window.__cameraOpen=error.message)");waitJs("document.getElementById('staffAttendanceVideo')");
   UiObject2 deny=device.wait(Until.findObject(By.res(java.util.regex.Pattern.compile(".+:id/permission_deny_button"))),7000);if(deny!=null)deny.click();
   waitJs("document.getElementById('staffAttendanceScanStatus')?.textContent.includes('permission')||document.getElementById('staffAttendanceScanStatus')?.textContent.includes('Position')");
   assertEquals("true",js("!![...document.querySelectorAll('button')].find(b=>b.textContent==='App camera settings')"));screenshot("camera-recovery");js("VoxelStaffHome.close()");facts.add("Actual WebView camera permission/recovery UI is reachable; physical QR camera focus is not asserted");
