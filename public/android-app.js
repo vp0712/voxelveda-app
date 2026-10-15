@@ -27,6 +27,7 @@
   const menu=document.querySelector('.record-action-menu[open]');if(menu){menu.open=false;return true;}
   if(document.body.classList.contains('mobile-menu-open')){window.toggleMobileMenu?.(false);window.toggleStaffMobileMenu?.(false);return true;}
   const dirty=document.querySelector('form[data-native-dirty="true"]');
+  if(dirty?.dataset.nativeBeforeunload==='true')return false;
   if(dirty&&!window.confirm('Discard your unsaved changes?'))return true;
   return false;
  }
