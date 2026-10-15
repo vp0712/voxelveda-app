@@ -96,7 +96,7 @@ function attendanceState(state, userId = 9401) {
     active_attendance: active, completed_attendance_id: row?.clock_out ? row.id : null,
     company_timezone: 'Australia/Sydney', work_date: '2026-10-13', server_time: state.serverNow.toISOString(),
     summary: { first_check_in: row?.clock_in || null, latest_check_out: row?.clock_out || null, break_recording_status: row ? 'RECORDED' : 'NOT_RECORDED', recorded_break_session_count: row ? 1 : 0, worked_minutes: row?.clock_out ? row.total_minutes : 0, live_worked_minutes: live, recorded_break_minutes: row?.break_minutes || 0, live_break_minutes: ongoingBreak, session_count: row ? 1 : 0, eligible_session_count: row?.clock_out ? 1 : 0, duplicate_session_count: 0, review_required: false },
-    timeline: row ? state.timeline.map(event => ({ ...event, verification_status: 'VERIFIED' })) : [], next_roster: null, tasks: [], categories: [], qr_required: userId !== 9401,
+    timeline: row ? state.timeline.map(event => ({ ...event, verification_status: 'VERIFIED' })) : [], next_roster: null, tasks: [], categories: [], qr_required: !identities.get(userId)?.permissions?.includes('attendance_qr_bypass'),
     allowed_actions: open ? ['CHECK_OUT', onBreak ? 'BREAK_END' : 'BREAK_START'] : ['CHECK_IN'],
     break_policy: { mode: 'RECORDED_ACTUAL', automatic_deduction: false }, reporting_basis: 'WHOLE_SHIFT_LOCAL_START_DATE', review_issues: [] };
 }

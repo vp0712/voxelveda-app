@@ -30,10 +30,16 @@
     setStatus('Your verification session is missing or expired. Sign in again.');
   } else if (setup) beginSetup();
 
+  let verificationBusy=false;
+  const verifyButton=document.getElementById('mfaVerify');
   document.getElementById('mfaForm').addEventListener('submit', async (event) => {
     event.preventDefault();
+    if(verificationBusy)return;
+    verificationBusy=true;verifyButton.disabled=true;
+    const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
+    try{
     const endpoint = setup ? '/api/auth/mfa/setup/confirm' : '/api/auth/mfa/verify';
-    const response = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challenge_token: challenge, code: document.getElementById('mfaCode').value }) });
+    const response = await fetch(endpoint, { signal:controller.signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ challenge_token: challenge, code: document.getElementById('mfaCode').value }) });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) return setStatus(data.message || 'Verification failed.');
     localStorage.setItem('user', JSON.stringify(data.user));
@@ -49,7 +55,10 @@
     const target = destination(data.user);
     clearChallenge();
     window.location.replace(target);
+    }catch{setStatus('Verification could not be confirmed. Check your connection. If this sign-in has expired, return to sign in again.');}
+    finally{clearTimeout(timeout);verificationBusy=false;verifyButton.disabled=false;}
   });
+  verifyButton.disabled=false;
   document.getElementById('copyCodes').addEventListener('click', () => navigator.clipboard.writeText(document.getElementById('recoveryCodes').textContent).then(() => setStatus('Recovery codes copied.', true)));
   document.getElementById('continueLogin').addEventListener('click', () => { const user = JSON.parse(localStorage.getItem('user') || '{}'); const target = destination(user); clearChallenge(); window.location.replace(target); });
 })();

@@ -77,7 +77,16 @@ public class MainActivity extends BridgeActivity {
                 return true;
             }
         });
-        web.setDownloadListener((url, agent, disposition, mime, length) -> showConnectionError("Use the document's Download PDF action to save a verified PDF securely."));
+        web.setDownloadListener((url, agent, disposition, mime, length) -> {
+            String trusted = NavigationPolicy.canonical(url);
+            if (trusted == null || !isTrustedApplicationOrigin()) { handleExternalNavigation(Uri.parse(url), false); return; }
+            if (!"application/pdf".equalsIgnoreCase(mime == null ? "" : mime.split(";")[0].trim())) {
+                new AlertDialog.Builder(this).setTitle("Document unavailable").setMessage("This response is not a PDF. Return to the record and retry the intended action. No file was saved.").setPositiveButton("Close", null).show(); return;
+            }
+            boolean download = disposition != null && disposition.toLowerCase(java.util.Locale.ROOT).startsWith("attachment");
+            String script = "if(window.VoxelNativeApp){VoxelNativeApp.openDocument(" + org.json.JSONObject.quote(trusted) + "," + download + ").catch(error=>window.alert(error.message));}else{window.alert('Return to the document record and use Download PDF.');}";
+            web.evaluateJavascript(script, null);
+        });
         createRecovery();
         View content = findViewById(android.R.id.content);
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {

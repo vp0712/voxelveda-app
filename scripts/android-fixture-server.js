@@ -10,6 +10,7 @@ const iv=crypto.randomBytes(12),cipher=crypto.createCipheriv('aes-256-gcm',Buffe
 mfaRecord.secret_ciphertext=[iv,cipher.getAuthTag(),encrypted].map(part=>part.toString('base64url')).join('.');
 const password=bcrypt.hashSync('SyntheticDevicePass123!',10);
 for(const user of fixture.identities.values())user.password=password;
+fixture.identities.get(9401).permissions=fixture.identities.get(9401).permissions.filter(permission=>permission!=='attendance_qr_bypass');
 fixture.identities.set(9410,{id:9410,name:'Synthetic Android Admin',username:'synthetic.android.admin',email:'android-admin@example.invalid',password,role:'admin',permissions:[],active:1,account_status:'ACTIVE',session_version:1,mfa_enabled:1});
 fixture.setNativeQuery(async(sql,params)=>{
  if(/FROM users/.test(sql)&&/LOWER\(email\)/.test(sql))return [[...fixture.identities.values()].filter(u=>u.email===params[0]),[]];

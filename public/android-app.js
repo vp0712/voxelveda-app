@@ -11,6 +11,15 @@
   const data={filename,base64:base64(bytes)};
   return download?plugin.savePdf(data):plugin.presentPdf(data);
  }
+ async function openDocument(value,download=false){
+  const url=new URL(value,canonical);
+  if(url.origin!==canonical||url.username||url.password)throw new Error('Open documents from your authorised Voxel Veda record.');
+  const response=await fetch(url.href,{credentials:'same-origin',cache:'no-store'});
+  if(!response.ok)throw new Error(response.status===401?'Your session has ended. Log in again before opening this document.':'The document could not be loaded. Return to its record and retry.');
+  if(response.headers.get('content-type')?.split(';')[0].trim().toLowerCase()!=='application/pdf')throw new Error('The service did not return a PDF. No file was saved.');
+  const filename=(response.headers.get('content-disposition')||'').match(/filename="?([^";]+)"?/i)?.[1];
+  return documentAction(await response.arrayBuffer(),filename,download);
+ }
  function handleBack(){
   const security=document.getElementById('stepUpDialog');
   if(security&&!security.hidden){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return true;}
@@ -21,7 +30,7 @@
   if(dirty&&!window.confirm('Discard your unsaved changes?'))return true;
   return false;
  }
- window.VoxelNativeApp={handleBack,documentAction,openCameraSettings:()=>plugin.openCameraSettings()};
+ window.VoxelNativeApp={handleBack,documentAction,openDocument,openCameraSettings:()=>plugin.openCameraSettings()};
  document.addEventListener('input',event=>{const form=event.target.closest?.('form');if(form)form.dataset.nativeDirty='true';},true);
  document.addEventListener('submit',event=>{if(event.target.matches?.('form'))delete event.target.dataset.nativeDirty;},true);
  function appearance(){plugin.setAppearance({dark:document.documentElement.dataset.colorMode==='dark'}).catch(()=>{});}

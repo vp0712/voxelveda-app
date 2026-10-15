@@ -97,11 +97,13 @@ async function login() {
   }
 
   loginInFlight=true;
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
   setLoginBusy(true);
   setLoginStatus('Authenticating...', 'info');
 
   try {
     const res = await fetch('/api/auth/login', {
+      signal:controller.signal,
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -151,6 +153,7 @@ async function login() {
     console.error('LOGIN ERROR:', err);
     setLoginStatus('Unable to reach the secure sign-in service. Check your connection and try again.');
   } finally {
+    clearTimeout(timeout);
     loginInFlight=false;
     setLoginBusy(false);
   }
