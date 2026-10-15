@@ -28,6 +28,7 @@ const {createDocumentPdf}=require('../services/documentPdfService');
  const server=await fixture.makeServer(path.join(root,'public'),fs.readFileSync(path.join(root,'public/logo.png')),async(app,{auth,pageAuth,authController,nativeMfaController,brand,identities,sessions})=>{
   app.set('trust proxy',1);
   const page=file=>brand.injectGlobalBrand(fs.readFileSync(path.join(root,'public',file),'utf8'));
+  app.get('/vendor/jsQR.js',(_req,res)=>res.type('application/javascript').sendFile(path.join(root,'node_modules/jsqr/dist/jsQR.js')));
   app.get('/__fixture/ready',(_req,res)=>res.json({fixtureOnly:true}));
   app.post('/__fixture/expire',(_req,res)=>{sessions.clear();res.json({expired:true});});
   app.get('/__fixture/totp',(_req,res)=>res.json({code:require('../services/mfaService')._test.totp(secret)}));
