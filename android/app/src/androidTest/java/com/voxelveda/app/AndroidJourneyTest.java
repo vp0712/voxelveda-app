@@ -45,11 +45,8 @@ public class AndroidJourneyTest {
   InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().evaluateJavascript(source,value->{result.set(value);latch.countDown();}));
   assertTrue("WebView evaluation completed",latch.await(20,TimeUnit.SECONDS));return result.get();
  }
- private void waitNativeText(String text,boolean partial)throws Exception{
-  long end=System.currentTimeMillis()+20000;
-  while(System.currentTimeMillis()<end){try{onView(partial?withSubstring(text):withText(text)).check(matches(isDisplayed()));return;}catch(androidx.test.espresso.NoMatchingViewException|AssertionError pending){Thread.sleep(200);}}
-  fail("Expected native control was not displayed: "+text);
- }
+ private UiObject nativeText(String text,boolean partial){return device.findObject(partial?new UiSelector().textContains(text):new UiSelector().textMatches("(?i)^"+java.util.regex.Pattern.quote(text)+"$"));}
+ private void waitNativeText(String text,boolean partial)throws Exception{assertTrue("Expected native control: "+text,nativeText(text,partial).waitForExists(20000));}
  private void waitJs(String expression)throws Exception{
   long end=System.currentTimeMillis()+30000;
   while(System.currentTimeMillis()<end){if("true".equals(js("Boolean("+expression+")")))return;Thread.sleep(180);}
@@ -62,7 +59,7 @@ public class AndroidJourneyTest {
  private FixtureTransport.Reply control(String route)throws Exception{return transport.relay(NavigationPolicy.ORIGIN+route,route.endsWith("expire")?"POST":"GET","",Collections.emptyMap());}
 
  @Before public void start()throws Exception{
-  Intents.init();intending(IntentMatchers.hasAction(Intent.ACTION_VIEW)).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED,null));
+  Intents.init();intending(org.hamcrest.CoreMatchers.allOf(IntentMatchers.hasAction(Intent.ACTION_VIEW),org.hamcrest.CoreMatchers.not(IntentMatchers.hasComponent(MainActivity.class.getName())))).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED,null));
   int port=Integer.parseInt(InstrumentationRegistry.getArguments().getString("fixture_port"));transport=new FixtureTransport(port);device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
   scenario=ActivityScenario.launch(MainActivity.class);scenario.onActivity(activity->{main=activity;activity.getBridge().getWebView().stopLoading();activity.getBridge().getWebView().addJavascriptInterface(transport,"VVAndroidTestFixture");activity.getBridge().setWebViewClient(new ApplicationWebViewClient(activity.getBridge(),activity){
    @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
@@ -74,7 +71,7 @@ public class AndroidJourneyTest {
      if(type.equals("text/html"))bytes=transport.inject(activity.getBridge(),new String(bytes,StandardCharsets.UTF_8)).getBytes(StandardCharsets.UTF_8);
      Map<String,String> headers=new HashMap<>(reply.headers);headers.remove("content-length");headers.remove("transfer-encoding");headers.remove("content-encoding");
      return new WebResourceResponse(type,"UTF-8",reply.status,reply.status>=400?"Fixture failure":"OK",headers,new ByteArrayInputStream(bytes));
-    }catch(Exception error){android.util.Log.e("AndroidFixture",request.getUrl().getPath()+": "+error.getClass().getSimpleName()+": "+error.getMessage());return new WebResourceResponse("text/html","UTF-8",503,"Fixture unavailable",Collections.emptyMap(),new ByteArrayInputStream("<!doctype html><head></head><body>Fixture unavailable</body>".getBytes(StandardCharsets.UTF_8)));}
+    }catch(Exception error){android.util.Log.e("AndroidFixture",request.getUrl().getPath()+": "+error.getClass().getSimpleName()+": "+error.getMessage());if(transport.offline&&request.isForMainFrame())view.postDelayed(()->onReceivedHttpError(view,request,new WebResourceResponse("text/html","UTF-8",503,"Isolated transport interruption",Collections.emptyMap(),new ByteArrayInputStream(new byte[0]))),250);return new WebResourceResponse("text/html","UTF-8",503,"Fixture unavailable",Collections.emptyMap(),new ByteArrayInputStream("<!doctype html><head></head><body>Fixture unavailable</body>".getBytes(StandardCharsets.UTF_8)));}
    }
   });});
   evidence=new File(main.getExternalFilesDir(null),"android-proof");assertTrue(evidence.mkdirs()||evidence.isDirectory());
@@ -102,7 +99,7 @@ public class AndroidJourneyTest {
   JSONObject otp=new JSONObject(new String(control("/__fixture/totp").bytes,StandardCharsets.UTF_8));js("document.getElementById('mfaCode').value="+JSONObject.quote(otp.getString("code"))+";document.getElementById('mfaForm').requestSubmit()");waitJs("location.pathname==='/admin'&&document.body.textContent.includes('Synthetic Android Admin')");screenshot("admin-home");facts.add("Admin login requires an actual encrypted TOTP challenge and reaches only its permitted portal after verification");
   js("fetch('/api/auth/logout',{method:'POST'}).then(()=>location.assign('/dashboard'))");waitJs("location.pathname==='/login'");facts.add("Logout revokes the fixture server session and clears the correct cookie");
   login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'");
-  transport.offline=true;InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+"/profile"));waitNativeText("Retry connection",false);screenshot("connection-error");transport.offline=false;onView(withText("Retry connection")).perform(click());waitJs("location.pathname==='/profile'&&document.getElementById('androidAppInfo')");go("/portal/staff");waitJs("window.VoxelStaffHome?.state");facts.add("An intercepted transport failure exercises the real WebView HTTP error callback and branded explicit GET retry without replaying writes");
+  transport.offline=true;InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+"/profile"));waitNativeText("Retry connection",false);screenshot("connection-error");transport.offline=false;nativeText("Retry connection",false).click();waitJs("location.pathname==='/profile'&&document.getElementById('androidAppInfo')");go("/portal/staff");waitJs("window.VoxelStaffHome?.state");facts.add("A controlled intercepted transport failure invokes the WebView HTTP-error callback and branded explicit GET retry without replaying writes");
   CookieManager.getInstance().flush();
   long external=Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&!main.getPackageName().equals(intent.getPackage())&&(intent.getComponent()==null||!main.getPackageName().equals(intent.getComponent().getPackageName()))).count();assertEquals("No ordinary flow asks Android to open a browser",0,external);
   facts.add("Normal launch/auth/navigation/resume/legacy-link flows create zero external browser ACTION_VIEW intents");
@@ -124,14 +121,14 @@ public class AndroidJourneyTest {
   double x=Double.parseDouble(js("document.getElementById('name').getBoundingClientRect().left+document.getElementById('name').getBoundingClientRect().width/2")),y=Double.parseDouble(js("document.getElementById('name').getBoundingClientRect().top+document.getElementById('name').getBoundingClientRect().height/2")),cssWidth=Double.parseDouble(js("innerWidth"));int[] position=new int[2];AtomicReference<Integer> pixels=new AtomicReference<>();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{main.getBridge().getWebView().getLocationOnScreen(position);pixels.set(main.getBridge().getWebView().getWidth());});double scale=pixels.get()/cssWidth;device.click(position[0]+(int)Math.round(x*scale),position[1]+(int)Math.round(y*scale));waitKeyboard(true);
   waitJs("document.activeElement?.id==='name'&&innerHeight>=160");js("document.getElementById('saveBtn').scrollIntoView({block:'center'})");waitJs("(()=>{const r=document.getElementById('saveBtn').getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight})()");screenshot("profile-keyboard");device.pressBack();waitKeyboard(false);assertEquals("true",js("location.pathname==='/profile'"));js("document.getElementById('name').blur()");facts.add("Actual Android on-screen keyboard leaves the real profile Save action reachable; first Back dismisses the keyboard without leaving the form");
   js("document.getElementById('name').value='Unsaved Android fixture edit';document.getElementById('name').dispatchEvent(new Event('input',{bubbles:true}))");
-  device.pressBack();waitNativeText("Unsaved changes",false);onView(withText("Keep editing")).perform(click());assertEquals("true",js("location.pathname==='/profile'&&document.getElementById('name').value==='Unsaved Android fixture edit'"));
-  device.pressBack();onView(withText("Discard")).perform(click());waitJs("location.pathname==='/portal/staff'");go("/profile");waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");facts.add("Android Back offers Keep editing/Discard on the real profile form; cancellation retains unsaved input and discard performs no save");
+  device.pressBack();waitNativeText("Unsaved changes",false);device.findObject(new UiSelector().resourceId("android:id/button2")).click();assertEquals("true",js("location.pathname==='/profile'&&document.getElementById('name').value==='Unsaved Android fixture edit'"));
+  device.pressBack();device.findObject(new UiSelector().resourceId("android:id/button1")).click();waitJs("location.pathname==='/portal/staff'");go("/profile");waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");facts.add("Android Back offers Keep editing/Discard on the real profile form; cancellation retains unsaved input and discard performs no save");
  }
  @Test public void nativeCameraAndBrandedQr()throws Exception{
   staffSession();
   go("/portal/staff");waitJs("window.VoxelStaffHome?.state");
   js("window.__cameraOpen='pending';window.VoxelStaffHome.openAction('CHECK_IN').then(()=>window.__cameraOpen='done').catch(error=>window.__cameraOpen=error.message)");waitJs("document.getElementById('staffAttendanceVideo')");
-  UiObject2 deny=device.wait(Until.findObject(By.res(java.util.regex.Pattern.compile(".+:id/permission_deny_button"))),7000);if(deny!=null)deny.click();
+  UiObject deny=device.findObject(new UiSelector().resourceId("com.android.permissioncontroller:id/permission_deny_button"));assertTrue("Android camera permission prompt displayed",deny.waitForExists(15000));deny.click();
   waitJs("document.getElementById('staffAttendanceScanStatus')?.textContent.includes('permission')||document.getElementById('staffAttendanceScanStatus')?.textContent.includes('Position')");
   assertEquals("true",js("!![...document.querySelectorAll('button')].find(b=>b.textContent==='App camera settings')"));screenshot("camera-recovery");js("VoxelStaffHome.close()");facts.add("Actual WebView camera permission/recovery UI is reachable; physical QR camera focus is not asserted");
   js("window.__qrDecoded=false;window.loadExternalScript('/vendor/jsQR.js').then(async()=>{for(let n=0;n<5;n++){const image=new Image();image.src='/__fixture/gate.png?n='+n+'&time='+Date.now();await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext('2d');context.drawImage(image,0,0);const pixels=context.getImageData(0,0,canvas.width,canvas.height);const result=jsQR(pixels.data,canvas.width,canvas.height);if(!result?.data.startsWith('https://app.voxelveda.com/a?t='))throw new Error('decode');}window.__qrDecoded=true;}).catch(()=>window.__qrDecoded='failed')");waitJs("window.__qrDecoded===true");facts.add("Installed Android WebView decodes five actual signed branded gate payload images with original centre logo");
@@ -141,7 +138,7 @@ public class AndroidJourneyTest {
   js("window.__pdfPreview=false;VoxelOperations.openPdf('/api/invoice/91/pdf').then(()=>window.__pdfPreview=true).catch(error=>window.__pdfPreview=error.message)");
   waitNativeText("ANDROID-FIXTURE-1.pdf",true);screenshot("pdf-viewer");device.pressBack();waitJs("window.__pdfPreview===true");facts.add("Authorised genuine PDF opens in the internal native viewer, with reachable Back/zoom/page/save controls");
   js("window.__savedPdf=null;VoxelNativeApp.openDocument('/api/invoice/91/pdf',true).then(value=>window.__savedPdf=value).catch(error=>window.__savedPdf={error:error.message})");
-  UiObject2 savePdf=device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)^save$"))),15000);assertNotNull("Android PDF destination picker opened",savePdf);screenshot("pdf-save-picker");savePdf.click();waitJs("window.__savedPdf?.saved===true");facts.add("Android destination picker saves the parser-validated fixture PDF and confirms the completed output stream");
+  UiObject savePdf=nativeText("Save",false);assertTrue("Android PDF destination picker opened",savePdf.waitForExists(15000));screenshot("pdf-save-picker");savePdf.click();waitJs("window.__savedPdf?.saved===true");facts.add("Android destination picker saves the parser-validated fixture PDF and confirms the completed output stream");
   js("window.__invalidPdf='pending';VoxelNativeApp.documentAction(new TextEncoder().encode('<html>Not a PDF</html>').buffer,'fixture.pdf',true).then(()=>window.__invalidPdf='unexpected').catch(()=>window.__invalidPdf='rejected')");waitJs("window.__invalidPdf==='rejected'");facts.add("HTML/error bytes cannot be saved as PDF");
  }
 
