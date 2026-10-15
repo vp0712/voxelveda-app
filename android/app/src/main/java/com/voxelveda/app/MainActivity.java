@@ -52,6 +52,13 @@ public class MainActivity extends BridgeActivity {
                     .setPositiveButton("Discard", (dialog, which) -> result.confirm()).setOnCancelListener(dialog -> result.cancel()).show();
                 return true;
             }
+            @Override public boolean onJsBeforeUnload(WebView source, String url, String message, JsResult result) {
+                if (!NavigationPolicy.isApplication(url)) { result.cancel(); return true; }
+                new AlertDialog.Builder(MainActivity.this).setTitle("Unsaved changes").setMessage("Discard your unsaved changes?")
+                    .setNegativeButton("Keep editing", (dialog, which) -> result.cancel())
+                    .setPositiveButton("Discard", (dialog, which) -> result.confirm()).setOnCancelListener(dialog -> result.cancel()).show();
+                return true;
+            }
             @Override public void onPermissionRequest(PermissionRequest request) {
                 if (!NavigationPolicy.isApplication(request.getOrigin().toString())) { request.deny(); return; }
                 super.onPermissionRequest(request);
