@@ -411,5 +411,8 @@ window.addEventListener('beforeunload', (event) => {
   event.preventDefault();
   event.returnValue = '';
 });
+// The native Back adapter defers to this existing authoritative discard guard.
+const nativeGuardedProfileForm=document.getElementById('profileForm');
+if(nativeGuardedProfileForm?.dataset){nativeGuardedProfileForm.dataset.nativeBeforeunload='true';nativeGuardedProfileForm.nativeHasUnsavedChanges=()=>updateDirtyState();}
 
 loadProfile();

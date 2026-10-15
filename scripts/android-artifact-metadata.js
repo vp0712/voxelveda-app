@@ -1,0 +1,16 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{execFileSync}=require('node:child_process');
+const apk=path.resolve(process.argv[2]),output=process.argv[3];
+const sdk=process.env.ANDROID_HOME||process.env.ANDROID_SDK_ROOT;
+assert(sdk,'An actual Android SDK is required');
+const analyzer=path.join(sdk,'cmdline-tools/latest/bin/apkanalyzer');
+const buildTools=fs.readdirSync(path.join(sdk,'build-tools')).filter(name=>/^\d/.test(name)).sort((a,b)=>a.localeCompare(b,undefined,{numeric:true})).at(-1);
+const signing=execFileSync(path.join(sdk,'build-tools',buildTools,'apksigner'),['verify','--print-certs',apk],{encoding:'utf8'});
+const value=key=>execFileSync(analyzer,['manifest',key,apk],{encoding:'utf8'}).trim();
+const config=JSON.parse(execFileSync('unzip',['-p',apk,'assets/capacitor.config.json'],{encoding:'utf8'}));
+assert.equal(config.appId,'com.voxelveda.app');assert.equal(config.server.url,'https://app.voxelveda.com');assert.equal(config.server.cleartext,false);assert.deepEqual(config.server.allowNavigation,['app.voxelveda.com']);assert.equal(config.android.allowMixedContent,false);
+const packageId=value('application-id');assert.equal(packageId,'com.voxelveda.app');
+const manifest=execFileSync(analyzer,['manifest','print',apk],{encoding:'utf8'});assert.match(manifest,/android:autoVerify="true"/);assert.match(manifest,/android:host="app\.voxelveda\.com"/);
+const fingerprint=signing.match(/certificate SHA-256 digest:\s*([a-fA-F0-9]{64})(?:\s|$)/)?.[1];assert(fingerprint,'APK signature must be verified');
+const metadata={artifact:path.basename(apk),packageId,versionCode:Number(value('version-code')),versionName:value('version-name'),sourceCommit:process.env.ANDROID_SOURCE_COMMIT||process.env.GITHUB_SHA||'working-tree',sha256:crypto.createHash('sha256').update(fs.readFileSync(apk)).digest('hex'),signingCertificateSha256:fingerprint.match(/.{2}/g).join(':').toUpperCase(),classification:'VERIFICATION ONLY. Test signing identity; not a Play update or production App Signing association.',canonicalOrigin:config.server.url,manifestAppLinksHost:'app.voxelveda.com',osDomainVerification:'Requires actual Play App Signing fingerprint and observed installed verification'};
+if(output){fs.mkdirSync(path.dirname(output),{recursive:true});fs.writeFileSync(output,JSON.stringify(metadata,null,2));}console.log(JSON.stringify(metadata));

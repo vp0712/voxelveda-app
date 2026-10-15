@@ -13,10 +13,15 @@ function normalizeOrigin(value, fallback) {
 }
 
 const website = normalizeOrigin(process.env.PUBLIC_WEBSITE_URL, DEFAULT_WEBSITE_URL);
-const app = normalizeOrigin(process.env.PUBLIC_APP_URL || process.env.APP_URL, DEFAULT_APP_URL);
+const configuredApp = normalizeOrigin(process.env.PUBLIC_APP_URL || process.env.APP_URL, DEFAULT_APP_URL);
+// An old hosting variable must not put infrastructure URLs into invitations or QR codes.
+const configuredHost = new URL(configuredApp).hostname;
+const localDevelopment = process.env.NODE_ENV !== 'production' && ['localhost', '127.0.0.1', '[::1]'].includes(configuredHost);
+const app = configuredApp === DEFAULT_APP_URL || localDevelopment ? configuredApp : DEFAULT_APP_URL;
 
 function absolute(pathname = '/', origin = app) {
   const safePath = String(pathname || '/').startsWith('/') ? pathname : `/${pathname}`;
+  if (safePath.startsWith('//') || /[\\\r\n\x00-\x1f]/.test(safePath)) throw new TypeError('Invalid application path');
   return new URL(safePath, `${origin}/`).toString();
 }
 

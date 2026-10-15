@@ -1,6 +1,7 @@
 async function redirectSavedSession() {
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),10000);
   try {
-    const res = await fetch('/api/auth/me', { credentials: 'same-origin' });
+    const res = await fetch('/api/auth/me', { credentials: 'same-origin',signal:controller.signal });
     if (!res.ok) throw new Error('Saved session is no longer valid');
     const data = await res.json();
     const savedUser = data.user || {};
@@ -15,7 +16,7 @@ async function redirectSavedSession() {
     localStorage.removeItem('user');
     localStorage.removeItem('role');
     return false;
-  }
+  } finally { clearTimeout(timeout); }
 }
 
 function setLoginStatus(message, tone = 'error') {
@@ -69,7 +70,8 @@ function safeReturnTo(role, user = {}) {
   if (!value || !value.startsWith('/') || value.startsWith('//') || value.includes('\\')) return home;
   // The server checks access for every restored protected destination.
   const path = value.split(/[?#]/, 1)[0];
-  return ['/dashboard', '/security', '/profile', '/admin', '/staff-dashboard', '/client-portal', '/quality', '/shop-floor', '/attendance-terminal'].includes(path) ? value : home;
+  const allowed=['/dashboard','/security','/profile','/admin','/client','/account','/quality','/shop-floor','/attendance-terminal','/a','/attendance/scan','/invoice/view','/document/view'];
+  return allowed.includes(path) || /^\/portal\/(staff|manager|supervisor|hr|production|sales)$/.test(path) ? value : home;
 }
 
 function showLoginMessageFromUrl() {
@@ -83,7 +85,9 @@ function showLoginMessageFromUrl() {
   window.history.replaceState({}, document.title, cleanUrl);
 }
 
+let loginInFlight=false;
 async function login() {
+  if(loginInFlight)return;
   const email = document.getElementById('email')?.value.trim();
   const password = document.getElementById('password')?.value;
 
@@ -92,11 +96,14 @@ async function login() {
     return;
   }
 
+  loginInFlight=true;
+  const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),20000);
   setLoginBusy(true);
   setLoginStatus('Authenticating...', 'info');
 
   try {
     const res = await fetch('/api/auth/login', {
+      signal:controller.signal,
       method: 'POST',
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
@@ -146,6 +153,8 @@ async function login() {
     console.error('LOGIN ERROR:', err);
     setLoginStatus('Unable to reach the secure sign-in service. Check your connection and try again.');
   } finally {
+    clearTimeout(timeout);
+    loginInFlight=false;
     setLoginBusy(false);
   }
 }
@@ -159,4 +168,5 @@ document.addEventListener('DOMContentLoaded', async () => {
   const explicitMessage = params.get('message');
   if (!explicitMessage && await redirectSavedSession()) return;
   showLoginMessageFromUrl();
+  setLoginBusy(false);
 });

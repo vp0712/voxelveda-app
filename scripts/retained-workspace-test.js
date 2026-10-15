@@ -83,11 +83,11 @@ async function run() {
 
   const login = harness('login.js', async () => response(401, {}));
   for (const role of ['viewer', 'admin', 'staff', 'finance_admin', 'accountant', 'production']) assert.equal(login.context.portalPathForUser(role), '/dashboard');
-  for (const target of ['/finance', '/portal/staff', '/client', '//example.invalid', '/\\example.invalid', '/removed.html', '/request-quote']) {
+  for (const target of ['/finance', '//example.invalid', '/\\example.invalid', '/removed.html', '/request-quote']) {
     login.context.window.location.search = '?returnTo=' + encodeURIComponent(target);
     assert.equal(login.context.safeReturnTo('admin'), '/dashboard', target);
   }
-  for(const target of ['/admin','/quality','/shop-floor']){login.context.window.location.search='?returnTo='+encodeURIComponent(target);assert.equal(login.context.safeReturnTo('admin'),target,'original protected return path survives sign in');}
+  for(const target of ['/admin','/client','/portal/staff','/a?t=expired-fixture','/invoice/view?id=91','/document/view','/quality','/shop-floor']){login.context.window.location.search='?returnTo='+encodeURIComponent(target);assert.equal(login.context.safeReturnTo('admin'),target,'original protected return path survives sign in');}
   login.context.window.location.search = '?returnTo=' + encodeURIComponent('/security?mfa_setup=required');
   assert.equal(login.context.safeReturnTo('viewer'), '/security?mfa_setup=required');
   login.context.window.location.search = '?returnTo=%2Fprofile';
@@ -98,7 +98,7 @@ async function run() {
   for (const target of ['/admin', '/finance/reports/RPT_example/view', '/portal/staff', '/request-quote', '//evil.invalid', '/security?returnTo=%2Fdashboard']) {
     const mfa = harness('mfa.js', async () => response(200, { user: { role: 'finance_admin' } }), { session: { vv_mfa_challenge: 'test-challenge', vv_mfa_return_to: target } });
     await mfa.get('mfaForm').events.submit(event);
-    assert.deepEqual(mfa.destinations, [target.startsWith('/security?') ? target : '/dashboard']);
+    assert.deepEqual(mfa.destinations, [['/admin','/portal/staff'].includes(target)||target.startsWith('/security?') ? target : '/dashboard']);
     assert.equal(mfa.context.sessionStorage.getItem('vv_mfa_challenge'), null);
   }
   console.log('Retained workspace regression passed: account identity/retry/error states, confirmed/failed logout, absence of removed business workflows, safe universal login and MFA navigation.');

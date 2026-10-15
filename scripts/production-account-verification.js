@@ -45,12 +45,23 @@ async function main(){
  for(const route of ['/api/profile','/api/profile/photo','/api/profile/staff/1/photo','/api/notifications','/api/notifications/unread-count','/api/attendance/today','/api/attendance/my','/api/attendance/reconcile','/api/attendance/corrections']){
   const response=await fetch(origin+route,{signal:AbortSignal.timeout(15000)});assert.equal(response.status,401,route+' retains authentication');proof.checks.push({route,status:401,staff_mobile_authentication_boundary:true});
  }
- for(const name of ['staff-home.js','staff-home.css','attendance-scanner.js','staff.js','admin-dashboard.js','profile.js','workflow-ui.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js','role-portal.js','shift-qr-terminal.js','attendance-gate.css','entry-home.css','portal-profile-menu.js','client-portal.js','admin-home.css','responsive-foundation.css','responsive-foundation.js','document-reader.css','pdf-reader.mjs','document-preview.js','invoice-preview.js','invoice-detail.js','invoice-detail.css','workspace-dialog.js','workspace-dialog.css','step-up.js','step-up.css','operations-ui.js','global-brand.js','global-brand.css']){
+ for(const name of ['android-app.js','login.js','mfa.js','staff-home.js','staff-home.css','attendance-scanner.js','staff.js','admin-dashboard.js','profile.js','workflow-ui.js','profile-avatar.js','dashboard-profile-avatar.js','notification-center.js','notification-center.css','workspace-overlays.js','compact-header.css','workspace-theme.js','role-portal.js','shift-qr-terminal.js','attendance-gate.css','entry-home.css','portal-profile-menu.js','client-portal.js','admin-home.css','responsive-foundation.css','responsive-foundation.js','document-reader.css','pdf-reader.mjs','document-preview.js','invoice-preview.js','invoice-detail.js','invoice-detail.css','workspace-dialog.js','workspace-dialog.css','step-up.js','step-up.css','operations-ui.js','global-brand.js','global-brand.css']){
   const response=await fetch(origin+'/'+name,{headers:{'Cache-Control':'no-cache'},signal:AbortSignal.timeout(15000)});assert.equal(response.status,200,name+' is deployed');
   const bytes=Buffer.from(await response.arrayBuffer()),digest=buffer=>crypto.createHash('sha256').update(buffer).digest('hex');
   assert.equal(digest(bytes),digest(fs.readFileSync(path.join(__dirname,'../public',name))),name+' matches exact release bytes');
   assert.match(response.headers.get('cache-control')||'',/no-store/i,name+' cannot retain stale private-workflow code');proof.checks.push({asset:name,status:200,sha256:digest(bytes),exact_release_bytes:true});
  }
+ const legacyOrigin='https://voxelveda-app-production.up.railway.app';
+ for(const route of ['/','/login?returnTo=%2Fportal%2Fstaff','/profile','/a?t=invalid']){
+  const response=await fetch(legacyOrigin+route,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+  assert.equal(response.status,308);assert.equal(response.headers.get('location'),origin+route);proof.checks.push({legacy_route:route,status:308,canonical_destination:origin+route});
+ }
+ for(const route of ['/api/health','/api/ready']){const response=await fetch(legacyOrigin+route,{redirect:'manual',signal:AbortSignal.timeout(15000)});assert.equal(response.status,200);proof.checks.push({legacy_probe:route,status:200});}
+ const legacyWrite=await fetch(legacyOrigin+'/api/auth/login',{method:'POST',redirect:'manual',headers:{'Content-Type':'application/json'},body:'{}',signal:AbortSignal.timeout(15000)});
+ assert.equal(legacyWrite.status,409);assert.equal((await legacyWrite.json()).code,'CANONICAL_ORIGIN_REQUIRED');proof.checks.push({legacy_write:409,credentials_not_forwarded:true});
+ const association=await fetch(origin+'/.well-known/assetlinks.json',{signal:AbortSignal.timeout(15000)});const associationBody=await association.json();
+ assert.ok([200,503].includes(association.status));assert.ok(Array.isArray(associationBody));if(association.status===503)assert.deepEqual(associationBody,[]);
+ proof.checks.push({android_association_status:association.status,configured:association.status===200,play_identity_verification:'Requires the actual Play App Signing certificate and installed distribution'});
  const rejectedRfq=await fetch(origin+'/api/public/rfq',{method:'POST',headers:{'Content-Type':'application/json','Origin':origin},body:'{}',signal:AbortSignal.timeout(15000)});
  assert.equal(rejectedRfq.status,400,'Invalid public RFQ fails validation without creating business records');proof.checks.push({route:'/api/public/rfq',invalid_empty_input:400});
  for(const download of ['', '?download=1']){

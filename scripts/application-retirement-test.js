@@ -109,6 +109,8 @@ function applicationFixture() {
     './controllers/readinessController': actualReadiness,
     './middleware/auth': pass, './middleware/pageAuth': actualPageAuth,
     './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
+    './middleware/canonicalApplication':require('../middleware/canonicalApplication'),
+    './services/androidAssociationService':require('../services/androidAssociationService'),
     './services/attendanceGateAccess': require('../services/attendanceGateAccess'),
     './config/urls': require('../config/urls'),
     './middleware/securityMiddleware': {
@@ -210,7 +212,10 @@ async function routeBoundaries() {
   }
   const invalidSession = await request(app, '/dashboard?from=expired-session', { headers: { cookie: 'vv_session=invalid-fixture-token' } });
   assert.equal(invalidSession.status, 302);
-  assert.equal(invalidSession.headers.location, '/login?returnTo=%2Fdashboard%3Ffrom%3Dexpired-session');
+  const expiredLocation = new URL(invalidSession.headers.location, 'https://app.voxelveda.com');
+  assert.equal(expiredLocation.pathname, '/login');
+  assert.equal(expiredLocation.searchParams.get('returnTo'), '/dashboard?from=expired-session');
+  assert.equal(expiredLocation.searchParams.get('message'), 'Your session has ended. Please log in again.');
   for (const url of ['/admin','/portal/admin']) {
     const result=await request(app,url,authenticated);assert.equal(result.status,302);assert.equal(result.headers.location,'/client');
   }

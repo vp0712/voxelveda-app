@@ -1,0 +1,69 @@
+name: Android installed application verification
+on:
+  pull_request:
+    branches: [main]
+    paths: ['android/**', 'native-shell/**', 'capacitor.config.json', 'public/**', 'scripts/android-*', 'scripts/staff-mobile-browser-test.js', 'services/globalBrandRenderer.js', 'middleware/**', 'controllers/authController.js', 'controllers/mfaController.js', 'services/authSessionService.js', 'config/urls.js', '.github/workflows/android-application.yml']
+  push:
+    branches: [main, 'simplify-*']
+    paths: ['android/**', 'native-shell/**', 'capacitor.config.json', 'public/**', 'scripts/android-*', 'scripts/staff-mobile-browser-test.js', 'services/globalBrandRenderer.js', 'middleware/**', 'controllers/authController.js', 'controllers/mfaController.js', 'services/authSessionService.js', 'config/urls.js', '.github/workflows/android-application.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: android-installed-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android-installed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ANDROID_VERSION_CODE: '2'
+      ANDROID_VERSION_NAME: '0.0.0-verification'
+      ANDROID_SOURCE_COMMIT: ${{ github.sha }}
+      VV_ANDROID_PROOF_DIR: /tmp/voxelveda-android-proof
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
+      - run: npm ci --ignore-scripts
+      - name: Synchronise the actual native project and canonical bundled configuration
+        run: npx cap sync android
+      - name: Build installed verification artifacts and native policy tests
+        run: android/gradlew -p android --no-daemon :app:assembleVerification :app:assembleVerificationAndroidTest :app:testVerificationUnitTest
+      - name: Verify the actual APK identity, canonical bundled config and signature
+        run: node scripts/android-artifact-metadata.js android/app/build/outputs/apk/verification/app-verification.apk /tmp/voxelveda-android-proof/artifact-before-upgrade.json
+      - name: Make the disposable runner's Android virtualisation device accessible
+        run: sudo chmod 666 /dev/kvm
+      - name: Run real installed WebView authentication, navigation and upgrade journeys
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: default
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
+          script: bash scripts/android-emulator-ci.sh
+      - name: Preserve test artifacts and explicit signing/domain limitations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-verification-only-${{ github.sha }}
+          path: |
+            /tmp/voxelveda-android-proof
+            android/app/build/outputs/apk/verification/
+            android/app/build/outputs/apk/androidTest/verification/
+            android/app/build/test-results/
+            android/app/build/reports/
+          retention-days: 30

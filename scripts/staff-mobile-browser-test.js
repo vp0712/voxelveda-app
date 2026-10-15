@@ -11,7 +11,7 @@ const Module = require('node:module');
 const { execFileSync } = require('node:child_process');
 const express = require('express');
 const jwt = require('jsonwebtoken');
-const { chromium } = require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
+const chromium = process.env.VV_ANDROID_FIXTURE ? null : require(process.env.VV_BROWSER_MODULE_PATH || 'playwright').chromium;
 const project = path.resolve(__dirname, '..');
 const baselineRef = process.env.VV_STAFF_BASELINE_REF || '616f8ee9e5d54af1201389ca1b7690a66163d0ad';
 assert(/^[a-f0-9]{40}$/.test(baselineRef), 'Before screenshots require an exact preserved Git commit.');
@@ -35,7 +35,9 @@ const userSession = id => {
   sessions.set(crypto.createHash('sha256').update(token).digest('hex'), { id: `synthetic-${id}`, user_id: id, session_version: 1, assurance_level: 1 });
   return token;
 };
+let nativeQuery = null;
 const query = async (sql, parameters = []) => {
+  if(nativeQuery){const result=await nativeQuery(String(sql),parameters);if(result!==undefined)return result;}
   if (/FROM users\s+WHERE id\s*=\s*\?/i.test(String(sql))) return [[identities.get(Number(parameters[0]))].filter(Boolean), []];
   if (/FROM privileged_access_requests/i.test(String(sql))) return [[], []];
   throw new Error('Unexpected authentication SQL in browser fixture: ' + String(sql).replace(/\s+/g, ' '));
@@ -43,7 +45,7 @@ const query = async (sql, parameters = []) => {
 const originalLoad = Module._load;
 Module._load = function fixtureLoad(request, parent) {
   const target = request.startsWith('.') ? path.resolve(path.dirname(parent.filename), request).replace(/\.js$/, '') : request;
-  if (target === path.join(project, 'config/db')) return { query };
+  if (target === path.join(project, 'config/db')) return { query, getConnection:async()=>({query,beginTransaction:async()=>{},commit:async()=>{},rollback:async()=>{},release(){}}) };
   if (target === path.join(project, 'services/userLifecycleService')) return { ensureUserLifecycleSchema: async () => {} };
   if (target === path.join(project, 'services/securitySchema')) return { ensureSecuritySchema: async () => {} };
   if (target === path.join(project, 'services/sessionService')) return {
@@ -51,6 +53,8 @@ Module._load = function fixtureLoad(request, parent) {
       const saved = sessions.get(crypto.createHash('sha256').update(token).digest('hex'));
       return saved && Number(saved.user_id) === Number(decoded.id) ? saved : null;
     },
+    createSession:async entry=>{sessions.set(crypto.createHash('sha256').update(entry.token).digest('hex'),{...entry,user_id:entry.userId,session_version:entry.sessionVersion,assurance_level:entry.assuranceLevel});},
+    revokeSession:async token=>{sessions.delete(crypto.createHash('sha256').update(token).digest('hex'));},
     logSecurityEvent: async () => {}
   };
   if (target === path.join(project, 'services/securityContextService')) return {
@@ -59,10 +63,11 @@ Module._load = function fixtureLoad(request, parent) {
   };
   return originalLoad.apply(this, arguments);
 };
-let auth, pageAuth, security, brand, authController;
+let auth, pageAuth, security, brand, authController, nativeMfaController;
 try {
   auth = require('../middleware/auth'); pageAuth = require('../middleware/pageAuth');
   authController = require('../controllers/authController');
+  if(process.env.VV_ANDROID_FIXTURE)nativeMfaController=require('../controllers/mfaController');
   security = require('../middleware/securityMiddleware'); brand = require('../services/globalBrandRenderer');
 } finally { Module._load = originalLoad; }
 
@@ -91,7 +96,7 @@ function attendanceState(state, userId = 9401) {
     active_attendance: active, completed_attendance_id: row?.clock_out ? row.id : null,
     company_timezone: 'Australia/Sydney', work_date: '2026-10-13', server_time: state.serverNow.toISOString(),
     summary: { first_check_in: row?.clock_in || null, latest_check_out: row?.clock_out || null, break_recording_status: row ? 'RECORDED' : 'NOT_RECORDED', recorded_break_session_count: row ? 1 : 0, worked_minutes: row?.clock_out ? row.total_minutes : 0, live_worked_minutes: live, recorded_break_minutes: row?.break_minutes || 0, live_break_minutes: ongoingBreak, session_count: row ? 1 : 0, eligible_session_count: row?.clock_out ? 1 : 0, duplicate_session_count: 0, review_required: false },
-    timeline: row ? state.timeline.map(event => ({ ...event, verification_status: 'VERIFIED' })) : [], next_roster: null, tasks: [], categories: [], qr_required: userId !== 9401,
+    timeline: row ? state.timeline.map(event => ({ ...event, verification_status: 'VERIFIED' })) : [], next_roster: null, tasks: [], categories: [], qr_required: !identities.get(userId)?.permissions?.includes('attendance_qr_bypass'),
     allowed_actions: open ? ['CHECK_OUT', onBreak ? 'BREAK_END' : 'BREAK_START'] : ['CHECK_IN'],
     break_policy: { mode: 'RECORDED_ACTUAL', automatic_deduction: false }, reporting_basis: 'WHOLE_SHIFT_LOCAL_START_DATE', review_issues: [] };
 }
@@ -109,11 +114,12 @@ async function deliverReply(state, req, res, payload) {
   if (gate) { state.delayedReplies.delete(key); gate.enter(captured); await gate.wait; gate.attempted = true; }
   return res.json(captured);
 }
-async function makeServer(publicDirectory, photo) {
+async function makeServer(publicDirectory, photo, configure) {
   let pageBrand=brand;if(publicDirectory!==path.join(project,'public')){const module={exports:{}};require('node:vm').runInNewContext(execFileSync('git',['show',baselineRef+':services/globalBrandRenderer.js'],{cwd:project,encoding:'utf8'}),{module,exports:module.exports});pageBrand=module.exports;}
   const state = resetState(), app = express();
   app.disable('x-powered-by'); app.use(security.securityHeaders); app.use(express.json()); app.use(security.csrfProtection);
   app.use((req, _res, next) => { requests.push({ path: req.path, method: req.method }); next(); });
+  if(configure)await configure(app,{auth,pageAuth,authController,nativeMfaController,brand,identities,sessions});
   app.get('/login', (_req, res) => res.type('html').send('<!doctype html><title>Synthetic fixture sign in</title><h1>Sign in</h1>'));
   for (const [route, file] of [['/portal/staff', 'staff-dashboard.html'], ['/profile', 'profile.html'], ['/admin', 'admin-dashboard.html']]) {
     app.get(route, pageAuth(), (_req, res) => res.set('Cache-Control', 'private, no-store').type('html').send(pageBrand.injectGlobalBrand(fs.readFileSync(path.join(publicDirectory, file), 'utf8'))));
@@ -889,4 +895,5 @@ async function run() {
     fs.rmSync(baselineDirectory, { recursive: true, force: true });
   }
 }
-run().catch(error => { console.error(error); process.exitCode = 1; });
+if(require.main===module)run().catch(error => { console.error(error); process.exitCode = 1; });
+else module.exports={makeServer,identities,sessions,requests,mutations,setNativeQuery:fn=>{nativeQuery=fn;}};
