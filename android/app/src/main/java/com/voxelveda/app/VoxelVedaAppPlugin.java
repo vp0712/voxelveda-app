@@ -61,6 +61,9 @@ public class VoxelVedaAppPlugin extends Plugin {
     private File verifiedPdf(PluginCall call) throws IOException {
         safeFilename(call.getString("filename"));
         String encoded = call.getString("base64", "");
+        // Capacitor persists pending activity-call options in an Android Bundle.
+        // Keep only the private validated file, never multi-megabyte document bytes in saved state.
+        call.getData().remove("base64");
         if (encoded.length() < 140 || encoded.length() > 28 * 1024 * 1024) throw new IOException("The PDF is empty or exceeds the supported size.");
         byte[] bytes;
         try { bytes = Base64.decode(encoded, Base64.DEFAULT); } catch (IllegalArgumentException error) { throw new IOException("Invalid PDF data."); }
