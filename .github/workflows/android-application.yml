@@ -20,7 +20,7 @@ jobs:
       ANDROID_VERSION_CODE: '2'
       ANDROID_VERSION_NAME: '0.0.0-verification'
       ANDROID_SOURCE_COMMIT: ${{ github.sha }}
-      VV_ANDROID_PROOF_DIR: ${{ runner.temp }}/android-proof
+      VV_ANDROID_PROOF_DIR: /tmp/voxelveda-android-proof
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,7 +57,7 @@ jobs:
         with:
           name: android-verification-only-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/android-proof
+            /tmp/voxelveda-android-proof
             android/app/build/outputs/apk/verification/
             android/app/build/outputs/apk/androidTest/verification/
             android/app/build/test-results/
