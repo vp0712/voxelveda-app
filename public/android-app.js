@@ -26,7 +26,7 @@
   if(window.VoxelOverlay?.active){window.VoxelOverlay.closeAll();return true;}
   const menu=document.querySelector('.record-action-menu[open]');if(menu){menu.open=false;return true;}
   if(document.body.classList.contains('mobile-menu-open')){window.toggleMobileMenu?.(false);window.toggleStaffMobileMenu?.(false);return true;}
-  const dirty=document.querySelector('form[data-native-dirty="true"]');
+  const dirty=[...document.forms].find(form=>{if(typeof form.nativeHasUnsavedChanges==='function'){try{return form.nativeHasUnsavedChanges()===true;}catch{}}return form.dataset.nativeDirty==='true';});
   if(dirty?.dataset.nativeBeforeunload==='true'&&options.canGoBack!==false)return false;
   if(dirty&&!window.confirm('Discard your unsaved changes?'))return true;
   return false;
