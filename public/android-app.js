@@ -20,14 +20,14 @@
   const filename=(response.headers.get('content-disposition')||'').match(/filename="?([^";]+)"?/i)?.[1];
   return documentAction(await response.arrayBuffer(),filename,download);
  }
- function handleBack(){
+ function handleBack(options={}){
   const security=document.getElementById('stepUpDialog');
   if(security&&!security.hidden){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return true;}
   if(window.VoxelOverlay?.active){window.VoxelOverlay.closeAll();return true;}
   const menu=document.querySelector('.record-action-menu[open]');if(menu){menu.open=false;return true;}
   if(document.body.classList.contains('mobile-menu-open')){window.toggleMobileMenu?.(false);window.toggleStaffMobileMenu?.(false);return true;}
   const dirty=document.querySelector('form[data-native-dirty="true"]');
-  if(dirty?.dataset.nativeBeforeunload==='true')return false;
+  if(dirty?.dataset.nativeBeforeunload==='true'&&options.canGoBack!==false)return false;
   if(dirty&&!window.confirm('Discard your unsaved changes?'))return true;
   return false;
  }
