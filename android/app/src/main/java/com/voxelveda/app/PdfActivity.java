@@ -49,6 +49,11 @@ public class PdfActivity extends AppCompatActivity {
         LinearLayout zoomControls=new LinearLayout(this);
         zoomControls.addView(button("−", () -> { zoom = Math.max(.5f, zoom-.25f); render(); }),new LinearLayout.LayoutParams(0,-2,1)); zoomControls.addView(button("+", () -> { zoom = Math.min(3, zoom+.25f); render(); }),new LinearLayout.LayoutParams(0,-2,1)); zoomControls.addView(button("Fit", () -> { zoom=1; render(); }),new LinearLayout.LayoutParams(0,-2,1)); root.addView(zoomControls);
         ScrollView scroller = new ScrollView(this); HorizontalScrollView horizontal = new HorizontalScrollView(this); image = new ImageView(this); image.setAdjustViewBounds(true); image.setContentDescription("Invoice or document PDF page"); horizontal.addView(image); scroller.addView(horizontal); root.addView(scroller,new LinearLayout.LayoutParams(-1,0,1)); setContentView(root);
+        int barBackground=Color.parseColor(dark?"#101a2a":"#f7f8fa");
+        getWindow().getDecorView().setBackgroundColor(barBackground);
+        getWindow().setStatusBarColor(barBackground);getWindow().setNavigationBarColor(barBackground);
+        androidx.core.view.WindowInsetsControllerCompat systemBars=new androidx.core.view.WindowInsetsControllerCompat(getWindow(),getWindow().getDecorView());
+        systemBars.setAppearanceLightStatusBars(!dark);systemBars.setAppearanceLightNavigationBars(!dark);
         ViewCompat.setOnApplyWindowInsetsListener(root,(view,insets)->{androidx.core.graphics.Insets bars=insets.getInsets(WindowInsetsCompat.Type.systemBars()|WindowInsetsCompat.Type.displayCutout());view.setPadding(bars.left,bars.top,bars.right,bars.bottom);return insets;});
         try {
             filename = VoxelVedaAppPlugin.safeFilename(getIntent().getStringExtra("filename"));
