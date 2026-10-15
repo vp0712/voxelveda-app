@@ -28,6 +28,7 @@ if [[ "$VV_ANDROID_LAUNCHER" == com.android.launcher3 || "$VV_ANDROID_LAUNCHER" 
 fi
 adb shell input keyevent KEYCODE_WAKEUP
 adb shell wm dismiss-keyguard
+adb shell settings put secure show_ime_with_hard_keyboard 1
 adb install -r android/app/build/outputs/apk/verification/app-verification.apk
 adb install -r android/app/build/outputs/apk/androidTest/verification/app-verification-androidTest.apk
 adb shell am instrument -w -r -e fixture_port "$VV_ANDROID_FIXTURE_PORT" -e class com.voxelveda.app.AndroidJourneyTest com.voxelveda.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$VV_ANDROID_PROOF_DIR/installed-journey.txt"
