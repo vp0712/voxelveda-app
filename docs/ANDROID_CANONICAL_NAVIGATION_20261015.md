@@ -10,6 +10,8 @@ The locked Capacitor Bridge's `launchIntent` creates an Android `ACTION_VIEW` wh
 
 Production observations before repair: canonical `/api/ready` is healthy at the starting commit; the old Railway `/login` returns HTTP200 and serves login on the infrastructure host; canonical `/.well-known/assetlinks.json` returns an HTML404. Production public variable values are redacted; their names do not establish values. Source also allowed stale APP_URL/PUBLIC_APP_URL values into email/careers links. Login and MFA return-path filters dropped valid staff, attendance and document paths.
 
+The public Play listing for `com.voxelveda.app` returns200, identifies Voxel Veda and reports an update date of 22 July 2026. Source migration `ae011107` is dated 3 August 2026. The listing therefore predates the source URL migration, supporting an outdated-build explanation without establishing the affected installed binary or Play version code.
+
 The affected phone's installed package/version/channel and Play Console's current release and signing identity are **not available**. No connected device, existing APK/AAB, Play connection or production test account was supplied. GitHub denies signing secret/variable metadata access with HTTP403. Therefore these findings establish the source/framework defects and legacy URL source, without claiming that the particular installed phone has been inspected or that its exact binary matches a source commit.
 
 ## Changes
