@@ -22,9 +22,16 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.*;
 import static androidx.test.espresso.intent.Intents.intending;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.matcher.ViewMatchers.withSubstring;
+import static androidx.test.espresso.action.ViewActions.click;
+import static androidx.test.espresso.assertion.ViewAssertions.matches;
+import static androidx.test.espresso.matcher.ViewMatchers.isDisplayed;
 
 @RunWith(AndroidJUnit4.class)
 public class AndroidJourneyTest {
+ @Rule public org.junit.rules.TestName testName=new org.junit.rules.TestName();
  private ActivityScenario<MainActivity> scenario;
  private MainActivity main;
  private FixtureTransport transport;
@@ -79,32 +86,17 @@ public class AndroidJourneyTest {
   go("/profile");waitJs("document.getElementById('androidAppInfo')?.textContent.includes('com.voxelveda.app')");screenshot("profile-version");facts.add("Native package/version/source information is accessible in account settings");
   js("window.__nativeInfo=null;Capacitor.Plugins.VoxelVedaApp.getAppInfo().then(value=>window.__nativeInfo=value)");waitJs("window.__nativeInfo?.packageId==='com.voxelveda.app'");
   js("VoxelTheme.set('dark')");waitJs("document.documentElement.dataset.colorMode==='dark'");screenshot("dark-profile");device.setOrientationLeft();Thread.sleep(400);screenshot("landscape-profile");device.setOrientationNatural();
-  waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");
-  js("document.getElementById('name').value='Unsaved Android fixture edit';document.getElementById('name').dispatchEvent(new Event('input',{bubbles:true}))");
-  device.pressBack();UiObject2 keepEditing=device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)^Keep editing$"))),5000);assertNotNull("Back asks before discarding the real profile form",keepEditing);keepEditing.click();assertEquals("true",js("location.pathname==='/profile'&&document.getElementById('name').value==='Unsaved Android fixture edit'"));
-  device.pressBack();UiObject2 discard=device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)^Discard$"))),5000);assertNotNull(discard);discard.click();waitJs("location.pathname==='/portal/staff'");go("/profile");waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");facts.add("Android Back offers Keep editing/Discard on the real profile form; cancellation retains unsaved input and discard performs no save");
   Intent link=new Intent(Intent.ACTION_VIEW,Uri.parse(NavigationPolicy.ORIGIN+"/profile")).setClass(main,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP);
   InstrumentationRegistry.getInstrumentation().getTargetContext().startActivity(link);waitJs("location.pathname==='/profile'");assertEquals(identity,System.identityHashCode(main));facts.add("Warm explicit HTTPS app-link dispatch preserves a single activity; OS domain verification is reported separately");
   InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl("https://voxelveda-app-production.up.railway.app/profile"));waitJs("location.origin==='https://app.voxelveda.com'&&location.pathname==='/profile'");facts.add("Legacy-host navigation is rewritten inside the app without an external VIEW intent");
   for(String route:new String[]{"/register","/forgot-password","/reset-password","/accept-invite"}){go(route);waitJs("document.querySelector('h1')");}facts.add("Signup, recovery and invitation screens remain canonical in the installed app; no accounts or email are created");
-  go("/portal/staff");waitJs("window.VoxelStaffHome?.state");
-  js("window.VoxelStaffHome.openAction('CHECK_IN')");waitJs("document.getElementById('staffAttendanceVideo')");
-  UiObject2 deny=device.wait(Until.findObject(By.res(java.util.regex.Pattern.compile(".+:id/permission_deny_button"))),7000);if(deny!=null)deny.click();
-  waitJs("document.getElementById('staffAttendanceScanStatus')?.textContent.includes('permission')||document.getElementById('staffAttendanceScanStatus')?.textContent.includes('Position')");
-  assertEquals("true",js("!![...document.querySelectorAll('button')].find(b=>b.textContent==='App camera settings')"));screenshot("camera-recovery");js("VoxelStaffHome.close()");facts.add("Actual WebView camera permission/recovery UI is reachable; physical QR camera focus is not asserted");
-  js("window.__qrDecoded=false;window.loadExternalScript('/vendor/jsQR.js').then(async()=>{for(let n=0;n<5;n++){const image=new Image();image.src='/__fixture/gate.png?n='+n+'&time='+Date.now();await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext('2d');context.drawImage(image,0,0);const pixels=context.getImageData(0,0,canvas.width,canvas.height);const result=jsQR(pixels.data,canvas.width,canvas.height);if(!result?.data.startsWith('https://app.voxelveda.com/a?t='))throw new Error('decode');}window.__qrDecoded=true;}).catch(()=>window.__qrDecoded='failed')");waitJs("window.__qrDecoded===true");facts.add("Installed Android WebView decodes five actual signed branded gate payload images with original centre logo");
-  js("window.__pdfPreview=false;VoxelOperations.openPdf('/api/invoice/91/pdf').then(()=>window.__pdfPreview=true).catch(error=>window.__pdfPreview=error.message)");
-  UiObject2 pdf=device.wait(Until.findObject(By.textContains("ANDROID-FIXTURE-1.pdf")),15000);assertNotNull("Internal parser-validated PDF viewer opened",pdf);screenshot("pdf-viewer");device.pressBack();waitJs("window.__pdfPreview===true");facts.add("Authorised genuine PDF opens in the internal native viewer, with reachable Back/zoom/page/save controls");
-  js("window.__savedPdf=null;VoxelNativeApp.openDocument('/api/invoice/91/pdf',true).then(value=>window.__savedPdf=value).catch(error=>window.__savedPdf={error:error.message})");
-  UiObject2 savePdf=device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)^save$"))),15000);assertNotNull("Android PDF destination picker opened",savePdf);screenshot("pdf-save-picker");savePdf.click();waitJs("window.__savedPdf?.saved===true");facts.add("Android destination picker saves the parser-validated fixture PDF and confirms the completed output stream");
-  js("window.__invalidPdf='pending';VoxelNativeApp.documentAction(new TextEncoder().encode('<html>Not a PDF</html>').buffer,'fixture.pdf',true).then(()=>window.__invalidPdf='unexpected').catch(()=>window.__invalidPdf='rejected')");waitJs("window.__invalidPdf==='rejected'");facts.add("HTML/error bytes cannot be saved as PDF");
   control("/__fixture/expire");go("/dashboard");waitJs("location.pathname==='/login'&&location.search.includes('returnTo')");facts.add("Expired server session returns to login with a safe intent");
   login("android-admin@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/mfa'&&document.getElementById('mfaVerify')?.disabled===false");
   js("document.getElementById('mfaCode').value='000000';document.getElementById('mfaForm').requestSubmit()");waitJs("document.getElementById('status').textContent.includes('Invalid')");
   JSONObject otp=new JSONObject(new String(control("/__fixture/totp").bytes,StandardCharsets.UTF_8));js("document.getElementById('mfaCode').value="+JSONObject.quote(otp.getString("code"))+";document.getElementById('mfaForm').requestSubmit()");waitJs("location.pathname==='/admin'&&document.body.textContent.includes('Synthetic Android Admin')");screenshot("admin-home");facts.add("Admin login requires an actual encrypted TOTP challenge and reaches only its permitted portal after verification");
   js("fetch('/api/auth/logout',{method:'POST'}).then(()=>location.assign('/dashboard'))");waitJs("location.pathname==='/login'");facts.add("Logout revokes the fixture server session and clears the correct cookie");
   login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'");
-  transport.offline=true;InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+"/profile"));assertNotNull(device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)^Retry connection$"))),10000));screenshot("connection-error");transport.offline=false;device.findObject(By.text(java.util.regex.Pattern.compile("(?i)^Retry connection$"))).click();waitJs("location.pathname==='/profile'&&document.getElementById('androidAppInfo')");go("/portal/staff");waitJs("window.VoxelStaffHome?.state");facts.add("An intercepted transport failure exercises the real WebView HTTP error callback and branded explicit GET retry without replaying writes");
+  transport.offline=true;InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+"/profile"));onView(withText("Retry connection")).check(matches(isDisplayed()));screenshot("connection-error");transport.offline=false;onView(withText("Retry connection")).perform(click());waitJs("location.pathname==='/profile'&&document.getElementById('androidAppInfo')");go("/portal/staff");waitJs("window.VoxelStaffHome?.state");facts.add("An intercepted transport failure exercises the real WebView HTTP error callback and branded explicit GET retry without replaying writes");
   CookieManager.getInstance().flush();
   long external=Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&!main.getPackageName().equals(intent.getPackage())&&(intent.getComponent()==null||!main.getPackageName().equals(intent.getComponent().getPackageName()))).count();assertEquals("No ordinary flow asks Android to open a browser",0,external);
   facts.add("Normal launch/auth/navigation/resume/legacy-link flows create zero external browser ACTION_VIEW intents");
@@ -112,8 +104,36 @@ public class AndroidJourneyTest {
   assertEquals(1,Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getComponent()==null).count());facts.add("Actual unmodified Capacitor cross-host fallback emits ACTION_VIEW for the legacy Railway URL; intercepted only for this diagnostic baseline assertion");
  }
 
+ private void staffSession()throws Exception{
+  CountDownLatch latch=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->latch.countDown()));assertTrue(latch.await(10,TimeUnit.SECONDS));go("/login");login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&window.VoxelStaffHome?.state");
+ }
+ @Test public void nativeBackDiscardsOnlyAfterConfirmation()throws Exception{
+  staffSession();go("/profile");
+  waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");
+  js("document.getElementById('name').value='Unsaved Android fixture edit';document.getElementById('name').dispatchEvent(new Event('input',{bubbles:true}))");
+  device.pressBack();onView(withText("Unsaved changes")).check(matches(isDisplayed()));onView(withText("Keep editing")).perform(click());assertEquals("true",js("location.pathname==='/profile'&&document.getElementById('name').value==='Unsaved Android fixture edit'"));
+  device.pressBack();onView(withText("Discard")).perform(click());waitJs("location.pathname==='/portal/staff'");go("/profile");waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");facts.add("Android Back offers Keep editing/Discard on the real profile form; cancellation retains unsaved input and discard performs no save");
+ }
+ @Test public void nativeCameraAndBrandedQr()throws Exception{
+  staffSession();
+  go("/portal/staff");waitJs("window.VoxelStaffHome?.state");
+  js("window.VoxelStaffHome.openAction('CHECK_IN')");waitJs("document.getElementById('staffAttendanceVideo')");
+  UiObject2 deny=device.wait(Until.findObject(By.res(java.util.regex.Pattern.compile(".+:id/permission_deny_button"))),7000);if(deny!=null)deny.click();
+  waitJs("document.getElementById('staffAttendanceScanStatus')?.textContent.includes('permission')||document.getElementById('staffAttendanceScanStatus')?.textContent.includes('Position')");
+  assertEquals("true",js("!![...document.querySelectorAll('button')].find(b=>b.textContent==='App camera settings')"));screenshot("camera-recovery");js("VoxelStaffHome.close()");facts.add("Actual WebView camera permission/recovery UI is reachable; physical QR camera focus is not asserted");
+  js("window.__qrDecoded=false;window.loadExternalScript('/vendor/jsQR.js').then(async()=>{for(let n=0;n<5;n++){const image=new Image();image.src='/__fixture/gate.png?n='+n+'&time='+Date.now();await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext('2d');context.drawImage(image,0,0);const pixels=context.getImageData(0,0,canvas.width,canvas.height);const result=jsQR(pixels.data,canvas.width,canvas.height);if(!result?.data.startsWith('https://app.voxelveda.com/a?t='))throw new Error('decode');}window.__qrDecoded=true;}).catch(()=>window.__qrDecoded='failed')");waitJs("window.__qrDecoded===true");facts.add("Installed Android WebView decodes five actual signed branded gate payload images with original centre logo");
+ }
+ @Test public void nativePdfViewAndSave()throws Exception{
+  staffSession();
+  js("window.__pdfPreview=false;VoxelOperations.openPdf('/api/invoice/91/pdf').then(()=>window.__pdfPreview=true).catch(error=>window.__pdfPreview=error.message)");
+  onView(withSubstring("ANDROID-FIXTURE-1.pdf")).check(matches(isDisplayed()));screenshot("pdf-viewer");device.pressBack();waitJs("window.__pdfPreview===true");facts.add("Authorised genuine PDF opens in the internal native viewer, with reachable Back/zoom/page/save controls");
+  js("window.__savedPdf=null;VoxelNativeApp.openDocument('/api/invoice/91/pdf',true).then(value=>window.__savedPdf=value).catch(error=>window.__savedPdf={error:error.message})");
+  UiObject2 savePdf=device.wait(Until.findObject(By.text(java.util.regex.Pattern.compile("(?i)^save$"))),15000);assertNotNull("Android PDF destination picker opened",savePdf);screenshot("pdf-save-picker");savePdf.click();waitJs("window.__savedPdf?.saved===true");facts.add("Android destination picker saves the parser-validated fixture PDF and confirms the completed output stream");
+  js("window.__invalidPdf='pending';VoxelNativeApp.documentAction(new TextEncoder().encode('<html>Not a PDF</html>').buffer,'fixture.pdf',true).then(()=>window.__invalidPdf='unexpected').catch(()=>window.__invalidPdf='rejected')");waitJs("window.__invalidPdf==='rejected'");facts.add("HTML/error bytes cannot be saved as PDF");
+ }
+
  @After public void finish()throws Exception{
-  if(evidence!=null){try{device.takeScreenshot(new File(evidence,"last-app-screen.png"));}catch(Exception ignored){}JSONObject result=new JSONObject();result.put("fixtureOnly",true);result.put("realProductionAccountUsed",false);result.put("physicalDevice",false);result.put("packageId","com.voxelveda.app");result.put("appSigningVerification","NOT_TESTED: real Play certificate/access unavailable");result.put("facts",new JSONArray(facts));try(FileOutputStream output=new FileOutputStream(new File(evidence,"result-"+InstrumentationRegistry.getArguments().getString("upgrade_only","false")+".json"))){output.write(result.toString(2).getBytes(StandardCharsets.UTF_8));}}
+  if(evidence!=null){try{device.dumpWindowHierarchy(new File(evidence,"ui-"+testName.getMethodName()+".xml"));}catch(Exception ignored){}try{device.takeScreenshot(new File(evidence,"last-app-screen-"+testName.getMethodName()+".png"));}catch(Exception ignored){}JSONObject result=new JSONObject();result.put("fixtureOnly",true);result.put("realProductionAccountUsed",false);result.put("physicalDevice",false);result.put("packageId","com.voxelveda.app");result.put("appSigningVerification","NOT_TESTED: real Play certificate/access unavailable");result.put("facts",new JSONArray(facts));try(FileOutputStream output=new FileOutputStream(new File(evidence,"result-"+testName.getMethodName()+"-"+InstrumentationRegistry.getArguments().getString("upgrade_only","false")+".json"))){output.write(result.toString(2).getBytes(StandardCharsets.UTF_8));}}
   if(scenario!=null)scenario.close();device.unfreezeRotation();Intents.release();
  }
 }
