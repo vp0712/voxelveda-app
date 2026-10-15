@@ -35,6 +35,7 @@ public class AndroidJourneyTest {
  @Rule public org.junit.rules.TestName testName=new org.junit.rules.TestName();
  private ActivityScenario<MainActivity> scenario;
  private MainActivity main;
+ private Intent originalLaunchIntent;
  private FixtureTransport transport;
  private final List<String> facts=new ArrayList<>();
  private File evidence;
@@ -50,7 +51,7 @@ public class AndroidJourneyTest {
  private void waitJs(String expression)throws Exception{
   long end=System.currentTimeMillis()+30000;
   while(System.currentTimeMillis()<end){if("true".equals(js("Boolean("+expression+")")))return;Thread.sleep(180);}
-  android.util.Log.e("AndroidFixture", "Condition failed: "+expression+"; "+js("JSON.stringify({path:location.pathname,ready:document.readyState,loginHandler:typeof login,status:document.getElementById('loginStatus')?.textContent})"));
+  android.util.Log.e("AndroidFixture", "Condition failed: "+expression+"; "+js("JSON.stringify({path:location.pathname,ready:document.readyState,loginHandler:typeof login,qrError:window.__qrError,status:document.getElementById('loginStatus')?.textContent})"));
   fail("Expected application condition was not reached: "+expression);
  }
  private void go(String path)throws Exception{String leaving=UUID.randomUUID().toString();js("window.__androidTestLeaving="+JSONObject.quote(leaving));InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+path));waitJs("window.__androidTestLeaving!=="+JSONObject.quote(leaving)+"&&document.readyState==='complete'&&("+(path.equals("/dashboard")?"['/dashboard','/portal/staff','/admin','/login'].includes(location.pathname)":"location.pathname==="+JSONObject.quote(path.split("\\?",2)[0]))+")");}
@@ -61,7 +62,7 @@ public class AndroidJourneyTest {
  @Before public void start()throws Exception{
   Intents.init();intending(org.hamcrest.CoreMatchers.allOf(IntentMatchers.hasAction(Intent.ACTION_VIEW),org.hamcrest.CoreMatchers.not(IntentMatchers.hasComponent(MainActivity.class.getName())))).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED,null));
   int port=Integer.parseInt(InstrumentationRegistry.getArguments().getString("fixture_port"));transport=new FixtureTransport(port);device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
-  scenario=ActivityScenario.launch(MainActivity.class);scenario.onActivity(activity->{main=activity;activity.getBridge().getWebView().stopLoading();activity.getBridge().getWebView().addJavascriptInterface(transport,"VVAndroidTestFixture");activity.getBridge().setWebViewClient(new ApplicationWebViewClient(activity.getBridge(),activity){
+  scenario=ActivityScenario.launch(MainActivity.class);scenario.onActivity(activity->{main=activity;originalLaunchIntent=new Intent(activity.getIntent());activity.getBridge().getWebView().stopLoading();activity.getBridge().getWebView().addJavascriptInterface(transport,"VVAndroidTestFixture");activity.getBridge().setWebViewClient(new ApplicationWebViewClient(activity.getBridge(),activity){
    @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
     if(!NavigationPolicy.isApplication(request.getUrl().toString()))return super.shouldInterceptRequest(view,request);
     try{
@@ -131,7 +132,7 @@ public class AndroidJourneyTest {
   UiObject deny=device.findObject(new UiSelector().resourceId("com.android.permissioncontroller:id/permission_deny_button"));assertTrue("Android camera permission prompt displayed",deny.waitForExists(15000));deny.click();
   waitJs("document.getElementById('staffAttendanceScanStatus')?.textContent.includes('permission')||document.getElementById('staffAttendanceScanStatus')?.textContent.includes('Position')");
   assertEquals("true",js("!![...document.querySelectorAll('button')].find(b=>b.textContent==='App camera settings')"));screenshot("camera-recovery");js("VoxelStaffHome.close()");facts.add("Actual WebView camera permission/recovery UI is reachable; physical QR camera focus is not asserted");
-  js("window.__qrDecoded=false;window.loadExternalScript('/vendor/jsQR.js').then(async()=>{for(let n=0;n<5;n++){const image=new Image();image.src='/__fixture/gate.png?n='+n+'&time='+Date.now();await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext('2d');context.drawImage(image,0,0);const pixels=context.getImageData(0,0,canvas.width,canvas.height);const result=jsQR(pixels.data,canvas.width,canvas.height);if(!result?.data.startsWith('https://app.voxelveda.com/a?t='))throw new Error('decode');}window.__qrDecoded=true;}).catch(()=>window.__qrDecoded='failed')");waitJs("window.__qrDecoded===true");facts.add("Installed Android WebView decodes five actual signed branded gate payload images with original centre logo");
+  js("window.__qrDecoded=false;window.__qrError=null;window.loadExternalScript('/vendor/jsQR.js').then(async()=>{for(let n=0;n<5;n++){const image=new Image();image.src='/__fixture/gate.png?n='+n+'&time='+Date.now();await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext('2d',{willReadFrequently:true});context.drawImage(image,0,0);const pixels=context.getImageData(0,0,canvas.width,canvas.height);const result=jsQR(pixels.data,canvas.width,canvas.height);if(!result?.data.startsWith('https://app.voxelveda.com/a?t='))throw new Error('decode');}window.__qrDecoded=true;}).catch(error=>{window.__qrError=error.message;window.__qrDecoded='failed'})");waitJs("window.__qrDecoded===true");facts.add("Installed Android WebView decodes five actual signed branded gate payload images with original centre logo");
  }
  @Test public void nativePdfViewAndSave()throws Exception{
   staffSession();
@@ -144,6 +145,10 @@ public class AndroidJourneyTest {
 
  @After public void finish()throws Exception{
   if(evidence!=null){try{device.dumpWindowHierarchy(new File(evidence,"ui-"+testName.getMethodName()+".xml"));}catch(Exception ignored){}try{device.takeScreenshot(new File(evidence,"last-app-screen-"+testName.getMethodName()+".png"));}catch(Exception ignored){}JSONObject result=new JSONObject();result.put("fixtureOnly",true);result.put("realProductionAccountUsed",false);result.put("physicalDevice",false);result.put("packageId","com.voxelveda.app");result.put("appSigningVerification","NOT_TESTED: real Play certificate/access unavailable");result.put("facts",new JSONArray(facts));try(FileOutputStream output=new FileOutputStream(new File(evidence,"result-"+testName.getMethodName()+"-"+InstrumentationRegistry.getArguments().getString("upgrade_only","false")+".json"))){output.write(result.toString(2).getBytes(StandardCharsets.UTF_8));}}
-  if(scenario!=null)scenario.close();device.unfreezeRotation();Intents.release();
+  try{
+   // ActivityScenario keys lifecycle events by the original launch intent.
+   if(main!=null&&originalLaunchIntent!=null)InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.setIntent(originalLaunchIntent));
+   if(scenario!=null)scenario.close();
+  }finally{if(device!=null)device.unfreezeRotation();Intents.release();}
  }
 }
