@@ -105,7 +105,7 @@ public class MainActivity extends BridgeActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
                 if (failed) { finish(); return; }
-                web.evaluateJavascript("window.VoxelNativeApp ? window.VoxelNativeApp.handleBack() : false", result -> {
+                web.evaluateJavascript("window.VoxelNativeApp ? window.VoxelNativeApp.handleBack({canGoBack:" + web.canGoBack() + "}) : false", result -> {
                     if ("true".equals(result)) return;
                     if (web.canGoBack()) web.goBack(); else finish();
                 });
