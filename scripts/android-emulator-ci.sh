@@ -18,6 +18,16 @@ for attempt in $(seq 1 40); do
   sleep 1
 done
 VV_ANDROID_FIXTURE_PORT=$(node -p "JSON.parse(require('fs').readFileSync('/tmp/vv-android-fixture.json')).port")
+# Isolate the known unrelated launcher ANR on this disposable headless emulator.
+# App/SystemUI/permission/document activities and application ANR dialogs remain enabled.
+adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME > "$VV_ANDROID_PROOF_DIR/launcher-observed.txt"
+VV_ANDROID_LAUNCHER=$(tail -1 "$VV_ANDROID_PROOF_DIR/launcher-observed.txt" | cut -d/ -f1 | tr -d '\r')
+if [[ "$VV_ANDROID_LAUNCHER" == com.android.launcher3 || "$VV_ANDROID_LAUNCHER" == com.google.android.apps.nexuslauncher ]]; then
+  adb shell pm disable-user --user 0 "$VV_ANDROID_LAUNCHER" >> "$VV_ANDROID_PROOF_DIR/launcher-observed.txt"
+  adb shell am force-stop "$VV_ANDROID_LAUNCHER"
+fi
+adb shell input keyevent KEYCODE_WAKEUP
+adb shell wm dismiss-keyguard
 adb install -r android/app/build/outputs/apk/verification/app-verification.apk
 adb install -r android/app/build/outputs/apk/androidTest/verification/app-verification-androidTest.apk
 adb shell am instrument -w -r -e fixture_port "$VV_ANDROID_FIXTURE_PORT" -e class com.voxelveda.app.AndroidJourneyTest com.voxelveda.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$VV_ANDROID_PROOF_DIR/installed-journey.txt"
