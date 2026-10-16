@@ -1,0 +1,23 @@
+# Dedicated workplace QR display
+
+`/attendance-display/` is a deliberately separate display view in the existing app. Its private bookmark has a `#display=…` fragment. The fragment is not sent in HTTP URLs, request-path logs or referrers. The page loads only its own CSS/JS and the existing native adapter; it does not load the normal shell, analytics, account identity, notifications or management. CSP reporting is removed from this view to prevent document-URL telemetry.
+
+The display sends a 256-bit bearer credential to `/attendance-display/current` with credentials omitted, no referrer and no caching. Only its SHA-256 digest is stored in the existing database. It is assigned to the existing configured QR site/audience. That credential is not an account token and is rejected by normal protected APIs. The display endpoint has no attendance-write handler. Invalid and revoked credentials show unavailable, without login or MFA redirects.
+
+The existing signed, expiring compact attendance QR and original branded PNG renderer remain authoritative. Complete high-correction white-backed images load before swapping, with integer module scaling and a four-module quiet zone. Expiry is anchored to the server snapshot with elapsed monotonic/wall time; visible resume reconciles, expired images hide, and outages recover with bounded retries. Rotation does not consume a shared code. Staff still use their existing authenticated explicit-action, durable-request-ID, server-time attendance transaction. No employee data is in the gate code.
+
+Admins with existing `EDIT_ATTENDANCE` authority can use Shift QR Control → Display settings → Manage display links. Create/copy occurs once; lost links must be replaced. Replacement atomically revokes the old link. Revoke/replace require a reason and current revision. Stable request IDs, transaction rollback and audit preserve uncertain/repeated operations. Normal authentication and MFA apply to management.
+
+Initial delivery can use the authorised release configuration `ATTENDANCE_DISPLAY_BOOTSTRAP_SHA256`, containing only a digest of a locally generated private credential. Lazy provisioning records an audited configuration action with no employee actor. INSERT IGNORE never reactivates an existing revoked credential. No raw private link belongs in source, CI artifacts, analytics, logs or release notes. The private delivery file stays outside the repository. The optional manual live-verification workflow requires a separately configured secure display URL binding; ordinary production checks need no such binding.
+
+## Verification
+
+- Service checks: hashed storage, no credential in lists/audit, one-time issuance and replay/conflict, invalid/wrong-site rejection, audited replacement/revocation, rollback, permanent revocation after restart.
+- Browser checks: actual application route in a fresh cookie-free context, no login/MFA redirect or shell, no credential in HTTP URLs/referrers/cookies, private read/write/management denial, four distinct auto-rotating decoded branded images, 320/360/390/430/768/1024/1440 widths in both themes and landscape, atomic swap, outage/expiry/reconnect/refresh, replacement and revocation.
+- Real disposable InnoDB: issuance/replay and hashed storage; two fixture staff use the same real display payload with concurrent idempotent check-ins, correct Working ownership, persisted checkouts, expiry, audited replace/revoke.
+- Existing 240 branded-decoder checks over 60 rotations, live attendance clock/break/resume, original workflow/PDF/private weekly-delivery and native regression gates remain mandatory.
+- No production employee attendance or customer records are created for verification. Real cameras, physical kiosk sleep, affected installed Android/Play build and private production account flows require those devices/accounts. Existing Android production signing/Publisher blockers are unchanged; this display is hosted content, not a new package.
+
+## Release and recovery
+
+Use the existing checked candidate → exact main CI → marker-only Railway release workflow. The previous web release is `0b43406a2cd58db49a6a96f15ac3a6e91aee9d0f` / Railway `2e46c0b9-760b-4f87-ad46-4589dca47754`. Schema addition is isolated to display-link metadata; rollback leaves records intact and disables the new route until restored. Never delete attendance or audit data during rollback. New link verification must confirm the actual readiness SHA, cookie-free live rendering and real rotating decoder results before delivery.

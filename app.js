@@ -90,6 +90,10 @@ const gatePageAuth=pageAuth(),gateApiAuth=auth,gatePermission=pagePermissions(['
 function gatePage(req,res,next){if(gateAccess.hasAccess(req))return next();return gatePageAuth(req,res,()=>gatePermission(req,res,next));}
 function gateApi(req,res,next){if(gateAccess.hasAccess(req))return next();return gateApiAuth(req,res,()=>requirePermission('EDIT_ATTENDANCE')(req,res,next));}
 app.get('/attendance-terminal',noIndex,gateAccess.exchange,gatePage,sendPage('shift-qr.html'));
+const displayRoutes=require('./routes/attendanceDisplayRoutes');
+app.get('/attendance-display.html',displayRoutes.privacy,displayRoutes.page);
+app.use('/attendance-display',displayRoutes.display);
+app.use('/api/attendance/display-links',displayRoutes.management);
 app.get(['/a','/attendance/scan'],noIndex,pageAuth(),pagePermissions(['VIEW_ATTENDANCE']),(req,res)=>{
  try{const token=req.query.shift_qr_token||req.query.t;require('./services/attendanceQrService').validateSiteToken(token);return res.redirect(303,portalPath(req.user)+'?attendance_intent='+encodeURIComponent(token));}
  catch(error){return res.redirect(303,portalPath(req.user)+'?attendance_code_expired=1');}

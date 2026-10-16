@@ -107,6 +107,7 @@ function appLimiterFixture() {
     './services/globalBrandRenderer': require('../services/globalBrandRenderer'),
     './middleware/canonicalApplication':require('../middleware/canonicalApplication'),
     './services/androidAssociationService':require('../services/androidAssociationService'),
+    './routes/attendanceDisplayRoutes': {display:express.Router(),management:express.Router(),privacy:(_req,_res,next)=>next(),page:(_req,res)=>res.send('display fixture')},
     './services/attendanceGateAccess': require('../services/attendanceGateAccess'),
     './config/urls': require('../config/urls'),
     './middleware/securityMiddleware': require('../middleware/securityMiddleware'),

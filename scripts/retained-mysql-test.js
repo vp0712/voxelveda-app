@@ -904,6 +904,7 @@ async function main() {
   await testDurableProfilePhotos();
   await testDurableNotifications();
   await testDurableAttendanceActions();
+  await testAttendanceDisplayLinks();
   await testAttendanceCorrections();
   await testAttendancePeriodActionGuards();
   await testVerifiedAttendanceTotals();
@@ -1019,6 +1020,45 @@ async function testDurableNotifications() {
   assert.equal(service.normaliseActionUrl('/portal/staff?view=tasks'), '/portal/staff?view=tasks');
   assert.deepEqual(await historicalState(), historicalRows);
   facts.push('actual notification recipient/event uniqueness, durable read/unread totals/restart, owner-only read-all and retained-link sanitization');
+}
+
+async function testAttendanceDisplayLinks() {
+  const displays = require('../services/attendanceDisplayService'), actions = require('../services/attendanceActionService');
+  const daily = require('../services/attendanceDailyService'), qr = require('../services/attendanceQrService');
+  const user = mobileUsers.approver, req = { ip: '127.0.0.1', get: () => 'Disposable display SQL fixture' };
+  const input = { request_id: crypto.randomUUID(), label: 'SQL fixture kiosk' };
+  const issued = await displays.create({ user, input, req });
+  const credential = new URL(issued.url).hash.slice('#display='.length);
+  const replay = await displays.create({ user, input, req });
+  assert.equal(replay.display.id, issued.display.id); assert.equal(replay.url, undefined);
+  const [[stored]] = await pool.query('SELECT * FROM attendance_display_links WHERE id=?', [issued.display.id]);
+  assert.equal(stored.credential_hash, crypto.createHash('sha256').update(credential).digest('hex'));
+  assert.ok(!JSON.stringify((await displays.list()).links).includes(stored.credential_hash));
+  const now = new Date('2026-10-13T22:00:00Z'), code = await displays.current({ credential, now });
+  for (const id of [181,182]) {
+    const staff = { id, role: 'staff', permissions: ['VIEW_ATTENDANCE', 'VIEW_OWN_TIMESHEET'] };
+    await pool.query('INSERT INTO users(id,name,username,email,password,role,permissions,active) VALUES(?,?,?,?,?,?,?,1)', [id, 'Synthetic QR SQL staff '+id, 'synthetic-display-'+id, 'display-'+id+'@example.invalid', 'not-a-login-hash', staff.role, JSON.stringify(staff.permissions)]);
+    const proof = await actions.resolveQr({ user: staff, input: { action: 'CHECK_IN', token: code.qr_data }, now });
+    const punch = { action: 'CHECK_IN', request_id: crypto.randomUUID(), qr_proof: proof.qr_proof };
+    const receipts = await Promise.all([0,1].map(() => actions.performAction({ user: staff, input: punch, req, now })));
+    assert.equal(receipts[0].attendance_id, receipts[1].attendance_id);
+    let state = await daily.readToday({ user: staff, now }); assert.equal(state.status, 'WORKING'); assert.equal(state.active_attendance.user_id, id);
+    const later = new Date(now.getTime()+3600000), next = await displays.current({ credential, now: later });
+    const out = await actions.resolveQr({ user: staff, input: { action: 'CHECK_OUT', attendance_id: receipts[0].attendance_id, token: next.qr_data }, now: later });
+    await actions.performAction({ user: staff, input: { action: 'CHECK_OUT', attendance_id: receipts[0].attendance_id, request_id: crypto.randomUUID(), qr_proof: out.qr_proof }, req, now: later });
+    state = await daily.readToday({ user: staff, now: later }); assert.notEqual(state.status, 'WORKING'); assert.equal(state.active_attendance, null);
+    const [[saved]] = await pool.query('SELECT user_id,total_minutes,clock_out FROM staff_attendance WHERE id=?', [receipts[0].attendance_id]); assert.equal(saved.user_id, id); assert.equal(saved.total_minutes, 60); assert.ok(saved.clock_out);
+  }
+  assert.throws(() => qr.validateSiteToken(code.qr_data, new Date(code.expires_at)), { code: 'ATTENDANCE_QR_EXPIRED' });
+  const replacement = await displays.create({ user, replaceId: issued.display.id, input: { request_id: crypto.randomUUID(), expected_revision: 1, label: 'SQL replacement', reason: 'Disposable fixture replacement' }, req });
+  await assert.rejects(() => displays.current({ credential }), { statusCode: 403 });
+  const nextKey = new URL(replacement.url).hash.slice('#display='.length); await displays.current({ credential: nextKey });
+  const revoke = { request_id: crypto.randomUUID(), expected_revision: 1, reason: 'Disposable fixture revocation' };
+  await displays.revoke({ user, id: replacement.display.id, input: revoke, req });
+  assert.equal((await displays.revoke({ user, id: replacement.display.id, input: revoke, req })).existing, true);
+  await assert.rejects(() => displays.current({ credential: nextKey }), { statusCode: 403 });
+  const [audits] = await pool.query("SELECT * FROM audit_logs WHERE record_type='attendance_display_link'"); assert.ok(audits.length>=4); assert.ok(!JSON.stringify(audits).includes(credential));
+  facts.push('real InnoDB display issuance/replay, hashed credential, audited replacement/revocation; two staff share one QR with concurrent idempotent punches, correct Working identity, persisted checkout and expiry rejection');
 }
 
 async function testDurableAttendanceActions() {

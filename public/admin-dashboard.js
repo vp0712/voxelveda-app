@@ -6156,11 +6156,6 @@ async function loadShiftQr() {
   if(attendanceGateController)return attendanceGateController.refresh();
   attendanceGateController=window.VoxelGate({imageId:'shiftQrImage',countdownId:'shiftQrCountdown',statusId:'shiftQrStatus',detailId:'shiftQrTokenText',siteId:'shiftQrSite',endpoint:'/api/attendance/shift-qr',headers:()=>authHeaders()});
 }
-async function createAttendanceGateLink(){
-  const res=await fetch('/api/attendance/gate-access',{method:'POST',headers:authHeaders()});
-  const data=await safeJson(res);if(!res.ok)return showToast(data.message||'Unable to authorise this gate.');
-  const target=document.getElementById('attendanceGateLink');target.href=data.url;target.hidden=false;target.textContent='Open authorised gate (valid for 12 hours)';
-}
 
 function openSystemPage(path) {
   toggleMobileMenu(false);
