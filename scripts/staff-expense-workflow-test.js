@@ -116,7 +116,7 @@ function fixture(type) {
   if(type==='attendance'){
     const actionService=load('services/attendanceActionService.js',{
       '../config/db':db,'./attendanceMobileSchema':{ensureAttendanceMobileSchema:async()=>{}},
-      './attendanceTimeService':require('../services/attendanceTimeService'),'./attendanceQrService':{},
+      './attendanceTimeService':require('../services/attendanceTimeService'),'./attendanceQrService':{},'./checkoutSummaryService':require('../services/checkoutSummaryService'),
       './attendanceCorrectionService':{assertMutablePeriod:async()=>{}},
       './attendanceMobilePolicy':require('../services/attendanceMobilePolicy'),'./authorizationService':auth,'../utils/dateOnly':dates,
       './auditService':dependencies['../services/auditService'],
@@ -193,6 +193,7 @@ async function attendanceSafety() {
   assert.equal((await call('clockIn',{},staff)).statusCode,422,'legacy clock-in must require a durable retry ID');
   assert.equal((await call('clockOut',{request_id:crypto.randomUUID()},staff)).statusCode,422,'legacy clock-out must name its exact session');
   const request_id=crypto.randomUUID();const [clock1, clock2] = await Promise.all([call('clockIn',{request_id},staff),call('clockIn',{request_id},staff)]); assert.equal(clock1.statusCode,200); assert.equal(clock2.statusCode,200); assert.equal(clock1.body.attendance_id,clock2.body.attendance_id); assert.equal(state.records.filter((row)=>!row.clock_out&&!row.deleted).length,1);
+  assert.equal(state.receipts.find(row=>row.request_id===request_id).payload_sha256,require('../services/attendanceMobilePolicy').hash({action:'CHECK_IN',attendance_id:null,task_id:null,category:null,notes:null}),'Existing attendance request hashes remain compatible across this additive summary upgrade');
   assert.equal((await call('saveAttendance',{...body,clock_out:''})).statusCode,409,'a second active shift must not be created');
   assert(!state.queries.some((entry)=>/clock_out = DATE_ADD|total_minutes = 720|total_hours = 12/.test(entry.sql)),'incomplete clocks must never create fabricated 12-hour worked shifts');assert(!state.queries.some((entry)=>/^DELETE|^DROP|^TRUNCATE/.test(entry.sql))); assert(state.audits.every((entry)=>[4,99].includes(entry.actorId)));
 }

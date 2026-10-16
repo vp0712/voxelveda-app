@@ -70,6 +70,7 @@ async function settingsBoundaries() {
     '../middleware/authorizationMiddleware': require('../middleware/authorizationMiddleware'),
     '../middleware/stepUpMiddleware': () => pass,
     '../middleware/requestContractMiddleware': require('../middleware/requestContractMiddleware'),
+    '../services/checkoutSummaryService': {},
     '../controllers/settingsController': controller
   });
   async function get(user) {

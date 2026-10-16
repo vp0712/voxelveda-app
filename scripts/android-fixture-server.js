@@ -33,6 +33,11 @@ const {createDocumentPdf}=require('../services/documentPdfService');
   app.post('/__fixture/expire',(_req,res)=>{sessions.clear();res.json({expired:true});});
   app.get('/__fixture/totp',(_req,res)=>res.json({code:require('../services/mfaService')._test.totp(secret)}));
   app.get('/__fixture/state',(_req,res)=>res.json({fixtureOnly:true,mutations:fixture.mutations.length,requests:fixture.requests.map(r=>({path:r.path,method:r.method}))}));
+  app.get('/__fixture/summary-seed',(_req,res)=>{
+   server.state.attendance={id:9251,user_id:9401,clock_in:'2026-10-13T00:00:00.000Z',clock_out:'2026-10-13T02:00:00.000Z',clock_out_timestamp_basis:'UTC',work_date:'2026-10-13',total_minutes:120,total_hours:2,break_minutes:0,revision:1,timestamp_basis:'UTC'};
+   server.state.summaryOptions={tasks:[{id:11,title:'Synthetic open assigned task with a long label for Android',status:'pending'},{id:12,title:'Synthetic completed assigned task',status:'done'}],categories:[{id:21,name:'Synthetic configured company category'}]};
+   res.json({fixtureOnly:true});
+  });
   app.get('/',(_req,res)=>res.type('html').send(page('index.html')));
   for(const [route,file]of Object.entries({'/login':'login.html','/register':'register.html','/forgot-password':'forgot-password.html','/reset-password':'reset-password.html','/accept-invite':'accept-invite.html','/mfa':'mfa.html'}))app.get(route,(_req,res)=>res.type('html').send(page(file)));
   app.post('/api/auth/login',require('../middleware/publicEndpointProtection').loginContract,authController.login);

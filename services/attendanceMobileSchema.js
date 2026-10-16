@@ -33,6 +33,7 @@ function ensureAttendanceMobileSchema() {
   if (!schemaPromise) schemaPromise = (async () => {
     for (const [name,type] of Object.entries({revision:'INT NOT NULL DEFAULT 1',checkout_task_id:'INT NULL',checkout_category:'VARCHAR(120) NULL',break_tracking_base_minutes:'INT NULL'})) await additive(`ALTER TABLE staff_attendance ADD COLUMN ${name} ${type}`);
     for (const sql of STATEMENTS) await pool.query(sql);
+    await require('./checkoutSummarySchema').ensureCheckoutSummarySchema();
     for(const [name,type] of Object.entries({superseded_at:'DATETIME NULL',superseded_by:'INT NULL',superseded_attendance_revision:'INT NULL',superseded_by_correction_id:'BIGINT NULL'})) await additive(`ALTER TABLE attendance_break_intervals ADD COLUMN ${name} ${type}`);
     // Widen nullability only: retain all original IDs, values and history.
     await pool.query('ALTER TABLE attendance_correction_requests MODIFY COLUMN attendance_id INT NULL');

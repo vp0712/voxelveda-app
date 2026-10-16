@@ -911,6 +911,7 @@ async function main() {
   await testOriginalGoodsReceiptNotifications();
   await testMixedCollationNotificationOwnership();
   await testArchivedRetention();
+  await testCheckoutSummaryOptions();
   assert.deepEqual(await historicalState(), historicalRows, 'All restored workflows preserve original and retired historical records.');
   console.log(`MYSQL_RETAINED_OK: ${facts.join('; ')}.`);
 }
@@ -1123,6 +1124,7 @@ async function testDurableAttendanceActions() {
   const completed = await actions.performAction({ user, input: { action: 'CHECK_OUT', attendance_id: attendanceId, request_id: checkoutId, qr_proof: await proof('CHECK_OUT', attendanceId, end) }, req, now: end });
   assert.equal(completed.attendance.total_minutes, 105, 'DST wall-clock jump does not add an hour; only the recorded 15-minute break is deducted.');
   assert.equal(completed.attendance.break_minutes, 15); assert.equal(completed.attendance.clock_out, '2026-10-03T17:30:00.000Z');
+  await require('../services/checkoutSummaryService').saveCategory({user:{...mobileUsers.approver,permissions:['MANAGE_USERS']},input:{request_id:crypto.randomUUID(),name:'Synthetic verification',reason:'Configure an isolated test category'},req});
   const noteId = crypto.randomUUID(), note = { request_id: noteId, expected_revision: completed.attendance.revision, notes: 'Synthetic completed-shift note', category: 'Synthetic verification' };
   const notes = await actions.saveCheckoutNote({ user, attendanceId, input: note, req, now: new Date('2026-10-03T17:31:00Z') });
   assert.equal(notes.attendance.notes, note.notes); assert.equal(notes.attendance.checkout_category, note.category);
@@ -1168,6 +1170,50 @@ async function testDurableAttendanceActions() {
   assert.equal(legacyDaily.summary.worked_minutes, 0); assert.equal(legacyDaily.summary.review_required, true, 'Unverified legacy time stays excluded from authoritative daily work totals.');
   assert.deepEqual(await historicalState(), historicalRows, 'Attendance actions and new metadata preserve historical unverified clock values.');
   facts.push('real durable attendance receipts, concurrent devices/single session, lost-commit reconciliation, actual breaks, UTC/DST/overnight allocation, exact-session notes, scoped timelines and old checkout replay safety');
+}
+
+async function testCheckoutSummaryOptions() {
+  const summary=require('../services/checkoutSummaryService'),actions=require('../services/attendanceActionService');
+  const user=mobileUsers.other,admin={...mobileUsers.approver,permissions:['MANAGE_USERS']},req={ip:'127.0.0.1',requestId:'synthetic-summary-sql',get:()=> 'Synthetic isolated summary test'};
+  const input={request_id:crypto.randomUUID(),name:'Synthetic configured work',reason:'Configure a first-use category fixture',site_id:require('../services/attendanceQrService').siteId(),role_scope:'staff'};
+  const configured=await summary.saveCategory({user:admin,input,req});
+  assert.equal((await summary.saveCategory({user:admin,input,req})).existing,true);
+  await assert.rejects(()=>summary.saveCategory({user,input,req}),{code:'WORK_CATEGORY_ACCESS_DENIED'});
+  await pool.query(`CREATE TABLE IF NOT EXISTS tasks(id INT AUTO_INCREMENT PRIMARY KEY,title VARCHAR(180),assigned_to INT,status VARCHAR(40),due_date DATE NULL,deleted TINYINT DEFAULT 0,created_at DATETIME DEFAULT CURRENT_TIMESTAMP)`);
+  const [[clock]]=await pool.query("SELECT DATE_FORMAT(UTC_TIMESTAMP(),'%Y-%m-%d %H:%i:%s') at,DATE_FORMAT(DATE_SUB(UTC_TIMESTAMP(),INTERVAL 2 HOUR),'%Y-%m-%d %H:%i:%s') started");
+  const tasks=[];
+  for(const [title,owner,status]of [['Synthetic open task',user.id,'pending'],['Synthetic completed task',user.id,'done'],['Synthetic unrelated task',mobileUsers.staff.id,'done'],['Synthetic cancelled task',user.id,'cancelled'],['Synthetic formerly assigned task',mobileUsers.staff.id,'done']]){
+    const [insert]=await pool.query('INSERT INTO tasks(title,assigned_to,status,created_at) VALUES(?,?,?,?)',[title,owner,status,clock.started]);tasks.push(insert.insertId);
+  }
+  await require('../services/auditService').logAudit(pool,{actorId:user.id,module:'Tasks',recordType:'task',recordId:tasks[4],action:'TASK_STATUS_CHANGED',newValue:{status:'done',assigned_to:user.id}});
+  const [[end]]=await pool.query("SELECT DATE_FORMAT(UTC_TIMESTAMP(),'%Y-%m-%d %H:%i:%s') at");
+  const [insert]=await pool.query("INSERT INTO staff_attendance(user_id,clock_in,clock_out,work_date,total_minutes,total_hours,timestamp_basis,clock_out_timestamp_basis,revision) VALUES(?,?,?,DATE(?),120,2,'UTC','UTC',1)",[user.id,clock.started,end.at,clock.started]);
+  const id=insert.insertId,options=await summary.options({user,attendanceId:id});
+  assert(options.categories.items.some(c=>c.id===configured.item.id),'Employee with no category history sees active company configuration.');
+  for(const n of [0,1,4])assert(options.tasks.items.some(t=>t.id===tasks[n]),'Current and evidenced shift assignments include completed tasks.');
+  for(const n of [2,3])assert(!options.tasks.items.some(t=>t.id===tasks[n]));
+  const note={request_id:crypto.randomUUID(),expected_revision:1,task_id:tasks[1],category_id:configured.item.id,notes:'Synthetic saved shift summary'};
+  const writes=await Promise.all([0,1].map(()=>actions.saveCheckoutNote({user,attendanceId:id,input:note,req})));
+  assert.equal(writes.filter(r=>r.existing).length,1);assert.equal(writes[0].attendance.checkout_category_id,configured.item.id);
+  const rename={...input,request_id:crypto.randomUUID(),expected_revision:configured.item.revision,name:'Synthetic renamed work',reason:'Rename a test category'};
+  const renamed=await summary.saveCategory({user:admin,id:configured.item.id,input:rename,req});
+  const inactive=await summary.saveCategory({user:admin,id:configured.item.id,input:{...rename,request_id:crypto.randomUUID(),expected_revision:renamed.item.revision,active:false,reason:'Deactivate a test category'},req});
+  await assert.rejects(()=>summary.saveCategory({user:admin,id:configured.item.id,input:{...rename,request_id:crypto.randomUUID()},req}),{code:'ATTENDANCE_REVISION_CONFLICT'});
+  const current=await summary.options({user,attendanceId:id});
+  assert(!current.categories.items.some(c=>c.id===configured.item.id));assert.equal(current.attendance.checkout_category,'Synthetic configured work');assert.equal(current.attendance.checkout_task_title,'Synthetic completed task');
+  const edited=await actions.saveCheckoutNote({user,attendanceId:id,input:{...note,request_id:crypto.randomUUID(),expected_revision:writes[0].attendance.revision,notes:'Synthetic historical summary correction'},req});
+  assert.equal(edited.attendance.checkout_category,'Synthetic configured work','Inactive renamed category preserves the recorded snapshot.');
+  await assert.rejects(()=>summary.validateReferences(pool,user,{...current.attendance,checkout_category_id:null,checkout_category:null},{category_id:inactive.item.id,task_id:null}),{code:'ATTENDANCE_CATEGORY_UNAVAILABLE'});
+  await assert.rejects(()=>actions.saveCheckoutNote({user,attendanceId:id,input:{...note,request_id:crypto.randomUUID(),expected_revision:edited.attendance.revision,task_id:tasks[2]},req}),{code:'ATTENDANCE_TASK_UNAVAILABLE'});
+  await assert.rejects(()=>summary.options({user:mobileUsers.staff,attendanceId:id}),{code:'ATTENDANCE_SESSION_NOT_FOUND'});
+  delete require.cache[require.resolve('../services/checkoutSummaryService')];
+  assert.equal((await require('../services/checkoutSummaryService').options({user,attendanceId:id})).attendance.notes,'Synthetic historical summary correction');
+  const [[counts]]=await pool.query("SELECT COUNT(*) total FROM audit_logs WHERE record_type='staff_attendance' AND record_id=? AND action='CHECKOUT_NOTE'",[String(id)]);
+  assert.equal(counts.total,2,'Repeated transport requests write exactly one summary and audit per revision.');
+  const [[persisted]]=await pool.query("SELECT DATE_FORMAT(clock_out,'%Y-%m-%d %H:%i:%s') clock_out,revision FROM staff_attendance WHERE id=?",[id]);assert.equal(persisted.clock_out,end.at);assert.equal(persisted.revision,3);
+  const [[task]]=await pool.query('SELECT status FROM tasks WHERE id=?',[tasks[0]]);assert.equal(task.status,'pending','Summary changes never complete a task or job.');
+  assert.deepEqual(await historicalState(),historicalRows);
+  facts.push('real InnoDB first-use company categories, completed/current/evidenced task assignments, scoped rejection, audited category rename/deactivate and historical snapshot preservation, exact-session revisions, concurrent summary idempotency and service-restart persistence');
 }
 
 async function testAttendanceCorrections() {

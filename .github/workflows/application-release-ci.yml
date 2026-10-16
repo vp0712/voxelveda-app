@@ -60,6 +60,11 @@ jobs:
         run: |
           node scripts/attendance-live-browser-test.js
           VV_ATTENDANCE_WORKFLOW_PROOF=after node scripts/restored-ui-browser-test.js
+      - name: Verify checkout summary options, history and recovery in responsive browsers
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/checkout-summary
+        run: node scripts/checkout-summary-browser-test.js
       - name: Preserve attendance workflow evidence
         if: always()
         uses: actions/upload-artifact@v4

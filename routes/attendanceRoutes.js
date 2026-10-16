@@ -13,11 +13,12 @@ const { bodyContract } = require('../middleware/requestContractMiddleware');
 
 router.get('/shift-qr', auth, attendanceController.shiftQrToken);
 const attend = requireAnyPermission('VIEW_ATTENDANCE');
-const actionFields = ['request_id','action','attendance_id','qr_proof','shift_qr_token','task_id','category','notes'];
+const actionFields = ['request_id','action','attendance_id','qr_proof','shift_qr_token','task_id','category_id','category','notes'];
 router.post('/qr/validate', auth, attend, bodyContract(['token','action','attendance_id'],{required:['token','action']}), attendanceController.validateQr);
 router.post('/actions', auth, attend, bodyContract(actionFields,{required:['request_id','action']}), attendanceController.action);
 router.get('/reconcile', auth, attend, attendanceController.reconcile);
-router.post('/sessions/:id/note', auth, attend, bodyContract(['request_id','expected_revision','task_id','category','notes'],{required:['request_id','expected_revision']}), attendanceController.saveCheckoutNote);
+router.get('/sessions/:id/summary-options', auth, attend, attendanceController.checkoutSummaryOptions);
+router.post('/sessions/:id/note', auth, attend, bodyContract(['request_id','expected_revision','task_id','category_id','category','notes'],{required:['request_id','expected_revision']}), attendanceController.saveCheckoutNote);
 router.get('/corrections', auth, attend, attendanceController.listCorrections);
 router.get('/corrections/:id', auth, attend, attendanceController.correctionDetail);
 router.post('/corrections', auth, attend, bodyContract(['request_id','correction_type','attendance_id','expected_revision','clock_in','clock_out','break_minutes','notes','reason'],{required:['request_id','clock_in','reason']}), attendanceController.requestCorrection);
