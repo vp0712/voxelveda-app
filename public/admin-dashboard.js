@@ -7971,12 +7971,13 @@ async function openTimesheetDecision(id, action, submittedHours) {
     <p><strong>${escapeHtml(record.name||record.staff_name||'Staff member')}</strong> · ${escapeHtml(formatDate(record.week_start))} – ${escapeHtml(formatDate(record.week_end))}</p><p class="status-note">Verified source: ${Number(source.actualHours).toFixed(2)} hrs. ${source.reviewRequired?'Source attendance needs correction before approval.':'Any difference in approved hours requires an audit reason.'}</p>
     <div class="form-stack">
       ${(action === 'approve' || action === 'amend') ? `<label>Approved hours<input id="timesheetDecisionHours" type="number" min="0" max="168" step="0.01" value="${Number(submittedHours || 0).toFixed(2)}"></label>` : ''}
-      <label>${needsReason ? 'Reason / manager comments' : 'Manager comments (optional)'}<textarea id="timesheetDecisionComments" rows="4" placeholder="${needsReason ? 'Required for the audit history' : 'Optional approval note'}"></textarea></label>
+      <label>${needsReason ? 'Reason / manager comments' : 'Manager comments (required when adjusting hours)'}<textarea id="timesheetDecisionComments" rows="4" placeholder="${needsReason ? 'Required for the audit history' : 'Optional approval note'}"></textarea></label>
     </div>
   `, async () => {
     const comments = document.getElementById('timesheetDecisionComments')?.value.trim() || '';
     const approvedHours = Number(document.getElementById('timesheetDecisionHours')?.value || submittedHours || 0);
     if (needsReason && !comments) return showToast('A reason is required');
+    if(action==='approve'&&Math.abs(approvedHours-Number(source.actualHours))>0.00001&&!comments)return showToast('Explain why approved hours differ from the verified source hours.');
     if (action === 'approve') return approveTimesheetRecord(id, approvedHours, comments,decisionSource);
     const endpoint = action === 'amend' ? 'amend' : action;
     const body = action === 'amend' ? { approved_hours: approvedHours, reason: comments,expected_version:record.version_no } : { comments };

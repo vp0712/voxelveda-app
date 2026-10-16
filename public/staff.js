@@ -1097,7 +1097,7 @@ function showSuccessConfirmation(message) {
     popup.setAttribute('aria-live', 'polite');
     popup.innerHTML = `
       <div class="action-success-icon" aria-hidden="true">&#10003;</div>
-      <div class="action-success-copy"><strong>Completed</strong><span></span></div>
+      <div class="action-success-copy"><strong>Confirmed</strong><span></span></div>
       <button type="button" class="action-success-close" aria-label="Close confirmation">&#215;</button>
     `;
     popup.querySelector('.action-success-close').onclick = () => popup.classList.remove('show');
