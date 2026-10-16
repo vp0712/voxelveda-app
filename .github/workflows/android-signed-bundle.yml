@@ -1,101 +1,63 @@
 name: Prepare existing-identity signed Android bundle
+run-name: Inspect existing Android release access
 on:
+  push:
+    branches: [release-access-audit-20261016-display]
   workflow_dispatch:
-    inputs:
-      version_code:
-        description: Version code greater than the verified highest code in the existing Play listing
-        required: true
-        type: string
-      version_name:
-        description: Approved Android release version name
-        required: true
-        type: string
-      verified_play_max_code:
-        description: Highest existing Play version code verified by the release owner
-        required: true
-        type: string
-      upload_certificate_sha256:
-        description: Existing upload certificate SHA256 from the authorised signing record
-        required: true
-        type: string
-      app_signing_sha256:
-        description: Actual Play App Signing certificate SHA256, not the upload key
-        required: true
-        type: string
 permissions:
   contents: read
-  checks: read
 jobs:
-  signed-bundle:
+  release-access:
+    name: Inspect existing release bindings without publishing
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     env:
-      ANDROID_VERSION_CODE: ${{ inputs.version_code }}
-      ANDROID_VERSION_NAME: ${{ inputs.version_name }}
-      ANDROID_PLAY_MAX_VERSION_CODE: ${{ inputs.verified_play_max_code }}
-      ANDROID_UPLOAD_CERT_SHA256: ${{ inputs.upload_certificate_sha256 }}
-      ANDROID_APP_SIGNING_SHA256: ${{ inputs.app_signing_sha256 }}
-      ANDROID_SOURCE_COMMIT: ${{ github.sha }}
+      ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Require the checked main source and existing secure signing capability
-        env:
-          GH_TOKEN: ${{ github.token }}
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      - name: Report only binding availability and the public upload certificate
+        shell: python
         run: |
-          test "$GITHUB_REF" = refs/heads/main
-          test -n "$KEYSTORE_BASE64" && test -n "$KEYSTORE_PASSWORD" && test -n "$KEY_ALIAS" && test -n "$KEY_PASSWORD"
-          ANDROID_CHECKED_SOURCE="$GITHUB_SHA"
-          if git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -qx '.railway-release'; then
-            test "$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | wc -l)" -eq 1
-            ANDROID_CHECKED_SOURCE=$(sed -n 's/^merged-commit: //p' .railway-release)
-            test -n "$ANDROID_CHECKED_SOURCE"
-            test -z "$(git diff --name-only "$ANDROID_CHECKED_SOURCE" "$GITHUB_SHA" -- . ':!.railway-release')"
-          fi
-          printf 'ANDROID_SOURCE_COMMIT=%s\n' "$ANDROID_CHECKED_SOURCE" >> "$GITHUB_ENV"
-          gh api "repos/$GITHUB_REPOSITORY/commits/$ANDROID_CHECKED_SOURCE/check-runs?per_page=100" > "$RUNNER_TEMP/android-source-checks.json"
-          node -e 'const c=require(process.env.RUNNER_TEMP+"/android-source-checks.json").check_runs;for(const n of ["application-release","mysql-regression","android-installed","Security checks and tests"]){if(!c.some(r=>r.name===n&&r.status==="completed"&&r.conclusion==="success"))throw Error("Required checked source missing: "+n)}'
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools platforms;android-36 build-tools;36.0.0
-      - run: npm ci --ignore-scripts
-      - name: Verify the published association uses the actual App Signing identity
-        run: |
-          curl --fail --silent --show-error https://app.voxelveda.com/.well-known/assetlinks.json --output "$RUNNER_TEMP/android-live-association.json"
-          node -e 'const rows=require(process.env.RUNNER_TEMP+"/android-live-association.json");if(!rows.some(r=>r.target?.package_name==="com.voxelveda.app"&&r.target.sha256_cert_fingerprints?.includes(process.env.ANDROID_APP_SIGNING_SHA256.toUpperCase())))throw Error("Live App Signing association is not verified")'
-      - name: Synchronise and sign using the existing upload key without exporting credentials
-        env:
-          KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
-          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: |
-          ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/existing-upload-key.jks"
-          export ANDROID_KEYSTORE_PATH
-          trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
-          umask 077
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
-          npx cap sync android
-          android/gradlew -p android --no-daemon :app:bundleRelease
-          jarsigner -verify android/app/build/outputs/bundle/release/app-release.aab
-      - name: Preserve signed bundle for the existing authorised Play testing process
+          import os,json,pathlib,tempfile,base64,subprocess,re
+          names=['ANDROID_UPLOAD_KEYSTORE_BASE64','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD','GOOGLE_PLAY_SERVICE_ACCOUNT_JSON']
+          present={name:bool(os.environ.get(name)) for name in names}
+          report={'packageId':'com.voxelveda.app','testedApplicationCommit':'1ee62b1d2abd577cebcefde8ba33b7953caceb43','auditCommit':os.environ['GITHUB_SHA'],'bindingsAvailableToThisWorkflow':present,'privateTracksQueried':False,'bundleBuilt':False,'playUploadPerformed':False,'playReleasePerformed':False}
+          if all(present[name] for name in names[:4]):
+              try:
+                  with tempfile.TemporaryDirectory() as temp:
+                      path=pathlib.Path(temp)/'existing-upload-key.jks'
+                      path.write_bytes(base64.b64decode(os.environ['ANDROID_UPLOAD_KEYSTORE_BASE64'],validate=True))
+                      path.chmod(0o600)
+                      result=subprocess.run(['keytool','-list','-v','-keystore',str(path),'-alias',os.environ['ANDROID_KEY_ALIAS'],'-storepass:env','ANDROID_KEYSTORE_PASSWORD'],capture_output=True,text=True)
+                      match=re.search(r'SHA256:\s*([0-9A-Fa-f:]{95})',result.stdout)
+                      report['boundUploadCertificateReadable']=result.returncode==0 and bool(match)
+                      if match: report['boundUploadCertificateSha256']=match.group(1).upper()
+              except Exception:
+                  report['boundUploadCertificateReadable']=False
+          else:
+              report['boundUploadCertificateReadable']=False
+          report['playConsoleUploadIdentityVerified']=False
+          report['playAppSigningIdentityVerified']=False
+          report['missingBindings']=[name for name,available in present.items() if not available]
+          text=json.dumps(report,indent=2)
+          pathlib.Path('android-release-access.json').write_text(text+'\n')
+          pathlib.Path(os.environ['GITHUB_STEP_SUMMARY']).write_text('### Existing Android release access\n\n```json\n'+text+'\n```\n')
+          print(text)
+      - name: Preserve public availability report
         uses: actions/upload-artifact@v4
         with:
-          name: existing-app-signed-bundle-${{ inputs.version_code }}-${{ github.sha }}
-          path: android/app/build/outputs/bundle/release/app-release.aab
+          name: android-release-access
+          path: android-release-access.json
           retention-days: 14
-# This workflow prepares a verified bundle. It does not upload to or publish on Play.
-# Publisher access, the existing track and uploaded version must be verified separately.
+      - name: Require the release bindings before continuing
+        shell: python
+        run: |
+          import json
+          report=json.load(open('android-release-access.json'))
+          if report['missingBindings']:
+              raise SystemExit('Missing secure release bindings: '+', '.join(report['missingBindings']))
+          if not report['boundUploadCertificateReadable']:
+              raise SystemExit('The existing bound upload certificate could not be verified.')
