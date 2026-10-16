@@ -1,8 +1,8 @@
-application-release: 20261016-private-display-and-link-revalidation
-candidate-commit: 1ee62b1d2abd577cebcefde8ba33b7953caceb43
-merged-commit: e657d1d0a8495c4082646f0ac24fd6e16b894b6d
+application-release: 20261016-checkout-summary-company-categories-and-permitted-shift-tasks
+candidate-commit: a5f0e63e563b490715cc4847b71a096165e6b008
+merged-commit: b3c55f87751c557adf225984fbf076ffdc5230d2
 production-branch: main
-previous-live-commit: a45d17669466d6b77e866d72c0b882a914a1d5c6
+previous-live-commit: 574d3075f67d7938cfae1728d161be734780091a
 scope: canonical-application-origin-and-safe-legacy-host-redirects; existing-Capacitor-package-and-original-logo; trusted-in-app-password-MFA-and-role-navigation; bounded-native-recovery-and-consented-Back; validated-private-file-PDF-preview-save-without-Binder-payload-overflow; preserved-original-business-functions-records-permissions-and-previous-repairs; Banking-Finance-OS-and-added-ERP-remain-retired
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
@@ -53,3 +53,10 @@ display-rollback: previous-web-a45d17669466d6b77e866d72c0b882a914a1d5c6; Railway
 display-link-navigation: fragment-only-valid-replacement-and-invalid-links-reload-and-revalidate-without-manual-refresh; before-failing-and-after-passing-actual-browser-regression; settled-native-permission-dialog-test
 display-followup-candidate-evidence: source-1ee62b1d2abd577cebcefde8ba33b7953caceb43; application-38898238532; installed-Android-38898238556; real-InnoDB-38898238771; security-38898238690; all-success
 android-access-refresh: audit-38899671248; all-five-existing-signing-and-Publisher-bindings-unavailable; no-production-bundle-build-upload-or-Play-release; package-and-signing-continuity-preserved
+
+checkout-summary: persistent-audited-admin-work-categories; first-use-active-site-role-options; exact-completed-session-current-and-evidenced-open-completed-task-assignment; matching-server-ownership-reference-revision-validation; historical-label-snapshots; no-seeded-business-names
+checkout-summary-client: fresh-options-on-open; explicit-loading-empty-restricted-error-retry; search-and-pagination; account-sheet-request-isolation; stable-summary-retries; legacy-attendance-receipt-hash-compatibility; clock-out-remains-committed
+checkout-summary-candidate-gates: application38944587409; MySQL38944587380; Security38944587393; Consolidation38944587417; Android38944587494; all-success
+checkout-summary-native-proof: seven-installed-Android15-WebView-tests-and-one-fixture-upgrade; actual-native-picker-text-and-screenshots; source79f5db2aa89b36c79bf678565254fe9e67a5ef59-PR-merge; production-native-source-unchanged; verification-artifacts-not-Play-release
+checkout-summary-rollback: previous-live574d3075f67d7938cfae1728d161be734780091a; Railway6bc33e94-6559-480c-b7aa-dba65107fe87; retain-additive-category-tables-and-recorded-history
+checkout-summary-main-gates: application38945745158; MySQL38945745185; Security38945744892; Consolidation38945744924; Android38945744893; Enterprise38945745060; all-success
