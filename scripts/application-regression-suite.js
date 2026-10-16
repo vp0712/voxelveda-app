@@ -8,6 +8,7 @@ const checks = [
   'security-foundation-test.js',
   'android-canonical-test.js',
   'attendance-live-regression-test.js',
+  'checkout-summary-test.js',
   'auth-lifecycle-test.js',
   'mfa-foundation-test.js',
   'authorization-foundation-test.js',

@@ -70,6 +70,12 @@
 .staff-attendance-sheet .staff-sheet-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
 .staff-sheet-actions>button{min-height:48px;border-radius:10px;flex:1}
 .staff-attendance-sheet :is(input,select,textarea){display:block;width:100%;min-width:0;max-width:100%;box-sizing:border-box;min-height:46px;background:var(--surface);color:var(--text-primary);border:1px solid var(--control-border);border-radius:9px;padding:10px 12px;font:inherit}
+.checkout-option-group{min-width:0}
+.checkout-option-search{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.checkout-option-search[hidden]{display:none}
+.checkout-option-search input{flex:1;min-width:120px}
+.checkout-option-search button{min-height:44px}
+.checkout-option-group p{overflow-wrap:anywhere}
 .staff-attendance-sheet textarea{min-height:100px;resize:vertical}
 .staff-attendance-sheet label{display:block;font-size:.9rem;margin:14px 0 6px;font-weight:600}
 .staff-attendance-field-error{display:block;font-size:.8rem;color:var(--danger);margin-top:5px}

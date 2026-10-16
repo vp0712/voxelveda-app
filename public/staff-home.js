@@ -250,19 +250,9 @@
   }
   function options(items,label){return `<option value="">${escape(label)}</option>`+(items||[]).map(item=>`<option value="${escape(typeof item==='object'?item.id:item)}">${escape(typeof item==='object'?item.title||item.name||item.label:item)}</option>`).join('');}
   function openCheckoutNote(attendanceId,attendance){
-    const lease=account();if(!attendanceId){openSheet('Clock-out recorded','<p>Your shift has ended. Its note is not available yet; check attendance history before adding one.</p>');return;}
-    const revision=attendance.revision??attendance.record_revision;let noteAttempt=null;const noteTasks=[...(today?.tasks||[])];if(attendance.checkout_task_id&&!noteTasks.some(task=>Number(task.id)===Number(attendance.checkout_task_id)))noteTasks.push({id:attendance.checkout_task_id,title:`Recorded task #${attendance.checkout_task_id}`});const noteCategories=[...(today?.categories||[])];if(attendance.checkout_category&&!noteCategories.includes(attendance.checkout_category))noteCategories.push(attendance.checkout_category);
-    openSheet('Shift ended',`<p>Clock-out is saved for this session. An optional task summary can be added separately; skipping or a note failure does not undo clock-out.</p><label for="staffCheckoutTask">Task worked on (optional)</label><select id="staffCheckoutTask" name="task_id">${options(noteTasks,'No task selected')}</select><label for="staffCheckoutCategory">Work category (optional)</label><select id="staffCheckoutCategory" name="category">${options(noteCategories,'No category selected')}</select><label for="staffCheckoutNotes">Shift summary (optional)</label><textarea id="staffCheckoutNotes" name="notes" maxlength="10000" placeholder="Work completed, handover or issues"></textarea><div class="staff-sheet-actions">${button('staffCheckoutSave','Save summary')}${button('staffCheckoutSkip','Skip','secondary-btn')}</div>`,'note');
-    $('staffCheckoutNotes').value=attendance.notes||'';$('staffCheckoutTask').value=attendance.checkout_task_id||'';$('staffCheckoutCategory').value=attendance.checkout_category||'';
-    $('staffCheckoutSkip').onclick=close;$('staffCheckoutSave').onclick=async()=>{
-      if(submitBusy||!current(lease))return;if(revision==null){sheetError('This session’s revision is not available. Open its saved history before adding a note. Clock-out is already saved.');return;}
-      const notes=$('staffCheckoutNotes').value,task=$('staffCheckoutTask').value,category=$('staffCheckoutCategory').value;
-      const payload=noteAttempt||{request_id:uuid(),expected_revision:revision,notes,...(task?{task_id:Number(task)}:{}),...(category?{category}:{})};noteAttempt=payload;
-      submitBusy=true;$('staffCheckoutSave').disabled=true;
-      try{const result=await api(`/api/attendance/sessions/${encodeURIComponent(attendanceId)}/note`,{method:'POST',body:JSON.stringify(payload)});assertCurrent(lease);assertResult(result);if(String(result.request_id)!==String(payload.request_id)||String(result.attendance_id)!==String(attendanceId))throw Object.assign(new Error('The summary response was interrupted. Retry the same summary request before changing it.'),{uncertain:true});if(overlayKind==='note')close();window.showToast?.('Shift summary saved.');await refresh();}
-      catch(error){if(error.staleAccount||!current(lease))return;if(overlayKind==='note'){sheetError(`${error.message} Clock-out remains saved.`,error.fields);if(error.uncertain){$('staffCheckoutSave').textContent='Retry original summary';['staffCheckoutTask','staffCheckoutCategory','staffCheckoutNotes'].forEach(id=>{$(id).disabled=true;});}else noteAttempt=null;}}
-      finally{if(current(lease)){submitBusy=false;if($('staffCheckoutSave'))$('staffCheckoutSave').disabled=false;}}
-    };
+    if(!attendanceId){openSheet('Checkout recorded','<p>Your shift has ended. Open attendance history to add a summary.</p>');return;}
+    if(!window.VoxelCheckoutSummary){openSheet('Checkout saved','<p>The summary could not load. Your checkout remains saved. Refresh and open Edit summary in attendance history.</p>'+button('staffSummaryUnavailableClose','Close','secondary-btn'));$('staffSummaryUnavailableClose').onclick=close;return;}
+    window.VoxelCheckoutSummary.open({account,current,api,assertResult,openSheet,close,button,sheetError,refresh,isNote:()=>overlayKind==='note'},attendanceId,attendance);
   }
   async function openHistory(scope='own',pages={}){
     const previous=identity?account():null;if(!await verifyIdentity())return;if(previous&&!current(previous))return;const lease=account();

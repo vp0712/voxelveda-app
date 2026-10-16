@@ -82,7 +82,7 @@ function resetState() {
       linked_record_id: String(index + 1), action_url: index === 0 ? '/portal/staff?view=tasks' : null,
       is_read: index > 23 ? 1 : 0, created_at: new Date(Date.now() - index * 60000).toISOString()
     })),
-    attendance: null, actionResults: new Map(), receiptRequests: [], timeline: [], breakStart: null,
+    attendance: null, summaryOptions:{tasks:[],categories:[]}, summaryReceipts:new Map(), actionResults: new Map(), receiptRequests: [], timeline: [], breakStart: null,
     serverNow: new Date('2026-10-13T00:00:00Z'), loseNextActionReply: false, corrections: [], correctionRequests: [], qrValidationRequests: [], delayedReplies: new Map(), directoryPhotoRequests: []
   };
 }
@@ -216,12 +216,27 @@ async function makeServer(publicDirectory, photo, configure) {
     if (state.loseNextActionReply) { state.loseNextActionReply = false; return res.set('X-Fixture-Expected', 'COMMIT_REPLY_INTERRUPTED').status(503).json({ message: 'Synthetic commit reply interrupted; reconcile the original receipt.' }); }
     return deliverReply(state, req, res, { ...response, state: attendanceState(state, userId) });
   });
+  app.get('/api/attendance/sessions/:id/summary-options',async(req,res)=>{
+    const row=state.attendance,userId=Number(req.user.id);
+    if(!row||row.user_id!==userId||row.id!==Number(req.params.id)||!row.clock_out)return res.sendStatus(404);
+    if(state.summaryOptionsFailure)return res.status(503).json({message:'Synthetic options service interruption'});
+    const canTasks=require('../services/authorizationService').hasAnyPermission(req.user,['VIEW_OWN_JOBS','MANAGE_JOBS','MANAGE_TEAM_JOBS']);
+    const collection=kind=>{const search=String(req.query[kind+'_search']||''),page=Number(req.query[kind+'_page']||1),all=(state.summaryOptions[kind==='task'?'tasks':'categories']||[]).filter(r=>String(r.title||r.name).toLowerCase().includes(search.toLowerCase())),restricted=kind==='task'&&!canTasks;return {items:restricted?[]:all.slice((page-1)*50,page*50),total:restricted?null:all.length,page,page_size:50,pages:Math.max(1,Math.ceil(all.length/50)),state:restricted?'RESTRICTED':all.length?'AVAILABLE':'EMPTY'};};
+    return deliverReply(state,req,res,{user_id:userId,attendance:{...row},tasks:collection('task'),categories:collection('category'),can_manage_categories:false});
+  });
   app.post('/api/attendance/sessions/:id/note', (req, res) => {
     const row = state.attendance;
     if (!row || row.user_id !== Number(req.user.id) || row.id !== Number(req.params.id) || !row.clock_out) return res.sendStatus(404);
-    if (Number(req.body.expected_revision) !== row.revision) return res.status(409).json({ code: 'ATTENDANCE_REVISION_CONFLICT' });
-    row.notes = req.body.notes; row.revision++; mutations.push({ type: 'checkout_note', attendance_id: row.id });
-    res.json({ request_id: req.body.request_id, attendance_id: row.id, attendance: { ...row }, state: attendanceState(state, Number(req.user.id)) });
+    const key=String(req.user.id)+':'+req.body.request_id,previous=state.summaryReceipts.get(key);
+    if(previous){if(previous.payload!==JSON.stringify(req.body))return res.status(409).json({code:'ATTENDANCE_IDEMPOTENCY_CONFLICT'});return res.json({...previous.response,existing:true});}
+    if (Number(req.body.expected_revision) !== row.revision) return res.status(409).json({message:'This saved summary changed. Reload it before saving.',code: 'ATTENDANCE_REVISION_CONFLICT' });
+    row.notes=req.body.notes;row.checkout_task_id=req.body.task_id||null;row.checkout_task_title=state.summaryOptions.tasks.find(t=>t.id===row.checkout_task_id)?.title||null;
+    if(req.body.category_id&&req.body.category_id!==row.checkout_category_id)row.checkout_category=state.summaryOptions.categories.find(c=>c.id===req.body.category_id)?.name;
+    if(!req.body.category_id)row.checkout_category=req.body.category||null;
+    row.checkout_category_id=req.body.category_id||null;row.revision++; mutations.push({type:'checkout_note',attendance_id:row.id});
+    const response={request_id:req.body.request_id,attendance_id:row.id,attendance:{...row},state:attendanceState(state,Number(req.user.id))};state.summaryReceipts.set(key,{payload:JSON.stringify(req.body),response});
+    if(state.loseNextSummaryReply){state.loseNextSummaryReply=false;return res.status(503).json({message:'Synthetic summary response interrupted after commit'});}
+    res.json(response);
   });
   app.get('/api/attendance/week', (req, res) => { const owned = attendanceState(state, Number(req.user.id)); return res.json({ attendance: owned.sessions, timesheet: null, total_hours: owned.summary.worked_minutes / 60 }); });
   app.get('/api/attendance/my', (req, res) => {
