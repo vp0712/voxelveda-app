@@ -6280,6 +6280,11 @@ function formatDate(value) {
   return value ? String(value).slice(0, 10) : '-';
 }
 
+function formatWorkplaceSchedule(value,zone) {
+  if(!value||!zone)return 'Unavailable';
+  try{return new Intl.DateTimeFormat('en-AU',{timeZone:zone,weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));}catch{return 'Unavailable';}
+}
+
 function formatDateTime(value) {
   if (!value) return '-';
   try {
@@ -8096,7 +8101,7 @@ async function loadWeeklyTimesheetDeliveries(page = 1) {
     const day = ['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][Number(schedule.weekday)] || 'Configured day';
     const time = `${String(schedule.hour ?? 0).padStart(2,'0')}:${String(schedule.minute ?? 0).padStart(2,'0')}`;
     const scheduleNote = document.getElementById('weeklyDeliverySchedule');
-    if (scheduleNote) scheduleNote.textContent = `${schedule.enabled ? 'Enabled' : 'Disabled'} · ${day} ${time} ${schedule.timezone || 'Company timezone unavailable'} · Last completed Monday–Sunday work week · Next scheduled: ${schedule.next_due_local ? formatDateTime(schedule.next_due_local) : 'Unavailable'}. Provider acceptance is recorded separately from recipient receipt.`;
+    if (scheduleNote) scheduleNote.textContent = `${schedule.enabled ? 'Enabled' : 'Disabled'} · ${day} ${time} ${schedule.timezone || 'Company timezone unavailable'} · Last completed Monday–Sunday work week · Next scheduled: ${formatWorkplaceSchedule(schedule.next_due_local,schedule.timezone)}. Provider acceptance is recorded separately from recipient receipt.`;
     body.innerHTML = weeklyDeliveryState.deliveries.length ? weeklyDeliveryState.deliveries.map(row => {
       const id = Number(row.id), version = Number(row.version);
       const pdf = Number(row.document_request_id);

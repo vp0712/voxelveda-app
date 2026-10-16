@@ -13,6 +13,8 @@ exports.run=async({page,origin,out,phase})=>{
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,phase+'-admin-staff-filter.png'),fullPage:true});
  await page.evaluate(async()=>{await loadAttendance();await openAttendanceDialog(21);});await page.locator('#dialogBackdrop.active').waitFor();await page.screenshot({path:path.join(out,phase+'-admin-attendance-edit.png')});await page.locator('#dialogCancelBtn').click();
  if(phase==='after'){
+  await page.route('**/api/attendance/timesheets/weekly-deliveries?*',r=>r.fulfill({contentType:'application/json',body:JSON.stringify({page:1,page_size:25,total:0,deliveries:[],schedule:{enabled:true,weekday:1,hour:9,minute:30,timezone:'Australia/Sydney',next_due_local:'2026-10-19T09:30:00+11:00'}})}));
+  await page.evaluate(()=>loadWeeklyTimesheetDeliveries());const schedule=await page.locator('#weeklyDeliverySchedule').innerText();assert.match(schedule,/19 Oct 2026, 9:30 am/);assert.doesNotMatch(schedule,/T09:30:00/);await page.unroute('**/api/attendance/timesheets/weekly-deliveries?*');proof.checks.push('Delivery schedule formats the recorded company timezone even when the browser is UTC');
   await page.selectOption('#timesheetReportStaffSelect','902');
   let order=0;await page.route('**/api/users',async route=>{const n=++order;await new Promise(r=>setTimeout(r,n===1?550:30));await route.fulfill({contentType:'application/json',body:JSON.stringify({users:[{id:902,name:n===1?'Stale response':'Current authorised staff with a very long name and team label',email:'designated@example.invalid',role:'staff',active:1}]})});});
   await page.evaluate(async()=>{const first=loadStaff();await new Promise(r=>setTimeout(r,50));await Promise.all([first,loadStaff()]);});

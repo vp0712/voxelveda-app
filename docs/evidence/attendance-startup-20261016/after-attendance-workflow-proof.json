@@ -1466,6 +1466,7 @@
     {
       "staffOptionsAfterLoad": 4
     },
+    "Delivery schedule formats the recorded company timezone even when the browser is UTC",
     "Delayed/out-of-order staff fetch: newest response wins and valid stable-ID selection survives",
     "Approval reloads authoritative source instead of prefilling stale one-hour register value",
     "Editable modal: labelled company-local dates, immutable owner, reason, compact viewport fit, reachable actions, human review explanation"
