@@ -8,7 +8,7 @@ const before=fs.mkdtempSync(path.join(os.tmpdir(),'vv-live-before-')),archive=pa
 const proof={fixtureOnly:true,baseline:ref,physicalDevice:false,cases:[]};
 (async()=>{const browser=await chromium.launch({headless:true,args:['--no-sandbox']});const servers=[];try{
  for(const phase of ['before','after']){
-  const photo=await require('sharp')({create:{width:64,height:64,channels:3,background:'#2457d6'}}).png().toBuffer();const fixture=await fixtures.makeServer(phase==='before'?path.join(before,'public'):path.join(root,'public'),photo);servers.push(fixture.server);
+  const avatarCanvas=require('@napi-rs/canvas').createCanvas(64,64),avatarDrawing=avatarCanvas.getContext('2d');avatarDrawing.fillStyle='#2457d6';avatarDrawing.fillRect(0,0,64,64);const photo=avatarCanvas.toBuffer('image/png');const fixture=await fixtures.makeServer(phase==='before'?path.join(before,'public'):path.join(root,'public'),photo);servers.push(fixture.server);
   const token=jwt.sign({id:9401,role:'staff'},process.env.JWT_SECRET,{expiresIn:'1h',jwtid:crypto.randomUUID()});fixtures.sessions.set(crypto.createHash('sha256').update(token).digest('hex'),{id:'live-proof',user_id:9401,session_version:1,assurance_level:1});
   const context=await browser.newContext({viewport:{width:390,height:844}});await context.addCookies([{name:'vv_session',value:token,url:fixture.origin,httpOnly:true,sameSite:'Lax'}]);const page=await context.newPage();page.setDefaultTimeout(15000);
   await page.goto(fixture.origin+'/portal/staff');await page.waitForFunction(()=>window.VoxelStaffHome?.state?.profile.id===9401);await page.waitForFunction(()=>!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
