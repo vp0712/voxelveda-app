@@ -21,3 +21,5 @@ Initial delivery can use the authorised release configuration `ATTENDANCE_DISPLA
 ## Release and recovery
 
 Use the existing checked candidate → exact main CI → marker-only Railway release workflow. The previous web release is `0b43406a2cd58db49a6a96f15ac3a6e91aee9d0f` / Railway `2e46c0b9-760b-4f87-ad46-4589dca47754`. Schema addition is isolated to display-link metadata; rollback leaves records intact and disables the new route until restored. Never delete attendance or audit data during rollback. New link verification must confirm the actual readiness SHA, cookie-free live rendering and real rotating decoder results before delivery.
+
+Fragment-only navigation is handled explicitly: replacing or editing a display bookmark in an already-open tab reloads the dedicated view, reads the new credential and revalidates it. The browser regression changes from a revoked link to its replacement without a manual refresh, then to an invalid link. This test failed on the initial release and passes with the hash-change handler. Native verification also waits for the OS permission dialog to settle and confirms dismissal before inspecting the camera recovery state.

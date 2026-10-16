@@ -28,6 +28,8 @@
  const interval=setInterval(tick,250);
  function resume(){if(document.hidden)return;tick();if(anchor&&Math.abs(Date.now()-anchor.wall-(performance.now()-anchor.mono))>2500){hide('Reconnecting to confirm the current code…');anchor=null;}void refresh();}
  retry.addEventListener('click',refresh);window.addEventListener('resize',resize);window.addEventListener('online',resume);window.addEventListener('pageshow',()=>{stopped=false;resume();});document.addEventListener('visibilitychange',resume);
+ // Replacing a bookmark can change only the fragment; re-read and revalidate its credential.
+ window.addEventListener('hashchange',()=>location.reload());
  window.addEventListener('pagehide',()=>{stopped=true;clearTimeout(refreshTimer);});window.addEventListener('unload',()=>{clearInterval(interval);if(currentUrl)URL.revokeObjectURL(currentUrl);});
  void refresh();
 })();
