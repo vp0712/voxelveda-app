@@ -127,6 +127,18 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           GATE_PROOF_DIR: ${{ runner.temp }}/attendance-gate-proof
         run: timeout --signal=TERM --kill-after=10s 180s node scripts/attendance-gate-browser-test.js
+      - name: Verify independent QR display, cookie-free access, rotation and revocation
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          DISPLAY_PROOF_DIR: ${{ runner.temp }}/attendance-display-proof
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/attendance-display-browser-test.js
+      - name: Preserve scoped display evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: attendance-display-${{ github.sha }}
+          path: ${{ runner.temp }}/attendance-display-proof
+          retention-days: 30
       - name: Preserve branded gate evidence
         if: always()
         uses: actions/upload-artifact@v4

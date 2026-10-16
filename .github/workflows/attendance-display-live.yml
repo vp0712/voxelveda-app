@@ -1,0 +1,39 @@
+name: Verify private production attendance display
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_sha:
+        description: Exact deployed web commit
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  private-display-proof:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --ignore-scripts
+      - name: Install browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
+          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install chromium
+      - name: Verify actual cookie-free display without exposing the private URL
+        env:
+          ATTENDANCE_DISPLAY_VERIFICATION_URL: ${{ secrets.ATTENDANCE_DISPLAY_VERIFICATION_URL }}
+          VV_EXPECTED_COMMIT: ${{ inputs.deployed_sha }}
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          DISPLAY_PROOF_DIR: ${{ runner.temp }}/private-display-proof
+        run: node scripts/attendance-display-live-verification.js
+      - name: Preserve screenshots and redacted evidence only
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-attendance-display-${{ inputs.deployed_sha }}
+          path: ${{ runner.temp }}/private-display-proof
+          retention-days: 30

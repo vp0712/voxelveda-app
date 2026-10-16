@@ -724,7 +724,7 @@
           <p class="gate-status"><span id="shiftQrStatus">Connecting…</span><span>Code expires in <strong id="shiftQrCountdown">—</strong></span></p>
           <p id="shiftQrTokenText" role="status"></p>
           <button class="secondary-btn" onclick="loadShiftQr()">Refresh code</button>
-          <details class="gate-settings"><summary>Gate settings</summary><p>Use an authorised display link on the kiosk. This grants display access only, without an administrator account. The link expires after 12 hours.</p><button class="secondary-btn" onclick="createAttendanceGateLink()">Create kiosk link</button><a id="attendanceGateLink" hidden target="_blank" rel="noopener noreferrer"></a></details>
+          <details class="gate-settings"><summary>Display settings</summary><p>Create a QR-only workplace display link that works without an account. Links remain active until revoked. Keep them private.</p><button class="secondary-btn" onclick="openAttendanceDisplaySettings()">Manage display links</button></details>
         </div>
       </section>
 
@@ -1538,6 +1538,7 @@
   <script src="/step-up.js?v=20260919-access-fix"></script>
   <script src="/shift-qr-terminal.js"></script>
 <script src="/attendance-live-clock.js"></script>
+<script src="/attendance-display-admin.js"></script>
 <script src="/admin-dashboard.js?v=20261013-staff-mobile"></script>
   <script src="/profile-avatar.js?v=20261013-staff-mobile"></script>
   <script src="/dashboard-profile-avatar.js?v=20261013-staff-mobile"></script>
