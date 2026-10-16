@@ -50,12 +50,12 @@ public class ApplicationWebViewClient extends BridgeWebViewClient {
 
     @Override public void onPageCommitVisible(WebView view, String url) {
         super.onPageCommitVisible(view, url);
-        if (NavigationPolicy.isApplication(url)) activity.pageReady();
+        if (NavigationPolicy.isApplication(url)) activity.inspectPageReadiness();
     }
 
     @Override public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
-        if (NavigationPolicy.isApplication(url) && view.getProgress() == 100) activity.pageReady();
+        if (NavigationPolicy.isApplication(url) && view.getProgress() == 100) activity.inspectPageReadiness();
     }
 
     @Override public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
@@ -64,7 +64,15 @@ public class ApplicationWebViewClient extends BridgeWebViewClient {
     }
 
     @Override public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
-        if (request.isForMainFrame() && response.getStatusCode() >= 500) activity.showConnectionError("The service is temporarily unavailable (" + response.getStatusCode() + "). Retry when ready.");
+        if (request.isForMainFrame() && response.getStatusCode() >= 400) activity.showConnectionError("The service is temporarily unavailable (" + response.getStatusCode() + "). Retry when ready.");
+    }
+
+    @Override public boolean onRenderProcessGone(WebView view, android.webkit.RenderProcessGoneDetail detail) {
+        activity.rendererFailed();
+        android.view.ViewParent parent=view.getParent();
+        if(parent instanceof android.view.ViewGroup)((android.view.ViewGroup)parent).removeView(view);
+        view.destroy();
+        return true;
     }
 
     @Override public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {

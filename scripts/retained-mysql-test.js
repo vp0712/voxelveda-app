@@ -1037,6 +1037,9 @@ async function testDurableAttendanceActions() {
   const input = { action: 'CHECK_IN', request_id: checkInId, qr_proof: scan, clock_in: '2099-01-01T00:00:00Z', timestamp: '1900-01-01T00:00:00Z' };
   const concurrent = await Promise.all([actions.performAction({ user, input, req, now: start }), actions.performAction({ user, input, req, now: start })]);
   assert.equal(concurrent[0].attendance_id, concurrent[1].attendance_id);
+  const committedState=await daily.readToday({user,now:start});
+  assert.equal(committedState.status,'WORKING');assert.equal(committedState.profile.id,user.id);assert.equal(committedState.active_attendance.user_id,user.id);
+  assert.equal(committedState.active_attendance.id,concurrent[0].attendance_id);
   assert.equal(concurrent.filter(result => result.existing).length, 1);
   const attendanceId = concurrent[0].attendance_id;
   assert.equal(concurrent[0].attendance.clock_in, '2026-10-03T15:30:00.000Z', 'Device-supplied clocks cannot replace server UTC.');

@@ -1,0 +1,11 @@
+{
+  "fixtureOnly": true,
+  "physicalDevice": false,
+  "phase": "before",
+  "widths": [],
+  "checks": [
+    {
+      "staffOptionsAfterLoad": 1
+    }
+  ]
+}

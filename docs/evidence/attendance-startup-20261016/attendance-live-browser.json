@@ -1,0 +1,31 @@
+{
+  "fixtureOnly": true,
+  "baseline": "9dde6da30685722f3a64fdb64331fc96ac232d35",
+  "physicalDevice": false,
+  "cases": [
+    {
+      "phase": "before",
+      "confirmedOwner": 9401,
+      "receiptCount": 1,
+      "status": "Working",
+      "timerBefore": "0h 00m",
+      "timerAfter": "0h 00m",
+      "extraTodayReads": 0
+    },
+    {
+      "phase": "after",
+      "confirmedOwner": 9401,
+      "receiptCount": 1,
+      "status": "Working",
+      "timerBefore": "0h 00m",
+      "timerAfter": "0h 01m",
+      "extraTodayReads": 0,
+      "breakPausesWork": true,
+      "breakResume": true,
+      "otherDeviceCheckoutReconciled": true,
+      "noAdditionalAttendanceEvents": true,
+      "refreshPersists": true
+    }
+  ],
+  "result": "passed"
+}

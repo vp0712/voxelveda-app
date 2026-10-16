@@ -29,13 +29,20 @@ public class MainActivity extends BridgeActivity {
     private String lastGet = NavigationPolicy.ORIGIN + "/";
     private boolean failed;
     private boolean loaded;
+    private boolean needsRecreate;
+    private boolean checkingReadiness;
+    private int navigationVersion;
+    private final Runnable readinessProbe = () -> checkPageReadiness(navigationVersion);
     private volatile String currentDocument = NavigationPolicy.ORIGIN + "/";
     private final Runnable timeout = () -> showConnectionError("The connection is taking too long. Check your network, then retry.");
 
     @Override public void onCreate(Bundle state) {
         registerPlugin(VoxelVedaAppPlugin.class);
-        super.onCreate(state);
-        if (getBridge() == null) return;
+        try { super.onCreate(state); } catch (RuntimeException error) {
+            if (recovery == null) createRecovery();
+            needsRecreate = true; showConnectionError("The app could not initialise. Retry to restart securely."); return;
+        }
+        if (getBridge() == null) { needsRecreate=true; showConnectionError("Android WebView is unavailable. Update Android System WebView, then retry."); return; }
         WebView web = getBridge().getWebView();
         getBridge().setWebViewClient(new ApplicationWebViewClient(getBridge(), this));
         web.getSettings().setMixedContentMode(android.webkit.WebSettings.MIXED_CONTENT_NEVER_ALLOW);
@@ -94,7 +101,6 @@ public class MainActivity extends BridgeActivity {
             String script = "if(window.VoxelNativeApp){VoxelNativeApp.openDocument(" + org.json.JSONObject.quote(trusted) + "," + download + ").catch(error=>window.alert(error.message));}else{window.alert('Return to the document record and use Download PDF.');}";
             web.evaluateJavascript(script, null);
         });
-        createRecovery();
         View content = findViewById(android.R.id.content);
         ViewCompat.setOnApplyWindowInsetsListener(content, (view, insets) -> {
             androidx.core.graphics.Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
@@ -128,12 +134,19 @@ public class MainActivity extends BridgeActivity {
         }
         String launch = getIntent() == null ? null : getIntent().getDataString();
         if (launch != null) receiveApplicationLink(launch);
-        if (!loaded) pageStarted(lastGet);
+        if (!loaded) { pageStarted(lastGet); inspectPageReadiness(); }
+    }
+
+    @Override protected void load() {
+        createRecovery();
+        pageStarted(lastGet);
+        super.load();
     }
 
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 
     private void createRecovery() {
+        if (recovery != null) return;
         boolean dark = (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         recovery = new LinearLayout(this);
         recovery.setOrientation(LinearLayout.VERTICAL);
@@ -155,7 +168,7 @@ public class MainActivity extends BridgeActivity {
         connectionMessage.setPadding(0, dp(20), 0, dp(20));
         recovery.addView(connectionMessage);
         retry = new Button(this); retry.setText("Retry connection"); retry.setMinHeight(dp(48));
-        retry.setOnClickListener(v -> { failed = false; pageStarted(lastGet); getBridge().getWebView().loadUrl(lastGet); });
+        retry.setOnClickListener(v -> { if (needsRecreate || getBridge()==null) { recreate(); return; } failed = false; pageStarted(lastGet); getBridge().getWebView().loadUrl(lastGet); });
         recovery.addView(retry);
         Button close = new Button(this); close.setText("Close app"); close.setMinHeight(dp(48)); close.setOnClickListener(v -> finish());
         recovery.addView(close);
@@ -166,7 +179,8 @@ public class MainActivity extends BridgeActivity {
     public void pageStarted(String url) {
         currentDocument = url;
         if (NavigationPolicy.isApplication(url)) lastGet = NavigationPolicy.canonical(url);
-        failed = false;
+        failed = false; loaded = false; navigationVersion++; checkingReadiness=false;
+        timer.removeCallbacks(readinessProbe);
         timer.removeCallbacks(timeout); timer.postDelayed(timeout, 25000);
         if (!loaded && recovery != null) {
             connectionMessage.setText("Opening your secure account…"); retry.setVisibility(View.GONE); recovery.setVisibility(View.VISIBLE);
@@ -175,8 +189,29 @@ public class MainActivity extends BridgeActivity {
 
     public boolean isTrustedApplicationOrigin() { return NavigationPolicy.isApplication(currentDocument); }
 
+    public void inspectPageReadiness() {
+        if (failed || loaded) return;
+        timer.removeCallbacks(readinessProbe); timer.post(readinessProbe);
+    }
+
+    private void checkPageReadiness(int version) {
+        if (failed || loaded || checkingReadiness || getBridge()==null || version!=navigationVersion) return;
+        checkingReadiness=true;
+        String check="(()=>{const b=document.body;if(!b||document.readyState==='loading'||!window.VoxelNativeApp)return false;const visible=n=>{if(!n)return false;const r=n.getBoundingClientRect(),s=getComputedStyle(n);return r.width>0&&r.height>0&&s.visibility!=='hidden'&&s.display!=='none'&&Number(s.opacity)!==0};const loader=document.getElementById('vvGlobalBrandLoader');if(loader?.classList.contains('is-visible'))return false;if(document.getElementById('staffHomeStatus')&&!window.VoxelStaffHome?.state&&document.getElementById('staffHomeError')?.hidden!==false)return false;const login=document.getElementById('loginForm');if(login&&document.getElementById('loginButton')?.disabled)return false;return b.innerText.trim().length>12&&[...document.querySelectorAll('h1,h2,main,form,[role=alert]')].some(visible)})()";
+        getBridge().getWebView().evaluateJavascript(check,result->{
+            if(version!=navigationVersion)return;
+            checkingReadiness=false;
+            if("true".equals(result))pageReady();else if(!failed)timer.postDelayed(readinessProbe,300);
+        });
+    }
+
+    public void rendererFailed() {
+        needsRecreate=true;
+        showConnectionError("Android WebView stopped. Retry to restart this screen securely. Check pending actions before submitting again.");
+    }
+
     public void pageReady() {
-        timer.removeCallbacks(timeout);
+        timer.removeCallbacks(timeout);timer.removeCallbacks(readinessProbe);
         if (failed) return;
         loaded = true;
         if (recovery != null) recovery.setVisibility(View.GONE);
@@ -184,7 +219,7 @@ public class MainActivity extends BridgeActivity {
 
     public void showConnectionError(String message) {
         runOnUiThread(() -> {
-            failed = true; timer.removeCallbacks(timeout);
+            failed = true; timer.removeCallbacks(timeout);timer.removeCallbacks(readinessProbe);
             if (recovery != null) { connectionMessage.setText(message); retry.setVisibility(View.VISIBLE); recovery.setVisibility(View.VISIBLE); }
         });
     }

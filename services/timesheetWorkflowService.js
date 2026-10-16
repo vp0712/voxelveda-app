@@ -270,6 +270,12 @@ async function submitTimesheet(id, user, req) {
   }
 }
 
+function assertDecisionVersion(timesheet,options){
+  if(!options.requireVersion&&options.expectedVersion===undefined)return;
+  if(!Number.isSafeInteger(Number(options.expectedVersion))||options.expectedVersion===undefined)throw new WorkflowError('Refresh the timesheet before deciding. Its current version is required.',422,'TIMESHEET_VERSION_REQUIRED');
+  if(Number(options.expectedVersion)!==Number(timesheet.version_no||0))throw new WorkflowError('This timesheet changed after it was opened. Refresh and review the current version.',409,'TIMESHEET_VERSION_CONFLICT');
+}
+
 async function approveTimesheet(id, user, options = {}, req) {
   await ensureWorkforceSchema();
   await ensureWeeklyTimesheetDeliverySchema();
@@ -288,6 +294,7 @@ async function approveTimesheet(id, user, options = {}, req) {
       throw new WorkflowError('Only submitted timesheets can be approved.', 409, 'TIMESHEET_NOT_READY');
     }
 
+    assertDecisionVersion(timesheet,options);
     const calculated = await calculateTimesheet(connection, timesheet);
     verifiedAttendance.assertReviewResolved(calculated);
     const approvedHours = options.approvedHours === undefined
@@ -296,13 +303,16 @@ async function approveTimesheet(id, user, options = {}, req) {
     if (!Number.isFinite(approvedHours) || approvedHours < 0 || approvedHours > 168) {
       throw new WorkflowError('Approved hours must be between 0 and 168.', 400, 'APPROVED_HOURS_INVALID');
     }
+    if(options.requireVersion&&(!Number.isSafeInteger(Number(options.expectedSourceMinutes))||options.expectedSourceMinutes===undefined))throw new WorkflowError('Refresh the authoritative source hours before approving.',422,'TIMESHEET_SOURCE_REQUIRED');
+    if(options.expectedSourceMinutes!==undefined&&Number(options.expectedSourceMinutes)!==Number(calculated.verified_total_minutes))throw new WorkflowError('Attendance changed after this review was opened. Refresh the source hours.',409,'TIMESHEET_SOURCE_CONFLICT');
+    if(Math.abs(approvedHours-calculated.actualHours)>0.00001&&!String(options.reason||options.comments||'').trim())throw new WorkflowError('Explain why approved hours differ from the verified source hours.',422,'TIMESHEET_ADJUSTMENT_REASON_REQUIRED');
     const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
     const summary = {
       ...calculated,
       ordinaryHours: Number(Math.min(approvedHours, standardHours).toFixed(2)),
       overtimeHours: Number(Math.max(0, approvedHours - standardHours).toFixed(2))
     };
-    const versionNo = await createVersion(connection, timesheet, summary, 'APPROVED', user.id, options.reason);
+    const versionNo = await createVersion(connection, timesheet, summary, 'APPROVED', user.id, options.reason||options.comments);
     await recordTransition(connection, timesheet, 'APPROVED', 'APPROVED', user.id, options.comments);
 
     await connection.query(
@@ -442,7 +452,9 @@ async function amendApprovedTimesheet(id, user, options, req) {
       throw new WorkflowError('You cannot amend a timesheet outside your authorised scope.', 403, 'TIMESHEET_AMEND_DENIED');
     }
     if (timesheet.status !== 'APPROVED') throw new WorkflowError('Only approved timesheets can be amended.', 409, 'TIMESHEET_NOT_APPROVED');
+    assertDecisionVersion(timesheet,options);
     const calculated = await calculateTimesheet(connection, timesheet);
+    verifiedAttendance.assertReviewResolved(calculated);
     const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
     const summary = { ...calculated, ordinaryHours: Math.min(approvedHours, standardHours), overtimeHours: Math.max(0, approvedHours - standardHours) };
     const versionNo = await createVersion(connection, timesheet, summary, 'APPROVED', user.id, reason);

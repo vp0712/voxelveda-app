@@ -191,7 +191,7 @@ exports.weekAttendance = async (req, res) => {
       week_end: end,
       total_hours: data.totalHours,
       verified_total_minutes:data.verified_total_minutes,historical_saved_hours:data.historical_saved_hours,verification_status:data.verification_status,review_required:data.review_required,review_issues:data.review_issues,duplicate_records:data.duplicate_records,
-      attendance: data.rows,
+      attendance: data.rows.map(require('../services/attendanceMobilePolicy').publicAttendance),
       timesheet, company_timezone: attendanceTime.companyTimezone()
     });
   } catch (err) {
@@ -236,7 +236,7 @@ exports.allAttendance = async (req, res) => {
         a.total_hours,
         a.work_date,
         a.notes,
-        a.break_minutes,a.entry_source,a.timestamp_basis,a.clock_out_timestamp_basis,a.recorded_timezone,a.attendance_status,a.review_required,a.review_reason,
+        a.break_minutes,a.entry_source,a.timestamp_basis,a.clock_out_timestamp_basis,a.recorded_timezone,a.attendance_status,a.review_required,a.review_reason,a.revision,
         DATE_FORMAT(a.clock_in,'%Y-%m-%d %H:%i:%s') AS clock_in_utc_text,
         DATE_FORMAT(a.clock_out,'%Y-%m-%d %H:%i:%s') AS clock_out_utc_text,
         a.created_at,
@@ -444,6 +444,10 @@ exports.saveAttendance = async (req, res) => {
       if (!row) { await connection.rollback(); return res.status(404).json({ message: 'Attendance record not found' }); }
       if (Number(row.user_id) !== Number(identity.user_id)) { await connection.rollback(); return res.status(409).json({ message: 'The employee for this shift changed. Refresh before retrying.', code: 'ATTENDANCE_EDIT_CONFLICT' }); }
       previous = row;
+      require('../services/attendanceMobilePolicy').revision(req.body.expected_revision,row.revision);
+      if(Number(row.user_id)!==userId)throw Object.assign(new Error('The owner of a saved attendance session cannot be changed in an edit. Review the original record with an authorised administrator.'),{statusCode:409,code:'ATTENDANCE_OWNER_CHANGE_DENIED'});
+      const reason=String(req.body.correction_reason||req.body.reason||'').trim();
+      if(reason.length<3||reason.length>1000)throw Object.assign(new Error('Enter a correction reason for the audit history.'),{statusCode:422,code:'ATTENDANCE_CORRECTION_REASON_REQUIRED',fields:{correction_reason:'Explain the change'}});
       if (!Object.hasOwn(req.body, 'break_minutes')) entry = attendanceTime.manualWorkedEntry({ ...req.body, break_minutes: previous.break_minutes }, req.user.id);
     }
     await corrections.assertMutablePeriod(connection,userId,[entry.work_date]);
@@ -474,7 +478,7 @@ exports.saveAttendance = async (req, res) => {
     }
     await require('../services/auditService').logAudit(connection, {
       actorId: req.user.id, action: id ? 'ATTENDANCE_UPDATED' : 'ATTENDANCE_CREATED', module: 'Attendance', recordType: 'staff_attendance', recordId,
-      oldValue: previous?{...previous,break_intervals:previousBreaks}:null, newValue: { user_id: userId, ...entry, notes, superseded_break_ids:previousBreaks.map(interval=>interval.id) },
+      oldValue: previous?{...previous,break_intervals:previousBreaks}:null, newValue: { user_id: userId, ...entry, notes, correction_reason:req.body.correction_reason||req.body.reason||null, superseded_break_ids:previousBreaks.map(interval=>interval.id) },
       ipAddress: req.ip, userAgent: req.get?.('user-agent')
     });
     await connection.commit(); connection.release(); connection = null;

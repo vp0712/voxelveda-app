@@ -234,7 +234,7 @@
         <div id="staffHomeError" class="staff-home-feedback" role="status" hidden><span id="staffHomeErrorText"></span><button type="button" id="staffHomeRetry">Retry</button></div>
         <div id="staffHomeAttendance" class="staff-home-attendance permission-attendance hidden-section" aria-busy="true">
           <div class="staff-home-card-heading"><div><p class="staff-home-eyebrow">Today</p><h2>Your attendance</h2></div><span id="staffHomeStatus" class="staff-home-status">Checking...</span></div>
-          <div class="staff-home-worked"><strong id="staffHomeWorked">—</strong><span>Worked today</span><small id="staffHomeWorkedDetail">Waiting for your attendance record</small></div>
+          <div class="staff-home-worked"><strong id="staffHomeWorked">—</strong><span id="staffHomeWorkedLabel">Worked today</span><small id="staffHomeWorkedDetail">Waiting for your attendance record</small></div>
           <div class="staff-home-shift-actions"><button id="staffHomePrimaryAction" class="primary-btn" type="button" disabled>Checking attendance...</button><button id="staffHomeBreakAction" class="secondary-btn" type="button" hidden>Take a break</button></div>
           <div class="staff-home-totals"><div><span>Breaks today</span><strong id="staffHomeBreak">—</strong></div><div><span>Sessions</span><strong id="staffHomeSessions">—</strong></div><div><span>This week</span><strong id="staffHomeWeekHours">—</strong><small id="staffWeekSignal">Recorded hours</small></div></div>
           <div class="staff-home-session-boundaries"><div><span>First check-in</span><strong id="staffHomeFirstCheckIn">—</strong></div><div><span id="staffHomeLastCheckOutLabel">Latest check-out</span><strong id="staffHomeLastCheckOut">—</strong></div></div>
@@ -1090,6 +1090,7 @@
   <script src="/dashboard-profile-avatar.js?v=20261013-staff-mobile"></script>
   <script src="/notification-center.js?v=20261013-staff-mobile"></script>
   <script src="/attendance-scanner.js?v=20261013-staff-mobile"></script>
+  <script src="/attendance-live-clock.js"></script>
   <script src="/staff-home.js?v=20261013-staff-mobile"></script>
   <script src="/workflow-ui.js?v=20261011-restored"></script>
   <script src="/role-portal.js?v=20261013-staff-mobile"></script>

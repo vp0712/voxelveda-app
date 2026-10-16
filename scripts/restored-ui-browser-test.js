@@ -213,6 +213,7 @@ async function run() {
     await page.waitForURL('**/admin*');
     await page.waitForFunction(()=>document.getElementById('adminInfo')?.textContent.includes('Admin fixture'));
     await page.waitForFunction(()=>!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
+    if(process.env.VV_ATTENDANCE_WORKFLOW_PROOF){await require('./attendance-workflow-browser-scenario').run({page,context,origin,out:outputDir,phase:process.env.VV_ATTENDANCE_WORKFLOW_PROOF});return;}
     if(process.env.VV_INVOICE_DETAIL_PROOF){await require('./invoice-dialog-browser-scenario').run({page,context,origin,out:outputDir,phase:process.env.VV_INVOICE_DETAIL_PROOF,invoice,items:invoiceFixtureItems,payments:invoiceFixturePayments,activity:invoiceFixtureActivity});return;}
     if(process.env.VV_RESPONSIVE_MATRIX){await require('./responsive-workspace-scenario').run({page,context,origin,out:outputDir,phase:process.env.VV_RESPONSIVE_MATRIX,records:invoiceRecords,payments:invoiceFixturePayments});return;}
     stage='settings_qr_renderer';
