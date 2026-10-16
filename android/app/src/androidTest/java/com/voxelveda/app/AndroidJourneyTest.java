@@ -49,6 +49,13 @@ public class AndroidJourneyTest {
  }
  private UiObject nativeText(String text,boolean partial){return device.findObject(partial?new UiSelector().textContains(text):new UiSelector().textMatches("(?i)^"+java.util.regex.Pattern.quote(text)+"$"));}
  private void waitNativeText(String text,boolean partial)throws Exception{assertTrue("Expected native control: "+text,nativeText(text,partial).waitForExists(20000));}
+ private void tapDomControl(String id)throws Exception{
+  js("document.getElementById("+JSONObject.quote(id)+").scrollIntoView({block:'center',inline:'nearest'})");device.waitForIdle(1000);
+  String value=(String)new JSONTokener(js("JSON.stringify((()=>{const r=document.getElementById("+JSONObject.quote(id)+").getBoundingClientRect();return{x:r.x+r.width/2,y:r.y+r.height/2,width:innerWidth}})())")).nextValue();
+  JSONObject rect=new JSONObject(value);int[] location=new int[2];AtomicReference<Integer> width=new AtomicReference<>();
+  InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{WebView web=main.getBridge().getWebView();web.getLocationOnScreen(location);width.set(web.getWidth());});
+  double scale=width.get()/rect.getDouble("width");assertTrue("Actual HTML control receives a physical touch",device.click(location[0]+(int)Math.round(rect.getDouble("x")*scale),location[1]+(int)Math.round(rect.getDouble("y")*scale)));
+ }
  private void waitJs(String expression)throws Exception{
   long end=System.currentTimeMillis()+30000;
   while(System.currentTimeMillis()<end){if("true".equals(js("Boolean("+expression+")")))return;Thread.sleep(180);}
@@ -143,8 +150,8 @@ public class AndroidJourneyTest {
   js("VoxelStaffHome.openHistory()");waitJs("document.querySelector('[data-staff-session-note]')");js("document.querySelector('[data-staff-session-note]').click()");
   waitJs("document.querySelectorAll('#staffCheckoutTask option').length===3&&document.querySelectorAll('#staffCheckoutCategory option').length===2");
   assertTrue(js("document.querySelector('#staffCheckoutTask option[value=\"12\"]').textContent").contains("Completed"));
-  waitNativeText("No task selected",false);nativeText("No task selected",false).click();waitNativeText("Synthetic completed assigned task",true);assertTrue(device.takeScreenshot(new File(evidence,"checkout-task-dropdown-options.png")));device.pressBack();
-  waitNativeText("No category selected",false);nativeText("No category selected",false).click();waitNativeText("Synthetic configured company category",true);assertTrue(device.takeScreenshot(new File(evidence,"checkout-category-dropdown-options.png")));device.pressBack();
+  screenshot("checkout-summary-before-picker");tapDomControl("staffCheckoutTask");waitNativeText("Synthetic completed assigned task",true);assertTrue(device.takeScreenshot(new File(evidence,"checkout-task-dropdown-options.png")));device.pressBack();
+  tapDomControl("staffCheckoutCategory");waitNativeText("Synthetic configured company category",true);assertTrue(device.takeScreenshot(new File(evidence,"checkout-category-dropdown-options.png")));device.pressBack();
   screenshot("checkout-summary-populated");js("VoxelTheme.set('dark')");screenshot("checkout-summary-dark");device.setOrientationLeft();Thread.sleep(400);screenshot("checkout-summary-landscape");device.setOrientationNatural();
   js("document.getElementById('staffCheckoutTask').value='12';document.getElementById('staffCheckoutCategory').value='21';document.getElementById('staffCheckoutNotes').value='Synthetic Android saved summary';document.getElementById('staffCheckoutSave').click();document.getElementById('staffCheckoutSave').click()");
   waitJs("document.getElementById('staffAttendanceOverlay').hidden");go("/portal/staff");waitJs("VoxelStaffHome.state?.status==='COMPLETED'");
