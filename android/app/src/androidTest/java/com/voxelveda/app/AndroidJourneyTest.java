@@ -40,6 +40,7 @@ public class AndroidJourneyTest {
  private final List<String> facts=new ArrayList<>();
  private File evidence;
  private UiDevice device;
+ private volatile boolean blankStartup;
 
  private String js(String source)throws Exception{
   CountDownLatch latch=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
@@ -66,6 +67,7 @@ public class AndroidJourneyTest {
    @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
     if(!NavigationPolicy.isApplication(request.getUrl().toString()))return super.shouldInterceptRequest(view,request);
     try{
+     if(blankStartup&&request.isForMainFrame())return new WebResourceResponse("text/html","UTF-8",new ByteArrayInputStream("<!doctype html><head><title>Incomplete startup fixture</title></head><body></body>".getBytes(StandardCharsets.UTF_8)));
      FixtureTransport.Reply reply=transport.relay(request.getUrl().toString(),request.getMethod(),"",request.getRequestHeaders());
      if(reply.status>=300&&reply.status<400){String location=reply.headers.get("location");String next=location!=null&&location.startsWith("/")?NavigationPolicy.ORIGIN+location:NavigationPolicy.canonical(location);if(next==null)throw new IOException();view.post(()->view.loadUrl(next));return new WebResourceResponse("text/html","UTF-8",new ByteArrayInputStream("<!doctype html><head></head><body>Opening account…</body>".getBytes(StandardCharsets.UTF_8)));}
      String type=reply.headers.getOrDefault("content-type","application/octet-stream").split(";")[0];byte[] bytes=reply.bytes;
@@ -76,6 +78,22 @@ public class AndroidJourneyTest {
    }
   });});
   evidence=new File(main.getExternalFilesDir(null),"android-proof");assertTrue(evidence.mkdirs()||evidence.isDirectory());
+ }
+
+ @Test public void blankCompletedPageRequiresVisibleRecovery()throws Exception{
+  blankStartup=true;
+  InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+"/"));
+  waitJs("document.readyState==='complete'&&document.body.innerText.trim()===''&&typeof VoxelNativeApp==='undefined'");
+  waitNativeText("Opening your secure account",true);
+  assertTrue(device.takeScreenshot(new File(evidence,"blank-page-branded-loading.png")));
+  assertTrue("A completed blank document reaches bounded native recovery",nativeText("Retry connection",false).waitForExists(35000));
+  assertTrue(device.takeScreenshot(new File(evidence,"blank-page-controlled-recovery.png")));
+  blankStartup=false;nativeText("Retry connection",false).click();
+  waitJs("window.VoxelNativeApp&&document.querySelector('h1,h2,main')");
+  long deadline=System.currentTimeMillis()+10000;while(nativeText("Retry connection",false).exists()&&System.currentTimeMillis()<deadline)Thread.sleep(150);
+  assertFalse("Usable app dismisses the recovery overlay",nativeText("Retry connection",false).exists());
+  assertEquals("Startup and retry never launch a browser",0,Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getComponent()==null).count());
+  facts.add("A real installed WebView finishes an empty HTML document without the application adapter; branding remains visible, bounded recovery appears, explicit GET retry reaches usable canonical app with zero external-browser intents");
  }
 
  @Test public void installedJourney()throws Exception{

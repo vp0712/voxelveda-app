@@ -91,7 +91,7 @@ function attendanceState(state, userId = 9401) {
   const open = row && !row.clock_out, onBreak = open && Boolean(state.breakStart);
   const ongoingBreak = onBreak ? Math.floor((state.serverNow - state.breakStart) / 60000) : 0;
   const live = open ? Math.floor((state.serverNow - new Date(row.clock_in)) / 60000) - row.break_minutes - ongoingBreak : 0;
-  const active = open ? { ...row, live_worked_minutes: live, live_break_minutes: ongoingBreak, recorded_break_minutes: row.break_minutes, overnight: false, allocated_work_date: row.work_date } : null;
+  const active = open ? { ...row,on_break:Boolean(onBreak),break_started_at:onBreak?state.breakStart.toISOString():null,recorded_break_milliseconds:row.break_minutes*60000, live_worked_minutes: live, live_break_minutes: ongoingBreak, recorded_break_minutes: row.break_minutes, overnight: false, allocated_work_date: row.work_date } : null;
   return { profile: { id: userId, name: identities.get(userId).name, department: 'Synthetic verification team' }, attendance: active || row, sessions: row ? [{ ...row }] : [], status: open ? onBreak ? 'ON_BREAK' : 'WORKING' : row ? 'COMPLETED' : 'NOT_STARTED',
     active_attendance: active, completed_attendance_id: row?.clock_out ? row.id : null,
     company_timezone: 'Australia/Sydney', work_date: '2026-10-13', server_time: state.serverNow.toISOString(),

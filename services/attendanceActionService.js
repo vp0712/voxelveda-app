@@ -61,8 +61,9 @@ async function performAction({user,input,req,now}){
      const elapsed=start?Math.floor((serverNow.toMillis()-start.toMillis())/60000):null;
      if(elapsed!==null&&breaks.minutes>elapsed)throw p.fail('Recorded breaks exceed this session. Request an authorised correction.','ATTENDANCE_BREAK_INVALID',409);
      const verified=!!start,minutes=verified?elapsed-breaks.minutes:Number(session.total_minutes||0),hours=verified?Math.round(minutes/60*100)/100:Number(session.total_hours||0);
-     const review=Number(session.review_required)||!verified||elapsed>=720;
-     const reason=!verified?'ATTENDANCE_TIMEZONE_UNVERIFIED':session.review_reason||(elapsed>=720?'INCOMPLETE_SHIFT_REQUIRES_REVIEW':null);
+     const resolvedIncomplete=['INCOMPLETE_SHIFT','INCOMPLETE_SHIFT_REQUIRES_REVIEW'].includes(session.review_reason);
+     const review=(Number(session.review_required)&&!resolvedIncomplete)||!verified||elapsed>=720;
+     const reason=!verified?'ATTENDANCE_TIMEZONE_UNVERIFIED':elapsed>=720?'LONG_SHIFT_REQUIRES_REVIEW':review?session.review_reason:null;
      await db.query(`UPDATE staff_attendance SET clock_out=?,clock_out_timestamp_basis='UTC',total_minutes=?,total_hours=?,break_minutes=?,checkout_task_id=?,checkout_category=?,notes=COALESCE(?,notes),attendance_status=?,review_required=?,review_reason=?,revision=revision+1 WHERE id=? AND clock_out IS NULL`,[sqlNow,minutes,hours,breaks.rows.length?breaks.minutes:session.break_minutes,notes.task_id,notes.category,notes.notes,review?'REVIEW_REQUIRED':'WORKED',review?1:0,reason,session.id]);
     }
     session=await loadSession(db,userId,session.id);

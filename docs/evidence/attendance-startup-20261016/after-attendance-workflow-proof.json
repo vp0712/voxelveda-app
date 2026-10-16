@@ -1,0 +1,1474 @@
+{
+  "fixtureOnly": true,
+  "physicalDevice": false,
+  "phase": "after",
+  "widths": [
+    {
+      "mode": "light",
+      "width": 320,
+      "height": 844,
+      "scroll": 320,
+      "dialog": {
+        "x": 8,
+        "right": 312,
+        "top": 22.40625,
+        "bottom": 821.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 795.59375,
+          "top": 751.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 804.59375,
+          "top": 742.59375,
+          "height": 62,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 729.59375,
+          "width": 278,
+          "height": 79,
+          "top": 729.59375,
+          "right": 283,
+          "bottom": 808.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "dark",
+      "width": 320,
+      "height": 844,
+      "scroll": 320,
+      "dialog": {
+        "x": 8,
+        "right": 312,
+        "top": 22.40625,
+        "bottom": 821.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        },
+        {
+          "left": 21,
+          "right": 299
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 795.59375,
+          "top": 751.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 804.59375,
+          "top": 742.59375,
+          "height": 62,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 729.59375,
+          "width": 278,
+          "height": 79,
+          "top": 729.59375,
+          "right": 283,
+          "bottom": 808.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "light",
+      "width": 360,
+      "height": 844,
+      "scroll": 360,
+      "dialog": {
+        "x": 8,
+        "right": 352,
+        "top": 34.40625,
+        "bottom": 809.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 783.59375,
+          "top": 739.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 792.59375,
+          "top": 730.59375,
+          "height": 62,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 717.59375,
+          "width": 318,
+          "height": 79,
+          "top": 717.59375,
+          "right": 323,
+          "bottom": 796.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "dark",
+      "width": 360,
+      "height": 844,
+      "scroll": 360,
+      "dialog": {
+        "x": 8,
+        "right": 352,
+        "top": 34.40625,
+        "bottom": 809.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        },
+        {
+          "left": 21,
+          "right": 339
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 783.59375,
+          "top": 739.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 792.59375,
+          "top": 730.59375,
+          "height": 62,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 717.59375,
+          "width": 318,
+          "height": 79,
+          "top": 717.59375,
+          "right": 323,
+          "bottom": 796.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "light",
+      "width": 390,
+      "height": 844,
+      "scroll": 390,
+      "dialog": {
+        "x": 8,
+        "right": 382,
+        "top": 43.40625,
+        "bottom": 800.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 783.59375,
+          "top": 739.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 783.59375,
+          "top": 739.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 726.59375,
+          "width": 348,
+          "height": 61,
+          "top": 726.59375,
+          "right": 353,
+          "bottom": 787.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "61px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "dark",
+      "width": 390,
+      "height": 844,
+      "scroll": 390,
+      "dialog": {
+        "x": 8,
+        "right": 382,
+        "top": 43.40625,
+        "bottom": 800.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 783.59375,
+          "top": 739.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 783.59375,
+          "top": 739.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 726.59375,
+          "width": 348,
+          "height": 61,
+          "top": 726.59375,
+          "right": 353,
+          "bottom": 787.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "61px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "light",
+      "width": 430,
+      "height": 844,
+      "scroll": 430,
+      "dialog": {
+        "x": 8,
+        "right": 422,
+        "top": 55.40625,
+        "bottom": 788.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 771.59375,
+          "top": 727.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 771.59375,
+          "top": 727.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 714.59375,
+          "width": 388,
+          "height": 61,
+          "top": 714.59375,
+          "right": 393,
+          "bottom": 775.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "61px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "dark",
+      "width": 430,
+      "height": 844,
+      "scroll": 430,
+      "dialog": {
+        "x": 8,
+        "right": 422,
+        "top": 55.40625,
+        "bottom": 788.59375
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        },
+        {
+          "left": 21,
+          "right": 409
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 771.59375,
+          "top": 727.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 771.59375,
+          "top": 727.59375,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 714.59375,
+          "width": 388,
+          "height": 61,
+          "top": 714.59375,
+          "right": 393,
+          "bottom": 775.59375,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "61px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "light",
+      "width": 768,
+      "height": 844,
+      "scroll": 768,
+      "dialog": {
+        "x": 44,
+        "right": 724,
+        "top": 10,
+        "bottom": 750
+      },
+      "inputs": [
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 720,
+          "top": 676,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 729,
+          "top": 667,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 61,
+          "y": 654,
+          "width": 646,
+          "height": 79,
+          "top": 654,
+          "right": 707,
+          "bottom": 733,
+          "left": 61
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "dark",
+      "width": 768,
+      "height": 844,
+      "scroll": 768,
+      "dialog": {
+        "x": 44,
+        "right": 724,
+        "top": 10,
+        "bottom": 750
+      },
+      "inputs": [
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        },
+        {
+          "left": 63,
+          "right": 705
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 720,
+          "top": 676,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 729,
+          "top": 667,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 61,
+          "y": 654,
+          "width": 646,
+          "height": 79,
+          "top": 654,
+          "right": 707,
+          "bottom": 733,
+          "left": 61
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "light",
+      "width": 1024,
+      "height": 844,
+      "scroll": 1024,
+      "dialog": {
+        "x": 172,
+        "right": 852,
+        "top": 52,
+        "bottom": 792
+      },
+      "inputs": [
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 762,
+          "top": 718,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 771,
+          "top": 709,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 189,
+          "y": 696,
+          "width": 646,
+          "height": 79,
+          "top": 696,
+          "right": 835,
+          "bottom": 775,
+          "left": 189
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "dark",
+      "width": 1024,
+      "height": 844,
+      "scroll": 1024,
+      "dialog": {
+        "x": 172,
+        "right": 852,
+        "top": 52,
+        "bottom": 792
+      },
+      "inputs": [
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        },
+        {
+          "left": 191,
+          "right": 833
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 762,
+          "top": 718,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 771,
+          "top": 709,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 189,
+          "y": 696,
+          "width": 646,
+          "height": 79,
+          "top": 696,
+          "right": 835,
+          "bottom": 775,
+          "left": 189
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "light",
+      "width": 1440,
+      "height": 844,
+      "scroll": 1440,
+      "dialog": {
+        "x": 380,
+        "right": 1060,
+        "top": 52,
+        "bottom": 792
+      },
+      "inputs": [
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 762,
+          "top": 718,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 771,
+          "top": 709,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 397,
+          "y": 696,
+          "width": 646,
+          "height": 79,
+          "top": 696,
+          "right": 1043,
+          "bottom": 775,
+          "left": 397
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "dark",
+      "width": 1440,
+      "height": 844,
+      "scroll": 1440,
+      "dialog": {
+        "x": 380,
+        "right": 1060,
+        "top": 52,
+        "bottom": 792
+      },
+      "inputs": [
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        },
+        {
+          "left": 399,
+          "right": 1041
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 762,
+          "top": 718,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 771,
+          "top": 709,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 397,
+          "y": 696,
+          "width": 646,
+          "height": 79,
+          "top": 696,
+          "right": 1043,
+          "bottom": 775,
+          "left": 397
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": false
+    },
+    {
+      "mode": "light",
+      "width": 844,
+      "height": 390,
+      "scroll": 844,
+      "dialog": {
+        "x": 82,
+        "right": 762,
+        "top": 10,
+        "bottom": 376
+      },
+      "inputs": [
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 346,
+          "top": 302,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 355,
+          "top": 293,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 99,
+          "y": 280,
+          "width": 646,
+          "height": 79,
+          "top": 280,
+          "right": 745,
+          "bottom": 359,
+          "left": 99
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": true
+    },
+    {
+      "mode": "dark",
+      "width": 844,
+      "height": 390,
+      "scroll": 844,
+      "dialog": {
+        "x": 82,
+        "right": 762,
+        "top": 10,
+        "bottom": 376
+      },
+      "inputs": [
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        },
+        {
+          "left": 101,
+          "right": 743
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 346,
+          "top": 302,
+          "height": 44,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 355,
+          "top": 293,
+          "height": 62,
+          "position": "static",
+          "flex": "0 1 150px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 99,
+          "y": 280,
+          "width": 646,
+          "height": 79,
+          "top": 280,
+          "right": 745,
+          "bottom": 359,
+          "left": 99
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "79px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": true
+    },
+    {
+      "mode": "light",
+      "width": 390,
+      "height": 400,
+      "scroll": 390,
+      "dialog": {
+        "x": 8,
+        "right": 382,
+        "top": 10,
+        "bottom": 390
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 373,
+          "top": 329,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 373,
+          "top": 329,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 316,
+          "width": 348,
+          "height": 61,
+          "top": 316,
+          "right": 353,
+          "bottom": 377,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "61px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": true
+    },
+    {
+      "mode": "dark",
+      "width": 390,
+      "height": 400,
+      "scroll": 390,
+      "dialog": {
+        "x": 8,
+        "right": 382,
+        "top": 10,
+        "bottom": 390
+      },
+      "inputs": [
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        },
+        {
+          "left": 21,
+          "right": 369
+        }
+      ],
+      "footer": [
+        {
+          "label": "Cancel",
+          "bottom": 373,
+          "top": 329,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        },
+        {
+          "label": "Update Timesheet",
+          "bottom": 373,
+          "top": 329,
+          "height": 44,
+          "position": "static",
+          "flex": "1 1 110px",
+          "minHeight": "44px",
+          "transform": "none",
+          "margin": "0px"
+        }
+      ],
+      "footerStyle": {
+        "rect": {
+          "x": 5,
+          "y": 316,
+          "width": 348,
+          "height": 61,
+          "top": 316,
+          "right": 353,
+          "bottom": 377,
+          "left": 5
+        },
+        "display": "flex",
+        "direction": "row",
+        "height": "61px",
+        "minHeight": "auto",
+        "position": "static",
+        "flex": "0 0 auto"
+      },
+      "bodyScroll": true
+    }
+  ],
+  "checks": [
+    {
+      "staffOptionsAfterLoad": 4
+    },
+    "Delivery schedule formats the recorded company timezone even when the browser is UTC",
+    "Delayed/out-of-order staff fetch: newest response wins and valid stable-ID selection survives",
+    "Approval reloads authoritative source instead of prefilling stale one-hour register value",
+    "Editable modal: labelled company-local dates, immutable owner, reason, compact viewport fit, reachable actions, human review explanation"
+  ]
+}

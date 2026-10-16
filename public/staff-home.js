@@ -8,6 +8,11 @@
   let pending=null,history=[],corrections=[],historyScope='own',historyMeta={},correctionMeta={},historyStatus='ALL',sessionStatus='ALL',historySearch='',historyFrom='',historyTo='',historySequence=0;
   let authEpoch=0,identityPromise=null,identityFingerprint='',applyingVerifiedProfile=false,boundaryTimer=null;
   const requests=new Set(),resultLeases=new WeakMap();
+  let liveTimer=null,reconcileTimer=null,clockAnchor=null,stateEpoch=0;
+  function stopClock(){clearInterval(liveTimer);clearTimeout(reconcileTimer);liveTimer=null;reconcileTimer=null;clockAnchor=null;}
+  function adoptState(data){stopClock();today=data;stateEpoch++;clockAnchor={mono:performance.now(),wall:Date.now()};const at=instant(data.server_time);if(at)serverOffset=at.getTime()-Date.now();if(!document.hidden){liveTimer=setInterval(tick,1000);reconcileTimer=setTimeout(()=>{void refresh();},60000);}}
+  function tick(){if(!today||!clockAnchor||document.hidden||homeFailed)return;try{account();}catch{boundary();return;}const elapsed=performance.now()-clockAnchor.mono;const clockDiscontinuity=Math.abs(Date.now()-clockAnchor.wall-elapsed)>2500;if(clockDiscontinuity||elapsed>90000){stopClock();setText('staffHomeWorkedDetail','Rechecking the server clock…');void refresh();return;}renderClock(elapsed);}
+  function renderClock(elapsed=0){if(!today)return;const value=window.VoxelAttendanceClock.project(today,elapsed),active=today.active_attendance;setText('staffHomeWorked',value.overnight?value.active==null?'Requires review':duration(value.active):value.worked==null?'Unavailable':duration(value.worked));setText('staffHomeWorkedLabel',value.overnight?'Active overnight session':'Worked today');if(active){const seconds=value.activeMilliseconds==null?null:Math.floor(value.activeMilliseconds/1000);const live=seconds==null?'Time requires review':`${duration(Math.floor(seconds/60))} ${String(seconds%60).padStart(2,'0')}s`;setText('staffHomeWorkedDetail',`Active session: ${live}${active.on_break?' · Unpaid break in progress':' · Provisional until checkout'}${value.overnight?' · Allocated to '+dateOnly(active.allocated_work_date)+' · Today: '+duration(value.worked):' · Verified completed: '+duration(today.summary.worked_minutes)}`);}if(value.breakElapsed!=null)setText('staffHomeBreak',`${duration(Math.floor(value.breakElapsed/60))} ${String(value.breakElapsed%60).padStart(2,'0')}s on break`);else if(today.summary.break_recording_status!=='NOT_RECORDED')setText('staffHomeBreak',duration(value.breakMinutes));}
   const pendingStorage='voxelveda:attendance-pending';
   function fingerprint(){try{const user=JSON.parse(localStorage.getItem('user')||'{}');return String(localStorage.getItem('token')||'')+':'+String(user.id||'');}catch{return '';}}
   function authHeaders(){const supplied=window.VoxelAvatar?.authHeaders?.()||window.authHeaders?.()||{};const headers={...supplied,Accept:'application/json'};if(headers.Authorization?.trim()==='Bearer')delete headers.Authorization;return headers;}
@@ -18,7 +23,7 @@
   function assertResult(result){assertCurrent(resultLeases.get(result));}
   function ownerFailure(message){boundary({refreshAgain:false});showError(message);throw stale();}
   function clearPrivateView(){
-    historySequence++;today=null;history=[];corrections=[];historyMeta={};correctionMeta={};historyScope='own';historyStatus='ALL';sessionStatus='ALL';historySearch='';historyFrom='';historyTo='';serverOffset=0;submitBusy=false;pending=null;
+    stopClock();historySequence++;today=null;history=[];corrections=[];historyMeta={};correctionMeta={};historyScope='own';historyStatus='ALL';sessionStatus='ALL';historySearch='';historyFrom='';historyTo='';serverOffset=0;submitBusy=false;pending=null;
     window.VoxelOverlay?.closeAll?.();closeOverlay();window.closeStaffNotificationPanel?.();window.toggleMobileMenu?.(false);clearError();
     document.querySelectorAll('[data-avatar-self]').forEach(target=>{target.dataset.avatarName='';});
     ['staffHomeWorked','staffHomeBreak','staffHomeSessions','staffHomeFirstCheckIn','staffHomeLastCheckOut','weekHoursCount','staffHomeWeekHours'].forEach(id=>setText(id,'—'));
@@ -71,7 +76,7 @@
   function allowed(action){return Boolean(today&&Array.isArray(today.allowed_actions)&&today.allowed_actions.includes(action));}
   function activeId(){return today?.active_attendance?.id??null;}
   function correctionAccess(scope){return scope==='own'||scope==='team'&&Boolean(window.hasPermission?.('APPROVE_TEAM_TIMESHEET')||window.hasPermission?.('EDIT_ATTENDANCE')||window.hasPermission?.('APPROVE_ALL_TIMESHEETS'))||scope==='all'&&Boolean(window.hasPermission?.('EDIT_ATTENDANCE')||window.hasPermission?.('APPROVE_ALL_TIMESHEETS'));}
-  function showError(message){homeFailed=true;setText('staffHomeErrorText',message);if($('staffHomeError'))$('staffHomeError').hidden=false;renderActions();}
+  function showError(message){stopClock();homeFailed=true;setText('staffHomeStatus','Attendance unavailable');setText('staffHomeWorked','—');setText('staffHomeWorkedDetail','Retry to confirm attendance. Saved records have not changed.');setText('staffHomeErrorText',message);if($('staffHomeError'))$('staffHomeError').hidden=false;renderActions();}
   function clearError(){homeFailed=false;if($('staffHomeError'))$('staffHomeError').hidden=true;}
   async function api(url,options={}){
     const lease=account(),controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),options.method&&options.method!=='GET'?20000:12000);requests.add(controller);
@@ -131,7 +136,7 @@
     const shift=today.next_roster;
     $('staffHomeNextShift').classList.toggle('staff-home-empty',!shift);$('staffHomeNextShift').innerHTML=shift?`<div class="staff-home-next-date">${escape(dateOnly(shift.shift_date||shift.work_date))}</div><p class="staff-home-next-detail">${escape(String(shift.start_time||'').slice(0,5))}–${escape(String(shift.end_time||'').slice(0,5))} · ${escape(today.company_timezone)}</p>${shift.location||shift.site_name?`<p class="staff-home-next-detail">${escape(shift.location||shift.site_name)}</p>`:''}${shift.role_notes||shift.notes?`<p class="staff-home-next-detail">${escape(shift.role_notes||shift.notes)}</p>`:''}`:'No upcoming shift is assigned.';
     const tasks=today.tasks||[];$('staffHomeTasks').classList.toggle('staff-home-empty',!tasks.length);$('staffHomeTasks').innerHTML=tasks.length?tasks.slice(0,4).map(task=>`<button type="button" class="staff-home-task" data-staff-home-section="tasksSection"><strong>${escape(task.title)}</strong><small>${escape(String(task.status||'').replaceAll('_',' '))}${task.due_date?` · Due ${escape(dateOnly(task.due_date))}`:''}</small></button>`).join(''):'No assigned tasks need attention.';
-    $('staffHomeAttendance')?.setAttribute('aria-busy','false');greeting();renderActions();
+    $('staffHomeAttendance')?.setAttribute('aria-busy','false');renderClock();greeting();renderActions();
   }
   async function refresh(){
     if(loading)return loading;
@@ -139,11 +144,11 @@
     promise=(async()=>{
       let lease;
       try{
-        if(!await verifyIdentity())return null;lease=account();
+        if(!await verifyIdentity())return null;lease=account();const readEpoch=stateEpoch;
         const [dailyResult,weekResult]=await Promise.allSettled([api('/api/attendance/today'),api('/api/attendance/week')]);assertCurrent(lease);if(dailyResult.status!=='fulfilled')throw dailyResult.reason;const data=dailyResult.value;assertResult(data);
         const week=weekResult.status==='fulfilled'?weekResult.value:null;if(week){assertResult(week);if(week.timesheet?.user_id!=null&&String(week.timesheet.user_id)!==lease.id)ownerFailure('The weekly timesheet owner did not match your verified account.');}else if(weekResult.reason?.staleAccount)throw weekResult.reason;
         if(!data.summary||!Array.isArray(data.allowed_actions)||!Array.isArray(data.sessions))throw new Error('Your attendance view is updating. Refresh shortly or contact your supervisor. No attendance has been changed.');
-        today=data;const server=instant(data.server_time);if(server)serverOffset=server.getTime()-Date.now();clearError();renderToday();setText('staffHomeWeekHours',week&&Number.isFinite(Number(week.total_hours))?`${Number(week.total_hours).toFixed(2)} hrs`:'Unavailable');setText('staffWeekSignal',week?'Verified worked hours':'Retry in My timesheets');return data;
+        if(readEpoch!==stateEpoch)return today;adoptState(data);clearError();renderToday();setText('staffHomeWeekHours',week&&Number.isFinite(Number(week.total_hours))?`${Number(week.total_hours).toFixed(2)} hrs`:'Unavailable');setText('staffWeekSignal',week?'Verified worked hours':'Retry in My timesheets');return data;
       }catch(error){if(!error.staleAccount&&(!lease||current(lease)))showError(error.message);return null;}
       finally{if(loading===promise)loading=null;}
     })();loading=promise;return promise;
@@ -208,7 +213,7 @@
   }
   async function submitAction(request){
     if(submitBusy)return;const lease=account();submitBusy=true;rememberPending(request);const confirm=$('staffAttendanceConfirm');if(confirm){confirm.disabled=true;confirm.setAttribute('aria-busy','true');}renderActions();
-    try{const result=await api('/api/attendance/actions',{method:'POST',body:JSON.stringify(request)});assertCurrent(lease);assertResult(result);if(String(result.request_id)!==String(request.request_id)||result.action!==request.action)throw Object.assign(new Error('The server response could not be matched to this attendance request. Check its status before trying again.'),{uncertain:true});clearPending();if(result.state){today=result.state;const at=instant(today.server_time);if(at)serverOffset=at.getTime()-Date.now();clearError();renderToday();}else await refresh();await window.loadTimesheet?.();assertCurrent(lease);if(request.action==='CHECK_OUT'){openCheckoutNote(result.attendance_id,result.attendance||{});}else{close();window.showToast?.(`${actionLabels[request.action]} recorded.`);}}
+    try{const result=await api('/api/attendance/actions',{method:'POST',body:JSON.stringify(request)});assertCurrent(lease);assertResult(result);if(String(result.request_id)!==String(request.request_id)||result.action!==request.action)throw Object.assign(new Error('The server response could not be matched to this attendance request. Check its status before trying again.'),{uncertain:true});clearPending();if(result.state){adoptState(result.state);clearError();renderToday();}else await refresh();await window.loadTimesheet?.();assertCurrent(lease);if(request.action==='CHECK_OUT'){openCheckoutNote(result.attendance_id,result.attendance||{});}else{close();window.showToast?.(`${actionLabels[request.action]} recorded.`);}}
     catch(error){if(error.staleAccount||!current(lease))return;if(error.uncertain){openSheet('Check attendance status',`<p>The response was interrupted. This request may already have been saved. Do not scan again until its status has been checked.</p><div class="staff-sheet-actions">${button('staffAttendanceReconcile','Check server status')}${button('staffAttendancePendingClose','Close','secondary-btn')}</div>`,'pending');$('staffAttendanceReconcile').onclick=reconcileView;$('staffAttendancePendingClose').onclick=close;}else{clearPending();sheetError(error.message,error.fields);await refresh();if(!current(lease))return;if(String(error.code||'').startsWith('ATTENDANCE_QR_')&&overlayKind==='confirm'){if(confirm)confirm.dataset.qrExpired='true';$('staffAttendanceRescan')?.parentElement.remove();$('staffAttendanceBody').insertAdjacentHTML('beforeend',`<div class="staff-sheet-actions">${button('staffAttendanceRescan','Scan current QR again','secondary-btn')}</div>`);$('staffAttendanceRescan').onclick=()=>startCamera(request.action,request);}}}
     finally{if(current(lease)){submitBusy=false;if(confirm?.isConnected){confirm.disabled=confirm.dataset.qrExpired==='true';confirm.removeAttribute('aria-busy');}renderActions();}}
   }
@@ -226,7 +231,7 @@
     openSheet('Check attendance status','<p role="status">Checking the original request against the server...</p>','pending');
     try{
       const result=await api(`/api/attendance/reconcile?request_id=${encodeURIComponent(retained.request_id)}`);assertCurrent(lease);assertResult(result);
-      if(result.state){today=result.state;const at=instant(today.server_time);if(at)serverOffset=at.getTime()-Date.now();clearError();renderToday();}
+      if(result.state){adoptState(result.state);clearError();renderToday();}
       if(result.found&&result.receipt){
         const receipt=result.receipt;
         if(String(receipt.request_id)!==String(retained.request_id))throw new Error('The returned receipt does not match the pending request. Contact your supervisor before retrying.');
@@ -315,7 +320,7 @@
   function profileMenu(){const menu=$('staffProfileMenu'),toggle=$('staffProfileMenuToggle');if(!menu.hidden){window.VoxelOverlay?.close('staff-profile');menu.hidden=true;toggle.setAttribute('aria-expanded','false');return;}close();if(window.VoxelOverlay?.open('staff-profile',()=>{menu.hidden=true;toggle.setAttribute('aria-expanded','false');},toggle)===false)return;menu.hidden=false;toggle.setAttribute('aria-expanded','true');menu.querySelector('button')?.focus();}
   function applyIdentity(user){
     const switched=identity&&String(identity.id)!==String(user.id);identity=user;
-    if(switched){historySequence++;today=null;history=[];corrections=[];clearPending();close();clearError();['staffHomeWorked','staffHomeBreak','staffHomeSessions','staffHomeFirstCheckIn','staffHomeLastCheckOut','weekHoursCount','staffHomeWeekHours'].forEach(id=>setText(id,'—'));setText('staffHomeStatus','Checking...');setText('staffHomeDate','Checking workplace time...');setText('staffHomeAttendanceNote','');setText('staffHomeWorkedDetail','Loading your attendance record');$('staffHomeTimeline').innerHTML='<li class="staff-home-empty">Loading your sessions...</li>';setText('staffHomeNextShift','Loading your next shift...');setText('staffHomeTasks','Loading assigned work...');}
+    if(switched){stopClock();historySequence++;today=null;history=[];corrections=[];clearPending();close();clearError();['staffHomeWorked','staffHomeBreak','staffHomeSessions','staffHomeFirstCheckIn','staffHomeLastCheckOut','weekHoursCount','staffHomeWeekHours'].forEach(id=>setText(id,'—'));setText('staffHomeStatus','Checking...');setText('staffHomeDate','Checking workplace time...');setText('staffHomeAttendanceNote','');setText('staffHomeWorkedDetail','Loading your attendance record');$('staffHomeTimeline').innerHTML='<li class="staff-home-empty">Loading your sessions...</li>';setText('staffHomeNextShift','Loading your next shift...');setText('staffHomeTasks','Loading assigned work...');}
     hydratePending();greeting();renderRoleWork(user);renderActions();$('staffHomeAccountOnly').hidden=window.hasPermission?.('attendance')!==false;
   }
   function renderRoleWork(user){
@@ -348,7 +353,7 @@
     window.addEventListener('vv:avatar-auth-required',()=>boundary());
     window.addEventListener('vv:avatar-profile',event=>{const id=event.detail?.profile?.id;if(!Number.isSafeInteger(Number(id))||Number(id)<1)return;if(identity&&String(identity.id)!==String(id))boundary();else if(!identity&&!identityPromise&&!loading){clearTimeout(boundaryTimer);boundaryTimer=setTimeout(()=>{void refresh();},0);}});
     window.addEventListener('pagehide',()=>boundary({refreshAgain:false}));
-    window.addEventListener('pageshow',()=>{void refresh();void acceptCameraIntent();});window.addEventListener('focus',()=>{void refresh();});document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refresh();});
+    window.addEventListener('pageshow',()=>{void refresh();void acceptCameraIntent();});window.addEventListener('focus',()=>{void refresh();});document.addEventListener('visibilitychange',()=>{stopClock();if(!document.hidden)void refresh();});window.addEventListener('online',()=>{stopClock();void refresh();});
   }
   const oldProfile=window.renderStaffProfile;if(typeof oldProfile==='function')window.renderStaffProfile=function(){void refresh();};
   window.refreshStaffSession=verifyIdentity;

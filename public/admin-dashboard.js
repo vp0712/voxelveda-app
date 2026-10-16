@@ -30,6 +30,7 @@ let materialCache = {
   packaging: []
 };
 let staffCache = [];
+let staffLoadState='idle',staffLoadSequence=0;
 let attendanceCache = [];
 let announcementCache = [];
 let taskCache = [];
@@ -4985,6 +4986,8 @@ async function deleteAnnouncement(id) {
 }
 
 async function loadStaff() {
+  const sequence=++staffLoadSequence;staffLoadState='loading';populateTimesheetFilterStaffSelects();
+  try {
   const select = document.getElementById('taskAssignedTo');
   const tbody = document.getElementById('staffTableBody');
 
@@ -4999,10 +5002,12 @@ async function loadStaff() {
     });
     data = await safeJson(res);
   }
-  if (!res.ok) return;
+  if(sequence!==staffLoadSequence)return;
+  if (!res.ok) throw new Error(data.message||'Staff could not be loaded');
 
   const users = chronologicalRows(data.users || []);
-  staffCache = users;
+  staffCache = users;staffLoadState='ready';
+  populateTimesheetFilterStaffSelects();
   populateTimesheetStaffSelect(users);
   populateRosterStaffSelect(users);
 
@@ -5046,6 +5051,8 @@ async function loadStaff() {
       `
     });
   }
+  } catch(error) {if(sequence!==staffLoadSequence)return;staffLoadState='error';populateTimesheetFilterStaffSelects();}
+
 }
 
 function populateTimesheetStaffSelect(users = staffCache) {
@@ -6273,6 +6280,11 @@ function formatDate(value) {
   return value ? String(value).slice(0, 10) : '-';
 }
 
+function formatWorkplaceSchedule(value,zone) {
+  if(!value||!zone)return 'Unavailable';
+  try{return new Intl.DateTimeFormat('en-AU',{timeZone:zone,weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value));}catch{return 'Unavailable';}
+}
+
 function formatDateTime(value) {
   if (!value) return '-';
   try {
@@ -7034,7 +7046,9 @@ function toDateTimeLocal(value, basis = null) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
 }
 
-function openAttendanceDialog(attendanceId = null) {
+async function openAttendanceDialog(attendanceId = null) {
+  if(staffLoadState!=='ready')await loadStaff();
+  if(staffLoadState!=='ready')return showToast('The staff list is unavailable. Retry staff before editing.');
   const record = attendanceId
     ? attendanceCache.find((row) => Number(row.id) === Number(attendanceId))
     : null;
@@ -7052,7 +7066,7 @@ function openAttendanceDialog(attendanceId = null) {
     record ? 'Edit Staff Timesheet' : 'Add / Fix Staff Timesheet',
     `
       <div class="form-grid" style="grid-template-columns:1fr;">
-        <select id="attendanceUserId">
+        <select id="attendanceUserId" ${record?'disabled':''}>
           <option value="">Select staff</option>
           ${staffOptions}
         </select>
@@ -7062,11 +7076,12 @@ function openAttendanceDialog(attendanceId = null) {
         </label>
         <label>
           <span class="muted-text">Clock Out (${escapeHtml(attendanceCompanyTimezone)})</span>
-          <input id="attendanceClockOut" type="datetime-local" value="${escapeHtml(toDateTimeLocal(record?.clock_out_utc_text || record?.clock_out, record?.clock_out_timestamp_basis))}" />
+          <input id="attendanceClockOut" type="datetime-local" value="${escapeHtml(toDateTimeLocal(record?.clock_out_utc_text || record?.clock_out, record?.clock_out_timestamp_basis || record?.timestamp_basis))}" />
         </label>
         <label><span>Unpaid break minutes (optional)</span><input id="attendanceBreakMinutes" type="number" min="0" step="1" value="${escapeHtml(record?.break_minutes ?? '')}" placeholder="Unknown / not recorded" /></label>
         ${record && (record.timestamp_basis !== 'UTC' || (record.clock_out && record.clock_out_timestamp_basis !== 'UTC')) ? '<p class="warning-strip">Historical timestamp basis is unverified. Saved wall times are shown without conversion. Review the actual worked times and the company timezone before authorising this correction.</p>' : ''}
-        ${Number(record?.review_required) ? `<p class="warning-strip">Review required: ${escapeHtml(record.review_reason || 'Attendance requires review')}</p>` : ''}
+        ${Number(record?.review_required) ? `<p class="warning-strip">Review required: ${escapeHtml(window.VoxelAttendanceClock.explain(record.review_reason))}</p>` : ''}
+        ${record?'<label>Correction reason (required)<textarea id="attendanceCorrectionReason" rows="2" maxlength="1000" required></textarea></label>':''}
         <textarea id="attendanceNotes" placeholder="Reason / notes">${escapeHtml(record?.notes || '')}</textarea>
       </div>
       <p class="status-note">Enter actual worked times in ${escapeHtml(attendanceCompanyTimezone)}. Saving authorises this manual correction; incomplete shifts remain under review.</p>
@@ -7074,6 +7089,7 @@ function openAttendanceDialog(attendanceId = null) {
     async () => {
       const body = {
         id: record?.id,
+        expected_revision:record?.revision,correction_reason:document.getElementById('attendanceCorrectionReason')?.value.trim(),
         user_id: Number(document.getElementById('attendanceUserId')?.value),
         clock_in: document.getElementById('attendanceClockIn')?.value,
         clock_out: document.getElementById('attendanceClockOut')?.value,
@@ -7727,17 +7743,26 @@ function updateWorkforceDashboardMetrics() {
 function renderRosterIntelligence(rows, summary) { summary = summary || {}; var alerts = document.getElementById('rosterComplianceAlerts'); var calendar = document.getElementById('rosterCalendarCards'); if (alerts) { var published = rows.filter(function(row) { return String(row.status || '').toLowerCase() === 'published'; }).length; var warnings = [{ label: 'Cost Signal', value: summary.budget && summary.cost > summary.budget ? 'Budget risk' : 'Controlled', tone: summary.budget && summary.cost > summary.budget ? 'danger' : 'ok' }, { label: 'Overtime', value: String(summary.overtime || 0) + ' shifts', tone: summary.overtime ? 'warn' : 'ok' }, { label: 'Published', value: published + '/' + (rows.length || 0), tone: published === rows.length && rows.length ? 'ok' : 'warn' }, { label: 'Payroll Sync', value: 'Integration setup required', tone: 'info' }]; alerts.innerHTML = warnings.map(function(item) { return '<div class="roster-signal-card ' + item.tone + '"><span>' + escapeHtml(item.label) + '</span><strong>' + escapeHtml(item.value) + '</strong></div>'; }).join(''); } if (calendar) { var weeks = new Map(); rows.forEach(function(row) { var key = rosterWeekKey(row.shift_date); var item = weeks.get(key) || { hours: 0, cost: 0, shifts: 0 }; item.hours += rosterNetHours(row); item.cost += rosterShiftCost(row); item.shifts += 1; weeks.set(key, item); }); var cards = Array.from(weeks.entries()).slice(-6).map(function(pair) { return '<div class="roster-week-card"><span>Week ' + escapeHtml(pair[0]) + '</span><strong>' + pair[1].shifts + ' shifts</strong><small>' + pair[1].hours.toFixed(2) + ' hrs | ' + formatMoney(pair[1].cost) + '</small></div>'; }).join(''); calendar.innerHTML = cards || '<div class="empty-state compact">No roster weeks yet.</div>'; } }
 function updateRosterMetrics(rows) { var today = todayISO(); var upcoming = rows.filter(function(row) { return String(row.shift_date || '') >= today; }); var staffIds = new Set(rows.map(function(row) { return Number(row.user_id); }).filter(Boolean)); var netHours = rows.reduce(function(sum, row) { return sum + rosterNetHours(row); }, 0); var cost = rows.reduce(function(sum, row) { return sum + rosterShiftCost(row); }, 0); var budget = rows.reduce(function(max, row) { return Math.max(max, Number(row.wage_budget || 0)); }, 0); var overtime = rows.filter(function(row) { return rosterNetHours(row) > 10; }).length; setText('rosterUpcomingCount', upcoming.length); setText('rosterHoursCount', netHours.toFixed(2)); setText('rosterStaffCount', staffIds.size); setText('rosterCostCount', formatMoney(cost)); setText('rosterBudgetStatus', budget && cost > budget ? 'Over budget' : (budget ? 'On track' : 'No budget')); setText('overtimeWarningCount', overtime); renderRosterIntelligence(rows, { cost: cost, budget: budget, overtime: overtime, upcoming: upcoming.length }); updateWorkforceDashboardMetrics(); }
 function populateTimesheetFilterStaffSelects() {
-  for (const id of ['timesheetReportStaffSelect', 'weeklyDeliveryStaffSelect']) {
-    const select = document.getElementById(id);
-    if (!select) continue;
-    const selected = select.value;
-    select.innerHTML = '<option value="">All permitted staff</option>' + staffCache.map(user => `<option value="${Number(user.id)}">${escapeHtml(user.name || user.email)}</option>`).join('');
-    select.value = selected;
+  for(const id of ['timesheetReportStaffSelect','weeklyDeliveryStaffSelect']){
+    const select=document.getElementById(id);if(!select)continue;
+    const selected=select.value||select.dataset.pendingSelection||'';
+    if(selected)select.dataset.pendingSelection=selected;
+    const users=staffCache.filter(user=>Number.isSafeInteger(Number(user.id))&&Number(user.id)>0);
+    const unavailable=!users.length&&staffLoadState!=='ready';
+    const label=unavailable?(staffLoadState==='error'?'Staff unavailable — retry':'Loading staff…'):users.length?'All permitted staff':'No permitted staff';
+    select.innerHTML=`<option value="">${label}</option>`+users.map(user=>`<option value="${Number(user.id)}">${escapeHtml(user.name||user.email||'Staff member')} · ${Number(user.id)}</option>`).join('');
+    select.disabled=unavailable||!users.length;
+    if(users.some(user=>String(user.id)===selected)){select.value=selected;delete select.dataset.pendingSelection;}
+    else if(staffLoadState==='ready'){select.value='';delete select.dataset.pendingSelection;}
+    let note=document.getElementById(id+'Status');if(!note){note=document.createElement('div');note.id=id+'Status';note.className='staff-selector-status';note.setAttribute('role','status');select.after(note);}
+    note.replaceChildren();
+    if(staffLoadState==='error'){note.append(document.createTextNode('The authorised staff list could not be loaded. '));const retry=document.createElement('button');retry.type='button';retry.className='secondary-btn small';retry.textContent='Retry staff';retry.onclick=()=>loadStaff();note.append(retry);}
+    else if(staffLoadState==='loading')note.textContent='Loading authorised staff…';
+    else if(!users.length)note.textContent='No staff records are available within your permissions.';
   }
-  const from = document.getElementById('timesheetReportFrom'), to = document.getElementById('timesheetReportTo');
-  if (from && !from.value) from.value = todayISO(-7);
-  if (to && !to.value) to.value = todayISO();
+  const from=document.getElementById('timesheetReportFrom'),to=document.getElementById('timesheetReportTo');if(from&&!from.value)from.value=todayISO(-7);if(to&&!to.value)to.value=todayISO();
 }
+
 async function generateRoster() { var body = { user_ids: selectedRosterStaffIds(), from_date: document.getElementById('rosterFromDate')?.value, to_date: document.getElementById('rosterToDate')?.value, start_time: document.getElementById('rosterStartTime')?.value, end_time: document.getElementById('rosterEndTime')?.value, role_label: document.getElementById('rosterRoleLabel')?.value.trim(), location: document.getElementById('rosterLocation')?.value.trim(), notes: document.getElementById('rosterNotes')?.value.trim(), break_minutes: Number(document.getElementById('rosterBreakMinutes')?.value || 0), hourly_rate: Number(document.getElementById('rosterHourlyRate')?.value || 0), wage_budget: Number(document.getElementById('rosterWeeklyBudget')?.value || 0) }; var res = await fetch('/api/roster/generate', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) }); var data = await safeJson(res); if (!res.ok) { showToast(data.message || 'Roster generation failed'); return; } showToast(data.message || 'Roster generated'); await loadRoster(); }
 async function publishRoster() { var fromDate = document.getElementById('rosterFromDate')?.value || todayISO(); var toDate = document.getElementById('rosterToDate')?.value || fromDate; var res = await fetch('/api/roster/publish', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ from_date: fromDate, to_date: toDate }) }); var data = await safeJson(res); if (!res.ok) { showToast(data.message || 'Roster publish failed'); return; } showToast(String(data.published || 0) + ' roster shifts published' + (data.email_status === 'setup_required' ? ' - email setup required' : '')); await loadRoster(); }
 function exportRosterCsv() { return downloadOriginalReport('roster', { from_date:document.getElementById('rosterFromDate')?.value, to_date:document.getElementById('rosterToDate')?.value }); }
@@ -7920,9 +7945,9 @@ async function openTimesheetDetail(id) {
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
 }
 
-async function approveTimesheetRecord(id, approvedHours, comments = '') {
+async function approveTimesheetRecord(id, approvedHours, comments = '', source = {}) {
   const res = await fetch(`/api/attendance/timesheets/${Number(id)}/approve`, {
-    method: 'POST', headers: authHeaders(), body: JSON.stringify({ approved_hours: approvedHours, comments })
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ approved_hours: approvedHours, comments, reason:comments,expected_version:source.version_no,expected_source_minutes:source.minutes })
   });
   const data = await safeJson(res);
   showToast(data.message || (res.ok ? 'Timesheet approved' : 'Timesheet approval failed'));
@@ -7932,7 +7957,13 @@ async function approveTimesheetRecord(id, approvedHours, comments = '') {
   }
 }
 
-function openTimesheetDecision(id, action, submittedHours) {
+async function openTimesheetDecision(id, action, submittedHours) {
+  const res=await fetch(`/api/attendance/timesheets/${Number(id)}`,{headers:authHeaders(),cache:'no-store'});
+  const detail=await safeJson(res);if(!res.ok)return showToast(detail.message||'Timesheet source unavailable. Retry.');
+  const source=detail.summary,record=detail.timesheet;
+  if(!source||!record||!Number.isFinite(Number(source.actualHours)))return showToast('Verified source hours are unavailable. Refresh before deciding.');
+  submittedHours=action==='amend'?record.approved_hours:source.actualHours;
+  const decisionSource={version_no:record.version_no,minutes:source.verified_total_minutes};
   const labels = {
     approve: ['Approve Timesheet', 'Approve'],
     correction: ['Request Correction', 'Send Request'],
@@ -7942,17 +7973,19 @@ function openTimesheetDecision(id, action, submittedHours) {
   const [title, buttonText] = labels[action] || labels.approve;
   const needsReason = action !== 'approve';
   showDialog(title, `
+    <p><strong>${escapeHtml(record.name||record.staff_name||'Staff member')}</strong> · ${escapeHtml(formatDate(record.week_start))} – ${escapeHtml(formatDate(record.week_end))}</p><p class="status-note">Verified source: ${Number(source.actualHours).toFixed(2)} hrs. ${source.reviewRequired?'Source attendance needs correction before approval.':'Any difference in approved hours requires an audit reason.'}</p>
     <div class="form-stack">
       ${(action === 'approve' || action === 'amend') ? `<label>Approved hours<input id="timesheetDecisionHours" type="number" min="0" max="168" step="0.01" value="${Number(submittedHours || 0).toFixed(2)}"></label>` : ''}
-      <label>${needsReason ? 'Reason / manager comments' : 'Manager comments (optional)'}<textarea id="timesheetDecisionComments" rows="4" placeholder="${needsReason ? 'Required for the audit history' : 'Optional approval note'}"></textarea></label>
+      <label>${needsReason ? 'Reason / manager comments' : 'Manager comments (required when adjusting hours)'}<textarea id="timesheetDecisionComments" rows="4" placeholder="${needsReason ? 'Required for the audit history' : 'Optional approval note'}"></textarea></label>
     </div>
   `, async () => {
     const comments = document.getElementById('timesheetDecisionComments')?.value.trim() || '';
     const approvedHours = Number(document.getElementById('timesheetDecisionHours')?.value || submittedHours || 0);
     if (needsReason && !comments) return showToast('A reason is required');
-    if (action === 'approve') return approveTimesheetRecord(id, approvedHours, comments);
+    if(action==='approve'&&Math.abs(approvedHours-Number(source.actualHours))>0.00001&&!comments)return showToast('Explain why approved hours differ from the verified source hours.');
+    if (action === 'approve') return approveTimesheetRecord(id, approvedHours, comments,decisionSource);
     const endpoint = action === 'amend' ? 'amend' : action;
-    const body = action === 'amend' ? { approved_hours: approvedHours, reason: comments } : { comments };
+    const body = action === 'amend' ? { approved_hours: approvedHours, reason: comments,expected_version:record.version_no } : { comments };
     const res = await fetch(`/api/attendance/timesheets/${Number(id)}/${endpoint}`, {
       method: 'POST', headers: authHeaders(), body: JSON.stringify(body)
     });
@@ -8068,7 +8101,7 @@ async function loadWeeklyTimesheetDeliveries(page = 1) {
     const day = ['','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][Number(schedule.weekday)] || 'Configured day';
     const time = `${String(schedule.hour ?? 0).padStart(2,'0')}:${String(schedule.minute ?? 0).padStart(2,'0')}`;
     const scheduleNote = document.getElementById('weeklyDeliverySchedule');
-    if (scheduleNote) scheduleNote.textContent = `${schedule.enabled ? 'Enabled' : 'Disabled'} · ${day} ${time} ${schedule.timezone || 'Company timezone unavailable'} · Last completed Monday–Sunday work week · Next scheduled: ${schedule.next_due_local || 'Unavailable'}. Provider acceptance is recorded separately from recipient receipt.`;
+    if (scheduleNote) scheduleNote.textContent = `${schedule.enabled ? 'Enabled' : 'Disabled'} · ${day} ${time} ${schedule.timezone || 'Company timezone unavailable'} · Last completed Monday–Sunday work week · Next scheduled: ${formatWorkplaceSchedule(schedule.next_due_local,schedule.timezone)}. Provider acceptance is recorded separately from recipient receipt.`;
     body.innerHTML = weeklyDeliveryState.deliveries.length ? weeklyDeliveryState.deliveries.map(row => {
       const id = Number(row.id), version = Number(row.version);
       const pdf = Number(row.document_request_id);

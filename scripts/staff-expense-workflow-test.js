@@ -123,6 +123,7 @@ function fixture(type) {
       './attendanceDailyService':{readToday:async()=>({status:state.records.some(row=>!row.clock_out&&!row.deleted)?'WORKING':'COMPLETED'})}
     });
     dependencies['../services/attendanceVerifiedSummaryService']=require('../services/attendanceVerifiedSummaryService');
+    dependencies['../services/attendanceMobilePolicy']=require('../services/attendanceMobilePolicy');
     dependencies['../services/attendanceActionService']=actionService;
     dependencies['../services/attendanceDailyService']={};dependencies['../services/attendanceQrService']={};
     dependencies['../services/attendanceMobileSchema']={ensureAttendanceMobileSchema:async()=>{}};
@@ -169,6 +170,12 @@ async function attendanceSafety() {
   for (const invalid of [{...body,clock_in:'2026-02-30T08:00'},{...body,clock_out:'2026-10-11T25:00'},{...body,clock_out:'2026-10-10T12:00'},{...body,user_id:Infinity}]) assert.equal((await call('saveAttendance',invalid)).statusCode,422);
   assert.equal(state.queries.length,0,'invalid attendance input cannot write records');
   const saved = await call('saveAttendance',body); assert.equal(saved.statusCode,200); assert.equal(state.records[0].total_minutes,240); assert.equal(state.records[0].total_hours,4);assert.equal(state.records[0].clock_in,'2026-10-10 21:00:00');assert.equal(state.records[0].work_date,'2026-10-11');assert.equal(state.records[0].manual_authorised_by,99);assert.equal(state.records[0].timestamp_basis,'UTC');const retry=await call('saveAttendance',body);assert.equal(retry.body.unchanged,true);assert.equal(state.records.length,1);
+  const edit={...body,id:1,expected_revision:1,correction_reason:'Verified actual worked interval',clock_out:'2026-10-11T12:30',break_minutes:15};
+  assert.equal((await call('saveAttendance',{...edit,expected_revision:0})).body.code,'ATTENDANCE_REVISION_REQUIRED');
+  assert.equal((await call('saveAttendance',{...edit,correction_reason:''})).body.code,'ATTENDANCE_CORRECTION_REASON_REQUIRED');
+  assert.equal((await call('saveAttendance',{...edit,user_id:5})).body.code,'ATTENDANCE_OWNER_CHANGE_DENIED');
+  const corrected=await call('saveAttendance',edit);assert.equal(corrected.statusCode,200);assert.equal(state.records[0].total_minutes,255);assert.equal(state.records[0].revision,2);assert.equal(state.records[0].user_id,4);assert.equal(state.records[0].review_required,0);assert.equal(state.audits.at(-1).newValue.correction_reason,edit.correction_reason);
+  assert.equal((await call('saveAttendance',edit)).body.code,'ATTENDANCE_REVISION_CONFLICT');
   const beforeFailure = plain(state.records); state.auditFailure = true;
   assert.equal((await call('saveAttendance',{...body,clock_in:'2026-10-11T14:00',clock_out:'2026-10-11T15:00'})).statusCode,500); assert.deepEqual(state.records,beforeFailure); state.auditFailure = false;
   state.refreshFailure = true;
@@ -176,6 +183,11 @@ async function attendanceSafety() {
   const archivedList = await call('allAttendance',{}, {query:{archived:'true'}}); assert.equal(archivedList.body.attendance.length,1);
   assert.equal((await call('restoreAttendance',{id:1})).statusCode,200); assert.equal(state.records[0].deleted,0); assert.equal(state.records[0].id,1);
   state.refreshFailure = false;
+
+  for(const [reason,expectedReview] of [['INCOMPLETE_SHIFT_REQUIRES_REVIEW',false],['RECORDED_DURATION_INCONSISTENT',true]]){
+    const reviewed=fixture('attendance'),start=require('luxon').DateTime.utc().minus({minutes:60});reviewed.state.records.push({id:1,user_id:4,clock_in:start.toFormat('yyyy-MM-dd HH:mm:ss'),clock_in_utc_text:start.toFormat('yyyy-MM-dd HH:mm:ss'),clock_out:null,work_date:start.setZone('Australia/Sydney').toISODate(),entry_source:'CLOCK',timestamp_basis:'UTC',recorded_timezone:'Australia/Sydney',deleted:0,revision:1,break_minutes:0,total_minutes:0,total_hours:0,review_required:1,review_reason:reason});
+    const result=await reviewed.call('clockOut',{request_id:crypto.randomUUID(),attendance_id:1},{user:{id:4,permissions:['VIEW_ATTENDANCE']}});assert.equal(result.statusCode,200);assert.equal(result.body.attendance.review_required,expectedReview,'checkout resolves only the completed incomplete-shift cause');assert.equal(reviewed.state.records[0].review_reason,expectedReview?reason:null);
+  }
   const staff = {user:{id:4,permissions:['VIEW_ATTENDANCE']}};
   const legacy=fixture('attendance');legacy.state.records.push({id:1,user_id:4,clock_in:'2020-01-01 08:00:00',clock_out:null,total_minutes:15,total_hours:.25,work_date:'2020-01-01',deleted:0,timestamp_basis:null});const legacyEnded=await legacy.call('clockOut',{request_id:crypto.randomUUID(),attendance_id:1},staff);assert.equal(legacyEnded.statusCode,200);assert.equal(legacyEnded.body.attendance.review_required,true);assert.equal(legacy.state.records[0].clock_out_timestamp_basis,'UTC');assert.equal(legacy.state.records[0].timestamp_basis,null);assert.equal(legacy.state.records[0].clock_in,'2020-01-01 08:00:00');assert.equal(legacy.state.records[0].total_minutes,15);assert.equal(legacy.state.records[0].total_hours,.25);assert.equal(legacy.state.audits[0].action,'CHECK_OUT');
   assert.equal((await call('clockIn',{},staff)).statusCode,422,'legacy clock-in must require a durable retry ID');

@@ -1051,7 +1051,7 @@ function renderGroupedTimesheets(container, groups, type) {
                 <td>${escapeHtml(formatShortDate(row.work_date || row.clock_in))}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_in))}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_out))}</td>
-                <td>${escapeHtml(Number(row.total_hours || 0).toFixed(2))}</td>
+                <td>${escapeHtml(!row.clock_out?(row.clock_out_saved_text?'Requires review':'Open session'):row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
                 <td>${escapeHtml(row.notes || '-')}</td>
               </tr>
             `).join('')}
@@ -1097,7 +1097,7 @@ function showSuccessConfirmation(message) {
     popup.setAttribute('aria-live', 'polite');
     popup.innerHTML = `
       <div class="action-success-icon" aria-hidden="true">&#10003;</div>
-      <div class="action-success-copy"><strong>Completed</strong><span></span></div>
+      <div class="action-success-copy"><strong>Confirmed</strong><span></span></div>
       <button type="button" class="action-success-close" aria-label="Close confirmation">&#215;</button>
     `;
     popup.querySelector('.action-success-close').onclick = () => popup.classList.remove('show');
@@ -2507,8 +2507,8 @@ function timesheetStatusLabel(status) {
   return labels[String(status || 'DRAFT').toUpperCase()] || 'Draft';
 }
 
-function renderCurrentTimesheetWorkflow(timesheet, totalHours) {
-  currentWeekTimesheet = timesheet || null;
+function renderCurrentTimesheetWorkflow(timesheet, totalHours, source = {}) {
+  currentWeekTimesheet = timesheet ? {...timesheet, source_review_required:source.review_required,source_review_issues:source.review_issues} : null;
   const status = String(timesheet?.status || 'DRAFT').toUpperCase();
   const statusEl = document.getElementById('currentTimesheetStatus');
   const submitButton = document.getElementById('submitTimesheetBtn');
@@ -2525,18 +2525,21 @@ function renderCurrentTimesheetWorkflow(timesheet, totalHours) {
 
   if (statusEl) {
     statusEl.className = `timesheet-status-chip ${status.toLowerCase()}`;
-    statusEl.textContent = timesheetStatusLabel(status);
+    statusEl.textContent = source.unavailable?'Unavailable':timesheetStatusLabel(status);
   }
 
   if (submitButton) {
     const editable = ['DRAFT', 'CORRECTION_REQUIRED'].includes(status);
-    const canSubmit = editable && Number(totalHours || 0) > 0 && Boolean(timesheet?.id);
+    const canSubmit = editable && Number.isFinite(Number(totalHours)) && Number(totalHours) > 0 && Boolean(timesheet?.id) && source.review_required!==true && !source.unavailable;
+    let reason=document.getElementById('timesheetSubmitReason');if(!reason){reason=document.createElement('p');reason.id='timesheetSubmitReason';reason.className='status-note';reason.setAttribute('role','status');submitButton.after(reason);}
+    reason.textContent=source.unavailable?'Timesheet unavailable. Retry loading before submitting.':source.review_required?(source.review_issues||[]).some(issue=>['INCOMPLETE_SHIFT','INCOMPLETE_SHIFT_REQUIRES_REVIEW'].includes(issue.code))?'Finish the open session or request a correction before submitting. Live time is not verified payroll time.':'Source attendance needs an authorised correction before submission.':!timesheet?.id?'The weekly record is not ready. Reload My timesheets.':Number(totalHours)===0?'No eligible completed work is recorded for this period. Open or excluded sessions are not counted.':editable?'Verified completed work is ready for submission.':'This period is '+timesheetStatusLabel(status).toLowerCase()+'.';
+    submitButton.title=canSubmit?'Submit verified completed hours':reason.textContent;
     submitButton.classList.toggle('hidden-section', !editable);
     submitButton.disabled = !canSubmit;
     submitButton.textContent = status === 'CORRECTION_REQUIRED' ? 'Resubmit Timesheet' : 'Submit Timesheet';
   }
 
-  setText('timesheetPayrollSignal', payrollLabels[status] || 'Open');
+  setText('timesheetPayrollSignal',source.unavailable?'Unavailable':payrollLabels[status] || 'Open');
 
   if (managerNote) {
     const note = String(timesheet?.manager_comments || '').trim();
@@ -2564,8 +2567,10 @@ async function submitCurrentTimesheet() {
     ? 'Resubmit this corrected timesheet for manager approval?'
     : 'Submit this weekly timesheet for manager approval?')) return;
 
+  if(timesheet.source_review_required)return showToast('Source attendance needs correction before submission.');
   const button = document.getElementById('submitTimesheetBtn');
-  if (button) button.disabled = true;
+  if(button?.dataset.submitting==='true')return;
+  if (button) {button.disabled = true;button.dataset.submitting='true';}
   try {
     const res = await fetch(`/api/attendance/timesheets/${Number(timesheet.id)}/submit`, {
       method: 'POST',
@@ -2578,8 +2583,9 @@ async function submitCurrentTimesheet() {
     showToast('Timesheet submission failed. Please try again.');
   } finally {
     if (button && ['DRAFT', 'CORRECTION_REQUIRED'].includes(String(currentWeekTimesheet?.status || '').toUpperCase())) {
-      button.disabled = false;
+      button.disabled = Boolean(currentWeekTimesheet?.source_review_required);
     }
+    if(button)delete button.dataset.submitting;
   }
 }
 
@@ -2755,7 +2761,9 @@ async function clockOut(shiftQrToken = '') {
 
 /* ================= TIMESHEET ================= */
 
+let timesheetLoadSequence = 0;
 async function loadTimesheet() {
+  const sequence=++timesheetLoadSequence,owner=Number(currentUser.id);
   const tbody = document.getElementById('timesheetTableBody');
   const weeklyGroupsEl = document.getElementById('weeklyTimesheetGroups');
   const monthlyGroupsEl = document.getElementById('monthlyTimesheetGroups');
@@ -2776,14 +2784,16 @@ async function loadTimesheet() {
 
     const weekData = await safeJson(weekRes);
     const historyData = await safeJson(historyRes);
+    if(sequence!==timesheetLoadSequence||owner!==Number(currentUser.id)||owner!==Number(getStoredUser().id))return;
 
     if (tbody) {
       if (!weekRes.ok) {
+        renderCurrentTimesheetWorkflow(null,null,{unavailable:true});setText('weekHoursCount','—');
         tbody.innerHTML = `<tr><td colspan="4">${escapeHtml(weekData.message || 'Failed to load weekly timesheet')}</td></tr>`;
       } else {
         const rows = weekData.attendance || [];
         const totalHours = Number(weekData.total_hours || 0);
-        renderCurrentTimesheetWorkflow(weekData.timesheet, totalHours);
+        renderCurrentTimesheetWorkflow(weekData.timesheet, totalHours, weekData);
 
         if (currentWeekRange) {
           currentWeekRange.innerText = `This timesheet is from ${formatShortDate(weekData.week_start)} to ${formatShortDate(weekData.week_end)} of this week`;
@@ -2805,7 +2815,7 @@ async function loadTimesheet() {
                 <td>${escapeHtml(cleanDate)}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_in))}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_out))}</td>
-                <td>${escapeHtml(Number(row.total_hours || 0).toFixed(2))}</td>
+                <td>${escapeHtml(!row.clock_out?(row.clock_out_saved_text?'Requires review':'Open session'):row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
               </tr>
             `;
           }).join('');
@@ -2825,8 +2835,9 @@ async function loadTimesheet() {
       }
     }
   } catch {
+    if(sequence!==timesheetLoadSequence||owner!==Number(currentUser.id)||owner!==Number(getStoredUser().id))return;
     currentWeekTimesheet = null;
-    renderCurrentTimesheetWorkflow(null, 0);
+    renderCurrentTimesheetWorkflow(null, null, {unavailable:true});setText('weekHoursCount','—');
     if (tbody) {
       tbody.innerHTML = `<tr><td colspan="4">Server error loading weekly timesheet.</td></tr>`;
     }

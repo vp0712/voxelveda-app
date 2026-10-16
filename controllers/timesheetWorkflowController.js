@@ -45,6 +45,7 @@ exports.approve = async (req, res) => {
   try {
     const timesheet = await workflow.approveTimesheet(Number(req.params.id), req.user, {
       approvedHours: req.body.approved_hours,
+      requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
       comments: req.body.comments,
       reason: req.body.reason
     }, req);
@@ -80,6 +81,7 @@ exports.amend = async (req, res) => {
   try {
     const timesheet = await workflow.amendApprovedTimesheet(Number(req.params.id), req.user, {
       approvedHours: req.body.approved_hours,
+      requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
       reason: req.body.reason
     }, req);
     return res.json({ message: 'Approved timesheet amended with a new audit version.', timesheet });
@@ -106,6 +108,7 @@ exports.legacyStatus = async (req, res) => {
     if (status === 'APPROVED') {
       const timesheet = await workflow.approveTimesheet(id, req.user, {
         approvedHours: req.body.approved_hours,
+      requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
         comments: req.body.comments
       }, req);
       return res.json({ message: 'Timesheet approved and added to Payroll Ready.', timesheet });
