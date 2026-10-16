@@ -1,8 +1,8 @@
-application-release: 20261016-independent-revocable-workplace-display
-candidate-commit: 814c00639f85be6c3a4b2ac76ab4671bf8cccf9b
-merged-commit: bc7b0b21f65ed50248bb1a9781b8414dee12e546
+application-release: 20261016-private-display-and-link-revalidation
+candidate-commit: 1ee62b1d2abd577cebcefde8ba33b7953caceb43
+merged-commit: e657d1d0a8495c4082646f0ac24fd6e16b894b6d
 production-branch: main
-previous-live-commit: 0b43406a2cd58db49a6a96f15ac3a6e91aee9d0f
+previous-live-commit: a45d17669466d6b77e866d72c0b882a914a1d5c6
 scope: canonical-application-origin-and-safe-legacy-host-redirects; existing-Capacitor-package-and-original-logo; trusted-in-app-password-MFA-and-role-navigation; bounded-native-recovery-and-consented-Back; validated-private-file-PDF-preview-save-without-Binder-payload-overflow; preserved-original-business-functions-records-permissions-and-previous-repairs; Banking-Finance-OS-and-added-ERP-remain-retired
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
@@ -44,9 +44,12 @@ attendance-live: confirmed-UTC-snapshot-plus-monotonic-provisional-render; no-ti
 timesheet-review-repair: delayed-and-out-of-order-authorised-staff-loads-repopulate-stable-ID-selectors; immutable-saved-owner; current-attendance-revision-and-correction-reason-with-audit; source-version-minutes-and-adjustment-reason-on-approval; weekly-unavailable-state-and-human-review-reasons; readable-company-timezone-delivery-date
 mobile-dialog-repair: content-sized-edit-body-shrinks-and-scrolls; explicit-wrapping-row-footer-removes-legacy-column-height-error; constrained-date-inputs; seven-widths-both-themes-landscape-and-reduced-height; original-readonly-Close-and-edit-discard-policy-preserved
 android-startup-repair: original-logo-loading-before-Bridge-creation; bounded-real-DOM-adapter-staff-readiness; native-exception-and-null-bridge-recovery; completed-blank-page-recovery-tested; renderer-failure-removes-dead-WebView-and-requires-explicit-recreation; canonical-in-app-navigation-without-ordinary-browser-intents
-android-current-release-state: installed-Android-15-verification-and-fixture-upgrade-only; production-AAB-and-Play-publication-blocked-by-fresh-secure-binding-audit-38887419710; no-affected-phone-version-or-real-Play-App-Signing-identity-established; assetlinks-fails-closed-until-real-certificate-configured
+android-current-release-state: installed-Android-15-verification-and-fixture-upgrade-only; production-AAB-and-Play-publication-blocked-by-fresh-secure-binding-audit-38899671248; no-affected-phone-version-or-real-Play-App-Signing-identity-established; assetlinks-fails-closed-until-real-certificate-configured
 rollback-attendance-startup: previous-live-240c99c70ea1329d4caf0ec1b83e45697bbb39c2; Railway-52c811fe-1f4a-40c6-8acb-0a900a1c6240; no-new-database-migration
 attendance-display: dedicated-canonical-QR-only-view; no-account-MFA-shell-or-cookie-dependency; fragment-carried-256bit-credential; hash-only-durable-workplace-binding; audited-one-time-creation-and-revision-checked-replace-revoke; no-private-record-or-attendance-write-authority
 display-rotation: existing-expiring-compact-signed-gate-and-unchanged-original-logo-renderer; complete-image-before-swap; integer-modules-and-quiet-zone; server-expiry-and-controlled-offline-resume-recovery
-display-candidate-evidence: source-814c00639f85be6c3a4b2ac76ab4671bf8cccf9b; application-38893369614; real-InnoDB-38893369561; security-38893369721; installed-Android-38893369626; all-success
-display-rollback: previous-web-0b43406a2cd58db49a6a96f15ac3a6e91aee9d0f; Railway-2e46c0b9-760b-4f87-ad46-4589dca47754; additive-display-metadata-only; retain-attendance-and-audit
+display-initial-candidate-evidence: source-814c00639f85be6c3a4b2ac76ab4671bf8cccf9b; application-38893369614; real-InnoDB-38893369561; security-38893369721; installed-Android-38893369626; all-success
+display-rollback: previous-web-a45d17669466d6b77e866d72c0b882a914a1d5c6; Railway-a7be5d12-b1a3-407b-97b6-f7c48c31f67a; retain-display-credentials-attendance-and-audit
+display-link-navigation: fragment-only-valid-replacement-and-invalid-links-reload-and-revalidate-without-manual-refresh; before-failing-and-after-passing-actual-browser-regression; settled-native-permission-dialog-test
+display-followup-candidate-evidence: source-1ee62b1d2abd577cebcefde8ba33b7953caceb43; application-38898238532; installed-Android-38898238556; real-InnoDB-38898238771; security-38898238690; all-success
+android-access-refresh: audit-38899671248; all-five-existing-signing-and-Publisher-bindings-unavailable; no-production-bundle-build-upload-or-Play-release; package-and-signing-continuity-preserved
