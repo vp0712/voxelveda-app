@@ -1051,7 +1051,7 @@ function renderGroupedTimesheets(container, groups, type) {
                 <td>${escapeHtml(formatShortDate(row.work_date || row.clock_in))}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_in))}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_out))}</td>
-                <td>${escapeHtml(!row.clock_out?'Open session':row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
+                <td>${escapeHtml(!row.clock_out?(row.clock_out_saved_text?'Requires review':'Open session'):row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
                 <td>${escapeHtml(row.notes || '-')}</td>
               </tr>
             `).join('')}
@@ -2525,12 +2525,12 @@ function renderCurrentTimesheetWorkflow(timesheet, totalHours, source = {}) {
 
   if (statusEl) {
     statusEl.className = `timesheet-status-chip ${status.toLowerCase()}`;
-    statusEl.textContent = timesheetStatusLabel(status);
+    statusEl.textContent = source.unavailable?'Unavailable':timesheetStatusLabel(status);
   }
 
   if (submitButton) {
     const editable = ['DRAFT', 'CORRECTION_REQUIRED'].includes(status);
-    const canSubmit = editable && Number.isFinite(Number(totalHours)) && Number(totalHours) > 0 && Boolean(timesheet?.id) && source.review_required!==true;
+    const canSubmit = editable && Number.isFinite(Number(totalHours)) && Number(totalHours) > 0 && Boolean(timesheet?.id) && source.review_required!==true && !source.unavailable;
     let reason=document.getElementById('timesheetSubmitReason');if(!reason){reason=document.createElement('p');reason.id='timesheetSubmitReason';reason.className='status-note';reason.setAttribute('role','status');submitButton.after(reason);}
     reason.textContent=source.unavailable?'Timesheet unavailable. Retry loading before submitting.':source.review_required?(source.review_issues||[]).some(issue=>['INCOMPLETE_SHIFT','INCOMPLETE_SHIFT_REQUIRES_REVIEW'].includes(issue.code))?'Finish the open session or request a correction before submitting. Live time is not verified payroll time.':'Source attendance needs an authorised correction before submission.':!timesheet?.id?'The weekly record is not ready. Reload My timesheets.':Number(totalHours)===0?'No eligible completed work is recorded for this period. Open or excluded sessions are not counted.':editable?'Verified completed work is ready for submission.':'This period is '+timesheetStatusLabel(status).toLowerCase()+'.';
     submitButton.title=canSubmit?'Submit verified completed hours':reason.textContent;
@@ -2539,7 +2539,7 @@ function renderCurrentTimesheetWorkflow(timesheet, totalHours, source = {}) {
     submitButton.textContent = status === 'CORRECTION_REQUIRED' ? 'Resubmit Timesheet' : 'Submit Timesheet';
   }
 
-  setText('timesheetPayrollSignal', payrollLabels[status] || 'Open');
+  setText('timesheetPayrollSignal',source.unavailable?'Unavailable':payrollLabels[status] || 'Open');
 
   if (managerNote) {
     const note = String(timesheet?.manager_comments || '').trim();
@@ -2815,7 +2815,7 @@ async function loadTimesheet() {
                 <td>${escapeHtml(cleanDate)}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_in))}</td>
                 <td>${escapeHtml(formatDateTime(row.clock_out))}</td>
-                <td>${escapeHtml(!row.clock_out?'Open session':row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
+                <td>${escapeHtml(!row.clock_out?(row.clock_out_saved_text?'Requires review':'Open session'):row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
               </tr>
             `;
           }).join('');
@@ -2837,7 +2837,7 @@ async function loadTimesheet() {
   } catch {
     if(sequence!==timesheetLoadSequence||owner!==Number(currentUser.id)||owner!==Number(getStoredUser().id))return;
     currentWeekTimesheet = null;
-    renderCurrentTimesheetWorkflow(null, null, {unavailable:true});
+    renderCurrentTimesheetWorkflow(null, null, {unavailable:true});setText('weekHoursCount','—');
     if (tbody) {
       tbody.innerHTML = `<tr><td colspan="4">Server error loading weekly timesheet.</td></tr>`;
     }

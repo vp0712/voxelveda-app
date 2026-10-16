@@ -24,7 +24,8 @@
       "breakResume": true,
       "otherDeviceCheckoutReconciled": true,
       "noAdditionalAttendanceEvents": true,
-      "refreshPersists": true
+      "refreshPersists": true,
+      "weekFailureRecovery": true
     }
   ],
   "result": "passed"

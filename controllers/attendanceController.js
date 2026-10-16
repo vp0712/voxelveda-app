@@ -191,7 +191,7 @@ exports.weekAttendance = async (req, res) => {
       week_end: end,
       total_hours: data.totalHours,
       verified_total_minutes:data.verified_total_minutes,historical_saved_hours:data.historical_saved_hours,verification_status:data.verification_status,review_required:data.review_required,review_issues:data.review_issues,duplicate_records:data.duplicate_records,
-      attendance: data.rows.map(require('../services/attendanceMobilePolicy').publicAttendance),
+      attendance: data.rows.map(row=>({...require('../services/attendanceMobilePolicy').publicAttendance(row),total_hours:row.total_hours,total_minutes:row.total_minutes})),
       timesheet, company_timezone: attendanceTime.companyTimezone()
     });
   } catch (err) {
