@@ -20,6 +20,7 @@
   void window.VoxelFeedback?.show({kind:'error',title:'Check the required information',message:'Correct the highlighted fields. Your values have been kept.',items,actions:[{label:'Return to form',run:()=>{first?.focus({preventScroll:true});first?.scrollIntoView({block:'nearest'});}}]});return false;
  }
  function open(config){
+  window.VoxelFeedback?.fitViewport?.();
   if(current&&!close(current.id,{user:true}))return false;
   const backdrop=document.getElementById(config.backdrop),panel=backdrop?.querySelector('.dialog-panel'),title=document.getElementById(config.title),body=document.getElementById(config.body),primary=document.getElementById(config.primary),secondary=document.getElementById(config.secondary);
   if(!backdrop||!panel||!title||!body||!primary||!secondary)return false;

@@ -34,8 +34,9 @@ not replace portals, role templates, business records, the original logo or them
    .responsive-table width rule inside the scroll region. The shared table selector
    now enforces its intended zero minimum; a containment regression proves the
    760px failure before the fix. A single value group preserves label association. Status chips and
-   action groups can shrink/wrap; periods use readable calendar dates. Dialogs
-   follow visual viewport offsets/heights and safe areas; footer actions stay out
+   action groups can shrink/wrap; periods use readable calendar dates. CI also reproduced a stale portrait viewport value during landscape opening;
+   dialogs/feedback now synchronise current viewport bounds on opening, before
+   delayed resize events. Dialogs follow visual viewport offsets/heights and safe areas; footer actions stay out
    of the scrollable content. No global horizontal-overflow hiding is used.
 7. Admin button normalisation converted implicit form submit controls into inert
    ordinary buttons. It now preserves form semantics; a real submit-event regression
