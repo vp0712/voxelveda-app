@@ -334,7 +334,7 @@ async function verifyConnection() {
       let health = {};
       try { health = await response.json(); } catch {}
       if (!health || typeof health !== 'object' || Array.isArray(health) || health.ok !== true) {
-        throw Object.assign(new Error('The company relay did not return a valid successful JSON health response. Connectivity and PDF capability remain unverified.'), {code:'EMAIL_HTTPS_RELAY_FAILED',relayReason:'RELAY_HEALTH_JSON_NOT_READY'});
+        throw Object.assign(new Error('The company relay did not return a valid successful JSON health response. Connectivity and PDF capability remain unverified.'), {code:'EMAIL_HTTPS_RELAY_FAILED',relayHttpStatus:response.status,relayReason:'RELAY_HEALTH_JSON_NOT_READY'});
       }
       relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay', pdf_attachment_contract_version: Number(health.attachment_contract_version || 0), pdf_attachments_supported: Number(health.attachment_contract_version || 0) >= 3 && health.pdf_bytes_validated === true && health.attachment_filename_preserved === true, recipient_verified: false };
       let relayEndpoint='configured';

@@ -19,4 +19,8 @@
 #clientRecordList button { min-height:44px; max-width:100%; white-space:normal; }
 .client-profile-row > * { min-width:0; overflow-wrap:anywhere; }
 .client-form input,.client-form textarea { box-sizing:border-box; min-width:0; max-width:100%; }
-.weekly-review-filters button[type="submit"] { color:var(--text-primary,#eaf2ff); background:var(--surface,#132541); border:1px solid var(--control-border,#415572); min-height:44px; }
+
+.weekly-review-toolbar { display:flex; flex-wrap:wrap; align-items:start; gap:10px; margin-block:12px; }
+.weekly-review-filter-panel { flex:1 1 200px; min-width:0; }
+.weekly-review-filter-panel summary { cursor:pointer; min-height:44px; padding:10px; box-sizing:border-box; border:1px solid var(--control-border,#415572); border-radius:8px; }
+.weekly-review-filter-panel[open] .weekly-review-filters { padding-block:12px; }

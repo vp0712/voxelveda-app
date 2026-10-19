@@ -755,7 +755,7 @@
             <label class="form-field"><span>Delivery status</span><select id="weeklyDeliveryStatus" onchange="loadWeeklyTimesheetDeliveries(1)"><option value="">All statuses</option><option>QUEUED</option><option>SENT</option><option>PROVIDER_ACCEPTED</option><option>REVIEW_REQUIRED</option><option>NO_RECIPIENT</option><option>NO_WORK</option><option>GENERATION_FAILED</option><option>PREPARING</option></select></label>
           </div>
           <p id="weeklyDeliverySchedule" class="status-note">Loading the company weekly delivery schedule…</p>
-          <div class="table-wrap"><table><thead><tr><th>Staff</th><th>Week</th><th>Worked hours</th><th>Version / status</th><th>Review / delivery</th><th>Actions</th></tr></thead><tbody id="weeklyDeliveryBody"><tr><td colspan="6">Open Workforce to review weekly deliveries.</td></tr></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>Staff</th><th>Week</th><th>PDF snapshot hours</th><th>Version / status</th><th>Review / delivery</th><th>Actions</th></tr></thead><tbody id="weeklyDeliveryBody"><tr><td colspan="6">Open Workforce to review weekly deliveries.</td></tr></tbody></table></div>
           <div class="register-pagination"><span id="weeklyDeliveryPageSummary">0 deliveries</span><div><button class="secondary-btn" onclick="return loadWeeklyTimesheetDeliveries(Math.max(1, weeklyDeliveryState.page - 1))">Previous</button><button class="secondary-btn" onclick="return loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page + 1)">Next</button></div></div>
         </div>
         <div class="card workforce-action-centre">

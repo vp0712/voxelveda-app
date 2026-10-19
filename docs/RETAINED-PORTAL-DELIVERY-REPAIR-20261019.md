@@ -16,6 +16,7 @@ repository screenshots and fixtures contain synthetic identities only.
   persistent 15-minute delay now bound routine generation; explicit authorised
   retries/revisions remain available. Source and recipient locks still apply.
 - Admin review reason objects rendered as `[object Object]`.
+- Unprepared delivery snapshot totals appeared as zero. They now say Not finalised; current verified work is shown separately in reconciliation. Resolved attendance issues remain in review history instead of appearing as current blockers.
 - Approval service failures rendered false empty lists and zero counters.
 - HR's attendance shortcut required EDIT_ATTENDANCE instead of its existing
   APPROVE_ALL_TIMESHEETS authority.
@@ -80,7 +81,7 @@ made. Provider acceptance is not recipient verification.
   15 retained role names; 98 weekly-view width/theme cases at 320, 360, 390, 430,
   768, 1024 and 1440; landscape; reachable short-viewport approval actions;
   authoritative defaults, adjustment reason and single-submit; readable blockers,
-  one read-only Close, permission denial, search/filter/paging and controlled retry.
+  one read-only Close, actual authorised entry buttons, permission denial, search/filter/paging and controlled retry. Mobile filters collapse behind a labelled control; computed filter-action contrast is checked in both themes.
 - Existing live-clock browser regression confirms visible ticking, recorded break
   pause/resume, other-device checkout, refresh and resume without extra punches.
 - Real parser and decoded MIME regressions preserve .pdf filenames,

@@ -135,7 +135,7 @@ async function reserveDelivery(staffId, period, config, now) {
     }
     const recipient = policy.emailAddress(staff.timesheet_delivery_email);
     if (!recipient) {
-      await conn.query("UPDATE weekly_timesheet_deliveries SET status='NO_RECIPIENT',claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
+      await conn.query("UPDATE weekly_timesheet_deliveries SET status='NO_RECIPIENT',review_reasons_json=NULL,last_error_code=NULL,claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
       await conn.commit(); return { staff_id: staffId, status: 'NO_RECIPIENT', duplicates: assessment.duplicates };
     }
     let timesheet = await reviewStatus(conn, staffId, period, true);
