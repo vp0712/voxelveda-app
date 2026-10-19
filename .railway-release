@@ -1,8 +1,8 @@
-application-release: 20261016-checkout-summary-company-categories-and-permitted-shift-tasks
-candidate-commit: a5f0e63e563b490715cc4847b71a096165e6b008
-merged-commit: b3c55f87751c557adf225984fbf076ffdc5230d2
+application-release: 20261019-weekly-read-only-reconciliation
+candidate-commit: addf21b18536099e99a5bcadbd2d2eced2903701
+merged-commit: 66b7e2eeb6928b832441751265ce9c9417eecc3f
 production-branch: main
-previous-live-commit: 574d3075f67d7938cfae1728d161be734780091a
+previous-live-commit: 129708ab1d8d6d20fc98c3e3b2f20ece5c925fb1
 scope: canonical-application-origin-and-safe-legacy-host-redirects; existing-Capacitor-package-and-original-logo; trusted-in-app-password-MFA-and-role-navigation; bounded-native-recovery-and-consented-Back; validated-private-file-PDF-preview-save-without-Binder-payload-overflow; preserved-original-business-functions-records-permissions-and-previous-repairs; Banking-Finance-OS-and-added-ERP-remain-retired
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
@@ -60,3 +60,7 @@ checkout-summary-candidate-gates: application38944587409; MySQL38944587380; Secu
 checkout-summary-native-proof: seven-installed-Android15-WebView-tests-and-one-fixture-upgrade; actual-native-picker-text-and-screenshots; source79f5db2aa89b36c79bf678565254fe9e67a5ef59-PR-merge; production-native-source-unchanged; verification-artifacts-not-Play-release
 checkout-summary-rollback: previous-live574d3075f67d7938cfae1728d161be734780091a; Railway6bc33e94-6559-480c-b7aa-dba65107fe87; retain-additive-category-tables-and-recorded-history
 checkout-summary-main-gates: application38945745158; MySQL38945745185; Security38945744892; Consolidation38945744924; Android38945744893; Enterprise38945745060; all-success
+
+weekly-diagnostic: hourly-read-only-current-week-staff-ID-attendance-ID-specific-issues-recipient-validity-PDF-queue-provider-status; no-attendance-recipient-transport-or-schedule-change
+weekly-diagnostic-gates: candidate39223160182-39223160176-39223160223-39223160296; main39224021884-39224021807-39224021989-39224021828-39224021887; all-success
+weekly-diagnostic-rollback: 129708ab1d8d6d20fc98c3e3b2f20ece5c925fb1; Railway5a5ccd14-89a0-4469-8b58-37995919c805; no-data-migration
