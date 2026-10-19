@@ -1,8 +1,8 @@
-application-release: 20261019-weekly-delivery-and-retained-role-workflows
-candidate-commit: ee77f2cad300ae33eb1382fd53b44b2138cf2cbd
-merged-commit: 884c79749672a0fec6d6a49a0449397fb344708d
+application-release: 20261019-explicit-action-dialogs-and-responsive-portals
+candidate-commit: 22ff6cffbd7612ce3e3e7a6c4adecd97b2146061
+merged-commit: 95e5aa3e9d181575a909df890da85e3dedfb38f9
 production-branch: main
-previous-live-commit: ed2df50bb06a4d98fd6e7e27e38f89cbe6c7a51a
+previous-live-commit: 5d3249f49cfbde5090b4f228e7ea21990f730f6a
 scope: canonical-application-origin-and-safe-legacy-host-redirects; existing-Capacitor-package-and-original-logo; trusted-in-app-password-MFA-and-role-navigation; bounded-native-recovery-and-consented-Back; validated-private-file-PDF-preview-save-without-Binder-payload-overflow; preserved-original-business-functions-records-permissions-and-previous-repairs; Banking-Finance-OS-and-added-ERP-remain-retired
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
@@ -73,3 +73,15 @@ weekly-main-gates: Enterprise Audit Evidence=39232565614-success; Final System C
 weekly-production-blockers: genuine-attendance-review-and-designated-delivery-address-setup-remain-required; configured-relay-health-and-recipient-receipt-not-claimed-fixed; no-business-records-or-recipients-fabricated
 weekly-rollback: ed2df50bb06a4d98fd6e7e27e38f89cbe6c7a51a; Railway-ab2b6b08-c605-45cd-9023-71abe89f5404; preserve-additive-generation-metadata-attendance-documents-category-and-audit-history
 weekly-android: existing-native-source-and-configuration-preserved; installed-verification-and-fixture-upgrade-gates-passed; verification-artifacts-are-not-a-production-AAB-or-Play-release
+
+action-dialogs: explicit-outcomes-no-word-classification; shared-centred-foreground-feedback-and-consolidated-field-errors; overlay-focus-scroll-lifecycle; action-specific-pending-lock-and-managed-discard; account-scoped-write-deduplication
+action-approval: committed-record-ID-status-hours-version-verification; uncertain-response-and-conflict-reconciliation; completed-form-closes-before-one-OK-confirmation; refresh-failure-remains-separate; authoritative-review-block-and-related-attendance-source-reload
+action-mobile: value-label-grouping; actual-zero-table-minimum-overrides-legacy760px; wrapping-status-and-actions; synchronous-first-frame-visual-viewport-bounds-and-safe-scroll-footer; no-global-overflow-hiding
+action-candidate-gates: Application39249622025; Android39249621740; MySQL39249622045; Security39249621733; Consolidation39249621764; Logo39249621749; Loader39249621838; all-success
+action-proof: 78-required-regression-scripts; real-InnoDB-exact409-no-write-and-concurrency-audit; Chromium210-and-WebKit210-width-theme-role-cases; retained-staff-invoice-procurement-RFQ-PDF-and-QR-gates; installed-Android15-eight-tests-and-one-fixture-upgrade
+action-data-limit: no-production-approval-attendance-invoice-or-email-used-for-tests; screenshot-specific-source-owner-period-unestablished; genuine-source-review-still-required; private-live-login-and-physical-iPhone-and-affected-Play-installation-unverified
+action-android: hosted-feedback-and-one-layer-Back; production-native-source-config-and-signing-identity-unchanged; installed-verification-only-not-Play-publication
+action-rollback: previous-live5d3249f49cfbde5090b4f228e7ea21990f730f6a; Railway3516e175-1623-4fa4-91fd-1ff69d4c0b21; no-new-database-migration; preserve-records-and-audit
+action-readiness-followup: PR331-one-test-file-only; authorised-requested-view-and-server-identity-ready-before-measurement; positive-visible-width-assertion; no-implementation-or-bounds-assertion-weakened
+action-final-candidate-gates: Application39252077072; MySQL39252077178; Security39252077078; Consolidation39252077151; all-success
+action-final-main-gates: Application39253330705; MySQL39253330782; Security39253330630; Consolidation39253330857; Enterprise39253330772; all-success
