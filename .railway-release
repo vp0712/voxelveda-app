@@ -1,8 +1,8 @@
-application-release: 20261019-weekly-read-only-reconciliation
-candidate-commit: addf21b18536099e99a5bcadbd2d2eced2903701
-merged-commit: 66b7e2eeb6928b832441751265ce9c9417eecc3f
+application-release: 20261019-weekly-delivery-and-retained-role-workflows
+candidate-commit: ee77f2cad300ae33eb1382fd53b44b2138cf2cbd
+merged-commit: 884c79749672a0fec6d6a49a0449397fb344708d
 production-branch: main
-previous-live-commit: 129708ab1d8d6d20fc98c3e3b2f20ece5c925fb1
+previous-live-commit: ed2df50bb06a4d98fd6e7e27e38f89cbe6c7a51a
 scope: canonical-application-origin-and-safe-legacy-host-redirects; existing-Capacitor-package-and-original-logo; trusted-in-app-password-MFA-and-role-navigation; bounded-native-recovery-and-consented-Back; validated-private-file-PDF-preview-save-without-Binder-payload-overflow; preserved-original-business-functions-records-permissions-and-previous-repairs; Banking-Finance-OS-and-added-ERP-remain-retired
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
@@ -64,3 +64,12 @@ checkout-summary-main-gates: application38945745158; MySQL38945745185; Security3
 weekly-diagnostic: hourly-read-only-current-week-staff-ID-attendance-ID-specific-issues-recipient-validity-PDF-queue-provider-status; no-attendance-recipient-transport-or-schedule-change
 weekly-diagnostic-gates: candidate39223160182-39223160176-39223160223-39223160296; main39224021884-39224021807-39224021989-39224021828-39224021887; all-success
 weekly-diagnostic-rollback: 129708ab1d8d6d20fc98c3e3b2f20ece5c925fb1; Railway5a5ccd14-89a0-4469-8b58-37995919c805; no-data-migration
+
+weekly-recovery: latest-completed-week-only; bounded-48-hour-recovery-with-configurable-zero-to-72-hour-limit; durable-five-generation-attempt-ceiling-and-delay; locked-employee-week-source-and-recipient; audited-recovery; no-accepted-or-uncertain-resend
+weekly-portals: eight-existing-authenticated-route-families-and-fifteen-retained-role-names; scoped-reconciliation-and-readable-current-blockers; preserved-review-history; pending-PDF-snapshot-not-zero; authorised-actual-entry-controls; team-review-and-correction-links; truthful-shared-approval-failure-and-counts; client-search-paging-retry; collapsed-mobile-filters-and-computed-contrast
+weekly-pdf: unchanged-real-work-source; reasoned-actor-and-version-proven-approved-adjustment-labelled-separately; genuine-parser-validated-PDF-and-decoded-MIME-one-To-no-CC-BCC-or-login-email-fallback; provider-acceptance-not-receipt
+weekly-candidate-gates: Security CI=39231480355-success; Final System Consolidation=39231480302-success; Original Application MySQL Regression=39231480633-success; Android installed application verification=39231480200-success; Application Release Candidate CI=39231480334-success
+weekly-main-gates: Enterprise Audit Evidence=39232565614-success; Final System Consolidation=39232565506-success; Security CI=39232565523-success; Original Application MySQL Regression=39232565509-success; Android installed application verification=39232565757-success; Application Release Candidate CI=39232565508-success
+weekly-production-blockers: genuine-attendance-review-and-designated-delivery-address-setup-remain-required; configured-relay-health-and-recipient-receipt-not-claimed-fixed; no-business-records-or-recipients-fabricated
+weekly-rollback: ed2df50bb06a4d98fd6e7e27e38f89cbe6c7a51a; Railway-ab2b6b08-c605-45cd-9023-71abe89f5404; preserve-additive-generation-metadata-attendance-documents-category-and-audit-history
+weekly-android: existing-native-source-and-configuration-preserved; installed-verification-and-fixture-upgrade-gates-passed; verification-artifacts-are-not-a-production-AAB-or-Play-release
