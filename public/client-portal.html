@@ -23,7 +23,7 @@
     .client-form input{width:100%;}.client-form textarea{width:100%;}.client-status{min-height:22px;color:var(--text-primary);}.client-profile-row{display:flex;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--border);}
     @media(max-width:850px){.client-grid{grid-template-columns:1fr;}.client-actions{grid-template-columns:1fr;}.client-form{grid-template-columns:1fr;}.client-form textarea{grid-column:auto;}.client-top{align-items:flex-start;}}
   </style>
-<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261011-restored"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css"><link rel="stylesheet" href="/notification-center.css"><script src="/workspace-overlays.js"></script></head>
+<link rel="stylesheet" href="/workspace-theme.css?v=20261011-restored"><link rel="stylesheet" href="/operations-theme.css?v=20261011-restored"><script src="/workspace-theme.js?v=20261011-restored"></script><script src="/operations-ui.js?v=20261011-restored"></script><link rel="stylesheet" href="/compact-header.css"><link rel="stylesheet" href="/notification-center.css"><script src="/workspace-overlays.js"></script><link rel="stylesheet" href="/weekly-delivery.css"></head>
 <body data-vv-role="viewer">
   <main class="client-shell">
     <header class="client-top vv-topbar">
@@ -65,7 +65,7 @@
           <textarea id="clientApplication" placeholder="Part description, use case, tolerances, finish, file types, NDA needs or other requirements"></textarea>
         </div>
         <label class="privacy-check" style="margin-top:12px;"><input id="clientPrivacy" type="checkbox" /> <span>I accept the <a href="/privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
-        <button type="button" class="primary-btn" style="margin-top:12px;" onclick="return submitClientRfq()">Submit RFQ</button>
+        <button type="button" class="primary-btn" style="margin-top:12px;" id="clientSubmitRfq" onclick="return submitClientRfq()">Submit RFQ</button>
       </section>
 
       <aside class="client-card">

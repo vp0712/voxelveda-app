@@ -72,3 +72,22 @@ async function revise(req, res, retryGeneration) {
 exports.revise = (req, res) => revise(req, res, false);
 exports.retryGeneration = (req, res) => revise(req, res, true);
 exports.legacySend = (req, res) => revise(req, res, req.body.retry_generation === true);
+
+exports.reconciliation = async (req,res) => {
+  try {
+    if (!['VIEW_OWN_TIMESHEET','VIEW_TEAM_TIMESHEET','VIEW_ALL_TIMESHEETS'].some(permission=>hasPermission(req.user,permission))) return res.status(403).json({message:'Timesheet access is not enabled for this account.'});
+    const page=Number(req.query.page ?? 1),size=Number(req.query.page_size ?? 20);
+    if(!Number.isSafeInteger(page)||page<1||page>10000||!Number.isSafeInteger(size)||size<1||size>100) return res.status(422).json({message:'Use valid pagination.'});
+    if(Boolean(req.query.from_date)!==Boolean(req.query.to_date))return res.status(422).json({message:'Select both reporting dates.'});
+    if(req.query.from_date&&(!dateOnly(req.query.from_date)||!dateOnly(req.query.to_date)))return res.status(422).json({message:'Use valid reporting dates.'});
+    await weekly.ensureWeeklyTimesheetDeliverySchema();
+    const result=await require('../services/weeklyTimesheetReconciliation').reconcileWeek({actor:req.user,start:req.query.from_date,end:req.query.to_date});
+    const search=String(req.query.search||'').trim().toLowerCase();
+    if(search.length>120)return res.status(422).json({message:'Search must be at most 120 characters.'});
+    const rows=result.outcomes.filter(row=>(!search||String(row.staff_name).toLowerCase().includes(search))&&(!req.query.status||row.status===req.query.status||row.eligibility===req.query.status));
+    const sort=String(req.query.sort || 'staff');if(!['staff','hours','status'].includes(sort))return res.status(422).json({message:'Choose a valid weekly sort.'});
+    rows.sort((a,b)=>(sort==='hours'?b.verified_minutes-a.verified_minutes:sort==='status'?String(a.status).localeCompare(String(b.status)):String(a.staff_name).localeCompare(String(b.staff_name)))||a.user_id-b.user_id);
+    const counts={};for(const row of rows){counts[row.eligibility]=(counts[row.eligibility]||0)+1;counts['delivery_'+row.status]=(counts['delivery_'+row.status]||0)+1;}
+    return res.set('Cache-Control','private, no-store').json({...result,week_counts:result.counts,counts,counts_scope:'FILTERED_RESULTS',week_counts_scope:'AUTHORISED_WEEK',outcomes:rows.slice((page-1)*size,page*size),total:rows.length,page,page_size:size,pages:Math.max(1,Math.ceil(rows.length/size)),schedule:weekly.getWeeklyTimesheetSchedule()});
+  }catch(error){return failure(res,error);}
+};

@@ -52,13 +52,19 @@ async function reviewProof(db, review, assessment, config) {
   const version = Number(review.version_no || 0);
   if (status !== 'APPROVED') return { status, version, verified: false };
   let verified = Number.isSafeInteger(version) && version > 0 && Number(review.approved_by) > 0 && Boolean(review.approved_at) &&
-    Math.abs(Number(review.approved_hours) - Math.round(assessment.totalMinutes / 60 * 100) / 100) < 0.00001 &&
+    review.approved_hours!==null && review.approved_hours!==undefined && Number.isFinite(Number(review.approved_hours)) && Number(review.approved_hours)>=0 && Number(review.approved_hours)<=168 &&
     Math.abs(Number(review.total_hours) - Math.round(assessment.totalMinutes / 60 * 100) / 100) < 0.00001;
   if (verified) {
-    const [[record]] = await db.query("SELECT snapshot_json,created_by FROM timesheet_versions WHERE timesheet_id=? AND version_no=? AND status='APPROVED' LIMIT 1", [review.id, version]);
+    const [[record]] = await db.query("SELECT snapshot_json,created_by,reason FROM timesheet_versions WHERE timesheet_id=? AND version_no=? AND status='APPROVED' LIMIT 1", [review.id, version]);
     try {
       const approved = JSON.parse(record?.snapshot_json), attendance = approved.attendance;
-      verified = Number(record?.created_by) === Number(review.approved_by) && Array.isArray(attendance) &&
+      const sourceHours=Math.round(assessment.totalMinutes / 60 * 100) / 100;
+      const adjustmentVerified=Math.abs(Number(review.approved_hours)-sourceHours)<0.00001 ||
+        Boolean(String(record?.reason || '').trim()) && Number(approved.verification?.total_minutes)===assessment.totalMinutes &&
+        Math.abs(Number(approved.calculated?.actual_hours)-sourceHours)<0.00001 &&
+        Math.abs(Number(approved.calculated?.ordinary_hours)+Number(approved.calculated?.overtime_hours)-Number(review.approved_hours))<0.00001;
+      verified=verified&&adjustmentVerified;
+      verified = verified && Number(record?.created_by) === Number(review.approved_by) && Array.isArray(attendance) &&
         new Set(attendance.map((entry) => Number(entry.id))).size === attendance.length &&
         attendance.length === assessment.rows.length && attendance.every((entry) => {
         const row = assessment.rows.find((current) => Number(current.id) === Number(entry.id));
@@ -75,12 +81,13 @@ async function reviewProof(db, review, assessment, config) {
       });
     } catch { verified = false; }
   }
-  return { status: verified ? 'APPROVED' : 'CORRECTION_REQUIRED', version, verified };
+  return { status: verified ? 'APPROVED' : 'CORRECTION_REQUIRED', version, verified, approvedHours:verified?Number(review.approved_hours):null };
 }
 async function reviewedSnapshot(db, staff, assessment, period, version, review, config, generatedAt) {
   const proof = await reviewProof(db, review, assessment, config);
   const snapshot = policy.canonicalSnapshot(staff, assessment, period, version, proof.status);
   snapshot.review_version = proof.version; snapshot.approval_verified = proof.verified;
+  if(proof.verified&&Math.abs(proof.approvedHours-Math.round(assessment.totalMinutes/60*100)/100)>0.00001)snapshot.approved_hours=proof.approvedHours;
   if (generatedAt) snapshot.generated_at = generatedAt;
   return snapshot;
 }
@@ -115,6 +122,9 @@ async function reserveDelivery(staffId, period, config, now) {
     }
     if (delivery.status === 'PREPARING' && generationClaimActive(delivery)) {
       await conn.commit(); return { staff_id: staffId, status: 'PREPARING', existing: true, version: delivery.version };
+    }
+    if (Number(delivery.generation_attempts || 0) >= 5 || delivery.next_generation_attempt_at && policy.utcInstant(delivery.next_generation_attempt_at,'UTC')?.toMillis() > now.getTime()) {
+      await conn.commit(); return { staff_id:staffId,status:delivery.status,existing:true,reason:Number(delivery.generation_attempts || 0)>=5?'GENERATION_RETRY_LIMIT':'GENERATION_RETRY_DELAY' };
     }
     const attendance = await attendanceForPeriod(conn, staffId, period, true);
     const assessment = policy.assessWorkedAttendance(staff, attendance, period, config, now);
@@ -152,7 +162,7 @@ async function reserveDelivery(staffId, period, config, now) {
     }
     const token = crypto.randomUUID();
     await conn.query(`UPDATE weekly_timesheet_deliveries SET status='PREPARING',recipient=?,source_sha256=?,snapshot_json=?,total_minutes=?,
-      timesheet_id=?,claim_token=?,claim_expires_at=DATE_ADD(NOW(),INTERVAL 20 MINUTE),last_error_code=NULL,review_reasons_json=NULL WHERE id=?`,
+      timesheet_id=?,claim_token=?,claim_expires_at=DATE_ADD(NOW(),INTERVAL 20 MINUTE),generation_attempts=generation_attempts+1,next_generation_attempt_at=DATE_ADD(NOW(),INTERVAL 15 MINUTE),last_error_code=NULL,review_reasons_json=NULL WHERE id=?`,
       [recipient, sourceHash, JSON.stringify(snapshot), assessment.totalMinutes, timesheet.id, token, delivery.id]);
     await conn.commit();
     return { staff_id: staffId, status: 'RESERVED', delivery_id: delivery.id, timesheet_id: timesheet.id, recipient, snapshot, claim_token: token,
@@ -187,6 +197,7 @@ async function queueReservedDelivery(reservation, config, now) {
       if (saved.affectedRows !== 1) throw safetyError('DELIVERY_CLAIM_CHANGED');
       const [[delivery]] = await conn.query('SELECT * FROM weekly_timesheet_deliveries WHERE id=? FOR UPDATE', [reservation.delivery_id]);
       await retainDeliveryVersion(conn, delivery);
+      if(reservation.recovery)await logAudit(conn,{actorId:null,action:'WEEKLY_TIMESHEET_RECOVERY_QUEUED',module:'timesheets',recordType:'weekly_delivery',recordId:delivery.id,newValue:{staff_id:reservation.staff_id,period_start:snapshot.period_start,period_end:snapshot.period_end,version:snapshot.version,reason:'Bounded recovery of the latest completed week after missed window or resolved eligibility; no accepted or uncertain delivery was resent.'}});
     } });
   if (!result.email_queue_id) throw safetyError('PDF_GENERATION_PENDING');
   const [[linked]] = await pool.query('SELECT email_queue_id,status FROM weekly_timesheet_deliveries WHERE id=?', [reservation.delivery_id]);
@@ -210,14 +221,16 @@ function documentDataForSnapshot(snapshot) {
   return timesheetDocumentData({ rows: snapshot.rows, fromDate: snapshot.period_start, toDate: snapshot.period_end,
     staffName: snapshot.staff_name, employeeReference: snapshot.employee_reference, totalHours: snapshot.total_minutes / 60,
     staffId: snapshot.staff_id, totalMinutes: snapshot.total_minutes, status: snapshot.review_status, timezone: snapshot.timezone,
-    version: snapshot.version, generatedAt: snapshot.generated_at });
+    version: snapshot.version, generatedAt: snapshot.generated_at, approvedHours:snapshot.approved_hours });
 }
 
 async function queueClosedWeekTimesheets(options = {}) {
   const config = policy.configuration(options.env || process.env), now = options.now || new Date(), window = policy.scheduleWindow(now, config), period = window.period;
   console.log('Weekly timesheet schedule', JSON.stringify({ timezone: config.timezone, weekday: config.weekday, hour: config.hour,
     minute: config.minute, window_minutes: config.windowMinutes, period_start: period.start, period_end: period.end, reason: window.reason }));
-  if (!window.eligible) return { skipped: true, reason: window.reason, queued: 0, period };
+  const recovery = policy.recoveryWindow(now,config);
+  if (!window.eligible && !recovery.eligible) return { skipped: true, reason: window.reason, queued: 0, period };
+  if (!window.eligible) console.log('Weekly timesheet bounded recovery',JSON.stringify({period_start:period.start,period_end:period.end,recovery_end:recovery.end_utc}));
   await ensureWeeklyTimesheetDeliverySchema();
   const [candidates] = await pool.query(`SELECT DISTINCT u.id FROM users u JOIN staff_attendance a ON a.user_id=u.id
     WHERE ((a.clock_in>=? AND a.clock_in<?) OR (a.work_date BETWEEN ? AND ?))
@@ -227,6 +240,7 @@ async function queueClosedWeekTimesheets(options = {}) {
     let reservation;
     try {
       reservation = await reserveDelivery(candidate.id, period, config, now);
+      reservation.recovery = !window.eligible;
       const outcome = reservation.status === 'RESERVED' ? await queueReservedDelivery(reservation, config, now) : reservation;
       // Recipient addresses and PDF source content never enter operational logs.
       const publicOutcome = { staff_id: outcome.staff_id, status: outcome.status, version: outcome.version, source_sha256: outcome.source_sha256,

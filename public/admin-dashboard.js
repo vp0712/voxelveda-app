@@ -8068,12 +8068,15 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 const weeklyDeliveryState = window.weeklyDeliveryState = { page:1, pages:1, deliveries:[] };
 function weeklyDeliveryReasons(row) {
-  let reasons = row.review_reasons_json;
-  if (typeof reasons === 'string') { try { reasons = JSON.parse(reasons); } catch { reasons = []; } }
-  return [...(Array.isArray(reasons) ? reasons : []), row.last_error_code].filter(Boolean).map(value => String(value).replaceAll('_', ' ')).join('; ');
+  let issues=row.review_reasons_json;
+  if(typeof issues==='string'){try{issues=JSON.parse(issues);}catch{issues=[];}}
+  return [...(Array.isArray(issues)?issues:[]),row.last_error_code].filter(Boolean).map(issue=> {
+    const code=typeof issue==='object'?issue.code:issue;
+    return (window.VoxelWeeklyDelivery?.reason(code)||String(code||'Review required').replaceAll('_',' ').toLowerCase())+(Number(issue?.attendance_id)>0?' · Attendance #'+Number(issue.attendance_id):'');
+  }).join('; ');
 }
 function canManageWeeklyDelivery() {
-  return hasCurrentPermission('MANAGE_COMPANY_EMAIL') || hasCurrentPermission('APPROVE_ALL_TIMESHEETS') || hasCurrentPermission('APPROVE_TEAM_TIMESHEET');
+  return hasCurrentPermission('SEND_COMPANY_EMAIL') && (hasCurrentPermission('MANAGE_COMPANY_EMAIL') || hasCurrentPermission('APPROVE_ALL_TIMESHEETS') || hasCurrentPermission('APPROVE_TEAM_TIMESHEET'));
 }
 async function loadWeeklyTimesheetDeliveries(page = 1) {
   const body = document.getElementById('weeklyDeliveryBody');
@@ -8105,7 +8108,7 @@ async function loadWeeklyTimesheetDeliveries(page = 1) {
     const summary = document.getElementById('weeklyDeliveryPageSummary');
     if (summary) summary.textContent = `${Number(data.total || 0)} deliveries · Page ${weeklyDeliveryState.page} of ${weeklyDeliveryState.pages}`;
     enhanceResponsiveTables();
-  } catch (error) { body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')}</td></tr>`; }
+  } catch (error) { body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')} <button type="button" class="secondary-btn" onclick="loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page)">Retry</button></td></tr>`; }
 }
 async function openWeeklyDeliveryPdf(requestId) {
   const id = Number(requestId);

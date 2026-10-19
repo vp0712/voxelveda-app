@@ -198,9 +198,29 @@ async function schedulerSafety() {
   const approved = { id: 1, status: 'APPROVED', total_hours: 8, approved_hours: 8, version_no: 2, approved_by: 99, approved_at: '2026-10-07T01:00:00Z' };
   const approvedDb = { query: async () => [[{ created_by:99,snapshot_json: JSON.stringify({ attendance: [worked(1,1)] }) }]] };
   assert.equal((await service._test.reviewProof(approvedDb, approved, assess([worked(1,1)]), CONFIG)).status, 'APPROVED');
+  const adjustedDb={query:async()=>[[{created_by:99,reason:'Authorised adjustment with source retained',snapshot_json:JSON.stringify({attendance:[worked(1,1)],verification:{total_minutes:480},calculated:{actual_hours:8,ordinary_hours:7.5,overtime_hours:0}})}]]};
+  assert.equal((await service._test.reviewProof(adjustedDb,{...approved,approved_hours:7.5},assess([worked(1,1)]),CONFIG)).status,'APPROVED','A reasoned audited adjustment preserves source hours without invalidating approval');
+  assert.equal((await service._test.reviewProof({query:async()=>[[{created_by:99,snapshot_json:JSON.stringify({attendance:[worked(1,1)],verification:{total_minutes:480},calculated:{actual_hours:8,ordinary_hours:7.5,overtime_hours:0}})}]]},{...approved,approved_hours:7.5},assess([worked(1,1)]),CONFIG)).status,'CORRECTION_REQUIRED','An unexplained deviation is not verified');
   assert.equal((await service._test.reviewProof({query:async()=>[[{created_by:98,snapshot_json:JSON.stringify({attendance:[worked(1,1)]})}]]},approved,assess([worked(1,1)]),CONFIG)).status,'CORRECTION_REQUIRED','approval snapshot must be attributed to the saved approving actor');
   assert.equal((await service._test.reviewProof(approvedDb, approved, assess([worked(1,1,undefined,undefined,450,{break_minutes:30})]), CONFIG)).status, 'CORRECTION_REQUIRED', 'an old approved total cannot approve newly changed actual work');
   assert.equal((await service._test.reviewProof(approvedDb, approved, assess([worked(1,1,undefined,undefined,undefined,{notes:'Changed after approval'})]), CONFIG)).verified, false, 'matching hours alone cannot prove an unchanged approved attendance snapshot');
+}
+async function boundedRecovery() {
+  const outside=new Date('2026-10-12T00:00:00Z');
+  assert.equal(policy.scheduleWindow(outside,CONFIG).eligible,false);
+  assert.equal(policy.recoveryWindow(outside,CONFIG).eligible,true);
+  assert.equal(policy.recoveryWindow(new Date('2026-10-13T20:00:00Z'),CONFIG).eligible,false,'Recovery ends exactly 48 hours after scheduled delivery');
+  assert.equal(policy.recoveryWindow(outside,{...CONFIG,enabled:false}).eligible,false);
+  assert.equal(policy.recoveryWindow(outside,{...CONFIG,recoveryHours:0}).eligible,false);
+  assert.throws(()=>policy.configuration({...ENV,WEEKLY_TIMESHEET_RECOVERY_HOURS:1000}),/integer/);
+  const fixture=schedulerFixture({staff:[staff(1),staff(4,{timesheet_delivery_email:null}),staff(5)],attendance:[worked(1,1),worked(4,4),worked(5,5,undefined,null)]});
+  const options={env:ENV,now:outside};
+  const result=await fixture.service.queueClosedWeekTimesheets(options);assert.equal(result.queued,1);assert.equal(result.review,1);assert.equal(result.invalid,1);assert.equal(fixture.state.queues.length,1);
+  await Promise.all([fixture.reload().queueClosedWeekTimesheets(options),fixture.service.queueClosedWeekTimesheets(options)]);assert.equal(fixture.state.queues.length,1,'Concurrent recovery/restart cannot enqueue a second version');
+  const capped=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],deliveries:[{id:1,user_id:1,period_start:PERIOD.start,period_end:PERIOD.end,timezone:CONFIG.timezone,status:'GENERATION_FAILED',version:1,generation_attempts:5}]});
+  assert.equal((await capped.service.queueClosedWeekTimesheets(options)).queued,0,'Exhausted generation attempts require explicit review');assert.equal(capped.state.sources.length,0);
+  const delay=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],deliveries:[{id:1,user_id:1,period_start:PERIOD.start,period_end:PERIOD.end,timezone:CONFIG.timezone,status:'GENERATION_FAILED',version:1,generation_attempts:1,next_generation_attempt_at:'2026-10-12 00:15:00'}]});
+  assert.equal((await delay.service.queueClosedWeekTimesheets(options)).queued,0);assert.equal((await delay.service.queueClosedWeekTimesheets({...options,now:new Date('2026-10-12T00:16:00Z')})).queued,1);
 }
 async function genuinePdfAndSchema() {
   const { timesheetDocumentData } = require('../services/timesheetDocumentService');
@@ -227,7 +247,7 @@ async function genuinePdfAndSchema() {
   assert(!queries.some((sql)=>/^\s*(?:UPDATE|DELETE|DROP|TRUNCATE)\b/i.test(sql)),'schema setup must never manufacture or erase attendance/history');
 }
 async function main() {
-  pureEligibility();manualTimeAndSchedule(); await schedulerSafety(); await genuinePdfAndSchema();
+  pureEligibility();manualTimeAndSchedule(); await schedulerSafety(); await boundedRecovery(); await genuinePdfAndSchema();
   console.log('Weekly timesheet eligibility tests passed: worked-only A/no-work B/planned C; explicit designated recipient only; incomplete/invalid/manual/break review; positive finite minutes and exact saved-hour consistency; no fabricated closures; whole overnight shift/local week boundaries; 167/169-hour DST weeks; duplicate/overlap isolation; Monday bounded latest-week scheduling; staff-period unique claim/atomic queue; concurrent and restarted workers; PDF failure safe retry; stale recipients/data blocked before queue and send; SENT/corrections never auto-resend; genuine PDF/parser identity validation and additive history-preserving schema. Fixtures only; no real staff or transport messages.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

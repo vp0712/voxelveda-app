@@ -1,7 +1,7 @@
 "use strict";
 const { DateTime, IANAZone } = require('luxon');
 const { dateLabel, pdfError } = require('./documentPdfService');
-function timesheetDocumentData({ rows, fromDate, toDate, staffName, staffId, employeeReference, totalHours, totalMinutes, status, approvedBy, timezone = process.env.TIMESHEET_TIMEZONE || 'Australia/Sydney', version = 1, generatedAt }) {
+function timesheetDocumentData({ rows, fromDate, toDate, staffName, staffId, employeeReference, totalHours, totalMinutes, status, approvedBy, timezone = process.env.TIMESHEET_TIMEZONE || 'Australia/Sydney', version = 1, generatedAt, approvedHours }) {
   if (!Array.isArray(rows) || !IANAZone.isValidZone(timezone)) throw pdfError('Timesheet entries or company timezone are unavailable.', 'PDF_DATA_INVALID');
   const staffIds = new Set(rows.filter(row => row.user_id != null).map(row => Number(row.user_id)));
   if (staffIds.size > 1 || (staffId && [...staffIds].some(id => id !== Number(staffId))) || rows.some(row => row.name && staffName && String(row.name) !== String(staffName))) throw pdfError('An individual timesheet must contain only its designated staff member.', 'PDF_STAFF_SCOPE_MISMATCH');
@@ -28,12 +28,13 @@ function timesheetDocumentData({ rows, fromDate, toDate, staffName, staffId, emp
   if ((totalMinutes !== undefined && (!Number.isSafeInteger(Number(totalMinutes)) || Number(totalMinutes) !== recordedMinutes)) || (totalHours !== undefined && (!Number.isFinite(Number(totalHours)) || Math.abs(Number(totalHours) - recordedMinutes / 60) > 0.011))) throw pdfError('Timesheet totals do not match saved attendance for this period.', 'PDF_TOTAL_MISMATCH');
   if (!Number.isSafeInteger(Number(version)) || Number(version) < 1) throw pdfError('The timesheet document version is invalid.', 'PDF_DATA_INVALID');
   const approved = String(status || '').toUpperCase() === 'APPROVED';
+  if(approvedHours!==undefined&&(!approved||!Number.isFinite(Number(approvedHours))||Number(approvedHours)<0||Number(approvedHours)>168))throw pdfError('Approved hours require verified approval evidence.','PDF_APPROVAL_INVALID');
   const review = approved ? 'Approved' : `Provisional — ${String(status || 'DRAFT').replace(/_/g, ' ')}`;
   return { title: Number(version) > 1 ? 'TIMESHEET — REVISION' : 'TIMESHEET', reference: `${fromDate} to ${toDate} | Version ${version}`, filename: `timesheet-${employeeReference || staffName || 'staff'}-${fromDate}-${toDate}-v${version}`, issueDate: generatedAt ? DateTime.fromISO(String(generatedAt), { setZone: true }).setZone(timezone).toISODate() : toDate,
     period: `${dateLabel(fromDate)} to ${dateLabel(toDate)} | ${timezone}`, party: `${staffName || 'Staff'}${employeeReference ? ` | Staff reference: ${employeeReference}` : ''}`,
     tables: [{ title: 'Worked shifts', columns: [{ label: 'Shift date', width: 1 }, { label: 'Start', width: 1.5 }, { label: 'End', width: 1.5 }, { label: 'Break', width: .8 }, { label: 'Worked hours', width: 1 }, { label: 'Job / site', width: 1.3 }], rows: shifts },
       { title: 'Daily totals', columns: [{ label: 'Date', width: 3 }, { label: 'Recorded hours', width: 2, align: 'right' }], rows: [...days.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([day, minutes]) => [dateLabel(day), hours(minutes)]) }],
-    totals: [{ label: 'Weekly recorded hours', value: hours(recordedMinutes) }],
+    totals: [{ label: 'Weekly recorded hours', value: hours(recordedMinutes) },...(approvedHours!==undefined?[{label:'Approved hours (authorised adjustment)',value:Number(approvedHours).toFixed(2)}]:[])],
     notes: [`Timesheet status: ${review}`, `Reporting interval: local Monday 00:00 through the following Monday 00:00 in ${timezone}; shifts are allocated to their local start date. An overnight shift is included once in full.`, 'Breaks marked “Not recorded” are not assumed or fabricated.', `Document version ${version}${Number(version) > 1 ? ' — authorised corrected report; replaces the earlier report for this staff member and period.' : ' — generated from this staff member’s saved worked-time records.'}`, approvedBy ? `Approved by: ${approvedBy}` : '', generatedAt ? `Generated ${formatClock(generatedAt)}` : ''].filter(Boolean) };
 }
 module.exports = { timesheetDocumentData };

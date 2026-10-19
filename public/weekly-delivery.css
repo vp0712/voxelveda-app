@@ -1,0 +1,22 @@
+.weekly-review-panel { min-width:0; overflow-wrap:anywhere; }
+.weekly-review-filters { display:flex; flex-wrap:wrap; gap:12px; align-items:end; }
+.weekly-review-filters label { flex:1 1 170px; min-width:0; }
+.weekly-review-panel input,.weekly-review-panel select,.weekly-review-panel textarea { box-sizing:border-box; width:100%; min-width:0; max-width:100%; min-height:44px; }
+.weekly-review-list { display:grid; gap:12px; }
+.weekly-review-item { padding:14px 0; border-top:1px solid var(--control-border,#415572); min-width:0; }
+.weekly-review-item h4 { margin:0 0 8px; }
+.weekly-review-item p { margin:8px 0; }
+.weekly-review-item .row-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.weekly-review-item button,.weekly-review-item a { max-width:100%; white-space:normal; overflow-wrap:anywhere; min-height:44px; }
+.weekly-review-pagination { display:flex; justify-content:space-between; gap:12px; padding-block:12px; }
+.portal-nav-search { display:grid; gap:6px; padding:10px; font-size:.85rem; }
+.portal-nav-search input { box-sizing:border-box; width:100%; min-width:0; min-height:44px; background:var(--surface,#132541); color:var(--text-primary,#eaf2ff); border:1px solid var(--control-border,#415572); border-radius:8px; padding:8px; }
+.portal-nav-search-hidden { display:none!important; }
+.portal-nav-search-note { padding:0 10px; font-size:.85rem; }
+.client-record { border-top:1px solid var(--control-border,#415572); padding:12px 0; overflow-wrap:anywhere; }
+#clientRecordList form,#clientRecordList nav { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+#clientRecordList input { flex:1 1 150px; min-width:0; }
+#clientRecordList button { min-height:44px; max-width:100%; white-space:normal; }
+.client-profile-row > * { min-width:0; overflow-wrap:anywhere; }
+.client-form input,.client-form textarea { box-sizing:border-box; min-width:0; max-width:100%; }
+.weekly-review-filters button[type="submit"] { color:var(--text-primary,#eaf2ff); background:var(--surface,#132541); border:1px solid var(--control-border,#415572); min-height:44px; }

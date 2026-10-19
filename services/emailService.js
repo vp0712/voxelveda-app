@@ -328,13 +328,13 @@ async function verifyConnection() {
       });
       if (!response.ok) {
         const error = new Error(`WordPress mail relay health check returned ${response.status}`);
-        error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+        error.code = 'EMAIL_HTTPS_RELAY_FAILED';error.relayHttpStatus=response.status;error.relayReason='RELAY_HEALTH_HTTP_ERROR';
         throw error;
       }
       let health = {};
       try { health = await response.json(); } catch {}
       if (!health || typeof health !== 'object' || Array.isArray(health) || health.ok !== true) {
-        throw Object.assign(new Error('The company relay did not return a valid successful JSON health response. Connectivity and PDF capability remain unverified.'), {code:'EMAIL_HTTPS_RELAY_FAILED'});
+        throw Object.assign(new Error('The company relay did not return a valid successful JSON health response. Connectivity and PDF capability remain unverified.'), {code:'EMAIL_HTTPS_RELAY_FAILED',relayReason:'RELAY_HEALTH_JSON_NOT_READY'});
       }
       relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay', pdf_attachment_contract_version: Number(health.attachment_contract_version || 0), pdf_attachments_supported: Number(health.attachment_contract_version || 0) >= 3 && health.pdf_bytes_validated === true && health.attachment_filename_preserved === true, recipient_verified: false };
       let relayEndpoint='configured';
@@ -349,7 +349,7 @@ async function verifyConnection() {
       }
     } catch (error) {
       if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
-      console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code}`);
+      console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code} http_status=${Number(error.relayHttpStatus)||'unknown'} reason=${error.relayReason||error.cause?.code||error.name||'unknown'}`);
       if (missingSmtpKeys().length || primaryTransport === 'https_relay') throw error;
     } finally {
       clearTimeout(timeout);

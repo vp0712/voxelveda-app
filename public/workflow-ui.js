@@ -5,7 +5,7 @@
   if (!root) return;
 
   const portal = root.dataset.workflowPortal || 'staff';
-  const state = { definitions: [], approvals: [], requests: [], tab: 'approvals', module: '', loading: false, user: null };
+  const state = { definitions: [], approvals: [], requests: [], tab: 'approvals', module: '', loading: false, error: '', user: null };
 
   function escapeHtml(value) {
     return String(value == null ? '' : value)
@@ -46,6 +46,7 @@
   }
 
   async function api(path, options = {}) {
+    if(options.method&&options.method!=='GET'&&state.owner!==accountKey())throw new Error('Account changed. Reload this workflow before taking action.');
     const response = await fetch(`/api/workflows${path}`, {
       credentials: 'same-origin',
       ...options,
@@ -80,6 +81,7 @@
 
   function updateSummary() {
     const now = Date.now();
+    if(state.error || state.loading){root.querySelectorAll('[data-workflow-count]').forEach(node=>{node.textContent='—';});return;}
     const pending = state.approvals.filter((item) => item.assignment_status === 'PENDING');
     const activeRequests = state.requests.filter((item) => isActive(item.status));
     const overdue = pending.filter((item) => item.due_at && new Date(item.due_at).getTime() < now);
@@ -105,6 +107,7 @@
       list.innerHTML = '<div class="empty-state">Loading approval work...</div>';
       return;
     }
+    if(state.error){list.innerHTML=`<div class="empty-state" role="alert"><strong>Approval work unavailable</strong><span>${escapeHtml(state.error)}</span><button type="button" class="secondary-btn" data-workflow-retry>Retry</button></div>`;list.querySelector('[data-workflow-retry]').onclick=load;return;}
     if (!items.length) {
       list.innerHTML = `<div class="empty-state"><strong>${state.tab === 'approvals' ? 'No approvals waiting' : 'No requests submitted'}</strong><span>${state.tab === 'approvals' ? 'New assignments will appear here.' : 'Create a request when a controlled decision is needed.'}</span></div>`;
       return;
@@ -122,7 +125,7 @@
         </button>
         <div class="workflow-item-actions">
           ${actionable && hasPermission('ACTION_APPROVALS') ? `<button type="button" class="primary-btn" data-workflow-action="APPROVE" data-workflow-id="${escapeHtml(item.id)}">Approve</button><button type="button" class="secondary-btn" data-workflow-action="REQUEST_CHANGES" data-workflow-id="${escapeHtml(item.id)}">Changes</button><button type="button" class="danger-btn" data-workflow-action="REJECT" data-workflow-id="${escapeHtml(item.id)}">Reject</button>` : ''}
-          ${cancellable ? `<button type="button" class="secondary-btn" data-workflow-cancel="${escapeHtml(item.id)}">Cancel</button>` : ''}
+          ${cancellable ? `<button type="button" class="secondary-btn" data-workflow-cancel="${escapeHtml(item.id)}">Cancel request</button>` : ''}
         </div>
       </article>`;
     }).join('');
@@ -131,16 +134,20 @@
     list.querySelectorAll('[data-workflow-cancel]').forEach((button) => button.addEventListener('click', () => openCancel(button.dataset.workflowCancel)));
   }
 
+  let loadEpoch=0;
+  function accountKey(){try{return String(JSON.parse(localStorage.getItem('user')||'{}').id||'')+'|'+(localStorage.getItem('token')||'');}catch{return '';}}
   async function load() {
     if (state.loading) return;
-    state.loading = true;
+    const epoch=++loadEpoch,owner=accountKey();
+    state.loading = true;state.error='';
     render();
     try {
       const [me, definitions, approvals, requests] = await Promise.all([
-        fetch('/api/auth/me', { credentials: 'same-origin' }).then((response) => response.json()),
+        fetch('/api/auth/me', { credentials: 'same-origin',cache:'no-store' }).then(async response=>{if(!response.ok)throw new Error('Your session could not be verified. Sign in again before taking action.');return response.json();}),
         api('/definitions'), api('/my-approvals'), api('/my-requests')
       ]);
-      state.user = me.user || {};
+      if(epoch!==loadEpoch||owner!==accountKey())return;
+      state.user = me.user || {};state.owner=owner;
       root.querySelector('[data-workflow-create]').hidden = !hasPermission('CREATE_APPROVAL_REQUEST');
       const manageButton = root.querySelector('[data-workflow-manage]');
       if (manageButton) manageButton.hidden = !hasPermission('MANAGE_WORKFLOWS');
@@ -149,12 +156,12 @@
       state.requests = requests.items || [];
       populateModules();
     } catch (error) {
-      toast(error.message || 'Approvals could not be loaded');
+      if(epoch!==loadEpoch||owner!==accountKey())return;
+      state.error=error.message || 'Approvals could not be loaded';
       state.approvals = [];
       state.requests = [];
     } finally {
-      state.loading = false;
-      render();
+      if(epoch===loadEpoch){state.loading = false;if(owner!==accountKey()){state.user=null;state.approvals=[];state.requests=[];state.error='Account changed. Reload approval work for the current account.';}render();}
     }
   }
 
@@ -382,6 +389,7 @@
     manageButton.addEventListener('click', openDefinitionManager);
   }
 
+  window.addEventListener('storage',event=>{if(!event.key||['user','token'].includes(event.key)){loadEpoch++;state.loading=false;state.user=null;state.approvals=[];state.requests=[];state.error='Account changed. Reload approval work for the current account.';render();}});
   window.VoxelWorkflowUI = { load, openComposer, openDetail };
   document.addEventListener('DOMContentLoaded', () => {
     if (new URLSearchParams(window.location.search).get('view') === 'approvals') load();
