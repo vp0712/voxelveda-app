@@ -54,8 +54,14 @@
     }catch(error){if(current(sequence))$('weeklyReviewPanel').innerHTML=`<p role="alert">${esc(error.message)}</p><button type="button" class="secondary-btn" id="weeklyReviewRetry">Retry</button>`;if($('weeklyReviewRetry'))$('weeklyReviewRetry').onclick=()=>review(id,period);}
   }
   async function delivery(id){try{const result=await api('/api/attendance/timesheets/weekly-deliveries/'+Number(id));if(owner!==key())return;const row=result.delivery;if(window.openWeeklyDeliveryDetail){await window.openWeeklyDeliveryDetail(Number(id));return;}dialog('Weekly delivery history',`<p>${esc(status[row.status]||String(row.status).replaceAll('_',' '))} · Version ${Number(row.version)}</p><p>Review attendance corrections before asking an administrator to authorise a replacement PDF. Accepted and uncertain messages are never automatically resent.</p>`);}catch(error){window.showToast?.(error.message);}}
-  function install(){const section=$('timesheetSection')||$('workforceSection');if(section&&!$('weeklyDeliveryOpen')){const button=document.createElement('button');button.id='weeklyDeliveryOpen';button.type='button';button.className='secondary-btn';button.textContent='Weekly timesheets & delivery';button.onclick=()=>open();section.prepend(button);}}
+  async function install(){
+    const section=$('timesheetSection')||$('attendanceSection');if(!section)return;
+    let button=$('weeklyDeliveryOpen');
+    if(!button){button=document.createElement('button');button.id='weeklyDeliveryOpen';button.type='button';button.className='secondary-btn';button.textContent=$('weeklyDeliverySchedule')?'Reconcile completed week':'Weekly timesheets & delivery';button.onclick=()=>open();const host=$('weeklyDeliverySchedule')?.closest('.workforce-action-centre')?.querySelector('.section-head')||section;host.append(button);}
+    button.hidden=true;
+    try{const me=await api('/api/auth/me'),stored=key().split('|')[0];if(stored&&String(me.user?.id)!==stored)return;button.hidden=!['VIEW_OWN_TIMESHEET','VIEW_TEAM_TIMESHEET','VIEW_ALL_TIMESHEETS'].some(permission=>me.user?.effective_permissions?.includes(permission));}catch{button.hidden=true;}
+  }
   window.VoxelWeeklyDelivery={open,review,reason:code=>messages[code]||String(code||'Review required').replaceAll('_',' ').toLowerCase()};
   document.addEventListener('DOMContentLoaded',install);
-  window.addEventListener('storage',event=>{if(!event.key||['user','token'].includes(event.key)){epoch++;user=null;const root=$('weeklyReviewPanel');if(root)root.textContent='Account changed. Close this view and reopen weekly records.';}});
+  window.addEventListener('storage',event=>{if(!event.key||['user','token'].includes(event.key)){epoch++;user=null;void install();const root=$('weeklyReviewPanel');if(root)root.textContent='Account changed. Close this view and reopen weekly records.';}});
 })();

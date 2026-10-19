@@ -78,7 +78,7 @@ async function reconcileWeek(options = {}) {
     const distinct = new Map([...current,...stored].map(issue => [issue.code+':'+(issue.attendance_id||''),issue]));
     if (delivery?.last_error_code) for (const issue of reasons([delivery.last_error_code])) distinct.set(issue.code,issue);
     const recipientValid = Boolean(policy.emailAddress(staff.timesheet_delivery_email));
-    if (assessment.status === 'ELIGIBLE' && !recipientValid) distinct.set('NO_RECIPIENT',reasons(['NO_RECIPIENT'])[0]);
+    if ((assessment.totalMinutes>0||assessment.issues.length>0) && !recipientValid) distinct.set('NO_RECIPIENT',reasons(['NO_RECIPIENT'])[0]);
     const row = { user_id:Number(staff.id), staff_name:staff.name, period_start:period.start,period_end:period.end,
       eligibility:assessment.status, verified_minutes:assessment.totalMinutes, eligible_record_ids:assessment.rows.map(entry=>entry.id),
       candidate_record_count:attendance.length, duplicate_records:assessment.duplicates,

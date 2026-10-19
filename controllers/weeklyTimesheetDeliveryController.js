@@ -84,7 +84,9 @@ exports.reconciliation = async (req,res) => {
     const result=await require('../services/weeklyTimesheetReconciliation').reconcileWeek({actor:req.user,start:req.query.from_date,end:req.query.to_date});
     const search=String(req.query.search||'').trim().toLowerCase();
     if(search.length>120)return res.status(422).json({message:'Search must be at most 120 characters.'});
-    const rows=result.outcomes.filter(row=>(!search||String(row.staff_name).toLowerCase().includes(search))&&(!req.query.status||row.status===req.query.status||row.eligibility===req.query.status));
+    const selectedStatus=String(req.query.status||'');
+    if(!['','NO_WORK','NO_RECIPIENT','MISSING_DELIVERY','REVIEW_REQUIRED','QUEUED','RETRYING','FAILED','GENERATION_FAILED','PREPARING','SENDING','PROVIDER_ACCEPTED','DELIVERY_UNKNOWN','INELIGIBLE_ACCOUNT','LEGACY_WEEKLY_DELIVERY_REVIEW'].includes(selectedStatus))return res.status(422).json({message:'Choose a valid weekly state.'});
+    const rows=result.outcomes.filter(row=>(!search||String(row.staff_name).toLowerCase().includes(search))&&(!selectedStatus||(selectedStatus==='NO_RECIPIENT'?!row.recipient_configured&&(row.verified_minutes>0||row.eligibility==='REVIEW_REQUIRED'):row.status===selectedStatus||row.eligibility===selectedStatus)));
     const sort=String(req.query.sort || 'staff');if(!['staff','hours','status'].includes(sort))return res.status(422).json({message:'Choose a valid weekly sort.'});
     rows.sort((a,b)=>(sort==='hours'?b.verified_minutes-a.verified_minutes:sort==='status'?String(a.status).localeCompare(String(b.status)):String(a.staff_name).localeCompare(String(b.staff_name)))||a.user_id-b.user_id);
     const counts={};for(const row of rows){counts[row.eligibility]=(counts[row.eligibility]||0)+1;counts['delivery_'+row.status]=(counts['delivery_'+row.status]||0)+1;}
