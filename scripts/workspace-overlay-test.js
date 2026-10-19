@@ -37,3 +37,11 @@ overlay.closeAll(); assert.equal(body.style.overflow, 'auto');
 assert.equal(context.window.scrollY, 140, 'A replacement opened by a close callback retains the original page position.');
 assert(events.some(event => event.type === 'vv:overlay-closed' && event.detail.reason === 'escape'));
 console.log('WORKSPACE_OVERLAY_TEST_OK: exclusive sheets, menu handoff, Escape, focus return and scroll restoration');
+
+const parentRoot={inert:false,setAttribute(){},removeAttribute(){}};
+overlay.open({id:'form',root:parentRoot,onClose(){},returnFocus:focus});
+overlay.open({id:'feedback',modal:true,onClose(){},returnFocus:focus});
+assert.equal(overlay.active,'feedback');assert.equal(parentRoot.inert,true);
+overlay.close();assert.equal(overlay.active,'form');assert.equal(parentRoot.inert,false);assert.equal(body.style.overflow,'hidden');
+overlay.close();assert.equal(overlay.active,null);assert.equal(body.style.overflow,'auto');
+console.log('FOREGROUND_OVERLAY_TEST_OK: feedback suspends form without closing it; one Back restores form focus and scroll remains locked until final dismissal');

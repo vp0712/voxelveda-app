@@ -12,7 +12,7 @@ concurrency:
 jobs:
   application-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout exact candidate
         uses: actions/checkout@v4
@@ -52,7 +52,7 @@ jobs:
         id: browser-tools
         run: |
           npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
-          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install chromium
+          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install --with-deps chromium webkit
       - name: Verify visible attendance ticking, breaks, resume and delayed staff workflows
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
@@ -61,15 +61,30 @@ jobs:
           node scripts/attendance-live-browser-test.js
           VV_ATTENDANCE_WORKFLOW_PROOF=after node scripts/restored-ui-browser-test.js
       - name: Verify checkout summary options, history and recovery in responsive browsers
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/checkout-summary
         run: node scripts/checkout-summary-browser-test.js
       - name: Test weekly delivery and every retained role portal
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/weekly-portals
         run: node scripts/weekly-portals-browser-test.js
+      - name: Test explicit action outcomes and foreground dialogs across retained roles
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/action-dialogs
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/action-dialog-browser-test.js
+      - name: Verify foreground feedback and responsive actions with WebKit
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_ACTION_BROWSER_ENGINE: webkit
+          UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/action-dialogs-webkit
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/action-dialog-browser-test.js
       - name: Preserve attendance workflow evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -78,16 +93,19 @@ jobs:
           path: ${{ runner.temp }}/attendance-workflow-proof
           retention-days: 30
       - name: Test retained account pages in phone, tablet and desktop browsers
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           VV_PROOF_DIR: ${{ runner.temp }}/account-foundation-proof
         run: node scripts/account-foundation-browser-test.js
       - name: Test restored operational pages and saved workflows in responsive browsers
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/restored-application-proof
         run: timeout --signal=TERM --kill-after=10s 180s node scripts/restored-ui-browser-test.js
       - name: Verify populated invoice cards, values, seven widths and controlled workflows
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           VV_RESPONSIVE_MATRIX: after
@@ -101,6 +119,7 @@ jobs:
           path: ${{ runner.temp }}/responsive-invoice-proof
           retention-days: 30
       - name: Verify invoice review, structured views, one Close, discard and document versions
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           VV_INVOICE_DETAIL_PROOF: after
@@ -114,6 +133,7 @@ jobs:
           path: ${{ runner.temp }}/invoice-dialog-proof
           retention-days: 30
       - name: Test procurement import, records, reports and private source workflows in responsive browsers
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           PROCUREMENT_PROOF_DIR: ${{ runner.temp }}/procurement-import-proof

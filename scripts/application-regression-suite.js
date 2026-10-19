@@ -34,6 +34,7 @@ const checks = [
   'retained-workspace-test.js',
   'retained-theme-test.js',
   'workspace-overlay-test.js',
+  'action-network-test.js',
   'profile-avatar-test.js',
   'profile-avatar-component-test.js',
   'notification-center-test.js',

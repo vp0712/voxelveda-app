@@ -4,7 +4,7 @@ const policy = require('./weeklyTimesheetEligibility');
 const { hasPermission, canAccessUserRecord } = require('./authorizationService');
 const REASONS = Object.freeze({
   INCOMPLETE_SHIFT: 'A shift has no confirmed checkout. Confirm the actual finish time and request an attendance correction.',
-  INCOMPLETE_SHIFT_REQUIRES_REVIEW: 'An incomplete shift needs an authorised correction with the actual finish time.',
+  INCOMPLETE_SHIFT_REQUIRES_REVIEW: 'A saved shift requires review. Confirm its actual start, finish and unpaid breaks with an authorised reviewer.',
   ATTENDANCE_TIMEZONE_UNVERIFIED: 'The original timestamp timezone is unverified. A reviewer must confirm the actual local start and finish.',
   ATTENDANCE_REVIEW_REQUIRED: 'An attendance record is flagged for review. Open the related session and review its evidence.',
   RECORDED_DURATION_INCONSISTENT: 'Saved minutes and hours disagree. Review the recorded start, finish and breaks.',

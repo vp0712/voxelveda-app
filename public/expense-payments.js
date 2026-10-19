@@ -132,8 +132,8 @@
         };
         const res = await fetch('/api/expenses', { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
         const data = await safeJson(res);
-        if (!res.ok) return showToast(data.message || 'Expense save failed');
-        hideDialog(); showToast(data.message || 'Expense saved'); await loadExpenses(1);
+        if (!res.ok) return showToast(data.message || 'Expense save failed', {kind:'error'});
+        hideDialog(); showToast(data.message || 'Expense saved', {kind:'success',httpStatus:res.status}); await loadExpenses(1);
       }, id ? 'Update Expense' : 'Save Expense');
     document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'expense-dialog-panel');
     updateExpenseSummaryTiles();
@@ -162,7 +162,7 @@
 
   window.openRecordExpensePaymentDialog = function openRecordExpensePaymentDialog(id = null) {
     const options = expensePaymentOptions(id);
-    if (!options) return showToast('There are no unpaid expenses to pay');
+    if (!options) return showToast('There are no unpaid expenses to pay', {kind:'error'});
     const idempotencyKey = window.crypto?.randomUUID?.() || `expense-payment-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     showDialog('Record Expense Payment', `
       <div class="expense-dialog-shell">
@@ -186,14 +186,14 @@
           notes: document.getElementById('expensePaymentNotes')?.value.trim(),
           idempotency_key: idempotencyKey
         };
-        if (!body.amount || Number(body.amount) <= 0) return showToast('Enter a payment amount greater than zero');
-        if (!body.payment_date || !body.payment_method || !body.account_name) return showToast('Payment date, method and paid-from account are required');
+        if (!body.amount || Number(body.amount) <= 0) return showToast('Enter a payment amount greater than zero', {kind:'error'});
+        if (!body.payment_date || !body.payment_method || !body.account_name) return showToast('Payment date, method and paid-from account are required', {kind:'error'});
         const selected = expenseCache.find((row) => Number(row.id) === expenseId);
-        if (!confirm(`Record ${formatMoney(body.amount)} payment to ${selected?.supplier_name || 'this supplier'}?`)) return;
+        if (!(await VoxelFeedback.confirm(`Record ${formatMoney(body.amount)} payment to ${selected?.supplier_name || 'this supplier'}?`, {"title":"Record payment","confirmLabel":"Record payment"}))) return;
         const res = await fetch(`/api/expenses/${expenseId}/payments`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
         const data = await safeJson(res);
-        if (!res.ok) return showToast(data.message || 'Payment could not be recorded');
-        hideDialog(); showToast(data.message || 'Payment recorded'); await loadExpenses(expensePage);
+        if (!res.ok) return showToast(data.message || 'Payment could not be recorded', {kind:'error'});
+        hideDialog(); showToast(data.message || 'Payment recorded', {kind:'success',httpStatus:res.status}); await loadExpenses(expensePage);
       }, 'Record Payment');
     document.querySelector('.dialog-panel')?.classList.add('wide-dialog', 'expense-dialog-panel');
     updateExpensePaymentBalance();
@@ -202,18 +202,18 @@
   window.openExpensePaymentHistory = async function openExpensePaymentHistory(id) {
     const res = await fetch(`/api/expenses/${Number(id)}/payments`, { headers: { Authorization: `Bearer ${token}` } });
     const data = await safeJson(res);
-    if (!res.ok) return showToast(data.message || 'Payment history could not be loaded');
+    if (!res.ok) return showToast(data.message || 'Payment history could not be loaded', {kind:'error'});
     const rows = (data.payments || []).map((payment) => `<tr class="${payment.voided_at ? 'muted-text' : ''}"><td>${escapeHtml(formatDate(payment.payment_date))}</td><td>${escapeHtml(formatMoney(payment.amount))}</td><td>${escapeHtml(payment.payment_method || '-')}</td><td>${escapeHtml(payment.account_name || '-')}</td><td>${escapeHtml(payment.reference || '-')}</td><td>${payment.voided_at ? `Reversed: ${escapeHtml(payment.void_reason || '')}` : `<button class="mini-danger" onclick="voidExpensePayment(${Number(payment.id)}, ${Number(id)})">Reverse</button>`}</td></tr>`).join('') || '<tr><td colspan="6">No payments recorded.</td></tr>';
     showDialog('Expense Payment History', `<div class="expense-summary-strip"><div><span>ORIGINAL</span><strong>${escapeHtml(formatMoney(data.expense.total_amount))}</strong></div><div><span>PAID</span><strong>${escapeHtml(formatMoney(data.expense.total_paid))}</strong></div><div><span>BALANCE</span><strong>${escapeHtml(formatMoney(data.expense.balance_due))}</strong></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Amount</th><th>Method</th><th>Account</th><th>Reference</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`, hideDialog, 'Close');
     document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
   };
 
   window.voidExpensePayment = async function voidExpensePayment(paymentId, expenseId) {
-    const reason = prompt('Enter the reason for reversing this payment:');
+    const reason = (await VoxelFeedback.prompt('Enter the reason for reversing this payment:', {"title":"Reverse payment","confirmLabel":"Reverse payment"}));
     if (!reason?.trim()) return;
     const res = await fetch(`/api/expenses/payments/${Number(paymentId)}/void`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ reason: reason.trim() }) });
     const data = await safeJson(res);
-    if (!res.ok) return showToast(data.message || 'Payment could not be reversed');
-    showToast(data.message || 'Payment reversed'); await loadExpenses(expensePage); await openExpensePaymentHistory(expenseId);
+    if (!res.ok) return showToast(data.message || 'Payment could not be reversed', {kind:'error'});
+    showToast(data.message || 'Payment reversed', {kind:'success',httpStatus:res.status}); await loadExpenses(expensePage); await openExpensePaymentHistory(expenseId);
   };
 })();

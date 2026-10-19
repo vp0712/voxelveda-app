@@ -1433,6 +1433,12 @@ async function testVerifiedAttendanceTotals() {
     const beforeApprove = await snapshot();
     await assert.rejects(() => workflow.approveTimesheet(sheet.insertId, mobileUsers.approver, { approvedHours: 99 }, req), { code: 'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED', statusCode: 409 });
     assert.deepEqual(await snapshot(), beforeApprove, 'An explicit approved-hours override cannot bypass source review.');
+    const rejectedApproval=response();
+    const [[pendingSource]]=await pool.query('SELECT version_no FROM weekly_timesheets WHERE id=?',[sheet.insertId]);
+    await require('../controllers/timesheetWorkflowController').approve({...req,user:mobileUsers.approver,params:{id:sheet.insertId},body:{approved_hours:10,expected_version:pendingSource.version_no,expected_source_minutes:60,reason:'Synthetic attempt cannot resolve unverified attendance'}},rejectedApproval);
+    assert.equal(rejectedApproval.statusCode,409);assert.equal(rejectedApproval.body.code,'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED');assert.match(rejectedApproval.body.message,/submitted or approved/);assert(rejectedApproval.body.details.review_issues.length>0);
+    assert.deepEqual(await snapshot(),beforeApprove,'The exact HTTP409 cannot commit an approval, version, payroll or mail even with entered hours and a reason.');
+
     const originalSnapshot = '{"fixture":"synthetic approved history","hours":77,"preserve":true}';
     await pool.query("UPDATE weekly_timesheets SET status='APPROVED',total_hours=77,approved_hours=77,ordinary_hours=38,overtime_hours=39,version_no=1 WHERE id=?", [sheet.insertId]);
     await pool.query("INSERT INTO timesheet_versions(timesheet_id,version_no,status,snapshot_json,created_by) VALUES(?,1,'APPROVED',?,?)", [sheet.insertId, originalSnapshot, mobileUsers.approver.id]);
