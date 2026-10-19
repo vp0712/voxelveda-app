@@ -96,7 +96,7 @@ async function currentSnapshot(db, staff, delivery, config, now, lock = false) {
 }
 function outcomeLog(outcome, period) {
   console.log('Weekly timesheet eligibility', JSON.stringify({ staff_id: outcome.staff_id, period_start: period.start, period_end: period.end,
-    status: outcome.status, version: outcome.version || null, source_sha256: outcome.source_sha256 || null, reason: outcome.reason || null,
+    status: outcome.status, version: outcome.version || null, source_sha256: outcome.source_sha256 || null, reason: outcome.reason || null, review_reasons: outcome.review_reasons || [],
     duplicates: outcome.duplicates || 0 }));
 }
 function generationClaimActive(delivery) { return Number(delivery.claim_active) === 1; }
@@ -121,7 +121,7 @@ async function reserveDelivery(staffId, period, config, now) {
     if (assessment.status !== 'ELIGIBLE') {
       await conn.query(`UPDATE weekly_timesheet_deliveries SET status=?,review_reasons_json=?,claim_token=NULL,claim_expires_at=NULL WHERE id=?`,
         [assessment.status, JSON.stringify(assessment.issues), delivery.id]);
-      await conn.commit(); return { staff_id: staffId, status: assessment.status, duplicates: assessment.duplicates };
+      await conn.commit(); return { staff_id: staffId, status: assessment.status, duplicates: assessment.duplicates, review_reasons: assessment.issues };
     }
     const recipient = policy.emailAddress(staff.timesheet_delivery_email);
     if (!recipient) {
@@ -230,7 +230,7 @@ async function queueClosedWeekTimesheets(options = {}) {
       const outcome = reservation.status === 'RESERVED' ? await queueReservedDelivery(reservation, config, now) : reservation;
       // Recipient addresses and PDF source content never enter operational logs.
       const publicOutcome = { staff_id: outcome.staff_id, status: outcome.status, version: outcome.version, source_sha256: outcome.source_sha256,
-        reason: outcome.reason, duplicates: outcome.duplicates, existing: outcome.existing, queue_id: outcome.queue_id };
+        reason: outcome.reason, review_reasons: outcome.review_reasons, duplicates: outcome.duplicates, existing: outcome.existing, queue_id: outcome.queue_id };
       outcomes.push(publicOutcome); outcomeLog(publicOutcome, period);
     } catch (error) {
       if (reservation?.delivery_id) await pool.query(`UPDATE weekly_timesheet_deliveries SET status=?,last_error_code=?,claim_token=NULL,claim_expires_at=NULL
@@ -363,7 +363,13 @@ async function queueWeeklyTimesheetRevision(options = {}) {
     throw error;
   }
 }
-async function processScheduledWeeklyTimesheetEmails() { return queueClosedWeekTimesheets(); }
+async function processScheduledWeeklyTimesheetEmails() {
+  const result = await queueClosedWeekTimesheets();
+  await ensureWeeklyTimesheetDeliverySchema();
+  try { await require('./weeklyTimesheetReconciliation').logLatestWeek(); }
+  catch(error) { console.warn('Weekly reconciliation unavailable', String(error.code || 'RECONCILIATION_FAILED').slice(0,100)); }
+  return result;
+}
 const scheduler = backgroundJobService.createScheduler({ jobKey: 'weekly_timesheet_email',
   description: 'Queue one validated PDF for each employee with verified worked attendance in the most recently completed week',
   handler: processScheduledWeeklyTimesheetEmails, enabled,
