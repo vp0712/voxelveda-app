@@ -225,7 +225,6 @@
     confirmAction(retained.action,null,{},retained);
   }
   async function reconcileView(){
-    if(pages.from)historyFrom=pages.from;if(pages.to)historyTo=pages.to;if(pages.userId!==undefined)historyUserId=pages.userId?String(pages.userId):'';
     const previous=identity?account():null;if(!await verifyIdentity())return;if(previous&&!current(previous))return;
     if(!pending)return refresh();
     const lease=account(),retained={...pending};
