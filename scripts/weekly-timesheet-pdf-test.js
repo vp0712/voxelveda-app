@@ -9,6 +9,8 @@ async function main(){
  const row={user_id:31,name:'Fixture Staff A',work_date:'2026-10-01',clock_in:'2026-10-01T22:00:00+10:00',clock_out:'2026-10-02T06:30:00+10:00',total_minutes:480,total_hours:8,break_minutes:30,project:'Fixture night site'};
  const single=await createDocumentPdf(timesheetDocumentData({...common,rows:[row],totalMinutes:480,totalHours:8}));
  assert.equal(single.validation.pages,1);assert.match(single.validation.text,/Fixture Staff A/);assert.match(single.validation.text,/FIXTURE-A/);assert.match(single.validation.text,/30 min/);assert.match(single.validation.text,/Provisional/);assert.match(single.validation.text,/01 Oct 2026 22:00/);assert.match(single.validation.text,/02 Oct 2026 06:30/);
+ const adjusted=await createDocumentPdf(timesheetDocumentData({...common,rows:[row],totalMinutes:480,totalHours:8,status:'APPROVED',approvedHours:7.5}));await validatePdf(adjusted.buffer,{expectedText:['Weekly recorded hours','8.00 (8h 00m)','Approved hours (authorised adjustment)','7.50']});
+ assert.throws(()=>timesheetDocumentData({...common,rows:[row],approvedHours:7.5}),{code:'PDF_APPROVAL_INVALID'});
  const dst={...row,work_date:'2026-10-04',clock_in:'2026-10-04T01:30:00+10:00',clock_out:'2026-10-04T03:30:00+11:00',total_minutes:60,total_hours:1,break_minutes:0,project:'Fixture DST shift'};
  const overnight=await createDocumentPdf(timesheetDocumentData({...common,rows:[dst],totalMinutes:60,totalHours:1,status:'APPROVED'}));
  assert.match(overnight.validation.text,/(?:AEST|GMT\+10)/);assert.match(overnight.validation.text,/(?:AEDT|GMT\+11)/);assert.match(overnight.validation.text,/1.00 \(1h 00m\)/);assert.match(overnight.validation.text,/Approved/);

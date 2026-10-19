@@ -32,7 +32,7 @@ async function createSchema() {
     UNIQUE KEY uniq_weekly_delivery_queue (email_queue_id),
     INDEX idx_weekly_delivery_status (status, updated_at)
   ) ENGINE=InnoDB`);
-  for (const [name, type] of Object.entries({ timesheet_id: 'INT NULL', revision_authorised_by: 'INT NULL', revision_authorised_at: 'DATETIME NULL', revision_reason: 'VARCHAR(1000) NULL' })) {
+  for (const [name, type] of Object.entries({ generation_attempts: 'INT NOT NULL DEFAULT 0', next_generation_attempt_at: 'DATETIME NULL', timesheet_id: 'INT NULL', revision_authorised_by: 'INT NULL', revision_authorised_at: 'DATETIME NULL', revision_reason: 'VARCHAR(1000) NULL' })) {
     await additive(`ALTER TABLE weekly_timesheet_deliveries ADD COLUMN ${name} ${type}`);
   }
   await pool.query(`CREATE TABLE IF NOT EXISTS weekly_timesheet_delivery_versions (

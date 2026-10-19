@@ -27,9 +27,10 @@ const dependencies = { '../config/db': db, '../services/authorizationService': a
 const moduleFixture = { exports: {} }, filename = path.join(__dirname, '../controllers/weeklyTimesheetDeliveryController.js');
 new vm.Script(fs.readFileSync(filename, 'utf8'), { filename }).runInNewContext({ module: moduleFixture, exports: moduleFixture.exports,
   console: { error() {} }, require(name) { if (!Object.hasOwn(dependencies, name)) throw new Error('Unexpected API dependency '+name); return dependencies[name]; } });
+dependencies['../services/weeklyTimesheetReconciliation']={reconcileWeek:async options=>({period:{start:'2026-10-12',end:'2026-10-18',timezone:'Australia/Sydney'},outcomes:[{user_id:options.actor.id,staff_name:'Fixture own staff',status:'REVIEW_REQUIRED',eligibility:'REVIEW_REQUIRED',recipient_configured:false,verified_minutes:120}],counts:{NO_WORK:1}})};
 const controller = moduleFixture.exports;
 async function call(method, { user, params = {}, query = {}, body = {} } = {}) {
-  const result = { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(value) { this.body = JSON.parse(JSON.stringify(value)); return this; } };
+  const result = { statusCode: 200, set(){return this;}, status(code) { this.statusCode = code; return this; }, json(value) { this.body = JSON.parse(JSON.stringify(value)); return this; } };
   await controller[method]({ user, params, query, body }, result); return result;
 }
 async function mountedAttendanceBoundary(){
@@ -78,6 +79,11 @@ async function main() {
   assert.equal(revision.statusCode,202);assert.equal(revision.body.email_sent,false);assert.equal(revisions[0].confirmPossiblePreviousDelivery,true);assert.equal(revisions[0].retryGeneration,false);
   const retry=await call('retryGeneration',{user:{id:99,role:'admin'},params:{id:12},body:{expected_version:1,reason:'Retry corrected parser error'}});
   assert.equal(retry.statusCode,202);assert.equal(revisions[1].retryGeneration,true);
+  assert.equal((await call('reconciliation',{user:own})).body.outcomes[0].user_id,4);
+  assert.equal((await call('reconciliation',{user:own,query:{status:'NO_RECIPIENT'}})).body.total,1,'Missing address remains discoverable while attendance review also blocks delivery');
+  for(const query of [{status:'unknown-state'},{sort:'untrusted'},{page:0},{page_size:101},{from_date:'2026-10-12'},{from_date:'invalid',to_date:'2026-10-18'}])assert.equal((await call('reconciliation',{user:own,query})).statusCode,422);
+  for(const role of ['viewer','view_only','sales','finance_admin','finance_user','accountant'])assert.equal((await call('reconciliation',{user:{id:99,role}})).statusCode,403,role+' cannot obtain workforce reconciliation');
+  for(const role of ['staff','production','manager','supervisor','hr','admin','super_admin'])assert.equal((await call('reconciliation',{user:{id:99,role}})).statusCode,200,role+' retains scoped workforce access');
   await mountedAttendanceBoundary();
   console.log('Weekly timesheet API tests passed: own/team staff isolation; bound search, date/status and pagination validation; hidden claim metadata; controlled revision and generation retry; recipient overrides/copies blocked before generation. Fixtures only, no mail transport.');
 }

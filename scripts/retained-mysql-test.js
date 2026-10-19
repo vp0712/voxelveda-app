@@ -569,6 +569,23 @@ async function testWeeklyDelivery() {
   assert.equal(capturedMessages.length, sentBefore + 1);
   const [[heldDelivery]] = await pool.query('SELECT status FROM weekly_timesheet_deliveries WHERE id=?', [worked.id]);
   assert.equal(heldDelivery.status, 'REVIEW_REQUIRED');
+  // Resolve only the synthetic missing-recipient fixture after the normal window.
+  await pool.query("UPDATE users SET timesheet_delivery_email='weekly-33@example.invalid' WHERE id=33");
+  const recoveryNow=DateTime.fromJSDate(scheduledNow).plus({hours:3}).toJSDate();
+  assert.equal(policy.scheduleWindow(recoveryNow,policy.configuration(process.env)).eligible,false);
+  const recovered=await Promise.all([scheduler.queueClosedWeekTimesheets({...options,now:recoveryNow}),scheduler.queueClosedWeekTimesheets({...options,now:recoveryNow})]);
+  assert.equal(recovered.reduce((sum,result)=>sum+result.queued,0),1);
+  const [[recoveredDelivery]]=await pool.query('SELECT * FROM weekly_timesheet_deliveries WHERE user_id=33 AND period_start=?',[period.start]);
+  assert.equal(recoveredDelivery.generation_attempts,1,'Generation budget is persisted under the actual employee/delivery lock.');
+  assert.equal(recoveredDelivery.recipient,'weekly-33@example.invalid');
+  const [[recoveryAudit]]=await pool.query("SELECT COUNT(*) total FROM audit_logs WHERE action='WEEKLY_TIMESHEET_RECOVERY_QUEUED' AND record_id=?",[String(recoveredDelivery.id)]);
+  assert.equal(Number(recoveryAudit.total),1);
+  await makeWeeklyFixtureDue(recoveredDelivery.email_queue_id);
+  assert.deepEqual(await queue.processEmailQueue(50),[{id:recoveredDelivery.email_queue_id,status:'SENT',provider_accepted:true,recipient_verified:false}]);
+  const reconciled=await require('../services/weeklyTimesheetReconciliation').reconcileWeek({db:pool,now:recoveryNow,env:process.env,actor:{id:20,role:'admin'}});
+  const reconciledStaff=reconciled.outcomes.find(entry=>entry.user_id===33);
+  assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.pdf.status,'VALIDATED');
+  facts.push('real InnoDB bounded missed-window recovery after designated-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
   facts.push('real worked-only weekly scheduling/locks/PDF linkage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
 }
 

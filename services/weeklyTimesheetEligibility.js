@@ -23,7 +23,8 @@ function configuration(env = process.env) {
   // Historical unzoned DATETIME values must never be guessed from host settings.
   const storageTimezone = env.ATTENDANCE_STORAGE_TIMEZONE || '';
   if (storageTimezone && storageTimezone !== 'UTC') throw policyError('Only proven historical UTC storage may be attested. Leave this setting unset for explicit-row UTC delivery and legacy review.', 'ATTENDANCE_TIMEZONE_UNVERIFIED');
-  return { timezone, storageTimezone, weekday, hour, minute, windowMinutes, enabled: flag === 'true' };
+  const recoveryHours = integerSetting(env.WEEKLY_TIMESHEET_RECOVERY_HOURS, 48, 0, 72, 'Weekly recovery hours');
+  return { timezone, storageTimezone, weekday, hour, minute, windowMinutes, recoveryHours, enabled: flag === 'true' };
 }
 function latestCompletedWeek(now = new Date(), timezone = 'Australia/Sydney') {
   if (!IANAZone.isValidZone(timezone)) throw policyError('The company timesheet timezone is invalid.');
@@ -42,6 +43,14 @@ function scheduleWindow(now, config) {
   const eligible = config.enabled && instant.weekday === config.weekday && elapsed >= 0 && elapsed < config.windowMinutes;
   return { eligible, period, reason: !config.enabled ? 'disabled' : instant.weekday !== config.weekday ? 'outside_send_day' : elapsed < 0 ? 'before_send_window' : elapsed >= config.windowMinutes ? 'send_window_closed' : 'scheduled_window' };
 }
+function recoveryWindow(now, config) {
+  const local = DateTime.fromJSDate(now, { zone: config.timezone });
+  if (!local.isValid) throw policyError('The scheduler time is invalid.');
+  const due = local.startOf('week').plus({days:config.weekday - 1}).set({hour:config.hour,minute:config.minute});
+  const end = due.plus({hours:config.recoveryHours ?? 48});
+  return { eligible:config.enabled && (config.recoveryHours ?? 48)>0 && local>=due.plus({minutes:config.windowMinutes}) && local<end,
+    end_utc:end.toUTC().toISO(), period:latestCompletedWeek(now,config.timezone) };
+}
 function scheduleDetails(now = new Date(), env = process.env) {
   const config = configuration(env), window = scheduleWindow(now, config);
   const local = DateTime.fromJSDate(now, { zone: config.timezone });
@@ -49,7 +58,7 @@ function scheduleDetails(now = new Date(), env = process.env) {
   if (!window.eligible && due.toMillis() <= local.toMillis()) due = due.plus({ weeks: 1 });
   return { enabled: config.enabled, timezone: config.timezone, timezone_source: env.TIMESHEET_TIMEZONE ? 'TIMESHEET_TIMEZONE' : env.WEEKLY_TIMESHEET_EMAIL_TIMEZONE ? 'WEEKLY_TIMESHEET_EMAIL_TIMEZONE' : 'default',
     storage_timezone_verified: config.storageTimezone === 'UTC', timestamp_policy: config.storageTimezone === 'UTC' ? 'VERIFIED_LEGACY_AND_EXPLICIT_UTC' : 'EXPLICIT_ROW_UTC_ONLY', weekday: config.weekday, hour: config.hour, minute: config.minute,
-    window_minutes: config.windowMinutes, next_due_utc: due.toUTC().toISO(), next_due_local: due.toISO(),
+    window_minutes: config.windowMinutes, recovery_hours:config.recoveryHours, recovery_end_utc:recoveryWindow(now,config).end_utc, next_due_utc: due.toUTC().toISO(), next_due_local: due.toISO(),
     window_end_utc: due.plus({ minutes: config.windowMinutes }).toUTC().toISO(), current_period: window.period, waiting_reason: window.reason };
 }
 function emailAddress(value) {
@@ -165,4 +174,4 @@ function canonicalSnapshot(staff, assessment, period, version = 1, reviewStatus 
     review_status: reviewStatus, total_minutes: assessment.totalMinutes, rows: assessment.rows,
     shift_allocation: 'WHOLE_SHIFT_LOCAL_START_DATE' };
 }
-module.exports = { configuration, latestCompletedWeek, scheduleWindow, scheduleDetails, emailAddress, isEmployee, activeEmployee, assessWorkedAttendance, canonicalSnapshot, snapshotHash, stableJson, utcInstant, policyError };
+module.exports = { configuration, latestCompletedWeek, scheduleWindow, recoveryWindow, scheduleDetails, emailAddress, isEmployee, activeEmployee, assessWorkedAttendance, canonicalSnapshot, snapshotHash, stableJson, utcInstant, policyError };

@@ -25,6 +25,7 @@ async function getCorrection({user,id,db=pool}){
 async function listCorrections({user,query={}}){
  p.actor(user);await ensureAttendanceMobileSchema();const page=Number(query.page||1),size=Number(query.page_size||25);if(!Number.isSafeInteger(page)||page<1||!Number.isSafeInteger(size)||size<1||size>100||(page-1)*size>10000000)throw p.fail('Choose a valid correction page.','ATTENDANCE_PAGINATION_INVALID');
  const scope=scopedWhere(user,String(query.scope||'own').toLowerCase()),clauses=[scope.sql],params=[...scope.params];
+ if(query.user_id){const target=p.positiveId(query.user_id,'user_id');clauses.push('c.user_id=?');params.push(target);}
  if(query.status&&String(query.status).toUpperCase()!=='ALL'){const status=String(query.status).toUpperCase();if(!['PENDING','APPROVED','REJECTED'].includes(status))throw p.fail('Choose a valid correction status.','ATTENDANCE_FILTER_INVALID');clauses.push('c.status=?');params.push(status);}
  const [[count]]=await pool.query(`SELECT COUNT(*) total FROM attendance_correction_requests c JOIN users u ON u.id=c.user_id WHERE ${clauses.join(' AND ')}`,params);
  const [rows]=await pool.query(`SELECT ${CORRECTION_SELECT} FROM attendance_correction_requests c JOIN users u ON u.id=c.user_id LEFT JOIN staff_attendance a ON a.id=c.attendance_id WHERE ${clauses.join(' AND ')} ORDER BY c.created_at DESC,c.id DESC LIMIT ? OFFSET ?`,[...params,size,(page-1)*size]);

@@ -49,6 +49,7 @@ router.get('/timesheets', auth, timesheetWorkflowController.list);
 
 router.get('/timesheets/user', auth, attendanceController.userTimesheets);
 router.post('/timesheets/send', auth, weeklyDeliveryController.legacySend);
+router.get('/timesheets/weekly-reconciliation', auth, weeklyDeliveryController.reconciliation);
 router.get('/timesheets/weekly-deliveries', auth, weeklyDeliveryController.list);
 router.get('/timesheets/weekly-deliveries/:id', auth, weeklyDeliveryController.detail);
 router.post('/timesheets/weekly-deliveries/:id/revision', auth, weeklyDeliveryController.revise);

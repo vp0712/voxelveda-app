@@ -8067,13 +8067,17 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 const weeklyDeliveryState = window.weeklyDeliveryState = { page:1, pages:1, deliveries:[] };
+function weeklyDeliveryHours(row){return row.source_sha256&&row.total_minutes!=null&&row.total_minutes!==''&&Number.isSafeInteger(Number(row.total_minutes))?(Number(row.total_minutes)/60).toFixed(2):row.status==='NO_WORK'?'0.00':'Not finalised';}
 function weeklyDeliveryReasons(row) {
-  let reasons = row.review_reasons_json;
-  if (typeof reasons === 'string') { try { reasons = JSON.parse(reasons); } catch { reasons = []; } }
-  return [...(Array.isArray(reasons) ? reasons : []), row.last_error_code].filter(Boolean).map(value => String(value).replaceAll('_', ' ')).join('; ');
+  let issues=row.review_reasons_json;
+  if(typeof issues==='string'){try{issues=JSON.parse(issues);}catch{issues=[];}}
+  return [...(Array.isArray(issues)?issues:[]),row.last_error_code].filter(Boolean).map(issue=> {
+    const code=typeof issue==='object'?issue.code:issue;
+    return (window.VoxelWeeklyDelivery?.reason(code)||String(code||'Review required').replaceAll('_',' ').toLowerCase())+(Number(issue?.attendance_id)>0?' · Attendance #'+Number(issue.attendance_id):'');
+  }).join('; ');
 }
 function canManageWeeklyDelivery() {
-  return hasCurrentPermission('MANAGE_COMPANY_EMAIL') || hasCurrentPermission('APPROVE_ALL_TIMESHEETS') || hasCurrentPermission('APPROVE_TEAM_TIMESHEET');
+  return hasCurrentPermission('SEND_COMPANY_EMAIL') && (hasCurrentPermission('MANAGE_COMPANY_EMAIL') || hasCurrentPermission('APPROVE_ALL_TIMESHEETS') || hasCurrentPermission('APPROVE_TEAM_TIMESHEET'));
 }
 async function loadWeeklyTimesheetDeliveries(page = 1) {
   const body = document.getElementById('weeklyDeliveryBody');
@@ -8100,12 +8104,12 @@ async function loadWeeklyTimesheetDeliveries(page = 1) {
     body.innerHTML = weeklyDeliveryState.deliveries.length ? weeklyDeliveryState.deliveries.map(row => {
       const id = Number(row.id), version = Number(row.version);
       const pdf = Number(row.document_request_id);
-      return `<tr><td>${escapeHtml(row.staff_name || 'Staff')}<span class="cell-subtext">Staff #${Number(row.user_id)}</span></td><td>${escapeHtml(String(row.period_start || '').slice(0,10))}<span class="cell-subtext">to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</span></td><td>${(Number(row.total_minutes || 0)/60).toFixed(2)}</td><td>Version ${version}<span class="cell-subtext">${escapeHtml(String(row.status || '').replaceAll('_',' '))}</span></td><td>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}<span class="cell-subtext">${row.provider_accepted_at ? 'Provider accepted · recipient receipt unverified' : 'Provider acceptance unconfirmed'}${row.sent_at ? ' · Transport sent' : ''}</span></td><td><div class="row-actions"><button class="secondary-btn" onclick="return openWeeklyDeliveryDetail(${id})">Details</button>${Number.isSafeInteger(pdf) && pdf > 0 ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${pdf})">Individual PDF</button>` : ''}${canManageWeeklyDelivery() ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id})">Authorise revision</button>${row.status === 'GENERATION_FAILED' && !row.email_queue_id ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id}, true)">Retry generation</button>` : ''}` : ''}</div></td></tr>`;
+      return `<tr><td>${escapeHtml(row.staff_name || 'Staff')}<span class="cell-subtext">Staff #${Number(row.user_id)}</span></td><td>${escapeHtml(String(row.period_start || '').slice(0,10))}<span class="cell-subtext">to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</span></td><td>${escapeHtml(weeklyDeliveryHours(row))}</td><td>Version ${version}<span class="cell-subtext">${escapeHtml(String(row.status || '').replaceAll('_',' '))}</span></td><td>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}<span class="cell-subtext">${row.provider_accepted_at ? 'Provider accepted · recipient receipt unverified' : 'Provider acceptance unconfirmed'}${row.sent_at ? ' · Transport sent' : ''}</span></td><td><div class="row-actions"><button class="secondary-btn" onclick="return openWeeklyDeliveryDetail(${id})">Details</button>${Number.isSafeInteger(pdf) && pdf > 0 ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${pdf})">Individual PDF</button>` : ''}${canManageWeeklyDelivery() ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id})">Authorise revision</button>${row.status === 'GENERATION_FAILED' && !row.email_queue_id ? `<button class="secondary-btn" onclick="return openWeeklyDeliveryRevision(${id}, true)">Retry generation</button>` : ''}` : ''}</div></td></tr>`;
     }).join('') : '<tr><td colspan="6">No weekly deliveries match these filters.</td></tr>';
     const summary = document.getElementById('weeklyDeliveryPageSummary');
     if (summary) summary.textContent = `${Number(data.total || 0)} deliveries · Page ${weeklyDeliveryState.page} of ${weeklyDeliveryState.pages}`;
     enhanceResponsiveTables();
-  } catch (error) { body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')}</td></tr>`; }
+  } catch (error) { body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')} <button type="button" class="secondary-btn" onclick="loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page)">Retry</button></td></tr>`; }
 }
 async function openWeeklyDeliveryPdf(requestId) {
   const id = Number(requestId);
@@ -8121,7 +8125,7 @@ async function openWeeklyDeliveryDetail(deliveryId) {
     const data = await safeJson(response);
     if (!response.ok) throw new Error(data.message || 'Delivery details could not be loaded');
     const row = data.delivery || {};
-    showDialog('Individual weekly delivery history', `<p>Staff #${Number(row.user_id)} · ${escapeHtml(String(row.period_start || '').slice(0,10))} to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</p><p>Version ${Number(row.version)} · ${escapeHtml(row.status)} · ${(Number(row.total_minutes || 0)/60).toFixed(2)} worked hours</p><p>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}</p><p class="status-note">Each version contains only this staff member’s worked attendance. Provider acceptance and recipient receipt are separate states; recipient receipt remains unverified.</p><h4>Retained versions</h4>${(data.versions || []).map(version => `<p>Version ${Number(version.version)} · ${escapeHtml(version.status)} · ${escapeHtml(version.reason || 'Scheduled delivery')} · ${escapeHtml(formatDateTime(version.created_at))}${Number(version.document_request_id) > 0 ? ` <button class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${Number(version.document_request_id)})">Individual PDF</button>` : ''}</p>`).join('') || '<p>No previous revision recorded.</p>'}`, hideDialog, 'Close');
+    showDialog('Individual weekly delivery history', `<p>Staff #${Number(row.user_id)} · ${escapeHtml(String(row.period_start || '').slice(0,10))} to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</p><p>Version ${Number(row.version)} · ${escapeHtml(row.status)} · ${escapeHtml(weeklyDeliveryHours(row))} snapshot hours</p><p>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}</p><p class="status-note">Each version contains only this staff member’s worked attendance. Provider acceptance and recipient receipt are separate states; recipient receipt remains unverified.</p><h4>Retained versions</h4>${(data.versions || []).map(version => `<p>Version ${Number(version.version)} · ${escapeHtml(version.status)} · ${escapeHtml(version.reason || 'Scheduled delivery')} · ${escapeHtml(formatDateTime(version.created_at))}${Number(version.document_request_id) > 0 ? ` <button class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${Number(version.document_request_id)})">Individual PDF</button>` : ''}</p>`).join('') || '<p>No previous revision recorded.</p>'}`, hideDialog, 'Close');
   } catch (error) { showToast(error.message || 'Delivery details are unavailable'); }
 }
 function openWeeklyDeliveryRevision(deliveryId, retryGeneration = false, previousReason = '', requireUncertainConfirmation = false) {

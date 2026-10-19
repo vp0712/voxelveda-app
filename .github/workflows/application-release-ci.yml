@@ -65,6 +65,11 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/checkout-summary
         run: node scripts/checkout-summary-browser-test.js
+      - name: Test weekly delivery and every retained role portal
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/weekly-portals
+        run: node scripts/weekly-portals-browser-test.js
       - name: Preserve attendance workflow evidence
         if: always()
         uses: actions/upload-artifact@v4
