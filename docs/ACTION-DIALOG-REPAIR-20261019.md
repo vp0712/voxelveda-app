@@ -34,7 +34,10 @@ not replace portals, role templates, business records, the original logo or them
    action groups can shrink/wrap; periods use readable calendar dates. Dialogs
    follow visual viewport offsets/heights and safe areas; footer actions stay out
    of the scrollable content. No global horizontal-overflow hiding is used.
-7. A missing attendance edit ID could open the add-entry form. It now reports an
+7. Admin button normalisation converted implicit form submit controls into inert
+   ordinary buttons. It now preserves form semantics; a real submit-event regression
+   verifies consolidated validation instead of a silent no-op.
+8. A missing attendance edit ID could open the add-entry form. It now reports an
    unavailable record and requires a register refresh, preserving record identity.
 
 ## Attendance source integrity

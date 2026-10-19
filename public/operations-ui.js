@@ -51,6 +51,10 @@
     root.querySelector('[aria-invalid="true"]')?.focus();
   }
   function bindActions(root = document) {
+    root.querySelectorAll('form').forEach(form=>{
+      if(form.dataset.vvValidationBound)return;form.dataset.vvValidationBound='true';form.noValidate=true;
+      form.addEventListener('submit',event=>{if(window.VoxelDialog&&!window.VoxelDialog.validate(form)){event.preventDefault();event.stopImmediatePropagation();}},true);
+    });
     root.querySelectorAll('button[onclick]').forEach(button => {
       if (button.dataset.actionBound || !button.onclick || /dialogPrimaryBtn/i.test(button.id)) return;
       button.dataset.actionBound = 'true';
@@ -77,7 +81,7 @@
     if (field.getAttribute('aria-invalid') === 'true') {
       field.removeAttribute('aria-invalid');
       const label = document.getElementById(field.getAttribute('aria-describedby'));
-      if (label?.classList.contains('field-error')) label.remove();
+      if (label?.classList.contains('field-error')||label?.classList.contains('vv-validation-error')) label.remove();
       field.removeAttribute('aria-describedby');
     }
   });

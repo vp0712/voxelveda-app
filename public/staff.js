@@ -2281,7 +2281,7 @@ async function deleteStaffStockOut(id) {
     return;
   }
 
-  if (!(await VoxelFeedback.confirm('Delete this stock out entry and restore quantity?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this stock out entry and restore quantity?', {"title":"Delete stock issue","confirmLabel":"Delete stock issue"}))) return;
 
   const res = await fetch('/api/stock/movement/delete', {
     method: 'POST',
@@ -2513,12 +2513,12 @@ async function submitCurrentTimesheet() {
     return;
   }
   if (Number(timesheet.total_hours || 0) <= 0) {
-    showToast('Record shift hours before submitting this timesheet.', {kind:'info'});
+    showToast('Record shift hours before submitting this timesheet.', {kind:'error'});
     return;
   }
   if (!(await VoxelFeedback.confirm(status === 'CORRECTION_REQUIRED'
     ? 'Resubmit this corrected timesheet for manager approval?'
-    : 'Submit this weekly timesheet for manager approval?'))) return;
+    : 'Submit this weekly timesheet for manager approval?', {"title":"Submit timesheet","confirmLabel":"Submit timesheet"}))) return;
 
   if(timesheet.source_review_required)return showToast('Source attendance needs correction before submission.', {kind:'error'});
   const button = document.getElementById('submitTimesheetBtn');
@@ -2897,11 +2897,11 @@ async function submitLeaveRequest(event) {
   const to = document.getElementById('leaveTo')?.value || '';
   const reason = document.getElementById('leaveReason')?.value.trim() || '';
   if (!type || !from || !to || !reason) {
-    showToast('Please fill required fields', {kind:'info'});
+    showToast('Please fill required fields', {kind:'error'});
     return;
   }
   if (new Date(to) < new Date(from)) {
-    showToast('Leave end date must be after start date', {kind:'info'});
+    showToast('Leave end date must be after start date', {kind:'error'});
     return;
   }
   const sync = await sendStaffWorkRequest('leave', type + ' leave request', reason, { type, from, to, reason });
@@ -2930,7 +2930,7 @@ async function saveAvailability(event) {
   const status = document.getElementById('availabilityStatus')?.value || '';
   const notes = document.getElementById('availabilityNotes')?.value.trim() || '';
   if (!date || !status) {
-    showToast('Please fill required fields', {kind:'info'});
+    showToast('Please fill required fields', {kind:'error'});
     return;
   }
   const sync = await sendStaffWorkRequest('availability', status + ' availability', notes || status, { date, status, notes });
@@ -2987,7 +2987,7 @@ async function submitStaffChecklist(event) {
   const result = document.getElementById('staffFormResult')?.value || '';
   const notes = document.getElementById('staffFormNotes')?.value.trim() || '';
   if (!type || !result) {
-    showToast('Please fill required fields', {kind:'info'});
+    showToast('Please fill required fields', {kind:'error'});
     return;
   }
   const sync = await sendStaffWorkRequest('forms', type + ' checklist', notes || result, { type, result, notes });
@@ -3015,7 +3015,7 @@ async function sendStaffMessage(event) {
   const priority = document.getElementById('staffMessagePriority')?.value || 'Normal';
   const body = document.getElementById('staffMessageBody')?.value.trim() || '';
   if (!body) {
-    showToast('Please fill required fields', {kind:'info'});
+    showToast('Please fill required fields', {kind:'error'});
     return;
   }
 

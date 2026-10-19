@@ -189,7 +189,7 @@
         if (!body.amount || Number(body.amount) <= 0) return showToast('Enter a payment amount greater than zero', {kind:'error'});
         if (!body.payment_date || !body.payment_method || !body.account_name) return showToast('Payment date, method and paid-from account are required', {kind:'error'});
         const selected = expenseCache.find((row) => Number(row.id) === expenseId);
-        if (!(await VoxelFeedback.confirm(`Record ${formatMoney(body.amount)} payment to ${selected?.supplier_name || 'this supplier'}?`))) return;
+        if (!(await VoxelFeedback.confirm(`Record ${formatMoney(body.amount)} payment to ${selected?.supplier_name || 'this supplier'}?`, {"title":"Record payment","confirmLabel":"Record payment"}))) return;
         const res = await fetch(`/api/expenses/${expenseId}/payments`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(body) });
         const data = await safeJson(res);
         if (!res.ok) return showToast(data.message || 'Payment could not be recorded', {kind:'error'});
@@ -209,7 +209,7 @@
   };
 
   window.voidExpensePayment = async function voidExpensePayment(paymentId, expenseId) {
-    const reason = (await VoxelFeedback.prompt('Enter the reason for reversing this payment:'));
+    const reason = (await VoxelFeedback.prompt('Enter the reason for reversing this payment:', {"title":"Reverse payment","confirmLabel":"Reverse payment"}));
     if (!reason?.trim()) return;
     const res = await fetch(`/api/expenses/payments/${Number(paymentId)}/void`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ reason: reason.trim() }) });
     const data = await safeJson(res);

@@ -563,7 +563,7 @@ function enhanceResponsiveTables() {
 
 function normalizeActionButtons(root = document) {
   root.querySelectorAll('button:not([type])').forEach((button) => {
-    button.type = 'button';
+    if(!button.form)button.type = 'button';
   });
 }
 
@@ -2331,11 +2331,11 @@ function invoiceItemRows(items = [{ description: '', quantity: 1, unit_price: 0 
     <div class="invoice-item-row" data-invoice-item-row>
       <label>
         <span>Item description</span>
-        <input class="invoiceItemDescription" placeholder="Item description" autocomplete="off" value="${escapeHtml(item.description || '')}" />
+        <input class="invoiceItemDescription" required placeholder="Item description" autocomplete="off" value="${escapeHtml(item.description || '')}" />
       </label>
       <label>
         <span>Qty</span>
-        <input class="invoiceItemQty" type="number" min="0.001" step="0.001" placeholder="Qty" value="${escapeHtml(item.quantity || 1)}" oninput="updateManualInvoiceSummary()" />
+        <input class="invoiceItemQty" required type="number" min="0.001" step="0.001" placeholder="Qty" value="${escapeHtml(item.quantity || 1)}" oninput="updateManualInvoiceSummary()" />
       </label>
       <label>
         <span>Unit price</span>
@@ -2562,7 +2562,7 @@ function openManualInvoiceDialog() {
       <div class="stock-dialog-grid">
         <div class="dialog-card">
           <h4>Customer</h4>
-          <input id="manualInvoiceCustomer" placeholder="Type first letter, company, contact, phone or email" oninput="renderManualCustomerSuggestions()" autocomplete="off" />
+          <input id="manualInvoiceCustomer" required placeholder="Type first letter, company, contact, phone or email" oninput="renderManualCustomerSuggestions()" autocomplete="off" />
           <div id="manualInvoiceSelectedCustomer" class="selected-customer-card hidden-section"></div>
           <div id="manualCustomerSuggestions" class="customer-suggestion-list"></div>
           <input id="manualInvoiceEmail" type="email" placeholder="Customer email" />
@@ -2606,12 +2606,12 @@ function openManualInvoiceDialog() {
 
       const invalidItem = body.items.find((item) => !item.description || !Number.isFinite(Number(item.quantity)) || Number(item.quantity)<=0 || item.unit_price===null || !Number.isFinite(Number(item.unit_price)) || Number(item.unit_price)<0);
       if (!body.customer_name || !body.items.length || invalidItem) {
-        showToast('Please fill required fields', {kind:'info'});
+        showToast('Please fill required fields', {kind:'error'});
         return;
       }
 
       if (body.customer_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.customer_email)) {
-        showToast('Enter a valid customer email', {kind:'info'});
+        showToast('Enter a valid customer email', {kind:'error'});
         return;
       }
 
@@ -2658,7 +2658,7 @@ async function invoiceAction(invoiceId, action) {
   try {
     // Settlement records an actual receipt through the original payment form.
     if (action === 'paid') return await openInvoicePaymentDialog(id);
-    if (action === 'delete' && !(await VoxelFeedback.confirm('Archive this invoice? Its original records and payment history will be preserved.'))) return;
+    if (action === 'delete' && !(await VoxelFeedback.confirm('Archive this invoice? Its original records and payment history will be preserved.', {"title":"Archive invoice","confirmLabel":"Archive invoice"}))) return;
     const res = await fetch(`/api/invoice/${action}`, {
       method: 'POST', headers: authHeaders(), body: JSON.stringify({ invoice_id: id })
     });
@@ -2882,7 +2882,7 @@ async function openInvoicePaymentDialog(invoiceId) {
 }
 
 async function deleteInvoicePayment(invoiceId, paymentId) {
-  if (!(await VoxelFeedback.confirm('Void this payment? The original entry and audit history will be retained.'))) return;
+  if (!(await VoxelFeedback.confirm('Void this payment? The original entry and audit history will be retained.', {"title":"Void payment","confirmLabel":"Void payment"}))) return;
 
   const res = await fetch('/api/invoice/payment/delete', {
     method: 'POST',
@@ -3170,7 +3170,7 @@ function openSendInvoiceDialog(invoiceId) {
     'Send Invoice',
     `
       <p class="status-note">Send the PDF by email. Mobile number is saved on the send record for follow-up/SMS setup.</p>
-      <input id="sendInvoiceEmail" type="email" placeholder="Customer email address" />
+      <input id="sendInvoiceEmail" required type="email" placeholder="Customer email address" />
       <input id="sendInvoiceMobile" placeholder="Customer mobile number" />
       <div id="sendInvoiceDeliveryStatus" class="email-delivery-status" hidden></div>
       <div class="document-recovery-actions">
@@ -3185,7 +3185,7 @@ function openSendInvoiceDialog(invoiceId) {
       const mobile = document.getElementById('sendInvoiceMobile')?.value.trim();
 
       if (!isValidEmail(email)) {
-        showToast('Enter a valid authorised recipient email address', {kind:'info'});
+        showToast('Enter a valid authorised recipient email address', {kind:'error'});
         return;
       }
 
@@ -3332,7 +3332,7 @@ function openCustomerDialog(id = null) {
 }
 
 async function deleteCustomer(id) {
-  if (!(await VoxelFeedback.confirm('Delete this customer?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this customer?', {"title":"Delete customer","confirmLabel":"Delete customer"}))) return;
 
   const res = await fetch('/api/customers/delete', {
     method: 'POST',
@@ -3582,7 +3582,7 @@ async function viewSupplierFile(id) {
 }
 
 async function deleteSupplier(id) {
-  if (!(await VoxelFeedback.confirm('Delete this supplier profile and hide its files?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this supplier profile and hide its files?', {"title":"Delete supplier","confirmLabel":"Delete supplier"}))) return;
 
   const res = await fetch('/api/suppliers/delete', {
     method: 'POST',
@@ -3601,7 +3601,7 @@ async function deleteSupplier(id) {
 }
 
 async function deleteSupplierFile(id) {
-  if (!(await VoxelFeedback.confirm('Delete this supplier file/photo?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this supplier file/photo?', {"title":"Delete file","confirmLabel":"Delete file"}))) return;
 
   const res = await fetch('/api/suppliers/files/delete', {
     method: 'POST',
@@ -4004,7 +4004,7 @@ async function viewExpenseFile(id) {
 }
 
 async function deleteExpenseFile(id) {
-  if (!(await VoxelFeedback.confirm('Delete this bill/photo only?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this bill/photo only?', {"title":"Delete attachment","confirmLabel":"Delete attachment"}))) return;
 
   const res = await fetch('/api/expenses/files/delete', {
     method: 'POST',
@@ -4024,7 +4024,7 @@ async function deleteExpenseFile(id) {
 }
 
 async function deleteExpense(id) {
-  if (!(await VoxelFeedback.confirm('Delete this expense entry?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this expense entry?', {"title":"Delete expense","confirmLabel":"Delete expense"}))) return;
 
   const res = await fetch('/api/expenses/delete', {
     method: 'POST',
@@ -4266,7 +4266,7 @@ async function seedIndustryCompetitors() {
 }
 
 async function deleteCompetitor(id) {
-  if (!(await VoxelFeedback.confirm('Delete this competitor record?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this competitor record?', {"title":"Delete competitor","confirmLabel":"Delete competitor"}))) return;
 
   const res = await fetch('/api/competitors/delete', {
     method: 'POST',
@@ -4564,7 +4564,7 @@ function openComplianceFileDialog(entryId) {
 }
 
 async function deleteComplianceEntry(id) {
-  if (!(await VoxelFeedback.confirm('Delete this compliance entry?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this compliance entry?', {"title":"Delete compliance entry","confirmLabel":"Delete compliance entry"}))) return;
 
   const res = await fetch('/api/compliance/delete', {
     method: 'POST',
@@ -4583,7 +4583,7 @@ async function deleteComplianceEntry(id) {
 }
 
 async function deleteComplianceFile(id) {
-  if (!(await VoxelFeedback.confirm('Delete this uploaded compliance file?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this uploaded compliance file?', {"title":"Delete file","confirmLabel":"Delete file"}))) return;
 
   const res = await fetch('/api/compliance/files/delete', {
     method: 'POST',
@@ -4774,7 +4774,7 @@ function openTaskDialog(id) {
 }
 
 async function deleteTask(id) {
-  if (!(await VoxelFeedback.confirm('Delete this task from the register?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this task from the register?', {"title":"Delete task","confirmLabel":"Delete task"}))) return;
 
   const res = await fetch('/api/tasks/delete', {
     method: 'POST',
@@ -4919,7 +4919,7 @@ function openAnnouncementDialog(id = null) {
 }
 
 async function deleteAnnouncement(id) {
-  if (!(await VoxelFeedback.confirm('Delete this announcement?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this announcement?', {"title":"Delete announcement","confirmLabel":"Delete announcement"}))) return;
 
   const res = await fetch('/api/tasks/announcements/delete', {
     method: 'POST',
@@ -6551,7 +6551,7 @@ function openProcessSheetPdf(id) {
 }
 
 async function deleteMaterial(type, id) {
-  if (!(await VoxelFeedback.confirm(`Delete this ${materialLabel(type).toLowerCase()} item?`))) return;
+  if (!(await VoxelFeedback.confirm(`Delete this ${materialLabel(type).toLowerCase()} item?`, {"title":"Delete material","confirmLabel":"Delete material"}))) return;
 
   const res = await fetch('/api/materials/delete', {
     method: 'POST',
@@ -6849,7 +6849,7 @@ async function loadStockUsage() {
 }
 
 async function deleteStockUsage(id) {
-  if (!(await VoxelFeedback.confirm('Delete this stock out entry and restore the quantity?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this stock out entry and restore the quantity?', {"title":"Delete stock issue","confirmLabel":"Delete stock issue"}))) return;
 
   const res = await fetch('/api/stock/movement/delete', {
     method: 'POST',
@@ -6870,7 +6870,7 @@ async function deleteStockUsage(id) {
 }
 
 async function deleteStock(id) {
-  if (!(await VoxelFeedback.confirm('Delete this stock item?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this stock item?', {"title":"Delete stock item","confirmLabel":"Delete stock item"}))) return;
 
   const res = await fetch('/api/stock/delete', {
     method: 'POST',
@@ -7071,7 +7071,7 @@ async function openAttendanceDialog(attendanceId = null) {
 }
 
 async function deleteAttendance(id) {
-  if (!(await VoxelFeedback.confirm('Archive this attendance record? Its history remains recoverable.'))) return;
+  if (!(await VoxelFeedback.confirm('Archive this attendance record? Its history remains recoverable.', {"title":"Archive attendance","confirmLabel":"Archive attendance"}))) return;
 
   const res = await fetch('/api/attendance/admin/delete', {
     method: 'POST',
@@ -7283,7 +7283,7 @@ async function openMeetingDialog(id = null) {
 }
 
 async function deleteMeeting(id) {
-  if (!(await VoxelFeedback.confirm('Delete this meeting / inspection?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this meeting / inspection?', {"title":"Delete meeting","confirmLabel":"Delete meeting"}))) return;
 
   const res = await fetch('/api/meetings/delete', {
     method: 'POST',
@@ -7490,7 +7490,7 @@ function openRosterShiftDialog(id = null) {
 }
 
 async function deleteRosterShift(id) {
-  if (!(await VoxelFeedback.confirm('Delete this roster shift?'))) return;
+  if (!(await VoxelFeedback.confirm('Delete this roster shift?', {"title":"Delete shift","confirmLabel":"Delete shift"}))) return;
 
   const res = await fetch('/api/roster/delete', {
     method: 'POST',
@@ -7555,7 +7555,7 @@ async function loadSelectedStaffTimesheets() {
   const period = periodSelect.value || 'weekly';
 
   if (!userId) {
-    showToast('Select a staff member', {kind:'info'});
+    showToast('Select a staff member', {kind:'error'});
     return;
   }
 
@@ -7902,8 +7902,8 @@ async function approveTimesheetRecord(id, approvedHours, comments = '', source =
   return VoxelActions.timesheet({id,hours:approvedHours,url:`/api/attendance/timesheets/${Number(id)}/approve`,headers:authHeaders(),
     body:{approved_hours:approvedHours,comments,reason:comments,expected_version:source.version_no,expected_source_minutes:source.minutes},
     context:source.context,close:hideDialog,onCommit:row=>{window.vvTimesheetCache=(window.vvTimesheetCache||[]).map(t=>Number(t.id)===Number(id)?{...t,...row}:t);renderTimesheetRegister();updateWorkforceDashboardMetrics();},
-    refresh:()=>loadTimesheets({throwOnError:true}),reopen:()=>{hideDialog();return openTimesheetDecision(id,'approve');},
-    errorActions:[{label:'Return to form'},{label:'Refresh source',run:()=>{hideDialog();openTimesheetDecision(id,'approve');}}]});
+    refresh:()=>loadTimesheets({throwOnError:true}),reopen:()=>{hideDialog();return openTimesheetDecision(id,'approve',undefined,{comments});},
+    errorActions:[{label:'Return to form'},{label:'Refresh source',run:()=>{hideDialog();openTimesheetDecision(id,'approve',undefined,{comments});}}]});
 }
 
 async function reviewTimesheetAttendance(detail) {
@@ -7914,7 +7914,7 @@ async function reviewTimesheetAttendance(detail) {
   if(window.VoxelDialog?.active?.dirty){const answer=await VoxelFeedback.show({kind:'warning',title:'Open attendance review?',message:'The approval has not been saved. Discard the entered approval values to review the source attendance.',actions:[{label:'Return to form'},{label:'Review attendance',value:'review'}]});if(answer!=='review')return;}hideDialog();go();
 }
 
-async function openTimesheetDecision(id, action, submittedHours) {
+async function openTimesheetDecision(id, action, submittedHours, draft = {}) {
   const owner=VoxelActions.account();let detail;
   try{detail=await VoxelActions.request(`/api/attendance/timesheets/${Number(id)}`,{headers:authHeaders()});}catch(error){return showToast(error.message,{kind:'error'});}
   if(owner!==VoxelActions.account())return;
@@ -7927,9 +7927,9 @@ async function openTimesheetDecision(id, action, submittedHours) {
   const labels={approve:['Approve Timesheet','Approve'],correction:['Request Correction','Send Request'],reject:['Reject Timesheet','Reject'],amend:['Amend Approved Timesheet','Save Amendment']};
   const [title,buttonText]=labels[action]||labels.approve,needsReason=action!=='approve';
   const issues=source.reviewIssues||source.review_issues||[];
-  showDialog(title,`<dl class="decision-context"><div><dt>Employee</dt><dd>${escapeHtml(record.name||record.staff_name||'Staff member')}</dd></div><div><dt>Reporting period</dt><dd>${escapeHtml(VoxelActions.date(record.week_start))} – ${escapeHtml(VoxelActions.date(record.week_end))}</dd></div><div><dt>Verified completed source</dt><dd>${Number(source.actualHours).toFixed(2)} hrs</dd></div></dl>
+  showDialog(title,`<dl class="decision-context"><div><dt>Employee</dt><dd>${escapeHtml(record.name||record.staff_name||'Staff member')}</dd></div><div><dt>Reporting period</dt><dd>${escapeHtml(VoxelActions.date(record.week_start))} – ${escapeHtml(VoxelActions.date(record.week_end))}</dd></div><div><dt>Status</dt><dd>${renderTimesheetStatusChip(record.status)}</dd></div><div><dt>Verified completed source</dt><dd>${Number(source.actualHours).toFixed(2)} hrs</dd></div></dl>
     ${blocked?`<div class="source-review-warning"><p role="alert">Some source attendance is excluded pending authorised review. Approved hours and a comment cannot resolve these records.</p><ul>${issues.map(issue=>`<li>${escapeHtml(VoxelWeeklyDelivery.reason(issue.code))}${issue.attendance_id?' · Attendance #'+Number(issue.attendance_id):''}</li>`).join('')}</ul><button type="button" id="timesheetReviewAttendance" class="secondary-btn">Review attendance</button><button type="button" id="timesheetReloadSource" class="secondary-btn">Reload source after correction</button></div>`:'<p class="status-note">Any difference in approved hours requires an audit reason. Original recorded work is preserved.</p>'}
-    <div class="form-stack">${['approve','amend'].includes(action)?`<label>Approved hours<input id="timesheetDecisionHours" type="number" min="0" max="168" step="0.01" required value="${Number(submittedHours||0).toFixed(2)}" ${blocked?'disabled':''}></label>`:''}<label>${needsReason?'Reason / manager comments':'Manager comments (required when adjusting hours)'}<textarea id="timesheetDecisionComments" rows="3" maxlength="4000" ${needsReason?'required':''}></textarea></label></div>`,async()=>{
+    <div class="form-stack">${['approve','amend'].includes(action)?`<label>Approved hours<input id="timesheetDecisionHours" type="number" min="0" max="168" step="0.01" required value="${Number(submittedHours||0).toFixed(2)}" ${blocked?'disabled':''}></label>`:''}<label>${needsReason?'Reason / manager comments':'Manager comments (required when adjusting hours)'}<textarea id="timesheetDecisionComments" rows="3" maxlength="4000" ${needsReason?'required':''}>${escapeHtml(draft.comments||'')}</textarea></label></div>`,async()=>{
       if(owner!==VoxelActions.account())throw new Error('Account changed. Reopen this record.');
       const comments=document.getElementById('timesheetDecisionComments').value.trim(),approvedHours=Number(document.getElementById('timesheetDecisionHours')?.value??submittedHours);
       if(action==='approve'&&blocked)throw new Error('Review the source attendance before approval.');
@@ -7939,7 +7939,7 @@ async function openTimesheetDecision(id, action, submittedHours) {
       return VoxelActions.timesheet({id,hours:action==='amend'?approvedHours:null,status:action==='reject'?'REJECTED':action==='correction'?'CORRECTION_REQUIRED':'APPROVED',title:action==='amend'?'Amendment saved':action==='reject'?'Timesheet rejected':'Correction requested',context,url:`/api/attendance/timesheets/${Number(id)}/${action}`,headers:authHeaders(),body,close:hideDialog,onCommit:row=>{window.vvTimesheetCache=(window.vvTimesheetCache||[]).map(t=>Number(t.id)===Number(id)?{...t,...row}:t);renderTimesheetRegister();},refresh:()=>loadTimesheets({throwOnError:true}),reopen:()=>{hideDialog();openTimesheetDecision(id,action);}});
     },buttonText,{disabled:['approve','amend'].includes(action)&&(blocked||action==='approve'&&!ready)});
   document.getElementById('timesheetReviewAttendance')?.addEventListener('click',()=>reviewTimesheetAttendance(detail));
-  document.getElementById('timesheetReloadSource')?.addEventListener('click',()=>{hideDialog();openTimesheetDecision(id,action);});
+  document.getElementById('timesheetReloadSource')?.addEventListener('click',()=>{const comments=document.getElementById('timesheetDecisionComments')?.value||'';hideDialog();openTimesheetDecision(id,action,undefined,{comments});});
 }
 
 function renderTimesheetReviewActions(timesheet) {

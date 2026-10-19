@@ -769,7 +769,7 @@
       if(action==='uploads-page'){state.uploadFilters.page=Math.max(1,Number(id));return load();}
       if(action==='review-import' || action==='refresh-import')return await readImport(id || state.importDetail?.batch?.id,1);
       if(action==='review-page')return await readImport(state.importDetail.batch.id,Number(id),true);
-      if(action==='close-import'){if(state.mappingDirty&&!(await VoxelFeedback.confirm('Discard unsaved import mapping changes? The original uploaded files are preserved.')))return;state.importReadSequence+=1;state.importDetail=null;state.error='';render();return;}
+      if(action==='close-import'){if(state.mappingDirty&&!(await VoxelFeedback.confirm('Discard unsaved import mapping changes? The original uploaded files are preserved.', {"title":"Discard changes","confirmLabel":"Discard changes"})))return;state.importReadSequence+=1;state.importDetail=null;state.error='';render();return;}
       if(action==='retry-extraction'){
         const batch=state.importDetail?.batch;
         return showDialog('Retry failed extraction',`<form id="procurementEntryForm" class="procurement-form"><p>The retained originals are reused. Already saved entries remain linked to their source rows.</p><label>Retry reason<textarea name="reason" required maxlength="1000"></textarea></label><p id="procurementEntryError" class="procurement-inline-error" role="alert"></p></form>`,async()=>{
