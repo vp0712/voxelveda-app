@@ -76,6 +76,7 @@ const checks = [
   'weekly-timesheet-eligibility-test.js',
   'attendance-verified-summary-test.js',
   'weekly-timesheet-api-test.js',
+  'weekly-reconciliation-test.js',
   'weekly-timesheet-pdf-test.js',
   'timesheet-workflow-regression-test.js',
   'email-legacy-document-queue-test.js',
