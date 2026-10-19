@@ -78,12 +78,13 @@
         window.removeEventListener('resize',fitViewport);
         resumeLoader?.();
         document.body.style.overflow=savedOverflow;
+        if(window.VoxelOverlay?.active==='security-verification')window.VoxelOverlay.close('security-verification','verification-complete');
         verificationPromise = null;
         if(returnFocus?.isConnected)returnFocus.focus({preventScroll:true});
         resolve(result);
       };
       const cancel = () => finish(false);
-      const keyboard=event=>{if(dialog.hidden)return;if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();if(!confirm.disabled)finish(false);}else if(event.key==='Tab'){event.stopImmediatePropagation();const controls=[...dialog.querySelectorAll('input,button')].filter(n=>!n.disabled&&n.getClientRects().length),first=controls[0],last=controls.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}};
+      const keyboard=event=>{if(dialog.hidden||window.VoxelOverlay?.active&&window.VoxelOverlay.active!=='security-verification')return;if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();if(!confirm.disabled)finish(false);}else if(event.key==='Tab'){event.stopImmediatePropagation();const controls=[...dialog.querySelectorAll('input,button')].filter(n=>!n.disabled&&n.getClientRects().length),first=controls[0],last=controls.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}};
       document.addEventListener('keydown',keyboard,true);
       const submit = async (event) => {
         event.preventDefault();
@@ -120,6 +121,7 @@
       };
       form.addEventListener('submit', submit);
       dialog.querySelector('.step-up-cancel').addEventListener('click', cancel);
+      window.VoxelOverlay?.open({id:'security-verification',modal:true,root:dialog,returnFocus,onClose:()=>finish(false),beforeClose:()=>!confirm.disabled});
     });
     return verificationPromise;
   }

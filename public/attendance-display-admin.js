@@ -11,7 +11,7 @@
   if(!data.url){target.append(paragraph(data.message||'The display was created. Replace it if its link was not saved.'),button('Manage display links',openAttendanceDisplaySettings));return;}
   target.append(paragraph('Save this private link now. It opens only the workplace QR, without login. The link cannot be retrieved later; replace it if lost.'));
   const label=document.createElement('label'),input=document.createElement('input');label.textContent='Private display link';input.type='text';input.readOnly=true;input.value=data.url;input.setAttribute('aria-label','Private display link');input.addEventListener('focus',()=>input.select());label.append(input);target.append(label);
-  target.append(button('Copy link',async()=>{try{await navigator.clipboard.writeText(input.value);showToast('Display link copied.');}catch{input.focus();input.select();showToast('Select and copy the private link.');}}));
+  target.append(button('Copy link',async()=>{try{await navigator.clipboard.writeText(input.value);showToast('Display link copied.', {kind:'info'});}catch{input.focus();input.select();showToast('Select and copy the private link.', {kind:'error'});}}));
   const link=document.createElement('a');link.textContent='Open QR display';link.href=data.url;link.target='_blank';link.rel='noopener noreferrer';link.className='secondary-btn';target.append(link,button('Manage display links',openAttendanceDisplaySettings));
  }
  function change(row,operation){listEpoch++;
@@ -19,9 +19,9 @@
   const title=creating?'Create display link':replacing?'Replace display link':'Revoke display link';
   showDialog(title,(creating||replacing?'<label>Display name<input id="displayLinkName" maxlength="120" required></label>':'')+(!creating?'<label>Reason<textarea id="displayLinkReason" minlength="3" maxlength="1000" required></textarea></label>':'')+'<p id="displayLinkError" role="status"></p>',async()=>{
    const label=document.getElementById('displayLinkName'),reason=document.getElementById('displayLinkReason'),error=document.getElementById('displayLinkError');
-   if(label&&(!label.value.trim()||!label.reportValidity()))return;if(reason&&(reason.value.trim().length<3||!reason.reportValidity()))return;
+   if(label&&(!label.value.trim()||!window.VoxelDialog.validate(label)))return;if(reason&&(reason.value.trim().length<3||!window.VoxelDialog.validate(reason)))return;
    try{const data=await api(creating?'':`/${encodeURIComponent(row.id)}/${operation}`,{request_id,...(label?{label:label.value.trim()}:{}),...(row?{expected_revision:row.revision,reason:reason.value.trim()}:{})});hideDialog();if(creating||replacing)issued(data);else await openAttendanceDisplaySettings();}
-   catch(e){error.textContent=e.message+' If the response was interrupted, use the same request to retry, or cancel and refresh the display list before creating another link.';}
+   catch(e){window.VoxelFeedback?.notify(e.message,{kind:'error'});error.textContent=e.message+' If the response was interrupted, use the same request to retry, or cancel and refresh the display list before creating another link.';}
   },creating?'Create link':replacing?'Replace link':'Revoke link');
 
  }

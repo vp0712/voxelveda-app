@@ -375,7 +375,7 @@ async function approveTimesheet(id, user, options = {}, req) {
   }
 }
 
-async function reviewTimesheet(id, user, action, comments, req) {
+async function reviewTimesheet(id, user, action, comments, req, options = {}) {
   const cleanAction = String(action || '').toUpperCase();
   const toStatus = cleanAction === 'REJECT' ? 'REJECTED' : cleanAction === 'REQUEST_CORRECTION' ? 'CORRECTION_REQUIRED' : '';
   if (!toStatus) throw new WorkflowError('A valid review action is required.');
@@ -393,6 +393,7 @@ async function reviewTimesheet(id, user, action, comments, req) {
     if (!APPROVAL_READY.has(timesheet.status)) {
       throw new WorkflowError('Only submitted timesheets can be reviewed.', 409, 'TIMESHEET_NOT_READY');
     }
+    assertDecisionVersion(timesheet,options);
     const summary = await calculateTimesheet(connection, timesheet);
     const versionNo = await createVersion(connection, timesheet, summary, toStatus, user.id, comments);
     await recordTransition(connection, timesheet, cleanAction, toStatus, user.id, comments);

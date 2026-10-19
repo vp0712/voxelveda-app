@@ -208,6 +208,7 @@ async function run() {
       };
     });
     const page=await context.newPage();
+    await page.addLocatorHandler(page.locator('#actionFeedback'),async()=>{const box=page.locator('#actionFeedback');const discard=box.getByRole('button',{name:'Discard changes',exact:true});if(await discard.count())await discard.click();else await box.locator('button').first().click();});
     observePage(page);
     await page.goto(origin+'/dashboard');
     await page.waitForURL('**/admin*');

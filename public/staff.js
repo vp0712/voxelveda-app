@@ -559,7 +559,7 @@ async function loadStaffRfqs() {
 
 async function updateStaffRfqStatus(id, action) {
   if (!canInput('rfqs')) {
-    showToast("You don't have access to update RFQs. Please contact admin.");
+    showToast("You don't have access to update RFQs. Please contact admin.", {kind:'info'});
     return;
   }
 
@@ -571,11 +571,11 @@ async function updateStaffRfqStatus(id, action) {
   const data = await safeJson(res);
 
   if (!res.ok) {
-    showToast(data.message || 'RFQ update failed');
+    showToast(data.message || 'RFQ update failed', {kind:'error'});
     return;
   }
 
-  showToast(data.message || 'RFQ updated');
+  showToast(data.message || 'RFQ updated', {kind:'success',httpStatus:res.status});
   await loadStaffRfqs();
 }
 
@@ -585,7 +585,7 @@ async function openStaffInvoicePdf(id) {
       headers: { Authorization: `Bearer ${token}` }
     });
   } catch (error) {
-    showToast(error.message || 'Invoice PDF failed');
+    showToast(error.message || 'Invoice PDF failed', {kind:'error'});
   }
 }
 
@@ -1062,12 +1062,6 @@ function renderGroupedTimesheets(container, groups, type) {
   `).join('');
 }
 
-function isSuccessfulActionMessage(message) {
-  const text = String(message || '');
-  const hasSuccessSignal = /\b(successfully|saved|updated|created|submitted|sent|deleted|approved|published|recorded|completed|processed|ready)\b/i.test(text);
-  const hasFailureSignal = /\b(failed|failure|error|unable|unavailable|offline|missing|required|denied|not sent|could not|did not)\b/i.test(text);
-  return hasSuccessSignal && !hasFailureSignal;
-}
 
 function installMobileShellControls() {
   document.querySelectorAll('[data-mobile-menu-action]').forEach((control) => {
@@ -1087,49 +1081,8 @@ function installMobileShellControls() {
   if (sidebar) sidebar.setAttribute('aria-hidden', isMobileShellViewport() ? 'true' : 'false');
 }
 
-function showSuccessConfirmation(message) {
-  let popup = document.getElementById('actionSuccessPopup');
-  if (!popup) {
-    popup = document.createElement('section');
-    popup.id = 'actionSuccessPopup';
-    popup.className = 'action-success-popup';
-    popup.setAttribute('role', 'status');
-    popup.setAttribute('aria-live', 'polite');
-    popup.innerHTML = `
-      <div class="action-success-icon" aria-hidden="true">&#10003;</div>
-      <div class="action-success-copy"><strong>Confirmed</strong><span></span></div>
-      <button type="button" class="action-success-close" aria-label="Close confirmation">&#215;</button>
-    `;
-    popup.querySelector('.action-success-close').onclick = () => popup.classList.remove('show');
-    document.body.appendChild(popup);
-  }
-
-  popup.querySelector('.action-success-copy span').textContent = String(message || 'Action completed successfully');
-  popup.classList.remove('show');
-  requestAnimationFrame(() => popup.classList.add('show'));
-  clearTimeout(window.__actionSuccessTimer);
-  window.__actionSuccessTimer = setTimeout(() => popup.classList.remove('show'), 4600);
-}
-
-function showToast(message) {
-  if (isSuccessfulActionMessage(message)) {
-    showSuccessConfirmation(message);
-    return;
-  }
-
-  const toast = document.getElementById('toast');
-
-  if (!toast) {
-    alert(message);
-    return;
-  }
-
-  toast.textContent = message;
-  toast.style.display = 'block';
-
-  setTimeout(() => {
-    toast.style.display = 'none';
-  }, 3500);
+function showToast(message, outcome = {}) {
+  window.VoxelFeedback?.notify(message, typeof outcome === 'string' ? {kind:outcome} : outcome);
 }
 
 function showAppNotificationBanner(title, body, variant = 'info') {
@@ -1241,7 +1194,7 @@ function installAccessDeniedHandler() {
       res.clone().json().then((data) => {
         if (data?.accessDenied) {
           const message = data.message || "You don't have access to input or change data in this section. Please contact admin.";
-          showToast(message);
+          showToast(message, {kind:'error'});
           sendStaffNotification('Access not enabled', message);
         }
       }).catch(() => {});
@@ -1289,7 +1242,7 @@ async function notifyNewAnnouncements(rows) {
   if (!firstAnnouncementLoad) {
     const newItems = rows.filter((item) => !lastAnnouncementIds.has(Number(item.id)));
     for (const item of newItems) {
-      showToast(`New announcement: ${item.title}`);
+      showToast(`New announcement: ${item.title}`, {kind:'info'});
       await sendStaffNotification(item.title, item.message);
     }
   }
@@ -1336,7 +1289,7 @@ async function checkAutoClockOutNotification(attendance) {
 
   localStorage.setItem('twelveHourAutoClockOutAttendanceId', reminderKey);
   const message = 'Your shift reached 12 hours and was closed automatically.';
-  showToast(message);
+  showToast(message, {kind:'info'});
   showShiftDialog(
     'Shift Auto Closed',
     message,
@@ -1363,7 +1316,7 @@ async function checkTenHourReminder(attendance) {
   ) {
     tenHourReminderShown = true;
     localStorage.setItem('tenHourReminderAttendanceId', reminderKey);
-    showToast('You have completed 10 hours. Please remember to clock out when your shift is finished.');
+    showToast('You have completed 10 hours. Please remember to clock out when your shift is finished.', {kind:'info'});
     showShiftDialog(
       '10 Hour Shift Reminder',
       'You have completed 10 hours. Please wrap up safely and remember to clock out when your shift is finished.',
@@ -1388,7 +1341,7 @@ function showShiftDialog(title, message, subtext) {
   const subtextEl = document.getElementById('shiftSubtext');
 
   if (!dialog || !titleEl || !messageEl || !subtextEl) {
-    showToast(message);
+    showToast(message, {kind:'info'});
     return;
   }
 
@@ -1650,7 +1603,7 @@ function openShiftQrScanner(mode) {
 
 async function submitAuthorizedShiftException() {
   if (!canUseQrException()) {
-    showToast('Authorized exception is not enabled for your account.');
+    showToast('Authorized exception is not enabled for your account.', {kind:'info'});
     return;
   }
   await submitShiftQr(activeShiftQrMode, '');
@@ -1956,7 +1909,7 @@ function notifyNewTasks(tasks) {
     const newTasks = tasks.filter((task) => !lastTaskIds.has(Number(task.id)));
 
     if (newTasks.length > 0) {
-      showToast(`${newTasks.length} new task assigned`);
+      showToast(`${newTasks.length} new task assigned`, {kind:'info'});
       const firstTask = newTasks[0];
       sendStaffNotification('New task assigned', firstTask.title || 'A new task has been assigned to you.');
     }
@@ -2013,15 +1966,15 @@ async function updateMyTaskStatus(taskId, status) {
     const data = await safeJson(res);
 
     if (!res.ok) {
-      showToast(data.message || 'Task update failed');
+      showToast(data.message || 'Task update failed', {kind:'error'});
       return;
     }
 
-    showToast(data.message || 'Task updated');
+    showToast(data.message || 'Task updated', {kind:'success',httpStatus:res.status});
 
     await loadMyTasks();
   } catch {
-    showToast('Task update failed');
+    showToast('Task update failed', {kind:'error'});
   }
 }
 
@@ -2103,7 +2056,7 @@ async function loadStaffStock() {
 
 function openStaffStockDialog(stockId = null) {
   if (!canInput('stock_in')) {
-    showToast("You don't have access to add or edit stock in. Please contact admin.");
+    showToast("You don't have access to add or edit stock in. Please contact admin.", {kind:'info'});
     return;
   }
 
@@ -2153,12 +2106,12 @@ function openStaffStockDialog(stockId = null) {
       const data = await safeJson(res);
 
       if (!res.ok) {
-        showToast(data.message || 'Stock save failed');
+        showToast(data.message || 'Stock save failed', {kind:'error'});
         return;
       }
 
       hideStaffDialog();
-      showToast(data.message || 'Stock saved');
+      showToast(data.message || 'Stock saved', {kind:'success',httpStatus:res.status});
       await loadStaffStock();
       await loadStaffStockOut();
     },
@@ -2223,12 +2176,12 @@ async function loadStaffStockOut() {
 
 function openStaffStockOutDialog(stockId = null, movement = null) {
   if (!canInput('stock_out')) {
-    showToast("You don't have access to issue or edit stock out. Please contact admin.");
+    showToast("You don't have access to issue or edit stock out. Please contact admin.", {kind:'info'});
     return;
   }
 
   if (!staffStockCache.length) {
-    showToast('Add stock before issuing it');
+    showToast('Add stock before issuing it', {kind:'info'});
     return;
   }
 
@@ -2278,12 +2231,12 @@ function openStaffStockOutDialog(stockId = null, movement = null) {
       const data = await safeJson(res);
 
       if (!res.ok) {
-        showToast(data.message || 'Stock out failed');
+        showToast(data.message || 'Stock out failed', {kind:'error'});
         return;
       }
 
       hideStaffDialog();
-      showToast(data.message || 'Stock out saved');
+      showToast(data.message || 'Stock out saved', {kind:'success',httpStatus:res.status});
       await loadStaffStock();
       await loadStaffStockOut();
     },
@@ -2310,13 +2263,13 @@ function updateStaffOutPreview() {
 
 function openStaffStockOutById(id) {
   if (!canInput('stock_out')) {
-    showToast("You don't have access to edit stock out. Please contact admin.");
+    showToast("You don't have access to edit stock out. Please contact admin.", {kind:'info'});
     return;
   }
 
   const movement = staffStockOutCache.find((row) => Number(row.id) === Number(id));
   if (!movement) {
-    showToast('Stock out entry not found');
+    showToast('Stock out entry not found', {kind:'info'});
     return;
   }
   openStaffStockOutDialog(movement.stock_id, movement);
@@ -2324,11 +2277,11 @@ function openStaffStockOutById(id) {
 
 async function deleteStaffStockOut(id) {
   if (!canInput('stock_out')) {
-    showToast("You don't have access to delete stock out entries. Please contact admin.");
+    showToast("You don't have access to delete stock out entries. Please contact admin.", {kind:'info'});
     return;
   }
 
-  if (!confirm('Delete this stock out entry and restore quantity?')) return;
+  if (!(await VoxelFeedback.confirm('Delete this stock out entry and restore quantity?'))) return;
 
   const res = await fetch('/api/stock/movement/delete', {
     method: 'POST',
@@ -2339,11 +2292,11 @@ async function deleteStaffStockOut(id) {
   const data = await safeJson(res);
 
   if (!res.ok) {
-    showToast(data.message || 'Stock out delete failed');
+    showToast(data.message || 'Stock out delete failed', {kind:'error'});
     return;
   }
 
-  showToast(data.message || 'Stock out deleted');
+  showToast(data.message || 'Stock out deleted', {kind:'success',httpStatus:res.status});
   await loadStaffStock();
   await loadStaffStockOut();
 }
@@ -2414,7 +2367,7 @@ async function notifyMeetingReminders(rows) {
     localStorage.setItem(reminderKey, '1');
     const when = days === 0 ? 'today' : `in ${days} day${days === 1 ? '' : 's'}`;
     const message = `${meeting.title} is ${when}. Please prepare required documents and details.`;
-    showToast(message);
+    showToast(message, {kind:'info'});
     await sendStaffNotification('Meeting / inspection reminder', message);
   }
 }
@@ -2551,36 +2504,31 @@ function renderCurrentTimesheetWorkflow(timesheet, totalHours, source = {}) {
 async function submitCurrentTimesheet() {
   const timesheet = currentWeekTimesheet;
   if (!timesheet?.id) {
-    showToast('Current weekly timesheet is not ready yet.');
+    showToast('Current weekly timesheet is not ready yet.', {kind:'info'});
     return;
   }
   const status = String(timesheet.status || 'DRAFT').toUpperCase();
   if (!['DRAFT', 'CORRECTION_REQUIRED'].includes(status)) {
-    showToast('This timesheet has already been submitted.');
+    showToast('This timesheet has already been submitted.', {kind:'info'});
     return;
   }
   if (Number(timesheet.total_hours || 0) <= 0) {
-    showToast('Record shift hours before submitting this timesheet.');
+    showToast('Record shift hours before submitting this timesheet.', {kind:'info'});
     return;
   }
-  if (!window.confirm(status === 'CORRECTION_REQUIRED'
+  if (!(await VoxelFeedback.confirm(status === 'CORRECTION_REQUIRED'
     ? 'Resubmit this corrected timesheet for manager approval?'
-    : 'Submit this weekly timesheet for manager approval?')) return;
+    : 'Submit this weekly timesheet for manager approval?'))) return;
 
-  if(timesheet.source_review_required)return showToast('Source attendance needs correction before submission.');
+  if(timesheet.source_review_required)return showToast('Source attendance needs correction before submission.', {kind:'error'});
   const button = document.getElementById('submitTimesheetBtn');
   if(button?.dataset.submitting==='true')return;
   if (button) {button.disabled = true;button.dataset.submitting='true';}
   try {
-    const res = await fetch(`/api/attendance/timesheets/${Number(timesheet.id)}/submit`, {
-      method: 'POST',
-      headers: authHeaders()
-    });
-    const data = await safeJson(res);
-    showToast(data.message || (res.ok ? 'Timesheet submitted for approval.' : 'Timesheet submission failed.'));
-    if (res.ok) await loadTimesheet();
-  } catch {
-    showToast('Timesheet submission failed. Please try again.');
+    await VoxelActions.timesheet({id:Number(timesheet.id),status:status==='CORRECTION_REQUIRED'?'CORRECTION_RESUBMITTED':'PENDING_APPROVAL',title:'Timesheet submitted',url:`/api/attendance/timesheets/${Number(timesheet.id)}/submit`,headers:authHeaders(),body:{expected_version:timesheet.version_no},
+      context:`${currentUser.name||'Your timesheet'} · ${VoxelActions.date(timesheet.week_start)} – ${VoxelActions.date(timesheet.week_end)}`,
+      onCommit:row=>{currentWeekTimesheet={...timesheet,...row};renderCurrentTimesheetWorkflow(currentWeekTimesheet,Number(row.total_hours));},
+      refresh:()=>loadTimesheet(),reopen:()=>loadTimesheet()});
   } finally {
     if (button && ['DRAFT', 'CORRECTION_REQUIRED'].includes(String(currentWeekTimesheet?.status || '').toUpperCase())) {
       button.disabled = Boolean(currentWeekTimesheet?.source_review_required);
@@ -2713,7 +2661,7 @@ async function clockIn(shiftQrToken = '') {
 
     const data = await safeJson(res);
 
-    showToast(data.message || 'Clock in response');
+    showToast(data.message || 'Clock in response', {kind:'info'});
 
     if (res.ok) {
       const message = dailyMessage(clockInMessages, 'clock-in');
@@ -2726,7 +2674,7 @@ async function clockIn(shiftQrToken = '') {
     await loadTimesheet();
     return res.ok;
   } catch {
-    showToast('Clock in failed');
+    showToast('Clock in failed', {kind:'error'});
     return false;
   }
 }
@@ -2741,7 +2689,7 @@ async function clockOut(shiftQrToken = '') {
 
     const data = await safeJson(res);
 
-    showToast(data.message || 'Clock out response');
+    showToast(data.message || 'Clock out response', {kind:'info'});
 
     if (res.ok) {
       const message = dailyMessage(clockOutMessages, 'clock-out');
@@ -2754,7 +2702,7 @@ async function clockOut(shiftQrToken = '') {
     await loadTimesheet();
     return res.ok;
   } catch {
-    showToast('Clock out failed');
+    showToast('Clock out failed', {kind:'error'});
     return false;
   }
 }
@@ -2938,7 +2886,7 @@ async function sendStaffWorkRequest(type, title, body, payload = {}) {
     return data;
   } catch (err) {
     console.warn('STAFF WORK REQUEST SYNC FAILED', err);
-    showToast('Saved locally, but admin sync failed');
+    showToast('Saved locally, but admin sync failed', {kind:'error'});
     return null;
   }
 }
@@ -2949,11 +2897,11 @@ async function submitLeaveRequest(event) {
   const to = document.getElementById('leaveTo')?.value || '';
   const reason = document.getElementById('leaveReason')?.value.trim() || '';
   if (!type || !from || !to || !reason) {
-    showToast('Please fill required fields');
+    showToast('Please fill required fields', {kind:'info'});
     return;
   }
   if (new Date(to) < new Date(from)) {
-    showToast('Leave end date must be after start date');
+    showToast('Leave end date must be after start date', {kind:'info'});
     return;
   }
   const sync = await sendStaffWorkRequest('leave', type + ' leave request', reason, { type, from, to, reason });
@@ -2963,7 +2911,7 @@ async function submitLeaveRequest(event) {
   event.target.reset();
   renderStaffLeaveRequests();
   sendStaffNotification('Leave request submitted', `${type} from ${from} to ${to}`);
-  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.', {kind:'info'});
 }
 
 function renderStaffLeaveRequests() {
@@ -2982,7 +2930,7 @@ async function saveAvailability(event) {
   const status = document.getElementById('availabilityStatus')?.value || '';
   const notes = document.getElementById('availabilityNotes')?.value.trim() || '';
   if (!date || !status) {
-    showToast('Please fill required fields');
+    showToast('Please fill required fields', {kind:'info'});
     return;
   }
   const sync = await sendStaffWorkRequest('availability', status + ' availability', notes || status, { date, status, notes });
@@ -2992,7 +2940,7 @@ async function saveAvailability(event) {
   event.target.reset();
   renderStaffAvailability();
   sendStaffNotification('Availability saved', `${status} on ${date}`);
-  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.', {kind:'info'});
 }
 
 function renderStaffAvailability() {
@@ -3030,7 +2978,7 @@ async function markStaffDocumentRead(id) {
   rows.push({ id, title: doc.title, read_at: new Date().toISOString(), sync_status: sync ? 'Sent to admin' : 'Local sync failed' });
   writeStaffWorkStore('documents', rows);
   renderStaffDocuments();
-  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.', {kind:'info'});
 }
 
 async function submitStaffChecklist(event) {
@@ -3039,7 +2987,7 @@ async function submitStaffChecklist(event) {
   const result = document.getElementById('staffFormResult')?.value || '';
   const notes = document.getElementById('staffFormNotes')?.value.trim() || '';
   if (!type || !result) {
-    showToast('Please fill required fields');
+    showToast('Please fill required fields', {kind:'info'});
     return;
   }
   const sync = await sendStaffWorkRequest('forms', type + ' checklist', notes || result, { type, result, notes });
@@ -3049,7 +2997,7 @@ async function submitStaffChecklist(event) {
   event.target.reset();
   renderStaffFormSubmissions();
   sendStaffNotification('Form submitted', `${type}: ${result}`);
-  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.');
+  showToast(sync ? 'Sent to admin successfully' : 'Saved locally. Admin did not receive it yet.', {kind:'info'});
 }
 
 function renderStaffFormSubmissions() {
@@ -3067,7 +3015,7 @@ async function sendStaffMessage(event) {
   const priority = document.getElementById('staffMessagePriority')?.value || 'Normal';
   const body = document.getElementById('staffMessageBody')?.value.trim() || '';
   if (!body) {
-    showToast('Please fill required fields');
+    showToast('Please fill required fields', {kind:'info'});
     return;
   }
 
@@ -3079,16 +3027,16 @@ async function sendStaffMessage(event) {
     });
     const data = await safeJson(res);
     if (!res.ok) {
-      showToast(data.message || 'Message send failed');
+      showToast(data.message || 'Message send failed', {kind:'error'});
       return;
     }
 
     event.target.reset();
     await renderStaffMessages();
     sendStaffNotification('Message sent', `${priority} message delivered to admin`);
-    showToast(data.message || 'Message sent to admin');
+    showToast(data.message || 'Message sent to admin', {kind:'success',httpStatus:res.status});
   } catch (err) {
-    showToast('Message send failed');
+    showToast('Message send failed', {kind:'error'});
   }
 }
 
@@ -3121,7 +3069,7 @@ function deleteStaffWorkRecord(store, id, renderFn) {
   const rows = readStaffWorkStore(store).filter((row) => Number(row.id) !== Number(id));
   writeStaffWorkStore(store, rows);
   if (typeof renderFn === 'function') renderFn();
-  showToast('Deleted successfully');
+  showToast('Deleted successfully', {kind:'info'});
 }
 
 function loadWorkHubModules() {
@@ -3195,7 +3143,7 @@ async function loadStaffTrash(page = 1) {
     staffTrashState.items = [];
     staffTrashState.pages = 1;
     staffTrashState.total = 0;
-    showToast(error.message || 'Trash could not be loaded');
+    showToast(error.message || 'Trash could not be loaded', {kind:'error'});
   } finally {
     staffTrashState.loading = false;
     renderStaffTrash();
@@ -3210,8 +3158,8 @@ function scheduleStaffTrashSearch() {
 async function restoreStaffTrashItem(id) {
   const response = await fetch(`/api/trash/${Number(id)}/restore`, { method: 'POST', headers: authHeaders() });
   const data = await safeJson(response);
-  if (!response.ok) return showToast(data.message || 'Item could not be restored');
-  showToast(data.message || 'Record restored successfully');
+  if (!response.ok) return showToast(data.message || 'Item could not be restored', {kind:'error'});
+  showToast(data.message || 'Record restored successfully', {kind:'success',httpStatus:response.status});
   await Promise.allSettled([loadStaffTrash(staffTrashState.page), loadStaffNotifications(), refreshGrantedStaffData()]);
 }
 
@@ -3306,7 +3254,7 @@ function setStaffNotificationCategory(category) {
 async function setStaffNotificationRead(id, read) {
   const response = await fetch(`/api/notifications/${id}/${read ? 'read' : 'unread'}`, { method: 'PATCH', headers: authHeaders() });
   const data = await safeJson(response);
-  if (!response.ok) return showToast(data.message || 'Notification could not be updated');
+  if (!response.ok) return showToast(data.message || 'Notification could not be updated', {kind:'error'});
   await loadStaffNotifications();
 }
 
@@ -3338,14 +3286,14 @@ async function restoreStaffNotifications(ids) {
   const results = await Promise.all([...new Set((ids || []).map(Number).filter(Boolean))].map((id) => fetch(`/api/notifications/${id}/restore`, { method: 'POST', headers: authHeaders() })));
   const restored = results.filter((response) => response.ok).length;
   document.getElementById('staffNotificationUndoToast')?.classList.remove('show');
-  showToast(restored ? `${restored} notification${restored === 1 ? '' : 's'} restored` : 'Notification restore failed');
+  showToast(restored ? `${restored} notification${restored === 1 ? '' : 's'} restored` : 'Notification restore failed', {kind:'info'});
   await loadStaffNotifications();
 }
 
 async function deleteStaffNotification(id) {
   const response = await fetch(`/api/notifications/${id}`, { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ reason: 'Removed from Notification Centre' }) });
   const data = await safeJson(response);
-  if (!response.ok) return showToast(data.message || 'Notification could not be removed');
+  if (!response.ok) return showToast(data.message || 'Notification could not be removed', {kind:'error'});
   showStaffNotificationUndo('Notification moved to Trash', [id]);
   await loadStaffNotifications();
 }
@@ -3353,14 +3301,14 @@ async function deleteStaffNotification(id) {
 async function markAllStaffNotificationsRead() {
   const response = await fetch('/api/notifications/mark-all-read', { method: 'POST', headers: authHeaders() });
   const data = await safeJson(response);
-  if (!response.ok) return showToast(data.message || 'Notifications could not be updated');
+  if (!response.ok) return showToast(data.message || 'Notifications could not be updated', {kind:'error'});
   await loadStaffNotifications();
 }
 
 async function clearStaffNotifications(scope) {
   const response = await fetch(`/api/notifications/${scope === 'read' ? 'read' : 'all'}`, { method: 'DELETE', headers: authHeaders() });
   const data = await safeJson(response);
-  if (!response.ok && response.status !== 207) return showToast(data.message || 'Notifications could not be cleared');
+  if (!response.ok && response.status !== 207) return showToast(data.message || 'Notifications could not be cleared', {kind:'error'});
   showStaffNotificationUndo(`${Number(data.deleted || 0)} notification${Number(data.deleted || 0) === 1 ? '' : 's'} moved to Trash`, data.deleted_ids || []);
   await loadStaffNotifications();
 }
@@ -3369,7 +3317,7 @@ async function openStaffNotificationPreferences() {
   closeStaffNotificationPanel();
   const response = await fetch('/api/notifications/preferences', { headers: authHeaders() });
   const data = await safeJson(response);
-  if (!response.ok) return showToast(data.message || 'Notification preferences could not be loaded');
+  if (!response.ok) return showToast(data.message || 'Notification preferences could not be loaded', {kind:'error'});
 
   const existing = new Map((data.preferences || []).map((item) => [String(item.category).toUpperCase(), item]));
   const categories = ['FINANCE', 'PRODUCTION', 'QUALITY', 'SECURITY', 'HR', 'TASKS', 'SYSTEM'];
@@ -3407,9 +3355,9 @@ async function openStaffNotificationPreferences() {
         quiet_hours_end: row.querySelector('[data-staff-preference-field="quiet_hours_end"]').value || null
       })
     })));
-    if (results.some((item) => !item.ok)) return showToast('Some notification preferences could not be saved');
+    if (results.some((item) => !item.ok)) return showToast('Some notification preferences could not be saved', {kind:'error',httpStatus:response.status});
     hideStaffDialog();
-    showToast('Notification preferences saved successfully');
+    showToast('Notification preferences saved successfully', {kind:'success',httpStatus:response.status});
   }, 'Save Preferences');
 }
 

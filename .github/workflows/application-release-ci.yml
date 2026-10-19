@@ -52,7 +52,7 @@ jobs:
         id: browser-tools
         run: |
           npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
-          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install chromium
+          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install --with-deps chromium webkit
       - name: Verify visible attendance ticking, breaks, resume and delayed staff workflows
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
@@ -70,6 +70,17 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/weekly-portals
         run: node scripts/weekly-portals-browser-test.js
+      - name: Test explicit action outcomes and foreground dialogs across retained roles
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/action-dialogs
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/action-dialog-browser-test.js
+      - name: Verify foreground feedback and responsive actions with WebKit
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_ACTION_BROWSER_ENGINE: webkit
+          UI_PROOF_DIR: ${{ runner.temp }}/attendance-workflow-proof/action-dialogs-webkit
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/action-dialog-browser-test.js
       - name: Preserve attendance workflow evidence
         if: always()
         uses: actions/upload-artifact@v4

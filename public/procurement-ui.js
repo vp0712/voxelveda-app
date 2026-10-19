@@ -52,7 +52,7 @@
   ]);
   const has = (permission) => String(state.user?.role || '').toLowerCase() === 'super_admin' || permissions().has(permission);
   const canWriteEntries = () => has('IMPORT_PROCUREMENT') || has('CREATE_PURCHASE_REQUISITION') || has('MANAGE_PROCUREMENT_RECORDS');
-  const toast = (message) => window.showToast?.(message);
+  const toast = (message,outcome={}) => window.showToast?.(message,outcome);
 
   function effectiveStatus(row) {
     const controlled = ['SUBMITTING', 'PENDING_APPROVAL', 'PENDING', 'BLOCKED_ASSIGNMENT', 'NEEDS_CHANGES'];
@@ -99,7 +99,7 @@
 
   function requireForm() {
     const current = form();
-    if (!current?.reportValidity()) return null;
+    if (!window.VoxelDialog.validate(current)) return null;
     return current;
   }
 
@@ -417,7 +417,7 @@
         title: current.title.value, department: current.department.value, required_date: current.required_date.value,
         currency: current.currency.value, business_reason: current.business_reason.value, items: collectLines('requisition')
       }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Save Requisition');
   }
 
@@ -427,8 +427,8 @@
 
   function openSupplierRfq() {
     const requisitions = approvedRequisitions();
-    if (!requisitions.length) return toast('Approve a purchase requisition before issuing a supplier RFQ');
-    if (!state.data.suppliers.length) return toast('Add an active supplier first');
+    if (!requisitions.length) return toast('Approve a purchase requisition before issuing a supplier RFQ', {kind:'error'});
+    if (!state.data.suppliers.length) return toast('Add an active supplier first', {kind:'error'});
     showDialog('Issue Supplier RFQ', `<form id="procurementActionForm" class="procurement-form">
       <label><span>Approved requisition</span><select name="purchase_requisition_id" required>${requisitions.map((row) => `<option value="${row.id}">${escapeHtml(row.requisition_no)} · ${escapeHtml(row.title)}</option>`).join('')}</select></label>
       <div class="procurement-form-grid"><label><span>Issue date</span><input name="issue_date" type="date" value="${today()}" required></label><label><span>Response due</span><input name="response_due_date" type="date"></label></div>
@@ -436,12 +436,12 @@
       <label><span>Notes</span><textarea name="notes" rows="3"></textarea></label></form>`, async () => {
       const current = requireForm(); if (!current) return;
       const supplierIds = [...current.querySelectorAll('[name="supplier_ids"]:checked')].map((input) => Number(input.value));
-      if (!supplierIds.length) return toast('Select at least one supplier');
+      if (!supplierIds.length) return toast('Select at least one supplier', {kind:'error'});
       const result = await api('/supplier-rfqs', { method: 'POST', body: JSON.stringify({
         purchase_requisition_id: Number(current.purchase_requisition_id.value), supplier_ids: supplierIds,
         issue_date: current.issue_date.value, response_due_date: current.response_due_date.value, notes: current.notes.value
       }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Issue RFQ');
   }
 
@@ -456,25 +456,25 @@
         supplier_id: Number(current.supplier_id.value), quote_reference: current.quote_reference.value,
         quoted_total: current.quoted_total.value, lead_time_days: current.lead_time_days.value, response_notes: current.response_notes.value
       }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Record Quote');
   }
 
   function openAwardRfq(rfq) {
     const responses = (rfq.invites || []).filter((invite) => invite.status === 'RESPONDED');
-    if (!responses.length) return toast('Record at least one supplier quote before selecting a supplier');
+    if (!responses.length) return toast('Record at least one supplier quote before selecting a supplier', {kind:'error'});
     showDialog('Select Supplier', `<form id="procurementActionForm" class="procurement-form">
       <label><span>Winning response</span><select name="selected_supplier_id" required>${responses.map((row) => `<option value="${row.supplier_id}">${escapeHtml(row.supplier_name)} · ${formatMoney(row.quoted_total)} · ${row.lead_time_days ?? '-'} days</option>`).join('')}</select></label>
       <label><span>Selection reason</span><textarea name="close_reason" rows="3" required></textarea></label></form>`, async () => {
       const current = requireForm(); if (!current) return;
       const result = await api(`/supplier-rfqs/${rfq.id}/close`, { method: 'POST', body: JSON.stringify({ selected_supplier_id: Number(current.selected_supplier_id.value), close_reason: current.close_reason.value }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Award RFQ');
   }
 
   function openNewPo() {
     const requisitions = approvedRequisitions();
-    if (!requisitions.length || !state.data.suppliers.length) return toast('An approved requisition and active supplier are required');
+    if (!requisitions.length || !state.data.suppliers.length) return toast('An approved requisition and active supplier are required', {kind:'error'});
     const orderLines = (requisition) => (requisition?.items || []).map((item) => lineRow('po', item)).join('');
     showDialog('New Purchase Order', `<form id="procurementActionForm" class="procurement-form">
       <div class="procurement-form-grid"><label><span>Approved requisition</span><select name="purchase_requisition_id" required>${requisitions.map((row) => `<option value="${row.id}">${escapeHtml(row.requisition_no)} · ${escapeHtml(row.title)}</option>`).join('')}</select></label><label><span>Supplier</span><select name="supplier_id" required>${state.data.suppliers.map((row) => `<option value="${row.id}">${escapeHtml(row.supplier_name)}</option>`).join('')}</select></label><label><span>Issue date</span><input name="issue_date" type="date" value="${today()}" required></label><label><span>Expected date</span><input name="expected_date" type="date"></label><label><span>Currency</span><select name="currency"><option>AUD</option><option>INR</option><option>USD</option></select></label><label><span>Payment terms</span><input name="payment_terms"></label></div>
@@ -486,7 +486,7 @@
         issue_date: current.issue_date.value, expected_date: current.expected_date.value, currency: current.currency.value,
         payment_terms: current.payment_terms.value, delivery_address: current.delivery_address.value, items: collectLines('po')
       }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Save Purchase Order');
     form()?.querySelector('[name="purchase_requisition_id"]')?.addEventListener('change', (event) => {
       const requisition = requisitions.find((row) => Number(row.id) === Number(event.target.value));
@@ -504,16 +504,16 @@
 
   function openReceive() {
     const orders = receivableOrders();
-    if (!orders.length) return toast('No approved purchase order has outstanding goods');
+    if (!orders.length) return toast('No approved purchase order has outstanding goods', {kind:'error'});
     showDialog('Receive Goods', `<form id="procurementActionForm" class="procurement-form">
       <label><span>Purchase order</span><select name="purchase_order_id" data-receipt-po required>${orders.map((row) => `<option value="${row.id}">${escapeHtml(row.po_number)} · ${escapeHtml(row.supplier_name)}</option>`).join('')}</select></label>
       <div class="procurement-form-grid"><label><span>Received date</span><input name="received_date" type="date" value="${today()}" required></label><label><span>Delivery reference</span><input name="delivery_reference"></label></div>
       <div data-receipt-lines>${receiptLineInputs(orders[0])}</div><label><span>Receipt notes</span><textarea name="notes" rows="3"></textarea></label></form>`, async () => {
       const current = requireForm(); if (!current) return;
       const items = [...current.querySelectorAll('[data-po-item-id]')].filter((input) => Number(input.value) > 0).map((input) => ({ purchase_order_item_id: Number(input.dataset.poItemId), quantity_received: input.value, lot_batch_no: current.querySelector(`[name="receipt_lot_${input.dataset.poItemId}"]`)?.value }));
-      if (!items.length) return toast('Enter a received quantity for at least one line');
+      if (!items.length) return toast('Enter a received quantity for at least one line', {kind:'error'});
       const result = await api('/goods-receipts', { method: 'POST', body: JSON.stringify({ purchase_order_id: Number(current.purchase_order_id.value), received_date: current.received_date.value, delivery_reference: current.delivery_reference.value, notes: current.notes.value, items }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Record Receipt');
     form()?.querySelector('[data-receipt-po]')?.addEventListener('change', (event) => {
       const po = orders.find((row) => Number(row.id) === Number(event.target.value));
@@ -530,7 +530,7 @@
       <label><span>Inspection notes</span><textarea name="notes" rows="3"></textarea></label></form>`, async () => {
       const current = requireForm(); if (!current) return;
       const result = await api(`/goods-receipts/${receipt.id}/inspect`, { method: 'POST', body: JSON.stringify({ result: current.result.value, accepted_quantity: current.accepted_quantity.value, rejected_quantity: current.rejected_quantity.value, nonconformance_reference: current.nonconformance_reference.value, notes: current.notes.value }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Complete Inspection');
   }
 
@@ -542,7 +542,7 @@
       <label><span>Exception note</span><textarea name="exception_reason" rows="3"></textarea></label></form>`, async () => {
       const current = requireForm(); if (!current) return;
       const result = await api('/bill-matches', { method: 'POST', body: JSON.stringify({ purchase_order_id: receipt.purchase_order_id, goods_receipt_id: receipt.id, supplier_invoice_no: current.supplier_invoice_no.value, issue_date: current.issue_date.value, due_date: current.due_date.value, bill_total: current.bill_total.value, tolerance_amount: current.tolerance_amount.value, exception_reason: current.exception_reason.value }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Run Match');
   }
 
@@ -553,9 +553,9 @@
       <div>${eligible.map((item) => `<label class="procurement-receipt-line"><span>${escapeHtml(item.description)}<small>${escapeHtml(item.quantity_received)} received</small></span><input type="number" min="0" max="${item.quantity_received}" step="0.001" value="0" data-return-item-id="${item.purchase_order_item_id}"></label>`).join('')}</div></form>`, async () => {
       const current = requireForm(); if (!current) return;
       const items = [...current.querySelectorAll('[data-return-item-id]')].filter((input) => Number(input.value) > 0).map((input) => ({ purchase_order_item_id: Number(input.dataset.returnItemId), quantity: input.value }));
-      if (!items.length) return toast('Enter a return quantity for at least one line');
+      if (!items.length) return toast('Enter a return quantity for at least one line', {kind:'error'});
       const result = await api('/returns', { method: 'POST', body: JSON.stringify({ purchase_order_id: receipt.purchase_order_id, goods_receipt_id: receipt.id, return_date: current.return_date.value, reason: current.reason.value, items }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Record Return');
   }
 
@@ -566,7 +566,7 @@
       <label><span>Notes</span><textarea name="notes" rows="3"></textarea></label></form>`, async () => {
       const current = requireForm(); if (!current) return;
       const result = await api(`/returns/${purchaseReturn.id}/credit-note`, { method: 'POST', body: JSON.stringify({ supplier_credit_reference: current.supplier_credit_reference.value, issue_date: current.issue_date.value, amount: current.amount.value, notes: current.notes.value }) });
-      hideDialog(); toast(result.message); await load();
+      hideDialog(); toast(result.message, {kind:'success'}); await load();
     }, 'Record Credit');
   }
 
@@ -591,7 +591,7 @@
   function setFormError(error) {
     const element=document.getElementById('procurementEntryError');
     if(element)element.textContent=errorText(error);
-    else toast(errorText(error));
+    else toast(errorText(error), {kind:'info'});
   }
   function openEntry(entry=null,row=null,sourceFile=null) {
     if(!canWriteEntries())return;
@@ -600,7 +600,7 @@
     const key=requestKey();
     showDialog(row?'Edit and review source row':entry?'Edit saved entry':'Add saved entry',`<form id="procurementEntryForm" class="procurement-form">${sourceFile?`<p class="procurement-source-status">This draft retains a link to ${escapeHtml(sourceFile.name)}. Review the source PDF or extracted text and enter the values below.</p>`:''}${row?`<p class="procurement-source-status">${escapeHtml(row.file_name)} · ${escapeHtml(row.sheet_name)} · Source row ${Number(row.source_row)}. Saving confirms that you reviewed these values.</p>`:''}${entryInputs(values)}<p id="procurementEntryError" class="procurement-inline-error" role="alert"></p></form>`,async()=>{
       const current=document.getElementById('procurementEntryForm');
-      if(!current?.reportValidity() || state.busy.has('entry'))return;
+      if(!window.VoxelDialog.validate(current) || state.busy.has('entry'))return;
       state.busy.add('entry');
       try {
         const payload=entryValues(current);
@@ -660,7 +660,7 @@
     state.uploadFiles=[];state.uploadKey='';
     showDialog('Upload procurement files',`<form id="procurementUploadForm" class="procurement-form"><label>Files<input type="file" name="files" accept=".csv,.xlsx,.xls,.pdf,.png,.jpg,.jpeg" multiple required></label><p class="procurement-source-status">Choose up to 10 files, each no larger than 8 MiB. Sources are saved in Uploaded files. Map columns and review extracted values before creating drafts.</p><div id="procurementUploadSelection"></div><p id="procurementEntryError" class="procurement-inline-error" role="alert"></p></form>`,async()=>{
       if(state.busy.has('upload'))return;
-      if(!document.getElementById('procurementUploadForm')?.reportValidity())return;
+      if(!window.VoxelDialog.validate(document.getElementById('procurementUploadForm')))return;
       if(!state.uploadFiles.length)return setFormError(new Error('Choose at least one file.'));
       if(state.uploadFiles.length>10 || state.uploadFiles.some(file=>file.size>8*1024*1024))return setFormError(new Error('Choose up to 10 files, each no larger than 8 MiB.'));
       if(!state.uploadKey)state.uploadKey=requestKey();
@@ -674,7 +674,7 @@
           await readImport(result.batch.id);
           void pollImportStatus(result.batch.id).catch(error=>{if(state.importDetail?.batch?.id===result.batch.id){state.error=errorText(error);render();}});
         }
-        toast('Files saved. Review their outcomes before importing drafts.');
+        toast('Files saved. Review their outcomes before importing drafts.', {kind:'info'});
       }catch(error){
         if(error.data?.files)state.uploadResult=error.data;
         setFormError(error);
@@ -692,7 +692,7 @@
   }
   function openReportOptions() {
     showDialog('Choose procurement PDF report',`<form id="procurementReportOptions" class="procurement-form"><label>Report<select name="type"><option value="register">Saved entry register</option><option value="items">Item details</option><option value="suppliers">Supplier totals</option><option value="summary">Procurement summary</option></select></label><p class="procurement-source-status">Uses the search, date, classification, category, priority, phase, currency, supplier and status filters applied to the table across all matching entries.</p></form>`,async()=>{
-      const current=document.getElementById('procurementReportOptions');if(current?.reportValidity())await openReport(current.elements.namedItem('type').value);
+      const current=document.getElementById('procurementReportOptions');if(window.VoxelDialog.validate(current))await openReport(current.elements.namedItem('type').value);
     },'Generate PDF');
   }
   async function openReport(type,recordId,batchId,source='entries') {
@@ -741,7 +741,7 @@
       }
       if(action==='send-report'){
         const current=document.getElementById('procurementReportEmailForm');
-        if(!current?.reportValidity() || snapshot.sending || snapshot.sendAttempted)return;
+        if(!window.VoxelDialog.validate(current) || snapshot.sending || snapshot.sendAttempted)return;
         const recipient=current.elements.namedItem('to').value.trim();
         snapshot.sending=true;snapshot.sendAttempted=true;
         current.querySelector('button').disabled=true;
@@ -769,11 +769,11 @@
       if(action==='uploads-page'){state.uploadFilters.page=Math.max(1,Number(id));return load();}
       if(action==='review-import' || action==='refresh-import')return await readImport(id || state.importDetail?.batch?.id,1);
       if(action==='review-page')return await readImport(state.importDetail.batch.id,Number(id),true);
-      if(action==='close-import'){if(state.mappingDirty&&!window.confirm('Discard unsaved import mapping changes? The original uploaded files are preserved.'))return;state.importReadSequence+=1;state.importDetail=null;state.error='';render();return;}
+      if(action==='close-import'){if(state.mappingDirty&&!(await VoxelFeedback.confirm('Discard unsaved import mapping changes? The original uploaded files are preserved.')))return;state.importReadSequence+=1;state.importDetail=null;state.error='';render();return;}
       if(action==='retry-extraction'){
         const batch=state.importDetail?.batch;
         return showDialog('Retry failed extraction',`<form id="procurementEntryForm" class="procurement-form"><p>The retained originals are reused. Already saved entries remain linked to their source rows.</p><label>Retry reason<textarea name="reason" required maxlength="1000"></textarea></label><p id="procurementEntryError" class="procurement-inline-error" role="alert"></p></form>`,async()=>{
-          const current=document.getElementById('procurementEntryForm');if(!current?.reportValidity() || state.busy.has('import'))return;state.busy.add('import');
+          const current=document.getElementById('procurementEntryForm');if(!window.VoxelDialog.validate(current) || state.busy.has('import'))return;state.busy.add('import');
           try{const detail=await api(`/imports/${safeId(id)}/retry-extraction`,{method:'POST',body:JSON.stringify({expected_revision:revision(batch),reason:current.elements.namedItem('reason').value.trim()})});adoptImport(detail);hideDialog();render();}catch(error){setFormError(error);}finally{state.busy.delete('import');render();}
         },'Retry extraction');
       }
@@ -793,14 +793,14 @@
         state.busy.add('import');ownsImport=true;render();
         const result=await api(`/imports/${safeId(state.importDetail.batch.id)}/commit`,{method:'POST',body:JSON.stringify({expected_revision:revision(state.importDetail),preview_token:state.importDetail.preview_token,row_ids:rows.map(row=>row.id),reviewed_row_ids:rows.map(row=>row.id)})});
         state.uploadResult=result;const batchId=state.importDetail.batch.id;
-        await readImport(batchId);await load();toast('Selected drafts saved. All file and row outcomes remain in Uploaded files.');return;
+        await readImport(batchId);await load();toast('Selected drafts saved. All file and row outcomes remain in Uploaded files.', {kind:'info'});return;
       }
       if(action==='archive-entry' || action==='restore-entry'){
         const entry=(state.entries.entries || []).find(row=>String(row.id)===id);
         if(!entry || !canWriteEntries())return;
         const verb=action==='archive-entry'?'archive':'restore';
         return showDialog(verb==='archive'?'Archive saved entry':'Restore saved entry',`<form id="procurementEntryForm" class="procurement-form"><p>${escapeHtml(entry.title)} · Revision ${revision(entry)}</p><label>Reason<textarea name="reason" required maxlength="1000"></textarea></label><p id="procurementEntryError" class="procurement-inline-error" role="alert"></p></form>`,async()=>{
-          const current=document.getElementById('procurementEntryForm');if(!current?.reportValidity() || state.busy.has('entry'))return;state.busy.add('entry');
+          const current=document.getElementById('procurementEntryForm');if(!window.VoxelDialog.validate(current) || state.busy.has('entry'))return;state.busy.add('entry');
           try{await api(`/entries/${safeId(id)}/${verb}`,{method:'POST',body:JSON.stringify({expected_revision:revision(entry),reason:current.elements.namedItem('reason').value.trim()})});state.selectedEntries.delete(id);hideDialog();await load();}catch(error){setFormError(error);}finally{state.busy.delete('entry');}
         },verb==='archive'?'Archive entry':'Restore entry');
       }
@@ -816,8 +816,8 @@
   async function simpleAction(path, message, body = {}) {
     try {
       const result = await api(path, { method: 'POST', body: JSON.stringify(body) });
-      toast(result.message || message); await load();
-    } catch (error) { toast(error.message); }
+      toast(result.message || message, {kind:'success'}); await load();
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   async function handleAction(action, id) {
@@ -845,10 +845,10 @@
           const current = requireForm(); if (!current) return;
           const path = action === 'cancel-requisition' ? `/requisitions/${id}/cancel` : `/purchase-orders/${id}/cancel`;
           const result = await api(path, { method: 'POST', body: JSON.stringify({ reason: current.reason.value }) });
-          hideDialog(); toast(result.message); await load();
+          hideDialog(); toast(result.message, {kind:'success'}); await load();
         }, action === 'cancel-requisition' ? 'Cancel requisition' : 'Cancel purchase order');
       }
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   root.addEventListener('click', (event) => {

@@ -13,8 +13,8 @@
       .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
   }
 
-  function toast(message) {
-    if (typeof window.showToast === 'function') window.showToast(message);
+  function toast(message, outcome = {}) {
+    if (typeof window.showToast === 'function') window.showToast(message, {kind:'info'});
   }
 
   function displayDate(value, includeTime = true) {
@@ -184,7 +184,7 @@
 
   async function submitComposer() {
     const form = document.getElementById('workflowRequestForm');
-    if (!form?.reportValidity()) return;
+    if (!window.VoxelDialog.validate(form)) return;
     const payload = {
       workflow_key: document.getElementById('workflowDefinitionKey').value,
       entity_type: document.getElementById('workflowEntityType').value.trim(),
@@ -196,10 +196,11 @@
     };
     try {
       const data = await api('/instances', { method: 'POST', body: JSON.stringify(payload) });
+      if(!data.instance?.id||!data.instance?.status)throw new Error('The saved request could not be confirmed. Refresh your requests before retrying.');
       hidePortalDialog();
-      toast(data.message || 'Approval request submitted');
+      toast(data.message || 'Approval request submitted', {kind:'success',title:data.instance.status==='BLOCKED_ASSIGNMENT'?'Saved; reviewer needed':'Request submitted'});
       await load();
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   async function openDetail(instanceId) {
@@ -218,7 +219,7 @@
           ${hasPermission('MANAGE_WORKFLOWS') && isActive(instance.status) ? `<button type="button" class="secondary-btn" data-workflow-reassign="${escapeHtml(instance.id)}">Assign Reviewer</button>` : ''}
         </div>`, hidePortalDialog, 'Close');
       document.querySelector('[data-workflow-reassign]')?.addEventListener('click', () => openReassign(instance.id));
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   function openAction(instanceId, action) {
@@ -232,15 +233,16 @@
 
   async function submitAction(instanceId, action) {
     const comment = document.getElementById('workflowActionComment')?.value.trim() || '';
-    if (action !== 'APPROVE' && !comment) return toast('Please enter a reason');
+    if (action !== 'APPROVE' && !comment) return toast('Please enter a reason', {kind:'error'});
     try {
       const data = await api(`/instances/${encodeURIComponent(instanceId)}/action`, {
         method: 'POST', body: JSON.stringify({ action, comment })
       });
+      if(String(data.instance?.id)!==String(instanceId)||!data.instance?.status)throw new Error('The review outcome could not be confirmed. Refresh the request before retrying.');
       hidePortalDialog();
-      toast(data.message || 'Approval action recorded');
+      toast(data.message || 'Approval action recorded', {kind:'success',title:data.instance.status==='APPROVED'?'Request approved':'Review step recorded'});
       await load();
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   function openCancel(instanceId) {
@@ -255,9 +257,9 @@
         method: 'POST', body: JSON.stringify({ comment: document.getElementById('workflowCancelComment')?.value.trim() || '' })
       });
       hidePortalDialog();
-      toast(data.message || 'Approval request cancelled');
+      toast(data.message || 'Approval request cancelled', {kind:'success'});
       await load();
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   async function openReassign(instanceId) {
@@ -271,21 +273,21 @@
           <label><span>Reviewer</span><select id="workflowReviewerId" required><option value="">Select active user</option>${reviewers.map((user) => `<option value="${Number(user.id)}">${escapeHtml(user.name || user.email)} - ${escapeHtml(statusLabel(user.role))}</option>`).join('')}</select></label>
           <label><span>Reason</span><textarea id="workflowReassignComment" rows="3" maxlength="4000" placeholder="Why is this assignment changing?"></textarea></label>
         </div>`, () => submitReassign(instanceId), 'Assign');
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   async function submitReassign(instanceId) {
     const assigneeUserId = Number(document.getElementById('workflowReviewerId')?.value);
-    if (!assigneeUserId) return toast('Select a reviewer');
+    if (!assigneeUserId) return toast('Select a reviewer', {kind:'error'});
     try {
       const data = await api(`/instances/${encodeURIComponent(instanceId)}/reassign`, {
         method: 'POST',
         body: JSON.stringify({ assignee_user_id: assigneeUserId, comment: document.getElementById('workflowReassignComment')?.value.trim() || '' })
       });
       hidePortalDialog();
-      toast(data.message || 'Approval reviewer assigned');
+      toast(data.message || 'Approval reviewer assigned', {kind:'success'});
       await load();
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   function workflowStepRow(step = {}) {
@@ -304,7 +306,7 @@
   function bindDefinitionStepControls() {
     document.querySelectorAll('.workflow-remove-step').forEach((button) => button.addEventListener('click', () => {
       const rows = document.querySelectorAll('[data-workflow-step]');
-      if (rows.length <= 1) return toast('A workflow needs at least one step');
+      if (rows.length <= 1) return toast('A workflow needs at least one step', {kind:'error'});
       button.closest('[data-workflow-step]')?.remove();
     }));
   }
@@ -332,7 +334,7 @@
     bindDefinitionStepControls();
     document.getElementById('workflowAddStep')?.addEventListener('click', () => {
       const container = document.getElementById('workflowDefinitionSteps');
-      if (container.children.length >= 10) return toast('A workflow can contain up to 10 steps');
+      if (container.children.length >= 10) return toast('A workflow can contain up to 10 steps', {kind:'error'});
       container.insertAdjacentHTML('beforeend', workflowStepRow());
       bindDefinitionStepControls();
     });
@@ -340,7 +342,7 @@
 
   async function submitDefinition() {
     const form = document.getElementById('workflowDefinitionForm');
-    if (!form?.reportValidity()) return;
+    if (!window.VoxelDialog.validate(form)) return;
     const steps = [...document.querySelectorAll('[data-workflow-step]')].map((row) => {
       const value = (name) => row.querySelector(`[data-step-field="${name}"]`)?.value;
       return {
@@ -362,9 +364,9 @@
         })
       });
       hidePortalDialog();
-      toast(data.message || 'Workflow definition published');
+      toast(data.message || 'Workflow definition published', {kind:'success'});
       await load();
-    } catch (error) { toast(error.message); }
+    } catch (error) { toast(error.message, {kind:'error'}); }
   }
 
   root.querySelectorAll('[data-workflow-tab]').forEach((button) => button.addEventListener('click', () => {

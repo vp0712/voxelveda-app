@@ -160,6 +160,19 @@ public class AndroidJourneyTest {
   assertEquals("No automatic browser launches in normal summary flow",0,Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getComponent()==null).count());
   facts.add("Installed Android WebView shows actual configured category and open/completed task options; double-tap Save, refresh, reopening, both themes and landscape verified against isolated fixture only");
  }
+ @Test public void foregroundActionFeedbackPreservesForm()throws Exception{
+  staffSession();waitJs("window.VoxelFeedback&&window.VoxelDialog&&window.showStaffDialog");
+  js("showStaffDialog('Synthetic action feedback','<label>Reference<input id=\"nativeActionReference\" required></label>',()=>{throw new Error('The saved request cannot be submitted or approved.');},'Save')");
+  js("document.getElementById('staffDialogPrimaryBtn').click()");waitJs("document.querySelector('#actionFeedback[data-kind=\"error\"]')&&document.getElementById('nativeActionReference').getAttribute('aria-invalid')==='true'");
+  screenshot("action-validation-foreground");
+  js("document.querySelector('#actionFeedback button').click();document.getElementById('nativeActionReference').value='Preserved Android input';document.getElementById('nativeActionReference').dispatchEvent(new Event('input',{bubbles:true}));document.getElementById('staffDialogPrimaryBtn').click()");
+  waitJs("document.querySelector('#actionFeedback[data-kind=\"error\"]')&&document.getElementById('actionFeedbackMessage').textContent.includes('submitted or approved')");
+  screenshot("action-error-foreground");device.pressBack();waitJs("!document.getElementById('actionFeedback')&&document.getElementById('staffDialogBackdrop').classList.contains('active')");
+  assertEquals("\"Preserved Android input\"",js("document.getElementById('nativeActionReference').value"));
+  device.pressBack();waitJs("document.querySelector('#actionFeedback[data-kind=\"warning\"]')");js("[...document.querySelectorAll('#actionFeedback button')].find(b=>b.textContent==='Discard changes').click()");
+  waitJs("!document.querySelector('.dialog-backdrop.active')&&!document.getElementById('actionFeedback')&&!document.body.classList.contains('vv-overlay-open')");facts.add("Installed WebView explicit failures containing saved/submitted/approved stay foreground errors; native Back closes only feedback, preserves form input, then offers managed discard with full scroll cleanup");
+ }
+
  @Test public void nativeBackDiscardsOnlyAfterConfirmation()throws Exception{
   staffSession();go("/profile");
   waitJs("document.getElementById('name')?.value==='Synthetic Staff Fixture'");

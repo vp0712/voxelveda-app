@@ -23,7 +23,7 @@
  function handleBack(options={}){
   const security=document.getElementById('stepUpDialog');
   if(security&&!security.hidden){document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true}));return true;}
-  if(window.VoxelOverlay?.active){window.VoxelOverlay.closeAll();return true;}
+  if(window.VoxelOverlay?.active){window.VoxelOverlay.close();return true;}
   const menu=document.querySelector('.record-action-menu[open]');if(menu){menu.open=false;return true;}
   if(document.body.classList.contains('mobile-menu-open')){window.toggleMobileMenu?.(false);window.toggleStaffMobileMenu?.(false);return true;}
   const dirty=[...document.forms].find(form=>{if(typeof form.nativeHasUnsavedChanges==='function'){try{return form.nativeHasUnsavedChanges()===true;}catch{}}return form.dataset.nativeDirty==='true';});

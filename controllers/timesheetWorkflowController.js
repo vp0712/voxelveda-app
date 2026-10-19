@@ -5,7 +5,8 @@ function sendWorkflowError(res, error, fallback) {
   if (status >= 500) console.error(`${fallback}:`, error);
   return res.status(status).json({
     message: status >= 500 ? fallback : error.message,
-    code: error?.code || 'TIMESHEET_WORKFLOW_ERROR'
+    code: error?.code || 'TIMESHEET_WORKFLOW_ERROR',
+    ...(status<500&&Array.isArray(error?.details?.review_issues)?{details:{review_issues:error.details.review_issues.map(issue=>({code:issue.code,attendance_id:issue.attendance_id}))}}:{})
   });
 }
 
@@ -49,7 +50,7 @@ exports.approve = async (req, res) => {
       comments: req.body.comments,
       reason: req.body.reason
     }, req);
-    return res.json({ message: 'Timesheet approved and added to Payroll Ready.', timesheet });
+    return res.json({ outcome:'COMMITTED', message: 'Timesheet approved and added to Payroll Ready.', timesheet });
   } catch (error) {
     return sendWorkflowError(res, error, 'Unable to approve the timesheet.');
   }
@@ -58,7 +59,7 @@ exports.approve = async (req, res) => {
 exports.reject = async (req, res) => {
   try {
     const timesheet = await workflow.reviewTimesheet(
-      Number(req.params.id), req.user, 'REJECT', req.body.comments, req
+      Number(req.params.id), req.user, 'REJECT', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
     );
     return res.json({ message: 'Timesheet rejected.', timesheet });
   } catch (error) {
@@ -69,7 +70,7 @@ exports.reject = async (req, res) => {
 exports.requestCorrection = async (req, res) => {
   try {
     const timesheet = await workflow.reviewTimesheet(
-      Number(req.params.id), req.user, 'REQUEST_CORRECTION', req.body.comments, req
+      Number(req.params.id), req.user, 'REQUEST_CORRECTION', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
     );
     return res.json({ message: 'Correction requested from the staff member.', timesheet });
   } catch (error) {
@@ -111,7 +112,7 @@ exports.legacyStatus = async (req, res) => {
       requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
         comments: req.body.comments
       }, req);
-      return res.json({ message: 'Timesheet approved and added to Payroll Ready.', timesheet });
+      return res.json({ outcome:'COMMITTED', message: 'Timesheet approved and added to Payroll Ready.', timesheet });
     }
     if (status === 'REJECTED') {
       const timesheet = await workflow.reviewTimesheet(
