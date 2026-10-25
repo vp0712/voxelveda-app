@@ -75,6 +75,13 @@ async function main(){
  await assert.rejects(()=>queueDocumentEmail({...message,recordId:'long:repeated',data:repeatedData,validatedArtifact:{buffer:repeatedPartial.buffer,filename:repeatedPartial.filename,sha256:repeatedPartial.validation.sha256}}),{code:'PDF_CONTENT_MISMATCH'});
  await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:wrong-record',data:{...longData,reference:'FIXTURE-OTHER-RECORD'},validatedArtifact:{buffer:longFrozen.buffer,filename:longFrozen.filename,sha256:longFrozen.validation.sha256}}),{code:'PDF_CONTENT_MISMATCH'});
  mutateQueuedBytes=true;try{await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:changed-queue'}),{code:'PDF_SNAPSHOT_MISMATCH'});}finally{mutateQueuedBytes=false;}
+ const exactData={...data,title:'EXACT SOURCE IDENTITY',reference:'FIXTURE-EXACT',filename:'FIXTURE-EXACT',party:'Staff 1',columns:[{label:'Field'},{label:'Value'}],rows:[['Hours','8.00'],['Status','ACTIVE']],notes:['Retain the exact source.']};
+ const variants={amount:{rows:[['Hours','18.00'],['Status','ACTIVE']]},status:{rows:[['Hours','8.00'],['Status','INACTIVE']]},staff:{party:'Staff 10'},appendedParty:{party:'Staff 1 and another employee'},duplicate:{rows:[...exactData.rows,exactData.rows[0]]},extra:{rows:[...exactData.rows,['Unrelated','Extra authorised-looking row']]},date:{issueDate:'2026-10-12'},heading:{columns:[{label:'Changed heading'},{label:'Value'}]}};
+ for(const [name,change]of Object.entries(variants)){
+   const altered=await actualPdf.createDocumentPdf({...exactData,...change});
+   await assert.rejects(()=>queueDocumentEmail({...message,recordId:'exact:'+name,data:exactData,validatedArtifact:{buffer:altered.buffer,filename:altered.filename,sha256:altered.validation.sha256}}),{code:'PDF_CONTENT_MISMATCH'},'Exact authoritative page identity rejects '+name);
+ }
+ const noDate={...exactData};delete noDate.issueDate;const undated=await actualPdf.createDocumentPdf(noDate);assert.match(undated.validation.text,/Date not recorded/);await actualPdf.validateDocumentPdf(undated.buffer,noDate);
  assert.equal(sendCount,beforeForged,'Forged/partial/repeated/wrong-record/changed-queue content cannot commit another message');
  console.log('Document lifecycle tests passed: retained immutable source; controlled generation retry; duplicate queue reuse; atomic bookkeeping rollback; changed-source rejection; complete long-field generated/frozen PDF and decoded MIME round trip; trusted measure-only proof; forged/unsupported/wrong-source/partial/repeated/wrong-record/changed-queue rejection; no re-rendered attachments; provider acceptance separate from recipient receipt.');
 }

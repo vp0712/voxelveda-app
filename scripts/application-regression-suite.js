@@ -7,6 +7,7 @@ const { spawnSync } = require('node:child_process');
 const checks = [
   'security-foundation-test.js',
   'android-canonical-test.js',
+  'android-back-test.js',
   'attendance-live-regression-test.js',
   'checkout-summary-test.js',
   'auth-lifecycle-test.js',
@@ -75,6 +76,7 @@ const checks = [
   'procurement-report-pdf-test.js',
   'qms-restoration-workflow-test.js',
   'qms-document-stock-test.js',
+  'qms-register-pagination-test.js',
   'original-report-test.js',
   'timesheet-preference-test.js',
   'weekly-timesheet-eligibility-test.js',

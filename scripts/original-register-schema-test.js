@@ -38,6 +38,39 @@ async function main() {
     await assert.rejects(schema.assertOriginalRegisterSchema('competitors', { async query() { return [broken]; } }), { code: 'ORIGINAL_REGISTER_SCHEMA_NOT_READY', statusCode: 503 });
   }
 
+  function preflightFixture({ fields = columns('competitors').filter(row => ['id','company_name'].includes(row.column_name)), primary = [{ column_name: 'id', sub_part: null }], tableType = 'BASE TABLE' } = {}) {
+    const state = { statements: [], acquired: 0, preservedRows: [{ id: 37, company_name: 'Original company' }] };
+    const db = {
+      async query(sql) {
+        state.statements.push(sql); assert.match(sql, /^SELECT /, 'Preflight must be read only');
+        if (sql.includes('information_schema.tables')) return [[{ table_name: 'competitors', table_type: tableType }]];
+        if (sql.includes('information_schema.columns')) return [fields];
+        if (sql.includes('information_schema.statistics')) return [primary];
+        throw new Error('Unexpected preflight query');
+      },
+      async getConnection() { state.acquired++; throw new Error('An incompatible schema must not acquire the migration connection'); }
+    };
+    return { db, state };
+  }
+  const compatibleLegacy = preflightFixture();
+  assert.equal((await schema.preflightOriginalRegisterSchemas(compatibleLegacy.db)).compatible, true, 'Optional missing legacy fields may upgrade additively');
+  const empty = { async query() { return [[]]; } };
+  assert.equal((await schema.preflightOriginalRegisterSchemas(empty)).inspected_tables, 0, 'Absent original tables are valid fresh-install candidates');
+  for (const fixture of [
+    preflightFixture({ fields: columns('competitors').filter(row => row.column_name !== 'id') }),
+    preflightFixture({ fields: columns('competitors').map(row => row.column_name === 'id' ? { ...row, data_type: 'varchar' } : row) }),
+    preflightFixture({ fields: columns('competitors').map(row => row.column_name === 'id' ? { ...row, extra: '' } : row) }),
+    preflightFixture({ primary: [{ column_name: 'id', sub_part: null }, { column_name: 'company_name', sub_part: null }] }),
+    preflightFixture({ fields: columns('competitors').map(row => row.column_name === 'company_name' ? { ...row, data_type: 'int' } : row) }),
+    preflightFixture({ tableType: 'VIEW' })
+  ]) {
+    const original = JSON.stringify(fixture.state.preservedRows);
+    await assert.rejects(migrations.runRetainedMigrations({ pool: fixture.db }), { code: 'ORIGINAL_REGISTER_SCHEMA_NOT_READY' });
+    assert.equal(fixture.state.acquired, 0, 'Invalid existing identity/key must fail before migration ledger creation or writes');
+    assert.equal(JSON.stringify(fixture.state.preservedRows), original);
+    assert(fixture.state.statements.every(sql => /^SELECT /.test(sql)));
+  }
+
   const statements = migrations.validateRetainedMigrations();
   assert.deepEqual(statements.map(entry => entry.migration_id), [...migrations.RETAINED_MIGRATIONS]);
   assert.match(statements[0].checksum_sha256, /^[a-f0-9]{64}$/);

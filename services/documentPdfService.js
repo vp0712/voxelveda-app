@@ -3,7 +3,8 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const { companyProfile } = require('../config/companyProfile');
-const DOCUMENT_LAYOUT_VERSION = '2026-10-25.1';
+const DOCUMENT_LAYOUT_VERSION = '2026-10-25.2';
+function exactLine(value) { return String(value ?? '').normalize('NFKC').replace(/\s+/gu,' ').trim(); }
 
 function pdfError(message, code = 'PDF_DOCUMENT_INVALID') {
   return Object.assign(new Error(message), { code, status: 422 });
@@ -12,28 +13,40 @@ function safePdfFilename(value) {
   const base = String(value || 'document').normalize('NFKC').replace(/[\\/\r\n\0"<>:|?*]/g, '-').replace(/[^\x20-\x7E]/g, '-').replace(/\s+/g, ' ').trim().replace(/(?:\.pdf)+$/i, '').replace(/\.(?:tmp|html?|csv|xlsx?|zip|jpe?g|png)$/i, '').slice(0, 160) || 'document';
   return `${base}.pdf`;
 }
-function compact(value) { return String(value ?? '').normalize('NFKC').replace(/\s+/g, '').toLowerCase(); }
-async function validatePdf(buffer, { expectedText = [], orderedExpectedText = false } = {}) {
+async function validatePdf(buffer, { expectedText = [], orderedExpectedText = false, documentProof } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 100 || buffer.length > 20 * 1024 * 1024 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') throw pdfError('Document generation did not produce PDF bytes. No document was sent.');
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const task = getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, useSystemFonts: true, disableFontFace: true });
   try {
     const pdf = await task.promise;
     if (!pdf.numPages || pdf.numPages > 500) throw pdfError('The PDF has no valid pages or exceeds the page limit.');
-    const texts = [];
+    const texts = [], pageLines = [];
     for (let index = 1; index <= pdf.numPages; index += 1) {
       const page = await pdf.getPage(index);
       const layer = await page.getTextContent();
       texts.push(layer.items.map(item => item.str || '').join(' '));
+      pageLines.push(layer.items.filter(item=>exactLine(item.str)).map(item=>({text:exactLine(item.str),x:item.transform[4],y:item.transform[5],size:item.height,width:item.width})));
       page.cleanup();
     }
     const text = texts.join(' ').replace(/\s+/g, ' ').trim();
-    const body = compact(text);
+    const identityText = text.normalize('NFKC');
+    if (documentProof) {
+      if(documentProof.schema_version!==2||documentProof.layout_version!==DOCUMENT_LAYOUT_VERSION||!Array.isArray(documentProof.pages))throw pdfError('This document identity layout is unsupported.','PDF_CONTENT_PROOF_UNSUPPORTED');
+      const close=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<0.04;
+      if(pageLines.length!==documentProof.pages.length)throw pdfError('The PDF page count does not match its authoritative document.','PDF_CONTENT_MISMATCH');
+      for(let p=0;p<pageLines.length;p++){
+        const actual=pageLines[p],expected=documentProof.pages[p];
+        if(actual.length!==expected.length||actual.some((line,i)=>line.text!==expected[i].text||!close(line.x,expected[i].x)||!close(line.y,expected[i].y)||!close(line.size,expected[i].size)||!close(line.width,expected[i].width)))throw pdfError('The complete PDF text or layout does not match its authoritative document.','PDF_CONTENT_MISMATCH');
+      }
+    }
     let contentAt = 0;
     for (const expected of expectedText.filter(value => value !== undefined && value !== null && String(value).trim())) {
-      const wanted = compact(expected), found = body.indexOf(wanted, orderedExpectedText ? contentAt : 0);
-      if (found < 0) throw pdfError('The PDF content does not match its document data.', 'PDF_CONTENT_MISMATCH');
-      if (orderedExpectedText) contentAt = found + wanted.length;
+      const wanted=String(expected).normalize('NFKC').replace(/\s/gu,''),escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const before=/^[0-9]/u.test(wanted)?'(?<![\\p{L}\\p{N}.+\\-])':'(?<![\\p{L}\\p{N}])';
+      const expression=new RegExp(before+Array.from(wanted).map(escape).join('\\s*')+'(?![\\p{L}\\p{N}])','giu');
+      expression.lastIndex=orderedExpectedText?contentAt:0;const match=expression.exec(identityText);
+      if (!match) throw pdfError('The PDF content does not match its document data.', 'PDF_CONTENT_MISMATCH');
+      if (orderedExpectedText) contentAt=expression.lastIndex;
     }
     return { pages: pdf.numPages, text, sha256: crypto.createHash('sha256').update(buffer).digest('hex'), bytes: buffer.length, status: 'VALIDATED' };
   } catch (error) {
@@ -55,12 +68,26 @@ async function buildDocumentPdf(data, proofOnly = false) {
   const doc = new PDFDocument({ size: 'A4', margin: 42, bufferPages: true, info: { Title: `${data.title} ${data.reference || ''}`, Author: company.name } });
   doc.registerFont('DocumentRegular', path.join(__dirname, '..', 'assets', 'fonts', 'OpenSans-Regular.ttf'));
   doc.registerFont('DocumentBold', path.join(__dirname, '..', 'assets', 'fonts', 'OpenSans-Bold.ttf'));
+  let pageIndex=0;
+  const pageLines=[[]],originalFragment=doc._fragment;
+  doc.on('pageAdded',()=>{pageIndex=pageLines.length;pageLines.push([]);});
+  doc._fragment=function(value,x,at,options){
+    const raw=String(value).replace(/\n/g,''),line=exactLine(raw);
+    if(line){
+      let drawX=x;
+      if(options.width&&options.align==='right')drawX+=options.lineWidth-this.widthOfString(raw.replace(/\s+$/u,''),options);
+      else if(options.width&&options.align==='center')drawX+=options.lineWidth/2-options.textWidth/2;
+      drawX+=this.widthOfString(raw.match(/^\s*/u)[0],options);
+      pageLines[pageIndex].push({text:line,x:drawX,y:this.page.height-at-this._font.ascender/1000*this._fontSize,size:this._fontSize,width:this.widthOfString(raw.trim(),options)});
+    }
+    if(!proofOnly)return originalFragment.call(this,value,x,at,options);
+  };
   const chunks = [];
   const completion = new Promise((resolve, reject) => { doc.on('data', chunk => { if (!proofOnly) chunks.push(chunk); }); doc.on('end', () => resolve(Buffer.concat(chunks))); doc.on('error', reject); });
   const left = 42, width = doc.page.width - 84, bottom = doc.page.height - 64;
   const navy = '#102b4e', blue = '#2563eb', ink = '#172a43', muted = '#526277';
   let y, pageStartY;
-  function text(value, x, at, available, options = {}) { if (!proofOnly) doc.text(String(value ?? ''), x, at, { width: available, lineGap: 2, ...options }); }
+  function text(value, x, at, available, options = {}) { doc.text(String(value ?? ''), x, at, { width: available, lineGap: 2, ...options }); }
   function header(continued = false) {
     if (!proofOnly) doc.rect(0, 0, doc.page.width, 8).fill(blue);
     const logo = path.join(__dirname, '..', 'public', 'Frame 1.png');
@@ -80,7 +107,7 @@ async function buildDocumentPdf(data, proofOnly = false) {
     text(data.reference || '', 160, referenceY, width - 118, { align: 'right' });
     const referenceHeight=doc.heightOfString(data.reference || '',{width:width-118,lineGap:2});
     const dateY=referenceY+referenceHeight+3;
-    text(continued ? 'Continued' : `${data.issueLabel || 'Issued'} ${dateLabel(data.issueDate || new Date())}`, 160, dateY, width - 118, { align: 'right' });
+    text(continued ? 'Continued' : `${data.issueLabel || 'Issued'} ${data.issueDate ? dateLabel(data.issueDate) : 'Date not recorded'}`, 160, dateY, width - 118, { align: 'right' });
     const headerEnd=Math.max(94,dateY+22);
     if (!proofOnly) doc.moveTo(left, headerEnd).lineTo(left + width, headerEnd).strokeColor('#d9e1ec').stroke();
     y = headerEnd+14; pageStartY = y;
@@ -216,6 +243,7 @@ async function buildDocumentPdf(data, proofOnly = false) {
   const pages = doc.bufferedPageRange();
   for (let index = 0; index < pages.count; index += 1) {
     doc.switchToPage(index);
+    pageIndex=index;
     doc.font('DocumentRegular').fontSize(8).fillColor(muted);
     const oldBottom = doc.page.margins.bottom; doc.page.margins.bottom = 0;
     text(company.name, left, doc.page.height - 34, width / 2);
@@ -224,9 +252,9 @@ async function buildDocumentPdf(data, proofOnly = false) {
   }
   doc.end();
   const buffer = await completion;
-  const contentProof = { schema_version: 1, layout_version: DOCUMENT_LAYOUT_VERSION, source_sha256: crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex'), fragments: expectedText };
+  const contentProof = { schema_version: 2, layout_version: DOCUMENT_LAYOUT_VERSION, source_sha256: crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex'), fragments: expectedText, pages:pageLines };
   if (proofOnly) return contentProof;
-  const validation = await validatePdf(buffer, { expectedText, orderedExpectedText: true });
+  const validation = await validatePdf(buffer, { documentProof:contentProof });
   return { buffer, filename: safePdfFilename(data.filename || data.reference || data.title), contentType: 'application/pdf', contentDisposition: 'attachment', validation, contentProof };
 }
 async function createDocumentPdf(data) { return buildDocumentPdf(data); }
@@ -234,6 +262,7 @@ async function createDocumentPdf(data) { return buildDocumentPdf(data); }
 // layout/font metrics, without drawing a second business document. A retained
 // PDF caller cannot supply, omit or forge the expected fragments.
 async function deriveDocumentContentProof(data) { return buildDocumentPdf(data, true); }
+async function validateDocumentPdf(buffer,data) { const proof=await deriveDocumentContentProof(data);return validatePdf(buffer,{documentProof:proof}); }
 async function sendPdfResponse(res, artifact, download = false) {
   await validatePdf(artifact.buffer);
   res.setHeader('Content-Type', 'application/pdf');
@@ -264,4 +293,4 @@ async function storedDocumentArtifact(body, filename) {
     return { buffer, filename: safePdfFilename(filename), validation: await validatePdf(buffer), converted_from: jpeg ? 'image/jpeg' : 'image/png' };
   } catch (error) { doc.destroy(); throw error; }
 }
-module.exports = { createDocumentPdf, deriveDocumentContentProof, DOCUMENT_LAYOUT_VERSION, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact, money, dateLabel, pdfError };
+module.exports = { createDocumentPdf, deriveDocumentContentProof, validateDocumentPdf, DOCUMENT_LAYOUT_VERSION, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact, money, dateLabel, pdfError };

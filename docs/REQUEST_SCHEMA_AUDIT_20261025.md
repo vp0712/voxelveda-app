@@ -34,6 +34,11 @@ essential original business fields cause an explicit compatibility failure.
 Source files, attachments, IDs, audit history, retired data and encryption keys
 are not touched. The changes remain additive for previous-release rollback.
 
+Before any current migration DDL or ledger bootstrap, a read-only preflight checks
+existing base-table identities, complete single-column primary keys, identity
+types and essential original business fields. Missing optional fields and absent
+tables are allowed; incompatible existing identities fail without assigning IDs
+or changing the ledger/data. Existing compatible legacy field types are retained.
 Startup completes the current migrations and read-only assertions before serving
 requests. Requests perform no schema writes for these eight registers. Failed
 observations are retryable; successful observations are shared per pool or

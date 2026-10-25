@@ -305,6 +305,18 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
     });
     if (deliveryPolicy && (result.rejected?.length || !Array.isArray(result.accepted) || result.accepted.length !== 1 || String(result.accepted[0]).toLowerCase() !== deliveryPolicy.recipient.toLowerCase())) throw Object.assign(new Error('The SMTP recipient outcome requires review before retry.'), {code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:Boolean(result.accepted?.length)});
     return { ...result, transport: 'smtp', attachmentFilenameGuaranteed: true, receivedVerified: false };
+  } catch (error) {
+    if(error.code==='DELIVERY_REVIEW_REQUIRED')throw error;
+    const response=Number(error.responseCode);
+    if(Number.isInteger(response)&&response>=400&&response<600){
+      error.deliveryOutcome='NOT_ACCEPTED';error.providerAccepted=false;error.retryable=response<500;throw error;
+    }
+    // Nodemailer can label a lost post-DATA socket as command CONN. Once
+    // sendMail was dispatched, that label cannot establish non-acceptance.
+    if(isEmailTransportError(error)||['EPIPE','ERR_STREAM_PREMATURE_CLOSE'].includes(error.code)||error.name==='AbortError'){
+      throw Object.assign(new Error('The SMTP response was lost after dispatch. Review the provider outcome before retrying; automatic resend is disabled.'),{code:'DELIVERY_REVIEW_REQUIRED',reasonCode:'SMTP_DELIVERY_OUTCOME_UNKNOWN',providerAccepted:false,retryable:false,deliveryOutcome:'UNKNOWN',cause:error});
+    }
+    throw error;
   } finally {
     transporter.close();
   }

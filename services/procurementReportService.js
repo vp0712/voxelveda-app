@@ -4,7 +4,7 @@ const { DateTime } = require('luxon');
 const pool = require('../config/db');
 const { hasPermission } = require('./authorizationService');
 const { logAudit, stableJsonText } = require('./auditService');
-const { createDocumentPdf, validatePdf, safePdfFilename, dateLabel, pdfError } = require('./documentPdfService');
+const { createDocumentPdf, validateDocumentPdf, safePdfFilename, dateLabel, pdfError } = require('./documentPdfService');
 const decimal = require('../utils/money');
 const { quantityUnits } = require('../utils/quantity');
 const TYPES = new Set(['register','items','suppliers','summary','selected','individual','import-outcomes']);
@@ -250,8 +250,7 @@ async function snapshotArtifact(row) {
   const source=JSON.parse(row.source_json),data=JSON.parse(row.document_json);
   if(sourceHash(source)!==row.source_sha256)throw pdfError('The retained procurement source snapshot failed integrity validation.','PDF_SNAPSHOT_MISMATCH');
   if(source.request.source!==row.source_kind || source.request.type!==row.report_type || sourceRecordCount(source)!==Number(row.record_count))throw pdfError('The procurement snapshot identity does not match its retained report.','PDF_SNAPSHOT_MISMATCH');
-  const checked=await validatePdf(row.pdf_bytes,{expectedText:[data.title,data.reference,data.party,data.period,
-    ...(data.tables || [{rows:data.rows||[]}]).flatMap(table=>(table.rows||[]).flat()),...(data.totals||[]).map(total=>total.value)]});
+  const checked=await validateDocumentPdf(row.pdf_bytes,data);
   if(checked.sha256!==row.pdf_sha256 || checked.pages!==Number(row.pdf_pages))throw pdfError('The retained procurement PDF failed integrity validation.','PDF_SNAPSHOT_MISMATCH');
   return {buffer:row.pdf_bytes,filename:safePdfFilename(data.filename||row.reference),sha256:checked.sha256,validation:checked};
 }

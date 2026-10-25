@@ -9,6 +9,23 @@ const crypto = require('node:crypto');
 const Module = require('node:module');
 const { chromium } = require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
 const root = path.join(__dirname, '..');
+// The browser fixture represents startup-complete current original schemas.
+// Derive metadata from the actual migration DDL, rather than bypassing the
+// production read-only assertions or maintaining a second imagined schema.
+const migratedRegisterColumns = new Map();
+const registerMigrationSql = fs.readFileSync(path.join(root, 'migrations/retained/20261025_original_request_schema.sql'), 'utf8');
+for (const match of registerMigrationSql.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)\s*\(([\s\S]*?)\)\s*ENGINE=InnoDB;/g)) {
+  const columns = [];
+  for (const line of match[2].split('\n')) {
+    const declaration = line.match(/^\s*([a-z][a-z0-9_]*)\s+([A-Z]+)\b(.*)/);
+    if (!declaration) continue;
+    columns.push({ column_name: declaration[1], data_type: declaration[2].toLowerCase(),
+      column_key: /\bPRIMARY KEY\b/.test(declaration[3]) ? 'PRI' : '',
+      extra: /\bAUTO_INCREMENT\b/.test(declaration[3]) ? 'auto_increment' : '' });
+  }
+  migratedRegisterColumns.set(match[1], columns);
+}
+assert.equal(migratedRegisterColumns.size, 8, 'The fixture observes all eight migrated original register definitions');
 const outputDir = process.env.UI_PROOF_DIR || path.join('/tmp', 'voxelveda-restored-ui-proof');
 const statements = [];
 const audits = [];
@@ -70,6 +87,12 @@ async function query(statement, parameters = []) {
   if (/^UPDATE rfqs SET archived/i.test(sql)) { const row=rfqs.find(item=>item.id===Number(parameters[1])); row.archived=Number(parameters[0]); row.revision++; return result({ affectedRows:1 }); }
   if (/^UPDATE rfqs SET status/i.test(sql)) { const row=rfqs.find(item=>item.id===Number(parameters[1])); row.status=parameters[0]; row.revision++; return result({ affectedRows:1 }); }
   if (/^UPDATE/i.test(sql)) return result({ affectedRows:1 });
+  if (/^SELECT COLUMN_NAME AS column_name, COLUMN_KEY AS column_key, DATA_TYPE AS data_type, EXTRA AS extra FROM information_schema\.columns/i.test(sql)) {
+    assert.equal(parameters.length, 1, 'Original register metadata is scoped to one expected table');
+    const columns = migratedRegisterColumns.get(parameters[0]);
+    assert.ok(columns, 'Original register metadata must come from an actual current migration CREATE statement');
+    return result(columns.map(row => ({ ...row })));
+  }
   if (/^SELECT DATA_TYPE data_type,CHARACTER_MAXIMUM_LENGTH max_length,IS_NULLABLE is_nullable FROM information_schema\.columns/i.test(sql)) {
     const [table,column]=parameters;
     assert.equal(secureDocumentColumns.get(table),column,'schema metadata is limited to the actual retained document reference columns');

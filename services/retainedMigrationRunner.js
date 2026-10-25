@@ -1,7 +1,7 @@
 'use strict';
 const path = require('node:path');
 const { discoverMigrations, runMigrations, MigrationError } = require('./migrationRunner');
-const { assertOriginalRegisterSchemas } = require('./originalRegisterSchema');
+const { preflightOriginalRegisterSchemas, assertOriginalRegisterSchemas } = require('./originalRegisterSchema');
 
 const RETAINED_MIGRATIONS = Object.freeze(['20261025_original_request_schema']);
 const RETAINED_MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations', 'retained');
@@ -24,6 +24,11 @@ function validateRetainedMigrations(directory = RETAINED_MIGRATIONS_DIR) {
 
 async function runRetainedMigrations({ pool, logger = console, env = process.env, migrationsDir = RETAINED_MIGRATIONS_DIR } = {}) {
   validateRetainedMigrations(migrationsDir);
+  // Inspect existing identity/key and essential-field contracts before even
+  // acquiring the migration connection or bootstrapping its ledger. Missing
+  // tables and optional fields are expected; incompatible existing data
+  // structures require review and must never receive invented identities.
+  await preflightOriginalRegisterSchemas(pool);
   // The existing engine supplies the cross-replica advisory lock, ordered
   // checksums, durable APPLIED/FAILED outcomes and safe resumable execution.
   // Its directory contains only reviewed current original migrations; the

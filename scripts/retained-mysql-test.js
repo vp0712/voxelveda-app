@@ -908,6 +908,10 @@ async function testInvoicePaymentReview(){
 
 async function main() {
   await prepareFixtures();
+  // Direct controller calls below must observe the same current original
+  // migration boundary as real application startup, after the fresh-DB guard
+  // and historical-row snapshot have been established by prepareFixtures.
+  await require('../services/retainedMigrationRunner').runRetainedMigrations({ pool });
   await initializeRetainedSchemas();
   await testAudit();
   await testInvoicePaymentReview();
