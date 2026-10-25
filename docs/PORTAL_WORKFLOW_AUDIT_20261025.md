@@ -1,0 +1,110 @@
+# Retained portal and workflow audit — 25 October 2026
+
+Baseline: `b3707b2376aba5b080b54d723b5dcb6dcfceedd1`, refreshed from GitHub before this audit. This register separates inspected implementation, reproduced defects, fixture verification and production verification. A route or historical passing workflow is not proof that a private production action completed.
+
+## Roles, routing and authority
+
+Sources: `app.js`, `config/permissionCatalog.js`, `services/authorizationService.js` and each module router/controller. Valid stored, temporary and break-glass grants are canonicalised and intersected with any permission boundary. Role names do not bypass ownership, current team assignments, status/version checks, MFA or step-up requirements.
+
+| Existing role family | Canonical portal | Original authority relevant to this review |
+| --- | --- | --- |
+| Super Admin | `/admin` | Original operational/security grants; sensitive actions retain step-up and record rules |
+| Admin | `/admin` | Original operations, users, inventories, procurement, all-timesheet review and QMS |
+| `finance_admin` | `/admin` | Original invoice/expense actions, suppliers, procurement read/import, approvals and archive recovery |
+| `finance_user` | `/admin` | Original invoice/expense actions and procurement read; no implied user/security administration |
+| `accountant` | `/admin` | Original finance/payroll/procurement read and approval requests |
+| HR | `/portal/hr` | Workforce/recruitment, all-timesheet review and training; roster/manual-clock editing still requires `EDIT_ATTENDANCE` |
+| Manager | `/portal/manager` | Managed-team work/time review, customers, meetings, procurement and QMS review |
+| Supervisor | `/portal/supervisor` | Managed-team work/time review, inspections and relevant procurement receiving/returns |
+| Production | `/portal/production` | Own work/time, inventory edits, inspections and procurement requisition/receiving |
+| Sales | `/portal/sales` | Customer/RFQ editing, meetings and QMS read; invoice authority is not implied |
+| Staff | `/portal/staff` | Own jobs/time, attendance, assigned meetings and original read/request workflows |
+| `viewer` / `view_only` | `/client` | `VIEW_DASHBOARD` template only; any stored original commercial grants remain customer-scoped |
+| `client` / `customer` | `/client` | Stored original grants, with RFQ/invoice access restricted by authenticated account email |
+
+There are 13 explicit templates plus the two supported client/customer families. The existing role-browser fixtures cover all 15 names. Unknown role names have no template grants; valid explicit legacy grants remain projected through the permission catalog. This source-derived matrix does not claim to enumerate every production account.
+
+Legacy finance-named grants above belong to retained invoicing, original expenses and purchasing. They do not reactivate Banking, Finance OS or the separate ERP portal. Retirement protection intercepts those route/asset families before their modules load.
+
+### QMS authority differs from customer commercial ownership
+
+Existing QMS routes explicitly grant company-register read authority through `VIEW_QMS` or `VIEW_COMPLIANCE`; several original role templates, including Staff, contain `VIEW_QMS`. The central customer-record policy applies to customer-owned commercial records, rather than imposing an undocumented ownership predicate on every explicitly granted original module. No established policy conflict justifies blanket-disabling a custom client account's explicit original QMS grant. Recipient-targeted QMS notifications still require their separate own-recipient or company (`NULL`) predicate, including count and report selection. QMS writes retain endpoint-specific authorities and step-up checks.
+
+## Module, route and workflow matrix
+
+The last column names executable candidate gates, not a claim that a new run has already passed. Controller record checks still apply after route grants.
+
+| Retained module | Route/surface | Authority and data boundary | Actions, lists and reports | Candidate gates |
+| --- | --- | --- | --- | --- |
+| RFQs | `/rfqs`, `/api/rfq` | `VIEW_RFQS` / `EDIT_RFQS`; client-family email predicate | Create, optimistic edit, approve/reject/close, archive/restore; status/search/sort/pages; stable RFQ IDs | `original-workflow-test`, `original-report-test`, restored browser |
+| Quotations/commercial linkage | `/quotations` view alias; RFQ quoted status; invoice `rfq_id` | Original RFQ/invoice grants | No independent quotation controller was found in this baseline. Preserve supported RFQ/invoice links and statuses; do not infer a replacement ERP job/order model from a view alias | RFQ/invoice workflow gates |
+| Invoices/statements | `/invoices`, `/invoice/view`, `/api/invoice` | `VIEW_FINANCE`; client email ownership; applicable edit/transaction/void grants and step-up | Create/edit/approve/send, recorded payment review/void, archive/restore; pages, exact-money totals, versioned invoice/statement PDFs | Invoice workflow/summary, invoice-dialog and responsive browser |
+| Customers | `/customers`, `/api/customers` | `VIEW_CUSTOMERS` / `EDIT_CUSTOMERS` | Create/edit/archive, bound search/sort/pages and stable links | Core workflow, original reports |
+| Suppliers/files | `/suppliers`, `/api/suppliers` | `VIEW_SUPPLIERS` / `EDIT_SUPPLIERS` | Create/edit/archive, history and authorised files; full-source reports | Original reports, file/PDF boundary gates |
+| Procurement operations | `/procurement`, `/api/procurement` | Separate view, requisition, supplier-RFQ, PO, receipt, inspection and return grants | Controlled state transitions, receiving/inspection/returns and stable item links; retired supplier-bill finance handoff remains 410 | Procurement workflow, actual MySQL |
+| Imports/editable procurement entries | `/api/procurement/imports`, `/entries`, `/reports/snapshots` | `VIEW_PROCUREMENT` plus applicable import/requisition/record-management grant; email also `SEND_COMPANY_EMAIL` | Every file outcome; separate private original-file vault; mapping/review and accepted/rejected/duplicate/review counts; safe retries; edit/archive/restore; complete filtered snapshot PDFs | Extraction/import workflow/report-PDF tests, procurement browser |
+| Stock/materials | `/stock`, `/inventory`, `/raw-material`, `/packaging`, stock/material APIs | `VIEW_INVENTORY` / `EDIT_INVENTORY` | Atomic stock issue/correction/void; quantity validation and movement history; archive/restore, search/filter/sort/pages and process-sheet/register PDFs | Core workflow, QMS stock, original reports |
+| Production | `/portal/production`, `/shop-floor`, tasks/inventory/QMS | Original production grants, assigned-task checks and QMS/compliance access | Existing work, materials, inspections and transitions stay in the original app; no second ERP database/portal | Core/QMS workflow, role/restored browser |
+| Tasks/work hub/messages | `/tasks`, `/api/tasks` | Own/team/company job grants and current assignment/team checks | Explicit task transitions/history, original messages, work requests and announcements | Original/core workflow, checkout summary, actual MySQL |
+| Meetings | `/meetings`, `/api/meetings` | `MANAGE_MEETINGS`; assigned own list through `VIEW_MEETINGS` | Create/edit/archive, attendee isolation, date/type/status validation, search/sort/pages | Core workflow |
+| Workforce/user access | `/workforce`, `/staff`, `/api/users` | `MANAGE_USERS`, step-up and protected role/permission boundaries | Create/edit/invite, audited account/access state, saved designated timesheet email; identities retained | Secure-user, active-boundary and delivery-preference tests |
+| Rosters | `/roster`, `/api/roster` | `EDIT_ATTENDANCE` for register/writes; `VIEW_ATTENDANCE` for own assignments | Create/edit/generate/publish/archive/restore; planned shifts do not prove work | Core roster, original reports |
+| Attendance/corrections | `/api/attendance/actions`, `/today`, `/my`, `/sessions`, `/corrections` | Authenticated employee ownership; current team/all review; signed QR policy | Explicit clock/break actions, server times, durable receipts/reconciliation, live clock/resume; original and revised values retained | QR/live/verified-summary tests, actual MySQL, live browser |
+| Checkout summary | Session summary-options and note APIs | Exact completed session and authorised actual choices | Configured first-use categories, relevant open/completed tasks, independent optional Save/Skip; summary failure cannot reverse checkout | Checkout-summary unit/browser |
+| Timesheets/private delivery | `/timesheets`, timesheet/weekly-reconciliation/delivery APIs | Own/team/all grants, current manager relation and no self-approval; designated recipient only | Version/source-minute review, corrections and exact hours; worked-only completed-week schedule; one To, no CC/BCC/fallback; durable period/revision claims and uncertain-outcome handling | Timesheet, weekly eligibility/API/reconciliation/PDF/queue tests, weekly portal browser |
+| Notifications | `/api/notifications`, shared bell/Alerts | Current recipient and permitted target | Durable read/archive/restore, event-recipient deduplication, accurate visible count, actionable target, failure/retry/empty states | Notification service/component and staff browser |
+| Profile/identity documents | `/profile`, profile-photo and employee-identity APIs | Own photo or explicit permitted team/HR access; controlled identity issue/revoke and step-up | Genuine bounded decode, EXIF/crop, private durable storage, immediate account-isolated avatars; identity PDF/revocation | Avatar, file-API and staff-browser gates |
+| QMS/regulatory registers | `/quality`, `/shop-floor`, `/api/qms` | Explicit QMS/compliance read, separate create/review/release authorities | Original records, NCR/CAPA, holds, plans, concessions, CoCs, changes, audits/reviews/continuity/regulatory registers; fixed caps are a separate confirmed repair | QMS workflow/document-stock and new register/report gates |
+| Compliance/files | `/compliance`, `/api/compliance` | `VIEW_COMPLIANCE` / `EDIT_COMPLIANCE` | Create/edit/archive, validated external links and authorised source-file access | External-link, retained file/document tests |
+| Recruitment | `/careers`, `/careers-admin`, careers APIs | Public published vacancies/application upload; HR/user-management authority for administration and applicable edit grant for status | Real vacancy/application data and controlled review/status changes; private applicant material | File/API, registration and retained public/browser gates |
+| Documents/exports | `/document/view`, `/api/documents`, original report PDFs | Document ownership/grants, source-module authority and applicable step-up; own/team/client predicates | Authoritative preview/download/email snapshots; complete pagination up to explicit safety limit; source/count drift blocks partial output; parser/page/identity/hash/version checks | PDF/lifecycle/module-isolation/response-boundary, original-report and PHP MIME tests |
+| Workflow/approvals | `/approvals`, `/api/workflows` | View/request/action/manage grants and current instance authority | Controlled request/review, durable explicit outcomes, audit and duplicate/busy/uncertain protection | Action-network/dialog and weekly-portal browser |
+| Archive recovery | `/trash`, `/api/trash` | View/restore grant plus original source-record restrictions | Recoverable archive and authorised restore; permanent deletion remains retired | Original/core workflow and retained-boundary gates |
+| Industry directory | `/api/competitors` | `VIEW_CUSTOMERS` / `EDIT_CUSTOMERS` | Original directory CRUD/source links; request-time schema work repaired separately | External links, original reports and schema assertions |
+
+## Issue register
+
+| ID | Reproduction and cause | Affected code/role | Change and verification | Remaining evidence |
+| --- | --- | --- | --- | --- |
+| PORTAL-01 | Exact baseline controller with synthetic SQL rows exposed company RFQ/invoice counts, revenue and an unrelated supplier to a customer carrying commercial grants. Serialization checked grants without a customer boundary | `dashboardController.getDashboardStats`; client/customer/viewer/view_only with explicit grants | Central `customerScoped` denial returns 403 before DDL/data reads. Client home does not call this endpoint; own paginated RFQ/invoice records/counts remain. New `dashboard-customer-isolation-test.js` covers stored/temporary grants, zero-query denial and preserved internal projections. Baseline failed isolated reproduction; repaired Node test passed | Fresh combined candidate/MySQL/browser and appropriate live authentication-boundary checks |
+| DATE-01 | UTC-midnight JavaScript Date written by SheetJS acquires a Melbourne local time component; strict date parser correctly rejects it | Procurement extraction fixture/calendar dates | Separate owner repairs fixtures and covers UTC/Melbourne, DST, 1900/1904 and ambiguous/time-bearing input | Exact candidate test runs; do not weaken real validation |
+| QMS-01 | Active registers have LIMIT200/300 and other lists LIMIT500 without complete register paging | QMS controllers/UI/reports | Separate owner adds scoped search/filter/sort/pages/counts and complete reports, retaining write grants | Large-data, authority, browser and PDF reconciliation |
+| DDL-01 | Competitor handlers perform request-time CREATE/ALTER with broad swallowed errors | Competitor controller and schema inventory | Separate owner supplies additive checksummed migrations and read-only runtime assertions, distinguishing memoised initializers | Fresh/upgrade actual MySQL evidence |
+| DB-01 | Active plaintext connection differs from encryption-only capability probe; public readiness spreads detailed database state | DB config/runtime/state and diagnostics | Root separates active/probe facts, protects detailed diagnostics and configures strict verified transport | Actual provider CA/hostname, authorised configuration and active-session proof |
+| ANDROID-01 | Association fails closed without verified signing identity; website SHA does not identify an installed app | Association, Play bindings and installed package | Android owner checks actual identity, track/version and distribution | Verified signing/publishing access and installed-device evidence; never invent certificate |
+| ANDROID-02 | Dirty-form Back still calls synchronous native confirmation | `android-app.js` | Android owner integrates existing managed asynchronous confirmation, repeated Back and one-layer dismissal | Fresh bridge and available native-device verification |
+| EMAIL-01 | Current completed-week queue/provider outcomes require refreshed authenticated inspection; historical relay/inbox evidence is insufficient | Weekly reconciliation and immutable document delivery | Root owns real worked-staff reconciliation, provider investigation and bounded recovery; this audit resends nothing | Current connection, queue/provider reconciliation and authorised received MIME/opening proof |
+
+## Working UI and attendance behaviour preserved
+
+No new shared-dialog, feedback, clock, photo or notification defect was established by this source review. Preserve these working repairs and obtain fresh candidate artifacts:
+
+- `VoxelActions.timesheet` confirms saved ID, status, version and approved hours; reconciles uncertain replies; closes the completed form; preserves the commit if refresh fails; shows centred success with one OK.
+- `VoxelFeedback` uses explicit outcome kind/HTTP status. Success-like words in an error message do not change its outcome.
+- `VoxelDialog` keeps field errors above the originating form, marks/focuses fields, preserves values and distinguishes editable Save/Cancel from read-only Close. Busy/uncertain actions cannot silently dismiss or duplicate a write.
+- The staff clock projects authoritative server records with monotonic elapsed time, re-fetches on resume/visibility/network recovery and includes recorded breaks.
+- Checkout options are actual authorised application categories/tasks. Optional summary failure or Skip cannot reverse clock-out.
+- QR gate/display fixtures decode the branded QR through rotation and outage/recovery; employee writes retain authenticated ownership.
+- Private shared avatars and permission-scoped notification counts/targets remain unchanged. The original logo is preserved.
+
+## Fresh browser execution and limitations
+
+Existing executable coverage should be rerun against the exact assembled candidate, rather than cited as a new result from a historical run:
+
+1. Application build under UTC and Australia/Melbourne, plus disposable actual MySQL regressions.
+2. `action-dialog-browser-test.js` in Chromium and WebKit: all 15 supported names × seven widths (320/360/390/430/768/1024/1440) × both themes: 210 cases per engine. Also landscape, 125% text, short/keyboard-like viewport, focus, validation, refresh failure, pending/uncertain requests and account cleanup.
+3. `weekly-portals-browser-test.js`: own/team/all and denied families, actual review/delivery fixture rows and client pagination/search.
+4. Populated invoice and procurement browsers: long identities/references/dates, visible badges, value labels, report completeness, file vault, edit/archive/retry and PDF reader/version checks. Existing invoice scenarios use all seven widths, both themes and landscape.
+5. Staff live-clock, summary, branded QR gate/display, avatar and notification suites with recovery and current fixture ownership.
+6. Release-marker deployment, exact live SHA/assets, original authentication and retired-module boundaries, active verified database transport and separate PDF HTTP/MIME/provider/inbox evidence.
+
+Root centralises all browser/network execution. The agent's attempted local Chromium launch was cancelled while permission execution remained pending; it produced no browser result and must not be recorded as passed. Exact command for the available runner:
+
+```sh
+VV_BROWSER_MODULE_PATH=/tmp/voxelveda-browser/node_modules/playwright \
+PLAYWRIGHT_BROWSERS_PATH=/workspace/voxelveda-browsers \
+UI_PROOF_DIR=/workspace/release-artifacts/audit-20261025/action-dialogs-baseline \
+node scripts/action-dialog-browser-test.js
+```
+
+For WebKit, set `VV_ACTION_BROWSER_ENGINE=webkit` and use a separate proof directory on the CI runner with its installed native libraries. All identities, records and addresses in these fixtures are synthetic; no real staff clock entry, customer/supplier record or email is created. Camera/keyboard/viewport emulation is not physical iOS/Android verification. Fresh combined candidate, private production, installed Android distribution and recipient opening results remain explicitly pending until recorded by the release owner.

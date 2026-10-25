@@ -21,6 +21,20 @@ function workbook(sheets, bookType = 'xlsx', options = {}) {
   if (options.date1904) book.Workbook = { WBProps: { date1904: true } };
   return XLSX.write(book, { type: 'buffer', bookType, compression: true });
 }
+
+// Excel stores calendar dates as serial days, not JavaScript instants. Construct
+// real numeric date cells so SheetJS cannot introduce the runner's local time.
+function excelCalendarCell(isoDate, date1904 = false) {
+  assert.match(isoDate, /^\d{4}-\d{2}-\d{2}$/);
+  const [year, month, day] = isoDate.split('-').map(Number);
+  const instant = Date.UTC(year, month - 1, day);
+  assert.equal(new Date(instant).toISOString().slice(0, 10), isoDate, 'Fixture must be a real calendar date.');
+  const serial1900 = (instant - Date.UTC(1899, 11, 31)) / 86400000 + (instant >= Date.UTC(1900, 2, 1) ? 1 : 0);
+  const serial = serial1900 - (date1904 ? 1462 : 0);
+  assert.ok(Number.isInteger(serial) && serial >= 0, 'Fixture must use a supported whole Excel serial day.');
+  return { t: 'n', v: serial, z: 'yyyy-mm-dd' };
+}
+
 function pdfFixture({ pages = 2, imageOnly = false, encrypted = false } = {}) {
   const doc = new PDFDocument({ size: 'A4', margin: 32, ...(encrypted ? { userPassword: 'fixture-only' } : {}) });
   const chunks = [];
@@ -163,7 +177,8 @@ async function main() {
   await assert.rejects(() => extractImportFile(file('limit.csv', 'Description,Qty\nFixture part,2'), { limits: { maxFileBytes: 8 } }), { code: 'IMPORT_FILE_LIMIT' });
   await assert.rejects(() => extractImportFile(file('limit.csv', 'Description,Qty\nFixture part,2'), { limits: { maxFileBytes: DEFAULT_LIMITS.maxFileBytes + 1 } }), { code: 'IMPORT_LIMIT_INVALID' });
 
-  const sheet = XLSX.utils.aoa_to_sheet([['Fixture supplier quotation'], ['Description', 'Quantity', 'Unit Price', 'GST %', 'Date'], ['Fixture plate', 2, 12.5, 10, new Date('2026-10-01T00:00:00Z')], ['Fixture formula', 1, 1, 0, new Date('2026-10-02T00:00:00Z')]]);
+  const sheet = XLSX.utils.aoa_to_sheet([['Fixture supplier quotation'], ['Description', 'Quantity', 'Unit Price', 'GST %', 'Date'], ['Fixture plate', 2, 12.5, 10, null], ['Fixture formula', 1, 1, 0, null]]);
+  sheet.E3 = excelCalendarCell('2026-10-01'); sheet.E4 = excelCalendarCell('2026-10-02');
   // SheetJS BIFF output uses raw bf tokens rather than the xlsx f text.
   // cce=3, PtgInt=0x1e, integer=1 gives a genuine stored XLS formula =1.
   sheet.B4 = { t: 'n', v: 1, f: '1', bf: Buffer.from([3, 0, 0x1e, 1, 0]) };
@@ -178,6 +193,64 @@ async function main() {
     const formula = normalizeImportRow(book.sheets[0].rows[1], { classification: 'QUOTATION', mapping: map });
     assert.equal(formula.status, 'REVIEW_REQUIRED'); assert.ok(formula.warnings.some(warning => warning.code === 'IMPORT_FORMULA_REVIEW_REQUIRED'));
   }
+
+  // The same real XLS/XLSX bytes must represent the same calendar date in UTC,
+  // Australia/Melbourne and its spring/fall DST boundary weeks. Both Excel
+  // epochs are exercised through actual workbook metadata, not parser mocks.
+  assert.equal(excelCalendarCell('1900-01-01').v, 1);
+  assert.equal(excelCalendarCell('1900-02-28').v, 59);
+  assert.equal(excelCalendarCell('1900-03-01').v, 61, 'Excel serial 60 is the fictitious 1900 leap day.');
+  assert.equal(excelCalendarCell('1904-01-01', true).v, 0);
+  assert.equal(excelCalendarCell('1904-02-29', true).v, 59);
+  assert.equal(excelCalendarCell('1904-03-01', true).v, 60, 'Serial 60 is a real date in the 1904 system.');
+  assert.equal(excelCalendarCell('2026-10-01').v, 46296);
+  const dstCalendarDates = ['2024-02-29', '2026-04-04', '2026-04-05', '2026-04-06', '2026-10-03', '2026-10-04', '2026-10-05'];
+  const calendarMapping = { description: 0, quantity: 1, date: 2 };
+  for (const format of ['xlsx', 'xls']) {
+    for (const date1904 of [false, true]) {
+      const epochName = date1904 ? '1904' : '1900';
+      const expectedDates = [...(date1904 ? ['1904-01-01', '1904-02-29', '1904-03-01'] : ['1900-01-01', '1900-02-28', '1900-03-01']), ...dstCalendarDates];
+      const dateSheet = XLSX.utils.aoa_to_sheet([['Description', 'Qty', 'Date'], ...expectedDates.map(date => ['Fixture calendar ' + date, 1, null])]);
+      expectedDates.forEach((date, index) => { dateSheet['C' + (index + 2)] = excelCalendarCell(date, date1904); });
+      const extracted = await extractImportFile(file('calendar-' + epochName + '.' + format, workbook({ Calendar: dateSheet }, format, { date1904 })));
+      assert.equal(extracted.sheets[0].rows.length, expectedDates.length);
+      const dates = extracted.sheets[0].rows.map(row => normalizeImportRow(row, { classification: 'PLAN', mapping: calendarMapping }));
+      assert.ok(dates.every(row => row.status === 'VALIDATED'), format + '/' + epochName + ' calendar dates must remain valid: ' + JSON.stringify(dates.map(row => row.errors)));
+      assert.deepEqual(dates.map(row => row.values.date), expectedDates, format + '/' + epochName + ' dates must not shift with local timezone or DST.');
+      assert.ok(extracted.sheets[0].rows.every(row => row.cellMeta[2].date === true));
+
+      // Hidden time remains invalid even when the cell's display format omits
+      // it. Include subsecond fractions that SSF can round below H/M/S.
+      const fractions = [0.5, 1 / 24, 1 / 1440, 1 / 86400, 1 / 172800, 1 / 86400000, 1e-9];
+      const timeSheet = XLSX.utils.aoa_to_sheet([['Description', 'Qty', 'Date'], ...fractions.map((_, index) => ['Fixture hidden time ' + index, 1, null])]);
+      fractions.forEach((fraction, index) => {
+        const cell = excelCalendarCell('2026-10-04', date1904);
+        timeSheet['C' + (index + 2)] = { ...cell, v: cell.v + fraction };
+      });
+      const timed = await extractImportFile(file('hidden-time-' + epochName + '.' + format, workbook({ Times: timeSheet }, format, { date1904 })));
+      assert.equal(timed.sheets[0].rows.length, fractions.length);
+      for (const row of timed.sheets[0].rows) {
+        const result = normalizeImportRow(row, { classification: 'PLAN', mapping: calendarMapping });
+        assert.equal(result.status, 'REJECTED', format + '/' + epochName + ' time-bearing serial must not become a calendar date.');
+        assert.ok(result.errors.some(error => error.code === 'IMPORT_DATE_INVALID'));
+        assert.equal(result.values.date, null, 'Rejected time cannot fabricate a date.');
+      }
+
+      const textSheet = XLSX.utils.aoa_to_sheet([['Description', 'Qty', 'Date'], ['Fixture ambiguous DST date', 1, '04/05/2026'], ['Fixture repeated local hour', 1, '2026-04-05T02:30:00+11:00'], ['Fixture nonexistent local hour', 1, '2026-10-04T02:30:00+10:00'], ['Fixture invalid leap day', 1, '2026-02-29']]);
+      const textBook = await extractImportFile(file('explicit-date-review-' + epochName + '.' + format, workbook({ Review: textSheet }, format, { date1904 })));
+      const ambiguous = textBook.sheets[0].rows[0];
+      const unresolved = normalizeImportRow(ambiguous, { classification: 'PLAN', mapping: calendarMapping });
+      assert.equal(unresolved.status, 'REVIEW_REQUIRED'); assert.equal(unresolved.values.date, null);
+      assert.ok(unresolved.warnings.some(warning => warning.code === 'IMPORT_DATE_AMBIGUOUS'));
+      assert.equal(normalizeImportRow(ambiguous, { classification: 'PLAN', mapping: calendarMapping, dateOrder: 'DMY' }).values.date, '2026-05-04');
+      assert.equal(normalizeImportRow(ambiguous, { classification: 'PLAN', mapping: calendarMapping, dateOrder: 'MDY' }).values.date, '2026-04-05');
+      for (const row of textBook.sheets[0].rows.slice(1)) {
+        const result = normalizeImportRow(row, { classification: 'PLAN', mapping: calendarMapping });
+        assert.equal(result.status, 'REJECTED'); assert.ok(result.errors.some(error => error.code === 'IMPORT_DATE_INVALID'));
+      }
+    }
+  }
+
   const percentSheet = XLSX.utils.aoa_to_sheet([['Description', 'Quantity', 'Unit price', 'GST %'], ['Fixture percent tax', 2, 12.5, 0.1], ['Fixture fractional tax', 2, 12.5, 0.075], ['Fixture literal percent', 2, 12.5, 10]]);
   percentSheet.D2.z = '0%'; percentSheet.D3.z = '0.0%'; percentSheet.D4.z = '0"%"';
   const percentBook = await extractImportFile(file('percent-tax.xlsx', workbook({ Data: percentSheet })));

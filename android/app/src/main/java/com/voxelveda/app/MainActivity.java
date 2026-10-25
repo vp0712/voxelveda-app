@@ -122,9 +122,12 @@ public class MainActivity extends BridgeActivity {
         getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
             @Override public void handleOnBackPressed() {
                 if (failed) { finish(); return; }
-                web.evaluateJavascript("window.VoxelNativeApp ? window.VoxelNativeApp.handleBack({canGoBack:" + web.canGoBack() + "}) : false", result -> {
-                    if ("true".equals(result)) return;
-                    if (web.canGoBack()) web.goBack(); else finish();
+                int version = navigationVersion;
+                String requestId = java.util.UUID.randomUUID().toString();
+                web.evaluateJavascript("window.VoxelNativeApp ? window.VoxelNativeApp.handleBack({canGoBack:" + web.canGoBack() + ",requestId:" + org.json.JSONObject.quote(requestId) + "}) : false", result -> {
+                    if (version != navigationVersion) return;
+                    if ("true".equals(result)) { awaitManagedBack(web, requestId, version); return; }
+                    if ("false".equals(result)) { if (web.canGoBack()) web.goBack(); else finish(); }
                 });
             }
         });
@@ -135,6 +138,16 @@ public class MainActivity extends BridgeActivity {
         String launch = getIntent() == null ? null : getIntent().getDataString();
         if (launch != null) receiveApplicationLink(launch);
         if (!loaded) { pageStarted(lastGet); inspectPageReadiness(); }
+    }
+
+    private void awaitManagedBack(WebView web, String requestId, int version) {
+        if (version != navigationVersion || isFinishing() || isDestroyed() || !isTrustedApplicationOrigin()) return;
+        web.evaluateJavascript("window.VoxelNativeApp?.takeBackDecision?.(" + org.json.JSONObject.quote(requestId) + ") ?? null", result -> {
+            if (version != navigationVersion || isFinishing() || isDestroyed()) return;
+            if ("\"pending\"".equals(result)) timer.postDelayed(() -> awaitManagedBack(web, requestId, version), 250);
+            else if ("\"continue\"".equals(result)) { if (web.canGoBack()) web.goBack(); else finish(); }
+            // Null/cancelled decisions consumed only the dismissed UI layer.
+        });
     }
 
     @Override protected void load() {
