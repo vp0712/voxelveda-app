@@ -17,6 +17,7 @@ function isolated(file, dependencies) {
       if (name === 'pdfkit') return function PDFDocument() {};
       if (name === '../config/urls') return { absolute: (route) => `https://app.voxelveda.com${route}` };
       if (name === '../services/documentPdfService') return {};
+      if (name === '../services/originalRegisterSchema') return { assertOriginalRegisterSchema: async () => {} };
       throw new Error(`Unexpected dependency in ${file}: ${name}`);
     }
   });

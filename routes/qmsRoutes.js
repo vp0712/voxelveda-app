@@ -16,6 +16,10 @@ const editQms = requireAnyPermission('CREATE_QMS_RECORD', 'EDIT_QMS_RECORD', 'MA
 router.use(viewQms);
 router.use('/enterprise', enterpriseRoutes);
 
+router.get('/registers', (req,res,next)=>require('../controllers/qmsRegisterController').catalog(req,res,next));
+router.get('/registers/:register/pdf', (req,res,next)=>require('../controllers/qmsRegisterController').pdf(req,res,next));
+router.get('/registers/:register', (req,res,next)=>require('../controllers/qmsRegisterController').list(req,res,next));
+
 router.get('/dashboard', ops.dashboard);
 router.get('/definitions', ops.listDefinitions);
 router.put('/definitions', requireAnyPermission('MANAGE_QMS', 'MANAGE_DOCUMENT_CONTROL', 'EDIT_COMPLIANCE'), requireStepUp('qms:publish-form-definition'), ops.upsertDefinition);

@@ -46,7 +46,7 @@ async function commandCentre(req, res, next) {
       documentReviewsDue: await count("SELECT COUNT(*) n FROM controlled_documents WHERE next_review_date IS NOT NULL AND next_review_date<=DATE_ADD(CURDATE(),INTERVAL 30 DAY)"),
       activeVisitors: await count('SELECT COUNT(*) n FROM site_visitors WHERE checked_out_at IS NULL'),
       openRegulatoryReviews: await count("SELECT COUNT(*) n FROM regulatory_reviews WHERE status IN('PENDING','UNDER_REVIEW','ESCALATED')"),
-      unacknowledgedNotifications: await count('SELECT COUNT(*) n FROM qms_notifications WHERE acknowledged_at IS NULL')
+      unacknowledgedNotifications: await count('SELECT COUNT(*) n FROM qms_notifications WHERE acknowledged_at IS NULL AND (target_user_id IS NULL OR target_user_id=?)',[actor(req)])
     };
     return res.json({ metrics, generated_at: new Date().toISOString() });
   } catch (error) { return next(error); }
@@ -68,12 +68,8 @@ async function createAudit(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function listAudits(req, res, next) {
-  try {
-    await ready();
-    const [rows] = await pool.query('SELECT * FROM internal_audits ORDER BY created_at DESC LIMIT 300');
-    return res.json({ audits: rows });
-  } catch (error) { return next(error); }
+async function listAudits(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'audits')); } catch(error) { return next(error); }
 }
 
 async function addAuditFinding(req, res, next) {
@@ -120,12 +116,8 @@ async function createManagementReview(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function listManagementReviews(req, res, next) {
-  try {
-    await ready();
-    const [rows] = await pool.query('SELECT * FROM management_reviews ORDER BY created_at DESC LIMIT 200');
-    return res.json({ reviews: rows });
-  } catch (error) { return next(error); }
+async function listManagementReviews(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'management-reviews')); } catch(error) { return next(error); }
 }
 
 async function createChemical(req,res,next) {
@@ -148,18 +140,8 @@ async function createChemical(req,res,next) {
   }catch(error){if(connection)await connection.rollback().catch(()=>{});return next(error);}finally{if(connection)connection.release();}
 }
 
-async function listChemicals(req, res, next) {
-  try {
-    await ready();
-    const [rows] = await pool.query(`SELECT c.*,s.version_label sds_version,s.issue_date sds_issue_date,s.review_due sds_review_due,s.status sds_status
-      FROM chemical_products c
-      LEFT JOIN sds_versions s ON s.id=(SELECT s2.id FROM sds_versions s2 WHERE s2.chemical_id=c.id ORDER BY s2.id DESC LIMIT 1)
-      ORDER BY c.product_name`);
-    const warnings = rows
-      .filter((row) => row.maximum_quantity !== null && Number(row.current_quantity) > Number(row.maximum_quantity))
-      .map((row) => ({ chemical_code: row.chemical_code, message: 'Configured internal maximum quantity exceeded; compliance review required.' }));
-    return res.json({ chemicals: rows, warnings, advisory: 'Automated quantity warnings are internal review triggers and are not definitive legal or dangerous-goods advice.' });
-  } catch (error) { return next(error); }
+async function listChemicals(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'chemicals')); } catch(error) { return next(error); }
 }
 
 async function checkInVisitor(req, res, next) {
@@ -186,12 +168,8 @@ async function checkOutVisitor(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function activeVisitors(req, res, next) {
-  try {
-    await ready();
-    const [rows] = await pool.query('SELECT * FROM site_visitors WHERE checked_out_at IS NULL ORDER BY checked_in_at');
-    return res.json({ visitors: rows });
-  } catch (error) { return next(error); }
+async function activeVisitors(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'visitors')); } catch(error) { return next(error); }
 }
 
 async function startEmergency(req, res, next) {
@@ -257,13 +235,14 @@ async function createCriticalService(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function listContinuity(req, res, next) {
+async function listContinuity(req,res,next){
   try {
     await ready();
-    const [services] = await pool.query('SELECT * FROM critical_services ORDER BY FIELD(criticality,\'CRITICAL\',\'HIGH\',\'MEDIUM\',\'LOW\'),service_name');
-    const [exercises] = await pool.query('SELECT * FROM continuity_exercises ORDER BY performed_at DESC LIMIT 200');
-    return res.json({ services, exercises, assurance_note: 'Backup/restore configuration is not treated as successful evidence unless an actual exercise/evidence record exists.' });
-  } catch (error) { return next(error); }
+    const registers=require('../services/qmsRegisterService');
+    const exercises=await registers.listRegister(req,'continuity-exercises');
+    const services=await registers.completeRegister({...req,query:{}},'critical-services');
+    return res.json({...exercises,services:services.rows,services_total:services.total,assurance_note:'Backup/restore configuration is not treated as successful evidence unless an actual exercise/evidence record exists.'});
+  } catch(error){return next(error);}
 }
 
 async function recordContinuityExercise(req, res, next) {
@@ -308,12 +287,8 @@ async function createRegulatoryReview(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function listRegulatoryReviews(req, res, next) {
-  try {
-    await ready();
-    const [rows] = await pool.query('SELECT * FROM regulatory_reviews ORDER BY created_at DESC LIMIT 300');
-    return res.json({ reviews: rows, notice: 'Sector/review gates do not represent ISO 9001, AS9100, ISO 13485, DISP, TGA/ARTG or export-control certification/approval.' });
-  } catch (error) { return next(error); }
+async function listRegulatoryReviews(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'regulatory-reviews')); } catch(error) { return next(error); }
 }
 
 async function decideRegulatoryReview(req, res, next) {
@@ -358,13 +333,8 @@ async function generateNotifications(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function listNotifications(req, res, next) {
-  try {
-    await ready();
-    const [rows] = await pool.query("SELECT * FROM qms_notifications WHERE acknowledged_at IS NULL ORDER BY FIELD(severity,'CRITICAL','HIGH','WARNING','INFO'),COALESCE(due_at,created_at) ASC LIMIT 300");
-    const registers={MEASUREMENT_EQUIPMENT:'calibration',MAINTENANCE:'maintenance',CAPA:'capa',EMPLOYEE_COMPETENCY:'training',SCAR:'supplier-quality',CONTROLLED_DOCUMENT:'documents',SDS_VERSION:'chemicals'};
-    return res.json({ notifications: rows.map((row)=>({...row,action_url:`/quality?register=${encodeURIComponent(registers[row.record_type]||'notifications')}&record_id=${encodeURIComponent(row.record_id)}`})) });
-  } catch (error) { return next(error); }
+async function listNotifications(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'notifications')); } catch(error) { return next(error); }
 }
 
 async function acknowledgeNotification(req, res, next) {
@@ -376,7 +346,7 @@ async function acknowledgeNotification(req, res, next) {
     await ready();
     connection=await pool.getConnection();await connection.beginTransaction();
     const [[notification]]=await connection.query('SELECT * FROM qms_notifications WHERE id=? FOR UPDATE',[id]);
-    if(!notification){await connection.rollback();return res.status(404).json({message:'Quality alert not found.'});}
+    if(!notification || (notification.target_user_id!=null && Number(notification.target_user_id)!==actor(req))){await connection.rollback();return res.status(404).json({message:'Quality alert not found.'});}
     if(notification.acknowledged_at){await connection.commit();return res.json({acknowledged:true,unchanged:true});}
     await connection.query('UPDATE qms_notifications SET acknowledged_at=NOW(),acknowledged_by=? WHERE id=? AND acknowledged_at IS NULL',[actor(req),id]);
     await logAudit(connection,{...auditContext(req),action:'QMS_NOTIFICATION_ACKNOWLEDGED',module:'QMS',recordType:notification.record_type,recordId:notification.record_id,oldValue:{acknowledged_at:null},newValue:{notification_id:id,acknowledged_by:actor(req)}});

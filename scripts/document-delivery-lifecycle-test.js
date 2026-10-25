@@ -5,7 +5,7 @@ const queuePath=require.resolve('../services/emailQueue');
 const pdfPath=require.resolve('../services/documentPdfService');
 const actualPdf=require(pdfPath);
 const crypto=require('node:crypto');
-const requests=new Map(),messages=[];let failRender=false,failBookkeeping=false,sendCount=0,queueStatus='SENT';
+const requests=new Map(),messages=[];let failRender=false,failBookkeeping=false,sendCount=0,queueStatus='SENT',mutateQueuedBytes=false;
 const db={async query(sql,values=[]){
   if(/^(CREATE TABLE|ALTER TABLE)/.test(sql))return [{}];
   if(sql.startsWith('INSERT INTO document_delivery_requests')){
@@ -13,7 +13,7 @@ const db={async query(sql,values=[]){
     return [{affectedRows:1}];
   }
   if(sql.startsWith('SELECT * FROM document_delivery_requests'))return [[requests.get(values[0])]];
-  if(sql.startsWith('SELECT attachments_json')){const part=messages[values[0]-1].attachments[0],bytes=part.content;return [[{attachments_json:JSON.stringify([{filename:part.filename,content:bytes.toString('base64'),encoding:'base64',byteLength:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')}])}]];}
+  if(sql.startsWith('SELECT attachments_json')){const part=messages[values[0]-1].attachments[0],bytes=mutateQueuedBytes?Buffer.concat([part.content,Buffer.from('\n% queue fixture changed bytes\n')]):part.content;return [[{attachments_json:JSON.stringify([{filename:part.filename,content:bytes.toString('base64'),encoding:'base64',byteLength:bytes.length,sha256:crypto.createHash('sha256').update(bytes).digest('hex')}])}]];}
   if(sql.startsWith('SELECT id,status'))return [[{id:values[0],status:queueStatus,message_id:queueStatus==='SENT'?'fixture-provider-acceptance':null,last_error:queueStatus==='FAILED'?'Fixture transport failure':null}]];
   const request=[...requests.values()].find(row=>row.id===values[values.length-1]);
   if(sql.includes("generation_status='GENERATING'")){
@@ -52,6 +52,30 @@ async function main(){
  const mismatchData={...frozenData,reference:'FIXTURE-MISMATCH-5',filename:'FIXTURE-MISMATCH-5',rows:[['Identity','FIXTURE-MISMATCH-5']]};const mismatch=await actualPdf.createDocumentPdf(mismatchData);const beforeInvalid=sendCount;
  await assert.rejects(()=>queueDocumentEmail({...frozenMessage,data:mismatchData,validatedArtifact:{buffer:mismatch.buffer,filename:mismatch.filename,sha256:'0'.repeat(64)}}),{code:'PDF_SNAPSHOT_MISMATCH'});assert.equal(sendCount,beforeInvalid,'Invalid retained PDF hash must not enqueue or send');
  failRender=false;
- console.log('Document lifecycle tests passed: generation failure retains immutable source and sends nothing; controlled retry queues one validated PDF; duplicate request reuses queue; bookkeeping failure atomically rolls back the queue; changed-source guard sends nothing; provider acceptance remains separate from recipient receipt.');
+ const paragraph=Array.from({length:140},(_,i)=>`PARTY${String(i).padStart(4,'0')} authorised fixture information.`).join(' '),note=Array.from({length:180},(_,i)=>`NOTE${String(i).padStart(4,'0')} preserve the complete original terms.`).join(' ');
+ const longData={...data,title:'LARGE DOCUMENT SNAPSHOT',reference:'FIXTURE-LONG-6',filename:'FIXTURE-LONG-6',party:paragraph,period:'19 to 25 October 2026',rows:[['Evidence','Repeated source evidence. '.repeat(220)+'FINAL-EVIDENCE-TOKEN'],['Amount','AUD 123.45']],notes:[note]};
+ const longMessage={...message,recordId:'long:fresh',data:longData};
+ const longFresh=await queueDocumentEmail(longMessage);assert.equal(longFresh.generation_status,'VALIDATED');assert([...requests.values()].at(-1).pdf_pages>=4);await actualPdf.validatePdf(messages.at(-1).attachments[0].content,{expectedText:['PARTY0139','NOTE0179','FINAL-EVIDENCE-TOKEN','AUD 123.45']});
+ const longFrozen=await actualPdf.createDocumentPdf(longData),proof=await actualPdf.deriveDocumentContentProof(longData);assert.deepEqual(proof,longFrozen.contentProof,'Measure-only identity must cover the exact canonical source/layout without caller fragments');
+ const retainedMessage={...longMessage,recordId:'long:frozen',validatedArtifact:{buffer:longFrozen.buffer,filename:longFrozen.filename,sha256:longFrozen.validation.sha256,contentProof:longFrozen.contentProof}};
+ failRender=true;try{await queueDocumentEmail(retainedMessage);}finally{failRender=false;}
+ const retainedPart=messages.at(-1).attachments[0];assert.deepEqual(retainedPart.content,longFrozen.buffer,'A long frozen PDF must queue the original preview/download bytes while attachment rendering is unavailable');
+ const nodemailer=require('nodemailer'),mimeResult=await nodemailer.createTransport({streamTransport:true,buffer:true,newline:'unix'}).sendMail({from:'Voxel Veda <info@voxelveda.com>',to:'fixture@example.invalid',subject:'Retained long PDF fixture',text:'Validated synthetic document.',attachments:[retainedPart]}),mime=mimeResult.message.toString('utf8');
+ assert.equal((mime.match(/Content-Disposition: attachment/g)||[]).length,1);assert.match(mime,/Content-Type: application\/pdf; name=FIXTURE-LONG-6.pdf/);assert.doesNotMatch(mime,/\.tmp|application\/octet-stream|^Cc:|^Bcc:/mi);
+ const pdfPart=mime.split(/--[^\n]+\n/).find(part=>/Content-Type: application\/pdf/.test(part));assert(pdfPart);const decoded=Buffer.from(pdfPart.split('\n\n')[1].trim(),'base64');assert.deepEqual(decoded,longFrozen.buffer);await actualPdf.validatePdf(decoded,{expectedText:proof.fragments,orderedExpectedText:true});
+ const beforeForged=sendCount;
+ await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:forged',validatedArtifact:{...retainedMessage.validatedArtifact,contentProof:{...proof,fragments:proof.fragments.slice(0,3)}}}),{code:'PDF_CONTENT_PROOF_MISMATCH'});
+ await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:unsupported',validatedArtifact:{...retainedMessage.validatedArtifact,contentProof:{...proof,schema_version:999}}}),{code:'PDF_CONTENT_PROOF_UNSUPPORTED'});
+ await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:unsupported-layout',validatedArtifact:{...retainedMessage.validatedArtifact,contentProof:{...proof,layout_version:'unknown-layout'}}}),{code:'PDF_CONTENT_PROOF_UNSUPPORTED'});
+ await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:wrong-source',validatedArtifact:{...retainedMessage.validatedArtifact,contentProof:{...proof,source_sha256:'0'.repeat(64)}}}),{code:'PDF_CONTENT_PROOF_MISMATCH'});
+ const partial=await actualPdf.createDocumentPdf({...longData,party:paragraph.slice(0,paragraph.length/2),rows:[['Evidence','Repeated source evidence. '.repeat(110)],['Amount','AUD 123.45']],notes:[note.slice(0,note.length/2)]});
+ await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:partial',validatedArtifact:{buffer:partial.buffer,filename:partial.filename,sha256:partial.validation.sha256}}),{code:'PDF_CONTENT_MISMATCH'});
+ const repeatedData={...data,title:'REPEATED CONTENT FIXTURE',reference:'FIXTURE-REPEATED',filename:'FIXTURE-REPEATED',rows:[['Evidence','Repeated source evidence. '.repeat(400)]]};
+ const repeatedPartial=await actualPdf.createDocumentPdf({...repeatedData,rows:[['Evidence','Repeated source evidence. '.repeat(200)]]});
+ await assert.rejects(()=>queueDocumentEmail({...message,recordId:'long:repeated',data:repeatedData,validatedArtifact:{buffer:repeatedPartial.buffer,filename:repeatedPartial.filename,sha256:repeatedPartial.validation.sha256}}),{code:'PDF_CONTENT_MISMATCH'});
+ await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:wrong-record',data:{...longData,reference:'FIXTURE-OTHER-RECORD'},validatedArtifact:{buffer:longFrozen.buffer,filename:longFrozen.filename,sha256:longFrozen.validation.sha256}}),{code:'PDF_CONTENT_MISMATCH'});
+ mutateQueuedBytes=true;try{await assert.rejects(()=>queueDocumentEmail({...retainedMessage,recordId:'long:changed-queue'}),{code:'PDF_SNAPSHOT_MISMATCH'});}finally{mutateQueuedBytes=false;}
+ assert.equal(sendCount,beforeForged,'Forged/partial/repeated/wrong-record/changed-queue content cannot commit another message');
+ console.log('Document lifecycle tests passed: retained immutable source; controlled generation retry; duplicate queue reuse; atomic bookkeeping rollback; changed-source rejection; complete long-field generated/frozen PDF and decoded MIME round trip; trusted measure-only proof; forged/unsupported/wrong-source/partial/repeated/wrong-record/changed-queue rejection; no re-rendered attachments; provider acceptance separate from recipient receipt.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

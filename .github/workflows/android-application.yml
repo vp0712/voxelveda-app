@@ -33,6 +33,36 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Record current existing-identity release binding availability without publishing
+        env:
+          ANDROID_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        shell: python
+        run: |
+          import os,json,pathlib,tempfile,base64,subprocess,re
+          names=['ANDROID_UPLOAD_KEYSTORE_BASE64','ANDROID_KEYSTORE_PASSWORD','ANDROID_KEY_ALIAS','ANDROID_KEY_PASSWORD','GOOGLE_PLAY_SERVICE_ACCOUNT_JSON']
+          present={name:bool(os.environ.get(name)) for name in names}
+          report={'packageId':'com.voxelveda.app','candidateCommit':os.environ['GITHUB_SHA'],'runId':os.environ['GITHUB_RUN_ID'],'scope':'Bindings available to this repository workflow; presence alone does not prove provider authorisation.','bindingsAvailableToThisWorkflow':present,'boundUploadCertificateReadable':False,'playAppSigningIdentityVerified':False,'privateTracksQueried':False,'bundleBuilt':False,'playUploadPerformed':False,'playReleasePerformed':False,'physicalDeviceTested':False}
+          if all(present[name] for name in names[:4]):
+              try:
+                  with tempfile.TemporaryDirectory() as temp:
+                      key=pathlib.Path(temp)/'existing-upload-key.jks'
+                      key.write_bytes(base64.b64decode(os.environ[names[0]],validate=True))
+                      key.chmod(0o600)
+                      result=subprocess.run(['keytool','-list','-v','-keystore',str(key),'-alias',os.environ['ANDROID_KEY_ALIAS'],'-storepass:env','ANDROID_KEYSTORE_PASSWORD'],capture_output=True,text=True,timeout=30)
+                      match=re.search(r'SHA256:\s*([0-9A-Fa-f:]{95})',result.stdout)
+                      report['boundUploadCertificateReadable']=result.returncode==0 and bool(match)
+                      if report['boundUploadCertificateReadable']: report['boundUploadCertificateSha256']=match.group(1).upper()
+              except Exception:
+                  report['boundUploadCertificateReadable']=False
+          report['missingBindings']=[name for name,available in present.items() if not available]
+          target=pathlib.Path(os.environ['VV_ANDROID_PROOF_DIR'])/'android-release-access.json'
+          target.parent.mkdir(parents=True,exist_ok=True)
+          target.write_text(json.dumps(report,indent=2)+'\n')
+          print(json.dumps(report,indent=2))
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0

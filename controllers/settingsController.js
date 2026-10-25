@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { assertOriginalRegisterSchema } = require('../services/originalRegisterSchema');
 const { logAudit } = require('../services/auditService');
 const secureLogger = require('../utils/secureLogger');
 
@@ -13,12 +14,8 @@ const SETTING_RULES = Object.freeze({
 });
 const ALLOWED_SETTINGS = Object.freeze(Object.keys(SETTING_RULES));
 
-async function ensureSettingsTable(connection = pool) {
-  await connection.query(`CREATE TABLE IF NOT EXISTS app_settings (
-    setting_key VARCHAR(120) PRIMARY KEY,
-    setting_value TEXT NULL,
-    updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
-  )`);
+function ensureSettingsTable(connection = pool) {
+  return assertOriginalRegisterSchema('app_settings', connection);
 }
 
 function validateSettings(input) {
@@ -46,7 +43,7 @@ exports.getSettings = async (req, res) => {
     return res.json({ settings });
   } catch (error) {
     secureLogger.error('SETTINGS_READ_FAILED', { requestId: req.requestId, error });
-    return res.status(500).json({ message: 'Failed to load settings', requestId: req.requestId });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to load settings', code: error.code, requestId: req.requestId });
   }
 };
 
@@ -79,7 +76,7 @@ exports.updateSettings = async (req, res) => {
   } catch (error) {
     await connection.rollback().catch(() => {});
     secureLogger.error('SETTINGS_UPDATE_FAILED', { requestId: req.requestId, error });
-    return res.status(500).json({ message: 'Failed to save settings', requestId: req.requestId });
+    return res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to save settings', code: error.code, requestId: req.requestId });
   } finally { connection.release(); }
 };
 

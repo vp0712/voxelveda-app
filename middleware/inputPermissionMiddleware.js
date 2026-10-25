@@ -1,22 +1,9 @@
 const pool = require('../config/db');
+const { assertOriginalRegisterSchema } = require('../services/originalRegisterSchema');
 const { hasAnyPermission } = require('../services/authorizationService');
 
-async function ensureAccessAttemptTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS access_attempts (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NULL,
-      user_name VARCHAR(255) NULL,
-      user_email VARCHAR(255) NULL,
-      section VARCHAR(120) NOT NULL,
-      action VARCHAR(120) NOT NULL,
-      method VARCHAR(20) NOT NULL,
-      path VARCHAR(255) NOT NULL,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      INDEX idx_access_attempts_created_at (created_at),
-      INDEX idx_access_attempts_user_id (user_id)
-    )
-  `);
+function ensureAccessAttemptTable() {
+  return assertOriginalRegisterSchema('access_attempts', pool);
 }
 
 function resolveRequired(required, req) {

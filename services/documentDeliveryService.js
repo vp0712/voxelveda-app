@@ -1,7 +1,7 @@
 'use strict';
 const crypto = require('node:crypto');
 const pool = require('../config/db');
-const { createDocumentPdf,validatePdf,safePdfFilename } = require('./documentPdfService');
+const { createDocumentPdf,deriveDocumentContentProof,DOCUMENT_LAYOUT_VERSION,validatePdf,safePdfFilename } = require('./documentPdfService');
 const { queueEmail,restoreAttachments } = require('./emailQueue');
 const { ensureEmailQueueSchema } = require('./emailQueueSchema');
 let schemaPromise;
@@ -38,19 +38,37 @@ async function queueDocumentEmail({ module, recordId, data, to, subject, html, t
   let conn;
   try {
     // The immutable source snapshot is the authority for rendering and its retained retry.
-    let artifact;
+    const sourceData = JSON.parse(request.source_json);
+    const sourceSha256 = crypto.createHash('sha256').update(JSON.stringify(sourceData)).digest('hex');
+    let artifact, contentProof;
     if (validatedArtifact) {
-      const sourceData = JSON.parse(request.source_json);
-      const expectedText = [sourceData.title, sourceData.reference, sourceData.party, sourceData.period,
-        ...(sourceData.tables || [{ rows: sourceData.rows || [] }]).flatMap(table => (table.rows || []).flat()),
-        ...(sourceData.totals || []).map(total => total.value)];
-      const validation = await validatePdf(validatedArtifact.buffer, { expectedText });
+      // A frozen preview/download remains the attachment authority. Re-derive
+      // all text fragments from its trusted model using measurement only; do
+      // not trust a browser/caller's proof or generate replacement PDF bytes.
+      contentProof = await deriveDocumentContentProof(sourceData);
+      if (validatedArtifact.contentProof !== undefined) {
+        const supplied = validatedArtifact.contentProof;
+        if (supplied?.schema_version !== 1 || supplied.layout_version !== DOCUMENT_LAYOUT_VERSION) throw Object.assign(new Error('This document content proof or layout version is unsupported. No document was queued.'), {code:'PDF_CONTENT_PROOF_UNSUPPORTED'});
+        if (supplied.source_sha256 !== contentProof.source_sha256 || JSON.stringify(supplied.fragments) !== JSON.stringify(contentProof.fragments)) {
+          throw Object.assign(new Error('The supplied document proof does not match the authoritative source.'), {code:'PDF_CONTENT_PROOF_MISMATCH'});
+        }
+      }
+      const validation = await validatePdf(validatedArtifact.buffer, { expectedText:contentProof.fragments, orderedExpectedText:true });
       if (!/^[a-f0-9]{64}$/.test(String(validatedArtifact.sha256)) || validatedArtifact.sha256 !== validation.sha256 ||
           safePdfFilename(validatedArtifact.filename) !== safePdfFilename(sourceData.filename || sourceData.reference || sourceData.title)) {
         throw Object.assign(new Error('The retained PDF bytes or filename do not match their authoritative document snapshot.'), {code:'PDF_SNAPSHOT_MISMATCH'});
       }
       artifact = { buffer: validatedArtifact.buffer, filename: safePdfFilename(validatedArtifact.filename), validation };
-    } else artifact = await createDocumentPdf(JSON.parse(request.source_json));
+    } else {
+      artifact = await createDocumentPdf(sourceData);
+      contentProof = artifact.contentProof;
+    }
+    if (contentProof?.schema_version !== 1 || contentProof.layout_version !== DOCUMENT_LAYOUT_VERSION) {
+      throw Object.assign(new Error('This document content proof or layout version is unsupported. No document was queued.'), {code:'PDF_CONTENT_PROOF_UNSUPPORTED'});
+    }
+    if (contentProof.source_sha256 !== sourceSha256 || !Array.isArray(contentProof.fragments)) {
+      throw Object.assign(new Error('The document content proof does not match its retained source.'), {code:'PDF_CONTENT_PROOF_MISMATCH'});
+    }
     // Keep the queue insert and validated document status in one transaction.
     // Workers cannot claim a message whose document bookkeeping did not commit.
     conn=await pool.getConnection();await conn.beginTransaction();
@@ -59,7 +77,10 @@ async function queueDocumentEmail({ module, recordId, data, to, subject, html, t
     const [[queued]] = await conn.query('SELECT attachments_json FROM email_queue WHERE id=?',[queueId]);
     const savedAttachments=restoreAttachments(JSON.parse(queued.attachments_json));
     if(savedAttachments.length!==1)throw Object.assign(new Error('The queued document must contain exactly one PDF.'),{code:'PDF_ATTACHMENT_INVALID'});
-    const queuedValidation=await validatePdf(savedAttachments[0].content,{expectedText:[data.title,data.reference,data.party,data.period]});
+    const queuedValidation=await validatePdf(savedAttachments[0].content,{expectedText:contentProof.fragments,orderedExpectedText:true});
+    if (queuedValidation.sha256 !== artifact.validation.sha256 || !savedAttachments[0].content.equals(artifact.buffer)) {
+      throw Object.assign(new Error('Queued PDF bytes differ from the validated document version.'), {code:'PDF_SNAPSHOT_MISMATCH'});
+    }
     await conn.query(`UPDATE document_delivery_requests SET generation_status='VALIDATED',pdf_sha256=?,pdf_pages=?,email_queue_id=?,last_error=NULL WHERE id=?`, [queuedValidation.sha256, queuedValidation.pages, queueId, request.id]);
     if(afterQueue)await afterQueue(conn,queueId,request.id);
     await conn.commit();

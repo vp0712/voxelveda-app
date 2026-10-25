@@ -468,21 +468,26 @@ async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attac
         signal: controller.signal
       }
     );
-    if (response.status !== 204) {
-      let details = {};
-      try { details = await response.json(); } catch {}
-      const error = new Error(details.error || details.message || 'Hostinger Mail API returned ' + response.status);
-      error.code = String(details.code || 'HOSTINGER_MAIL_API_FAILED');
-      error.responseCode = response.status;
-      throw error;
+    // Authorisation rejection establishes that this request could not hand off
+    // a message. Other responses do not prove that a provider-side send did
+    // not happen (including a 5xx after handoff or an uncorrelated 204).
+    if ([401,403].includes(Number(response.status))) {
+      throw Object.assign(new Error('The Hostinger Mail API rejected mailbox authorisation. Verify the configured company connection before retry.'), {
+        code:'HOSTINGER_MAIL_API_REJECTED',responseCode:Number(response.status),providerAccepted:false,retryable:false,deliveryOutcome:'NOT_ACCEPTED'
+      });
     }
-    return { messageId: null, accepted: to, transport: 'hostinger_mail_api', attachmentFilenameGuaranteed: true, receivedVerified: false };
+    // The documented endpoint returns no acceptance identifier. HTTP success
+    // alone cannot safely correlate a later retry or establish received MIME.
+    // Do not invent a response contract or silently mark this message SENT.
+    throw Object.assign(new Error('The Hostinger mail request may have been accepted, but no traceable message outcome was confirmed. Review the provider before retrying; automatic resend is disabled.'), {
+      code:'DELIVERY_REVIEW_REQUIRED',reasonCode:Number(response.status)===204?'HOSTINGER_MAIL_API_ACCEPTANCE_UNCONFIRMED':'HOSTINGER_MAIL_API_RESPONSE_UNCONFIRMED',
+      responseCode:Number(response.status)||null,providerAccepted:false,retryable:false,deliveryOutcome:'UNKNOWN'
+    });
   } catch (error) {
-    if (error.name === 'AbortError') {
-      error.code = 'HOSTINGER_MAIL_API_TIMEOUT';
-      error.message = 'Hostinger Mail API timed out.';
-    }
-    throw error;
+    if (['DELIVERY_REVIEW_REQUIRED','HOSTINGER_MAIL_API_REJECTED'].includes(error.code)) throw error;
+    throw Object.assign(new Error('The Hostinger mail response was lost or timed out after dispatch. Review the provider outcome before retrying; automatic resend is disabled.'), {
+      code:'DELIVERY_REVIEW_REQUIRED',reasonCode:'HOSTINGER_MAIL_API_RESPONSE_LOST',providerAccepted:false,retryable:false,deliveryOutcome:'UNKNOWN',cause:error
+    });
   } finally {
     clearTimeout(timeout);
   }

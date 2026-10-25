@@ -50,10 +50,7 @@ async function syncLinks(connection,recordId,links,userId){
 }
 
 async function listRecords(req,res,next){
-  try{await ready();const status=clean(req.query.status,32).toUpperCase();const documentId=clean(req.query.document_id,64);const search=clean(req.query.q,120);const where=[];const params=[];
-    if(status){where.push('status=?');params.push(status)}if(documentId){where.push('document_id=?');params.push(documentId)}if(search){where.push('(record_no LIKE ? OR document_id LIKE ? OR document_title LIKE ?)');params.push(`%${search}%`,`%${search}%`,`%${search}%`)}
-    const [rows]=await pool.query(`SELECT id,record_uuid,record_no,document_id,document_title,source_revision,record_revision,status,owner_user_id,prepared_by,reviewed_by,approved_by,approved_at,closed_at,effective_at,completed_at,confidentiality_classification,retention_class,related_customer_id,related_supplier_id,related_job_id,related_material_lot_id,related_machine_id,related_build_id,related_inspection_id,integrity_hash,created_at,updated_at FROM qms_records ${where.length?`WHERE ${where.join(' AND ')}`:''} ORDER BY updated_at DESC LIMIT 500`,params);return res.json({records:rows});
-  }catch(e){return next(e)}
+  try { await ready(); return res.json(await require('../../services/qmsRegisterService').listRegister(req,'records')); } catch(error) { return next(error); }
 }
 
 async function getRecord(req,res,next){

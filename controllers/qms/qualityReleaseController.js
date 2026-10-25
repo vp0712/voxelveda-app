@@ -46,9 +46,8 @@ async function createConcession(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function listConcessions(req, res, next) {
-  try { await ready(); const [rows] = await pool.query('SELECT * FROM concessions ORDER BY created_at DESC LIMIT 500'); return res.json({ concessions: rows }); }
-  catch (error) { return next(error); }
+async function listConcessions(req,res,next){
+  try { await ready(); return res.json(await require('../../services/qmsRegisterService').listRegister(req,'concessions')); } catch(error) { return next(error); }
 }
 
 async function approveConcession(req, res, next) {
@@ -172,12 +171,8 @@ async function issueCoc(req, res, next) {
   } catch (error) { return next(error); }
 }
 
-async function listCocs(req, res, next) {
-  try {
-    await ready();
-    const [rows] = await pool.query('SELECT id,coc_no,revision,job_id,production_release_id,customer_id,customer_po,part_no,drawing_revision,quantity,integrity_hash,issued_by,issued_at,voided_at FROM certificates_of_conformance ORDER BY issued_at DESC LIMIT 500');
-    return res.json({ cocs: rows });
-  } catch (error) { return next(error); }
+async function listCocs(req,res,next){
+  try { await ready(); return res.json(await require('../../services/qmsRegisterService').listRegister(req,'cocs')); } catch(error) { return next(error); }
 }
 
 async function cocPdf(req, res, next) {

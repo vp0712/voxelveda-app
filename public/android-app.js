@@ -5,6 +5,35 @@
  if(!platform?.isNativePlatform?.()||!plugin)return;
  const canonical='https://app.voxelveda.com';
  if(location.origin!==canonical)return;
+ let backDecision=null,discardConsent=null,legacyBackConsent=null;
+ const owner=()=>{try{return window.VoxelActions?.account?.()||String(JSON.parse(localStorage.getItem('user')||'{}').id||'')+'|'+(localStorage.getItem('token')||'');}catch{return '';}};
+ const formValues=form=>JSON.stringify([...form.elements].map(field=>[field.name||field.id||field.type,field.type==='checkbox'||field.type==='radio'?field.checked:field.value,field.type==='file'?[...field.files].map(file=>[file.name,file.size,file.lastModified]):null]));
+ const unchanged=decision=>decision.form.isConnected&&decision.owner===owner()&&decision.values===formValues(decision.form);
+ function allowDiscardOnUnload(form){const consent=discardConsent;discardConsent=null;return Boolean(consent&&consent.form===form&&unchanged(consent));}
+ function takeBackDecision(requestId){
+  const decision=backDecision;if(!decision||decision.requestId!==requestId)return null;
+  if(decision.state==='pending')return 'pending';
+  backDecision=null;
+  if(decision.state!=='confirmed'||!unchanged(decision))return 'cancelled';
+  discardConsent=decision;return 'continue';
+ }
+ function confirmDiscard(form,options){
+  if(backDecision)return;
+  if(typeof window.VoxelFeedback?.confirm!=='function')return; // Keep unsaved values when the shared UI is unavailable.
+  const decision={form,values:formValues(form),owner:owner(),requestId:typeof options.requestId==='string'?options.requestId:null,state:'pending'};
+  backDecision=decision;
+  Promise.resolve().then(()=>window.VoxelFeedback.confirm('Your entered values have not been saved.',{title:'Discard unsaved changes?',confirmLabel:'Discard changes'})).then(confirmed=>{
+   if(backDecision!==decision)return;
+   decision.state=confirmed&&unchanged(decision)?'confirmed':'cancelled';
+   if(decision.requestId)return; // Android resumes the original Back only after reading this one-shot decision.
+   backDecision=null;
+   if(decision.state!=='confirmed')return;
+   // Previously installed bridges do not understand managed Back decisions.
+   // Retain history navigation; never pretend an unsupported native close succeeded.
+   if(options.canGoBack!==false){discardConsent=decision;history.back();}
+   else {legacyBackConsent=decision;window.VoxelFeedback.notify?.('Press Back again to close this screen without saving. New edits will require confirmation again.',{kind:'info',background:true});}
+  }).catch(()=>{if(backDecision===decision)backDecision=null;});
+ }
  const base64=bytes=>{const input=new Uint8Array(bytes);let value='';for(let n=0;n<input.length;n+=16384)value+=String.fromCharCode(...input.subarray(n,n+16384));return btoa(value);};
  async function documentAction(bytes,filename,download=false){
   if(!/^[A-Za-z0-9][A-Za-z0-9._ -]{0,179}\.pdf$/.test(filename)||bytes.byteLength<100||new TextDecoder('ascii').decode(bytes.slice(0,5))!=='%PDF-')throw new Error('The document is not a valid PDF. No file was saved.');
@@ -26,12 +55,14 @@
   if(window.VoxelOverlay?.active){window.VoxelOverlay.close();return true;}
   const menu=document.querySelector('.record-action-menu[open]');if(menu){menu.open=false;return true;}
   if(document.body.classList.contains('mobile-menu-open')){window.toggleMobileMenu?.(false);window.toggleStaffMobileMenu?.(false);return true;}
+  if(legacyBackConsent){const consent=legacyBackConsent;legacyBackConsent=null;if(unchanged(consent)){discardConsent=consent;return false;}}
   const dirty=[...document.forms].find(form=>{if(typeof form.nativeHasUnsavedChanges==='function'){try{return form.nativeHasUnsavedChanges()===true;}catch{}}return form.dataset.nativeDirty==='true';});
-  if(dirty?.dataset.nativeBeforeunload==='true'&&options.canGoBack!==false)return false;
-  if(dirty&&!window.confirm('Discard your unsaved changes?'))return true;
+  if(dirty){confirmDiscard(dirty,options);return true;}
+  if(backDecision)return true;
   return false;
  }
- window.VoxelNativeApp={handleBack,documentAction,openDocument,openCameraSettings:()=>plugin.openCameraSettings()};
+ window.VoxelNativeApp={handleBack,takeBackDecision,allowDiscardOnUnload,documentAction,openDocument,openCameraSettings:()=>plugin.openCameraSettings()};
+ window.addEventListener('pagehide',()=>{backDecision=null;discardConsent=null;legacyBackConsent=null;});
  document.addEventListener('input',event=>{const form=event.target.closest?.('form');if(form)form.dataset.nativeDirty='true';},true);
  document.addEventListener('submit',event=>{if(event.target.matches?.('form'))delete event.target.dataset.nativeDirty;},true);
  function appearance(){plugin.setAppearance({dark:document.documentElement.dataset.colorMode==='dark'}).catch(()=>{});}

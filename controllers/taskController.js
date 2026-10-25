@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { assertOriginalRegisterSchema } = require('../services/originalRegisterSchema');
 const { hasAnyPermission, hasPermission, isManagerOf } = require('../services/authorizationService');
 const { moveToTrash } = require('../services/trashService');
 const { createNotification } = require('../services/notificationService');
@@ -26,23 +27,8 @@ async function canManageTaskTarget(req, targetUserId) {
   return hasPermission(req.user, 'MANAGE_TEAM_JOBS') && isManagerOf(req.user?.id, targetUserId);
 }
 
-async function ensureAnnouncementTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS announcements (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(180) NOT NULL,
-      message TEXT NOT NULL,
-      priority VARCHAR(40) NOT NULL DEFAULT 'normal',
-      starts_at DATE NOT NULL,
-      expires_at DATE NOT NULL,
-      audience_type VARCHAR(40) NOT NULL DEFAULT 'selected',
-      target_user_ids TEXT NULL,
-      created_by INT NULL,
-      deleted TINYINT(1) NOT NULL DEFAULT 0,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP
-    )
-  `);
+function ensureAnnouncementTable() {
+  return assertOriginalRegisterSchema('announcements', pool);
 }
 
 let originalSchemaPromise;
@@ -485,7 +471,7 @@ exports.getAnnouncements = async (req, res) => {
     });
   } catch (err) {
     console.error('GET ANNOUNCEMENTS ERROR FULL:', err);
-    res.status(500).json({ message: 'Failed to load announcements', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Failed to load announcements', code: err.code });
   }
 };
 
@@ -526,7 +512,7 @@ exports.getMyAnnouncements = async (req, res) => {
     res.json({ announcements: visible });
   } catch (err) {
     console.error('GET MY ANNOUNCEMENTS ERROR FULL:', err);
-    res.status(500).json({ message: 'Failed to load announcements', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Failed to load announcements', code: err.code });
   }
 };
 
@@ -604,7 +590,7 @@ exports.createAnnouncement = async (req, res) => {
     res.json({ message: 'Announcement published successfully', announcement_id: result.insertId });
   } catch (err) {
     console.error('CREATE ANNOUNCEMENT ERROR FULL:', err);
-    res.status(500).json({ message: 'Announcement creation failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Announcement creation failed', code: err.code });
   }
 };
 
@@ -661,7 +647,7 @@ exports.updateAnnouncement = async (req, res) => {
     res.json({ message: 'Announcement updated successfully' });
   } catch (err) {
     console.error('UPDATE ANNOUNCEMENT ERROR FULL:', err);
-    res.status(500).json({ message: 'Announcement update failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Announcement update failed', code: err.code });
   }
 };
 
@@ -687,32 +673,8 @@ exports.deleteAnnouncement = async (req, res) => {
   }
 };
 
-async function ensureStaffMessageTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS staff_messages (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      priority VARCHAR(40) NOT NULL DEFAULT 'Normal',
-      body TEXT NOT NULL,
-      status VARCHAR(40) NOT NULL DEFAULT 'Open',
-      deleted TINYINT(1) NOT NULL DEFAULT 0,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      reviewed_at DATETIME NULL,
-      reviewed_by INT NULL,
-      INDEX idx_staff_messages_user (user_id),
-      INDEX idx_staff_messages_status (status),
-      INDEX idx_staff_messages_deleted (deleted)
-    )
-  `);
-
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN user_id INT NOT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN priority VARCHAR(40) NOT NULL DEFAULT 'Normal'`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN body TEXT NOT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'Open'`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN reviewed_at DATETIME NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_messages ADD COLUMN reviewed_by INT NULL`).catch(() => {});
+function ensureStaffMessageTable() {
+  return assertOriginalRegisterSchema('staff_messages', pool);
 }
 
 exports.getStaffMessages = async (req, res) => {
@@ -741,7 +703,7 @@ exports.getStaffMessages = async (req, res) => {
     res.json({ messages: rows });
   } catch (err) {
     console.error('GET STAFF MESSAGES ERROR FULL:', err);
-    res.status(500).json({ message: 'Failed to load staff messages', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Failed to load staff messages', code: err.code });
   }
 };
 
@@ -760,7 +722,7 @@ exports.getMyStaffMessages = async (req, res) => {
     res.json({ messages: rows });
   } catch (err) {
     console.error('GET MY STAFF MESSAGES ERROR FULL:', err);
-    res.status(500).json({ message: 'Failed to load your messages', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Failed to load your messages', code: err.code });
   }
 };
 
@@ -796,7 +758,7 @@ exports.createStaffMessage = async (req, res) => {
     res.json({ message: 'Message sent to admin successfully', message_id: result.insertId });
   } catch (err) {
     console.error('CREATE STAFF MESSAGE ERROR FULL:', err);
-    res.status(500).json({ message: 'Message send failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Message send failed', code: err.code });
   }
 };
 
@@ -821,7 +783,7 @@ exports.updateStaffMessage = async (req, res) => {
     res.json({ message: 'Message updated successfully' });
   } catch (err) {
     console.error('UPDATE STAFF MESSAGE ERROR FULL:', err);
-    res.status(500).json({ message: 'Message update failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Message update failed', code: err.code });
   }
 };
 
@@ -848,37 +810,8 @@ exports.deleteStaffMessage = async (req, res) => {
 };
 const STAFF_WORK_REQUEST_TYPES = new Set(['leave', 'availability', 'documents', 'forms']);
 
-async function ensureStaffWorkRequestTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS staff_work_requests (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      user_id INT NOT NULL,
-      request_type VARCHAR(40) NOT NULL,
-      title VARCHAR(180) NOT NULL,
-      body TEXT NULL,
-      payload LONGTEXT NULL,
-      status VARCHAR(40) NOT NULL DEFAULT 'Open',
-      deleted TINYINT(1) NOT NULL DEFAULT 0,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      reviewed_at DATETIME NULL,
-      reviewed_by INT NULL,
-      INDEX idx_staff_work_requests_user (user_id),
-      INDEX idx_staff_work_requests_type (request_type),
-      INDEX idx_staff_work_requests_status (status),
-      INDEX idx_staff_work_requests_deleted (deleted)
-    )
-  `);
-
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN user_id INT NOT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN request_type VARCHAR(40) NOT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN title VARCHAR(180) NOT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN body TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN payload LONGTEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN status VARCHAR(40) NOT NULL DEFAULT 'Open'`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN reviewed_at DATETIME NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE staff_work_requests ADD COLUMN reviewed_by INT NULL`).catch(() => {});
+function ensureStaffWorkRequestTable() {
+  return assertOriginalRegisterSchema('staff_work_requests', pool);
 }
 
 function normaliseStaffWorkType(type) {
@@ -903,7 +836,7 @@ exports.getStaffWorkRequests = async (req, res) => {
     res.json({ requests: rows });
   } catch (err) {
     console.error('GET STAFF WORK REQUESTS ERROR FULL:', err);
-    res.status(500).json({ message: 'Failed to load staff requests', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Failed to load staff requests', code: err.code });
   }
 };
 
@@ -919,7 +852,7 @@ exports.getMyStaffWorkRequests = async (req, res) => {
     res.json({ requests: rows });
   } catch (err) {
     console.error('GET MY STAFF WORK REQUESTS ERROR FULL:', err);
-    res.status(500).json({ message: 'Failed to load your requests', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Failed to load your requests', code: err.code });
   }
 };
 
@@ -951,7 +884,7 @@ exports.createStaffWorkRequest = async (req, res) => {
     res.json({ message: 'Request sent to admin successfully', request_id: result.insertId });
   } catch (err) {
     console.error('CREATE STAFF WORK REQUEST ERROR FULL:', err);
-    res.status(500).json({ message: 'Request send failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Request send failed', code: err.code });
   }
 };
 
@@ -972,7 +905,7 @@ exports.updateStaffWorkRequest = async (req, res) => {
     res.json({ message: 'Request updated successfully' });
   } catch (err) {
     console.error('UPDATE STAFF WORK REQUEST ERROR FULL:', err);
-    res.status(500).json({ message: 'Request update failed', error: err.message });
+    res.status(err.statusCode || 500).json({ message: err.statusCode ? err.message : 'Request update failed', code: err.code });
   }
 };
 
