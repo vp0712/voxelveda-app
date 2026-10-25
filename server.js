@@ -16,6 +16,7 @@ const { startEmailQueueWorker, stopEmailQueueWorker } = require('./services/emai
 const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./services/databaseRuntimeService');
 const { recoverDatabaseCapacity } = require('./services/databaseCapacityRecoveryService');
 const { runMigrations } = require('./services/migrationRunner');
+const { runRetainedMigrations } = require('./services/retainedMigrationRunner');
 const { allowedHosts } = require('./services/outboundRequestPolicy');
 const { getRateLimitService } = require('./services/rateLimitService');
 const { healthCheck: malwareHealthCheck, scannerConfig } = require('./services/malwareScannerService');
@@ -280,9 +281,18 @@ async function bootstrap() {
     setPhase('RUNNING_MIGRATIONS');
     setMigrations({ state: CONTROL_STATES.INITIALIZING });
     const migrationResult = await runMigrations({ pool, verifyOnly: true });
-    setMigrations({ state: CONTROL_STATES.OPERATIONAL, ...migrationResult });
-    setCriticalService('migrations', CONTROL_STATES.OPERATIONAL, migrationResult.schema_version || 'no migrations');
+    const retainedMigrationResult = await runRetainedMigrations({ pool });
+    const currentMigrationState = {
+      schema_version: retainedMigrationResult.schema_version || migrationResult.schema_version,
+      discovered: Number(migrationResult.discovered || 0) + Number(retainedMigrationResult.discovered || 0),
+      applied: Number(retainedMigrationResult.applied || 0),
+      baselined: Number(retainedMigrationResult.baselined || 0),
+      skipped: Number(migrationResult.skipped || 0) + Number(retainedMigrationResult.skipped || 0)
+    };
+    setMigrations({ state: CONTROL_STATES.OPERATIONAL, ...currentMigrationState });
+    setCriticalService('migrations', CONTROL_STATES.OPERATIONAL, currentMigrationState.schema_version || 'no migrations');
     console.log(`Migrations ready at ${migrationResult.schema_version || 'unversioned'} (${migrationResult.applied} applied, ${migrationResult.baselined || 0} baselined, ${migrationResult.skipped} verified).`);
+    console.log(`Current original migrations: ${retainedMigrationResult.applied} applied, ${retainedMigrationResult.skipped} verified; request handlers use read-only register assertions.`);
 
     setPhase('INITIALIZING_CRITICAL_SCHEMAS');
     await initializeCriticalSchemas();
