@@ -109,7 +109,6 @@ jobs:
       DB_NAME: voxelveda_tls_test
       DB_TLS_REQUIRED: 'true'
       DB_TLS_REJECT_UNAUTHORIZED: 'true'
-      TLS_PROOF_DIR: ${{ runner.temp }}/database-tls-proof
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -146,6 +145,8 @@ jobs:
           echo "DB_TLS_CA_FILE=$fixture_dir/server/ca.pem" >> "$GITHUB_ENV"
           echo "TLS_TEST_WRONG_CA_FILE=$fixture_dir/wrong-ca.pem" >> "$GITHUB_ENV"
       - name: Prove actual MySQL session encryption, CA trust and hostname validation
+        env:
+          TLS_PROOF_DIR: ${{ runner.temp }}/database-tls-proof
         run: node scripts/database-transport-mysql-test.js
       - name: Preserve non-sensitive transport evidence
         if: always()
