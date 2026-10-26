@@ -110,7 +110,7 @@ function fixture(type) {
   } };
   const auth = { hasPermission: (user, permission) => (user.permissions || []).includes(permission), hasAnyPermission: (user, permissions) => permissions.some((permission) => (user.permissions || []).includes(permission)), isManagerOf: async (_manager, userId) => userId === 4 };
   const dependencies = { '../config/db': db, '../services/auditService': { async logAudit(_connection, entry) { if (state.auditFailure) throw new Error('Audit unavailable'); state.audits.push(plain(entry)); } },
-    '../services/authorizationService': auth, '../services/trashService': {}, '../services/notificationService': {}, '../utils/dateOnly': dates, '../utils/money': money,
+    '../services/authorizationService': auth, '../services/originalRegisterSchema': { assertOriginalRegisterSchema: async () => {} }, '../services/trashService': {}, '../services/notificationService': {}, '../utils/dateOnly': dates, '../utils/money': money,
     '../services/expensePaymentDomain': paymentDomain, '../services/expenseRegisterFilters': {}, '../services/sessionService': {}, '../services/documentSecurityService': {}, '../services/documentPdfService': {},
     luxon:require('luxon'),'../services/attendanceTimeService':require('../services/attendanceTimeService'),'../services/attendanceRecordedTotals':require('../services/attendanceRecordedTotals'),'./weeklyTimesheetDeliveryController':{legacySend:()=>{}},'../services/weeklyTimesheetDeliverySchema':{ensureWeeklyTimesheetDeliverySchema:async()=>{}},'../services/workforceSchema': { async ensureWorkforceSchema() {} }, '../services/documentDeliveryService': {}, '../services/timesheetDocumentService': {}, '../services/emailService': {} };
   if(type==='attendance'){
