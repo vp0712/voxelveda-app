@@ -106,6 +106,13 @@ function isEmailTransportError(error) {
   const code = String(error?.code || '').toUpperCase();
   return EMAIL_TRANSPORT_CODES.has(code) || /smtp|socket|connection|timed?\s*out/i.test(String(error?.message || ''));
 }
+function explicitNegativeSmtpReply(error) {
+  const reply=String(error?.response||''),match=/^([45]\d{2})(?:[ -]|$)/u.exec(reply);
+  return Boolean(match&&Number(error.responseCode)===Number(match[1]));
+}
+function beforeDispatch(error) {
+  error.deliveryOutcome='NOT_DISPATCHED';error.deliveryAttempted=false;return error;
+}
 
 function classifySmtpFailure(error) {
   const code = String(error?.code || '').toUpperCase();
@@ -283,14 +290,17 @@ async function assertRelayPdfCapability() {
       throw Object.assign(new Error('The company email relay must support validated PDF bytes and original .pdf filenames before document email can be sent. The request is retained for controlled retry.'), { code: 'PDF_RELAY_CONTRACT_REQUIRED' });
     }
     return health;
-  } finally { clearTimeout(timeout); }
+  } catch(error) { throw beforeDispatch(error); }
+  finally { clearTimeout(timeout); }
 }
 
 async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
-  assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
-  attachments = await assertAttachmentIntegrity(attachments);
-  const config = smtpConfig();
-  const transporter = createTransporter();
+  let config,transporter;
+  try{
+    assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+    attachments = await assertAttachmentIntegrity(attachments);
+    config = smtpConfig();transporter = createTransporter();
+  }catch(error){throw beforeDispatch(error);}
   try {
     const result = await transporter.sendMail({
       from: `"${config.fromName}" <${config.fromEmail}>`,
@@ -303,8 +313,21 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
       replyTo: replyTo || config.replyTo || undefined,
       attachments
     });
+    if(!/^250(?:[ -]|$)/u.test(String(result?.response||''))||!Array.isArray(result?.accepted)||!result.accepted.length){
+      throw Object.assign(new Error('SMTP did not provide a valid final acceptance reply and recipient outcome. Review the provider before retrying.'),{code:'DELIVERY_REVIEW_REQUIRED',reasonCode:'SMTP_ACCEPTANCE_UNCONFIRMED',providerAccepted:false,retryable:false,deliveryOutcome:'UNKNOWN'});
+    }
     if (deliveryPolicy && (result.rejected?.length || !Array.isArray(result.accepted) || result.accepted.length !== 1 || String(result.accepted[0]).toLowerCase() !== deliveryPolicy.recipient.toLowerCase())) throw Object.assign(new Error('The SMTP recipient outcome requires review before retry.'), {code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:Boolean(result.accepted?.length)});
     return { ...result, transport: 'smtp', attachmentFilenameGuaranteed: true, receivedVerified: false };
+  } catch (error) {
+    if(error.code==='DELIVERY_REVIEW_REQUIRED')throw error;
+    const response=Number(error.responseCode);
+    if(explicitNegativeSmtpReply(error)){
+      error.deliveryOutcome='NOT_ACCEPTED';error.providerAccepted=false;error.retryable=response<500;throw error;
+    }
+    // Positive proof is required after invocation. Error names, commands and
+    // wording cannot establish non-acceptance; malformed final replies count
+    // as uncertain just like lost sockets, even for EMESSAGE or EPROTOCOL.
+    throw Object.assign(new Error('The SMTP outcome could not be confirmed after dispatch. Review the provider before retrying; automatic resend is disabled.'),{code:'DELIVERY_REVIEW_REQUIRED',reasonCode:'SMTP_DELIVERY_OUTCOME_UNKNOWN',providerAccepted:false,retryable:false,deliveryOutcome:'UNKNOWN',cause:error});
   } finally {
     transporter.close();
   }
@@ -435,7 +458,7 @@ async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attac
   if (!isHostingerMailApiConfigured()) {
     const error = new Error('Hostinger Mail API transport is not configured.');
     error.code = 'HOSTINGER_MAIL_API_CONFIG_MISSING';
-    throw error;
+    throw beforeDispatch(error);
   }
   const encoded = await relayAttachments(attachments);
   const controller = new AbortController();
@@ -468,32 +491,39 @@ async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attac
         signal: controller.signal
       }
     );
-    if (response.status !== 204) {
-      let details = {};
-      try { details = await response.json(); } catch {}
-      const error = new Error(details.error || details.message || 'Hostinger Mail API returned ' + response.status);
-      error.code = String(details.code || 'HOSTINGER_MAIL_API_FAILED');
-      error.responseCode = response.status;
-      throw error;
+    // Authorisation rejection establishes that this request could not hand off
+    // a message. Other responses do not prove that a provider-side send did
+    // not happen (including a 5xx after handoff or an uncorrelated 204).
+    if ([401,403].includes(Number(response.status))) {
+      throw Object.assign(new Error('The Hostinger Mail API rejected mailbox authorisation. Verify the configured company connection before retry.'), {
+        code:'HOSTINGER_MAIL_API_REJECTED',responseCode:Number(response.status),providerAccepted:false,retryable:false,deliveryOutcome:'NOT_ACCEPTED'
+      });
     }
-    return { messageId: null, accepted: to, transport: 'hostinger_mail_api', attachmentFilenameGuaranteed: true, receivedVerified: false };
+    // The documented endpoint returns no acceptance identifier. HTTP success
+    // alone cannot safely correlate a later retry or establish received MIME.
+    // Do not invent a response contract or silently mark this message SENT.
+    throw Object.assign(new Error('The Hostinger mail request may have been accepted, but no traceable message outcome was confirmed. Review the provider before retrying; automatic resend is disabled.'), {
+      code:'DELIVERY_REVIEW_REQUIRED',reasonCode:Number(response.status)===204?'HOSTINGER_MAIL_API_ACCEPTANCE_UNCONFIRMED':'HOSTINGER_MAIL_API_RESPONSE_UNCONFIRMED',
+      responseCode:Number(response.status)||null,providerAccepted:false,retryable:false,deliveryOutcome:'UNKNOWN'
+    });
   } catch (error) {
-    if (error.name === 'AbortError') {
-      error.code = 'HOSTINGER_MAIL_API_TIMEOUT';
-      error.message = 'Hostinger Mail API timed out.';
-    }
-    throw error;
+    if (['DELIVERY_REVIEW_REQUIRED','HOSTINGER_MAIL_API_REJECTED'].includes(error.code)) throw error;
+    throw Object.assign(new Error('The Hostinger mail response was lost or timed out after dispatch. Review the provider outcome before retrying; automatic resend is disabled.'), {
+      code:'DELIVERY_REVIEW_REQUIRED',reasonCode:'HOSTINGER_MAIL_API_RESPONSE_LOST',providerAccepted:false,retryable:false,deliveryOutcome:'UNKNOWN',cause:error
+    });
   } finally {
     clearTimeout(timeout);
   }
 }
 
 async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
-  assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
-  if (attachments.length) {
-    const health = await assertRelayPdfCapability();
-    if (deliveryPolicy && health.weekly_recipient_privacy_enforced !== true) throw Object.assign(new Error('The existing relay must enforce the designated single recipient through final MIME construction before weekly timesheets can be sent.'), {code:'PDF_RELAY_CONTRACT_REQUIRED'});
-  }
+  try {
+    assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+    if (attachments.length) {
+      const health = await assertRelayPdfCapability();
+      if (deliveryPolicy && health.weekly_recipient_privacy_enforced !== true) throw Object.assign(new Error('The existing relay must enforce the designated single recipient through final MIME construction before weekly timesheets can be sent.'), {code:'PDF_RELAY_CONTRACT_REQUIRED'});
+    }
+  } catch(error) {throw beforeDispatch(error);}
   const config = relayConfig();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
@@ -541,6 +571,7 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
       error.code = definitiveRejection ? 'PDF_RELAY_VALIDATION_FAILED' : 'DELIVERY_REVIEW_REQUIRED';
       error.responseCode = response.status;
       error.providerAccepted = knownAcceptance;
+      if(definitiveRejection)error.deliveryOutcome='NOT_ACCEPTED';
       throw error;
     }
     if(attachments.length){
@@ -562,6 +593,7 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
       receivedVerified: false
     };
   } catch (error) {
+    if(!attempted)throw beforeDispatch(error);
     if(attempted && !['DELIVERY_REVIEW_REQUIRED','PDF_RELAY_VALIDATION_FAILED'].includes(error.code)){error.code='DELIVERY_REVIEW_REQUIRED';error.message='The relay transaction outcome is uncertain. Review provider logs before retry to prevent duplicate delivery.';}
     if(!error.code)error.code='EMAIL_HTTPS_RELAY_FAILED';
     throw error;
@@ -576,7 +608,8 @@ function selectedEmailTransport() {
   return configured || (isRelayConfigured()?'https_relay':isHostingerMailApiConfigured()?'hostinger_mail_api':'smtp');
 }
 async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
-  const args = {
+  let args,selected;
+  try { args = {
     to: validateRecipients(to, 'to'),
     cc: validateRecipients(cc, 'cc'),
     bcc: validateRecipients(bcc, 'bcc'),
@@ -585,10 +618,11 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   };
   assertWeeklyDeliveryPolicy(args, args);
   // Explicit transport selection is honoured; no provider change is inferred from PDF failures.
-  const selected = selectedEmailTransport();
+  selected = selectedEmailTransport();
+  if (selected === 'https_relay' && !isRelayConfigured()) throw Object.assign(new Error('The configured HTTPS company relay is incomplete.'), {code:'EMAIL_HTTPS_RELAY_FAILED'});
+  }catch(error){throw beforeDispatch(error);}
   if (selected === 'smtp') return sendViaSmtp(args);
   if (selected === 'hostinger_mail_api') return sendViaHostingerMailApi(args);
-  if (selected === 'https_relay' && !isRelayConfigured()) throw Object.assign(new Error('The configured HTTPS company relay is incomplete.'), {code:'EMAIL_HTTPS_RELAY_FAILED'});
   if (isRelayConfigured()) return { ...await sendViaHttpsRelay(args), transport: 'https_relay' };
   if (missingSmtpKeys().length && isHostingerMailApiConfigured()) return sendViaHostingerMailApi(args);
   return sendViaSmtp(args);
@@ -600,6 +634,7 @@ module.exports = {
   verifyConnection,
   createTransporter,
   isEmailConfigured,
+  explicitNegativeSmtpReply,
   missingSmtpKeys,
   smtpConfig,
   smtpReadinessSummary,

@@ -145,7 +145,9 @@ async function releaseHold(req,res,next){
     return res.json({id:hold.id,hold_no:hold.hold_no,active:false});
   }catch(e){return next(e)}
 }
-async function listHolds(req,res,next){try{await ready();const [rows]=await pool.query('SELECT * FROM quality_holds WHERE (?=\'\' OR entity_type=?) AND (?=\'\' OR entity_id=?) ORDER BY active DESC,placed_at DESC LIMIT 500',[clean(req.query.entity_type,40),clean(req.query.entity_type,40),clean(req.query.entity_id,100),clean(req.query.entity_id,100)]);return res.json({holds:rows})}catch(e){return next(e)}}
+async function listHolds(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'holds')); } catch(error) { return next(error); }
+}
 
 async function createNcr(req,res,next){
   try{await ready(); const description=clean(req.body.description,4000); if(!description)return res.status(400).json({message:'description is required.'});
@@ -157,7 +159,10 @@ async function createNcr(req,res,next){
     }catch(e){await connection.rollback();throw e}finally{connection.release()}
   }catch(e){return next(e)}
 }
-async function listNcrs(req,res,next){try{await ready();const [rows]=await pool.query('SELECT * FROM ncrs ORDER BY created_at DESC LIMIT 500');return res.json({ncrs:rows})}catch(e){return next(e)}}
+async function listNcrs(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'ncrs')); } catch(error) { return next(error); }
+}
+
 async function transitionNcr(req,res,next){
   const allowed={OPEN:['CONTAINMENT_REQUIRED','CONTAINED'],CONTAINMENT_REQUIRED:['CONTAINED'],CONTAINED:['INVESTIGATION'],INVESTIGATION:['DISPOSITION_REQUIRED'],DISPOSITION_REQUIRED:['REWORK','REINSPECTION','APPROVAL'],REWORK:['REINSPECTION'],REINSPECTION:['APPROVAL'],APPROVAL:['CLOSED']};
   try{await ready();const target=clean(req.body.status,40).toUpperCase();const [[ncr]]=await pool.query('SELECT * FROM ncrs WHERE id=?',[req.params.id]);if(!ncr)return res.status(404).json({message:'NCR not found.'});if(!(allowed[ncr.status]||[]).includes(target))return res.status(409).json({message:`Invalid NCR transition ${ncr.status} → ${target}.`});
@@ -172,7 +177,10 @@ async function createCapa(req,res,next){
   try{await ready();const problem=clean(req.body.problem_statement,4000);if(!problem)return res.status(400).json({message:'problem_statement is required.'});const [r]=await pool.query('INSERT INTO capas(capa_no,source_type,source_id,problem_statement,containment,owner_user_id,due_date,created_by) VALUES(?,?,?,?,?,?,?,?)',[`PENDING-${crypto.randomUUID()}`,clean(req.body.source_type,50)||'MANUAL',clean(req.body.source_id,100)||null,problem,clean(req.body.containment,4000)||null,req.body.owner_user_id||actor(req),req.body.due_date||null,actor(req)]);const no=idNo('CAPA',r.insertId);await pool.query('UPDATE capas SET capa_no=? WHERE id=?',[no,r.insertId]);await logAudit(pool,{...auditContext(req),action:'CAPA_CREATED',module:'QMS',recordType:'CAPA',recordId:no,newValue:{sourceType:req.body.source_type||'MANUAL',dueDate:req.body.due_date||null}});return res.status(201).json({id:r.insertId,capa_no:no,status:'OPEN'});
   }catch(e){return next(e)}
 }
-async function listCapas(req,res,next){try{await ready();const [rows]=await pool.query('SELECT * FROM capas ORDER BY created_at DESC LIMIT 500');return res.json({capas:rows})}catch(e){return next(e)}}
+async function listCapas(req,res,next){
+  try { await ready(); return res.json(await require('../services/qmsRegisterService').listRegister(req,'capas')); } catch(error) { return next(error); }
+}
+
 async function addCapaAction(req,res,next){try{await ready();const text=clean(req.body.action_text,4000);if(!text)return res.status(400).json({message:'action_text is required.'});const [r]=await pool.query('INSERT INTO capa_actions(capa_id,action_type,action_text,owner_user_id,due_date) VALUES(?,?,?,?,?)',[req.params.id,clean(req.body.action_type,20)||'CORRECTIVE',text,req.body.owner_user_id||actor(req),req.body.due_date||null]);return res.status(201).json({id:r.insertId})}catch(e){return next(e)}}
 
 async function genealogyByMaterial(req,res,next){try{await ready();const [rows]=await pool.query(`SELECT g.*,j.job_no,b.build_no,s.serial_no,j.customer_id,j.part_no,j.drawing_revision FROM material_genealogy g JOIN manufacturing_jobs j ON j.id=g.job_id LEFT JOIN job_builds b ON b.id=g.build_id LEFT JOIN job_serials s ON s.id=g.serial_id WHERE g.material_lot_id=? ORDER BY g.created_at DESC`,[req.params.id]);return res.json({material_lot_id:Number(req.params.id),impacts:rows})}catch(e){return next(e)}}

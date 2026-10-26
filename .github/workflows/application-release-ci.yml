@@ -28,15 +28,20 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends tesseract-ocr poppler-utils util-linux
-      - name: Production application build and retained regression gate
-        run: npm run build
-      - name: Run the complete build with production HTTPS enforcement
+      - name: UTC production application build and retained regression gate
         env:
+          TZ: UTC
+        run: npm run build
+      - name: Melbourne build with production HTTPS, scanning and private storage
+        env:
+          TZ: Australia/Melbourne
           NODE_ENV: production
           MALWARE_SCANNER_REQUIRED: 'true'
           OBJECT_STORAGE_PROVIDER: s3
         run: npm run build
       - name: Build the packaged source without Git metadata
+        env:
+          TZ: UTC
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/vv-source-artifact"

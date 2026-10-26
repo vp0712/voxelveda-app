@@ -3,6 +3,7 @@ const money=require('../utils/money');
 const {receivableSelect}=require('../services/invoiceSummaryService');
 const {paymentSql}=require('../services/expensePaymentDomain');
 const {hasPermission}=require('../services/authorizationService');
+const {customerScoped}=require('../services/customerRecordScope');
 
 let originalSchemaPromise;
 function ensureDashboardTables() {
@@ -96,6 +97,12 @@ async function createDashboardTablesStructures() {
 
 exports.getDashboardStats = async (req, res) => {
   try {
+    // Client home uses its email-scoped registers. A stored commercial grant
+    // must never make a customer account a reader of company-wide summaries.
+    if (customerScoped(req.user)) return res.status(403).json({
+      code: 'COMPANY_DASHBOARD_RESTRICTED',
+      message: 'Company-wide dashboard totals are restricted. Open Client home to view your authorised records.'
+    });
     await ensureDashboardTables();
     const now = new Date();
     const fyStartYear = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear() - 1;

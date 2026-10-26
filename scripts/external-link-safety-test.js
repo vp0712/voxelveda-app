@@ -8,7 +8,7 @@ const { externalHttpUrl } = require('../utils/externalHttpUrl');
 function response() { return { statusCode: 200, status(code) { this.statusCode = code; return this; }, json(body) { this.body = body; return this; } }; }
 function controller(file, db) {
   const fixture = { exports: {} }, filename = path.join(__dirname, '..', file);
-  const dependencies = { '../config/db': db, '../utils/externalHttpUrl': { externalHttpUrl }, '../services/documentPdfService': {}, '../services/sessionService': {}, '../services/documentSecurityService': {}, fs: require('node:fs'), path: require('node:path') };
+  const dependencies = { '../config/db': db, '../services/originalRegisterSchema': { assertOriginalRegisterSchema: async () => {} }, '../utils/externalHttpUrl': { externalHttpUrl }, '../services/documentPdfService': {}, '../services/sessionService': {}, '../services/documentSecurityService': {}, fs: require('node:fs'), path: require('node:path') };
   new vm.Script(fs.readFileSync(filename, 'utf8'), { filename }).runInNewContext({ module: fixture, exports: fixture.exports, process: { env: {} }, console: { error() {} },
     require(name) { if (Object.hasOwn(dependencies, name)) return dependencies[name]; throw new Error('Unexpected link fixture dependency: ' + name); } });
   return fixture.exports;

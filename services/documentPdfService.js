@@ -3,6 +3,8 @@ const crypto = require('node:crypto');
 const path = require('node:path');
 const fs = require('node:fs');
 const { companyProfile } = require('../config/companyProfile');
+const DOCUMENT_LAYOUT_VERSION = '2026-10-25.2';
+function exactLine(value) { return String(value ?? '').normalize('NFKC').replace(/\s+/gu,' ').trim(); }
 
 function pdfError(message, code = 'PDF_DOCUMENT_INVALID') {
   return Object.assign(new Error(message), { code, status: 422 });
@@ -11,25 +13,61 @@ function safePdfFilename(value) {
   const base = String(value || 'document').normalize('NFKC').replace(/[\\/\r\n\0"<>:|?*]/g, '-').replace(/[^\x20-\x7E]/g, '-').replace(/\s+/g, ' ').trim().replace(/(?:\.pdf)+$/i, '').replace(/\.(?:tmp|html?|csv|xlsx?|zip|jpe?g|png)$/i, '').slice(0, 160) || 'document';
   return `${base}.pdf`;
 }
-function compact(value) { return String(value ?? '').normalize('NFKC').replace(/\s+/g, '').toLowerCase(); }
-async function validatePdf(buffer, { expectedText = [] } = {}) {
+async function validatePdf(buffer, { expectedText = [], orderedExpectedText = false, documentProof } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 100 || buffer.length > 20 * 1024 * 1024 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') throw pdfError('Document generation did not produce PDF bytes. No document was sent.');
-  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const { getDocument, OPS } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const task = getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, useSystemFonts: true, disableFontFace: true });
   try {
     const pdf = await task.promise;
     if (!pdf.numPages || pdf.numPages > 500) throw pdfError('The PDF has no valid pages or exceeds the page limit.');
-    const texts = [];
+    const texts = [], pageLines = [], encodedPageLines = [];
     for (let index = 1; index <= pdf.numPages; index += 1) {
       const page = await pdf.getPage(index);
       const layer = await page.getTextContent();
       texts.push(layer.items.map(item => item.str || '').join(' '));
+      pageLines.push(layer.items.filter(item=>exactLine(item.str)).map(item=>({text:exactLine(item.str),x:item.transform[4],y:item.transform[5],size:item.height,width:item.width})));
+      if(documentProof){
+        const operators=await page.getOperatorList(),lines=[];let current=null;
+        const unsupported=[OPS.showSpacedText,OPS.nextLineShowText,OPS.nextLineSetSpacingShowText].filter(Number.isFinite);
+        const invalid=()=>pdfError('The PDF uses an unsupported text identity layout.','PDF_CONTENT_PROOF_UNSUPPORTED');
+        for(let at=0;at<operators.fnArray.length;at++){
+          const op=operators.fnArray[at],args=operators.argsArray[at];
+          if(op===OPS.beginText){if(current!==null)throw invalid();current=[];}
+          else if(op===OPS.endText){if(current===null)throw invalid();const line=exactLine(current.join(''));if(line)lines.push(line);current=null;}
+          else if(op===OPS.showText){
+            if(current===null||!Array.isArray(args?.[0]))throw invalid();
+            for(const glyph of args[0]){if(typeof glyph==='number'&&Number.isFinite(glyph))continue;if(!glyph||typeof glyph.unicode!=='string')throw invalid();current.push(glyph.unicode);}
+          }else if(unsupported.includes(op))throw invalid();
+        }
+        if(current!==null)throw invalid();encodedPageLines.push(lines);
+      }
       page.cleanup();
     }
     const text = texts.join(' ').replace(/\s+/g, ' ').trim();
-    const body = compact(text);
+    const identityText = text.normalize('NFKC');
+    if (documentProof) {
+      if(documentProof.schema_version!==2||documentProof.layout_version!==DOCUMENT_LAYOUT_VERSION||!Array.isArray(documentProof.pages))throw pdfError('This document identity layout is unsupported.','PDF_CONTENT_PROOF_UNSUPPORTED');
+      const close=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&Math.abs(a-b)<0.04;
+      if(pageLines.length!==documentProof.pages.length)throw pdfError('The PDF page count does not match its authoritative document.','PDF_CONTENT_MISMATCH');
+      for(let p=0;p<pageLines.length;p++){
+        const actual=pageLines[p],expected=documentProof.pages[p];
+        // Text-content extraction can invent a space for a positive font kern
+        // (Open Sans MAJOR becomes "MA JOR"). Encoded glyph operators retain
+        // real word spaces, so require their exact source text first. Only the
+        // secondary parser view tolerates synthetic whitespace; geometry and
+        // every line/page count remain exact within the existing tolerance.
+        const encoded=encodedPageLines[p],glyphView=value=>value.replace(/\s/gu,'');
+        if(encoded.length!==expected.length||encoded.some((line,i)=>line!==expected[i].text)||actual.length!==expected.length||actual.some((line,i)=>glyphView(line.text)!==glyphView(expected[i].text)||!close(line.x,expected[i].x)||!close(line.y,expected[i].y)||!close(line.size,expected[i].size)||!close(line.width,expected[i].width)))throw pdfError('The complete PDF text or layout does not match its authoritative document.','PDF_CONTENT_MISMATCH');
+      }
+    }
+    let contentAt = 0;
     for (const expected of expectedText.filter(value => value !== undefined && value !== null && String(value).trim())) {
-      if (!body.includes(compact(expected))) throw pdfError('The PDF content does not match its document data.', 'PDF_CONTENT_MISMATCH');
+      const wanted=String(expected).normalize('NFKC').replace(/\s/gu,''),escape=value=>value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const before=/^[0-9]/u.test(wanted)?'(?<![\\p{L}\\p{N}.+\\-])':'(?<![\\p{L}\\p{N}])';
+      const expression=new RegExp(before+Array.from(wanted).map(escape).join('\\s*')+'(?![\\p{L}\\p{N}])','giu');
+      expression.lastIndex=orderedExpectedText?contentAt:0;const match=expression.exec(identityText);
+      if (!match) throw pdfError('The PDF content does not match its document data.', 'PDF_CONTENT_MISMATCH');
+      if (orderedExpectedText) contentAt=expression.lastIndex;
     }
     return { pages: pdf.numPages, text, sha256: crypto.createHash('sha256').update(buffer).digest('hex'), bytes: buffer.length, status: 'VALIDATED' };
   } catch (error) {
@@ -45,22 +83,36 @@ function dateLabel(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? String(value || '') : date.toLocaleDateString('en-AU', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
-async function createDocumentPdf(data) {
+async function buildDocumentPdf(data, proofOnly = false) {
   const PDFDocument = require('pdfkit');
   const company = companyProfile();
   const doc = new PDFDocument({ size: 'A4', margin: 42, bufferPages: true, info: { Title: `${data.title} ${data.reference || ''}`, Author: company.name } });
   doc.registerFont('DocumentRegular', path.join(__dirname, '..', 'assets', 'fonts', 'OpenSans-Regular.ttf'));
   doc.registerFont('DocumentBold', path.join(__dirname, '..', 'assets', 'fonts', 'OpenSans-Bold.ttf'));
+  let pageIndex=0;
+  const pageLines=[[]],originalFragment=doc._fragment;
+  doc.on('pageAdded',()=>{pageIndex=pageLines.length;pageLines.push([]);});
+  doc._fragment=function(value,x,at,options){
+    const raw=String(value).replace(/\n/g,''),line=exactLine(raw);
+    if(line){
+      let drawX=x;
+      if(options.width&&options.align==='right')drawX+=options.lineWidth-this.widthOfString(raw.replace(/\s+$/u,''),options);
+      else if(options.width&&options.align==='center')drawX+=options.lineWidth/2-options.textWidth/2;
+      drawX+=this.widthOfString(raw.match(/^\s*/u)[0],options);
+      pageLines[pageIndex].push({text:line,x:drawX,y:this.page.height-at-this._font.ascender/1000*this._fontSize,size:this._fontSize,width:this.widthOfString(raw.trim(),options)});
+    }
+    if(!proofOnly)return originalFragment.call(this,value,x,at,options);
+  };
   const chunks = [];
-  const completion = new Promise((resolve, reject) => { doc.on('data', chunk => chunks.push(chunk)); doc.on('end', () => resolve(Buffer.concat(chunks))); doc.on('error', reject); });
+  const completion = new Promise((resolve, reject) => { doc.on('data', chunk => { if (!proofOnly) chunks.push(chunk); }); doc.on('end', () => resolve(Buffer.concat(chunks))); doc.on('error', reject); });
   const left = 42, width = doc.page.width - 84, bottom = doc.page.height - 64;
   const navy = '#102b4e', blue = '#2563eb', ink = '#172a43', muted = '#526277';
-  let y;
+  let y, pageStartY;
   function text(value, x, at, available, options = {}) { doc.text(String(value ?? ''), x, at, { width: available, lineGap: 2, ...options }); }
   function header(continued = false) {
-    doc.rect(0, 0, doc.page.width, 8).fill(blue);
+    if (!proofOnly) doc.rect(0, 0, doc.page.width, 8).fill(blue);
     const logo = path.join(__dirname, '..', 'public', 'Frame 1.png');
-    if (fs.existsSync(logo)) doc.image(logo, left, 24, { fit: [94, 56] });
+    if (!proofOnly && fs.existsSync(logo)) doc.image(logo, left, 24, { fit: [94, 56] });
     doc.font('DocumentBold').fontSize(19).fillColor(navy);
     const titleWidth=width-118;
     const longTitle=String(data.title).length>24 || doc.widthOfString(String(data.title))>titleWidth*0.85;
@@ -76,25 +128,65 @@ async function createDocumentPdf(data) {
     text(data.reference || '', 160, referenceY, width - 118, { align: 'right' });
     const referenceHeight=doc.heightOfString(data.reference || '',{width:width-118,lineGap:2});
     const dateY=referenceY+referenceHeight+3;
-    text(continued ? 'Continued' : `${data.issueLabel || 'Issued'} ${dateLabel(data.issueDate || new Date())}`, 160, dateY, width - 118, { align: 'right' });
+    text(continued ? 'Continued' : `${data.issueLabel || 'Issued'} ${data.issueDate ? dateLabel(data.issueDate) : 'Date not recorded'}`, 160, dateY, width - 118, { align: 'right' });
     const headerEnd=Math.max(94,dateY+22);
-    doc.moveTo(left, headerEnd).lineTo(left + width, headerEnd).strokeColor('#d9e1ec').stroke();
-    y = headerEnd+14;
+    if (!proofOnly) doc.moveTo(left, headerEnd).lineTo(left + width, headerEnd).strokeColor('#d9e1ec').stroke();
+    y = headerEnd+14; pageStartY = y;
   }
-  function nextPage() { doc.addPage(); header(true); }
+  function nextPage() {
+    if (doc.bufferedPageRange().count >= 500) throw pdfError('The document exceeds the PDF page limit. Narrow the report selection.', 'PDF_DATA_INVALID');
+    doc.addPage(); header(true);
+  }
+  // PDFKit can wrap an entire cell onto additional pages by itself, which
+  // would bypass the table heading/background and move the other cells to a
+  // different row. Fit an exact prefix instead, then continue every remaining
+  // cell together beneath the next repeated heading. Never truncate data.
+  function cellFragment(value, availableWidth, availableHeight) {
+    const height = content => doc.heightOfString(content, { width: availableWidth, lineGap: 2 });
+    if (!value || height(value) <= availableHeight) return value;
+    const characters = Array.from(value);
+    let low = 0, high = characters.length;
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      if (height(characters.slice(0, middle).join('')) <= availableHeight) low = middle;
+      else high = middle - 1;
+    }
+    if (!low) throw pdfError('Document text needs enough space for a readable page.', 'PDF_DATA_INVALID');
+    let fragment = characters.slice(0, low).join('');
+    // Prefer a whole-word boundary. A long reference with no spaces still
+    // progresses at Unicode code-point boundaries and retains every character.
+    const boundary = fragment.search(/\s+\S*$/u);
+    if (boundary > 0) fragment = fragment.slice(0, boundary + 1);
+    return fragment;
+  }
+  const expectedText = [data.title, data.reference];
   function paragraph(value, options = {}) {
-    doc.font(options.bold ? 'DocumentBold' : 'DocumentRegular').fontSize(options.size || 9).fillColor(options.color || ink);
-    const height = doc.heightOfString(String(value), { width, lineGap: 2 });
-    if (height > bottom - 120) throw pdfError('Document text is too long for a readable page.', 'PDF_DATA_INVALID');
-    if (y + height > bottom) nextPage();
-    text(value, left, y, width); y += height + 9;
+    const style = () => doc.font(options.bold ? 'DocumentBold' : 'DocumentRegular').fontSize(options.size || 9).fillColor(options.color || ink);
+    style();
+    let remaining = String(value ?? ''), firstFragment = true;
+    const height = doc.heightOfString(remaining, { width, lineGap: 2 });
+    // Ordinary paragraphs stay together. Longer authorised notes/party details
+    // continue without losing words, style or document identity at a page break.
+    if (height <= bottom-pageStartY && y+height > bottom) nextPage();
+    while (firstFragment || remaining) {
+      style();
+      const lineHeight = doc.heightOfString('M', {width,lineGap:2});
+      if (bottom-y < lineHeight) { nextPage(); style(); }
+      const fragment = cellFragment(remaining,width,bottom-y);
+      const fragmentHeight = doc.heightOfString(fragment,{width,lineGap:2});
+      text(fragment,left,y,width); y += fragmentHeight;
+      expectedText.push(fragment);
+      remaining = remaining.slice(fragment.length);
+      firstFragment = false;
+      if (remaining) nextPage();
+    }
+    y += 9;
   }
   header();
   const details = [company.legalName || company.name, company.address, company.phone, company.email, company.abn ? `ABN ${company.abn}` : ''].filter(Boolean);
   paragraph(details.join(' | '), { size: 8, color: muted });
   if (data.party) paragraph(data.party, { bold: true, size: 11 });
   if (data.period) paragraph(`Period: ${data.period}`);
-  const expectedText = [data.title, data.reference, data.party, data.period];
   for (const table of data.tables || [{ columns: data.columns || [], rows: data.rows || [] }]) {
     const columns = table.columns;
     if (!columns.length) continue;
@@ -109,7 +201,8 @@ async function createDocumentPdf(data) {
       doc.font('DocumentRegular').fontSize(8);
       const first=table.rows[0]||columns.map((_,i)=>i?'':'No records for this period.');
       const firstHeight=Math.max(28,...first.map((cell,i)=>doc.heightOfString(String(cell??''),{width:(columns[i].width||1)*scale-14,lineGap:2})+16));
-      if(y+titleHeight+headingHeight+firstHeight>bottom)nextPage();
+      const firstReserve = firstHeight > bottom-pageStartY-headingHeight ? 28 : firstHeight;
+      if(y+titleHeight+headingHeight+firstReserve>bottom)nextPage();
       paragraph(table.title,{bold:true,size:11});
     }
     function tableHeader() {
@@ -117,7 +210,7 @@ async function createDocumentPdf(data) {
       const height=Math.max(26,...columns.map(col=>doc.heightOfString(String(col.label),{width:(col.width || 1)*scale-14,lineGap:2})+16));
       if(height>80)throw pdfError('Document table headings need wider columns for a readable layout.','PDF_DATA_INVALID');
       if (y + height + 6 > bottom) nextPage();
-      doc.rect(left, y, width, height).fill(navy); let x = left;
+      if (!proofOnly) doc.rect(left, y, width, height).fill(navy); let x = left;
       doc.font('DocumentBold').fontSize(8).fillColor('#ffffff');
       for (const col of columns) { const w = (col.width || 1) * scale; text(col.label, x + 7, y + 8, w - 14, { align: col.align || 'left' }); x += w; }
       y += height;
@@ -128,13 +221,26 @@ async function createDocumentPdf(data) {
       const cells = row.map(value => String(value ?? ''));
       doc.font('DocumentRegular').fontSize(8);
       const rowHeight = Math.max(28, ...cells.map((cell, i) => doc.heightOfString(cell, { width: (columns[i].width || 1) * scale - 14, lineGap: 2 }) + 16));
-      if (rowHeight > bottom - 160) throw pdfError('A document row is too long. Shorten its description before generating the document.', 'PDF_DATA_INVALID');
-      if (y + rowHeight > bottom) { nextPage(); tableHeader(); }
-      doc.rect(left, y, width, rowHeight).fill(index % 2 ? '#ffffff' : '#f2f6fc');
-      let x = left;
-      cells.forEach((cell, i) => { const w = (columns[i].width || 1) * scale; doc.fillColor(ink).font('DocumentRegular').fontSize(8); text(cell, x + 7, y + 8, w - 14, { align: columns[i].align || 'left' }); x += w; });
-      y += rowHeight;
-      expectedText.push(...cells);
+      doc.font('DocumentBold').fontSize(8);
+      const headingHeight=Math.max(26,...columns.map(col=>doc.heightOfString(String(col.label),{width:(col.width||1)*scale-14,lineGap:2})+16));
+      // Keep ordinary rows intact when they fit a fresh page. Oversized rows
+      // are split across as many pages as necessary, with the same row shade.
+      if (rowHeight <= bottom-pageStartY-headingHeight && y + rowHeight > bottom) { nextPage(); tableHeader(); }
+      let remaining = cells, firstFragment = true;
+      while (firstFragment || remaining.some(Boolean)) {
+        if (bottom-y < 28) { nextPage(); tableHeader(); }
+        doc.font('DocumentRegular').fontSize(8);
+        const fragments = remaining.map((cell,i)=>cellFragment(cell,(columns[i].width||1)*scale-14,bottom-y-16));
+        const height = Math.max(28,...fragments.map((cell,i)=>doc.heightOfString(cell,{width:(columns[i].width||1)*scale-14,lineGap:2})+16));
+        if (!proofOnly) doc.rect(left,y,width,height).fill(index % 2 ? '#ffffff' : '#f2f6fc');
+        let x = left;
+        fragments.forEach((cell,i)=>{const w=(columns[i].width||1)*scale;doc.fillColor(ink).font('DocumentRegular').fontSize(8);text(cell,x+7,y+8,w-14,{align:columns[i].align||'left'});x+=w;});
+        y += height;
+        expectedText.push(...fragments);
+        remaining = remaining.map((cell,i)=>cell.slice(fragments[i].length));
+        firstFragment = false;
+        if (remaining.some(Boolean)) { nextPage(); tableHeader(); }
+      }
     });
     y += 17;
   }
@@ -142,19 +248,23 @@ async function createDocumentPdf(data) {
     const blockHeight = data.totals.length * 28 + (data.notes || []).reduce((sum, note) => sum + doc.font('DocumentRegular').fontSize(8).heightOfString(note, { width, lineGap: 2 }) + 9, 0);
     if (y + Math.min(blockHeight, bottom - 130) > bottom) nextPage();
   }
-  for (const total of data.totals || []) { paragraph(`${total.label}: ${total.value}`, { bold: true, size: 10 }); expectedText.push(total.value); }
+  for (const total of data.totals || []) paragraph(`${total.label}: ${total.value}`, { bold: true, size: 10 });
   for (const note of data.notes || []) paragraph(note, { size: 8, color: muted });
   if(data.verificationUrl){
     if(y+130>bottom)nextPage();
-    const QRCode=require('qrcode');
-    const qr=await QRCode.toBuffer(String(data.verificationUrl),{errorCorrectionLevel:'H',margin:2,width:240});
-    doc.image(qr,left,y,{width:100,height:100});
+    if (!proofOnly) {
+      const QRCode=require('qrcode');
+      const qr=await QRCode.toBuffer(String(data.verificationUrl),{errorCorrectionLevel:'H',margin:2,width:240});
+      doc.image(qr,left,y,{width:100,height:100});
+      doc.link(left,y,100,100,String(data.verificationUrl));
+    }
     doc.font('DocumentRegular').fontSize(8).fillColor(muted);text('Scan to verify the current credential.',left+114,y+40,width-114);
-    doc.link(left,y,100,100,String(data.verificationUrl));y+=116;
+    y+=116;
   }
   const pages = doc.bufferedPageRange();
   for (let index = 0; index < pages.count; index += 1) {
     doc.switchToPage(index);
+    pageIndex=index;
     doc.font('DocumentRegular').fontSize(8).fillColor(muted);
     const oldBottom = doc.page.margins.bottom; doc.page.margins.bottom = 0;
     text(company.name, left, doc.page.height - 34, width / 2);
@@ -163,9 +273,17 @@ async function createDocumentPdf(data) {
   }
   doc.end();
   const buffer = await completion;
-  const validation = await validatePdf(buffer, { expectedText });
-  return { buffer, filename: safePdfFilename(data.filename || data.reference || data.title), contentType: 'application/pdf', contentDisposition: 'attachment', validation };
+  const contentProof = { schema_version: 2, layout_version: DOCUMENT_LAYOUT_VERSION, source_sha256: crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex'), fragments: expectedText, pages:pageLines };
+  if (proofOnly) return contentProof;
+  const validation = await validatePdf(buffer, { documentProof:contentProof });
+  return { buffer, filename: safePdfFilename(data.filename || data.reference || data.title), contentType: 'application/pdf', contentDisposition: 'attachment', validation, contentProof };
 }
+async function createDocumentPdf(data) { return buildDocumentPdf(data); }
+// Re-derive complete content identity from the trusted model using the exact
+// layout/font metrics, without drawing a second business document. A retained
+// PDF caller cannot supply, omit or forge the expected fragments.
+async function deriveDocumentContentProof(data) { return buildDocumentPdf(data, true); }
+async function validateDocumentPdf(buffer,data) { const proof=await deriveDocumentContentProof(data);return validatePdf(buffer,{documentProof:proof}); }
 async function sendPdfResponse(res, artifact, download = false) {
   await validatePdf(artifact.buffer);
   res.setHeader('Content-Type', 'application/pdf');
@@ -196,4 +314,4 @@ async function storedDocumentArtifact(body, filename) {
     return { buffer, filename: safePdfFilename(filename), validation: await validatePdf(buffer), converted_from: jpeg ? 'image/jpeg' : 'image/png' };
   } catch (error) { doc.destroy(); throw error; }
 }
-module.exports = { createDocumentPdf, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact, money, dateLabel, pdfError };
+module.exports = { createDocumentPdf, deriveDocumentContentProof, validateDocumentPdf, DOCUMENT_LAYOUT_VERSION, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact, money, dateLabel, pdfError };

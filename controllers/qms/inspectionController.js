@@ -42,9 +42,7 @@ function endpoint(work, transactional = true) {
     } finally { if (connection) connection.release(); }
   };
 }
-const listPlans = endpoint(async (_req, db) => {
-  const [plans] = await db.query('SELECT * FROM inspection_plans ORDER BY id DESC LIMIT 500'); return { plans };
-}, false);
+const listPlans = endpoint(async (req) => require('../../services/qmsRegisterService').listRegister(req,'inspection-plans'), false);
 const createPlan = endpoint(async (req, db) => {
   const name = clean(req.body.name,255), type = clean(req.body.inspection_type,20).toUpperCase();
   if (!name || !['INCOMING','IN_PROCESS','FINAL','FAI'].includes(type)) fail('Name and a valid inspection type are required.');

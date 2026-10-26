@@ -44,3 +44,117 @@ jobs:
           node scripts/core-audit-isolation-test.js
       - name: Disposable MySQL original schema, record preservation, PDF grants and atomic email claims
         run: node scripts/retained-mysql-test.js
+      - name: Complete QMS registers, full authorised PDFs and targeted alerts in real MySQL
+        env:
+          QMS_PROOF_DIR: ${{ runner.temp }}/qms-register-proof
+        run: node scripts/qms-register-mysql-test.js
+      - name: Preserve complete register and PDF evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qms-registers-${{ github.sha }}
+          path: ${{ runner.temp }}/qms-register-proof
+          retention-days: 30
+
+  original-schema-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        fixture: [fresh, upgrade]
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: disposable-ci-password
+          MYSQL_DATABASE: voxelveda_schema_test
+          MYSQL_USER: schema_test
+          MYSQL_PASSWORD: disposable-ci-password
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      NODE_ENV: test
+      SCHEMA_DB_TEST: 'true'
+      SCHEMA_FIXTURE_MODE: ${{ matrix.fixture }}
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: schema_test
+      DB_PASSWORD: disposable-ci-password
+      DB_NAME: voxelveda_schema_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Verify additive original schema, preservation, checksums and concurrent startup
+        run: node scripts/original-register-schema-mysql-test.js
+
+  mysql-tls-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      NODE_ENV: test
+      TLS_DB_TEST: 'true'
+      DB_HOST: mysql-tls.test
+      DB_PORT: '43307'
+      DB_USER: tls_test
+      DB_PASSWORD: disposable-ci-password
+      DB_NAME: voxelveda_tls_test
+      DB_TLS_REQUIRED: 'true'
+      DB_TLS_REJECT_UNAUTHORIZED: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Create private disposable certificates and a TLS-only local MySQL service
+        shell: bash
+        run: |
+          set -euo pipefail
+          fixture_dir="$RUNNER_TEMP/vv-mysql-tls"
+          install -d -m 0700 "$fixture_dir"
+          install -d -m 0755 "$fixture_dir/server"
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=VoxelVeda Disposable TLS Fixture CA' -keyout "$fixture_dir/ca-key.pem" -out "$fixture_dir/server/ca.pem" >"$fixture_dir/openssl.log" 2>&1
+          openssl req -new -newkey rsa:2048 -nodes -subj '/CN=mysql-tls.test' -keyout "$fixture_dir/server/server-key.pem" -out "$fixture_dir/server.csr" >>"$fixture_dir/openssl.log" 2>&1
+          printf '%s\n' 'subjectAltName=DNS:mysql-tls.test' 'extendedKeyUsage=serverAuth' 'basicConstraints=CA:FALSE' 'keyUsage=digitalSignature,keyEncipherment' > "$fixture_dir/server.ext"
+          openssl x509 -req -in "$fixture_dir/server.csr" -CA "$fixture_dir/server/ca.pem" -CAkey "$fixture_dir/ca-key.pem" -CAcreateserial -days 2 -extfile "$fixture_dir/server.ext" -out "$fixture_dir/server/server.pem" >>"$fixture_dir/openssl.log" 2>&1
+          openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=Untrusted Disposable TLS Fixture CA' -keyout "$fixture_dir/wrong-ca-key.pem" -out "$fixture_dir/wrong-ca.pem" >>"$fixture_dir/openssl.log" 2>&1
+          chmod 0600 "$fixture_dir/ca-key.pem" "$fixture_dir/wrong-ca-key.pem"
+          docker pull mysql:8.4
+          mysql_fixture_uid="$(docker run --rm --entrypoint id mysql:8.4 -u mysql)"
+          sudo chown "$mysql_fixture_uid" "$fixture_dir/server/server-key.pem"
+          sudo chmod 0600 "$fixture_dir/server/server-key.pem"
+          chmod 0644 "$fixture_dir/server/ca.pem" "$fixture_dir/server/server.pem"
+          printf '%s\n' '127.0.0.1 mysql-tls.test wrong-mysql-tls.test' | sudo tee -a /etc/hosts >/dev/null
+          docker run -d --name voxelveda-disposable-tls-mysql -p 127.0.0.1:43307:3306 -e MYSQL_ROOT_PASSWORD=disposable-ci-password -e MYSQL_DATABASE=voxelveda_tls_test -e MYSQL_USER=tls_test -e MYSQL_PASSWORD=disposable-ci-password --mount "type=bind,src=$fixture_dir/server,dst=/fixture-tls,readonly" mysql:8.4 --ssl-ca=/fixture-tls/ca.pem --ssl-cert=/fixture-tls/server.pem --ssl-key=/fixture-tls/server-key.pem --require-secure-transport=ON >/dev/null
+          ready=false
+          for attempt in $(seq 1 90); do
+            if docker exec -e MYSQL_PWD=disposable-ci-password voxelveda-disposable-tls-mysql mysqladmin --ssl-mode=REQUIRED --protocol=tcp -h127.0.0.1 -utls_test ping --silent >/dev/null 2>&1; then ready=true; break; fi
+            sleep 2
+          done
+          if [[ "$ready" != true ]]; then docker logs --tail 60 voxelveda-disposable-tls-mysql; exit 1; fi
+          echo "DB_TLS_CA_FILE=$fixture_dir/server/ca.pem" >> "$GITHUB_ENV"
+          echo "TLS_TEST_WRONG_CA_FILE=$fixture_dir/wrong-ca.pem" >> "$GITHUB_ENV"
+      - name: Prove actual MySQL session encryption, CA trust and hostname validation
+        env:
+          TLS_PROOF_DIR: ${{ runner.temp }}/database-tls-proof
+        run: node scripts/database-transport-mysql-test.js
+      - name: Preserve non-sensitive transport evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-tls-${{ github.sha }}
+          path: ${{ runner.temp }}/database-tls-proof
+          retention-days: 30
+      - name: Remove only the disposable TLS fixture service
+        if: always()
+        run: docker rm -f voxelveda-disposable-tls-mysql >/dev/null 2>&1 || true

@@ -407,11 +407,13 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Escape') closePhotoViewer();
 });
 window.addEventListener('beforeunload', (event) => {
+  if (window.VoxelNativeApp?.allowDiscardOnUnload?.($('profileForm'))) return;
   if (!updateDirtyState()) return;
   event.preventDefault();
   event.returnValue = '';
 });
-// The native Back adapter defers to this existing authoritative discard guard.
+// Managed native Back grants only one matching, explicit discard; all other
+// navigation retains this authoritative browser/native unload guard.
 const nativeGuardedProfileForm=document.getElementById('profileForm');
 if(nativeGuardedProfileForm?.dataset){nativeGuardedProfileForm.dataset.nativeBeforeunload='true';nativeGuardedProfileForm.nativeHasUnsavedChanges=()=>updateDirtyState();}
 

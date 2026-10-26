@@ -1,4 +1,5 @@
 const fs = require('node:fs');
+const { X509Certificate } = require('node:crypto');
 
 function flag(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;
@@ -40,10 +41,24 @@ function parseDatabaseUrl(value) {
 
 function readTlsCa(env) {
   const encoded = String(env.DB_TLS_CA_BASE64 || '').trim();
-  if (encoded) return Buffer.from(encoded, 'base64').toString('utf8');
   const filename = String(env.DB_TLS_CA_FILE || '').trim();
-  if (filename) return fs.readFileSync(filename, 'utf8');
-  return undefined;
+  if (!encoded && !filename) return undefined;
+  let value;
+  try {
+    if (encoded) {
+      const compact = encoded.replace(/\s/g, '');
+      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(compact) || compact.length % 4 !== 0) throw new Error('base64');
+      value = Buffer.from(compact, 'base64').toString('utf8');
+    } else value = fs.readFileSync(filename, 'utf8');
+    const certificates = value.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g);
+    if (!certificates?.length || value.replace(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/g, '').trim()) throw new Error('certificate');
+    certificates.forEach((certificate) => new X509Certificate(certificate));
+    return value;
+  } catch {
+    const error = new Error('Configured database CA must be a readable, valid PEM certificate bundle.');
+    error.code = 'DB_TLS_CA_INVALID';
+    throw error;
+  }
 }
 
 function buildDatabaseConfig(env = process.env) {
@@ -69,6 +84,9 @@ function buildDatabaseConfig(env = process.env) {
   const ssl = tlsRequested ? {
     minVersion: 'TLSv1.2',
     rejectUnauthorized,
+    // mysql2 has its own identity-verification switch. Keep it explicit; an
+    // isolated encryption-only capability probe is never the application pool.
+    verifyIdentity: rejectUnauthorized,
     ...(tlsCa ? { ca: tlsCa } : {})
   } : undefined;
 
@@ -97,6 +115,7 @@ function buildDatabaseConfig(env = process.env) {
       configured: Boolean(base.host && base.user && base.database),
       tls_requested: tlsRequested,
       tls_certificate_verification: Boolean(ssl?.rejectUnauthorized),
+      tls_identity_verification: Boolean(ssl?.verifyIdentity),
       connection_limit: positiveInteger(env.DB_CONNECTION_LIMIT, 10, 1, 100),
       date_transport: 'YYYY-MM-DD_STRING'
     }

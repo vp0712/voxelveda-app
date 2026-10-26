@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { assertOriginalRegisterSchema } = require('../services/originalRegisterSchema');
 const { moveToTrash } = require('../services/trashService');
 const { logAudit } = require('../services/auditService');
 
@@ -44,24 +45,8 @@ function listOptions(query) {
   return { order: `${columns[sort]} ${direction.toUpperCase()}, c.id ${direction.toUpperCase()}`, paginated, page, limit };
 }
 
-async function ensureCustomerTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS customers (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      company_name VARCHAR(180) NOT NULL,
-      contact_name VARCHAR(180) NULL,
-      email VARCHAR(180) NULL,
-      phone VARCHAR(80) NULL,
-      address TEXT NULL,
-      notes TEXT NULL,
-      file_link TEXT NULL,
-      created_by INT NULL,
-      updated_by INT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
-      deleted TINYINT(1) NOT NULL DEFAULT 0
-    )
-  `);
+function ensureCustomerTable() {
+  return assertOriginalRegisterSchema('customers', pool);
 }
 
 exports.getCustomers = async (req, res) => {
@@ -104,7 +89,7 @@ exports.getCustomers = async (req, res) => {
     res.json({ customers: rows, ...(pagination ? { pagination } : {}) });
   } catch (error) {
     console.error('getCustomers error:', error);
-    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to load customers', ...(error.fields ? { fields: error.fields } : {}) });
+    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to load customers', code: error.code, ...(error.fields ? { fields: error.fields } : {}) });
   }
 };
 
@@ -152,7 +137,7 @@ exports.saveCustomer = async (req, res) => {
   } catch (error) {
     if (connection) await connection.rollback();
     console.error('saveCustomer error:', error);
-    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to save customer', ...(error.fields ? { fields: error.fields } : {}) });
+    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to save customer', code: error.code, ...(error.fields ? { fields: error.fields } : {}) });
   } finally {
     connection?.release();
   }

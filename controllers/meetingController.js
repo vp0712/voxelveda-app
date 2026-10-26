@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const { assertOriginalRegisterSchema } = require('../services/originalRegisterSchema');
 const { moveToTrash } = require('../services/trashService');
 const { logAudit } = require('../services/auditService');
 
@@ -14,33 +15,8 @@ function parseIds(value) {
   }
 }
 
-async function ensureMeetingTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS meetings (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      meeting_type VARCHAR(80) NOT NULL DEFAULT 'internal',
-      organisation VARCHAR(255) NULL,
-      contact_person VARCHAR(255) NULL,
-      contact_details VARCHAR(255) NULL,
-      location_type VARCHAR(80) NOT NULL DEFAULT 'site',
-      location_details TEXT NULL,
-      meeting_date DATE NOT NULL,
-      meeting_time TIME NOT NULL,
-      agenda TEXT NULL,
-      required_preparation TEXT NULL,
-      assigned_user_ids TEXT NULL,
-      status VARCHAR(40) NOT NULL DEFAULT 'scheduled',
-      created_by INT NULL,
-      updated_by INT NULL,
-      deleted TINYINT(1) NOT NULL DEFAULT 0,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_meeting_date (meeting_date),
-      INDEX idx_meeting_status (status),
-      INDEX idx_meeting_deleted (deleted)
-    )
-  `);
+function ensureMeetingTable() {
+  return assertOriginalRegisterSchema('meetings', pool);
 }
 
 function normalizeMeeting(row) {
@@ -107,7 +83,7 @@ function meetingListOptions(query) {
 
 function meetingFailure(res, error, message) {
   console.error(message, { code: error.code, message: error.message });
-  res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : message, ...(error.fields ? { fields: error.fields } : {}) });
+  res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : message, code: error.code, ...(error.fields ? { fields: error.fields } : {}) });
 }
 
 async function listMeetings(req, res, own) {

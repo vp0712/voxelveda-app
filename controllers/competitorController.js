@@ -1,44 +1,9 @@
 const pool = require('../config/db');
+const { assertOriginalRegisterSchema } = require('../services/originalRegisterSchema');
 const { externalHttpUrl } = require('../utils/externalHttpUrl');
 
-async function ensureCompetitorTable() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS competitors (
-      id INT AUTO_INCREMENT PRIMARY KEY,
-      company_name VARCHAR(180) NOT NULL,
-      category VARCHAR(160) NULL,
-      country VARCHAR(120) NULL,
-      city VARCHAR(140) NULL,
-      website TEXT NULL,
-      capabilities TEXT NULL,
-      materials TEXT NULL,
-      target_market TEXT NULL,
-      strength TEXT NULL,
-      source_type VARCHAR(80) NOT NULL DEFAULT 'manual',
-      source_url TEXT NULL,
-      notes TEXT NULL,
-      created_by INT NULL,
-      updated_by INT NULL,
-      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME NULL ON UPDATE CURRENT_TIMESTAMP,
-      deleted TINYINT(1) NOT NULL DEFAULT 0
-    )
-  `);
-
-  await pool.query(`ALTER TABLE competitors ADD COLUMN category VARCHAR(160) NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN country VARCHAR(120) NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN city VARCHAR(140) NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN website TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN capabilities TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN materials TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN target_market TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN strength TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN source_type VARCHAR(80) NOT NULL DEFAULT 'manual'`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN source_url TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN notes TEXT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN created_by INT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN updated_by INT NULL`).catch(() => {});
-  await pool.query(`ALTER TABLE competitors ADD COLUMN deleted TINYINT(1) NOT NULL DEFAULT 0`).catch(() => {});
+function ensureCompetitorTable() {
+  return assertOriginalRegisterSchema('competitors', pool);
 }
 
 exports.getCompetitors = async (req, res) => {
@@ -60,7 +25,7 @@ exports.getCompetitors = async (req, res) => {
     res.json({ competitors: rows });
   } catch (error) {
     console.error('getCompetitors error:', error);
-    res.status(500).json({ message: 'Failed to load competitors', error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to load competitors', code: error.code });
   }
 };
 
@@ -135,6 +100,6 @@ exports.deleteCompetitor = async (req, res) => {
     res.json({ message: 'Competitor deleted successfully' });
   } catch (error) {
     console.error('deleteCompetitor error:', error);
-    res.status(500).json({ message: 'Failed to delete competitor', error: error.message });
+    res.status(error.statusCode || 500).json({ message: error.statusCode ? error.message : 'Failed to delete competitor', code: error.code });
   }
 };

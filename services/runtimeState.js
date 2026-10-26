@@ -36,6 +36,9 @@ function baseState() {
       tls_trust_status: null,
       tls_cipher: null,
       tls_certificate_verification: null,
+      tls_identity_verification: false,
+      tls_verified: false,
+      tls_probe: null,
       least_privilege_attested: false,
       least_privilege_source: null,
       runtime_user: null,
@@ -83,13 +86,23 @@ function publicReadiness() {
     [CONTROL_STATES.OPERATIONAL, CONTROL_STATES.EXTERNALLY_VERIFIED, CONTROL_STATES.DEGRADED].includes(serviceState));
   return {
     ready: state.ready && dependenciesReady,
-    database: { ...state.database },
+    // Explicit public allowlist. Provider identity, grants, CA/probe diagnostics
+    // and certificate/cipher details belong to the protected details endpoint.
+    database: {
+      state: state.database.state,
+      connected: Boolean(state.database.connected),
+      tls_requested: Boolean(state.database.tls_requested),
+      tls_active: Boolean(state.database.tls_active),
+      tls_certificate_verification: Boolean(state.database.tls_certificate_verification),
+      tls_identity_verification: Boolean(state.database.tls_identity_verification),
+      tls_verified: Boolean(state.database.tls_verified)
+    },
     schema_version: state.migrations.schema_version,
     critical_services: Object.fromEntries(Object.entries(state.critical_services).map(([key, value]) => [key, value.state])),
     deployment_sha: state.deployment_sha
   };
 }
-function detailedReadiness() { const readiness = publicReadiness(); return JSON.parse(JSON.stringify({ ...readiness, phase: state.ready && !readiness.ready ? 'DEGRADED' : state.phase, started_at: state.started_at, ready_at: state.ready_at, failure: state.failure, warnings: state.warnings, migrations: state.migrations, controls: state.controls, critical_service_details: state.critical_services })); }
+function detailedReadiness() { const readiness = publicReadiness(); return JSON.parse(JSON.stringify({ ...readiness, database: state.database, phase: state.ready && !readiness.ready ? 'DEGRADED' : state.phase, started_at: state.started_at, ready_at: state.ready_at, failure: state.failure, warnings: state.warnings, migrations: state.migrations, controls: state.controls, critical_service_details: state.critical_services })); }
 function controlSnapshot() { return JSON.parse(JSON.stringify(state.controls)); }
 
 module.exports = { CONTROL_KEYS, CONTROL_STATES, addWarning, controlSnapshot, deploymentSha, detailedReadiness, liveness, markFailed, markReady, publicReadiness, resetRuntimeState, setControl, setCriticalService, setDatabase, setMigrations, setPhase };

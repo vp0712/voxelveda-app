@@ -262,7 +262,10 @@ function extractWorkbook(buffer, format, limits, headerRow, preserveSourceRows =
         const cell = sheet['!data']?.[rowNumber]?.[col] || sheet[XLSX.utils.encode_cell({ r: rowNumber, c: col })];
         let value = cell?.v ?? '';
         if (cell?.t === 'n' && cell.z && XLSX.SSF.is_date(cell.z)) {
-          const parts = XLSX.SSF.parse_date_code(value, { date1904: !!book.Workbook?.WBProps?.date1904 });
+          // Any fractional Excel serial contains time, including subsecond
+          // fractions that SSF may round away in its H/M/S fields.
+          const calendarSerial = Number.isFinite(value) && Number.isInteger(value);
+          const parts = calendarSerial && XLSX.SSF.parse_date_code(value, { date1904: !!book.Workbook?.WBProps?.date1904 });
           const date = parts && `${String(parts.y).padStart(4, '0')}-${String(parts.m).padStart(2, '0')}-${String(parts.d).padStart(2, '0')}`;
           const parsed = date && new Date(`${date}T00:00:00Z`);
           if (!parts || Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== date || parts.H || parts.M || parts.S) {

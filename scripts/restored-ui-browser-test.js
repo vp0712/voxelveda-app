@@ -9,6 +9,23 @@ const crypto = require('node:crypto');
 const Module = require('node:module');
 const { chromium } = require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
 const root = path.join(__dirname, '..');
+// The browser fixture represents startup-complete current original schemas.
+// Derive metadata from the actual migration DDL, rather than bypassing the
+// production read-only assertions or maintaining a second imagined schema.
+const migratedRegisterColumns = new Map();
+const registerMigrationSql = fs.readFileSync(path.join(root, 'migrations/retained/20261025_original_request_schema.sql'), 'utf8');
+for (const match of registerMigrationSql.matchAll(/CREATE TABLE IF NOT EXISTS ([a-z_]+)\s*\(([\s\S]*?)\)\s*ENGINE=InnoDB;/g)) {
+  const columns = [];
+  for (const line of match[2].split('\n')) {
+    const declaration = line.match(/^\s*([a-z][a-z0-9_]*)\s+([A-Z]+)\b(.*)/);
+    if (!declaration) continue;
+    columns.push({ column_name: declaration[1], data_type: declaration[2].toLowerCase(),
+      column_key: /\bPRIMARY KEY\b/.test(declaration[3]) ? 'PRI' : '',
+      extra: /\bAUTO_INCREMENT\b/.test(declaration[3]) ? 'auto_increment' : '' });
+  }
+  migratedRegisterColumns.set(match[1], columns);
+}
+assert.equal(migratedRegisterColumns.size, 8, 'The fixture observes all eight migrated original register definitions');
 const outputDir = process.env.UI_PROOF_DIR || path.join('/tmp', 'voxelveda-restored-ui-proof');
 const statements = [];
 const audits = [];
@@ -26,6 +43,7 @@ const customers = [
   {id:82,company_name:'Historical <svg onload="window.__storedXss=7"> customer',contact_name:'',email:'legacy@example.invalid',phone:'',address:'',notes:'Unsafe legacy URL remains stored data',file_link:'javascript:window.__storedXss=8',order_count:0,total_spend:0}
 ];
 const ncrs=[{id:101,ncr_no:'NCR-FIXTURE-0101',severity:'MINOR',status:'INVESTIGATION',description:'Isolated staff QMS register fixture',created_at:'2026-10-10T10:00:00.000Z'}];
+ncrs.push(...Array.from({length:324},(_,index)=>({id:102+index,ncr_no:'NCR-FIXTURE-'+String(102+index).padStart(4,'0'),severity:index%3?'MINOR':'MAJOR',status:'OPEN',description:'Synthetic retained quality finding with a long manufacturing specification and evidence reference '+index+'. No production records were used.',created_at:'2026-10-09T10:00:00.000Z'})));
 const secureDocumentColumns=new Map([['qms_record_evidence','document_security_id'],['document_revisions','secure_document_id'],['sds_versions','secure_document_id'],['qms_evidence_index','secure_document_id']]);
 const attendanceRows = [
   { id:21,user_id:902,name:'Staff fixture',email:'staff@example.invalid',work_date:'2026-10-09',clock_in:'2026-10-08 22:00:00',clock_out:'2026-10-09 06:30:00',clock_in_utc_text:'2026-10-08 22:00:00',clock_out_utc_text:'2026-10-09 06:30:00',timestamp_basis:'UTC',clock_out_timestamp_basis:'UTC',recorded_timezone:'Australia/Sydney',break_minutes:30,total_hours:8,total_minutes:480,review_required:0 },
@@ -46,6 +64,7 @@ const users = {
   902:{ id:902, name:'Staff fixture', username:'fixture-staff', email:'staff@example.invalid', role:'staff', permissions:['VIEW_RFQS','VIEW_FINANCE','VIEW_CUSTOMERS','VIEW_SUPPLIERS','VIEW_INVENTORY','VIEW_PROCUREMENT','VIEW_QMS','VIEW_MEETINGS','VIEW_COMPLIANCE','VIEW_ATTENDANCE'], active:1, account_status:'ACTIVE', mfa_enabled:0 },
   903:{ id:903, name:'Client fixture', username:'fixture-client', email:'fixture@example.invalid', role:'client', permissions:['VIEW_RFQS'], active:1, account_status:'ACTIVE', mfa_enabled:0 }
 };
+function selectedNcrs(sql,args){let rows=[...ncrs],at=0;if(/r\.id=\?/.test(sql)){const id=args[at++];rows=rows.filter(row=>String(row.id)===String(id));}if(/ LIKE \? ESCAPE '!'/i.test(sql)){const search=String(args[at]||'').slice(1,-1).replace(/!(.)/g,'$1').toLowerCase();at+=(sql.match(/ LIKE \? ESCAPE '!'/gi)||[]).length;rows=rows.filter(row=>[row.ncr_no,row.description,row.severity,row.status].some(value=>String(value||'').toLowerCase().includes(search)));}if(/r\.status=\?/.test(sql)){const status=args[at++];rows=rows.filter(row=>row.status===status);}if(/r\.created_at>=\?/.test(sql)){const from=args[at++];rows=rows.filter(row=>row.created_at.slice(0,10)>=from);}if(/r\.created_at<DATE_ADD/.test(sql)){const to=args[at++];rows=rows.filter(row=>row.created_at.slice(0,10)<=to);}const order=sql.match(/ORDER BY r\.([a-z_]+) (asc|desc)/i);if(order){const key=order[1],direction=order[2].toLowerCase()==='desc'?-1:1;rows.sort((a,b)=>String(a[key]??'').localeCompare(String(b[key]??''),'en',{numeric:true})*direction||(a.id-b.id)*direction);}return rows;}
 function result(rows) { return [rows, []]; }
 async function query(statement, parameters = []) {
   const sql = String(statement).replace(/\s+/g,' ').trim();
@@ -68,6 +87,12 @@ async function query(statement, parameters = []) {
   if (/^UPDATE rfqs SET archived/i.test(sql)) { const row=rfqs.find(item=>item.id===Number(parameters[1])); row.archived=Number(parameters[0]); row.revision++; return result({ affectedRows:1 }); }
   if (/^UPDATE rfqs SET status/i.test(sql)) { const row=rfqs.find(item=>item.id===Number(parameters[1])); row.status=parameters[0]; row.revision++; return result({ affectedRows:1 }); }
   if (/^UPDATE/i.test(sql)) return result({ affectedRows:1 });
+  if (/^SELECT COLUMN_NAME AS column_name, COLUMN_KEY AS column_key, DATA_TYPE AS data_type, EXTRA AS extra FROM information_schema\.columns/i.test(sql)) {
+    assert.equal(parameters.length, 1, 'Original register metadata is scoped to one expected table');
+    const columns = migratedRegisterColumns.get(parameters[0]);
+    assert.ok(columns, 'Original register metadata must come from an actual current migration CREATE statement');
+    return result(columns.map(row => ({ ...row })));
+  }
   if (/^SELECT DATA_TYPE data_type,CHARACTER_MAXIMUM_LENGTH max_length,IS_NULLABLE is_nullable FROM information_schema\.columns/i.test(sql)) {
     const [table,column]=parameters;
     assert.equal(secureDocumentColumns.get(table),column,'schema metadata is limited to the actual retained document reference columns');
@@ -78,6 +103,8 @@ async function query(statement, parameters = []) {
     return result([{data_type:declaration[1].toLowerCase(),max_length:Number(declaration[2]),is_nullable:declaration[3].toUpperCase()==='NULL'?'YES':'NO'}]);
   }
   if (/^SELECT COUNT\(\*\) n FROM /i.test(sql)) return result([{n:/FROM ncrs\b/i.test(sql)?ncrs.filter(row=>row.status!=='CLOSED').length:0}]);
+  if (/^SELECT COUNT\(\*\) total FROM ncrs r\b/i.test(sql)) return result([{total:selectedNcrs(sql,parameters).length}]);
+  if (/^SELECT r\.\* FROM ncrs r\b/i.test(sql)) {const limit=Number(parameters.at(-2)),offset=Number(parameters.at(-1));return result(selectedNcrs(sql,parameters).slice(offset,offset+limit));}
   if (/^SELECT \* FROM ncrs ORDER BY/i.test(sql)) return result(ncrs);
   if (/FROM customers c\b/i.test(sql)) return result(/^SELECT COUNT\(/i.test(sql) ? [{total:customers.length}] : customers);
   if(/^SELECT COUNT\(\*\) AS total_invoices/.test(sql))return result([{total_invoices:invoiceRecords.length,draft_invoices:1,approved_invoices:0,sent_invoices:0,paid_invoices:0,payment_review_count:invoiceRecords.filter(r=>r.status==='paid'&&r.paid_amount<r.total).length,paid_revenue:invoiceRecords.some(r=>r.status==='paid'&&r.paid_amount<r.total)?null:0,total_invoice_value:invoiceRecords.reduce((n,r)=>n+(r.total||0),0)}]);
@@ -444,19 +471,28 @@ async function run() {
       staffPage.goto(origin+'/quality')
     ]);
     assert.equal(commandCentreResponse.status(),200,'authorised staff QMS command centre completes its real schema checks');
-    assert.equal((await commandCentreResponse.json()).metrics.openNcr,1,'QMS metrics reflect the isolated open NCR');
+    assert.equal((await commandCentreResponse.json()).metrics.openNcr,ncrs.length,'QMS metrics reflect the isolated open NCR');
     await staffPage.getByRole('heading',{name:'Quality Command Centre',exact:true}).waitFor();
-    await staffPage.locator('#metricGrid .metric').filter({has:staffPage.getByText('Open NCR',{exact:true})}).locator('strong').getByText('1',{exact:true}).waitFor();
+    await staffPage.locator('#metricGrid .metric').filter({has:staffPage.getByText('Open NCR',{exact:true})}).locator('strong').getByText(String(ncrs.length),{exact:true}).waitFor();
     const [ncrResponse]=await Promise.all([
       staffPage.waitForResponse(response=>new URL(response.url()).pathname==='/api/qms/ncrs'),
       staffPage.locator('[data-api="/api/qms/ncrs"]').click()
     ]);
     assert.equal(ncrResponse.status(),200,'authorised staff NCR register must return a successful real API response');
-    assert.deepEqual((await ncrResponse.json()).ncrs,ncrs);
+    const ncrPage=await ncrResponse.json();assert.equal(ncrPage.pagination.total,ncrs.length);assert.equal(ncrPage.pagination.limit,25);assert.equal(ncrPage.ncrs.length,25);assert.deepEqual(ncrPage.ncrs[0],ncrs[0]);
     await staffPage.waitForFunction(()=>document.getElementById('apiOutput')?.textContent !== 'Loading…');
     assert.match(await staffPage.locator('#apiOutput').innerText(),/NCR-FIXTURE-0101/,'the actual successful NCR response is rendered in the staff register');
     await settleVisualState(staffPage);
     await staffPage.screenshot({path:path.join(outputDir,'staff-qms-phone.png'),fullPage:true,animations:'disabled'});
+    stage='qms_pagination_search_and_complete_pdf';
+    const [nextNcr]=await Promise.all([staffPage.waitForResponse(r=>new URL(r.url()).pathname==='/api/qms/ncrs'&&new URL(r.url()).searchParams.get('page')==='2'),staffPage.locator('#registerNext').click()]);assert.equal((await nextNcr.json()).pagination.page,2);await staffPage.locator('#registerPage').getByText('Page 2 of 13',{exact:true}).waitFor();
+    await staffPage.locator('#registerSearch').fill('NCR-FIXTURE-0425');const [searchedNcr]=await Promise.all([staffPage.waitForResponse(r=>new URL(r.url()).pathname==='/api/qms/ncrs'&&new URL(r.url()).searchParams.get('search')==='NCR-FIXTURE-0425'),staffPage.locator('#registerFilters button[type=submit]').click()]);assert.equal((await searchedNcr.json()).pagination.total,1);await staffPage.locator('#registerTable tbody tr').getByText('NCR-FIXTURE-0425',{exact:true}).waitFor();
+    await staffPage.locator('#registerSearch').fill('');await Promise.all([staffPage.waitForResponse(r=>new URL(r.url()).pathname==='/api/qms/ncrs'&&!new URL(r.url()).searchParams.has('search')),staffPage.locator('#registerFilters button[type=submit]').click()]);await staffPage.locator('#registerPage').getByText('Page 1 of 13',{exact:true}).waitFor();
+    const qmsMatrix=[];for(const width of [320,360,390,430,768,1024,1440])for(const mode of ['light','dark']){await staffPage.setViewportSize({width,height:width>=768?900:844});await staffPage.evaluate(mode=>window.VoxelTheme.set(mode),mode);await settleVisualState(staffPage);const layout=await staffPage.evaluate(()=>({width:innerWidth,scrollWidth:document.documentElement.scrollWidth,theme:document.documentElement.dataset.colorMode,rows:document.querySelectorAll('#registerTable tbody tr').length}));assert(layout.scrollWidth<=width+1,'QMS register fits '+width+' '+mode);assert.equal(layout.rows,25);qmsMatrix.push(layout);await staffPage.screenshot({path:path.join(outputDir,'qms-register-'+width+'-'+mode+'.png'),fullPage:true,animations:'disabled'});}
+    await staffPage.setViewportSize({width:360,height:800});const enlarged=await staffPage.addStyleTag({content:'.quality-register{font-size:28px!important}.quality-register :is(table,input,select,button,th,td){font-size:inherit!important}'});await settleVisualState(staffPage);assert(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Enlarged QMS register labels remain associated and fit phone');await staffPage.screenshot({path:path.join(outputDir,'qms-register-360-enlarged.png'),fullPage:true,animations:'disabled'});await enlarged.evaluate(el=>el.remove());
+    await staffPage.setViewportSize({width:390,height:844});const [qmsPdfResponse]=await Promise.all([staffPage.waitForResponse(r=>new URL(r.url()).pathname==='/api/qms/registers/ncrs/pdf'),staffPage.locator('#registerPreview').click()]);assert.equal(qmsPdfResponse.status(),200);const completeQmsBytes=await qmsPdfResponse.body();const completeQms=await require('../services/documentPdfService').validatePdf(completeQmsBytes,{expectedText:['NCR-FIXTURE-0101','NCR-FIXTURE-0425','NCR-FIXTURE-0102']});await staffPage.waitForFunction(()=>document.getElementById('qualityPdfStatus')?.textContent==='Page 1 is ready.');assert.equal(await staffPage.locator('#qualityPdfBackdrop .dialog-actions button:visible').count(),1,'Read-only PDF dialog has one Close');assert.equal((await staffPage.evaluate(()=>window.VoxelQualityRegisters.report)).records,325);assert(completeQms.pages>1);
+    const [qmsDownload]=await Promise.all([staffPage.waitForEvent('download'),staffPage.locator('#qualityPdfDownload').click()]);assert.match(qmsDownload.suggestedFilename(),/\.pdf$/);const qmsSaved=fs.readFileSync(await qmsDownload.path());assert.equal(crypto.createHash('sha256').update(qmsSaved).digest('hex'),completeQms.sha256,'QMS preview and download preserve the exact complete report bytes');fs.writeFileSync(path.join(outputDir,'quality-complete-register.pdf'),qmsSaved);await staffPage.screenshot({path:path.join(outputDir,'qms-pdf-phone.png'),fullPage:true,animations:'disabled'});await staffPage.setViewportSize({width:844,height:390});await staffPage.waitForFunction(()=>document.getElementById('qualityPdfStatus')?.textContent==='Page 1 is ready.');assert(await staffPage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Landscape PDF dialog stays within the phone');await staffPage.screenshot({path:path.join(outputDir,'qms-pdf-landscape.png'),fullPage:true,animations:'disabled'});await staffPage.locator('#qualityPdfClose').click();await staffPage.waitForFunction(()=>!document.querySelector('#qualityPdfBackdrop.active'));
+    fs.writeFileSync(path.join(outputDir,'quality-register-proof.json'),JSON.stringify({fixture_only:true,source_records:325,server_pages:13,page_size:25,next_and_search:true,full_report_records:325,pdf_pages:completeQms.pages,pdf_sha256:completeQms.sha256,preview_download_same_bytes:true,responsive:qmsMatrix,enlarged_text:true,landscape_pdf:true,no_email_sent:true},null,2));
     const client=await browser.newContext({viewport:{width:390,height:844},extraHTTPHeaders:{'x-fixture-role':'client'}});
     const clientPage=await client.newPage(); observePage(clientPage); stage='client_portal';
     await clientPage.goto(origin+'/dashboard'); await clientPage.waitForURL('**/client*');

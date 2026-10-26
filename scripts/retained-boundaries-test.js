@@ -48,6 +48,7 @@ async function settingsBoundaries() {
   };
   const controller = isolated('controllers/settingsController.js', {
     '../config/db': db,
+    '../services/originalRegisterSchema': { assertOriginalRegisterSchema: async () => {} },
     '../services/auditService': { async logAudit(connection, entry) { audits.push(entry); } },
     '../utils/secureLogger': { error() {} }
   });

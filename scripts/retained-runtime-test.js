@@ -27,7 +27,8 @@ function load(filename, dependencies, env = {}) {
 }
 
 async function testStartup() {
-  for (const databaseFails of [false, true]) {
+  for (const failure of ['none', 'database', 'retained']) {
+    const databaseFails = failure === 'database', retainedFails = failure === 'retained';
     const calls = [];
     const runtime = require('../services/runtimeState');
     const schemas = {
@@ -65,6 +66,11 @@ async function testStartup() {
       './services/migrationRunner': { runMigrations: async () => {
         calls.push('migrations'); return { schema_version: 'retained_fixture', applied: 0, skipped: 1 };
       } },
+      './services/retainedMigrationRunner': { runRetainedMigrations: async () => {
+        calls.push('retained.migrations');
+        if (retainedFails) throw Object.assign(new Error('Current original migration failed'), { code: 'CURRENT_SCHEMA_FIXTURE_FAILED' });
+        return { schema_version: 'current_original_fixture', discovered: 1, applied: 0, baselined: 0, skipped: 1 };
+      } },
       './services/outboundRequestPolicy': { allowedHosts: () => new Set() },
       './services/rateLimitService': { getRateLimitService: () => ({
         initialize: async () => { calls.push('limiter'); return { provider: 'REDIS', distributed: true }; },
@@ -96,16 +102,17 @@ async function testStartup() {
     dependencies['./services/procurementImportService']={startProcurementImportWorker:()=>{calls.push('import.start');return true},stopProcurementImportWorker:()=>calls.push('import.stop')};
     dependencies['./services/releasePdfVerificationService']={queueAuthorisedReleasePdf:async()=>({enabled:false})};
     const server = load(path.join(root, 'server.js'), dependencies, { NODE_ENV: 'production' });
-    if (databaseFails) {
-      await assert.rejects(server.bootstrap(), { code: 'DB_TEST_DENIED' });
+    if (databaseFails || retainedFails) {
+      await assert.rejects(server.bootstrap(), { code: databaseFails ? 'DB_TEST_DENIED' : 'CURRENT_SCHEMA_FIXTURE_FAILED' });
       assert.equal(calls.includes('listen'), false);
-      assert.equal(calls.includes('migrations'), false);
+      assert.equal(calls.includes('migrations'), retainedFails);
+      assert.equal(calls.includes('original.preflight'), false, 'Schema failure cannot proceed to application startup or requests');
       assert.equal(runtime.publicReadiness().ready, false);
-      assert.equal(runtime.detailedReadiness().failure.phase, 'CONNECTING_DATABASE');
+      assert.equal(runtime.detailedReadiness().failure.phase, databaseFails ? 'CONNECTING_DATABASE' : 'RUNNING_MIGRATIONS');
     } else {
       await server.bootstrap();
       assert.deepEqual(calls, [
-        'database', 'capacity', 'migrations', 'original.preflight', ...Object.keys(schemas), ...Object.keys(originalSchemas),'profilePhotoSchema',...Object.keys(originalControllers),'documentDeliverySchema','weeklyTimesheetDeliverySchema','original.preflight',
+        'database', 'capacity', 'migrations', 'retained.migrations', 'original.preflight', ...Object.keys(schemas), ...Object.keys(originalSchemas),'profilePhotoSchema',...Object.keys(originalControllers),'documentDeliverySchema','weeklyTimesheetDeliverySchema','original.preflight',
         'attestation', 'limiter', 'jobs', 'email.start', 'timesheet.start','workflow.start','import.start', 'listen'
       ]);
       assert.equal(runtime.publicReadiness().ready, true);
