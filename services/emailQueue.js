@@ -2,7 +2,7 @@ const pool = require('../config/db');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { ensureEmailQueueSchema } = require('./emailQueueSchema');
-const { sendMail, normalizeAddressList, isEmailTransportError, classifySmtpFailure, attachmentBuffer, assertAttachmentIntegrity } = require('./emailService');
+const { sendMail, normalizeAddressList, isEmailTransportError, explicitNegativeSmtpReply, classifySmtpFailure, attachmentBuffer, assertAttachmentIntegrity } = require('./emailService');
 const { assertWeeklyDeliveryPolicy, weeklyMessage, privacyError } = require('./weeklyDeliveryPolicy');
 const { validatePdf } = require('./documentPdfService');
 
@@ -171,6 +171,7 @@ async function processEmailQueue(limit = 10) {
     if (!claim.affectedRows) continue;
 
     let providerAccepted = false;
+    let transportInvoked = false;
     let weeklyDb = null;
     const isWeekly = weeklyMessage(row);
     const markWeekly = async (status, metadata = {}, db = pool) => {
@@ -190,6 +191,7 @@ async function processEmailQueue(limit = 10) {
         const data = checked.documentData;
         await validatePdf(attachmentBuffer(attachments[0]), { expectedText: [data.title, data.reference, data.party, data.period] });
       }
+      transportInvoked=true;
       const result = await sendMail({
         to: parseJson(row.to_json, []),
         cc: parseJson(row.cc_json, []),
@@ -217,8 +219,9 @@ async function processEmailQueue(limit = 10) {
       outcomes.push({ id: row.id, status: 'SENT', provider_accepted: true, recipient_verified: false });
     } catch (error) {
       if (weeklyDb) { await weeklyDb.rollback().catch(() => {}); weeklyDb.release(); weeklyDb = null; }
-      const explicitNegative=error.deliveryOutcome==='NOT_ACCEPTED'||Number(error.responseCode)>=400&&Number(error.responseCode)<600;
-      const uncertainTransport=isEmailTransportError(error)&&error.code!=='SMTP_CONFIG_MISSING'&&!explicitNegative;
+      const explicitNegative=error.deliveryOutcome==='NOT_ACCEPTED'||explicitNegativeSmtpReply(error);
+      const provedBeforeDispatch=error.deliveryOutcome==='NOT_DISPATCHED';
+      const uncertainTransport=transportInvoked&&!provedBeforeDispatch&&!explicitNegative;
       if(providerAccepted || error.code==='DELIVERY_REVIEW_REQUIRED' || uncertainTransport) {
         providerAccepted=providerAccepted || error.providerAccepted===true;
         await pool.query("UPDATE email_queue SET status='REVIEW_REQUIRED',provider_accepted_at=CASE WHEN ?=1 THEN COALESCE(provider_accepted_at,NOW()) ELSE provider_accepted_at END,last_error=?,next_attempt_at=NULL WHERE id=?",[providerAccepted?1:0,providerAccepted ? 'The provider accepted this message, but attachment confirmation or delivery bookkeeping could not finish. Review before retry; recipient receipt is unverified.' : (error.message || 'The transport transaction outcome is uncertain. Review provider logs before retry to avoid duplicate delivery.'),row.id]);
