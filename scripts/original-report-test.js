@@ -68,6 +68,7 @@ async function reportFixture(options = {}) {
   const fixtureModule = { exports: {} };
   const dependencies = {
     '../config/db': db, '../services/authorizationService': authorization,
+    '../services/customerRecordScope': require('../services/customerRecordScope'),
     '../services/attendanceRecordedTotals': require('../services/attendanceRecordedTotals'),
     '../services/documentPdfService': { ...pdfService, async createDocumentPdf(data) { state.pdfCalls.push(plain(data)); return options.corruptArtifact ? { buffer: Buffer.from('<html>invalid PDF</html>'), filename: 'error.pdf' } : pdfService.createDocumentPdf(data); } },
     ...sourceModules

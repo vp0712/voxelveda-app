@@ -15,17 +15,32 @@ function safePdfFilename(value) {
 }
 async function validatePdf(buffer, { expectedText = [], orderedExpectedText = false, documentProof } = {}) {
   if (!Buffer.isBuffer(buffer) || buffer.length < 100 || buffer.length > 20 * 1024 * 1024 || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') throw pdfError('Document generation did not produce PDF bytes. No document was sent.');
-  const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const { getDocument, OPS } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const task = getDocument({ data: new Uint8Array(buffer), isEvalSupported: false, useSystemFonts: true, disableFontFace: true });
   try {
     const pdf = await task.promise;
     if (!pdf.numPages || pdf.numPages > 500) throw pdfError('The PDF has no valid pages or exceeds the page limit.');
-    const texts = [], pageLines = [];
+    const texts = [], pageLines = [], encodedPageLines = [];
     for (let index = 1; index <= pdf.numPages; index += 1) {
       const page = await pdf.getPage(index);
       const layer = await page.getTextContent();
       texts.push(layer.items.map(item => item.str || '').join(' '));
       pageLines.push(layer.items.filter(item=>exactLine(item.str)).map(item=>({text:exactLine(item.str),x:item.transform[4],y:item.transform[5],size:item.height,width:item.width})));
+      if(documentProof){
+        const operators=await page.getOperatorList(),lines=[];let current=null;
+        const unsupported=[OPS.showSpacedText,OPS.nextLineShowText,OPS.nextLineSetSpacingShowText].filter(Number.isFinite);
+        const invalid=()=>pdfError('The PDF uses an unsupported text identity layout.','PDF_CONTENT_PROOF_UNSUPPORTED');
+        for(let at=0;at<operators.fnArray.length;at++){
+          const op=operators.fnArray[at],args=operators.argsArray[at];
+          if(op===OPS.beginText){if(current!==null)throw invalid();current=[];}
+          else if(op===OPS.endText){if(current===null)throw invalid();const line=exactLine(current.join(''));if(line)lines.push(line);current=null;}
+          else if(op===OPS.showText){
+            if(current===null||!Array.isArray(args?.[0]))throw invalid();
+            for(const glyph of args[0]){if(typeof glyph==='number'&&Number.isFinite(glyph))continue;if(!glyph||typeof glyph.unicode!=='string')throw invalid();current.push(glyph.unicode);}
+          }else if(unsupported.includes(op))throw invalid();
+        }
+        if(current!==null)throw invalid();encodedPageLines.push(lines);
+      }
       page.cleanup();
     }
     const text = texts.join(' ').replace(/\s+/g, ' ').trim();
@@ -36,7 +51,13 @@ async function validatePdf(buffer, { expectedText = [], orderedExpectedText = fa
       if(pageLines.length!==documentProof.pages.length)throw pdfError('The PDF page count does not match its authoritative document.','PDF_CONTENT_MISMATCH');
       for(let p=0;p<pageLines.length;p++){
         const actual=pageLines[p],expected=documentProof.pages[p];
-        if(actual.length!==expected.length||actual.some((line,i)=>line.text!==expected[i].text||!close(line.x,expected[i].x)||!close(line.y,expected[i].y)||!close(line.size,expected[i].size)||!close(line.width,expected[i].width)))throw pdfError('The complete PDF text or layout does not match its authoritative document.','PDF_CONTENT_MISMATCH');
+        // Text-content extraction can invent a space for a positive font kern
+        // (Open Sans MAJOR becomes "MA JOR"). Encoded glyph operators retain
+        // real word spaces, so require their exact source text first. Only the
+        // secondary parser view tolerates synthetic whitespace; geometry and
+        // every line/page count remain exact within the existing tolerance.
+        const encoded=encodedPageLines[p],glyphView=value=>value.replace(/\s/gu,'');
+        if(encoded.length!==expected.length||encoded.some((line,i)=>line!==expected[i].text)||actual.length!==expected.length||actual.some((line,i)=>glyphView(line.text)!==glyphView(expected[i].text)||!close(line.x,expected[i].x)||!close(line.y,expected[i].y)||!close(line.size,expected[i].size)||!close(line.width,expected[i].width)))throw pdfError('The complete PDF text or layout does not match its authoritative document.','PDF_CONTENT_MISMATCH');
       }
     }
     let contentAt = 0;

@@ -10,6 +10,14 @@ const { expenseFilters } = require('../services/expenseRegisterFilters');
 const { logAudit } = require('../services/auditService');
 const { dateOnly } = require('../utils/dateOnly');
 const crypto = require('crypto');
+const { customerScoped } = require('../services/customerRecordScope');
+
+function companyExpenseAccess(req, res) {
+  if (!customerScoped(req.user)) return true;
+  res.status(403).json({ code: 'COMPANY_EXPENSES_RESTRICTED', message: 'Company expense records are restricted. Open Client home to view your own invoices.' });
+  return false;
+}
+exports.requireCompanyExpenseAccess = (req, res, next) => { if (companyExpenseAccess(req, res)) return next(); };
 
 let originalSchemaPromise;
 function ensureExpenseTables() {
@@ -226,6 +234,7 @@ async function getExpenseSummary(input = {}) {
 }
 
 exports.getExpenses = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   try {
     await ensureExpenseTables();
 
@@ -241,6 +250,7 @@ exports.getExpenses = async (req, res) => {
 };
 
 exports.saveExpense = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   let connection;
   try {
     const id = Number(req.body.id || 0);
@@ -316,6 +326,7 @@ exports.saveExpense = async (req, res) => {
 };
 
 exports.getExpensePayments = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   try {
     await ensureExpenseTables();
     const expenseId = Number(req.params.id || 0);
@@ -339,6 +350,7 @@ exports.getExpensePayments = async (req, res) => {
 };
 
 exports.recordExpensePayment = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   const connection = await pool.getConnection();
   try {
     await ensureExpenseTables();
@@ -401,6 +413,7 @@ exports.recordExpensePayment = async (req, res) => {
 };
 
 exports.voidExpensePayment = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   const connection = await pool.getConnection();
   try {
     await ensureExpenseTables();
@@ -433,6 +446,7 @@ exports.voidExpensePayment = async (req, res) => {
 };
 
 async function archiveExpense(req, res, archived) {
+  if (!companyExpenseAccess(req, res)) return;
   let connection;
   try {
     const id = Number(req.body.id || req.params.id || 0);
@@ -455,6 +469,7 @@ exports.deleteExpense = (req, res) => archiveExpense(req, res, true);
 exports.restoreExpense = (req, res) => archiveExpense(req, res, false);
 
 exports.expenseHistory = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   try {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ message: 'Choose a valid expense' });
@@ -468,6 +483,7 @@ exports.expenseHistory = async (req, res) => {
 };
 
 exports.saveExpenseFile = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   try {
     await ensureExpenseTables();
 
@@ -497,6 +513,7 @@ exports.saveExpenseFile = async (req, res) => {
 };
 
 exports.viewExpenseFile = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   try {
     await ensureExpenseTables();
 
@@ -528,6 +545,7 @@ exports.viewExpenseFile = async (req, res) => {
 };
 
 exports.deleteExpenseFile = async (req, res) => {
+  if (!companyExpenseAccess(req, res)) return;
   try {
     await ensureExpenseTables();
 

@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const nodemailer = require('nodemailer');
-const { createDocumentPdf, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact } = require('../services/documentPdfService');
+const { createDocumentPdf, validateDocumentPdf, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact } = require('../services/documentPdfService');
 const { invoiceDocumentData, statementDocumentData, blankInvoiceDocumentData } = require('../services/invoiceDocumentService');
 const { timesheetDocumentData } = require('../services/timesheetDocumentService');
 
@@ -93,6 +93,15 @@ async function main() {
   await assert.rejects(()=>validatePdf(invoice.buffer,{expectedText:['Unrelated document identity']}),{code:'PDF_CONTENT_MISMATCH'});
   const boundaryPdf=await createDocumentPdf({title:'IDENTITY CHECK',reference:'FIXTURE-BOUNDARY',party:'Staff 10',columns:[{label:'Field'},{label:'Value'}],rows:[['Hours','18.00'],['Status','INACTIVE']]});
   for(const expected of ['8.00','ACTIVE','Staff 1'])await assert.rejects(()=>validatePdf(boundaryPdf.buffer,{expectedText:[expected]}),{code:'PDF_CONTENT_MISMATCH'},'Identity selectors cannot accept a longer value containing '+expected);
+  const majorData={title:'Nonconformance register',reference:'FIXTURE-NCR-MAJOR',issueDate:'2026-10-26',columns:[['Reference',1.6],['Description',1.6],['Severity',1.6],['Status',1.6],['Closed',1.2],['Created',1.2]].map(([label,width])=>({label,width})),rows:[['NCR-FIXTURE-0101','Synthetic inspection finding. No production records were used.','MAJOR','INVESTIGATION','—','09 Oct 2026']]};
+  const majorPdf=await createDocumentPdf(majorData);await validateDocumentPdf(majorPdf.buffer,majorData);assert.match(majorPdf.validation.text,/MA\s*JOR/,'Positive Open Sans kerning must not reject a genuine six-column NCR');
+  const wordSpaceData={title:'SPACE IDENTITY',reference:'FIXTURE-WORD-SPACE',issueDate:'2026-10-26',party:'Staff 1',columns:[{label:'Code'}],rows:[['A BC']]};
+  for(const changed of [{rows:[['AB C']]},{party:'St aff1'}]){const changedPdf=await createDocumentPdf({...wordSpaceData,...changed});await assert.rejects(()=>validateDocumentPdf(changedPdf.buffer,wordSpaceData),{code:'PDF_CONTENT_MISMATCH'},'Equal-width genuine word-space relocation cannot pass canonical identity');}
+  const PDFDocument=require('pdfkit'),originalFragment=PDFDocument.prototype._fragment;
+  try{
+    PDFDocument.prototype._fragment=function(value,x,y,options){if(String(value).trim()==='MAJOR'){const spacing=(this.widthOfString('MAJOR')-this.widthOfString('MA JOR'))/5;return originalFragment.call(this,'MA JOR',x,y,{...options,characterSpacing:spacing});}return originalFragment.call(this,value,x,y,options);};
+    await assert.rejects(()=>createDocumentPdf(majorData),{code:'PDF_CONTENT_MISMATCH'},'Encoded genuine MA JOR plus compensated character spacing must fail despite identical text-extraction geometry');
+  }finally{PDFDocument.prototype._fragment=originalFragment;}
   assert.throws(()=>invoiceDocumentData({id:1,total:999,gst_rate:10},items),{code:'PDF_TOTAL_MISMATCH'});
   assert.equal(safePdfFilename('bad\r\n"/file.PDF'),'bad----file.pdf');
   const mail = require('../services/emailService');

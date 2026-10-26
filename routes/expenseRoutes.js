@@ -8,6 +8,7 @@ const requireStepUp = require('../middleware/stepUpMiddleware');
 const { sanitizeUploadName, secureMulterOptions, validateUploadedFile } = require('../middleware/uploadSecurity');
 
 const router = express.Router();
+router.use(expenseController.requireCompanyExpenseAccess);
 const uploadDir = path.join(__dirname, '..', 'uploads', 'expenses');
 
 if (!fs.existsSync(uploadDir)) {

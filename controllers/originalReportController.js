@@ -3,6 +3,7 @@ const { hasPermission, canAccessUserRecord } = require('../services/authorizatio
 const { createDocumentPdf, sendPdfResponse, dateLabel, money } = require('../services/documentPdfService');
 const pool = require('../config/db');
 const {attendanceRecordedHours}=require('../services/attendanceRecordedTotals');
+const { customerScoped } = require('../services/customerRecordScope');
 
 // Each source is an original application register. Explicit response contracts
 // prevent unrelated fallback arrays or an incomplete page becoming a report.
@@ -230,6 +231,7 @@ exports.download = async (req, res, next) => {
   try {
     if (!req.user) throw reportError('Authentication required.', 401);
     const type = String(req.params.type || '');
+    if (type === 'expenses' && customerScoped(req.user)) throw reportError('Company expense reports are restricted. Open Client home to view your own invoices.', 403, 'COMPANY_EXPENSES_RESTRICTED');
     if (type === 'procurement') {
       const { download = '0', source: procurementSource = 'entries', ...filters } = req.query || {};
       if (!['0', '1'].includes(String(download))) throw reportError('Download must be 0 or 1.');

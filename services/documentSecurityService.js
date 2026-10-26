@@ -63,6 +63,7 @@ async function mayViewDocument(user,document,db=pool){
   if(!documentModuleAvailable(document.module))return false;
   if(!user || !Number.isSafeInteger(Number(user.id)) || Number(user.id)<1)return false;
   const module=String(document.module || '').toLowerCase();
+  if (customerScoped(user) && ['expense','expenses'].includes(module)) return false;
   if (customerScoped(user) && ['rfq','rfqs','invoice','invoices','quotation','quotes'].includes(module)) {
     const invoiceModule = ['invoice','invoices','quotation','quotes'].includes(module);
     if (!hasPermission(user, invoiceModule ? 'VIEW_FINANCE' : 'VIEW_RFQS')) return false;
