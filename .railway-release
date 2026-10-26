@@ -1,9 +1,9 @@
-application-release: 20261019-explicit-action-dialogs-and-responsive-portals
-candidate-commit: 22ff6cffbd7612ce3e3e7a6c4adecd97b2146061
-merged-commit: 95e5aa3e9d181575a909df890da85e3dedfb38f9
+application-release: 20261026-retained-portal-audit-and-validated-documents
+candidate-commit: 47527073a0ac836836181d92694a0b627e4b7f01
+merged-commit: 02e6f2919178ab54b991194a182afc64018d34a8
 production-branch: main
-previous-live-commit: 5d3249f49cfbde5090b4f228e7ea21990f730f6a
-scope: canonical-application-origin-and-safe-legacy-host-redirects; existing-Capacitor-package-and-original-logo; trusted-in-app-password-MFA-and-role-navigation; bounded-native-recovery-and-consented-Back; validated-private-file-PDF-preview-save-without-Binder-payload-overflow; preserved-original-business-functions-records-permissions-and-previous-repairs; Banking-Finance-OS-and-added-ERP-remain-retired
+previous-live-commit: b3707b2376aba5b080b54d723b5dcb6dcfceedd1
+scope: original-retained-portals; customer-company-dashboard-expense-report-and-attachment-isolation; complete-authorised-QMS-registers-and-PDFs; original-additive-schema-migrations; strict-calendar-imports; exact-PDF-glyph-and-layout-validation; controlled-mail-handoffs; explicit-database-TLS-diagnostics; managed-Android-Back
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
 avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
@@ -85,3 +85,20 @@ action-rollback: previous-live5d3249f49cfbde5090b4f228e7ea21990f730f6a; Railway3
 action-readiness-followup: PR331-one-test-file-only; authorised-requested-view-and-server-identity-ready-before-measurement; positive-visible-width-assertion; no-implementation-or-bounds-assertion-weakened
 action-final-candidate-gates: Application39252077072; MySQL39252077178; Security39252077078; Consolidation39252077151; all-success
 action-final-main-gates: Application39253330705; MySQL39253330782; Security39253330630; Consolidation39253330857; Enterprise39253330772; all-success
+
+retained-audit-source-tree: b89ec9b7cf7ddb4f060738db3950a0acc1cf32d8
+retained-audit-coverage: 15-supported-role-names; 29-module-matrix-rows; original-commercial-operational-workforce-quality-security-and-account-services; no-banking-or-separate-ERP-restoration
+retained-audit-schema: eight-original-register-tables; read-only-legacy-compatibility-preflight; ordered-checksummed-additive-current-migration; historical-migrations-verify-only; no-table-drop-or-record-rewrite
+retained-audit-isolation: customer-family-company-dashboard-and-all-expense-actions-files-documents-reports-denied-before-source-access; own-invoices-and-explicit-original-QMS-authority-preserved
+retained-audit-QMS: 21-registers; permission-scoped-search-filters-sort-pages-counts; read-only-consistent-full-selection-PDF; recipient-alert-count-ack-and-report-isolation; 650-real-MySQL-fixture-records-and-325-NCR-browser-records
+retained-audit-PDF: complete-multipage-rows-and-paragraphs; trusted-source-encoded-glyph-identity-and-exact-layout; parser-inferred-kerning-spaces-distinguished-from-real-word-boundaries; frozen-preview-download-queue-bytes-preserved; PDF-only-MIME-and-safe-filenames
+retained-audit-email: ambiguous-SMTP-or-HTTPS-handoffs-held-for-review; positive-dispatch-and-acceptance-provenance; no-blind-resend; provider-acceptance-is-not-recipient-receipt
+retained-audit-weekly: original-worked-only-designated-single-recipient-policy-and-Sydney-Monday-0700-schedule-preserved; no-CC-BCC-fallback-or-historical-test-backfill; genuine-missing-recipient-and-attendance-review-remain-actionable
+retained-audit-calendar: genuine-XLS-XLSX-calendar-cells-under-UTC-and-Melbourne; 1900-1904-and-DST-boundaries; ambiguous-dates-reviewed; hidden-fractional-times-rejected
+retained-audit-database: active-session-encryption-and-CA-hostname-verification-separate-from-probe; restricted-public-readiness; real-MySQL-TLS-positive-and-negative-fixtures; actual-production-verified-TLS-remains-unresolved
+retained-audit-android: managed-asynchronous-discard-with-synchronous-bridge-contract-and-old-bridge-compatibility; actual-installed-emulator-journeys-and-fixture-upgrade; no-physical-device-or-Play-release-claim
+retained-audit-dependencies: body-parser1.20.9; multer2.5.0; nodemailer10.2.1; production-advisory-audit-clean
+retained-audit-candidate-gates: Application40250744727; MySQL40250744632; Security40250744748; Consolidation40250744635; Android40250744669; all-success
+retained-audit-main-gates: Application40251738668; MySQL40251738677; Security40251738737; Consolidation40251738686; Android40251738637; Enterprise40251738644; all-success
+retained-audit-integration-limits: production-DB-trusted-certificate-and-active-verified-TLS-pending; WordPress-administrator-receiver-backup-install-and-authorised-inbox-verification-pending; fresh-Android-access-audit38880540150-attempt2-binding-gate-failed-no-build-upload-or-release; actual-private-production-user-actions-and-physical-phones-unverified; no-provider-billing-DNS-change
+retained-audit-rollback: previous-liveb3707b2376aba5b080b54d723b5dcb6dcfceedd1; Railway20fbf03e-1b93-453f-b387-d5c4c37e6bfe; preserve-additive-schema-original-records-IDs-attachments-audit-and-encryption-keys
