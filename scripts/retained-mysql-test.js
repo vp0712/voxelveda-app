@@ -488,6 +488,17 @@ async function makeWeeklyFixtureDue(queueId) {
 }
 
 async function testWeeklyDelivery() {
+  // Keep real MySQL source/cache metadata, scheduler locks, renderer, parser and
+  // queue serialization. Only the private object provider is local to this
+  // disposable fixture; never invent credentials or contact a production bucket.
+  const storage = require('../services/objectStorageService');
+  const originalStorage = { putObject: storage.putObject, getObject: storage.getObject, deleteObject: storage.deleteObject };
+  const objects = new Map();
+  const fixtureKey = key => assert.match(String(key), /^timesheet-pdfs\/[a-f0-9]{64}\/[a-f0-9]{64}\.pdf$/, 'Weekly fixture accesses only its content-addressed PDF objects.');
+  storage.putObject = async (key, bytes, type) => { fixtureKey(key); assert.equal(type, 'application/pdf'); assert(Buffer.isBuffer(bytes)); objects.set(key, Buffer.from(bytes)); return { key, size: bytes.length }; };
+  storage.getObject = async key => { fixtureKey(key); assert(objects.has(key), 'A persisted PDF key must identify stored fixture bytes.'); return Buffer.from(objects.get(key)); };
+  storage.deleteObject = async key => { fixtureKey(key); objects.delete(key); return { key, deleted: true }; };
+  try {
   const { DateTime } = require('luxon');
   const policy = require('../services/weeklyTimesheetEligibility');
   const { validatePdf } = require('../services/documentPdfService');
@@ -536,6 +547,15 @@ async function testWeeklyDelivery() {
   assert.equal(attachments.length, 1);
   const parsed = await validatePdf(attachments[0].content, { expectedText: ['Worked fixture employee', period.start, period.end, '8.00'] });
   assert.doesNotMatch(parsed.text, /No-work fixture|Planned fixture|Missing designation|login-only/);
+  const [[cachedPdf]] = await pool.query('SELECT pdf_object_key,pdf_sha256,pdf_bytes_count,pdf_filename,generation_status FROM timesheet_pdf_snapshots WHERE source_key=?', [require('../services/timesheetPdfService').sourceKey(JSON.parse(worked.snapshot_json))]);
+  assert.equal(cachedPdf.generation_status, 'VALIDATED');
+  assert.equal(cachedPdf.pdf_sha256, digest(attachments[0].content));
+  assert.equal(Number(cachedPdf.pdf_bytes_count), attachments[0].content.length);
+  assert.equal(cachedPdf.pdf_filename, attachments[0].filename);
+  assert((await storage.getObject(cachedPdf.pdf_object_key)).equals(attachments[0].content), 'The real SQL cache points to the exact parser-valid bytes serialized into the durable email queue.');
+  const restoredArtifact = await require('../services/timesheetPdfService').snapshotArtifact(pool, JSON.parse(worked.snapshot_json));
+  assert(restoredArtifact.buffer.equals(attachments[0].content), 'Reopening the persistent PDF metadata returns the same authoritative document version without regeneration.');
+
   const [[request]] = await pool.query('SELECT generation_status,pdf_sha256,email_queue_id FROM document_delivery_requests WHERE id=?', [worked.document_request_id]);
   assert.deepEqual(request, { generation_status: 'VALIDATED', pdf_sha256: digest(attachments[0].content), email_queue_id: worked.email_queue_id });
   delete require.cache[require.resolve('../services/weeklyTimesheetScheduler')];
@@ -587,6 +607,11 @@ async function testWeeklyDelivery() {
   assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.pdf.status,'VALIDATED');
   facts.push('real InnoDB bounded missed-window recovery after designated-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
   facts.push('real worked-only weekly scheduling/locks/PDF linkage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
+  } finally {
+    Object.assign(storage, originalStorage);
+    objects.clear();
+    for (const [name, method] of Object.entries(originalStorage)) assert.equal(storage[name], method, 'The private fixture adapter must not leak into another workflow.');
+  }
 }
 
 async function testProcurementRecordsAndSnapshots() {
@@ -1427,6 +1452,15 @@ async function testVerifiedAttendanceTotals() {
     assert.equal(week.body.verified_total_minutes, 60); assert.equal(week.body.historical_saved_hours, 11);
     assert.equal(week.body.duplicate_records, 1); assert.equal(week.body.review_required, true);
     assert.equal(Number(week.body.timesheet.total_hours), 1);
+    assert.equal(Number(week.body.timesheet.user_id),user.id,'Existing weekly records retain owner identity in the staff response');
+    assert.equal(require('../utils/dateOnly').dateOnly(week.body.timesheet.week_start),'2026-10-12');
+    assert.equal(week.body.current_week_start,'2026-10-12');
+    assert.equal(week.body.attendance.reduce((sum,row)=>sum+row.verified_worked_minutes,0),60,'Source rows expose the same eligible minutes as the weekly PDF/approval totals');
+    assert.deepEqual(week.body.attendance.map(row=>row.verification_status),['VERIFIED','EXCLUDED','EXCLUDED','EXCLUDED','REVIEW_REQUIRED']);
+    const history=await require('../services/attendanceDailyService').listMySessions({user});
+    assert.equal(history.verification_complete,true);assert.equal(history.verified_total_minutes,60);
+    assert.equal(history.attendance.reduce((sum,row)=>sum+row.verified_worked_minutes,0),60,'History cannot add duplicate/rejected/cancelled/unverified saved hours');
+    assert.equal(history.attendance.length,5,'Original excluded records remain visible for authorised review');
     const detail = await workflow.getTimesheetDetail(sheet.insertId, user);
     assert.equal(detail.summary.actualHours, 1); assert.equal(detail.summary.historical_saved_hours, 11);
     assert.equal(detail.summary.reviewRequired, true); assert.equal(detail.summary.duplicate_records, 1);
@@ -1453,6 +1487,11 @@ async function testVerifiedAttendanceTotals() {
     const approvedDetail = await workflow.getTimesheetDetail(sheet.insertId, user);
     assert.equal(approvedDetail.summary.actualHours, 1); assert.equal(Number(approvedDetail.timesheet.approved_hours), 77);
     assert.deepEqual(await snapshot(), beforeApprovedRead, 'Reading verified totals does not rewrite approved rows or their original version bytes.');
+    const invalidWeek=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-06'}},invalidWeek);assert.equal(invalidWeek.statusCode,422);assert.equal(invalidWeek.body.code,'TIMESHEET_WEEK_INVALID');
+    const futureWeek=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-19'}},futureWeek);assert.equal(futureWeek.statusCode,422);
+    const priorReads=await Promise.all([1,2].map(async()=>{const result=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-05',user_id:mobileUsers.other.id}},result);return result;}));
+    for(const prior of priorReads){assert.equal(prior.statusCode,200);assert.equal(prior.body.week_start,'2026-10-05');assert.equal(prior.body.week_end,'2026-10-11');assert.equal(Number(prior.body.timesheet.user_id),user.id,'A supplied foreign user ID cannot change the own-week query');assert.equal(prior.body.total_hours,0);}
+    const [[onePrior]]=await pool.query("SELECT COUNT(*) count FROM weekly_timesheets WHERE user_id=? AND week_start='2026-10-05'",[user.id]);assert.equal(Number(onePrior.count),1,'Concurrent first reads keep one durable staff/week identity');
     assert.deepEqual(await raw(), preservedRaw, 'Duplicate, rejected, cancelled and unzoned records remain intact.');
   } finally { Settings.now = originalNow; }
   facts.push('actual current/draft weekly and approval totals exclude duplicate/rejected/cancelled/unverified hours, preserve saved diagnostics and approved historical versions, and block unresolved source review without payroll/mail side effects');

@@ -17,4 +17,20 @@ async function loadVerifiedSummary({db,userId,fromDate,toDate,records,lock=false
 }
 function diagnostics(summary){return{verified_total_minutes:summary.totalMinutes,verified_total_hours:summary.actualHours,historical_saved_hours:summary.historicalSavedHours,verification_status:summary.status,review_required:summary.reviewRequired,review_issues:summary.reviewIssues,duplicate_records:summary.duplicates,eligible_record_count:summary.eligibleRecords.length,source_record_count:summary.records.length,company_timezone:summary.timezone,reporting_basis:'WHOLE_SHIFT_LOCAL_START_DATE'};}
 function assertReviewResolved(summary){if(summary.reviewRequired)throw Object.assign(new Error('Attendance source records require authorised correction before this timesheet can be submitted or approved.'),{statusCode:409,code:'TIMESHEET_ATTENDANCE_REVIEW_REQUIRED',details:{review_issues:summary.reviewIssues}});}
-module.exports={assessVerifiedAttendance,loadVerifiedSummary,diagnostics,assertReviewResolved};
+// Presentation is derived from the same assessment used by approvals and weekly
+// PDFs. Raw saved values remain available for review, never counted as verified.
+function presentAttendance(summary){
+ const eligible=new Map(summary.eligibleRecords.map(row=>[Number(row.id),row]));
+ const issues=new Map();for(const issue of summary.reviewIssues){const id=Number(issue.attendance_id);if(!issues.has(id))issues.set(id,[]);issues.get(id).push(issue.code);}
+ const excluded=new Set(['PLANNED','SCHEDULED','CANCELLED','CANCELED','REJECTED','DELETED','VOID','VOIDED','DUPLICATE']);
+ return summary.records.map(row=>{
+  const verified=eligible.get(Number(row.id)),reasons=issues.get(Number(row.id))||[];
+  const rawStart=row.clock_in_utc_text??row.clock_in;
+  const instant=row.timestamp_basis==='UTC'?eligibility.utcInstant(rawStart,'UTC'):null;
+  const workDate=verified?.work_date||instant?.setZone(summary.timezone).toISODate()||dateOnly(row.work_date);
+  const unfinished=!row.clock_out&&!Number(row.review_required)&&row.timestamp_basis==='UTC'&&String(row.entry_source||'').toUpperCase()==='CLOCK'&&reasons.length>0&&reasons.every(code=>code==='INCOMPLETE_SHIFT');
+  const status=verified?'VERIFIED':unfinished?'OPEN':reasons.length?'REVIEW_REQUIRED':excluded.has(String(row.attendance_status||row.status||'').toUpperCase())||Number(row.deleted)?'EXCLUDED':Number(row.total_minutes)===0?'NO_WORK':'EXCLUDED';
+  return {...row,allocated_work_date:workDate,verified_worked_minutes:verified?verified.total_minutes:0,verification_status:status,review_reasons:reasons};
+ });
+}
+module.exports={assessVerifiedAttendance,loadVerifiedSummary,diagnostics,assertReviewResolved,presentAttendance};

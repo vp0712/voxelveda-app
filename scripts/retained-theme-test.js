@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const vm = require('node:vm');
-const { injectGlobalBrand, WORKSPACE_CSS } = require('../services/globalBrandRenderer');
+const { injectGlobalBrand, WORKSPACE_CSS, BUSINESS_HUB_CSS } = require('../services/globalBrandRenderer');
 const root = path.join(__dirname, '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
 const css = read('public/workspace-theme.css');
@@ -44,9 +44,32 @@ for (const file of ['login.html', 'register.html', 'profile.html', 'privacy-poli
   assert.ok(rendered.includes('data-vv-theme="navy-blue"'), `${file} uses the requested navy/blue presentation`);
   assert.ok(rendered.includes(`href="${WORKSPACE_CSS}"`), `${file} receives the current palette`);
   assert.equal((rendered.match(/href=["']\/workspace-theme\.css(?:\?[^"']*)?["']/g) || []).length, 1, `${file} has one shared palette`);
+  assert.ok(rendered.includes(`href="${BUSINESS_HUB_CSS}"`), `${file} receives the shared Business Hub presentation`);
+  assert.equal((rendered.match(/href=["']\/business-hub\.css(?:\?[^"']*)?["']/g) || []).length, 1, `${file} has one shared Business Hub stylesheet`);
   assert.equal(injectGlobalBrand(rendered), rendered, `${file} injection stays idempotent`);
   assert.ok(!rendered.includes('/workspace-shell.js'), `${file} does not load the retired navigation`);
 }
+// Use the actual retained page renderer across portal families. The shared
+// stylesheet must load after page-specific styles, without changing permission
+// attributes or introducing another navigation/portal application.
+for (const file of ['admin-dashboard.html','staff-dashboard.html','client-portal.html','quality.html','shop-floor.html']) {
+  const original = read('public/' + file);
+  const rendered = injectGlobalBrand(original);
+  const links = [...rendered.matchAll(/<link[^>]+rel="stylesheet"[^>]*>/g)];
+  assert.ok(links.at(-1)[0].includes(BUSINESS_HUB_CSS), `${file} uses the current shared presentation last`);
+  assert.equal(injectGlobalBrand(rendered), rendered, `${file} shared presentation is idempotent`);
+  assert.deepEqual([...rendered.matchAll(/data-permission="([^"]*)"/g)].map(x=>x[1]), [...original.matchAll(/data-permission="([^"]*)"/g)].map(x=>x[1]), `${file} retains its actual permission controls`);
+}
+const hubCss = read('public/business-hub.css');
+const darkHub = hubCss.slice(hubCss.indexOf(':root[data-color-mode="dark"]'), hubCss.indexOf('body[data-vv-theme'));
+const hubTokens = {};
+for (const match of darkHub.matchAll(/--([\w-]+):\s*#([a-f\d]{6})/gi)) hubTokens[match[1]]=match[2];
+for (const background of ['page','surface','surface-muted']) {
+  assert.ok(contrast(hubTokens['text-primary'],hubTokens[background])>=4.5, `Hub dark primary text on ${background}`);
+  assert.ok(contrast(hubTokens['text-secondary'],hubTokens[background])>=4.5, `Hub dark supporting text on ${background}`);
+}
+assert.ok(contrast(hubTokens['control-border'],hubTokens.surface)>=3, 'Hub dark form boundaries remain visible');
+assert.ok(contrast('DCEAFF','203B66')>=4.5, 'Selected navigation remains readable');
 const hiddenFixture = '<html><head></head><body data-vv-role="viewer"><button hidden class="hidden-section">Restricted</button><img src="/Frame 1.png"></body></html>';
 const rendered = injectGlobalBrand(hiddenFixture);
 assert.ok(rendered.includes('<button hidden class="hidden-section">Restricted</button>'));

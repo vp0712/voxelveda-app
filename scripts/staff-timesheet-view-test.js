@@ -1,0 +1,30 @@
+'use strict';
+const assert=require('node:assert/strict');
+const view=require('../public/staff-timesheet-view');
+const verified=require('../services/attendanceVerifiedSummaryService');
+const staff={id:17,name:'Synthetic staff',role:'staff',active:1,account_status:'ACTIVE'};
+const record=(id,extra={})=>({id,user_id:17,work_date:'2026-10-05',clock_in:'2026-10-04T21:00:00Z',clock_out:'2026-10-04T22:01:00Z',total_minutes:61,total_hours:1.02,break_minutes:0,entry_source:'CLOCK',timestamp_basis:'UTC',recorded_timezone:'Australia/Melbourne',notes:'',...extra});
+const source=[record(1),record(2),record(3,{clock_in:'2026-10-05T00:00:00Z',clock_out:'2026-10-05T02:00:00Z',total_minutes:120,total_hours:2,attendance_status:'CANCELLED'}),record(4,{clock_in:'2026-10-05T03:00:00Z',clock_out:null,total_minutes:0,total_hours:0}),record(5,{clock_in:'2026-10-05T04:00:00Z',clock_out:'2026-10-05T05:00:00Z',total_minutes:60,total_hours:1,review_required:1}),record(6,{clock_in:'2026-10-06T00:00:00Z',clock_out:'2026-10-06T01:01:00Z',work_date:'2026-10-06',total_minutes:61,total_hours:1.02,break_minutes:null})];
+const original=JSON.stringify(source),summary=verified.assessVerifiedAttendance({staff,records:source,fromDate:'2026-10-05',toDate:'2026-10-11',now:new Date('2026-10-12T00:00:00Z'),env:{TIMESHEET_TIMEZONE:'Australia/Melbourne'}}),rows=verified.presentAttendance(summary);
+assert.equal(summary.totalMinutes,122);assert.equal(rows.reduce((sum,row)=>sum+row.verified_worked_minutes,0),122);assert.equal(summary.duplicates,1);
+assert.deepEqual(rows.map(row=>row.verification_status),['VERIFIED','EXCLUDED','EXCLUDED','OPEN','REVIEW_REQUIRED','VERIFIED']);
+assert.equal(view.group(rows,view.week)[0].totalHours,2.03,'Consolidate exact eligible minutes once, never add rounded shift hours or cancelled/duplicate/review values');
+assert.equal(view.worked(rows[3]),'In progress');assert.equal(rows[3].verified_worked_minutes,0);assert.equal(view.breaks(rows[0]),'0 min');assert.equal(view.breaks(rows[5]),'Not recorded');assert.equal(view.worked(rows[4]),'Requires review');assert.equal(view.worked(rows[1]),'Excluded');
+assert.equal(view.group([{work_date:'2026-10-05',total_hours:100}],view.week)[0].totalHours,null,'Missing server verification cannot be silently replaced by raw saved hours');
+assert.equal(JSON.stringify(source),original,'Presentation retains original attendance values unchanged');
+const savedTZ=process.env.TZ;
+try{for(const timezone of ['UTC','Australia/Melbourne','America/Los_Angeles']){
+ process.env.TZ=timezone;
+ assert.equal(view.week('2026-10-05').key,'2026-10-05');assert.equal(view.week('2026-10-11').key,'2026-10-05');
+ assert.equal(view.week('2026-04-05').key,'2026-03-30','DST end Sunday belongs to the same local Monday');
+ assert.equal(view.month('2026-10-01').key,'2026-10');assert.equal(view.month('2026-10-31').end,'2026-10-31');
+ assert.equal(view.week('2026-01-01').key,'2025-12-29');assert.equal(view.calendar('2026-02-30'),null);
+ assert.match(view.clock('2026-10-04T13:05:00Z','Australia/Melbourne'),/5 Oct/,'Local Monday may have a Sunday UTC timestamp');
+ assert.equal(view.clock('2026-10-05 00:00:00','Australia/Melbourne'),'Requires review','Never guess an unzoned timestamp from the browser timezone');
+ const manual=record(70,{clock_in:null,clock_out:null,work_date:'2026-10-07',total_minutes:75,total_hours:1.25,break_minutes:null,entry_source:'MANUAL',manual_authorised_by:99,manual_authorised_at:new Date('2026-10-12T01:00:00Z'),manual_authorised_at_utc_text:'2026-10-11 23:59:00'});
+ const assessed=verified.assessVerifiedAttendance({staff,records:[manual],fromDate:'2026-10-05',toDate:'2026-10-11',now:new Date('2026-10-12T00:00:00Z'),env:{TIMESHEET_TIMEZONE:'Australia/Melbourne'}});assert.equal(assessed.totalMinutes,75,'A formatted UTC authorisation instant takes precedence over a timezone-shifted SQL driver Date');
+ const withoutText={...manual};delete withoutText.manual_authorised_at_utc_text;assert.equal(verified.assessVerifiedAttendance({staff,records:[withoutText],fromDate:'2026-10-05',toDate:'2026-10-11',now:new Date('2026-10-12T00:00:00Z'),env:{TIMESHEET_TIMEZONE:'Australia/Melbourne'}}).reviewIssues[0].code,'MANUAL_AUTHORISATION_REQUIRED','A genuinely future authorisation remains rejected');
+}}finally{if(savedTZ===undefined)delete process.env.TZ;else process.env.TZ=savedTZ;}
+const overnight=verified.assessVerifiedAttendance({staff,records:[record(8,{work_date:'2026-10-11',clock_in:'2026-10-11T12:30:00Z',clock_out:'2026-10-11T14:30:00Z',total_minutes:120,total_hours:2})],fromDate:'2026-10-05',toDate:'2026-10-11',now:new Date('2026-10-12T00:00:00Z'),env:{TIMESHEET_TIMEZONE:'Australia/Melbourne'}});
+assert.equal(overnight.totalMinutes,120);assert.equal(view.group(verified.presentAttendance(overnight),view.week)[0].key,'2026-10-05','An overnight Sunday session remains in its authorised local-start reporting week');
+console.log('Staff timesheet view passed: authoritative eligible minute totals, cancelled/duplicate/review exclusions, recorded versus missing breaks, UTC/Melbourne/US calendar invariance, DST/year/overnight allocation, no raw fallback or source mutation.');

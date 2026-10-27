@@ -19,9 +19,19 @@ function pureEligibility() {
   assert.throws(() => policy.configuration({ ...ENV, WEEKLY_TIMESHEET_EMAIL_TIMEZONE: 'Not/A_Zone' }), /timezone/);
   assert.throws(() => policy.configuration({ ...ENV, WEEKLY_TIMESHEET_EMAIL_HOUR: 'NaN' }), /integer/);
   assert.throws(() => policy.configuration({ ...ENV, WEEKLY_TIMESHEET_EMAIL_HOUR: 23 }), /end on the configured send day/);
+  const beforeSend=policy.reportingDispatch(PERIOD,CONFIG,new Date('2026-10-11T19:59:00Z'));
+  assert.equal(beforeSend.state,'NOT_DUE');assert.equal(beforeSend.overdue,false);assert.equal(beforeSend.scheduled_at_utc,'2026-10-11T20:00:00.000Z');
+  assert.equal(policy.reportingDispatch(PERIOD,CONFIG,NOW).state,'SCHEDULED_WINDOW');
+  assert.equal(policy.reportingDispatch(PERIOD,CONFIG,new Date('2026-10-12T20:00:00Z')).state,'RECOVERY_WINDOW');
+  assert.equal(policy.reportingDispatch(PERIOD,CONFIG,new Date('2026-10-13T20:00:00Z')).state,'CONTROLLED_RECOVERY_REQUIRED');
+  assert.equal(policy.reportingDispatch(PERIOD,{...CONFIG,enabled:false},NOW).state,'DISABLED');
+  const springPeriod={start:'2026-09-28',end:'2026-10-04'};
+  assert.equal(policy.reportingDispatch(springPeriod,CONFIG,new Date('2026-10-04T19:59:00Z')).scheduled_at_utc,'2026-10-04T20:00:00.000Z','Dispatch uses post-DST company local Monday07:00');
+  const autumnPeriod={start:'2026-03-30',end:'2026-04-05'};
+  assert.equal(policy.reportingDispatch(autumnPeriod,CONFIG,new Date('2026-04-05T20:59:00Z')).scheduled_at_utc,'2026-04-05T21:00:00.000Z','Dispatch uses post-DST company local Monday07:00');
   assert.equal(assess([worked(1, 1)]).status, 'ELIGIBLE'); assert.equal(assess([worked(1, 1)]).totalMinutes, 480);
   assert.equal(assess([]).status, 'NO_WORK');
-  for (const status of ['planned', 'scheduled', 'cancelled', 'rejected']) assert.equal(assess([worked(1, 1, undefined, undefined, undefined, { attendance_status: status })]).status, 'NO_WORK');
+  for (const status of ['planned', 'scheduled', 'cancelled', 'rejected', 'duplicate']) assert.equal(assess([worked(1, 1, undefined, undefined, undefined, { attendance_status: status })]).status, 'NO_WORK');
   assert.equal(assess([worked(1, 1, undefined, undefined, undefined, { deleted: 1 })]).status, 'NO_WORK');
   assert.equal(assess([worked(1, 1, undefined, undefined, 0)]).status, 'NO_WORK');
   assert.equal(assess([worked(1, 1, undefined, null)]).status, 'REVIEW_REQUIRED');
@@ -37,6 +47,7 @@ function pureEligibility() {
   assert.equal(assess([worked(1, 1)], staff(1, { role: 'manager' })).status, 'ELIGIBLE', 'managers may receive their own worked record, never an automatic staff copy');
   const duplicate = assess([worked(1, 1), worked(2, 1)]); assert.equal(duplicate.status, 'ELIGIBLE'); assert.equal(duplicate.totalMinutes, 480); assert.equal(duplicate.duplicates, 1); assert.equal(duplicate.rows.length, 1);
   assert.equal(assess([worked(1, 1), worked(2, 1, '2026-10-05T23:00:00Z', '2026-10-06T07:00:00Z')]).status, 'REVIEW_REQUIRED');
+  assert.equal(assess([worked(1,1),worked(2,1,'2026-10-06T22:00:00Z','2026-10-07T06:00:00Z',480,{attendance_status:'DUPLICATE'})]).totalMinutes,480,'A record explicitly rejected as duplicate must not count even with a distinct interval');
   assert.equal(assess([worked(1, 2)]).status, 'REVIEW_REQUIRED');
   const overnight = assess([worked(1, 1, '2026-10-11T11:00:00Z', '2026-10-11T19:00:00Z')]); assert.equal(overnight.status, 'ELIGIBLE'); assert.equal(overnight.rows[0].work_date, '2026-10-11'); assert.equal(overnight.totalMinutes, 480);
   assert.equal(assess([worked(1, 1, '2026-10-11T13:30:00Z', '2026-10-11T19:30:00Z', 360)]).status, 'NO_WORK', 'a Monday local shift must not enter the prior week merely because its UTC date is Sunday');
@@ -115,6 +126,7 @@ function schedulerFixture(initial = {}) {
       query: (sql, params) => query(sql, params, conn), async commit() { held = false; releaseLock(); }, async rollback() { if (held) { state.deliveries = saved.deliveries; state.timesheets = saved.timesheets; state.queues = saved.queues; held = false; releaseLock(); } }, release() { assert(!held); } }; return conn;
   } };
   const dependencies = { '../config/db': db, luxon: require('luxon'), 'node:crypto': require('node:crypto'),
+    './timesheetPdfService': { freezeSnapshot: async (_db,snapshot) => snapshot, snapshotArtifact: async () => ({ fixture:true }) },
     './weeklyTimesheetEligibility': policy, './weeklyTimesheetDeliverySchema': { ensureWeeklyTimesheetDeliverySchema: async () => {} },
     './authorizationService':require('../services/authorizationService'),'./auditService':{logAudit:async(_db,entry)=>state.audits.push(plain(entry))},
     './timesheetDocumentService': { timesheetDocumentData: (data) => ({ title: 'Fixture timesheet', reference: `${data.fromDate}-${data.toDate}`, party: data.staffName, fixture_data: data }) },

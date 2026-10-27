@@ -59,14 +59,50 @@ async function main() {
   await pool.query("INSERT INTO bank_accounts(id,preserved_value) VALUES(501,'Historical retired fixture remains unchanged')");
   const archived = digest((await pool.query('SELECT * FROM bank_accounts'))[0]);
   const results = await Promise.all(Array.from({ length: 3 }, () => runRetainedMigrations({ pool, logger: { info() {} } })));
-  assert.equal(results.reduce((sum, value) => sum + value.applied, 0), 1, 'Concurrent replicas apply this migration exactly once.');
-  assert.equal(results.reduce((sum, value) => sum + value.skipped, 0), 2);
+  assert.equal(results.reduce((sum, value) => sum + value.applied, 0), RETAINED_MIGRATIONS.length, 'Concurrent replicas apply each registered migration exactly once.');
+  assert.equal(results.reduce((sum, value) => sum + value.skipped, 0), RETAINED_MIGRATIONS.length * 2);
   await assertOriginalRegisterSchemas(pool);
   const migration = discoverMigrations(RETAINED_MIGRATIONS_DIR)[0];
   const [[ledger]] = await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations WHERE migration_id=?', [RETAINED_MIGRATIONS[0]]);
   assert.equal(ledger.status, 'APPLIED'); assert.equal(ledger.checksum_sha256, migration.checksum_sha256);
   const repeated = await runRetainedMigrations({ pool, logger: { info() {} } });
-  assert.equal(repeated.applied, 0); assert.equal(repeated.skipped, 1);
+  assert.equal(repeated.applied, 0); assert.equal(repeated.skipped, RETAINED_MIGRATIONS.length);
+  // Exercise persisted metadata in actual MySQL using a private-object-store
+  // adapter fixture. Provider connectivity is verified separately in production.
+  // No PDF BLOB, local file, recipient or email queue is involved.
+  const pdfs = require('../services/timesheetPdfService');
+  const pdfObjects=new Map(),pdfStorage={async putObject(key,buffer,type){assert.equal(type,'application/pdf');pdfObjects.set(key,Buffer.from(buffer));},async getObject(key){assert(pdfObjects.has(key));return Buffer.from(pdfObjects.get(key));},async deleteObject(key){pdfObjects.delete(key);}};
+  const cachedArtifact=(db,snapshot)=>pdfs.snapshotArtifact(db,snapshot,null,pdfStorage);
+  const pdfSnapshot = { staff_id: 901, staff_name: 'Migration PDF fixture', employee_reference: 'FIXTURE-901',
+    period_start: '2026-10-19', period_end: '2026-10-25', timezone: 'Australia/Sydney', version: 1,
+    review_status: 'DRAFT', review_version: 0, approval_verified: false, total_minutes: 480,
+    generated_at: '2026-10-26T01:00:00.000Z', shift_allocation: 'WHOLE_SHIFT_LOCAL_START_DATE',
+    rows: [{ id: 901, user_id: 901, work_date: '2026-10-20', clock_in: '2026-10-19T22:00:00Z', clock_out: '2026-10-20T06:30:00Z', total_minutes: 480, total_hours: 8, break_minutes: 30 }] };
+  const frozenPdf = await pdfs.freezeSnapshot(pool, pdfSnapshot);
+  const artifacts = await Promise.all([cachedArtifact(pool, frozenPdf), cachedArtifact(pool, frozenPdf)]);
+  assert(artifacts[0].buffer.equals(artifacts[1].buffer), 'Independent producers converge on the persisted first PDF.');
+  const reopened = await pool.getConnection();
+  try {
+    const [[storedPdf]] = await reopened.query('SELECT pdf_object_key,pdf_bytes_count,pdf_sha256,pdf_filename FROM timesheet_pdf_snapshots WHERE source_key=?', [pdfs.sourceKey(frozenPdf)]);
+    assert((await pdfStorage.getObject(storedPdf.pdf_object_key)).equals(artifacts[0].buffer));assert.equal(storedPdf.pdf_bytes_count,artifacts[0].buffer.length);
+    assert.equal(storedPdf.pdf_sha256, artifacts[0].validation.sha256); assert.match(storedPdf.pdf_filename, /\.pdf$/);
+    const restoredPdf = await pdfs.freezeSnapshot(reopened, { ...pdfSnapshot, generated_at: '2026-10-27T01:00:00.000Z' });
+    assert.equal(restoredPdf.generated_at, pdfSnapshot.generated_at, 'A later process preserves the original source timestamp.');
+    assert((await cachedArtifact(reopened, restoredPdf)).buffer.equals(artifacts[0].buffer));
+  } finally { reopened.release(); }
+  let snapshotReaders=0,releaseSnapshotReaders;
+  const snapshotReadersReady=new Promise(resolve=>{releaseSnapshotReaders=resolve;});
+  const racingSnapshots=await Promise.all([0,1].map(async index=>{
+    const connection=await pool.getConnection();
+    try {
+      await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');await connection.beginTransaction();
+      await connection.query('SELECT COUNT(*) AS total FROM timesheet_pdf_snapshots');
+      if(++snapshotReaders===2)releaseSnapshotReaders();await snapshotReadersReady;
+      const result=await pdfs.freezeSnapshot(connection,{...pdfSnapshot,version:2,generated_at:`2026-10-26T0${index+2}:00:00.000Z`});
+      await connection.commit();return result;
+    }catch(error){await connection.rollback();throw error;}finally{connection.release();}
+  }));
+  assert.deepEqual(racingSnapshots[0],racingSnapshots[1],'A stale REPEATABLE READ snapshot sees the concurrent committed source winner through the locking read.');
   const [[unchanged]] = await pool.query('SELECT migration_id,checksum_sha256,status,applied_at,started_at,updated_at FROM schema_migrations WHERE migration_id=?', [RETAINED_MIGRATIONS[0]]);
   assert.equal(digest(unchanged), digest(ledger), 'A restart does not rewrite completed migration evidence.');
   for (const [table, original] of originals) {
@@ -79,12 +115,13 @@ async function main() {
   }
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'vv-mysql-checksum-'));
   try {
+    for (const entry of discoverMigrations(RETAINED_MIGRATIONS_DIR)) fs.copyFileSync(entry.filename, path.join(temp, entry.migration_id + '.sql'));
     fs.writeFileSync(path.join(temp, RETAINED_MIGRATIONS[0] + '.sql'), fs.readFileSync(migration.filename, 'utf8') + '\n-- changed applied checksum fixture\n');
     await assert.rejects(runRetainedMigrations({ pool, migrationsDir: temp, logger: { info() {} } }), { code: 'MIGRATION_CHECKSUM_MISMATCH' });
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
   assert.equal(digest((await pool.query('SELECT * FROM bank_accounts'))[0]), archived, 'No retired table or historical record is changed');
   const [tables] = await pool.query('SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE()');
-  assert.equal(tables.length, Object.keys(TABLES).length + 2, 'Only current original tables, the migration ledger and the protected retired fixture exist.');
+  assert.equal(tables.length, Object.keys(TABLES).length + 3, 'Only current original tables, the private timesheet PDF cache, the migration ledger and the protected retired fixture exist.');
   console.log(JSON.stringify({ result: 'passed', fixture_mode: mode, original_tables: Object.keys(TABLES).length, concurrent_runners: 3, applied_once: true, checksummed: true, historical_values_preserved: true, retired_table_unchanged: true }));
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => pool.end());

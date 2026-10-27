@@ -23,6 +23,7 @@
   function assertResult(result){assertCurrent(resultLeases.get(result));}
   function ownerFailure(message){boundary({refreshAgain:false});showError(message);throw stale();}
   function clearPrivateView(){
+    window.clearStaffTimesheetPrivateView?.();
     stopClock();historySequence++;today=null;history=[];corrections=[];historyMeta={};correctionMeta={};historyScope='own';historyStatus='ALL';sessionStatus='ALL';historySearch='';historyFrom='';historyTo='';historyUserId='';serverOffset=0;submitBusy=false;pending=null;
     window.VoxelOverlay?.closeAll?.();closeOverlay();window.closeStaffNotificationPanel?.();window.toggleMobileMenu?.(false);clearError();
     document.querySelectorAll('[data-avatar-self]').forEach(target=>{target.dataset.avatarName='';});

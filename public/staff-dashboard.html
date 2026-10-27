@@ -974,7 +974,7 @@
       <!-- TIMESHEET -->
       <section id="timesheetSection" class="page-section hidden-section permission-attendance">
 
-        <div class="card table-wrap">
+        <div class="card">
 
           <div class="section-head">
             <div>
@@ -984,33 +984,28 @@
             <div class="timesheet-staff-actions">
               <span id="currentTimesheetStatus" class="timesheet-status-chip draft">Draft</span>
               <button id="submitTimesheetBtn" class="primary-btn" type="button" onclick="return submitCurrentTimesheet()">Submit Timesheet</button>
-              <button class="secondary-btn" type="button" onclick="return loadTimesheet()">Refresh</button>
+              <button class="secondary-btn" type="button" data-staff-week-pdf onclick="return openStaffTimesheetPdf(false)">Preview PDF</button><button class="secondary-btn" type="button" data-staff-week-pdf onclick="return openStaffTimesheetPdf(true)">Download PDF</button><button class="secondary-btn" type="button" onclick="return loadTimesheet()">Refresh</button>
             </div>
           </div>
+          <div class="staff-timesheet-week-picker"><button type="button" class="secondary-btn" onclick="shiftStaffTimesheetWeek(-7)" aria-label="Previous reporting week">Previous week</button><label>Reporting week<input id="staffTimesheetWeek" type="date" onchange="selectStaffTimesheetWeek(this.value)"></label><button id="staffTimesheetNextWeek" type="button" class="secondary-btn" onclick="shiftStaffTimesheetWeek(7)" aria-label="Next reporting week">Next week</button><button type="button" class="secondary-btn" onclick="return selectCurrentStaffTimesheetWeek()">Current week</button><button type="button" class="secondary-btn" onclick="VoxelStaffHome.openHistory('own')">Request attendance correction</button></div>
           <div id="currentTimesheetManagerNote" class="status-note hidden-section"></div>
 
           <div class="timesheet-insight-strip">
-            <article><small>Recorded This Week</small><strong id="timesheetRecordedSignal">0.00 hrs</strong><span>Auto-calculated from clock-in/out</span></article>
+            <article><small>Verified completed work</small><strong id="timesheetRecordedSignal">—</strong><span>Excludes open sessions and entries requiring review</span></article>
             <article><small>Roster Comparison</small><strong id="timesheetVarianceSignal">Waiting</strong><span id="timesheetVarianceDetail">Roster sync will appear here</span></article>
-            <article><small>Payroll Readiness</small><strong id="timesheetPayrollSignal">Open</strong><span>Review before admin finalises payroll</span></article>
+            <article><small>Last approved hours</small><strong id="timesheetApprovedSignal">Not approved</strong><span>Separate from source work and scheduled roster hours</span></article>
+            <article><small>Saved review status</small><strong id="timesheetPayrollSignal">Open</strong><span>Review before admin finalises payroll</span></article>
           </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Clock In</th>
-                <th>Clock Out</th>
-                <th>Total Hours</th>
-              </tr>
-            </thead>
+          <div class="table-wrap staff-timesheet-table">          <table>
+            <thead><tr><th>Date</th><th>Clock in</th><th>Clock out</th><th>Recorded break</th><th>Verified work</th><th>Source status</th><th>Notes</th></tr></thead>
 
             <tbody id="timesheetTableBody">
               <tr>
-                <td colspan="4">Loading timesheet...</td>
+                <td colspan="7">Loading timesheet...</td>
               </tr>
             </tbody>
-          </table>
+          </table></div>
 
         </div>
 
@@ -1084,6 +1079,7 @@
   </div>
 
   <script src="/step-up.js?v=20260905"></script>
+  <script src="/staff-timesheet-view.js"></script>
   <script src="/staff.js?v=20261013-staff-mobile"></script>
   <script src="/workspace-overlays.js?v=20261013-staff-mobile"></script>
   <script src="/profile-avatar.js?v=20261013-staff-mobile"></script>

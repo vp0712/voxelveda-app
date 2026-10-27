@@ -39,7 +39,7 @@ async function mountedAttendanceBoundary(){
   const attendanceOnly={id:4,role:'staff',permission_boundary:['VIEW_ATTENDANCE']};
   const authFixture=(req,res,next)=>{req.user=req.get('x-fixture-scope')==='attendance'?attendanceOnly:req.get('x-fixture-scope')==='none'?{id:4,role:'staff',permission_boundary:['VIEW_CUSTOMERS']}:own;next();};
   const handlers=new Proxy({}, {get(_target,name){return(req,res)=>{invoked.push(String(name));return res.json({fixture:true,user_id:req.user.id});};}});
-  const routeDependencies={'express':express,'../controllers/attendanceController':handlers,'../controllers/timesheetWorkflowController':handlers,'../controllers/weeklyTimesheetDeliveryController':controller,'../middleware/auth':authFixture,'../middleware/inputPermissionMiddleware':()=>require('../middleware/authorizationMiddleware').requireAnyPermission('EDIT_ATTENDANCE'),'../middleware/authorizationMiddleware':require('../middleware/authorizationMiddleware'),'../middleware/requestContractMiddleware':require('../middleware/requestContractMiddleware')};
+  const routeDependencies={'express':express,'../controllers/attendanceController':handlers,'../controllers/timesheetWorkflowController':handlers,'../controllers/staffTimesheetPdfController':handlers,'../controllers/weeklyTimesheetDeliveryController':controller,'../middleware/auth':authFixture,'../middleware/inputPermissionMiddleware':()=>require('../middleware/authorizationMiddleware').requireAnyPermission('EDIT_ATTENDANCE'),'../middleware/authorizationMiddleware':require('../middleware/authorizationMiddleware'),'../middleware/requestContractMiddleware':require('../middleware/requestContractMiddleware')};
   const routeModule={exports:{}},routeFile=path.join(__dirname,'../routes/attendanceRoutes.js');
   new vm.Script(fs.readFileSync(routeFile,'utf8'),{filename:routeFile}).runInNewContext({module:routeModule,exports:routeModule.exports,require(name){if(!Object.hasOwn(routeDependencies,name))throw new Error('Unexpected attendance route fixture dependency '+name);return routeDependencies[name];}});
   const appFile=path.join(__dirname,'../app.js'),appSource=fs.readFileSync(appFile,'utf8');
@@ -53,8 +53,9 @@ async function mountedAttendanceBoundary(){
     const week=await request('/week');assert.equal(week.status,200);assert.equal(week.body.user_id,4);assert.equal((await request('/week/')).status,200);
     const list=await request('/timesheets/weekly-deliveries');assert.equal(list.status,200);assert.equal(list.body.deliveries[0].user_id,4,'The unchanged weekly controller still enforces the current own-staff query.');
     assert.equal((await request('/timesheets/weekly-deliveries/12')).status,200);
+    assert.equal((await request('/timesheets/week/pdf?week_start=2026-10-05')).status,200);
     for(const [pathname,method] of [['/today','GET'],['/actions','POST'],['/all','GET'],['/my','GET'],['/sessions?scope=all','GET'],['/admin/save','POST'],['/timesheets-other','GET']])assert.equal((await request(pathname,method)).status,403,`Own-timesheet authority must not reach ${pathname}`);
-    assert.deepEqual(invoked,['weekAttendance','weekAttendance'],'Denied attendance paths cannot dispatch a data-read or mutation controller.');
+    assert.deepEqual(invoked,['weekAttendance','weekAttendance','download'],'Denied attendance paths cannot dispatch a data-read or mutation controller.');
     assert.equal((await request('/today','GET','attendance')).status,200,'Existing VIEW_ATTENDANCE access remains available.');
     assert.equal((await request('/week','GET','none')).status,403);assert.equal((await request('/timesheets/weekly-deliveries','GET','none')).status,403);
   }finally{await new Promise((resolve,reject)=>server.close(error=>error?reject(error):resolve()));}

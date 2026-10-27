@@ -110,12 +110,16 @@
   });
   async function openPdf(url, options = {}) {
     const { download = false, ...request } = options;
+    const accountKey=()=>{try{return String(JSON.parse(localStorage.getItem('user')||'{}').id||'')+'|'+(localStorage.getItem('token')||'');}catch{return 'storage-unavailable';}};
+    const owner=accountKey();
+    const assertAccount=()=>{if(accountKey()!==owner)throw Object.assign(new Error('The signed-in account changed. Open the document again from your current account.'),{code:'PDF_ACCOUNT_CHANGED'});};
     // Open immediately for browser popup policy, then fill only after validation.
     const native=window.VoxelNativeApp;
     const preview = download || native ? null : window.open('/document/view', '_blank');
-    let readyHandler,timer;const ready=preview?new Promise((resolve,reject)=>{readyHandler=event=>{if(event.source===preview&&event.origin===location.origin&&event.data?.type==='VV_PDF_VIEWER_READY')resolve();};window.addEventListener('message',readyHandler);timer=setTimeout(()=>reject(new Error('The preview could not be opened. Download the verified PDF instead.')),15000);}):null;ready?.catch(()=>{});
+    let readyHandler,timer,objectUrl;const ready=preview?new Promise((resolve,reject)=>{readyHandler=event=>{if(event.source===preview&&event.origin===location.origin&&event.data?.type==='VV_PDF_VIEWER_READY')resolve();};window.addEventListener('message',readyHandler);timer=setTimeout(()=>reject(new Error('The preview could not be opened. Download the verified PDF instead.')),15000);}):null;ready?.catch(()=>{});
     try {
       const response = await fetch(url, { credentials:'same-origin', cache:'no-store', ...request });
+      assertAccount();
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.message || 'The PDF could not be generated. No alternative file was provided.');
@@ -124,18 +128,19 @@
       const filename = (response.headers.get('content-disposition') || '').match(/filename="?([^";]+)"?/i)?.[1];
       if (!filename || !/^[A-Za-z0-9._ -]+\.pdf$/.test(filename)) throw new Error('The service returned an invalid PDF filename.');
       const bytes = await response.arrayBuffer();
+      assertAccount();
       if (bytes.byteLength < 100 || new TextDecoder('ascii').decode(bytes.slice(0,5)) !== '%PDF-') throw new Error('The service returned invalid PDF bytes.');
       if(native){await native.documentAction(bytes,filename,download);return {filename,bytes:bytes.byteLength};}
-      const objectUrl = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
+      objectUrl = URL.createObjectURL(new Blob([bytes], { type:'application/pdf' }));
       if (download) {
         const link = document.createElement('a'); link.href = objectUrl; link.download = filename;
         document.body.append(link); link.click(); link.remove();
-      } else if (preview) { await ready;preview.postMessage({type:'VV_VERIFIED_PDF',filename,bytes},location.origin); }
+      } else if (preview) { await ready;assertAccount();preview.postMessage({type:'VV_VERIFIED_PDF',filename,bytes},location.origin); }
       else { const link = document.createElement('a'); link.href = objectUrl; link.target = '_blank'; link.rel = 'noopener'; document.body.append(link); link.click(); link.remove(); }
       // Keep the bytes available for the browser PDF viewer's own download control.
       window.addEventListener('pagehide', () => URL.revokeObjectURL(objectUrl), { once:true });
       return { filename, bytes:bytes.byteLength };
-    } catch (error) { if (preview) preview.close(); throw error; }finally{if(readyHandler)window.removeEventListener('message',readyHandler);clearTimeout(timer);}
+    } catch (error) { if (preview) preview.close();if(objectUrl)URL.revokeObjectURL(objectUrl);throw error; }finally{if(readyHandler)window.removeEventListener('message',readyHandler);clearTimeout(timer);}
   }
   window.VoxelOperations = { showFieldErrors, openPdf };
 })();

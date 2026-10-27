@@ -79,6 +79,7 @@ async function main() {
   assert.ok(!discoverMigrations().some(entry => migrations.RETAINED_MIGRATIONS.includes(entry.migration_id)), 'Historical discovery cannot replay current migrations or retired SQL');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vv-retained-schema-policy-'));
   try {
+    for (const migration of statements) fs.copyFileSync(migration.filename, path.join(dir, migration.migration_id + '.sql'));
     const name = migrations.RETAINED_MIGRATIONS[0] + '.sql';
     fs.writeFileSync(path.join(dir, name), sql + '\nDELETE FROM bank_accounts;\n');
     assert.throws(() => migrations.validateRetainedMigrations(dir), { code: 'RETAINED_MIGRATION_NOT_ADDITIVE' });
