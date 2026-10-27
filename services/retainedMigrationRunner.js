@@ -3,7 +3,7 @@ const path = require('node:path');
 const { discoverMigrations, runMigrations, MigrationError } = require('./migrationRunner');
 const { preflightOriginalRegisterSchemas, assertOriginalRegisterSchemas } = require('./originalRegisterSchema');
 
-const RETAINED_MIGRATIONS = Object.freeze(['20261025_original_request_schema']);
+const RETAINED_MIGRATIONS = Object.freeze(['20261025_original_request_schema', '20261027_timesheet_pdf_snapshots']);
 const RETAINED_MIGRATIONS_DIR = path.join(__dirname, '..', 'migrations', 'retained');
 
 function validateRetainedMigrations(directory = RETAINED_MIGRATIONS_DIR) {

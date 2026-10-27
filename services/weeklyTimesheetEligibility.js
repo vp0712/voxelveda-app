@@ -61,6 +61,23 @@ function scheduleDetails(now = new Date(), env = process.env) {
     window_minutes: config.windowMinutes, recovery_hours:config.recoveryHours, recovery_end_utc:recoveryWindow(now,config).end_utc, next_due_utc: due.toUTC().toISO(), next_due_local: due.toISO(),
     window_end_utc: due.plus({ minutes: config.windowMinutes }).toUTC().toISO(), current_period: window.period, waiting_reason: window.reason };
 }
+// The dispatch for a selected reporting week is separate from the next run.
+// In particular, Monday before send time is not a missed weekly delivery.
+function reportingDispatch(period, config, now = new Date()) {
+  const start = DateTime.fromISO(String(period.start), { zone: config.timezone }).startOf('day');
+  const local = DateTime.fromJSDate(now, { zone: config.timezone });
+  if (!start.isValid || start.weekday !== 1 || start.plus({ days: 6 }).toISODate() !== period.end || !local.isValid) throw policyError('Select a valid completed reporting week.');
+  const due = start.plus({ weeks: 1, days: config.weekday - 1 }).set({ hour: config.hour, minute: config.minute });
+  const windowEnd = due.plus({ minutes: config.windowMinutes });
+  const recoveryEnd = due.plus({ hours: config.recoveryHours });
+  const latest = latestCompletedWeek(now, config.timezone);
+  const current = period.start === latest.start && period.end === latest.end;
+  const state = !config.enabled ? 'DISABLED' : local < due ? 'NOT_DUE' : !current ? 'CONTROLLED_RECOVERY_REQUIRED' : local < windowEnd ? 'SCHEDULED_WINDOW' : config.recoveryHours > 0 && local < recoveryEnd ? 'RECOVERY_WINDOW' : 'CONTROLLED_RECOVERY_REQUIRED';
+  return { state, timezone: config.timezone, scheduled_at_utc: due.toUTC().toISO(), scheduled_at_local: due.toISO(),
+    window_end_utc: windowEnd.toUTC().toISO(), recovery_end_utc: recoveryEnd.toUTC().toISO(),
+    automatic_recovery_available: ['SCHEDULED_WINDOW', 'RECOVERY_WINDOW'].includes(state),
+    overdue: config.enabled && local >= windowEnd };
+}
 function emailAddress(value) {
   if (typeof value !== 'string') return '';
   const text = value.trim();
@@ -102,10 +119,10 @@ function snapshotHash(snapshot) { return crypto.createHash('sha256').update(stab
 function assessWorkedAttendance(staff, records, period, config, now = new Date()) {
   if (!activeEmployee(staff)) return { status: 'INELIGIBLE_ACCOUNT', rows: [], totalMinutes: 0, issues: [], duplicates: 0 };
   const rows = [], issues = [], intervals = [], fingerprints = new Map(); let duplicates = 0;
-  const excludedStatuses = new Set(['PLANNED', 'SCHEDULED', 'CANCELLED', 'CANCELED', 'REJECTED', 'DELETED', 'VOID', 'VOIDED']);
+  const excludedStatuses = new Set(['PLANNED', 'SCHEDULED', 'CANCELLED', 'CANCELED', 'REJECTED', 'DUPLICATE', 'DELETED', 'VOID', 'VOIDED']);
   for (const row of [...records].sort((a, b) => Number(a.id) - Number(b.id))) {
     if (Number(row.user_id) !== Number(staff.id)) { issues.push({ code: 'STAFF_ID_MISMATCH', attendance_id: row.id }); continue; }
-    if (Number(row.deleted) || row.deleted_at || excludedStatuses.has(String(row.attendance_status || row.status || '').toUpperCase())) continue;
+    if (Number(row.deleted) || row.deleted_at || excludedStatuses.has(String(row.attendance_status || row.status || '').trim().toUpperCase())) continue;
     const timestampVerified = row.timestamp_basis === 'UTC' || config.storageTimezone === 'UTC';
     if (!timestampVerified) {
       const savedDate = calendarDate(row.work_date);
@@ -174,4 +191,4 @@ function canonicalSnapshot(staff, assessment, period, version = 1, reviewStatus 
     review_status: reviewStatus, total_minutes: assessment.totalMinutes, rows: assessment.rows,
     shift_allocation: 'WHOLE_SHIFT_LOCAL_START_DATE' };
 }
-module.exports = { configuration, latestCompletedWeek, scheduleWindow, recoveryWindow, scheduleDetails, emailAddress, isEmployee, activeEmployee, assessWorkedAttendance, canonicalSnapshot, snapshotHash, stableJson, utcInstant, policyError };
+module.exports = { configuration, latestCompletedWeek, scheduleWindow, recoveryWindow, scheduleDetails, reportingDispatch, emailAddress, isEmployee, activeEmployee, assessWorkedAttendance, canonicalSnapshot, snapshotHash, stableJson, utcInstant, policyError };

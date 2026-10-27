@@ -1427,6 +1427,15 @@ async function testVerifiedAttendanceTotals() {
     assert.equal(week.body.verified_total_minutes, 60); assert.equal(week.body.historical_saved_hours, 11);
     assert.equal(week.body.duplicate_records, 1); assert.equal(week.body.review_required, true);
     assert.equal(Number(week.body.timesheet.total_hours), 1);
+    assert.equal(Number(week.body.timesheet.user_id),user.id,'Existing weekly records retain owner identity in the staff response');
+    assert.equal(require('../utils/dateOnly').dateOnly(week.body.timesheet.week_start),'2026-10-12');
+    assert.equal(week.body.current_week_start,'2026-10-12');
+    assert.equal(week.body.attendance.reduce((sum,row)=>sum+row.verified_worked_minutes,0),60,'Source rows expose the same eligible minutes as the weekly PDF/approval totals');
+    assert.deepEqual(week.body.attendance.map(row=>row.verification_status),['VERIFIED','EXCLUDED','EXCLUDED','EXCLUDED','REVIEW_REQUIRED']);
+    const history=await require('../services/attendanceDailyService').listMySessions({user});
+    assert.equal(history.verification_complete,true);assert.equal(history.verified_total_minutes,60);
+    assert.equal(history.attendance.reduce((sum,row)=>sum+row.verified_worked_minutes,0),60,'History cannot add duplicate/rejected/cancelled/unverified saved hours');
+    assert.equal(history.attendance.length,5,'Original excluded records remain visible for authorised review');
     const detail = await workflow.getTimesheetDetail(sheet.insertId, user);
     assert.equal(detail.summary.actualHours, 1); assert.equal(detail.summary.historical_saved_hours, 11);
     assert.equal(detail.summary.reviewRequired, true); assert.equal(detail.summary.duplicate_records, 1);
@@ -1453,6 +1462,11 @@ async function testVerifiedAttendanceTotals() {
     const approvedDetail = await workflow.getTimesheetDetail(sheet.insertId, user);
     assert.equal(approvedDetail.summary.actualHours, 1); assert.equal(Number(approvedDetail.timesheet.approved_hours), 77);
     assert.deepEqual(await snapshot(), beforeApprovedRead, 'Reading verified totals does not rewrite approved rows or their original version bytes.');
+    const invalidWeek=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-06'}},invalidWeek);assert.equal(invalidWeek.statusCode,422);assert.equal(invalidWeek.body.code,'TIMESHEET_WEEK_INVALID');
+    const futureWeek=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-19'}},futureWeek);assert.equal(futureWeek.statusCode,422);
+    const priorReads=await Promise.all([1,2].map(async()=>{const result=response();await controller.weekAttendance({...req,query:{week_start:'2026-10-05',user_id:mobileUsers.other.id}},result);return result;}));
+    for(const prior of priorReads){assert.equal(prior.statusCode,200);assert.equal(prior.body.week_start,'2026-10-05');assert.equal(prior.body.week_end,'2026-10-11');assert.equal(Number(prior.body.timesheet.user_id),user.id,'A supplied foreign user ID cannot change the own-week query');assert.equal(prior.body.total_hours,0);}
+    const [[onePrior]]=await pool.query("SELECT COUNT(*) count FROM weekly_timesheets WHERE user_id=? AND week_start='2026-10-05'",[user.id]);assert.equal(Number(onePrior.count),1,'Concurrent first reads keep one durable staff/week identity');
     assert.deepEqual(await raw(), preservedRaw, 'Duplicate, rejected, cancelled and unzoned records remain intact.');
   } finally { Settings.now = originalNow; }
   facts.push('actual current/draft weekly and approval totals exclude duplicate/rejected/cancelled/unverified hours, preserve saved diagnostics and approved historical versions, and block unresolved source review without payroll/mail side effects');

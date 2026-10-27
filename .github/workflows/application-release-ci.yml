@@ -58,6 +58,23 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
           "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install --with-deps chromium webkit
+      - name: Preserve existing charts through the shared Business Hub design update
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          CHART_BASELINE_DIR: ${{ runner.temp }}/chart-baseline/public
+          CHART_PROOF_DIR: ${{ runner.temp }}/chart-preservation-proof
+        run: |
+          mkdir -p "$RUNNER_TEMP/chart-baseline"
+          git archive 63709fbd3c24fbe6f4c7ea1eefd6ec61e1d4c8f9 public services/globalBrandRenderer.js controllers/dashboardController.js controllers/expenseController.js | tar -x -C "$RUNNER_TEMP/chart-baseline"
+          timeout --signal=TERM --kill-after=10s 240s node scripts/chart-preservation-browser-test.js
+      - name: Preserve chart before and after screenshots and interaction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: chart-preservation-${{ github.sha }}
+          path: ${{ runner.temp }}/chart-preservation-proof
+          retention-days: 30
       - name: Verify visible attendance ticking, breaks, resume and delayed staff workflows
         env:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
@@ -156,6 +173,26 @@ jobs:
           VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
           UI_PROOF_DIR: ${{ runner.temp }}/staff-mobile-proof
         run: timeout --signal=TERM --kill-after=10s 360s node scripts/staff-mobile-browser-test.js
+      - name: Verify authoritative staff weekly views, PDF failures and workplace dates
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/staff-timesheet-proof/chromium
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/staff-timesheet-browser-test.js
+      - name: Verify staff weekly views in WebKit
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          VV_STAFF_TIMESHEET_BROWSER_ENGINE: webkit
+          UI_PROOF_DIR: ${{ runner.temp }}/staff-timesheet-proof/webkit
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/staff-timesheet-browser-test.js
+      - name: Preserve staff weekly view evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: staff-timesheet-browser-${{ github.sha }}
+          path: ${{ runner.temp }}/staff-timesheet-proof
+          retention-days: 30
       - name: Decode the actual branded attendance gate through rotation, outage and responsive layouts
         if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
         env:

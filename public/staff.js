@@ -971,95 +971,42 @@ function addDays(date, days) {
   return d;
 }
 
-function weekRangeFor(value) {
-  const d = new Date(`${toDateOnly(value)}T00:00:00`);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  const start = new Date(d);
-  start.setDate(diff);
-  const end = addDays(start, 6);
-
-  return {
-    key: start.toISOString().slice(0, 10),
-    label: `${formatShortDate(start)} to ${formatShortDate(end)}`
-  };
+let staffTimesheetTimezone=null;
+function weekRangeFor(value){return VoxelStaffTimesheets.week(value);}
+function monthRangeFor(value){return VoxelStaffTimesheets.month(value);}
+function groupRows(rows,rangeFactory){return VoxelStaffTimesheets.group(rows,rangeFactory);}
+function staffTimesheetRow(row){
+ const state={VERIFIED:'Verified',REVIEW_REQUIRED:'Review required',OPEN:'In progress',EXCLUDED:'Excluded',NO_WORK:'No worked time'}[row.verification_status]||'Verification unavailable';
+ return `<tr><td>${escapeHtml(VoxelStaffTimesheets.dateLabel(row.allocated_work_date||row.work_date))}</td><td>${escapeHtml(VoxelStaffTimesheets.clock(row.clock_in,staffTimesheetTimezone))}</td><td>${escapeHtml(row.verification_status==='OPEN'?'In progress':VoxelStaffTimesheets.clock(row.clock_out,staffTimesheetTimezone))}</td><td>${escapeHtml(VoxelStaffTimesheets.breaks(row))}</td><td>${escapeHtml(VoxelStaffTimesheets.worked(row))}</td><td>${escapeHtml(state)}${row.review_reasons?.length?`<small>${escapeHtml(row.review_reasons.map(code=>window.VoxelAttendanceClock?.explain(code)||'Review source attendance').join(' '))}</small>`:''}</td><td>${escapeHtml(row.notes||'—')}</td></tr>`;
 }
-
-function monthRangeFor(value) {
-  const d = new Date(`${toDateOnly(value)}T00:00:00`);
-  const start = new Date(d.getFullYear(), d.getMonth(), 1);
-  const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-
-  return {
-    key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-    label: start.toLocaleDateString('en-AU', { month: 'long', year: 'numeric' }),
-    range: `${formatShortDate(start)} to ${formatShortDate(end)}`
-  };
+function renderGroupedTimesheets(container,groups,type){
+ if(!container)return;
+ if(!groups.length){container.innerHTML=`<div class="empty-state">Your ${type} timesheet history will appear here after your first shift.</div>`;return;}
+ container.innerHTML=groups.map(group=>`<section class="timesheet-group"><div class="timesheet-group-head"><div><h3>${escapeHtml(type==='monthly'?group.label:'Week: '+group.label)}</h3><p>${escapeHtml(type==='monthly'?group.range:group.label)} · ${escapeHtml(staffTimesheetTimezone||'Workplace timezone unavailable')}</p>${group.reviewCount?`<p>${group.reviewCount} source ${group.reviewCount===1?'session needs':'sessions need'} review. Unverified work is excluded.</p>`:''}</div><div class="timesheet-total">${group.totalHours===null?'Verification unavailable':escapeHtml(group.totalHours.toFixed(2))+' verified hrs'}</div>${type==='weekly'&&group.start?`<button type="button" class="secondary-btn" data-staff-week="${escapeHtml(group.start)}">Open week</button>`:''}</div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Clock in</th><th>Clock out</th><th>Recorded break</th><th>Verified work</th><th>Source status</th><th>Notes</th></tr></thead><tbody>${group.rows.map(staffTimesheetRow).join('')}</tbody></table></div></section>`).join('');
+ container.querySelectorAll('[data-staff-week]').forEach(button=>button.onclick=()=>selectStaffTimesheetWeek(button.dataset.staffWeek));
 }
-
-function groupRows(rows, rangeFactory) {
-  const groups = new Map();
-
-  rows.forEach((row) => {
-    const range = rangeFactory(row.work_date || row.clock_in);
-
-    if (!groups.has(range.key)) {
-      groups.set(range.key, { ...range, rows: [], totalHours: 0 });
-    }
-
-    const group = groups.get(range.key);
-    group.rows.push(row);
-    group.totalHours += Number(row.total_hours || 0);
-  });
-
-  return Array.from(groups.values())
-    .sort((a, b) => b.key.localeCompare(a.key))
-    .map((group) => ({ ...group, totalHours: Number(group.totalHours.toFixed(2)) }));
+let selectedStaffTimesheetWeek='',staffTimesheetSelectionEpoch=0;
+function markStaffTimesheetWeekLoading(){
+ staffTimesheetSelectionEpoch++;timesheetLoadSequence++;currentWeekTimesheet=null;
+ renderCurrentTimesheetWorkflow(null,null,{unavailable:true});setText('currentTimesheetStatus','Loading');setText('currentWeekRange','Loading the selected reporting week…');setText('timesheetSubmitReason','Wait for the selected week to load before submitting.');
+ for(const id of ['weekHoursCount','timesheetRecordedSignal','timesheetApprovedSignal','timesheetVarianceSignal'])setText(id,'—');
+ const tbody=document.getElementById('timesheetTableBody');if(tbody)tbody.innerHTML='<tr><td colspan="7">Loading the selected reporting week…</td></tr>';
 }
-
-function renderGroupedTimesheets(container, groups, type) {
-  if (!container) return;
-
-  if (!groups.length) {
-    container.innerHTML = `<div class="empty-state">Your ${type} timesheet history will appear here after your first shift.</div>`;
-    return;
-  }
-
-  container.innerHTML = groups.map((group) => `
-    <section class="timesheet-group">
-      <div class="timesheet-group-head">
-        <div>
-          <h3>${escapeHtml(type === 'monthly' ? group.label : `Week: ${group.label}`)}</h3>
-          <p>${escapeHtml(type === 'monthly' ? `Month timesheet from ${group.range}` : `This timesheet is from ${group.label}`)}</p>
-        </div>
-        <div class="timesheet-total">${escapeHtml(group.totalHours.toFixed(2))} hrs</div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Clock In</th>
-              <th>Clock Out</th>
-              <th>Total Hours</th>
-              <th>Notes</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${group.rows.map((row) => `
-              <tr>
-                <td>${escapeHtml(formatShortDate(row.work_date || row.clock_in))}</td>
-                <td>${escapeHtml(formatDateTime(row.clock_in))}</td>
-                <td>${escapeHtml(formatDateTime(row.clock_out))}</td>
-                <td>${escapeHtml(!row.clock_out?(row.clock_out_saved_text?'Requires review':'Open session'):row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
-                <td>${escapeHtml(row.notes || '-')}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  `).join('');
+function selectCurrentStaffTimesheetWeek(){selectedStaffTimesheetWeek='';markStaffTimesheetWeekLoading();return loadTimesheet();}
+function selectStaffTimesheetWeek(value){
+ const week=VoxelStaffTimesheets.week(value);if(!week.start)return;
+ selectedStaffTimesheetWeek=week.start;markStaffTimesheetWeekLoading();const input=document.getElementById('staffTimesheetWeek');if(input)input.value=week.start;
+ void loadTimesheet();document.getElementById('timesheetSection')?.scrollIntoView({block:'start'});
+}
+function shiftStaffTimesheetWeek(days){const current=document.getElementById('staffTimesheetWeek')?.value;const date=VoxelStaffTimesheets.move(current,days);if(date)selectStaffTimesheetWeek(date);}
+async function openStaffTimesheetPdf(download=false){
+ const week=VoxelStaffTimesheets.calendar(document.getElementById('staffTimesheetWeek')?.value);
+ if(!week)return showToast('Select and load a reporting week first.',{kind:'error'});
+ const buttons=document.querySelectorAll('[data-staff-week-pdf]');if([...buttons].some(button=>button.dataset.busy==='true'))return;
+ buttons.forEach(button=>{button.disabled=true;button.dataset.busy='true';});
+ try{await window.VoxelOperations.openPdf('/api/attendance/timesheets/week/pdf?week_start='+encodeURIComponent(week)+(download?'':'&disposition=inline'),{download});}
+ catch(error){showToast(error.message||'The verified weekly PDF could not be loaded. Review source attendance and retry.',{kind:'error'});}
+ finally{buttons.forEach(button=>{button.disabled=false;delete button.dataset.busy;});}
 }
 
 
@@ -2436,12 +2383,15 @@ function updateStaffRosterMetrics(rows) {
 function updateTimesheetVarianceSignals(totalHours = null) {
   const recordedEl = document.getElementById('weekHoursCount');
   const recorded = totalHours === null ? Number(recordedEl?.innerText || 0) : Number(totalHours || 0);
-  const rostered = latestRosterRows.reduce((sum, row) => sum + rosterShiftHours(row), 0);
+  if(!Number.isFinite(recorded)){setText('timesheetRecordedSignal','Unavailable');setText('timesheetVarianceSignal','Unavailable');setText('timesheetVarianceDetail','Reload this reporting week before comparing scheduled and verified work.');return;}
+  const start=String(currentWeekTimesheet?.week_start||'').slice(0,10),end=String(currentWeekTimesheet?.week_end||'').slice(0,10);
+  const selectedRoster=latestRosterRows.filter(row=>{const day=String(row.shift_date||'').slice(0,10);return start&&end&&day>=start&&day<=end&&!['cancelled','canceled','deleted'].includes(String(row.status||'').toLowerCase());});
+  const rostered = selectedRoster.reduce((sum, row) => sum + rosterShiftHours(row), 0);
   const variance = recorded - rostered;
   setText('timesheetRecordedSignal', `${recorded.toFixed(2)} hrs`);
   setText('staffRosterVarianceSignal', rostered ? `${Math.abs(variance).toFixed(2)} hrs` : 'No roster');
   setText('timesheetVarianceSignal', rostered ? `${variance >= 0 ? '+' : '-'}${Math.abs(variance).toFixed(2)} hrs` : 'No roster');
-  setText('timesheetVarianceDetail', rostered ? `${recorded.toFixed(2)} recorded vs ${rostered.toFixed(2)} rostered` : 'Roster sync will appear here');
+  setText('timesheetVarianceDetail', rostered ? `${recorded.toFixed(2)} verified vs ${rostered.toFixed(2)} scheduled in this reporting week` : 'No scheduled roster in this reporting week');
   if (!currentWeekTimesheet) {
     setText('timesheetPayrollSignal', recorded > 0 ? 'Draft' : 'Open');
   }
@@ -2492,7 +2442,7 @@ function renderCurrentTimesheetWorkflow(timesheet, totalHours, source = {}) {
     submitButton.textContent = status === 'CORRECTION_REQUIRED' ? 'Resubmit Timesheet' : 'Submit Timesheet';
   }
 
-  setText('timesheetPayrollSignal',source.unavailable?'Unavailable':payrollLabels[status] || 'Open');
+  setText('timesheetPayrollSignal',source.unavailable?'Unavailable':source.review_required?'Source review required':payrollLabels[status] || 'Open');
 
   if (managerNote) {
     const note = String(timesheet?.manager_comments || '').trim();
@@ -2503,6 +2453,7 @@ function renderCurrentTimesheetWorkflow(timesheet, totalHours, source = {}) {
 
 async function submitCurrentTimesheet() {
   const timesheet = currentWeekTimesheet;
+  const selectionEpoch=staffTimesheetSelectionEpoch,submissionOwner=Number(currentUser.id),submissionAccount=VoxelActions.account(),submissionPeriod=String(timesheet?.week_start||'').slice(0,10);
   if (!timesheet?.id) {
     showToast('Current weekly timesheet is not ready yet.', {kind:'info'});
     return;
@@ -2520,14 +2471,15 @@ async function submitCurrentTimesheet() {
     ? 'Resubmit this corrected timesheet for manager approval?'
     : 'Submit this weekly timesheet for manager approval?', {"title":"Submit timesheet","confirmLabel":"Submit timesheet"}))) return;
 
-  if(timesheet.source_review_required)return showToast('Source attendance needs correction before submission.', {kind:'error'});
+  if(selectionEpoch!==staffTimesheetSelectionEpoch||submissionOwner!==Number(currentUser.id)||submissionAccount!==VoxelActions.account()||!currentWeekTimesheet||Number(currentWeekTimesheet.id)!==Number(timesheet.id)||Number(currentWeekTimesheet.version_no)!==Number(timesheet.version_no)||String(currentWeekTimesheet.week_start||'').slice(0,10)!==submissionPeriod||String(currentWeekTimesheet.status||'').toUpperCase()!==status)return showToast('The selected week or account changed while confirming. Reload the intended week and review it before submitting.',{kind:'error'});
+  if(currentWeekTimesheet.source_review_required)return showToast('Source attendance needs correction before submission.', {kind:'error'});
   const button = document.getElementById('submitTimesheetBtn');
   if(button?.dataset.submitting==='true')return;
   if (button) {button.disabled = true;button.dataset.submitting='true';}
   try {
     await VoxelActions.timesheet({id:Number(timesheet.id),status:status==='CORRECTION_REQUIRED'?'CORRECTION_RESUBMITTED':'PENDING_APPROVAL',title:'Timesheet submitted',url:`/api/attendance/timesheets/${Number(timesheet.id)}/submit`,headers:authHeaders(),body:{expected_version:timesheet.version_no},
       context:`${currentUser.name||'Your timesheet'} · ${VoxelActions.date(timesheet.week_start)} – ${VoxelActions.date(timesheet.week_end)}`,
-      onCommit:row=>{currentWeekTimesheet={...timesheet,...row};renderCurrentTimesheetWorkflow(currentWeekTimesheet,Number(row.total_hours));},
+      onCommit:row=>{if(selectionEpoch!==staffTimesheetSelectionEpoch)return;currentWeekTimesheet={...timesheet,...row};renderCurrentTimesheetWorkflow(currentWeekTimesheet,Number(row.total_hours));},
       refresh:()=>loadTimesheet(),reopen:()=>loadTimesheet()});
   } finally {
     if (button && ['DRAFT', 'CORRECTION_REQUIRED'].includes(String(currentWeekTimesheet?.status || '').toUpperCase())) {
@@ -2710,6 +2662,15 @@ async function clockOut(shiftQrToken = '') {
 /* ================= TIMESHEET ================= */
 
 let timesheetLoadSequence = 0;
+function clearStaffTimesheetPrivateView(){
+ timesheetLoadSequence++;staffTimesheetSelectionEpoch++;selectedStaffTimesheetWeek='';currentWeekTimesheet=null;staffTimesheetTimezone=null;
+ const picker=document.getElementById('staffTimesheetWeek');if(picker){picker.value='';picker.removeAttribute('max');}setText('currentWeekRange','Verifying your own reporting period…');
+ const tbody=document.getElementById('timesheetTableBody');if(tbody)tbody.innerHTML='<tr><td colspan="7">Verifying your own timesheet records…</td></tr>';
+ for(const id of ['weeklyTimesheetGroups','monthlyTimesheetGroups']){const node=document.getElementById(id);if(node)node.textContent='Verifying your own attendance history…';}
+ for(const id of ['timesheetRecordedSignal','timesheetApprovedSignal','timesheetVarianceSignal','weekHoursCount'])setText(id,'—');
+ renderCurrentTimesheetWorkflow(null,null,{unavailable:true});
+}
+window.clearStaffTimesheetPrivateView=clearStaffTimesheetPrivateView;
 async function loadTimesheet() {
   const sequence=++timesheetLoadSequence,owner=Number(currentUser.id);
   const tbody = document.getElementById('timesheetTableBody');
@@ -2722,29 +2683,34 @@ async function loadTimesheet() {
 
   try {
     const [weekRes, historyRes] = await Promise.all([
-      fetch('/api/attendance/week', {
-        headers: { Authorization: `Bearer ${token}` }
+      fetch('/api/attendance/week'+(selectedStaffTimesheetWeek?'?week_start='+encodeURIComponent(selectedStaffTimesheetWeek):''), {
+        cache:'no-store',headers: { Authorization: `Bearer ${token}` }
       }),
       fetch('/api/attendance/my', {
-        headers: { Authorization: `Bearer ${token}` }
+        cache:'no-store',headers: { Authorization: `Bearer ${token}` }
       })
     ]);
 
     const weekData = await safeJson(weekRes);
     const historyData = await safeJson(historyRes);
     if(sequence!==timesheetLoadSequence||owner!==Number(currentUser.id)||owner!==Number(getStoredUser().id))return;
+    if((weekRes.ok&&((weekData.attendance||[]).some(row=>Number(row.user_id)!==owner)||weekData.timesheet?.user_id!=null&&Number(weekData.timesheet.user_id)!==owner))||(historyRes.ok&&(historyData.attendance||[]).some(row=>Number(row.user_id)!==owner)))throw new Error('The timesheet owner did not match your verified account. Retry after confirming the signed-in account.');
 
     if (tbody) {
       if (!weekRes.ok) {
-        renderCurrentTimesheetWorkflow(null,null,{unavailable:true});setText('weekHoursCount','—');
-        tbody.innerHTML = `<tr><td colspan="4">${escapeHtml(weekData.message || 'Failed to load weekly timesheet')}</td></tr>`;
+        renderCurrentTimesheetWorkflow(null,null,{unavailable:true});setText('weekHoursCount','—');setText('timesheetApprovedSignal','Unavailable');setText('timesheetRecordedSignal','Unavailable');
+        tbody.innerHTML = `<tr><td colspan="7">${escapeHtml(weekData.message || 'Failed to load weekly timesheet')}</td></tr>`;
       } else {
         const rows = weekData.attendance || [];
         const totalHours = Number(weekData.total_hours || 0);
+        staffTimesheetTimezone=weekData.company_timezone||null;
+        const weekInput=document.getElementById('staffTimesheetWeek');if(weekInput&&weekData.week_start){weekInput.value=weekData.week_start;weekInput.max=weekData.current_week_start||weekData.week_start;}
+        const nextWeek=document.getElementById('staffTimesheetNextWeek');if(nextWeek)nextWeek.disabled=weekData.week_start===(weekData.current_week_start||weekData.week_start);
+        setText('timesheetApprovedSignal',String(weekData.timesheet?.status).toUpperCase()==='APPROVED'?Number(weekData.timesheet.approved_hours).toFixed(2)+' hrs':'Not approved');
         renderCurrentTimesheetWorkflow(weekData.timesheet, totalHours, weekData);
 
         if (currentWeekRange) {
-          currentWeekRange.innerText = `This timesheet is from ${formatShortDate(weekData.week_start)} to ${formatShortDate(weekData.week_end)} of this week`;
+          currentWeekRange.innerText = `${VoxelStaffTimesheets.dateLabel(weekData.week_start)} to ${VoxelStaffTimesheets.dateLabel(weekData.week_end)} · ${staffTimesheetTimezone||'Timezone unavailable'} · Whole shifts allocated to their local start date`;
         }
 
         if (weekHours) {
@@ -2753,20 +2719,9 @@ async function loadTimesheet() {
         }
 
         if (!rows.length) {
-          tbody.innerHTML = `<tr><td colspan="4">No records for the current week yet.</td></tr>`;
+          tbody.innerHTML = `<tr><td colspan="7">No records for the current week yet.</td></tr>`;
         } else {
-          tbody.innerHTML = rows.map((row) => {
-            const cleanDate = row.work_date ? String(row.work_date).slice(0, 10) : '-';
-
-            return `
-              <tr>
-                <td>${escapeHtml(cleanDate)}</td>
-                <td>${escapeHtml(formatDateTime(row.clock_in))}</td>
-                <td>${escapeHtml(formatDateTime(row.clock_out))}</td>
-                <td>${escapeHtml(!row.clock_out?(row.clock_out_saved_text?'Requires review':'Open session'):row.total_hours==null?'Requires review':Number(row.total_hours).toFixed(2))}</td>
-              </tr>
-            `;
-          }).join('');
+          tbody.innerHTML = rows.map(staffTimesheetRow).join('');
         }
       }
     }
@@ -2778,6 +2733,7 @@ async function loadTimesheet() {
         if (monthlyGroupsEl) monthlyGroupsEl.innerHTML = message;
       } else {
         const historyRows = historyData.attendance || [];
+        staffTimesheetTimezone=historyData.company_timezone||staffTimesheetTimezone;
         renderGroupedTimesheets(weeklyGroupsEl, groupRows(historyRows, weekRangeFor), 'weekly');
         renderGroupedTimesheets(monthlyGroupsEl, groupRows(historyRows, monthRangeFor), 'monthly');
       }
@@ -2785,9 +2741,9 @@ async function loadTimesheet() {
   } catch {
     if(sequence!==timesheetLoadSequence||owner!==Number(currentUser.id)||owner!==Number(getStoredUser().id))return;
     currentWeekTimesheet = null;
-    renderCurrentTimesheetWorkflow(null, null, {unavailable:true});setText('weekHoursCount','—');
+    renderCurrentTimesheetWorkflow(null, null, {unavailable:true});setText('weekHoursCount','—');setText('timesheetApprovedSignal','Unavailable');setText('timesheetRecordedSignal','Unavailable');
     if (tbody) {
-      tbody.innerHTML = `<tr><td colspan="4">Server error loading weekly timesheet.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7">Server error loading weekly timesheet.</td></tr>`;
     }
 
     if (weeklyGroupsEl) {

@@ -164,8 +164,13 @@ async function processEmailQueue(limit = 10) {
 
   const outcomes = [];
   for (const row of rows) {
+    const isWeekly = weeklyMessage(row);
+    // The SELECT may be stale after another replica safely failed and scheduled
+    // a retry. Recheck due time and the weekly attempt budget atomically when
+    // claiming, so that replica cannot bypass backoff or consume another send.
     const [claim] = await pool.query(
-      `UPDATE email_queue SET status = 'SENDING', claimed_at=NOW(), attempts = attempts + 1 WHERE id = ? AND status IN ('PENDING', 'RETRY') AND related_module IN (${modulePlaceholders})`,
+      `UPDATE email_queue SET status = 'SENDING', claimed_at=NOW(), attempts = attempts + 1 WHERE id = ? AND status IN ('PENDING', 'RETRY') AND related_module IN (${modulePlaceholders})
+        AND scheduled_at <= NOW() AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())${isWeekly ? ' AND attempts < max_attempts' : ''}`,
       [row.id, ...RETAINED_EMAIL_MODULES]
     );
     if (!claim.affectedRows) continue;
@@ -173,7 +178,6 @@ async function processEmailQueue(limit = 10) {
     let providerAccepted = false;
     let transportInvoked = false;
     let weeklyDb = null;
-    const isWeekly = weeklyMessage(row);
     const markWeekly = async (status, metadata = {}, db = pool) => {
       if (isWeekly && row.delivery_policy_json) await require('./weeklyTimesheetScheduler').markWeeklyDeliveryResult(db, row, status, metadata);
     };
@@ -235,7 +239,11 @@ async function processEmailQueue(limit = 10) {
       const persistentTransportRetry = isEmailTransportError(error)
         && !['EAUTH', 'SMTP_CONFIG_MISSING'].includes(code);
       const requiresRepair = code.startsWith('PDF_');
-      const retry = error.retryable!==false && !requiresRepair && (persistentTransportRetry || attempts < Number(row.max_attempts || 5));
+      // Weekly reports have a bounded recovery policy. Repeated known-safe
+      // connectivity failures must not bypass the durable attempt budget.
+      // Accepted/uncertain attempts are already held above, never retried here.
+      const withinBudget = attempts < Number(row.max_attempts || 5);
+      const retry = error.retryable!==false && !requiresRepair && (isWeekly ? withinBudget : persistentTransportRetry || withinBudget);
       const retryMinutes = persistentTransportRetry
         ? Math.min(360, 2 ** Math.min(9, Math.max(0, attempts - 1)))
         : Math.min(60, 2 ** Math.max(0, attempts - 1));

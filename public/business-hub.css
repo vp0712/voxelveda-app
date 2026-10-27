@@ -1,0 +1,131 @@
+/* Shared Business Hub presentation, adapted from the inspected hub.voxelveda.com
+   interface (27 October 2026). Voxel Veda keeps its blue actions, logo and readable
+   touch targets. Chart grids, frames, canvases and configuration are untouched. */
+:root {
+  --hub-sidebar:#0C1827;
+  --hub-sidebar-hover:#19283A;
+  --hub-sidebar-selected:#203B66;
+  --hub-sidebar-muted:#B3C2D6;
+  --hub-radius:8px;
+  --hub-dialog-radius:12px;
+  --hub-panel-shadow:0 3px 12px rgba(9,19,31,.035);
+}
+:root[data-color-mode="dark"] {
+  --page:#09131F;
+  --surface:#101E2E;
+  --surface-muted:#142437;
+  --text-primary:#EDF2F8;
+  --text-secondary:#B5C4D7;
+  --border:#35475E;
+  --control-border:#8A9DB6;
+  --hub-panel-shadow:0 3px 12px rgba(0,0,0,.09);
+}
+body[data-vv-theme="navy-blue"] {
+  -webkit-tap-highlight-color:transparent;
+  --nav:var(--hub-sidebar);
+  --nav-hover:var(--hub-sidebar-hover);
+  --nav-text:#EDF2F8;
+}
+body[data-vv-theme="navy-blue"] :is(h1,h2,h3) {
+  letter-spacing:-.018em;
+}
+body[data-vv-theme="navy-blue"] :is(.topbar,.client-top,.workspace-header,.top) {
+  border-color:var(--border);
+  box-shadow:var(--hub-panel-shadow);
+}
+body[data-vv-theme="navy-blue"] .topbar.vv-topbar {
+  border-radius:var(--hub-radius);
+}
+body[data-vv-theme="navy-blue"] .topbar-kicker {
+  font-size:.6875rem;
+  letter-spacing:.09em;
+  font-weight:650;
+}
+body[data-vv-theme="navy-blue"] .sidebar {
+  background:var(--hub-sidebar)!important;
+  border-right:1px solid #2B3D53!important;
+}
+body[data-vv-theme="navy-blue"] .sidebar .brand :is(h1,p) { color:#EDF2F8!important; }
+body[data-vv-theme="navy-blue"] .sidebar .brand p { color:var(--hub-sidebar-muted)!important; }
+body[data-vv-theme="navy-blue"] .sidebar :is(.nav-btn,.nav-group-toggle,.logout-btn) {
+  border-radius:6px!important;
+  font-weight:550!important;
+  color:#CFDAE9!important;
+}
+body[data-vv-theme="navy-blue"] .sidebar :is(.nav-btn,.nav-group-toggle,.logout-btn):hover {
+  background:var(--hub-sidebar-hover)!important;
+  color:#FFF!important;
+}
+body[data-vv-theme="navy-blue"] .sidebar .nav-btn.active {
+  background:var(--hub-sidebar-selected)!important;
+  color:#DCEAFF!important;
+  border-color:#547CB1!important;
+  box-shadow:inset 3px 0 0 #9EBBFF!important;
+}
+body[data-vv-theme="navy-blue"] .sidebar .nav-section-label {
+  color:var(--hub-sidebar-muted)!important;
+  font-size:.6875rem!important;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  font-weight:650;
+}
+body[data-vv-theme="navy-blue"] .sidebar .nav-submenu {
+  border-inline-start:1px solid #40516A;
+  margin-inline-start:12px;
+}
+body[data-vv-theme="navy-blue"] .sidebar .sidebar-footer {
+  border-top:1px solid #2B3D53;
+}
+body[data-vv-theme="navy-blue"] .workspace-nav-search { color:var(--hub-sidebar-muted); }
+body[data-vv-theme="navy-blue"] .workspace-nav-search input {
+  background:#152335!important;
+  color:#EDF2F8!important;
+  border-color:#6F839F!important;
+  border-radius:6px;
+}
+body[data-vv-theme="navy-blue"] .workspace-nav-search input::placeholder { color:#B5C4D7; }
+body[data-vv-theme="navy-blue"] :is(.card,.panel,.procurement-panel,.role-command-panel,.role-command-card,.role-focus-card,.role-access-card,.staff-work-card,.staff-home-panel) {
+  border-radius:var(--hub-radius);
+  border-color:var(--border);
+  box-shadow:var(--hub-panel-shadow);
+}
+body[data-vv-theme="navy-blue"] :is(.primary-btn,.secondary-btn,.danger-btn,.icon-btn,.button,.vv-theme-toggle) {
+  border-radius:6px;
+  font-weight:600;
+  /* Change foreground and background together when switching themes. */
+  transition:border-color .15s;
+}
+body[data-vv-theme="navy-blue"] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),select,textarea) {
+  border-radius:6px;
+}
+body[data-vv-theme="navy-blue"] :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea):focus-visible {
+  outline:2px solid var(--focus)!important;
+  outline-offset:2px;
+}
+body[data-vv-theme="navy-blue"] :is(.form-grid,.procurement-form-grid,.quality-register-filters) label {
+  line-height:1.5;
+}
+body[data-vv-theme="navy-blue"] :is(.table-wrap,.table-wrapper,.quality-table-wrap,.procurement-table-wrap) {
+  border-radius:var(--hub-radius);
+}
+body[data-vv-theme="navy-blue"] table th {
+  color:var(--text-secondary);
+  background:var(--surface-muted);
+  font-weight:650;
+}
+body[data-vv-theme="navy-blue"] table tbody tr:hover { background:var(--surface-muted); }
+body[data-vv-theme="navy-blue"] :is(.status-badge,.status-pill,.badge) {
+  border-radius:5px;
+  font-weight:650;
+}
+body[data-vv-theme="navy-blue"] :is(.dialog-panel,.vv-feedback-panel,.portal-profile-menu) {
+  border-radius:var(--hub-dialog-radius);
+  border-color:var(--border);
+}
+body[data-vv-theme="navy-blue"] .vv-managed-dialog>.dialog-actions {
+  background:var(--surface);
+}
+body[data-vv-theme="navy-blue"] .mobile-bottom-nav button { border-radius:6px; }
+@media(prefers-reduced-motion:reduce) {
+  body[data-vv-theme="navy-blue"] :is(.primary-btn,.secondary-btn,.danger-btn,.icon-btn,.button) { transition:none; }
+}

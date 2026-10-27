@@ -110,19 +110,20 @@ exports.legacyStatus = async (req, res) => {
       const timesheet = await workflow.approveTimesheet(id, req.user, {
         approvedHours: req.body.approved_hours,
       requireVersion:true,expectedVersion:req.body.expected_version,expectedSourceMinutes:req.body.expected_source_minutes,
-        comments: req.body.comments
+        comments: req.body.comments,
+        reason: req.body.reason
       }, req);
       return res.json({ outcome:'COMMITTED', message: 'Timesheet approved and added to Payroll Ready.', timesheet });
     }
     if (status === 'REJECTED') {
       const timesheet = await workflow.reviewTimesheet(
-        id, req.user, 'REJECT', req.body.comments || 'Rejected during manager review.', req
+        id, req.user, 'REJECT', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
       );
       return res.json({ message: 'Timesheet rejected.', timesheet });
     }
     if (status === 'CORRECTION_REQUIRED') {
       const timesheet = await workflow.reviewTimesheet(
-        id, req.user, 'REQUEST_CORRECTION', req.body.comments || 'Please review and correct this timesheet.', req
+        id, req.user, 'REQUEST_CORRECTION', req.body.comments, req, {requireVersion:true,expectedVersion:req.body.expected_version}
       );
       return res.json({ message: 'Correction requested.', timesheet });
     }

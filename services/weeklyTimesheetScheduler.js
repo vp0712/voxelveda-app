@@ -153,8 +153,9 @@ async function reserveDelivery(staffId, period, config, now) {
       await conn.query('UPDATE weekly_timesheet_deliveries SET status=?,last_error_code=? WHERE id=?', [status, 'LEGACY_WEEKLY_DELIVERY_REVIEW', delivery.id]);
       await conn.commit(); return { staff_id: staffId, status, existing: true, reason: 'LEGACY_WEEKLY_DELIVERY_REVIEW' };
     }
-    const snapshot = await reviewedSnapshot(conn, staff, assessment, period, Number(delivery.version), timesheet, config,
+    let snapshot = await reviewedSnapshot(conn, staff, assessment, period, Number(delivery.version), timesheet, config,
       delivery.snapshot_json ? frozenSnapshot(delivery).generated_at : now.toISOString());
+    if (!delivery.snapshot_json) snapshot = await require('./timesheetPdfService').freezeSnapshot(conn, snapshot);
     const sourceHash = policy.snapshotHash(snapshot);
     if (delivery.source_sha256 && delivery.source_sha256 !== sourceHash) {
       await conn.query("UPDATE weekly_timesheet_deliveries SET status='REVIEW_REQUIRED',last_error_code='SOURCE_CHANGED',claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
@@ -181,7 +182,12 @@ async function checkReservedDelivery(conn, reservation, config, now) {
 async function queueReservedDelivery(reservation, config, now) {
   const snapshot = reservation.snapshot;
   const data = documentDataForSnapshot(snapshot);
+  const pdfs = require('./timesheetPdfService');
+  const frozen = await pdfs.freezeSnapshot(pool, snapshot);
+  if (policy.snapshotHash(frozen) !== reservation.source_sha256) throw safetyError('SOURCE_CHANGED');
+  const artifact = await pdfs.snapshotArtifact(pool, frozen);
   const result = await queueDocumentEmail({ module: 'timesheets', recordId: reservation.timesheet_id, data, to: [reservation.recipient],
+    validatedArtifact: artifact,
     deliveryPolicy: { type: 'WEEKLY_TIMESHEET', deliveryId: reservation.delivery_id, staffId: snapshot.staff_id,
       fromDate: snapshot.period_start, toDate: snapshot.period_end, revision: snapshot.version,
       sourceHash: reservation.source_sha256, recipient: reservation.recipient },
@@ -397,4 +403,5 @@ module.exports = { latestCompletedWeek: policy.latestCompletedWeek, queueClosedW
   loadWorkedAttendance:attendanceForPeriod,
   getWeeklyTimesheetSchedule: policy.scheduleDetails,
   documentDataForSnapshot,
+  loadDocumentStaff: staffById, loadDocumentReview: reviewStatus, reviewedDocumentSnapshot: reviewedSnapshot,
   _test: { reserveDelivery, checkReservedDelivery, queueReservedDelivery, attendanceForPeriod, currentSnapshot, reviewProof } };

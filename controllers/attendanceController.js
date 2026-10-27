@@ -180,8 +180,11 @@ exports.weekAttendance = async (req, res) => {
 
     await incompleteShiftsForReview(userId);
 
-    const start = weekStartDate();
-    const end = weekEndDate();
+    const currentStart=weekStartDate();
+    const requested=req.query?.week_start;
+    const start=requested===undefined?currentStart:dateOnly(requested);
+    if(!start||String(requested??start)!==start||weekStartForDate(start)!==start||start>currentStart)return res.status(422).json({message:'Choose a Monday on or before the current reporting week.',code:'TIMESHEET_WEEK_INVALID',fields:{week_start:'Choose a valid Monday'}});
+    const end = weekEndForDate(start);
 
     const data = await getWeekAttendance(userId, start, end);
 
@@ -190,9 +193,10 @@ exports.weekAttendance = async (req, res) => {
     res.json({
       week_start: start,
       week_end: end,
+      current_week_start:currentStart,
       total_hours: data.totalHours,
       verified_total_minutes:data.verified_total_minutes,historical_saved_hours:data.historical_saved_hours,verification_status:data.verification_status,review_required:data.review_required,review_issues:data.review_issues,duplicate_records:data.duplicate_records,
-      attendance: data.rows.map(row=>({...require('../services/attendanceMobilePolicy').publicAttendance(row),total_hours:row.total_hours,total_minutes:row.total_minutes})),
+      attendance: data.rows.map(row=>({...require('../services/attendanceMobilePolicy').publicAttendance(row),allocated_work_date:row.allocated_work_date,total_hours:row.total_hours,total_minutes:row.total_minutes})),
       timesheet, company_timezone: attendanceTime.companyTimezone()
     });
   } catch (err) {
@@ -539,7 +543,7 @@ exports.restoreAttendance = (req, res) => archiveAttendance(req, res, false);
 
 async function getWeekAttendance(userId, start, end) {
   const summary=await verifiedAttendance.loadVerifiedSummary({db:pool,userId,fromDate:start,toDate:end});
-  return {rows:summary.records,totalHours:summary.actualHours,...verifiedAttendance.diagnostics(summary)};
+  return {rows:verifiedAttendance.presentAttendance(summary),totalHours:summary.actualHours,...verifiedAttendance.diagnostics(summary)};
 }
 
 async function refreshCurrentWeekTimesheet(userId) {
@@ -561,7 +565,7 @@ async function refreshWeekForDate(userId, dateValue) {
 async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
   const [existing] = await pool.query(
     `
-    SELECT id, status, total_hours, ordinary_hours, overtime_hours, approved_hours,
+    SELECT id, user_id, week_start, week_end, status, total_hours, ordinary_hours, overtime_hours, approved_hours,
       payroll_status, submitted_at, approved_at, version_no, manager_comments
     FROM weekly_timesheets
     WHERE user_id = ?
@@ -581,25 +585,28 @@ async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
         `
         UPDATE weekly_timesheets
         SET total_hours = ?, ordinary_hours = ?, overtime_hours = ?
-        WHERE id = ?
+        WHERE id = ? AND status IN ('DRAFT','CORRECTION_REQUIRED') AND version_no = ?
         `,
         [
           totalHours,
           Math.min(Number(totalHours || 0), standardHours),
           Math.max(0, Number(totalHours || 0) - standardHours),
-          record.id
+          record.id, record.version_no
         ]
       );
       record.total_hours = totalHours;
       record.ordinary_hours = Math.min(Number(totalHours || 0), standardHours);
       record.overtime_hours = Math.max(0, Number(totalHours || 0) - standardHours);
+      const [[saved]]=await pool.query('SELECT id,user_id,week_start,week_end,status,total_hours,ordinary_hours,overtime_hours,approved_hours,payroll_status,submitted_at,approved_at,version_no,manager_comments FROM weekly_timesheets WHERE id=?',[record.id]);
+      if(saved)return {...saved,status:String(saved.status||'DRAFT').trim().toUpperCase()};
     }
     record.status = status;
     return record;
   }
 
   const standardHours = Number(process.env.STANDARD_WEEKLY_HOURS || 38);
-  const [result] = await pool.query(
+  let result;
+  try { [result] = await pool.query(
     `
     INSERT INTO weekly_timesheets
     (user_id, week_start, week_end, total_hours, ordinary_hours, overtime_hours, status)
@@ -615,6 +622,14 @@ async function upsertWeeklyTimesheet(userId, weekStart, weekEnd, totalHours) {
       'DRAFT'
     ]
   );
+  } catch(error) {
+    // Both staff home and My timesheets may first read a week simultaneously.
+    // The existing unique staff/week key wins; never overwrite the winner.
+    if(error.code!=='ER_DUP_ENTRY')throw error;
+    const [[saved]]=await pool.query('SELECT id,user_id,week_start,week_end,status,total_hours,ordinary_hours,overtime_hours,approved_hours,payroll_status,submitted_at,approved_at,version_no,manager_comments FROM weekly_timesheets WHERE user_id=? AND week_start=? AND week_end=?',[userId,weekStart,weekEnd]);
+    if(!saved)throw error;
+    return {...saved,status:String(saved.status||'DRAFT').trim().toUpperCase()};
+  }
   return {
     id: result.insertId,
     user_id: userId,
