@@ -488,6 +488,17 @@ async function makeWeeklyFixtureDue(queueId) {
 }
 
 async function testWeeklyDelivery() {
+  // Keep real MySQL source/cache metadata, scheduler locks, renderer, parser and
+  // queue serialization. Only the private object provider is local to this
+  // disposable fixture; never invent credentials or contact a production bucket.
+  const storage = require('../services/objectStorageService');
+  const originalStorage = { putObject: storage.putObject, getObject: storage.getObject, deleteObject: storage.deleteObject };
+  const objects = new Map();
+  const fixtureKey = key => assert.match(String(key), /^timesheet-pdfs\/[a-f0-9]{64}\/[a-f0-9]{64}\.pdf$/, 'Weekly fixture accesses only its content-addressed PDF objects.');
+  storage.putObject = async (key, bytes, type) => { fixtureKey(key); assert.equal(type, 'application/pdf'); assert(Buffer.isBuffer(bytes)); objects.set(key, Buffer.from(bytes)); return { key, size: bytes.length }; };
+  storage.getObject = async key => { fixtureKey(key); assert(objects.has(key), 'A persisted PDF key must identify stored fixture bytes.'); return Buffer.from(objects.get(key)); };
+  storage.deleteObject = async key => { fixtureKey(key); objects.delete(key); return { key, deleted: true }; };
+  try {
   const { DateTime } = require('luxon');
   const policy = require('../services/weeklyTimesheetEligibility');
   const { validatePdf } = require('../services/documentPdfService');
@@ -536,6 +547,15 @@ async function testWeeklyDelivery() {
   assert.equal(attachments.length, 1);
   const parsed = await validatePdf(attachments[0].content, { expectedText: ['Worked fixture employee', period.start, period.end, '8.00'] });
   assert.doesNotMatch(parsed.text, /No-work fixture|Planned fixture|Missing designation|login-only/);
+  const [[cachedPdf]] = await pool.query('SELECT pdf_object_key,pdf_sha256,pdf_bytes_count,pdf_filename,generation_status FROM timesheet_pdf_snapshots WHERE source_key=?', [require('../services/timesheetPdfService').sourceKey(JSON.parse(worked.snapshot_json))]);
+  assert.equal(cachedPdf.generation_status, 'VALIDATED');
+  assert.equal(cachedPdf.pdf_sha256, digest(attachments[0].content));
+  assert.equal(Number(cachedPdf.pdf_bytes_count), attachments[0].content.length);
+  assert.equal(cachedPdf.pdf_filename, attachments[0].filename);
+  assert((await storage.getObject(cachedPdf.pdf_object_key)).equals(attachments[0].content), 'The real SQL cache points to the exact parser-valid bytes serialized into the durable email queue.');
+  const restoredArtifact = await require('../services/timesheetPdfService').snapshotArtifact(pool, JSON.parse(worked.snapshot_json));
+  assert(restoredArtifact.buffer.equals(attachments[0].content), 'Reopening the persistent PDF metadata returns the same authoritative document version without regeneration.');
+
   const [[request]] = await pool.query('SELECT generation_status,pdf_sha256,email_queue_id FROM document_delivery_requests WHERE id=?', [worked.document_request_id]);
   assert.deepEqual(request, { generation_status: 'VALIDATED', pdf_sha256: digest(attachments[0].content), email_queue_id: worked.email_queue_id });
   delete require.cache[require.resolve('../services/weeklyTimesheetScheduler')];
@@ -587,6 +607,11 @@ async function testWeeklyDelivery() {
   assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.pdf.status,'VALIDATED');
   facts.push('real InnoDB bounded missed-window recovery after designated-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
   facts.push('real worked-only weekly scheduling/locks/PDF linkage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
+  } finally {
+    Object.assign(storage, originalStorage);
+    objects.clear();
+    for (const [name, method] of Object.entries(originalStorage)) assert.equal(storage[name], method, 'The private fixture adapter must not leak into another workflow.');
+  }
 }
 
 async function testProcurementRecordsAndSnapshots() {
