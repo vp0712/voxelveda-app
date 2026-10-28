@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { ensureEmailQueueSchema } = require('./emailQueueSchema');
 const { sendMail, normalizeAddressList, isEmailTransportError, explicitNegativeSmtpReply, classifySmtpFailure, attachmentBuffer, assertAttachmentIntegrity } = require('./emailService');
-const { assertWeeklyDeliveryPolicy, weeklyMessage, privacyError } = require('./weeklyDeliveryPolicy');
+const { assertWeeklyDeliveryPolicy, assertWeeklyDeliveryContent, weeklyFormat, weeklyMessage, privacyError } = require('./weeklyDeliveryPolicy');
 const { validatePdf } = require('./documentPdfService');
 
 // Retired and unclassified messages remain in their original queue rows but
@@ -33,6 +33,19 @@ function assertExpectedDocumentAttachment(message, attachments) {
   const template = String(message.templateKey || message.template_key || '').toLowerCase();
   const key = String(message.idempotencyKey || message.idempotency_key || '');
   const body = [message.subject, message.text || message.text_body, message.html || message.html_body].join(' ').replace(/<[^>]*>/g, ' ');
+  const suppliedPolicy = message.deliveryPolicy || parseJson(message.delivery_policy_json, null);
+  if (suppliedPolicy?.format === 'HTML') {
+    // This exception belongs only to the explicit, source-bound weekly HTML
+    // report. A generic timesheet/invoice message cannot use it to omit a PDF.
+    const deliveryPolicy = assertWeeklyDeliveryPolicy({ ...message, deliveryPolicy: suppliedPolicy }, {
+      to: normalizeAddressList(message.to ?? parseJson(message.to_json, [])),
+      cc: normalizeAddressList(message.cc ?? parseJson(message.cc_json, [])),
+      bcc: normalizeAddressList(message.bcc ?? parseJson(message.bcc_json, []))
+    });
+    if (module !== 'timesheets' || template !== 'weekly_timesheet_html') throw privacyError('WEEKLY_HTML_IDENTITY_MISMATCH');
+    assertWeeklyDeliveryContent({ ...message, attachments }, deliveryPolicy);
+    return;
+  }
   const expected = module === 'invoices'
     || /^(?:document:|weekly-timesheet:)/.test(key)
     || /(?:^|_)(?:document_pdf|invoice|invoice_statement|customer_statement|quotation|purchase_order|weekly_timesheet|timesheet_summary)(?:_|$)/.test(template)
@@ -76,6 +89,8 @@ async function queueEmail(message, db = pool) {
   const attachments = await serializableAttachments(message.attachments);
   assertExpectedDocumentAttachment(message, attachments);
   const deliveryPolicy = assertWeeklyDeliveryPolicy(message, { to: normalizeAddressList(message.to), cc: normalizeAddressList(message.cc), bcc: normalizeAddressList(message.bcc) });
+  assertWeeklyDeliveryContent({ ...message, attachments }, deliveryPolicy);
+  if (deliveryPolicy && weeklyFormat(deliveryPolicy) === 'HTML' && message.idempotencyKey !== `weekly-timesheet:${deliveryPolicy.staffId}:${deliveryPolicy.fromDate}:${deliveryPolicy.toDate}:v${deliveryPolicy.revision}`) throw privacyError('WEEKLY_POLICY_IDENTITY_MISMATCH');
   await ensureEmailQueueSchema();
   const payload = [
     message.templateKey || null,
@@ -108,6 +123,21 @@ async function queueEmail(message, db = pool) {
     return result.insertId;
   } catch (error) {
     if (error?.code !== 'ER_DUP_ENTRY' || !message.idempotencyKey) throw error;
+    if (deliveryPolicy && weeklyFormat(deliveryPolicy) === 'HTML') {
+      const [[existing]] = await db.query('SELECT * FROM email_queue WHERE idempotency_key = ? LIMIT 1', [message.idempotencyKey]);
+      let existingPolicy;
+      try {
+        existingPolicy = assertWeeklyDeliveryPolicy({ ...existing, deliveryPolicy: parseJson(existing?.delivery_policy_json, null) }, {
+          to: parseJson(existing?.to_json, []), cc: parseJson(existing?.cc_json, []), bcc: parseJson(existing?.bcc_json, [])
+        });
+        assertExpectedDocumentAttachment(existing || {}, restoreAttachments(parseJson(existing?.attachments_json, [])));
+      } catch { throw privacyError('WEEKLY_HTML_IDEMPOTENCY_CONFLICT'); }
+      if (!existing || existing.related_module !== message.relatedModule || String(existing.related_record_id) !== String(message.relatedRecordId) ||
+          existing.template_key !== message.templateKey || existing.subject !== message.subject || existing.html_body !== message.html || existing.text_body !== message.text ||
+          existingPolicy?.sourceHash !== deliveryPolicy.sourceHash || existingPolicy?.contentHash !== deliveryPolicy.contentHash ||
+          existingPolicy?.recipient !== deliveryPolicy.recipient || existingPolicy?.format !== 'HTML') throw privacyError('WEEKLY_HTML_IDEMPOTENCY_CONFLICT');
+      return existing.id;
+    }
     const [[existing]] = await db.query(
       'SELECT id FROM email_queue WHERE idempotency_key = ? LIMIT 1',
       [message.idempotencyKey]
@@ -191,9 +221,16 @@ async function processEmailQueue(limit = 10) {
         await weeklyDb.beginTransaction();
         const checked = await require('./weeklyTimesheetScheduler').validateQueuedWeeklyDelivery(row, weeklyDb);
         if (!checked || Number(checked.delivery_id) !== Number(deliveryPolicy.deliveryId) || Number(checked.staff_id) !== Number(deliveryPolicy.staffId) || Number(checked.version) !== Number(deliveryPolicy.revision) || checked.source_sha256 !== deliveryPolicy.sourceHash) throw privacyError('WEEKLY_POLICY_SOURCE_MISMATCH');
-        if (attachments.length !== 1) throw privacyError('WEEKLY_ATTACHMENT_COUNT_INVALID');
-        const data = checked.documentData;
-        await validatePdf(attachmentBuffer(attachments[0]), { expectedText: [data.title, data.reference, data.party, data.period] });
+        if (weeklyFormat(deliveryPolicy) === 'HTML') {
+          const content = assertWeeklyDeliveryContent({ ...row, attachments }, deliveryPolicy);
+          if (checked.format !== 'HTML' || checked.contentHash !== deliveryPolicy.contentHash || !checked.contentSnapshot ||
+              ['subject', 'html', 'text', 'layoutVersion'].some(field => checked.contentSnapshot[field] !== content[field])) throw privacyError('WEEKLY_HTML_SNAPSHOT_MISMATCH');
+        } else {
+          if (checked.format && checked.format !== 'PDF') throw privacyError('WEEKLY_FORMAT_MISMATCH');
+          assertWeeklyDeliveryContent({ ...row, attachments }, deliveryPolicy);
+          const data = checked.documentData;
+          await validatePdf(attachmentBuffer(attachments[0]), { expectedText: [data.title, data.reference, data.party, data.period] });
+        }
       }
       transportInvoked=true;
       const result = await sendMail({
@@ -228,7 +265,7 @@ async function processEmailQueue(limit = 10) {
       const uncertainTransport=transportInvoked&&!provedBeforeDispatch&&!explicitNegative;
       if(providerAccepted || error.code==='DELIVERY_REVIEW_REQUIRED' || uncertainTransport) {
         providerAccepted=providerAccepted || error.providerAccepted===true;
-        await pool.query("UPDATE email_queue SET status='REVIEW_REQUIRED',provider_accepted_at=CASE WHEN ?=1 THEN COALESCE(provider_accepted_at,NOW()) ELSE provider_accepted_at END,last_error=?,next_attempt_at=NULL WHERE id=?",[providerAccepted?1:0,providerAccepted ? 'The provider accepted this message, but attachment confirmation or delivery bookkeeping could not finish. Review before retry; recipient receipt is unverified.' : (error.message || 'The transport transaction outcome is uncertain. Review provider logs before retry to avoid duplicate delivery.'),row.id]);
+        await pool.query("UPDATE email_queue SET status='REVIEW_REQUIRED',provider_accepted_at=CASE WHEN ?=1 THEN COALESCE(provider_accepted_at,NOW()) ELSE provider_accepted_at END,last_error=?,next_attempt_at=NULL WHERE id=?",[providerAccepted?1:0,providerAccepted ? 'The provider accepted this message, but content confirmation or delivery bookkeeping could not finish. Review before retry; recipient receipt is unverified.' : (error.message || 'The transport transaction outcome is uncertain. Review provider logs before retry to avoid duplicate delivery.'),row.id]);
         await writeEmailLog(row,'REVIEW_REQUIRED',null,error);
         await markWeekly('REVIEW_REQUIRED', { code: error.code, reasonCode: error.reasonCode, providerAccepted });
         outcomes.push({id:row.id,status:'REVIEW_REQUIRED',provider_accepted:providerAccepted,recipient_verified:false});

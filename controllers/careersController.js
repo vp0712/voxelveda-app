@@ -377,30 +377,60 @@ async function submitApplication(req, res) {
 }
 
 async function listApplications(req, res) {
-  await ensureCareersSchema();
-  const status = clean(req.query.status, 40).toUpperCase();
-  const department = clean(req.query.department, 120);
-  const search = clean(req.query.search, 160);
-  const where = [];
-  const params = [];
-  if (status && VALID_STATUSES.has(status)) { where.push('a.status=?'); params.push(status); }
+  const { hasAnyPermission } = require('../services/authorizationService');
+  const fail = (message, field, status = 400, code = 'CAREER_REGISTER_INVALID') => Object.assign(new Error(message), { status, statusCode: status, code, ...(field ? { fields: { [field]: message } } : {}) });
+  if (!req.user || !Number.isSafeInteger(Number(req.user.id)) || Number(req.user.id) < 1) throw fail('Sign in to view recruitment records.', null, 401, 'AUTH_REQUIRED');
+  if (!hasAnyPermission(req.user, ['VIEW_STAFF_HR', 'MANAGE_USERS'])) throw fail('Recruitment records are not permitted for this account.', null, 403, 'CAREER_REGISTER_FORBIDDEN');
+  const query = req.query || {};
+  const allowed = new Set(['status', 'department', 'search', 'sort', 'direction', 'page', 'page_size']);
+  for (const key of Object.keys(query)) if (!allowed.has(key)) throw fail('This recruitment filter is not supported.', key);
+  const text = (field, max) => {
+    const value = query[field];
+    if (value === undefined || value === null || value === '') return '';
+    if (!['string', 'number'].includes(typeof value) || String(value).length > max) throw fail('Enter one '+field.replaceAll('_', ' ')+' value of up to '+max+' characters.', field);
+    return String(value).trim();
+  };
+  const integer = (field, fallback, max) => {
+    const value = text(field, 12);
+    if (!value) return fallback;
+    if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) > max) throw fail('Enter a whole '+field.replaceAll('_', ' ')+' from 1 to '+max+'.', field);
+    return Number(value);
+  };
+  const status = text('status', 40).toUpperCase(), department = text('department', 120), search = text('search', 160);
+  if (status && !VALID_STATUSES.has(status)) throw fail('Choose a supported application status.', 'status');
+  const sort = text('sort', 30) || 'created_at', direction = (text('direction', 4) || 'desc').toLowerCase();
+  const sorts = { created_at: 'a.created_at', full_name: 'a.full_name', job_title: 'j.title', status: 'a.status', department: 'j.department' };
+  if (!Object.hasOwn(sorts, sort)) throw fail('Choose a supported recruitment sort.', 'sort');
+  if (!['asc', 'desc'].includes(direction)) throw fail('Choose ascending or descending order.', 'direction');
+  const requestedPage = integer('page', 1, 1000000), pageSize = integer('page_size', 25, 100);
+  const where = [], params = [];
+  if (status) { where.push('a.status=?'); params.push(status); }
   if (department) { where.push('j.department=?'); params.push(department); }
   if (search) {
-    where.push('(a.full_name LIKE ? OR a.email LIKE ? OR j.title LIKE ?)');
-    const like = `%${search}%`; params.push(like, like, like);
+    const like = '%'+search.replace(/[!%_]/g, value => '!'+value)+'%';
+    where.push("(a.public_id LIKE ? ESCAPE '!' OR a.full_name LIKE ? ESCAPE '!' OR a.email LIKE ? ESCAPE '!' OR j.title LIKE ? ESCAPE '!')");
+    params.push(like, like, like, like);
   }
-  const [rows] = await pool.query(
-    `SELECT a.id,a.public_id,a.full_name,a.email,a.phone,a.current_location,a.work_rights,a.availability,
-            a.expected_remuneration,a.linkedin_url,a.portfolio_url,a.cover_note,a.resume_document_id,
-            a.status,a.created_at,a.updated_at,j.title AS job_title,j.department,j.location
-     FROM career_applications a
-     JOIN career_jobs j ON j.id=a.job_id
-     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
-     ORDER BY a.created_at DESC
-     LIMIT 500`,
-    params
-  );
-  return res.json({ applications: rows });
+  await ensureCareersSchema();
+  const from = 'FROM career_applications a JOIN career_jobs j ON j.id=a.job_id '+(where.length ? 'WHERE '+where.join(' AND ') : '');
+  const connection = await pool.getConnection();
+  try {
+    await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
+    await connection.beginTransaction();
+    const [[summary]] = await connection.query(`SELECT COUNT(*) AS total,
+      COALESCE(SUM(a.status NOT IN ('REJECTED','HIRED')),0) AS active,
+      COALESCE(SUM(a.status IN ('OFFER','HIRED')),0) AS offer_hired ${from}`, params);
+    const total = Number(summary.total), pages = Math.max(1, Math.ceil(total / pageSize)), page = Math.min(requestedPage, pages);
+    const [rows] = await connection.query(`SELECT a.id,a.public_id,a.full_name,a.email,a.phone,a.current_location,a.work_rights,a.availability,
+      a.expected_remuneration,a.linkedin_url,a.portfolio_url,a.cover_note,a.resume_document_id,
+      a.status,a.created_at,a.updated_at,j.title AS job_title,j.department,j.location
+      ${from} ORDER BY ${sorts[sort]} ${direction},a.id ${direction} LIMIT ? OFFSET ?`, [...params, pageSize, (page - 1) * pageSize]);
+    await connection.commit();
+    return res.json({ applications: rows, page, page_size: pageSize, total, pages,
+      summary: { total, active: Number(summary.active), offer_hired: Number(summary.offer_hired) },
+      sort, direction });
+  } catch (error) { await connection.rollback().catch(() => {}); throw error; }
+  finally { connection.release(); }
 }
 
 async function updateApplicationStatus(req, res) {

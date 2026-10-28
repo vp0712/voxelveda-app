@@ -16,6 +16,11 @@ const assess=records=>summary.assessVerifiedAttendance({staff,records,fromDate:s
 function loadScheduler(){
  const module={exports:{}};
  const deps={'node:crypto':require('node:crypto'),luxon:require('luxon'),'../config/db':{},'./documentDeliveryService':{},'./timesheetDocumentService':{},'./weeklyTimesheetDeliverySchema':{},'./backgroundJobService':{backgroundJobService:{createScheduler:()=>({})}},'./authorizationService':{},'./auditService':{},'./weeklyTimesheetEligibility':policy};
+ // This fixture exercises only authoritative source selection and approval
+ // evidence. Loading those helpers must not render or queue a weekly message.
+ const noEmail=()=>{throw new Error('Attendance summary verification must not render or queue email.');};
+ deps['./emailQueue']={queueEmail:noEmail};
+ deps['./weeklyTimesheetEmailService']={renderWeeklyTimesheetEmail:noEmail,contentHashFor:noEmail};
  const filename=path.join(__dirname,'../services/weeklyTimesheetScheduler.js');
  new vm.Script(fs.readFileSync(filename,'utf8'),{filename}).runInNewContext({module,exports:module.exports,process:{env},Date,console,Buffer,require(name){if(!Object.hasOwn(deps,name))throw new Error('Unexpected scheduler fixture dependency '+name);return deps[name];}});
  return module.exports;

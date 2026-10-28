@@ -3,6 +3,8 @@ const crypto = require('node:crypto');
 const { DateTime } = require('luxon');
 const pool = require('../config/db');
 const { queueDocumentEmail } = require('./documentDeliveryService');
+const { queueEmail } = require('./emailQueue');
+const { renderWeeklyTimesheetEmail, contentHashFor } = require('./weeklyTimesheetEmailService');
 const { timesheetDocumentData } = require('./timesheetDocumentService');
 const { ensureWeeklyTimesheetDeliverySchema } = require('./weeklyTimesheetDeliverySchema');
 const { backgroundJobService } = require('./backgroundJobService');
@@ -24,7 +26,7 @@ function periodBounds(start, end, timezone) {
 function attendanceCandidateParameters(period) {
   // The margin admits unzoned legacy values for review without interpreting
   // them as worked UTC timestamps. Verified entries are filtered again using
-  // their actual local shift start, before any PDF can be created.
+  // their actual local shift start, before any individual report can be created.
   return [DateTime.fromISO(period.startUtc).minus({ hours: 14 }).toUTC().toFormat('yyyy-MM-dd HH:mm:ss'),
     DateTime.fromISO(period.endExclusiveUtc).plus({ hours: 14 }).toUTC().toFormat('yyyy-MM-dd HH:mm:ss'), period.start, period.end];
 }
@@ -107,6 +109,23 @@ function outcomeLog(outcome, period) {
     duplicates: outcome.duplicates || 0 }));
 }
 function generationClaimActive(delivery) { return Number(delivery.claim_active) === 1; }
+function deliveryFormat(delivery) {
+  const format = String(delivery.delivery_format || 'PDF').toUpperCase();
+  if (!['HTML', 'PDF'].includes(format)) throw safetyError('DELIVERY_FORMAT_INVALID');
+  return format;
+}
+function frozenContent(delivery) {
+  try {
+    const content = JSON.parse(delivery.content_snapshot_json);
+    if (!content || content.format !== 'HTML' || !/^weekly-html-v[1-9]\d*$/.test(content.layoutVersion) ||
+      typeof content.subject !== 'string' || !content.subject.trim() || typeof content.html !== 'string' || !content.html.trim() ||
+      typeof content.text !== 'string' || !content.text.trim() || content.sourceHash !== delivery.source_sha256 ||
+      Number(content.staffId) !== Number(delivery.user_id) || Number(content.revision) !== Number(delivery.version) ||
+      content.fromDate !== delivery.period_start || content.toDate !== delivery.period_end ||
+      !/^[a-f0-9]{64}$/.test(String(delivery.content_sha256)) || contentHashFor(content) !== delivery.content_sha256) throw new Error();
+    return content;
+  } catch { throw safetyError('CONTENT_SNAPSHOT_INVALID'); }
+}
 async function reserveDelivery(staffId, period, config, now) {
   const conn = await pool.getConnection();
   try {
@@ -125,6 +144,12 @@ async function reserveDelivery(staffId, period, config, now) {
     }
     if (Number(delivery.generation_attempts || 0) >= 5 || delivery.next_generation_attempt_at && policy.utcInstant(delivery.next_generation_attempt_at,'UTC')?.toMillis() > now.getTime()) {
       await conn.commit(); return { staff_id:staffId,status:delivery.status,existing:true,reason:Number(delivery.generation_attempts || 0)>=5?'GENERATION_RETRY_LIMIT':'GENERATION_RETRY_DELAY' };
+    }
+    // Only reports with no frozen source or queue may adopt the new default.
+    // Legacy sent/queued/frozen PDF versions retain their original format.
+    if (!delivery.snapshot_json && !delivery.source_sha256) {
+      await conn.query("UPDATE weekly_timesheet_deliveries SET delivery_format='HTML' WHERE id=? AND snapshot_json IS NULL AND source_sha256 IS NULL AND email_queue_id IS NULL", [delivery.id]);
+      delivery.delivery_format = 'HTML';
     }
     const attendance = await attendanceForPeriod(conn, staffId, period, true);
     const assessment = policy.assessWorkedAttendance(staff, attendance, period, config, now);
@@ -155,7 +180,7 @@ async function reserveDelivery(staffId, period, config, now) {
     }
     let snapshot = await reviewedSnapshot(conn, staff, assessment, period, Number(delivery.version), timesheet, config,
       delivery.snapshot_json ? frozenSnapshot(delivery).generated_at : now.toISOString());
-    if (!delivery.snapshot_json) snapshot = await require('./timesheetPdfService').freezeSnapshot(conn, snapshot);
+    if (!delivery.snapshot_json && deliveryFormat(delivery) === 'PDF') snapshot = await require('./timesheetPdfService').freezeSnapshot(conn, snapshot);
     const sourceHash = policy.snapshotHash(snapshot);
     if (delivery.source_sha256 && delivery.source_sha256 !== sourceHash) {
       await conn.query("UPDATE weekly_timesheet_deliveries SET status='REVIEW_REQUIRED',last_error_code='SOURCE_CHANGED',claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
@@ -167,7 +192,7 @@ async function reserveDelivery(staffId, period, config, now) {
       [recipient, sourceHash, JSON.stringify(snapshot), assessment.totalMinutes, timesheet.id, token, delivery.id]);
     await conn.commit();
     return { staff_id: staffId, status: 'RESERVED', delivery_id: delivery.id, timesheet_id: timesheet.id, recipient, snapshot, claim_token: token,
-      version: delivery.version, source_sha256: sourceHash, duplicates: assessment.duplicates };
+      version: delivery.version, source_sha256: sourceHash, duplicates: assessment.duplicates, format: deliveryFormat(delivery) };
   } catch (error) { await conn.rollback().catch(() => {}); throw error; }
   finally { conn.release(); }
 }
@@ -178,8 +203,75 @@ async function checkReservedDelivery(conn, reservation, config, now) {
   if (!policy.activeEmployee(staff) || policy.emailAddress(staff.timesheet_delivery_email) !== reservation.recipient) throw safetyError('STAFF_OR_RECIPIENT_CHANGED');
   const current = await currentSnapshot(conn, staff, delivery, config, now, true);
   if (current.sourceHash !== reservation.source_sha256 || policy.snapshotHash(JSON.parse(delivery.snapshot_json)) !== reservation.source_sha256) throw safetyError('SOURCE_CHANGED');
+  if (deliveryFormat(delivery) !== (reservation.format || 'PDF')) throw safetyError('DELIVERY_FORMAT_CHANGED');
+  return delivery;
+}
+async function queueReservedHtmlDelivery(reservation, config, now) {
+  // Rendering is independent of PDF parsing, PDF storage and document requests.
+  // Recheck the source/recipient under the same locks used by attendance writers
+  // before freezing any content or committing an individual queue message.
+  const conn = await pool.getConnection();
+  try {
+    await conn.beginTransaction();
+    const delivery = await checkReservedDelivery(conn, reservation, config, now);
+    let content;
+    if (delivery.content_snapshot_json || delivery.content_sha256) content = frozenContent(delivery);
+    else {
+      const rendered = renderWeeklyTimesheetEmail(reservation.snapshot);
+      // A renderer may be extended later. Recheck the same locked source before
+      // accepting newly produced content; frozen versions never render again.
+      await checkReservedDelivery(conn, reservation, config, now);
+      if (rendered.format !== 'HTML' || rendered.contentHash !== contentHashFor(rendered)) throw safetyError('CONTENT_RENDER_INVALID');
+      content = { format: 'HTML', layoutVersion: rendered.layoutVersion, subject: rendered.subject, html: rendered.html, text: rendered.text,
+        sourceHash: reservation.source_sha256, staffId: reservation.staff_id, revision: reservation.version,
+        fromDate: reservation.snapshot.period_start, toDate: reservation.snapshot.period_end };
+      const [written] = await conn.query(`UPDATE weekly_timesheet_deliveries SET delivery_format='HTML',content_sha256=?,content_snapshot_json=?
+        WHERE id=? AND claim_token=? AND status='PREPARING' AND email_queue_id IS NULL AND content_sha256 IS NULL AND content_snapshot_json IS NULL`,
+        [rendered.contentHash, JSON.stringify(content), reservation.delivery_id, reservation.claim_token]);
+      if (written.affectedRows !== 1) throw safetyError('CONTENT_SNAPSHOT_CONFLICT');
+      delivery.content_sha256 = rendered.contentHash; delivery.content_snapshot_json = JSON.stringify(content);
+      content = frozenContent(delivery);
+    }
+    const deliveryPolicy = { type: 'WEEKLY_TIMESHEET', format: 'HTML', layoutVersion: content.layoutVersion,
+      contentHash: delivery.content_sha256, deliveryId: reservation.delivery_id, staffId: reservation.staff_id,
+      fromDate: content.fromDate, toDate: content.toDate, revision: reservation.version,
+      sourceHash: reservation.source_sha256, recipient: reservation.recipient };
+    const key = `weekly-timesheet:${reservation.staff_id}:${content.fromDate}:${content.toDate}:v${reservation.version}`;
+    const queueId = await queueEmail({ templateKey: 'weekly_timesheet_html', relatedModule: 'timesheets', relatedRecordId: reservation.timesheet_id,
+      to: [reservation.recipient], cc: [], bcc: [], subject: content.subject, html: content.html, text: content.text,
+      attachments: [], deliveryPolicy, idempotencyKey: key, scheduledAt: now, createdBy: reservation.created_by || null }, conn);
+    const [[queued]] = await conn.query('SELECT * FROM email_queue WHERE id=? FOR UPDATE', [queueId]);
+    if (!queued) throw safetyError('DELIVERY_QUEUE_CONTENT_MISMATCH');
+    let queuedPolicy, queuedAttachments;
+    try { queuedPolicy = JSON.parse(queued.delivery_policy_json || 'null'); queuedAttachments = JSON.parse(queued.attachments_json || '[]'); }
+    catch { throw safetyError('DELIVERY_QUEUE_CONTENT_MISMATCH'); }
+    if (!['PENDING','RETRY'].includes(queued.status) || queued.related_module !== 'timesheets' || String(queued.related_record_id) !== String(reservation.timesheet_id) ||
+      queued.idempotency_key !== key || JSON.stringify(parsedAddresses(queued.to_json)) !== JSON.stringify([reservation.recipient]) ||
+      parsedAddresses(queued.cc_json).length || parsedAddresses(queued.bcc_json).length ||
+      queued.subject !== content.subject || queued.html_body !== content.html || queued.text_body !== content.text ||
+      JSON.stringify(queuedPolicy) !== JSON.stringify(deliveryPolicy) ||
+      !Array.isArray(queuedAttachments) || queuedAttachments.length) throw safetyError('DELIVERY_QUEUE_CONTENT_MISMATCH');
+    const [saved] = await conn.query(`UPDATE weekly_timesheet_deliveries SET status='QUEUED',email_queue_id=?,document_request_id=?,claim_token=NULL,claim_expires_at=NULL
+      WHERE id=? AND claim_token=? AND status='PREPARING' AND email_queue_id IS NULL`, [queueId, null, reservation.delivery_id, reservation.claim_token]);
+    if (saved.affectedRows !== 1) throw safetyError('DELIVERY_CLAIM_CHANGED');
+    delivery.email_queue_id = queueId; delivery.document_request_id = null; delivery.status = 'QUEUED';
+    await retainDeliveryVersion(conn, delivery);
+    await logAudit(conn, { actorId: reservation.created_by || null, action: 'WEEKLY_TIMESHEET_HTML_QUEUED', module: 'timesheets', recordType: 'weekly_delivery', recordId: delivery.id,
+      newValue: { staff_id: reservation.staff_id, period_start: content.fromDate, period_end: content.toDate, version: reservation.version,
+        format: 'HTML', source_sha256: reservation.source_sha256, content_sha256: delivery.content_sha256, queue_id: queueId, automated: !reservation.created_by } });
+    if (reservation.recovery) await logAudit(conn, { actorId: null, action: 'WEEKLY_TIMESHEET_RECOVERY_QUEUED', module: 'timesheets', recordType: 'weekly_delivery', recordId: delivery.id,
+      newValue: { staff_id: reservation.staff_id, period_start: content.fromDate, period_end: content.toDate, version: reservation.version, format: 'HTML', content_sha256: delivery.content_sha256,
+        reason: 'Bounded recovery of the latest completed week; no accepted or uncertain delivery was resent.' } });
+    await conn.commit();
+    return { staff_id: reservation.staff_id, status: 'QUEUED', queue_id: queueId, version: reservation.version, format: 'HTML',
+      report_generation_status: 'READY', contentHash: delivery.content_sha256, content_sha256: delivery.content_sha256,
+      source_sha256: reservation.source_sha256, duplicates: reservation.duplicates, request_id: null, document_pdf_url: null, delivery_status_url: null,
+      provider_accepted: false, recipient_verified: false };
+  } catch (error) { await conn.rollback().catch(() => {}); throw error; }
+  finally { conn.release(); }
 }
 async function queueReservedDelivery(reservation, config, now) {
+  if (reservation.format === 'HTML') return queueReservedHtmlDelivery(reservation, config, now);
   const snapshot = reservation.snapshot;
   const data = documentDataForSnapshot(snapshot);
   const pdfs = require('./timesheetPdfService');
@@ -210,18 +302,25 @@ async function queueReservedDelivery(reservation, config, now) {
   if (Number(linked?.email_queue_id) !== Number(result.email_queue_id)) throw safetyError('DELIVERY_QUEUE_LINK_INVALID');
   return { staff_id: reservation.staff_id, status: 'QUEUED', queue_id: result.email_queue_id, version: snapshot.version,
     request_id: result.request_id, document_pdf_url: result.document_pdf_url, delivery_status_url: result.delivery_status_url,
-    source_sha256: reservation.source_sha256, duplicates: reservation.duplicates, provider_accepted: false, recipient_verified: false };
+    source_sha256: reservation.source_sha256, duplicates: reservation.duplicates, format: 'PDF', provider_accepted: false, recipient_verified: false };
 }
 async function retainDeliveryVersion(db, delivery) {
   if (!delivery.snapshot_json || !delivery.source_sha256) return;
+  const format = deliveryFormat(delivery);
+  const [[existing]] = await db.query('SELECT source_sha256,recipient,delivery_format,content_sha256,content_snapshot_json FROM weekly_timesheet_delivery_versions WHERE delivery_id=? AND version=? LIMIT 1 FOR UPDATE', [delivery.id, delivery.version]);
+  if (existing && (existing.source_sha256 !== delivery.source_sha256 || existing.recipient !== delivery.recipient || deliveryFormat(existing) !== format ||
+    (existing.content_sha256 && existing.content_sha256 !== delivery.content_sha256) || (existing.content_snapshot_json && existing.content_snapshot_json !== delivery.content_snapshot_json))) throw safetyError('DELIVERY_VERSION_CONTENT_CONFLICT');
   await db.query(`INSERT INTO weekly_timesheet_delivery_versions
-    (delivery_id,version,user_id,period_start,period_end,recipient,source_sha256,snapshot_json,total_minutes,email_queue_id,document_request_id,status,created_by,reason)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE
+    (delivery_id,version,user_id,period_start,period_end,recipient,source_sha256,snapshot_json,total_minutes,email_queue_id,document_request_id,status,created_by,reason,delivery_format,content_sha256,content_snapshot_json)
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE
       status=IF(source_sha256=VALUES(source_sha256) AND (email_queue_id IS NULL OR email_queue_id=VALUES(email_queue_id)),VALUES(status),status),
       email_queue_id=IF(source_sha256=VALUES(source_sha256) AND email_queue_id IS NULL,VALUES(email_queue_id),email_queue_id),
-      document_request_id=IF(source_sha256=VALUES(source_sha256) AND document_request_id IS NULL,VALUES(document_request_id),document_request_id)`, [delivery.id, delivery.version, delivery.user_id, delivery.period_start, delivery.period_end,
+      document_request_id=IF(source_sha256=VALUES(source_sha256) AND document_request_id IS NULL,VALUES(document_request_id),document_request_id),
+      content_sha256=IF(source_sha256=VALUES(source_sha256) AND content_sha256 IS NULL,VALUES(content_sha256),content_sha256),
+      content_snapshot_json=IF(source_sha256=VALUES(source_sha256) AND content_snapshot_json IS NULL,VALUES(content_snapshot_json),content_snapshot_json)`, [delivery.id, delivery.version, delivery.user_id, delivery.period_start, delivery.period_end,
     delivery.recipient, delivery.source_sha256, delivery.snapshot_json, delivery.total_minutes, delivery.email_queue_id || null,
-    delivery.document_request_id || null, delivery.status, delivery.revision_authorised_by || null, delivery.revision_reason || null]);
+    delivery.document_request_id || null, delivery.status, delivery.revision_authorised_by || null, delivery.revision_reason || null, format,
+    delivery.content_sha256 || null, delivery.content_snapshot_json || null]);
 }
 function documentDataForSnapshot(snapshot) {
   return timesheetDocumentData({ rows: snapshot.rows, fromDate: snapshot.period_start, toDate: snapshot.period_end,
@@ -249,13 +348,13 @@ async function queueClosedWeekTimesheets(options = {}) {
       reservation.recovery = !window.eligible;
       const outcome = reservation.status === 'RESERVED' ? await queueReservedDelivery(reservation, config, now) : reservation;
       // Recipient addresses and PDF source content never enter operational logs.
-      const publicOutcome = { staff_id: outcome.staff_id, status: outcome.status, version: outcome.version, source_sha256: outcome.source_sha256,
+      const publicOutcome = { staff_id: outcome.staff_id, status: outcome.status, version: outcome.version, source_sha256: outcome.source_sha256, format: outcome.format, content_sha256: outcome.content_sha256,
         reason: outcome.reason, review_reasons: outcome.review_reasons, duplicates: outcome.duplicates, existing: outcome.existing, queue_id: outcome.queue_id };
       outcomes.push(publicOutcome); outcomeLog(publicOutcome, period);
     } catch (error) {
       if (reservation?.delivery_id) await pool.query(`UPDATE weekly_timesheet_deliveries SET status=?,last_error_code=?,claim_token=NULL,claim_expires_at=NULL
-        WHERE id=? AND claim_token=? AND email_queue_id IS NULL`, [error.code === 'DELIVERY_REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'GENERATION_FAILED', String(error.reasonCode || error.code || 'PDF_GENERATION_FAILED').slice(0, 100), reservation.delivery_id, reservation.claim_token]);
-      const outcome = { staff_id: candidate.id, status: error.code === 'DELIVERY_REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'GENERATION_FAILED', reason: error.reasonCode || error.code || 'PDF_GENERATION_FAILED' };
+        WHERE id=? AND claim_token=? AND email_queue_id IS NULL`, [error.code === 'DELIVERY_REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'GENERATION_FAILED', String(error.reasonCode || error.code || 'TIMESHEET_REPORT_GENERATION_FAILED').slice(0, 100), reservation.delivery_id, reservation.claim_token]);
+      const outcome = { staff_id: candidate.id, status: error.code === 'DELIVERY_REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'GENERATION_FAILED', reason: error.reasonCode || error.code || 'TIMESHEET_REPORT_GENERATION_FAILED' };
       outcomes.push(outcome); outcomeLog(outcome, period);
     }
   }
@@ -303,8 +402,18 @@ async function validateQueuedWeeklyDelivery(queueRow, db = pool, options = {}) {
   const current = await currentSnapshot(db, staff, delivery, config, options.now || new Date(), true);
   const snapshot = frozenSnapshot(delivery);
   if (current.sourceHash !== delivery.source_sha256 || policy.snapshotHash(snapshot) !== delivery.source_sha256) throw safetyError('SOURCE_CHANGED');
+  if (deliveryFormat(delivery) === 'HTML') {
+    const content = frozenContent(delivery);
+    if (transportPolicy.format !== 'HTML' || transportPolicy.contentHash !== delivery.content_sha256 || transportPolicy.layoutVersion !== content.layoutVersion ||
+      queueRow.subject !== content.subject || queueRow.html_body !== content.html || queueRow.text_body !== content.text) throw safetyError('DELIVERY_CONTENT_MISMATCH');
+    let attachments;
+    try { attachments = JSON.parse(queueRow.attachments_json || '[]'); } catch { throw safetyError('DELIVERY_CONTENT_MISMATCH'); }
+    if (!Array.isArray(attachments) || attachments.length) throw safetyError('HTML_ATTACHMENT_NOT_ALLOWED');
+  } else if (transportPolicy.format && transportPolicy.format !== 'PDF') throw safetyError('DELIVERY_FORMAT_CHANGED');
   return { delivery_id: delivery.id, staff_id: delivery.user_id, version: delivery.version, source_sha256: delivery.source_sha256,
-    snapshot, documentData: documentDataForSnapshot(snapshot) };
+    snapshot, format: deliveryFormat(delivery), contentHash: delivery.content_sha256 || null,
+    contentSnapshot: deliveryFormat(delivery) === 'HTML' ? frozenContent(delivery) : null,
+    documentData: deliveryFormat(delivery) === 'PDF' ? documentDataForSnapshot(snapshot) : null };
 }
 async function markWeeklyDeliveryResult(db, queueRow, status, metadata = {}) {
   if (!String(queueRow.idempotency_key || '').startsWith('weekly-timesheet:')) return;
@@ -352,6 +461,7 @@ async function queueWeeklyTimesheetRevision(options = {}) {
     const retry = options.retryGeneration === true;
     if (retry && (delivery.status !== 'GENERATION_FAILED' || delivery.email_queue_id || !delivery.snapshot_json)) throw safetyError('GENERATION_RETRY_NOT_AVAILABLE');
     const version = retry ? expectedVersion : expectedVersion + 1;
+    const format = retry ? deliveryFormat(delivery) : 'HTML';
     if (!Number.isSafeInteger(version) || version > 2147483647) throw safetyError('REVISION_VERSION_INVALID');
     const snapshot = await reviewedSnapshot(conn, staff, assessment, period, version, review, config,
       retry ? frozenSnapshot(delivery).generated_at : now.toISOString());
@@ -367,18 +477,20 @@ async function queueWeeklyTimesheetRevision(options = {}) {
     const token = crypto.randomUUID();
     await conn.query(`UPDATE weekly_timesheet_deliveries SET version=?,timezone=?,status='PREPARING',recipient=?,source_sha256=?,snapshot_json=?,total_minutes=?,
       timesheet_id=?,email_queue_id=NULL,document_request_id=NULL,provider_accepted_at=NULL,sent_at=NULL,
-      revision_authorised_by=?,revision_authorised_at=NOW(),revision_reason=?,claim_token=?,claim_expires_at=DATE_ADD(NOW(),INTERVAL 20 MINUTE),last_error_code=NULL WHERE id=?`,
-      [version, config.timezone, recipient, hash, JSON.stringify(snapshot), assessment.totalMinutes, review.id, actor.id, reason, token, id]);
+      revision_authorised_by=?,revision_authorised_at=NOW(),revision_reason=?,claim_token=?,claim_expires_at=DATE_ADD(NOW(),INTERVAL 20 MINUTE),last_error_code=NULL,
+      delivery_format=?,content_sha256=?,content_snapshot_json=? WHERE id=?`,
+      [version, config.timezone, recipient, hash, JSON.stringify(snapshot), assessment.totalMinutes, review.id, actor.id, reason, token,
+        format, retry ? delivery.content_sha256 || null : null, retry ? delivery.content_snapshot_json || null : null, id]);
     await logAudit(conn, { actorId: actor.id, action: retry ? 'WEEKLY_TIMESHEET_GENERATION_RETRY' : 'WEEKLY_TIMESHEET_REVISION_AUTHORISED', module: 'timesheets', recordType: 'weekly_delivery', recordId: id,
       oldValue: { version: expectedVersion, source_sha256: delivery.source_sha256, status: delivery.status }, newValue: { version, source_sha256: hash, staff_id: staff.id, period_start: period.start, period_end: period.end, reason } });
     await conn.commit();
-    reservation = { staff_id: staff.id, delivery_id: id, timesheet_id: review.id, recipient, snapshot, claim_token: token, version, source_sha256: hash, duplicates: assessment.duplicates };
+    reservation = { staff_id: staff.id, delivery_id: id, timesheet_id: review.id, recipient, snapshot, claim_token: token, version, source_sha256: hash, duplicates: assessment.duplicates, format, created_by: actor.id };
   } catch (error) { await conn.rollback().catch(() => {}); throw error; }
   finally { conn.release(); }
   try { return await queueReservedDelivery(reservation, config, now); }
   catch (error) {
     await pool.query(`UPDATE weekly_timesheet_deliveries SET status=?,last_error_code=?,claim_token=NULL,claim_expires_at=NULL
-      WHERE id=? AND claim_token=? AND email_queue_id IS NULL`, [error.code === 'DELIVERY_REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'GENERATION_FAILED', String(error.reasonCode || error.code || 'PDF_GENERATION_FAILED').slice(0,100), id, reservation.claim_token]);
+      WHERE id=? AND claim_token=? AND email_queue_id IS NULL`, [error.code === 'DELIVERY_REVIEW_REQUIRED' ? 'REVIEW_REQUIRED' : 'GENERATION_FAILED', String(error.reasonCode || error.code || 'TIMESHEET_REPORT_GENERATION_FAILED').slice(0,100), id, reservation.claim_token]);
     error.delivery_id = id; error.version = reservation.version;
     throw error;
   }
@@ -391,7 +503,7 @@ async function processScheduledWeeklyTimesheetEmails() {
   return result;
 }
 const scheduler = backgroundJobService.createScheduler({ jobKey: 'weekly_timesheet_email',
-  description: 'Queue one validated PDF for each employee with verified worked attendance in the most recently completed week',
+  description: 'Queue one complete HTML timesheet for each employee with verified worked attendance in the most recently completed week',
   handler: processScheduledWeeklyTimesheetEmails, enabled,
   intervalMs: () => Math.max(60000, Number(process.env.WEEKLY_TIMESHEET_EMAIL_INTERVAL_MS || 900000)), initialDelayMs: 10000,
   leaseMs: Number(process.env.WEEKLY_TIMESHEET_LEASE_MS || 15 * 60 * 1000) });
@@ -404,4 +516,4 @@ module.exports = { latestCompletedWeek: policy.latestCompletedWeek, queueClosedW
   getWeeklyTimesheetSchedule: policy.scheduleDetails,
   documentDataForSnapshot,
   loadDocumentStaff: staffById, loadDocumentReview: reviewStatus, reviewedDocumentSnapshot: reviewedSnapshot,
-  _test: { reserveDelivery, checkReservedDelivery, queueReservedDelivery, attendanceForPeriod, currentSnapshot, reviewProof } };
+  _test: { reserveDelivery, checkReservedDelivery, queueReservedDelivery, queueReservedHtmlDelivery, attendanceForPeriod, currentSnapshot, reviewProof, deliveryFormat, frozenContent } };

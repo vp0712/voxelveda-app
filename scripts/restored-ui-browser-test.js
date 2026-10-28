@@ -26,6 +26,14 @@ for (const match of registerMigrationSql.matchAll(/CREATE TABLE IF NOT EXISTS ([
   migratedRegisterColumns.set(match[1], columns);
 }
 assert.equal(migratedRegisterColumns.size, 8, 'The fixture observes all eight migrated original register definitions');
+const weeklyMetadataColumns = [];
+const weeklyMigrationSql = fs.readFileSync(path.join(root, 'migrations/retained/20261028_weekly_timesheet_html.sql'), 'utf8');
+for (const match of weeklyMigrationSql.matchAll(/CREATE TABLE IF NOT EXISTS (weekly_timesheet_deliveries|weekly_timesheet_delivery_versions)\s*\(([\s\S]*?)\)\s*ENGINE=InnoDB;/g)) {
+  for (const declaration of match[2].matchAll(/\b(delivery_format|content_sha256|content_snapshot_json)\s+(VARCHAR|CHAR|LONGTEXT)\b/g)) {
+    weeklyMetadataColumns.push({ table_name:match[1], column_name:declaration[1] });
+  }
+}
+assert.equal(weeklyMetadataColumns.length, 6, 'The browser fixture observes all six HTML metadata columns from the actual additive migration');
 const outputDir = process.env.UI_PROOF_DIR || path.join('/tmp', 'voxelveda-restored-ui-proof');
 const statements = [];
 const audits = [];
@@ -87,6 +95,11 @@ async function query(statement, parameters = []) {
   if (/^UPDATE rfqs SET archived/i.test(sql)) { const row=rfqs.find(item=>item.id===Number(parameters[1])); row.archived=Number(parameters[0]); row.revision++; return result({ affectedRows:1 }); }
   if (/^UPDATE rfqs SET status/i.test(sql)) { const row=rfqs.find(item=>item.id===Number(parameters[1])); row.status=parameters[0]; row.revision++; return result({ affectedRows:1 }); }
   if (/^UPDATE/i.test(sql)) return result({ affectedRows:1 });
+  if (/^SELECT table_name AS table_name,column_name AS column_name FROM information_schema\.columns/i.test(sql)) {
+    assert.equal(parameters.length, 0, 'Weekly metadata assertion uses its fixed retained table/column allowlist');
+    assert.match(sql, /table_name IN \('weekly_timesheet_deliveries','weekly_timesheet_delivery_versions'\) AND column_name IN \('delivery_format','content_sha256','content_snapshot_json'\)$/);
+    return result(weeklyMetadataColumns.map(row => ({ ...row })));
+  }
   if (/^SELECT COLUMN_NAME AS column_name, COLUMN_KEY AS column_key, DATA_TYPE AS data_type, EXTRA AS extra FROM information_schema\.columns/i.test(sql)) {
     assert.equal(parameters.length, 1, 'Original register metadata is scoped to one expected table');
     const columns = migratedRegisterColumns.get(parameters[0]);

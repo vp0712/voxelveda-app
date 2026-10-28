@@ -120,8 +120,29 @@ async function main() {
     await assert.rejects(runRetainedMigrations({ pool, migrationsDir: temp, logger: { info() {} } }), { code: 'MIGRATION_CHECKSUM_MISMATCH' });
   } finally { fs.rmSync(temp, { recursive: true, force: true }); }
   assert.equal(digest((await pool.query('SELECT * FROM bank_accounts'))[0]), archived, 'No retired table or historical record is changed');
-  const [tables] = await pool.query('SELECT table_name FROM information_schema.tables WHERE table_schema=DATABASE()');
-  assert.equal(tables.length, Object.keys(TABLES).length + 3, 'Only current original tables, the private timesheet PDF cache, the migration ledger and the protected retired fixture exist.');
-  console.log(JSON.stringify({ result: 'passed', fixture_mode: mode, original_tables: Object.keys(TABLES).length, concurrent_runners: 3, applied_once: true, checksummed: true, historical_values_preserved: true, retired_table_unchanged: true }));
+  const [tables] = await pool.query('SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema=DATABASE()');
+  const weeklyTables = ['weekly_timesheet_deliveries','weekly_timesheet_delivery_versions'];
+  const expectedTables = [...Object.keys(TABLES), 'timesheet_pdf_snapshots', 'schema_migrations', 'bank_accounts', ...weeklyTables].sort();
+  assert.deepEqual(tables.map(table => table.table_name).sort(), expectedTables,
+    'Only the exact original registers, PDF cache, immutable weekly delivery tables, migration ledger and protected retired fixture exist.');
+  const [htmlColumns] = await pool.query(`SELECT table_name AS table_name,column_name AS column_name,data_type AS data_type,
+    is_nullable AS is_nullable,column_default AS column_default,character_maximum_length AS max_length
+    FROM information_schema.columns WHERE table_schema=DATABASE()
+      AND table_name IN (?,?) AND column_name IN (?,?,?)`,
+  [...weeklyTables, 'delivery_format', 'content_sha256', 'content_snapshot_json']);
+  const expectedColumnNames = weeklyTables.flatMap(table => ['delivery_format','content_sha256','content_snapshot_json'].map(column => table + '.' + column)).sort();
+  assert.deepEqual(htmlColumns.map(column => column.table_name + '.' + column.column_name).sort(), expectedColumnNames,
+    'Both current and immutable historical versions have all six explicit HTML metadata fields.');
+  for (const column of htmlColumns) {
+    if (column.column_name === 'delivery_format') {
+      assert.equal(column.data_type, 'varchar');assert.equal(Number(column.max_length), 16);
+      assert.equal(column.is_nullable, 'NO');assert.equal(column.column_default, 'PDF', 'Legacy rows retain PDF semantics; HTML is selected explicitly by the new scheduler.');
+    } else {
+      assert.equal(column.is_nullable, 'YES');assert.equal(column.column_default, null, 'Migration must not invent a content hash or rendered historical body.');
+      assert.equal(column.data_type, column.column_name === 'content_sha256' ? 'char' : 'longtext');
+      if (column.column_name === 'content_sha256') assert.equal(Number(column.max_length), 64);
+    }
+  }
+  console.log(JSON.stringify({ result: 'passed', fixture_mode: mode, original_tables: Object.keys(TABLES).length, exact_schema_tables: expectedTables.length, weekly_html_metadata_columns: htmlColumns.length, concurrent_runners: 3, applied_once: true, checksummed: true, historical_values_preserved: true, retired_table_unchanged: true }));
 }
 main().catch(error => { console.error(error); process.exitCode = 1; }).finally(() => pool.end());

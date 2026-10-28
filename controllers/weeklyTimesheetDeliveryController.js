@@ -10,6 +10,10 @@ function failure(res, error) {
 async function permitted(user, staffId, connection = pool) {
   return canAccessUserRecord(user, staffId, { own: 'VIEW_OWN_TIMESHEET', team: 'VIEW_TEAM_TIMESHEET', all: 'VIEW_ALL_TIMESHEETS', connection });
 }
+function intendedDeliveryFormat(delivery) {
+  const frozen = Boolean(delivery.snapshot_json || delivery.source_sha256 || delivery.content_snapshot_json || delivery.content_sha256 || delivery.email_queue_id || delivery.provider_accepted_at || delivery.sent_at || ['SENT','PROVIDER_ACCEPTED'].includes(delivery.status));
+  return String(frozen ? delivery.delivery_format || 'PDF' : 'HTML').toUpperCase();
+}
 exports.list = async (req, res) => {
   try {
     await weekly.ensureWeeklyTimesheetDeliverySchema();
@@ -39,10 +43,19 @@ exports.list = async (req, res) => {
     const [[count]] = await pool.query(`SELECT COUNT(*) AS total FROM weekly_timesheet_deliveries d JOIN users u ON u.id=d.user_id ${where}`, params);
     const [deliveries] = await pool.query(`SELECT d.id,d.user_id,u.name AS staff_name,d.period_start,d.period_end,d.timezone,d.version,d.status,
       d.total_minutes,d.review_reasons_json,d.last_error_code,d.email_queue_id,d.document_request_id,d.provider_accepted_at,d.sent_at,d.updated_at,
-      d.revision_authorised_by,d.revision_authorised_at,d.revision_reason,d.source_sha256
+      d.revision_authorised_by,d.revision_authorised_at,d.revision_reason,d.source_sha256,
+      CASE WHEN NULLIF(d.snapshot_json,'') IS NULL AND NULLIF(d.source_sha256,'') IS NULL
+        AND NULLIF(d.content_snapshot_json,'') IS NULL AND NULLIF(d.content_sha256,'') IS NULL
+        AND d.email_queue_id IS NULL AND d.provider_accepted_at IS NULL AND d.sent_at IS NULL
+        AND d.status NOT IN ('SENT','PROVIDER_ACCEPTED') THEN 'HTML' ELSE COALESCE(d.delivery_format,'PDF') END AS delivery_format,
+      d.content_sha256
       FROM weekly_timesheet_deliveries d JOIN users u ON u.id=d.user_id ${where}
       ORDER BY d.period_start DESC,d.id DESC LIMIT ? OFFSET ?`, [...params,size,(page-1)*size]);
-    return res.json({ deliveries, page, page_size: size, total: Number(count.total), schedule: weekly.getWeeklyTimesheetSchedule(), provider_acceptance_is_receipt: false });
+    const safeDeliveries = deliveries.map(row => {
+      const { recipient, snapshot_json, content_snapshot_json, claim_token, claim_expires_at, ...summary } = row;
+      return summary;
+    });
+    return res.set('Cache-Control','private, no-store').json({ deliveries: safeDeliveries, page, page_size: size, total: Number(count.total), schedule: weekly.getWeeklyTimesheetSchedule(), provider_acceptance_is_receipt: false });
   } catch (error) { return failure(res, error); }
 };
 exports.detail = async (req, res) => {
@@ -50,13 +63,20 @@ exports.detail = async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isSafeInteger(id) || id < 1) return res.status(422).json({ message: 'Select a valid delivery.' });
     await weekly.ensureWeeklyTimesheetDeliverySchema();
+    const [[identity]] = await pool.query('SELECT user_id FROM weekly_timesheet_deliveries WHERE id=?', [id]);
+    if (!identity) return res.status(404).json({ message: 'Weekly delivery not found.' });
+    if (!await permitted(req.user, identity.user_id)) return res.status(403).json({ message: 'This employee timesheet is outside your access.' });
     const [[delivery]] = await pool.query('SELECT * FROM weekly_timesheet_deliveries WHERE id=?', [id]);
-    if (!delivery) return res.status(404).json({ message: 'Weekly delivery not found.' });
-    if (!await permitted(req.user, delivery.user_id)) return res.status(403).json({ message: 'This employee timesheet is outside your access.' });
-    const [versions] = await pool.query(`SELECT version,user_id,period_start,period_end,total_minutes,status,source_sha256,
+    if (!delivery || Number(delivery.user_id) !== Number(identity.user_id)) return res.status(404).json({ message: 'Weekly delivery changed. Refresh its history before continuing.' });
+    const [versions] = await pool.query(`SELECT version,user_id,period_start,period_end,total_minutes,status,source_sha256,delivery_format,content_sha256,
       email_queue_id,document_request_id,created_by,reason,created_at FROM weekly_timesheet_delivery_versions WHERE delivery_id=? ORDER BY version DESC`, [id]);
-    delete delivery.claim_token; delete delivery.claim_expires_at;
-    return res.json({ delivery, versions, provider_acceptance_is_receipt: false });
+    const safeDelivery = { ...delivery };
+    safeDelivery.delivery_format = intendedDeliveryFormat(delivery);
+    delete safeDelivery.claim_token; delete safeDelivery.claim_expires_at;
+    // Rendered email bodies stay in the immutable delivery snapshot. The
+    // authorised history view needs state/hash/version, not inline HTML.
+    delete safeDelivery.content_snapshot_json;
+    return res.set('Cache-Control','private, no-store').json({ delivery: safeDelivery, versions, provider_acceptance_is_receipt: false });
   } catch (error) { return failure(res, error); }
 };
 function requestedRecipients(body) { return ['recipient','to','cc','bcc','include_employee'].some((key) => Object.hasOwn(body || {}, key)); }
@@ -66,7 +86,8 @@ async function revise(req, res, retryGeneration) {
     const result = await weekly.queueWeeklyTimesheetRevision({ actor: req.user, deliveryId: req.params.id || req.body.delivery_id,
       expectedVersion: req.body.expected_version, reason: req.body.reason, retryGeneration,
       confirmPossiblePreviousDelivery: req.body.confirm_possible_previous_delivery === true });
-    return res.status(202).json({ message: retryGeneration ? 'The validated weekly PDF is queued for controlled delivery.' : 'The authorised timesheet correction is queued as a new labelled revision.', ...result, email_sent: false });
+    const format = result.format || result.delivery_format;
+    return res.status(202).json({ message: retryGeneration ? (format === 'HTML' ? 'The weekly HTML timesheet is queued for controlled delivery without a PDF attachment.' : 'The validated weekly PDF is queued for controlled delivery.') : 'The authorised timesheet correction is queued as a new labelled revision.', ...result, email_sent: false });
   } catch (error) { return failure(res, error); }
 }
 exports.revise = (req, res) => revise(req, res, false);

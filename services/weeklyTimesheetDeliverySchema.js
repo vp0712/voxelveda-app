@@ -21,6 +21,7 @@ async function createSchema() {
     timezone VARCHAR(100) NOT NULL, version INT NOT NULL DEFAULT 1,
     status VARCHAR(40) NOT NULL DEFAULT 'PENDING',
     recipient VARCHAR(254) NULL, source_sha256 CHAR(64) NULL, snapshot_json LONGTEXT NULL,
+    delivery_format VARCHAR(16) NOT NULL DEFAULT 'PDF', content_sha256 CHAR(64) NULL, content_snapshot_json LONGTEXT NULL,
     total_minutes INT NOT NULL DEFAULT 0, review_reasons_json TEXT NULL,
     claim_token CHAR(36) NULL, claim_expires_at DATETIME NULL,
     timesheet_id INT NULL, email_queue_id BIGINT NULL, document_request_id BIGINT NULL,
@@ -39,11 +40,19 @@ async function createSchema() {
     id BIGINT AUTO_INCREMENT PRIMARY KEY, delivery_id BIGINT NOT NULL, version INT NOT NULL,
     user_id INT NOT NULL, period_start DATE NOT NULL, period_end DATE NOT NULL,
     recipient VARCHAR(254) NULL, source_sha256 CHAR(64) NOT NULL, snapshot_json LONGTEXT NOT NULL,
+    delivery_format VARCHAR(16) NOT NULL DEFAULT 'PDF', content_sha256 CHAR(64) NULL, content_snapshot_json LONGTEXT NULL,
     total_minutes INT NOT NULL, email_queue_id BIGINT NULL, document_request_id BIGINT NULL, status VARCHAR(40) NOT NULL,
     created_by INT NULL, reason VARCHAR(1000) NULL, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uniq_weekly_delivery_version (delivery_id, version)
   ) ENGINE=InnoDB`);
   await additive('ALTER TABLE weekly_timesheet_delivery_versions ADD COLUMN document_request_id BIGINT NULL');
+  // Current HTML metadata is installed by the ordered retained migration.
+  // Request/startup compatibility checks never conceal an incomplete migration.
+  const [columns] = await pool.query("SELECT table_name AS table_name,column_name AS column_name FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name IN ('weekly_timesheet_deliveries','weekly_timesheet_delivery_versions') AND column_name IN ('delivery_format','content_sha256','content_snapshot_json')");
+  const present = new Set(columns.map(column => column.table_name + '.' + column.column_name));
+  if (['weekly_timesheet_deliveries','weekly_timesheet_delivery_versions'].some(table => ['delivery_format','content_sha256','content_snapshot_json'].some(column => !present.has(table + '.' + column)))) {
+    throw Object.assign(new Error('Weekly HTML delivery schema is incomplete. Apply the ordered retained migration before starting weekly workers.'), { code: 'WEEKLY_HTML_SCHEMA_REQUIRED' });
+  }
 }
 function ensureWeeklyTimesheetDeliverySchema() {
   if (!schemaPromise) schemaPromise = createSchema().catch((error) => { schemaPromise = null; throw error; });

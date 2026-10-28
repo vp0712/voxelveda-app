@@ -3,7 +3,7 @@
 const BRAND_CSS = '/global-brand.css?v=20261009-navy-blue';
 const BRAND_JS = '/global-brand.js?v=20261009-navy-blue';
 const WORKSPACE_CSS = '/workspace-theme.css?v=20261009-navy-blue';
-const BUSINESS_HUB_CSS = '/business-hub.css?v=20261028-shell';
+const BUSINESS_HUB_CSS = '/business-hub.css?v=20261028-weekly-html';
 const BUSINESS_HUB_JS = '/business-hub-shell.js?v=20261028-shell';
 const CANONICAL_LOGO = '/logo.png';
 

@@ -9,7 +9,7 @@ const auth = require('../services/authorizationService');
 const policy = require('../services/weeklyTimesheetEligibility');
 const queries = [], revisions = [];
 const row = { id: 12, user_id: 4, period_start: '2026-10-05', period_end: '2026-10-11', version: 1,
-  status: 'SENT', total_minutes: 480, claim_token: 'private-claim', claim_expires_at: '2026-10-12 08:00:00',
+  status: 'SENT', total_minutes: 480, delivery_format:'HTML',content_sha256:'a'.repeat(64),content_snapshot_json:'{\"html\":\"private HTML body\"}',recipient:'private-fixture@example.invalid',claim_token: 'private-claim', claim_expires_at: '2026-10-12 08:00:00',
   snapshot_json: JSON.stringify({ staff_id: 4, rows: [{ user_id: 4, total_minutes: 480 }] }) };
 const db = { async query(sql, params = []) {
   queries.push({ sql: sql.replace(/\s+/g, ' ').trim(), params });
@@ -22,7 +22,7 @@ const db = { async query(sql, params = []) {
 const dependencies = { '../config/db': db, '../services/authorizationService': auth,
   '../utils/dateOnly': require('../utils/dateOnly'), '../services/weeklyTimesheetScheduler': {
     ensureWeeklyTimesheetDeliverySchema: async () => {}, getWeeklyTimesheetSchedule: () => policy.scheduleDetails(new Date('2026-10-12T02:00:00Z')),
-    queueWeeklyTimesheetRevision: async (options) => { revisions.push(options); return { status: 'QUEUED', version: 2, source_sha256: 'fixture' }; }
+    queueWeeklyTimesheetRevision: async (options) => { revisions.push(options); return { status: 'QUEUED', version: 2, source_sha256: 'fixture',format:'HTML' }; }
   } };
 const moduleFixture = { exports: {} }, filename = path.join(__dirname, '../controllers/weeklyTimesheetDeliveryController.js');
 new vm.Script(fs.readFileSync(filename, 'utf8'), { filename }).runInNewContext({ module: moduleFixture, exports: moduleFixture.exports,
@@ -63,12 +63,20 @@ async function mountedAttendanceBoundary(){
 async function main() {
   const own = { id: 4, role: 'staff', permissions: ['VIEW_OWN_TIMESHEET'] };
   const ownList = await call('list', { user: own, query: { page: 1, page_size: 10 } });
-  assert.equal(ownList.statusCode, 200); assert.equal(ownList.body.total, 1); assert.equal(ownList.body.schedule.timezone, 'Australia/Sydney');
+  assert.equal(ownList.statusCode, 200);assert.equal(ownList.body.deliveries[0].delivery_format,'HTML');assert.equal(ownList.body.deliveries[0].content_sha256,'a'.repeat(64));for(const key of ['recipient','snapshot_json','content_snapshot_json','claim_token','claim_expires_at'])assert(!Object.hasOwn(ownList.body.deliveries[0],key),'List omits private '+key); assert.equal(ownList.body.total, 1); assert.equal(ownList.body.schedule.timezone, 'Australia/Sydney');
   assert(queries.filter(entry => /FROM weekly_timesheet_deliveries d/.test(entry.sql)).every(entry => /d.user_id=\?/.test(entry.sql) && entry.params[0] === 4), 'own lists must bind the authenticated staff identity in both totals and rows');
   await call('list',{user:{id:10,role:'manager',permission_boundary:['VIEW_TEAM_TIMESHEET']}});assert(queries.at(-1).sql.includes('(u.manager_id=? AND d.user_id<>?)'),'team-only permission boundary cannot silently grant own timesheet access');
   const detail = await call('detail', { user: own, params: { id: 12 } });
-  assert.equal(detail.statusCode, 200); assert(!Object.hasOwn(detail.body.delivery, 'claim_token')); assert(!Object.hasOwn(detail.body.delivery, 'claim_expires_at'));
-  assert.equal((await call('detail', { user: { id: 5, role: 'staff' }, params: { id: 12 } })).statusCode, 403);
+  assert.equal(detail.statusCode, 200); assert(!Object.hasOwn(detail.body.delivery, 'claim_token')); assert(!Object.hasOwn(detail.body.delivery, 'claim_expires_at'));assert(!Object.hasOwn(detail.body.delivery,'content_snapshot_json'));assert.equal(detail.body.delivery.delivery_format,'HTML');
+  const previousRow={...row};
+  Object.assign(row,{status:'NO_RECIPIENT',delivery_format:'PDF',snapshot_json:null,source_sha256:null,content_snapshot_json:null,content_sha256:null,email_queue_id:null,provider_accepted_at:null,sent_at:null});
+  assert.equal((await call('detail',{user:own,params:{id:12}})).body.delivery.delivery_format,'HTML','Untouched migrated placeholder detail agrees with planned HTML in the register');
+  row.snapshot_json='{"staff_id":4}';
+  assert.equal((await call('detail',{user:own,params:{id:12}})).body.delivery.delivery_format,'PDF','Frozen legacy detail retains its PDF delivery format');
+  row.snapshot_json=null;row.email_queue_id=88;
+  assert.equal((await call('detail',{user:own,params:{id:12}})).body.delivery.delivery_format,'PDF','Queued legacy detail cannot be reclassified as HTML');
+  for(const key of Object.keys(row))delete row[key];Object.assign(row,previousRow);
+  const readsBeforeDenied=queries.filter(q=>/^SELECT \*/.test(q.sql)).length;assert.equal((await call('detail', { user: { id: 5, role: 'staff' }, params: { id: 12 } })).statusCode, 403);assert.equal(queries.filter(q=>/^SELECT \*/.test(q.sql)).length,readsBeforeDenied,'Denied actor cannot read stored source/content snapshots');
   assert.equal((await call('detail', { user: { id: 10, role: 'manager' }, params: { id: 12 } })).statusCode, 200);
   assert.equal((await call('detail', { user: { id: 11, role: 'manager' }, params: { id: 12 } })).statusCode, 403);
   for (const query of [{page:-1},{page_size:101},{from_date:'2026-02-30'},{status:'SENT;DROP'},{user_id:'Infinity'}]) assert.equal((await call('list', { user: own, query })).statusCode, 422);
@@ -79,7 +87,7 @@ async function main() {
   const revision=await call('revise',{user:{id:99,role:'admin'},params:{id:12},body:{expected_version:1,reason:'Correct actual work',confirm_possible_previous_delivery:true}});
   assert.equal(revision.statusCode,202);assert.equal(revision.body.email_sent,false);assert.equal(revisions[0].confirmPossiblePreviousDelivery,true);assert.equal(revisions[0].retryGeneration,false);
   const retry=await call('retryGeneration',{user:{id:99,role:'admin'},params:{id:12},body:{expected_version:1,reason:'Retry corrected parser error'}});
-  assert.equal(retry.statusCode,202);assert.equal(revisions[1].retryGeneration,true);
+  assert.equal(retry.statusCode,202);assert.equal(revisions[1].retryGeneration,true);assert.match(retry.body.message,/HTML timesheet.*without a PDF attachment/);assert.equal(retry.body.email_sent,false);
   assert.equal((await call('reconciliation',{user:own})).body.outcomes[0].user_id,4);
   assert.equal((await call('reconciliation',{user:own,query:{status:'NO_RECIPIENT'}})).body.total,1,'Missing address remains discoverable while attendance review also blocks delivery');
   for(const query of [{status:'unknown-state'},{sort:'untrusted'},{page:0},{page_size:101},{from_date:'2026-10-12'},{from_date:'invalid',to_date:'2026-10-18'}])assert.equal((await call('reconciliation',{user:own,query})).statusCode,422);
