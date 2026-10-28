@@ -116,7 +116,12 @@ const companionPages = { '/client':'client-portal.html', '/account':'workspace.h
       await page.keyboard.press('Escape');
       assert.equal(await page.evaluate(() => document.body.style.overflow),'');
       assert.equal(await page.getByRole('button',{name:'Open workspace menu',exact:true}).evaluate(node=>node===document.activeElement),true,'drawer restores focus');
-      proof.companion.push({route,oneShell:true,focusLifecycle:true,noPageOverflow:true});
+      await page.getByRole('button',{name:'Open workspace menu',exact:true}).click();
+      assert.equal(await page.evaluate(()=>window.VoxelOverlay?.active),'companion-navigation',route+' registers its drawer in the shared Android Back lifecycle');
+      assert.equal(await page.evaluate(()=>VoxelOverlay.close(null,'native-back')),true);
+      assert.equal(await page.evaluate(()=>document.body.classList.contains('hub-companion-open')),false);
+      assert.equal(await page.evaluate(()=>document.body.style.overflow),'');
+      proof.companion.push({route,oneShell:true,focusLifecycle:true,noPageOverflow:true,sharedBackLifecycle:true});
     }
     await context.close();
     proof.result='passed'; fs.writeFileSync(path.join(out,'business-hub-shell.json'),JSON.stringify(proof,null,2));

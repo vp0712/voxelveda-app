@@ -46,6 +46,9 @@ function injectGlobalBrand(html) {
   if (!rendered.includes('/responsive-foundation.css')) rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/responsive-foundation.css">\n</head>');
   if (!rendered.includes('/responsive-foundation.js')) rendered=rendered.replace(/<\/body>/i,'<script src="/responsive-foundation.js" defer></script>\n</body>');
 
+  // Every retained page uses the same overlay lifecycle, including Android Back
+  // handling for the dedicated-page navigation drawer and foreground feedback.
+  if(!rendered.includes('/workspace-overlays.js'))rendered=rendered.replace(/<\/head>/i,'<script src="/workspace-overlays.js" defer></script>\n</head>');
   if(!rendered.includes('/action-feedback.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/action-feedback.css"><script src="/action-feedback.js" defer></script>\n</head>');
   if(!rendered.includes('/workspace-dialog.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/workspace-dialog.css"><script src="/workspace-dialog.js" defer></script>\n</head>');
   if(!rendered.includes('/invoice-detail.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/invoice-detail.css"><script src="/invoice-detail.js" defer></script>\n</head>');

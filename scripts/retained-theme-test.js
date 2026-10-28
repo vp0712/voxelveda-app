@@ -48,6 +48,7 @@ for (const file of ['login.html', 'register.html', 'profile.html', 'privacy-poli
   assert.equal((rendered.match(/href=["']\/business-hub\.css(?:\?[^"']*)?["']/g) || []).length, 1, `${file} has one shared Business Hub stylesheet`);
   assert.ok(rendered.includes(`src="${BUSINESS_HUB_JS}"`), `${file} receives the current shared shell`);
   assert.equal((rendered.match(/src=["']\/business-hub-shell\.js(?:\?[^"']*)?["']/g) || []).length, 1, `${file} has one shared shell script`);
+  assert.equal((rendered.match(/src=["']\/workspace-overlays\.js(?:\?[^"']*)?["']/g) || []).length, 1, `${file} shares one overlay lifecycle with Android Back`);
   assert.equal(injectGlobalBrand(rendered), rendered, `${file} injection stays idempotent`);
   assert.ok(!rendered.includes('/workspace-shell.js'), `${file} does not load the retired navigation`);
 }
