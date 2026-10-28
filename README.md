@@ -6,6 +6,8 @@ Original RFQs and invoices, customer statements, customer/supplier records, purc
 
 Document previews, downloads and email attachments contain parser-validated PDFs with safe `.pdf` filenames. Generation, queue status, provider acceptance and recipient receipt are separate states. The existing HTTPS company mail relay requires the receiver contract in [the WordPress repair package](deployment/wordpress/README.md) before document attachments can be sent. Normal account emails retain the existing transport. See [PDF verification evidence](docs/PDF-DELIVERY-VERIFICATION-20261011.md).
 
+Weekly staff timesheets now support complete branded HTML email with a plain-text alternative and no attachment. New reports freeze their own immutable content version independently of optional app PDF generation. Exactly one saved designated recipient, worked-time eligibility and review/duplicate-delivery protections still apply. Other document workflows retain PDF-only attachments. The live relay must support the HTML contract before delivery can succeed; a generated report is not evidence of inbox receipt. See [the HTML timesheet release register](docs/WEEKLY_HTML_RELEASE_20261028.md).
+
 Use Node 22.13 or later and an isolated development MySQL database. Run `npm ci`, `npm run check`, `npm test`, `npm run build` and `npm run security:audit`. Disposable database and browser checks are defined by the repository workflows. Never commit secrets, production exports or user uploads.
 
 Authenticated `/dashboard` entries select the original role portal; `/account`, `/profile` and `/security` retain account controls. Public intake is at `/request-quote`, and recruitment is at `/careers`. Business APIs enforce their original scopes and current security controls.

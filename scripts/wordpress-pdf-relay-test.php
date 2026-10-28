@@ -1,6 +1,13 @@
 <?php
 // Isolated WordPress receiver contract. No network, provider or real inbox is used.
-require __DIR__ . '/../deployment/wordpress/vendor/autoload.php';
+$vv_autoloader = require __DIR__ . '/../deployment/wordpress/vendor/autoload.php';
+// A second invocation proves that HTML mail has no runtime PDF-parser need.
+// Load only the real MIME builder before disabling Composer discovery.
+if (getenv('VV_RELAY_HTML_ONLY_WITHOUT_PDF_PARSER') === '1') {
+    class_exists('\\PHPMailer\\PHPMailer\\PHPMailer');
+    class_exists('\\PHPMailer\\PHPMailer\\Exception');
+    $vv_autoloader->unregister();
+}
 define('ABSPATH', __DIR__);
 define('VOXEL_VEDA_MAIL_RELAY_TOKEN', hash('sha256', 'disposable-relay-fixture'));
 $vv_options = array(); $vv_hooks = array(); $vv_attempts = 0; $vv_mode = 'accepted'; $vv_mime = ''; $vv_interceptor=false;
@@ -35,13 +42,17 @@ function wp_mail($recipients, $subject, $body, $headers) {
     if ($GLOBALS['vv_mode']==='extra-to') $mail->addAddress('unrelated@example.invalid');
     if ($GLOBALS['vv_mode']==='default-cc') $mail->addCC('manager@example.invalid');
     if ($GLOBALS['vv_mode']==='default-bcc') $mail->addBCC('payroll@example.invalid');
+    if ($GLOBALS['vv_mode']==='pre-altered-html') $mail->Body.='<p>Unrelated content inserted by a prior hook.</p>';
     $hooks=$GLOBALS['vv_hooks']['phpmailer_init'] ?? array(); ksort($hooks);
     if ($GLOBALS['vv_mode']!=='missing-hook') foreach ($hooks as $callbacks) foreach ($callbacks as $callback) $callback($mail);
     if ($GLOBALS['vv_mode']==='altered-parts') { $mail->clearAttachments(); $mail->addStringAttachment('modified bytes', 'modified.pdf', 'base64', 'application/pdf', 'attachment'); }
+    if ($GLOBALS['vv_mode']==='altered-html') $mail->Body.='<p>Unrelated content inserted after the final hook.</p>';
+    if ($GLOBALS['vv_mode']==='altered-text') $mail->AltBody.="\nUnrelated plain-text content.";
+    if ($GLOBALS['vv_mode']==='altered-subject') $mail->Subject.=' altered';
     $mail->preSend(); // Build genuine PHPMailer MIME without invoking a transport.
     $GLOBALS['vv_mime']=$mail->getSentMIMEMessage();
     if ($GLOBALS['vv_mode']==='exception') throw new RuntimeException('Simulated uncertain provider response');
-    return in_array($GLOBALS['vv_mode'],array('accepted','missing-hook','altered-parts','extra-to','default-cc','default-bcc'),true);
+    return in_array($GLOBALS['vv_mode'],array('accepted','missing-hook','altered-parts','extra-to','default-cc','default-bcc','altered-html','altered-text','altered-subject','pre-altered-html'),true);
 }
 class FixtureRequest {
     public $data; function __construct($data) { $this->data=$data; }
@@ -50,6 +61,14 @@ class FixtureRequest {
 }
 function verify($value, $message) { if (!$value) throw new RuntimeException($message); }
 require __DIR__ . '/../deployment/wordpress/voxel-veda-pdf-relay.php';
+if (getenv('VV_RELAY_HTML_ONLY_WITHOUT_PDF_PARSER') === '1') {
+    verify(!class_exists('\\Smalot\\PdfParser\\Parser'), 'This isolated HTML-only invocation must not have a PDF parser.');
+    verify(vv_pdf_relay_health()['pdf_bytes_validated']===false, 'Missing parser must still disable PDF capability.');
+    verify(vv_pdf_relay_health()['weekly_html_content_preserved']===true, 'HTML body capability must remain available without a PDF parser.');
+    vv_verify_weekly_html_receiver();
+    echo 'WordPress HTML-only receiver passed without a PDF parser or PDF fixture; genuine multipart alternative MIME and private immutable content verified. No network or received inbox used.'.PHP_EOL;
+    exit(0);
+}
 $filename=getenv('PDF_FIXTURE_PATH') ?: '/fixtures/invoice.pdf';
 $bytes=file_get_contents($filename); verify($bytes!==false, 'The generated PDF fixture is required.');
 $part=array('filename'=>'voxel-veda-fixture-invoice.pdf', 'contentType'=>'application/pdf', 'content_base64'=>base64_encode($bytes), 'byte_length'=>strlen($bytes), 'sha256'=>hash('sha256',$bytes));
@@ -112,4 +131,88 @@ foreach(array('extra-to','default-cc','default-bcc') as $index=>$mode) {
 }
 $GLOBALS['vv_mode']='accepted';$bad=$weekly;$bad['request_id']='weekly-timesheet:99:2026-09-28:2026-10-04:v1';$bad['delivery_policy']['staffId']=99;$bad['cc']=array('manager@example.invalid');$before=$GLOBALS['vv_attempts'];
 $blocked=vv_pdf_relay_send(new FixtureRequest($bad));verify($blocked instanceof WP_Error && $blocked->code==='PDF_RELAY_VALIDATION_FAILED' && $GLOBALS['vv_attempts']===$before,'Weekly copies must fail before any mail attempt.');
-echo 'WordPress receiver tests passed: real PHP PDF parser; genuine PHPMailer MIME; exact decoded bytes; PDF-only metadata; stale attachment removal; validation prevents send; accepted/uncertain retries never duplicate; recipient receipt unverified.'.PHP_EOL;
+vv_verify_weekly_html_receiver();
+echo 'WordPress receiver tests passed: real PHP PDF parser; genuine PHPMailer PDF and HTML/plain-text MIME; exact decoded bytes and body content; PDF-only attachment metadata; HTML with zero attachments; stale attachment removal; validation prevents send; accepted/uncertain retries never duplicate; recipient receipt unverified.'.PHP_EOL;
+
+function vv_decode_alternative($mime, $type) {
+    $normalized = str_replace("\r\n", "\n", $mime);
+    $pattern = '~(?:^|\n)--[^\n]+\n(Content-Type: '.preg_quote($type, '~').'[^\n]*\n(?:[^\n]+\n)*)\n([\s\S]*?)(?=\n--[^\n]+)~i';
+    if (!preg_match($pattern, $normalized, $match)) throw new RuntimeException('The real MIME is missing its '.$type.' alternative.');
+    $headers = $match[1]; $body = $match[2];
+    if (preg_match('/Content-Transfer-Encoding:\s*base64/i', $headers)) {
+        $body = base64_decode(preg_replace('/\s+/', '', $body), true);
+        verify($body!==false, 'The MIME alternative must have valid base64 bytes.');
+    } elseif (preg_match('/Content-Transfer-Encoding:\s*quoted-printable/i', $headers)) $body = quoted_printable_decode($body);
+    // MIME uses CRLF and adds a boundary separator. Compare content after only
+    // protocol line-ending normalization, never HTML sanitization/truncation.
+    return rtrim(str_replace("\r\n", "\n", $body), "\n");
+}
+function vv_verify_weekly_html_receiver() {
+    $file = getenv('WEEKLY_HTML_FIXTURE_PATH') ?: '/tmp/voxel-weekly-html-evidence/report.json';
+    $json = file_get_contents($file); verify($json!==false, 'Generate the real JavaScript HTML report fixture before PHP receiver verification.');
+    $report = json_decode($json, true); verify(is_array($report), 'The real renderer fixture must contain valid JSON.');
+    verify(vv_weekly_html_hash($report['subject'], $report['html'], $report['text'], $report['layoutVersion'])===$report['contentHash'], 'PHP and JavaScript must hash the exact same ordered Unicode HTML/text content.');
+    $message = array('request_id'=>'weekly-timesheet:131:2026-09-28:2026-10-04:v1', 'to'=>array('fixture@example.invalid'),
+        'cc'=>array(), 'bcc'=>array(), 'subject'=>$report['subject'], 'html'=>$report['html'], 'text'=>$report['text'], 'attachments'=>array(),
+        'weekly_html_contract_version'=>1, 'delivery_policy'=>array('type'=>'WEEKLY_TIMESHEET', 'format'=>'HTML', 'staffId'=>131,
+            'deliveryId'=>181, 'revision'=>1, 'fromDate'=>'2026-09-28', 'toDate'=>'2026-10-04', 'sourceHash'=>hash('sha256', 'isolated HTML source'),
+            'recipient'=>'fixture@example.invalid', 'layoutVersion'=>$report['layoutVersion'], 'contentHash'=>$report['contentHash']));
+    $GLOBALS['vv_mode']='accepted'; $GLOBALS['vv_interceptor']=false; $before=$GLOBALS['vv_attempts'];
+    $accepted=vv_pdf_relay_send(new FixtureRequest($message));
+    verify(is_array($accepted) && $accepted['provider_accepted']===true && $accepted['recipient_verified']===false, 'HTML provider acceptance is not recipient receipt.');
+    verify($accepted['weekly_html_contract_version']===1 && $accepted['weekly_html_content_preserved']===true &&
+        $accepted['weekly_html_sha256']===$report['contentHash'] && $accepted['layout_version']===$report['layoutVersion'] &&
+        $accepted['request_id']===$message['request_id'] && $accepted['weekly_recipient_privacy_enforced']===true &&
+        $accepted['designated_recipient']==='fixture@example.invalid' && $accepted['attachments']===array() && $accepted['pdf_bytes_validated']===false, 'HTML receipt must bind its version/content and zero-attachment policy independently of PDFs.');
+    verify($GLOBALS['vv_attempts']===$before+1, 'One HTML transport attempt expected.');
+    $mime=$GLOBALS['vv_mime'];
+    if (getenv('WEEKLY_HTML_RELAY_MIME_OUTPUT')) file_put_contents(getenv('WEEKLY_HTML_RELAY_MIME_OUTPUT'),$mime);
+    verify(strpos($mime,'multipart/alternative')!==false, 'The received-format fixture must contain HTML and plain text alternatives.');
+    verify(strpos($mime,'Content-Disposition: attachment')===false && strpos($mime,'stale.tmp')===false, 'HTML-only MIME cannot contain PDF, TMP, logo or other attachments.');
+    verify(!preg_match('/^(?:Cc|Bcc):/mi',$mime) && preg_match('/^To:\s*fixture@example\.invalid\s*$/m',$mime), 'HTML MIME must have exactly the designated To and no copies.');
+    verify(vv_decode_alternative($mime,'text/html')===rtrim(str_replace("\r\n", "\n", $report['html']),"\n"), 'The full decoded HTML must equal the authoritative renderer snapshot.');
+    verify(vv_decode_alternative($mime,'text/plain')===rtrim(str_replace("\r\n", "\n", $report['text']),"\n"), 'The full decoded plain text must equal the authoritative renderer snapshot.');
+    verify(strpos($report['html'],'alt="Voxel Veda"')!==false && strpos($report['text'],'Voxel Veda Pty Ltd')!==false && strpos($report['text'],'DAILY TOTALS')!==false, 'The report must remain useful with external images blocked.');
+    vv_pdf_relay_send(new FixtureRequest($message)); verify($GLOBALS['vv_attempts']===$before+1, 'Accepted HTML retries cannot deliver again.');
+    $changed=$message; $changed['html'].='<p>A different report.</p>';
+    $changed['delivery_policy']['contentHash']=vv_weekly_html_hash($changed['subject'],$changed['html'],$changed['text'],$changed['delivery_policy']['layoutVersion']);
+    $blocked=vv_pdf_relay_send(new FixtureRequest($changed));
+    verify($blocked instanceof WP_Error && $blocked->code==='DELIVERY_REVIEW_REQUIRED' && $GLOBALS['vv_attempts']===$before+1, 'An accepted identity cannot be rewritten with a changed report.');
+    $changed=$message; $changed['to']=array('different@example.invalid'); $changed['delivery_policy']['recipient']='different@example.invalid';
+    $blocked=vv_pdf_relay_send(new FixtureRequest($changed));
+    verify($blocked instanceof WP_Error && $blocked->code==='DELIVERY_REVIEW_REQUIRED' && $GLOBALS['vv_attempts']===$before+1, 'Completed delivery recipients cannot be rewritten.');
+    verify(vv_pdf_relay_send(new FixtureRequest($message))===$accepted, 'The original accepted receipt must remain unchanged.');
+
+    $sequence=140;
+    foreach (array('html','text','subject','contentHash','layoutVersion','cc','bcc','attachments','missing-contract','missing-format','wrong-format','unsafe-html','header-injection','oversized-html') as $field) {
+        $bad=$message; $sequence++; $bad['delivery_policy']['staffId']=$sequence; $bad['request_id']='weekly-timesheet:'.$sequence.':2026-09-28:2026-10-04:v1';
+        if (in_array($field,array('html','text','subject'),true)) $bad[$field].=' changed';
+        elseif ($field==='contentHash') $bad['delivery_policy']['contentHash']=str_repeat('0',64);
+        elseif ($field==='layoutVersion') $bad['delivery_policy']['layoutVersion']='unapproved-layout';
+        elseif ($field==='cc' || $field==='bcc') $bad[$field]=array('unrelated@example.invalid');
+        elseif ($field==='attachments') $bad['attachments']=array(array('filename'=>'forbidden.tmp','contentType'=>'text/html','content_base64'=>base64_encode('not PDF')));
+        elseif ($field==='missing-contract') unset($bad['weekly_html_contract_version']);
+        elseif ($field==='missing-format') unset($bad['delivery_policy']['format']);
+        elseif ($field==='wrong-format') $bad['delivery_policy']['format']='HTML_PDF';
+        elseif ($field==='unsafe-html') { $bad['html'].='<script>unsafe</script>'; $bad['delivery_policy']['contentHash']=vv_weekly_html_hash($bad['subject'],$bad['html'],$bad['text'],$bad['delivery_policy']['layoutVersion']); }
+        elseif ($field==='header-injection') { $bad['subject'].="\r\nBcc: unrelated@example.invalid"; $bad['delivery_policy']['contentHash']=vv_weekly_html_hash($bad['subject'],$bad['html'],$bad['text'],$bad['delivery_policy']['layoutVersion']); }
+        elseif ($field==='oversized-html') { $bad['html']=str_repeat('x',1024*1024+1); $bad['delivery_policy']['contentHash']=vv_weekly_html_hash($bad['subject'],$bad['html'],$bad['text'],$bad['delivery_policy']['layoutVersion']); }
+        $count=$GLOBALS['vv_attempts'];$failure=vv_pdf_relay_send(new FixtureRequest($bad));
+        verify($failure instanceof WP_Error && in_array($failure->code,array('WEEKLY_HTML_RELAY_VALIDATION_FAILED','PDF_RELAY_VALIDATION_FAILED'),true) && $GLOBALS['vv_attempts']===$count, 'Invalid HTML report metadata/body/policy must fail before transport: '.$field);
+    }
+    $GLOBALS['vv_interceptor']=true;
+    verify(vv_pdf_relay_health()['weekly_html_content_preserved']===false && vv_pdf_relay_health()['weekly_recipient_privacy_enforced']===false, 'A bypassing API adapter cannot advertise HTML content/privacy support.');
+    $bad=$message; $bad['delivery_policy']['staffId']=160;$bad['request_id']='weekly-timesheet:160:2026-09-28:2026-10-04:v1';$count=$GLOBALS['vv_attempts'];
+    $failure=vv_pdf_relay_send(new FixtureRequest($bad));
+    verify($failure instanceof WP_Error && $failure->code==='WEEKLY_HTML_RELAY_VALIDATION_FAILED' && $GLOBALS['vv_attempts']===$count, 'HTML privacy/content preflight failure cannot attempt transport.');
+    $GLOBALS['vv_interceptor']=false;
+    foreach (array('false','exception','missing-hook','altered-html','altered-text','altered-subject','pre-altered-html','altered-parts','extra-to','default-cc','default-bcc') as $index=>$mode) {
+        $GLOBALS['vv_mode']=$mode;$bad=$message;$staff=170+$index;$bad['delivery_policy']['staffId']=$staff;$bad['request_id']='weekly-timesheet:'.$staff.':2026-09-28:2026-10-04:v1';$count=$GLOBALS['vv_attempts'];
+        $failure=vv_pdf_relay_send(new FixtureRequest($bad));
+        verify($failure instanceof WP_Error && $failure->code==='DELIVERY_REVIEW_REQUIRED', 'Uncertain or altered HTML transport must be held for review: '.$mode);
+        if (in_array($mode,array('missing-hook','altered-html','altered-text','altered-subject','altered-parts'),true)) verify($failure->data['provider_accepted']===true, 'Known acceptance must survive HTML content review failure.');
+        vv_pdf_relay_send(new FixtureRequest($bad));
+        verify($GLOBALS['vv_attempts']===$count+1, 'A lost/unsafe HTML outcome cannot be attempted automatically again: '.$mode);
+    }
+    $GLOBALS['vv_mode']='accepted';
+}

@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { companyProfile } = require('../config/companyProfile');
 const { validatePdf, safePdfFilename } = require('./documentPdfService');
-const { assertWeeklyDeliveryPolicy } = require('./weeklyDeliveryPolicy');
+const { assertWeeklyDeliveryPolicy, assertWeeklyDeliveryContent, weeklyFormat } = require('./weeklyDeliveryPolicy');
 
 const SMTP_FIELDS = {
   host: ['SMTP_HOST', 'EMAIL_HOST', 'MAIL_HOST'],
@@ -99,7 +99,8 @@ const EMAIL_TRANSPORT_CODES = new Set([
   'EMAIL_HTTPS_RELAY_FAILED',
   'DELIVERY_REVIEW_REQUIRED',
   'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE',
-  'PDF_RELAY_CONTRACT_REQUIRED'
+  'PDF_RELAY_CONTRACT_REQUIRED',
+  'WEEKLY_HTML_RELAY_CONTRACT_REQUIRED'
 ]);
 
 function isEmailTransportError(error) {
@@ -146,7 +147,7 @@ function emailFailureDetails(error) {
 
   if(code==='DELIVERY_REVIEW_REQUIRED')return {status:409,code,message:error.message,retryable:false,provider_accepted:error.providerAccepted===true,recipient_verified:false};
 
-  if (code === 'PDF_RELAY_CONTRACT_REQUIRED') return { status: 503, code, message: error.message, retryable: false };
+  if (['PDF_RELAY_CONTRACT_REQUIRED','WEEKLY_HTML_RELAY_CONTRACT_REQUIRED'].includes(code)) return { status: 503, code, message: error.message, retryable: false };
   if (code.startsWith('PDF_')) return { status: 422, code, message: error.message, retryable: false };
 
   if (code === 'SMTP_CONFIG_MISSING') {
@@ -294,10 +295,32 @@ async function assertRelayPdfCapability() {
   finally { clearTimeout(timeout); }
 }
 
+async function assertRelayWeeklyHtmlCapability() {
+  const config = relayConfig(), controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+  try {
+    const response = await fetch(`${config.url.replace(/\/+$/, '')}/health`, {
+      method: 'GET', headers: { Accept: 'application/json', 'X-Voxel-Veda-Relay-Token': config.token }, signal: controller.signal
+    });
+    let health;
+    try { health = await response.json(); } catch {}
+    if (!response.ok || !health || typeof health !== 'object' || Array.isArray(health) || health.ok !== true ||
+        Number(health.weekly_html_contract_version) !== 1 || health.weekly_html_content_preserved !== true || health.weekly_recipient_privacy_enforced !== true) {
+      throw Object.assign(new Error('The company relay has not verified HTML weekly-report content and its designated single-recipient policy. No PDF capability is required for this report. The message remains pending for controlled retry after the existing relay is repaired.'), { code: 'WEEKLY_HTML_RELAY_CONTRACT_REQUIRED' });
+    }
+    return health;
+  } catch (error) {
+    if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
+    throw beforeDispatch(error);
+  }
+  finally { clearTimeout(timeout); }
+}
+
 async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
   let config,transporter;
   try{
-    assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+    const checkedPolicy = assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+    assertWeeklyDeliveryContent({ subject, html, text, attachments }, checkedPolicy);
     attachments = await assertAttachmentIntegrity(attachments);
     config = smtpConfig();transporter = createTransporter();
   }catch(error){throw beforeDispatch(error);}
@@ -359,7 +382,10 @@ async function verifyConnection() {
       if (!health || typeof health !== 'object' || Array.isArray(health) || health.ok !== true) {
         throw Object.assign(new Error('The company relay did not return a valid successful JSON health response. Connectivity and PDF capability remain unverified.'), {code:'EMAIL_HTTPS_RELAY_FAILED',relayHttpStatus:response.status,relayReason:'RELAY_HEALTH_JSON_NOT_READY'});
       }
-      relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay', pdf_attachment_contract_version: Number(health.attachment_contract_version || 0), pdf_attachments_supported: Number(health.attachment_contract_version || 0) >= 3 && health.pdf_bytes_validated === true && health.attachment_filename_preserved === true, recipient_verified: false };
+      relayResult = { configured: true, ok: true, provider: 'wordpress_wp_mail', transport: 'https_relay', pdf_attachment_contract_version: Number(health.attachment_contract_version || 0), pdf_attachments_supported: Number(health.attachment_contract_version || 0) >= 3 && health.pdf_bytes_validated === true && health.attachment_filename_preserved === true,
+        weekly_html_contract_version: Number(health.weekly_html_contract_version || 0),
+        weekly_html_supported: Number(health.weekly_html_contract_version) === 1 && health.weekly_html_content_preserved === true && health.weekly_recipient_privacy_enforced === true,
+        recipient_verified: false };
       let relayEndpoint='configured';
       try {
         const relayUrl=new URL(config.url);
@@ -452,7 +478,8 @@ async function relayAttachments(attachments = []) {
 }
 
 async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attachments = [], deliveryKey, deliveryPolicy }) {
-  assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+  const checkedPolicy = assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+  assertWeeklyDeliveryContent({ subject, html, text, attachments }, checkedPolicy);
   if (deliveryPolicy) throw Object.assign(new Error('The Hostinger API has no verified final-recipient privacy contract for weekly timesheets. Keep the request pending and verify the configured transport before sending.'), {code:'DELIVERY_REVIEW_REQUIRED',reasonCode:'WEEKLY_TRANSPORT_PRIVACY_UNVERIFIED'});
   const config = hostingerMailApiConfig();
   if (!isHostingerMailApiConfigured()) {
@@ -517,9 +544,13 @@ async function sendViaHostingerMailApi({ to, cc, bcc, subject, html, text, attac
 }
 
 async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
+  let checkedPolicy;
   try {
-    assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
-    if (attachments.length) {
+    checkedPolicy = assertWeeklyDeliveryPolicy({ deliveryKey, deliveryPolicy }, { to, cc, bcc });
+    assertWeeklyDeliveryContent({ subject, html, text, attachments }, checkedPolicy);
+    if (checkedPolicy && weeklyFormat(checkedPolicy) === 'HTML') {
+      await assertRelayWeeklyHtmlCapability();
+    } else if (attachments.length) {
       const health = await assertRelayPdfCapability();
       if (deliveryPolicy && health.weekly_recipient_privacy_enforced !== true) throw Object.assign(new Error('The existing relay must enforce the designated single recipient through final MIME construction before weekly timesheets can be sent.'), {code:'PDF_RELAY_CONTRACT_REQUIRED'});
     }
@@ -547,8 +578,9 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
         text: text || '',
         reply_to: replyTo || '',
         request_id: deliveryKey || `railway:${crypto.createHash('sha256').update(JSON.stringify({to,cc,bcc,subject,text,html,attachments:attachments.map(item=>({filename:item.filename,sha256:crypto.createHash('sha256').update(item.content).digest('hex')}))})).digest('hex')}`,
-        attachment_contract_version: 3,
-        preserve_attachment_filenames: true,
+        attachment_contract_version: checkedPolicy && weeklyFormat(checkedPolicy) === 'HTML' ? undefined : 3,
+        preserve_attachment_filenames: checkedPolicy && weeklyFormat(checkedPolicy) === 'HTML' ? undefined : true,
+        weekly_html_contract_version: checkedPolicy && weeklyFormat(checkedPolicy) === 'HTML' ? 1 : undefined,
         delivery_policy: deliveryPolicy || undefined,
         attachments: encodedAttachments
       }),
@@ -562,16 +594,17 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
       // A proxy/receiver may emit an error or HTML after the provider accepted
       // the request. Only its explicit pre-transport validation rejection is
       // definitive; all other POST outcomes require review before another send.
-      const definitiveRejection = !response.ok && !knownAcceptance && ['PDF_RELAY_VALIDATION_FAILED','INVALID_REQUEST_ID'].includes(result.code);
+      const definitiveRejection = !response.ok && !knownAcceptance && ['PDF_RELAY_VALIDATION_FAILED','WEEKLY_HTML_RELAY_VALIDATION_FAILED','INVALID_REQUEST_ID'].includes(result.code);
       const error = new Error(definitiveRejection
         ? result.message || 'The relay rejected this request before mail transport. Repair it before a controlled retry.'
         : result.code === 'DELIVERY_REVIEW_REQUIRED' && result.message
           ? result.message
           : 'The relay did not confirm the outcome of this attempted mail transaction. Review provider logs before retry; no automatic resend is permitted.');
-      error.code = definitiveRejection ? 'PDF_RELAY_VALIDATION_FAILED' : 'DELIVERY_REVIEW_REQUIRED';
+      error.code = definitiveRejection ? (result.code === 'WEEKLY_HTML_RELAY_VALIDATION_FAILED' ? result.code : 'PDF_RELAY_VALIDATION_FAILED') : 'DELIVERY_REVIEW_REQUIRED';
       error.responseCode = response.status;
       error.providerAccepted = knownAcceptance;
       if(definitiveRejection)error.deliveryOutcome='NOT_ACCEPTED';
+      if(error.code==='WEEKLY_HTML_RELAY_VALIDATION_FAILED')error.retryable=false;
       throw error;
     }
     if(attachments.length){
@@ -583,9 +616,18 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
       });
       if(!validContract || !exactParts)throw Object.assign(new Error('The relay accepted this message without confirming the exact validated PDF attachment metadata. Administrator review is required before retry; recipient receipt remains unverified.'),{code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:true});
     }
+    if (checkedPolicy && weeklyFormat(checkedPolicy) === 'HTML' &&
+        (result.provider_accepted !== true || Number(result.weekly_html_contract_version) !== 1 || result.weekly_html_content_preserved !== true ||
+         result.weekly_html_sha256 !== checkedPolicy.contentHash || result.layout_version !== checkedPolicy.layoutVersion ||
+         result.request_id !== deliveryKey || !Array.isArray(result.attachments) || result.attachments.length !== 0)) {
+      throw Object.assign(new Error('The relay did not confirm provider acceptance and the exact immutable HTML body, layout, request identity and absence of attachments. Review the provider before retry; recipient receipt remains unverified.'), { code: 'DELIVERY_REVIEW_REQUIRED', reasonCode: 'WEEKLY_HTML_ACCEPTANCE_UNCONFIRMED', providerAccepted: result.provider_accepted === true, retryable: false });
+    }
     if (deliveryPolicy && (result.weekly_recipient_privacy_enforced !== true || result.designated_recipient !== deliveryPolicy.recipient)) throw Object.assign(new Error('The relay accepted the weekly message without confirming its exact designated recipient and zero copies. Review provider logs before any retry.'), {code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:true});
     return {
-      messageId: result.provider_message_id || result.request_id || null,
+      messageId: result.provider_message_id || result.message_id || (checkedPolicy && weeklyFormat(checkedPolicy) === 'HTML' ? null : result.request_id) || null,
+      providerMessageId: result.provider_message_id || null,
+      mimeMessageId: result.message_id || null,
+      requestId: result.request_id || null,
       accepted: to,
       // This is only the relay's claim; it is never recipient-side verification.
       attachmentFilenameGuaranteed: result.attachment_filename_preserved === true,
@@ -594,7 +636,7 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
     };
   } catch (error) {
     if(!attempted)throw beforeDispatch(error);
-    if(attempted && !['DELIVERY_REVIEW_REQUIRED','PDF_RELAY_VALIDATION_FAILED'].includes(error.code)){error.code='DELIVERY_REVIEW_REQUIRED';error.message='The relay transaction outcome is uncertain. Review provider logs before retry to prevent duplicate delivery.';}
+    if(attempted && !['DELIVERY_REVIEW_REQUIRED','PDF_RELAY_VALIDATION_FAILED','WEEKLY_HTML_RELAY_VALIDATION_FAILED'].includes(error.code)){error.code='DELIVERY_REVIEW_REQUIRED';error.message='The relay transaction outcome is uncertain. Review provider logs before retry to prevent duplicate delivery.';}
     if(!error.code)error.code='EMAIL_HTTPS_RELAY_FAILED';
     throw error;
   } finally {
@@ -616,7 +658,8 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
     subject, html, text, replyTo, deliveryKey, deliveryPolicy,
     attachments: await assertAttachmentIntegrity(attachments)
   };
-  assertWeeklyDeliveryPolicy(args, args);
+  const checkedPolicy = assertWeeklyDeliveryPolicy(args, args);
+  assertWeeklyDeliveryContent(args, checkedPolicy);
   // Explicit transport selection is honoured; no provider change is inferred from PDF failures.
   selected = selectedEmailTransport();
   if (selected === 'https_relay' && !isRelayConfigured()) throw Object.assign(new Error('The configured HTTPS company relay is incomplete.'), {code:'EMAIL_HTTPS_RELAY_FAILED'});
@@ -652,6 +695,7 @@ module.exports = {
   emailFailureDetails,
   assertAttachmentIntegrity,
   assertRelayPdfCapability,
+  assertRelayWeeklyHtmlCapability,
   attachmentBuffer,
   isPdfAttachment,
   sendViaSmtp

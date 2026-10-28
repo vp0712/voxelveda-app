@@ -107,6 +107,13 @@ async function main() {
   for(const query of [{week_start:'2026-02-30'},{week_start:'2026-10-20'},{week_start:period.start,user_id:'Infinity'},{week_start:period.start,disposition:'bad'}])assert.equal((await call(undefined,query)).statusCode,422);
   records=[{...record,clock_out:null}]; const review=await call();assert.equal(review.statusCode,409);assert.equal(review.body.code,'ATTENDANCE_REVIEW_REQUIRED');assert(Array.isArray(review.body.issues));
   records=[];assert.equal((await call()).body.code,'NO_ELIGIBLE_WORK');
+  records=[record];
+  const htmlSource={...frozen,generated_at:'2026-10-27T04:00:00.000Z'};
+  db.deliveries=[{version:1,status:'SENT',delivery_format:'HTML',snapshot_json:JSON.stringify(htmlSource),source_sha256:policy.snapshotHash(htmlSource)}];
+  const htmlPdf=await call();assert.equal(htmlPdf.statusCode,200,'An earlier optional PDF does not block the authoritative HTML report or its independent app download.');
+  assert(htmlPdf.body.equals(first.buffer),'Existing optional PDF bytes are preserved; only its generation timestamp differs from the email.');
+  db.deliveries=[{version:1,status:'SENT',delivery_format:'PDF',snapshot_json:JSON.stringify(htmlSource),source_sha256:policy.snapshotHash(htmlSource)}];
+  assert.equal((await call()).body.code,'TIMESHEET_PDF_SNAPSHOT_INVALID','Legacy PDF email/app timestamp and byte identity remains strict.');
   records=[{...record,notes:'Legitimate source correction after delivery'}];db.deliveries=[{version:1,status:'SENT',snapshot_json:JSON.stringify(frozen),source_sha256:policy.snapshotHash(frozen)}];
   const countBefore=db.cache.size,sourceChanged=await call();assert.equal(sourceChanged.statusCode,409);assert.equal(sourceChanged.body.code,'SOURCE_CHANGED');assert.equal(db.cache.size,countBefore,'Changed accepted reports require explicit authorised revision, no new v1 download.');assert(first.buffer.equals(await storage.getObject(db.cache.get(pdfs.sourceKey(frozen)).pdf_object_key)));
   const stored=db.cache.get(pdfs.sourceKey(frozen));objects.set(stored.pdf_object_key,Buffer.from('<html>HTTP error</html>'));

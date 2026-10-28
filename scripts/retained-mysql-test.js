@@ -535,7 +535,9 @@ async function testWeeklyDelivery() {
   const worked = deliveries[0];
   assert.equal(worked.total_minutes, 480);
   assert.equal(worked.recipient, 'weekly-30@example.invalid');
-  assert.ok(worked.document_request_id);
+  assert.equal(worked.delivery_format, 'HTML');
+  assert.equal(worked.document_request_id, null, 'HTML-only delivery never creates a PDF email request.');
+  assert.match(worked.content_sha256, /^[a-f0-9]{64}$/);
   assert.equal(worked.claim_token, null);
   assert.equal(worked.claim_expires_at, null);
   const [[savedQueue]] = await pool.query('SELECT * FROM email_queue WHERE id=?', [worked.email_queue_id]);
@@ -543,21 +545,40 @@ async function testWeeklyDelivery() {
   assert.deepEqual(JSON.parse(savedQueue.cc_json), []);
   assert.deepEqual(JSON.parse(savedQueue.bcc_json), []);
   assert.equal(JSON.parse(savedQueue.delivery_policy_json).sourceHash, worked.source_sha256);
+  assert.equal(JSON.parse(savedQueue.delivery_policy_json).format, 'HTML');
+  assert.equal(JSON.parse(savedQueue.delivery_policy_json).contentHash, worked.content_sha256);
   const attachments = queue.restoreAttachments(JSON.parse(savedQueue.attachments_json));
-  assert.equal(attachments.length, 1);
-  const parsed = await validatePdf(attachments[0].content, { expectedText: ['Worked fixture employee', period.start, period.end, '8.00'] });
+  assert.equal(attachments.length, 0, 'The complete weekly report is in HTML/text, without a PDF dependency.');
+  const content = JSON.parse(worked.content_snapshot_json);
+  require('../services/weeklyTimesheetEmailService').assertWeeklyTimesheetEmailContent(content, { expectedHash: worked.content_sha256 });
+  assert.equal(savedQueue.html_body, content.html);
+  assert.equal(savedQueue.text_body, content.text);
+  for (const expected of ['Worked fixture employee', period.start, period.end, '8.00']) assert(content.text.includes(expected));
+  assert.doesNotMatch(content.text, /No-work fixture|Planned fixture|Missing designation|login-only/);
+  assert.equal(objects.size, 0, 'HTML scheduling has not generated or stored any PDF.');
+  const pdfs = require('../services/timesheetPdfService');
+  const snapshot = JSON.parse(worked.snapshot_json);
+  assert.deepEqual(await pdfs.freezeSnapshot(pool, snapshot), snapshot, 'An optional app preview freezes the same employee/week source used by the email body.');
+  // Optional PDF failure/success is independent of the already-frozen HTML queue.
+  const savedArtifact = pdfs.snapshotArtifact;
+  try {
+    pdfs.snapshotArtifact = async () => { throw Object.assign(new Error('Synthetic optional PDF failure'), { code: 'PDF_GENERATION_FAILED' }); };
+    await assert.rejects(pdfs.snapshotArtifact(pool, snapshot), { code: 'PDF_GENERATION_FAILED' });
+    assert.equal((await pool.query('SELECT status FROM email_queue WHERE id=?', [worked.email_queue_id]))[0][0].status, 'PENDING');
+  } finally { pdfs.snapshotArtifact = savedArtifact; }
+  const artifact = await pdfs.snapshotArtifact(pool, snapshot);
+  const parsed = await validatePdf(artifact.buffer, { expectedText: ['Worked fixture employee', period.start, period.end, '8.00'] });
   assert.doesNotMatch(parsed.text, /No-work fixture|Planned fixture|Missing designation|login-only/);
   const [[cachedPdf]] = await pool.query('SELECT pdf_object_key,pdf_sha256,pdf_bytes_count,pdf_filename,generation_status FROM timesheet_pdf_snapshots WHERE source_key=?', [require('../services/timesheetPdfService').sourceKey(JSON.parse(worked.snapshot_json))]);
   assert.equal(cachedPdf.generation_status, 'VALIDATED');
-  assert.equal(cachedPdf.pdf_sha256, digest(attachments[0].content));
-  assert.equal(Number(cachedPdf.pdf_bytes_count), attachments[0].content.length);
-  assert.equal(cachedPdf.pdf_filename, attachments[0].filename);
-  assert((await storage.getObject(cachedPdf.pdf_object_key)).equals(attachments[0].content), 'The real SQL cache points to the exact parser-valid bytes serialized into the durable email queue.');
+  assert.equal(cachedPdf.pdf_sha256, digest(artifact.buffer));
+  assert.equal(Number(cachedPdf.pdf_bytes_count), artifact.buffer.length);
+  assert.equal(cachedPdf.pdf_filename, artifact.filename);
+  assert((await storage.getObject(cachedPdf.pdf_object_key)).equals(artifact.buffer), 'Optional app PDF bytes remain durable and parser-valid without becoming an email requirement.');
   const restoredArtifact = await require('../services/timesheetPdfService').snapshotArtifact(pool, JSON.parse(worked.snapshot_json));
-  assert(restoredArtifact.buffer.equals(attachments[0].content), 'Reopening the persistent PDF metadata returns the same authoritative document version without regeneration.');
-
-  const [[request]] = await pool.query('SELECT generation_status,pdf_sha256,email_queue_id FROM document_delivery_requests WHERE id=?', [worked.document_request_id]);
-  assert.deepEqual(request, { generation_status: 'VALIDATED', pdf_sha256: digest(attachments[0].content), email_queue_id: worked.email_queue_id });
+  assert(restoredArtifact.buffer.equals(artifact.buffer), 'Reopening the persistent PDF metadata returns the same authoritative document version without regeneration.');
+  const [[htmlUnchanged]] = await pool.query('SELECT content_sha256,content_snapshot_json,document_request_id FROM weekly_timesheet_deliveries WHERE id=?', [worked.id]);
+  assert.deepEqual(htmlUnchanged, { content_sha256: worked.content_sha256, content_snapshot_json: worked.content_snapshot_json, document_request_id: null }, 'Optional PDF processing never rewrites the immutable HTML message or its format.');
   delete require.cache[require.resolve('../services/weeklyTimesheetScheduler')];
   scheduler = require('../services/weeklyTimesheetScheduler');
   await scheduler.queueClosedWeekTimesheets(options);
@@ -567,7 +588,9 @@ async function testWeeklyDelivery() {
   await makeWeeklyFixtureDue(worked.email_queue_id);
   assert.deepEqual(await queue.processEmailQueue(50), [{ id: worked.email_queue_id, status: 'SENT', provider_accepted: true, recipient_verified: false }]);
   assert.equal(capturedMessages.length, sentBefore + 1);
-  assert.deepEqual(capturedMessages.at(-1).attachments[0].content, attachments[0].content, 'Worker transport uses the same staff-specific validated queue PDF.');
+  assert.deepEqual(capturedMessages.at(-1).attachments, []);
+  assert.equal(capturedMessages.at(-1).html, content.html, 'Worker transport uses the exact immutable individual HTML body.');
+  assert.equal(capturedMessages.at(-1).text, content.text);
   await pool.query('UPDATE staff_attendance SET notes=? WHERE user_id=30 AND work_date=?', ['Authorised fixture correction', period.start]);
   await scheduler.queueClosedWeekTimesheets(options);
   assert.deepEqual(await queue.processEmailQueue(50), [], 'Saved work corrections never automatically resend an accepted staff/week PDF.');
@@ -577,9 +600,11 @@ async function testWeeklyDelivery() {
   assert.equal(revision.version, 2);
   const [[retainedOriginal]] = await pool.query('SELECT status,source_sha256,snapshot_json,email_queue_id FROM weekly_timesheet_delivery_versions WHERE delivery_id=? AND version=1', [worked.id]);
   assert.deepEqual(retainedOriginal, acceptedHistory, 'An explicit audited revision preserves the original accepted PDF/version identity.');
-  const [[revisionRequest]] = await pool.query('SELECT email_queue_id,pdf_sha256,generation_status FROM document_delivery_requests WHERE id=?', [revision.request_id]);
-  assert.equal(revisionRequest.generation_status, 'VALIDATED');
-  assert.equal(revisionRequest.email_queue_id, revision.queue_id);
+  assert.equal(revision.format, 'HTML');
+  assert.equal(revision.request_id, null);
+  const [[revisionQueue]] = await pool.query('SELECT html_body,attachments_json FROM email_queue WHERE id=?', [revision.queue_id]);
+  assert.match(revisionQueue.html_body, /REVISION/);
+  assert.deepEqual(JSON.parse(revisionQueue.attachments_json), []);
   await makeWeeklyFixtureDue(revision.queue_id);
   await pool.query("UPDATE users SET timesheet_delivery_email='changed-30@example.invalid' WHERE id=30");
   const held = await queue.processEmailQueue(50);
@@ -604,9 +629,9 @@ async function testWeeklyDelivery() {
   assert.deepEqual(await queue.processEmailQueue(50),[{id:recoveredDelivery.email_queue_id,status:'SENT',provider_accepted:true,recipient_verified:false}]);
   const reconciled=await require('../services/weeklyTimesheetReconciliation').reconcileWeek({db:pool,now:recoveryNow,env:process.env,actor:{id:20,role:'admin'}});
   const reconciledStaff=reconciled.outcomes.find(entry=>entry.user_id===33);
-  assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.pdf.status,'VALIDATED');
+  assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.delivery_format,'HTML');assert.equal(reconciledStaff.report.status,'RENDERED');
   facts.push('real InnoDB bounded missed-window recovery after designated-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
-  facts.push('real worked-only weekly scheduling/locks/PDF linkage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
+  facts.push('real worked-only HTML scheduling/source-content locks, zero-attachment immutable bodies, independent optional PDF failure/storage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
   } finally {
     Object.assign(storage, originalStorage);
     objects.clear();
@@ -946,6 +971,7 @@ async function main() {
   await testWeeklyDelivery();
   await testProcurementRecordsAndSnapshots();
   await testProcurementImports();
+  await require('./careers-register-mysql-fixture')({ pool, assert, facts });
   await prepareMobileUsers();
   await testDurableProfilePhotos();
   await testDurableNotifications();

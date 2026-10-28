@@ -286,6 +286,84 @@ body.hub-companion-shell .client-card button:disabled { cursor:default;opacity:.
   .staff-home-totals { gap:10px!important; }
   .staff-home-totals strong { font-size:16px!important; }
 }
+
+/* Existing recruitment records use the same readable register components.
+   Keep this scoped to dedicated pages: dashboard chart cards and gutters are
+   deliberately outside these selectors. */
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace :is(.jobs .job,.metrics .metric) {
+  border-radius:var(--hub-radius);
+  border-color:var(--border);
+  box-shadow:var(--hub-panel-shadow);
+}
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .filters {
+  align-items:end;
+  min-width:0;
+  max-width:100%;
+}
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .filters :is(input,select,button) {
+  min-width:0;
+  max-width:100%;
+  min-height:44px;
+  font:inherit;
+  border-radius:6px;
+}
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace :is(.filters,.jobs .job) label { display:grid;gap:6px;min-width:0;font-size:.875rem;font-weight:600; }
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace :is(#careerRegisterError,#careerJobsError) { margin-block:12px;padding:12px;border-inline-start:3px solid var(--danger);background:var(--surface-muted);overflow-wrap:anywhere; }
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace :is(#careerRegisterError,#careerJobsError) button { margin-top:8px; }
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .career-pagination { display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;margin-top:16px; }
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .career-pagination span { min-width:0;overflow-wrap:anywhere; }
+body[data-vv-theme="navy-blue"] #careerStatusBody textarea { display:block;box-sizing:border-box;width:100%;margin-top:8px; }
+#careerStatusBackdrop { display:none; }
+#careerStatusBackdrop.active { display:flex;align-items:center;justify-content:center; }
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline {
+  max-width:100%;
+  border:1px solid var(--border);
+  border-radius:var(--hub-radius);
+}
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row>div {
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row.head {
+  background:var(--surface-muted);
+  font-size:.875rem;
+}
+body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline :is(select,.cv) {
+  min-height:44px;
+  max-width:100%;
+}
+@media(max-width:1100px) {
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .panel>.top { align-items:stretch; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .filters { display:grid;grid-template-columns:minmax(0,1fr);width:100%; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .filters :is(input,select,button) { width:100%;box-sizing:border-box; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .career-pagination span { flex-basis:100%;text-align:center;order:-1; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .career-pagination button { flex:1; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline { border:0;overflow:visible; }
+  /* Retain the actual column headers for assistive technology while displaying
+     each candidate's values with their own visible field labels. */
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row.head {
+    position:absolute;width:1px;height:1px;min-width:0;margin:-1px;padding:0;
+    overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;
+  }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline #apps>.row {
+    display:grid;grid-template-columns:minmax(0,1fr);min-width:0;max-width:100%;
+    gap:0;margin-top:12px;padding:14px;box-sizing:border-box;
+    border:1px solid var(--border);border-radius:var(--hub-radius);background:var(--surface);
+  }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline #apps>.row:nth-child(even) { background:var(--surface-muted); }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row>[data-label] {
+    display:grid;grid-template-columns:minmax(78px,30%) minmax(0,1fr);
+    align-items:start;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);
+  }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row>[data-label]::before {
+    content:attr(data-label);font-size:.8125rem;line-height:1.5;font-weight:600;color:var(--text-secondary);
+  }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row>[data-label]:last-child { border-bottom:0; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row>[data-label]>:is(select,strong,small,a) { min-width:0;max-width:100%; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row>[data-label]>:is(small,a) { grid-column:2; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .row>[data-label]>br { display:none; }
+  body[data-vv-theme="navy-blue"] .hub-companion-content.career-workspace .pipeline .cv { display:inline-flex;align-items:center;width:fit-content; }
+}
 @media print {
   .hub-companion-sidebar,.hub-companion-toggle,.hub-companion-backdrop,.hub-find-page { display:none!important; }
   body.hub-companion-shell .hub-companion-content { margin:0!important;width:100%!important;padding:0!important; }

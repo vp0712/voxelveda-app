@@ -56,8 +56,15 @@ exports.download = async (req, res) => {
       }
     }
     const sourceBeforeFreeze = policy.snapshotHash(snapshot);
+    const businessSourceBeforeFreeze = pdfs.sourceKey(snapshot);
     snapshot = await pdfs.freezeSnapshot(conn, snapshot);
-    if (delivery?.snapshot_json && policy.snapshotHash(snapshot) !== sourceBeforeFreeze) throw error('The frozen app and delivery document timestamps differ. An authorised reviewer must reconcile this document version before it is downloaded or sent.', 'TIMESHEET_PDF_SNAPSHOT_INVALID');
+    if (delivery?.snapshot_json && (delivery.delivery_format === 'HTML'
+      ? pdfs.sourceKey(snapshot) !== businessSourceBeforeFreeze
+      : policy.snapshotHash(snapshot) !== sourceBeforeFreeze)) throw error('The frozen app and delivery document sources differ. An authorised reviewer must reconcile this document version before it is downloaded or sent.', 'TIMESHEET_PDF_SNAPSHOT_INVALID');
+    // An optional PDF may have been generated before its HTML email. Preserve
+    // those established bytes/timestamp while requiring the exact same staff,
+    // week, version, attendance, approval and layout source. HTML never depends
+    // on generating/replacing that PDF; legacy PDF-email bytes stay stricter.
     await conn.commit(); conn.release(); conn = null;
     const artifact = await pdfs.snapshotArtifact(pool, snapshot, retainedAttachment);
     return res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': `${disposition}; filename="${artifact.filename}"`,

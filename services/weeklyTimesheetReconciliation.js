@@ -19,15 +19,23 @@ const REASONS = Object.freeze({
   RECORDED_TIMEZONE_INVALID: 'The recorded workplace timezone needs correction.',
   ATTENDANCE_SOURCE_UNVERIFIED: 'The source of this attendance entry needs authorised review.',
   NO_RECIPIENT: 'Save a valid designated timesheet-delivery email in the employee profile. Login email is not used as a fallback.',
-  SOURCE_CHANGED: 'Attendance changed after this PDF snapshot. Review and authorise a labelled correction.',
+  SOURCE_CHANGED: 'Attendance changed after this report snapshot. Review and authorise a labelled correction.',
   LEGACY_WEEKLY_DELIVERY_REVIEW: 'A previous delivery exists. Reconcile its provider outcome before authorising another version.',
   WORKER_TRANSPORT_UNCERTAIN: 'The worker stopped during transport. Check the provider result before considering another delivery.',
   PDF_RELAY_CONTRACT_REQUIRED: 'The configured mail relay has not verified PDF attachment support. An administrator must repair the relay.',
+  WEEKLY_HTML_RELAY_CONTRACT_REQUIRED: 'The configured mail relay has not verified private HTML timesheet delivery. An administrator must repair its HTML and recipient contract.',
+  WEEKLY_HTML_CONTENT_INVALID: 'The saved email report content failed its integrity check. An authorised reviewer must inspect the retained report before retry.',
+  WEEKLY_HTML_RELAY_VALIDATION_FAILED: 'The relay rejected the HTML timesheet contract before sending. An administrator must review its receiver configuration.',
+  WEEKLY_HTML_CONTENT_HASH_MISMATCH: 'The saved email report no longer matches its immutable content hash. Review this retained version before retry.',
+  WEEKLY_HTML_SNAPSHOT_MISMATCH: 'The queued email report does not match its retained version. Review the saved report before retry.',
+  WEEKLY_HTML_ACCEPTANCE_UNCONFIRMED: 'The relay may have accepted this message without confirming its exact content. Review provider evidence; do not resend automatically.',
+  WEEKLY_HTML_ATTACHMENT_UNEXPECTED: 'This HTML-only report has an unexpected attachment. Review the queued version before retry.',
+  TIMESHEET_REPORT_GENERATION_FAILED: 'The timesheet email report could not be prepared. Review the rendering failure before an authorised controlled retry.',
   EMAIL_HTTPS_RELAY_FAILED: 'The configured mail relay failed. An administrator must review the transport diagnostics.',
   NO_WORK: 'There is no verified completed work in this reporting period.',
   INELIGIBLE_ACCOUNT: 'This account is not an active eligible employee.',
   MISSING_DELIVERY: 'Eligible completed work has no weekly delivery record yet.',
-  GENERATION_RETRY_LIMIT: 'Automatic PDF generation has reached its retry limit. An authorised reviewer must inspect the failure before a controlled retry.',
+  GENERATION_RETRY_LIMIT: 'Automatic report preparation has reached its retry limit. An authorised reviewer must inspect the failure before a controlled retry.',
   CONTROLLED_RECOVERY_REQUIRED: 'The automatic recovery window for this week has ended. Reconcile previous queue and provider outcomes before authorising a labelled recovery.',
   SCHEDULER_DISABLED: 'Automatic weekly delivery is disabled. An administrator must review the company scheduling configuration.'
 });
@@ -48,6 +56,22 @@ function queueOutcome(delivery, queue) {
   if (queue?.status === 'FAILED') return 'FAILED';
   return delivery?.status || 'MISSING_DELIVERY';
 }
+function reportMetadata(delivery, document) {
+  const frozen = Boolean(delivery?.snapshot_json || delivery?.source_sha256 || delivery?.content_snapshot_json || delivery?.content_sha256 || delivery?.email_queue_id || delivery?.provider_accepted_at || delivery?.sent_at || ['SENT','PROVIDER_ACCEPTED'].includes(delivery?.status));
+  // The migration labels historical rows PDF. An untouched eligibility/address
+  // placeholder has no old report to preserve and the next routine send is HTML.
+  const format = String(frozen ? delivery?.delivery_format || 'PDF' : 'HTML').toUpperCase();
+  if (format === 'PDF') return { format, status: document?.generation_status || (delivery?.status === 'GENERATION_FAILED' ? 'GENERATION_FAILED' : 'NOT_GENERATED'), version: delivery?.version || null };
+  if (format !== 'HTML') return { format: 'UNKNOWN', status: 'UNSUPPORTED', version: delivery?.version || null };
+  if (!delivery?.content_snapshot_json && !delivery?.content_sha256) return { format, status: delivery?.status === 'GENERATION_FAILED' ? 'GENERATION_FAILED' : 'NOT_RENDERED', version: delivery?.version || null };
+  try {
+    const { assertWeeklyTimesheetEmailContent } = require('./weeklyTimesheetEmailService');
+    const content = assertWeeklyTimesheetEmailContent(JSON.parse(delivery.content_snapshot_json), { expectedHash: delivery.content_sha256 });
+    return { format, status: 'PREPARED', version: delivery.version, content_sha256: content.contentHash, layout_version: content.layoutVersion };
+  } catch {
+    return { format, status: 'INVALID', version: delivery?.version || null };
+  }
+}
 function nextAction(row, dispatch) {
   if (row.recipient_verified) return { code: 'NONE', message: 'Recipient receipt has been verified.' };
   if (row.provider_accepted) return { code: 'CHECK_RECEIPT', message: 'The provider accepted this message. Recipient receipt remains unverified; do not resend automatically.' };
@@ -56,8 +80,8 @@ function nextAction(row, dispatch) {
   if (row.eligibility === 'NO_WORK') return { code: 'NONE', message: 'No weekly email is sent without eligible actual worked time.' };
   if (row.eligibility === 'REVIEW_REQUIRED') return { code: 'REVIEW_SOURCE', message: 'Resolve the identified attendance issues through the authorised correction workflow.' };
   if (!row.recipient_configured) return { code: 'SET_DELIVERY_EMAIL', message: REASONS.NO_RECIPIENT };
-  if (row.status === 'REVIEW_REQUIRED') return { code: 'REVIEW_SNAPSHOT', message: 'Review this retained document snapshot and its recorded blocker before an authorised correction or retry.' };
-  if (row.status === 'GENERATION_FAILED' || row.pdf.status === 'GENERATION_FAILED') return { code: 'RETRY_GENERATION', message: 'Review the generation failure, then request an authorised controlled retry. No substitute attachment will be sent.' };
+  if (row.status === 'REVIEW_REQUIRED' || ['INVALID','UNSUPPORTED'].includes(row.report?.status)) return { code: 'REVIEW_SNAPSHOT', message: 'Review this retained report snapshot and its recorded blocker before an authorised correction or retry.' };
+  if (row.status === 'GENERATION_FAILED' || (row.delivery_format === 'PDF' && row.pdf.status === 'GENERATION_FAILED')) return { code: 'RETRY_GENERATION', message: row.delivery_format === 'HTML' ? 'Review the email report preparation failure, then request an authorised controlled retry. Optional PDF generation is separate.' : 'Review the PDF generation failure, then request an authorised controlled retry. No substitute attachment will be sent.' };
   if (row.status === 'FAILED') return { code: 'REVIEW_FAILURE', message: 'Review the recorded transport failure and attempt budget before an authorised recovery. Failed delivery is not approval failure.' };
   if (row.status === 'RETRYING') return { code: 'WAIT_FOR_RETRY', message: 'The durable worker will retry within its attempt budget. Opening the application is not required.' };
   if (['QUEUED', 'PREPARING'].includes(row.status)) return { code: 'WAIT_FOR_WORKER', message: 'The background worker is processing this individual report. Opening the application is not required.' };
@@ -96,6 +120,7 @@ async function reconcileWeek(options = {}) {
     let queue, document;
     if (delivery?.email_queue_id) [[queue]] = await db.query('SELECT id,status,attempts,max_attempts,next_attempt_at,claimed_at,provider_accepted_at,recipient_verified_at FROM email_queue WHERE id=?',[delivery.email_queue_id]);
     if (delivery?.document_request_id) [[document]] = await db.query('SELECT id,generation_status,pdf_sha256,pdf_pages,email_queue_id FROM document_delivery_requests WHERE id=?',[delivery.document_request_id]);
+    const report = reportMetadata(delivery, document);
     const stored = reasons(delivery?.review_reasons_json), current = reasons(assessment.issues);
     const distinct = new Map(current.map(issue => [issue.code+':'+(issue.attendance_id||''),issue]));
     if (delivery?.last_error_code && ['REVIEW_REQUIRED','GENERATION_FAILED','FAILED','RETRY'].includes(delivery.status)) for (const issue of reasons([delivery.last_error_code])) distinct.set(issue.code,issue);
@@ -110,13 +135,14 @@ async function reconcileWeek(options = {}) {
       generation_attempts:documents.map(item=>({id:item.id,status:item.generation_status,pages:item.pdf_pages,queue_id:item.email_queue_id})),
       delivery_id:delivery?.id || null, version:delivery?.version || null, status:delivery || queue ? queueOutcome(delivery,queue) : assessment.status==='ELIGIBLE' ? recipientValid?'MISSING_DELIVERY':'NO_RECIPIENT' : assessment.status,
       review_reasons:[...distinct.values()], previous_review_reasons:stored, last_error_code:delivery?.last_error_code || null,
-      pdf:document ? { status:document.generation_status,pages:document.pdf_pages,sha256:document.pdf_sha256 } : {status:'NOT_GENERATED'},
+      delivery_format:report.format, report,
+      pdf:document ? { status:document.generation_status,pages:document.pdf_pages,sha256:document.pdf_sha256,required_for_email:report.format==='PDF' } : {status:'NOT_GENERATED',required_for_email:report.format==='PDF'},
       last_attempt_at:queue?.claimed_at || null, generation_attempt_count:Number(delivery?.generation_attempts || 0),
       provider_accepted_at:queue?.provider_accepted_at || delivery?.provider_accepted_at || null,
       queue:queue ? { id:queue.id,status:queue.status,attempts:queue.attempts,max_attempts:queue.max_attempts,next_attempt_at:queue.next_attempt_at } : null,
       document_request_id:document?.id || null, provider_accepted:queueOutcome(delivery,queue)==='PROVIDER_ACCEPTED',recipient_verified:Boolean(queue?.recipient_verified_at) };
     if(!delivery?.email_queue_id&&priorQueues.length){row.status='LEGACY_WEEKLY_DELIVERY_REVIEW';row.review_reasons.push(reasons(['LEGACY_WEEKLY_DELIVERY_REVIEW'])[0]);}
-    if(!document&&documents[0]?.generation_status==='GENERATION_FAILED')row.pdf={status:'GENERATION_FAILED'};
+    if(!document&&documents[0]?.generation_status==='GENERATION_FAILED')row.pdf={status:'GENERATION_FAILED',required_for_email:report.format==='PDF'};
     // A resolved, unsnapshotted eligibility blocker must not remain the
     // current diagnosis solely because the scheduler has not run again yet.
     if (!delivery?.email_queue_id && !delivery?.snapshot_json && !delivery?.source_sha256 && !priorQueues.length &&
@@ -146,4 +172,4 @@ async function logLatestWeek(options = {}) {
   console.log('Weekly timesheet reconciliation totals',JSON.stringify({period:result.period,counts:result.counts,dispatch:result.dispatch,recipient_verified:false}));
   lastObservation=hour;
 }
-module.exports={reconcileWeek,logLatestWeek,reasons,queueOutcome,nextAction,REASONS};
+module.exports={reconcileWeek,logLatestWeek,reasons,queueOutcome,nextAction,reportMetadata,REASONS};
