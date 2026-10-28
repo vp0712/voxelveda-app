@@ -1,8 +1,8 @@
-application-release: 20261027-business-hub-and-private-staff-timesheets
-candidate-commit: 049bead6105eaf5d5ff1b8eb39f01722c4b3559e
-merged-commit: fa63dad39a3f90651ec52f89d745a4003f7336ee
+application-release: 20261028-complete-weekly-html-and-retained-portals
+candidate-commit: 1ffe9b2a22919153af5fc2a97a3f554e3ddb536a
+merged-commit: 1e700f482836db7b6a5cf5526ab1cdd106c1dbc8
 production-branch: main
-previous-live-commit: 63709fbd3c24fbe6f4c7ea1eefd6ec61e1d4c8f9
+previous-live-commit: 50e9b5933a78693312257193134b57c3d39dc6fd
 scope: existing-retained-portals; shared-Business-Hub-presentation; unchanged-chart-rendering-and-aggregation; authoritative-staff-weekly-history-and-selection; consistent-approval-reasons; immutable-private-S3-timesheet-PDF-snapshots; bounded-worked-only-weekly-email-recovery-and-safe-delivery-visibility
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
@@ -124,3 +124,14 @@ portal-shell-20261028-mail-limits: genuine-PDF-generation-download-and-MIME-poli
 portal-shell-20261028-native-limits: installed-verification-and-fixture-upgrade-passed; existing-upload-keystore-and-Google-Play-service-account-bindings-not-available-to-workflow; no-production-AAB-upload-Play-release-or-physical-phone-claim
 portal-shell-20261028-live-limits: private-production-user-session-and-email-recipient-opening-unverified; existing-DB-verified-TLS-limit-separate; no-provider-plan-billing-or-DNS-change
 portal-shell-20261028-rollback: previous-live1d1ca411fee0c3faf261ed35c86c387df8032e34; Railwayd0924611-38aa-4e85-a1b2-4bcd563ce0f8; no-schema-migration; preserve-records-attachments-snapshots-audit-history-and-encryption-keys
+
+weekly-html-20261028-source: PR335; candidate1ffe9b2a22919153af5fc2a97a3f554e3ddb536a; gated-main1e700f482836db7b6a5cf5526ab1cdd106c1dbc8; identical-tree7983f6ba75af06911a462058f68387bdb1fec821
+weekly-html-20261028-behaviour: complete-branded-HTML-and-plain-text; immutable-staff-week-revision-source-content-hash; optional-app-PDF-independent; strict-PDF-only-other-document-attachments; Monday0700-Australia-Sydney-unchanged; worked-only-one-designated-To-no-CC-BCC-fallback; atomic-claims-and-queue-link; bounded-recovery-and-uncertain-outcome-review
+weekly-html-20261028-portals: retained-Business-Hub-shell-and-original-operations; full-authorised-recruitment-pagination-selection-metrics-mobile-cards-and-managed-status-feedback; protected-chart-functions-aggregation-geometry-and-original-logo-unchanged; Banking-and-added-ERP-retired
+weekly-html-20261028-schema: ordered-checksummed-additive-20261028_weekly_timesheet_html; six-content-format-fields-on-current-and-historical-versions; no-record-drop-or-rewrite
+weekly-html-20261028-candidate-gates: 40709121973,40709121909,40709122022,40709121979,40709122054,40709121922,40709122118; all-success
+weekly-html-20261028-main-gates: 40711987052,40711987200,40711987146,40711987230,40711987281,40711987295,40711987196,40711987089; all-success
+weekly-html-20261028-evidence: 88-regression-scripts-444-JavaScript-syntax; UTC-Melbourne-and-source-artifact-builds; real-MySQL-fresh-upgrade-concurrency-and-TLS-fixtures; Chromium-WebKit; HTML-email112-browser-cases; PHP-MIME-normal-and-parser-absent-HTML; preserved-chart28-cases84-dimensions; retained-role-staff-approval-procurement-invoice-and-installed-Android-gates
+weekly-html-20261028-mail-limits: eligible-last-week-employee-missing-designated-address; WordPress-authenticated-JSON-health-and-admin-installation-unverified; tested-installable-receiver-provided-to-hosting-administrator; no-test-message-or-historical-resend; provider-acceptance-and-recipient-body-opening-unverified
+weekly-html-20261028-other-limits: active-production-verified-DB-TLS-and-Android-Play-signing-association-distribution-remain-separate; no-physical-device-or-private-production-session-claim; no-provider-billing-DNS-change
+weekly-html-20261028-rollback: previous-live50e9b5933a78693312257193134b57c3d39dc6fd; Railway334dbd3d-bdd6-4a97-8951-9e49f3ca67bc; preserve-additive-schema-content-versions-documents-audit-idempotency-and-encryption-keys
