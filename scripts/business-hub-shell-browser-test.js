@@ -43,6 +43,13 @@ const companionPages = { '/client':'client-portal.html', '/account':'workspace.h
       await page.goto(fixture.origin+(client?'/client':admin?'/admin':'/portal/staff'));
       await page.waitForFunction(() => document.body.dataset.vvShell === 'business-hub' && Number(JSON.parse(localStorage.getItem('user') || '{}').id)>0);
       await page.waitForFunction(() => !document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
+      if (['finance_admin','finance_user','accountant'].includes(role)) {
+        assert.equal(await page.getByRole('button',{name:'Staff & access',exact:true}).count(),0,role+' does not advertise staff management');
+        await page.locator('.admin-suite-panel').evaluate(node=>{node.open=true;});
+        assert.equal(await page.getByRole('button',{name:'Manage Access',exact:true}).count(),0,role+' does not advertise the staff directory');
+        await page.locator('.admin-suite-panel').evaluate(node=>{node.open=false;});
+        assert(await page.locator('.profile-chip').isVisible(),role+' retains its own account menu');
+      }
       if (client) {
         for (const theme of ['light','dark']) {
           await page.evaluate(value=>VoxelTheme.set(value),theme);

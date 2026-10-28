@@ -1554,8 +1554,11 @@ function configureRestrictedWorkspaceView() {
   document.querySelectorAll('.nav-btn[data-section]').forEach((btn) => {
     btn.classList.toggle('hidden-section', !canAccessAdminSection(btn.dataset.section));
   });
-  document.querySelectorAll('.nav-btn[data-permission]').forEach((btn) => {
+  document.querySelectorAll('[data-permission]').forEach((btn) => {
     btn.classList.toggle('hidden-section', !hasCurrentPermission(btn.dataset.permission));
+  });
+  document.querySelectorAll('[data-workspace-section]').forEach((button) => {
+    button.classList.toggle('hidden-section', !canAccessAdminSection(button.dataset.workspaceSection));
   });
   document.querySelectorAll('[data-permission="MANAGE_TRASH"]').forEach((element) => {
     element.classList.toggle('hidden-section', !hasCurrentPermission('MANAGE_TRASH'));
