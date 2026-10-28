@@ -249,6 +249,11 @@ body[data-vv-theme="navy-blue"].hub-companion-shell .client-hero { margin-block:
 body[data-vv-theme="navy-blue"].hub-companion-shell .client-hero :is(h2,p,.eyebrow) { color:var(--text-primary)!important; }
 body[data-vv-theme="navy-blue"].hub-companion-shell .client-hero h2 { font-size:clamp(24px,3vw,32px);line-height:1.25; }
 body.hub-companion-shell .client-action { background:var(--surface-muted); }
+body[data-vv-theme="navy-blue"].hub-companion-shell .client-card button:not(.primary-btn):not(.danger-btn) {
+  min-height:44px;padding:9px 12px;border:1px solid var(--control-border);border-radius:6px;
+  background:var(--surface);color:var(--text-primary);font:inherit;font-weight:600;cursor:pointer;
+}
+body.hub-companion-shell .client-card button:disabled { cursor:default;opacity:.6; }
 @media(min-width:1024px) {
   .hub-companion-content .client-home-actions { gap:14px; }
   body[data-vv-theme="navy-blue"] .staff-portal .staff-home-card { padding:22px; }
