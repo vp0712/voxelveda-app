@@ -553,7 +553,8 @@ async function testWeeklyDelivery() {
   require('../services/weeklyTimesheetEmailService').assertWeeklyTimesheetEmailContent(content, { expectedHash: worked.content_sha256 });
   assert.equal(savedQueue.html_body, content.html);
   assert.equal(savedQueue.text_body, content.text);
-  for (const expected of ['Worked fixture employee', period.start, period.end, '8.00']) assert(content.text.includes(expected));
+  for (const expected of ['Worked fixture employee', DateTime.fromISO(period.start).toFormat('d LLL yyyy'), DateTime.fromISO(period.end).toFormat('d LLL yyyy'), '8.00 (8h 00m)']) assert(content.text.includes(expected), `The human-readable report contains ${expected}`);
+  assert.equal(content.fromDate, period.start); assert.equal(content.toDate, period.end, 'Immutable content metadata retains exact calendar boundaries.');
   assert.doesNotMatch(content.text, /No-work fixture|Planned fixture|Missing designation|login-only/);
   assert.equal(objects.size, 0, 'HTML scheduling has not generated or stored any PDF.');
   const pdfs = require('../services/timesheetPdfService');
@@ -629,7 +630,7 @@ async function testWeeklyDelivery() {
   assert.deepEqual(await queue.processEmailQueue(50),[{id:recoveredDelivery.email_queue_id,status:'SENT',provider_accepted:true,recipient_verified:false}]);
   const reconciled=await require('../services/weeklyTimesheetReconciliation').reconcileWeek({db:pool,now:recoveryNow,env:process.env,actor:{id:20,role:'admin'}});
   const reconciledStaff=reconciled.outcomes.find(entry=>entry.user_id===33);
-  assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.delivery_format,'HTML');assert.equal(reconciledStaff.report.status,'RENDERED');
+  assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.delivery_format,'HTML');assert.equal(reconciledStaff.report.status,'PREPARED');
   facts.push('real InnoDB bounded missed-window recovery after designated-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
   facts.push('real worked-only HTML scheduling/source-content locks, zero-attachment immutable bodies, independent optional PDF failure/storage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
   } finally {
