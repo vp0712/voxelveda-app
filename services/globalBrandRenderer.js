@@ -3,7 +3,8 @@
 const BRAND_CSS = '/global-brand.css?v=20261009-navy-blue';
 const BRAND_JS = '/global-brand.js?v=20261009-navy-blue';
 const WORKSPACE_CSS = '/workspace-theme.css?v=20261009-navy-blue';
-const BUSINESS_HUB_CSS = '/business-hub.css?v=20261027';
+const BUSINESS_HUB_CSS = '/business-hub.css?v=20261028-shell';
+const BUSINESS_HUB_JS = '/business-hub-shell.js?v=20261028-shell';
 const CANONICAL_LOGO = '/logo.png';
 
 function canonicalizeLogoPaths(html) {
@@ -53,7 +54,9 @@ function injectGlobalBrand(html) {
   // never rewrites permissions, chart configuration or business navigation.
   if (!rendered.includes(BUSINESS_HUB_CSS)) rendered = rendered.replace(/<\/head>/i,
     `<link rel="stylesheet" href="${BUSINESS_HUB_CSS}">\n</head>`);
+  if (!rendered.includes('/business-hub-shell.js')) rendered = rendered.replace(/<\/body>/i,
+    `<script src="${BUSINESS_HUB_JS}" defer></script>\n</body>`);
   return rendered;
 }
 
-module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };
+module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, BUSINESS_HUB_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };
