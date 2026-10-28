@@ -12,6 +12,10 @@ fs.mkdirSync(out, { recursive: true });
 const roles = ['staff','hr','manager','supervisor','production','sales','admin','super_admin','finance_admin','finance_user','accountant','viewer','view_only','client','customer'];
 const clientRoles = ['viewer','view_only','client','customer'];
 const adminRoles = ['admin','super_admin','finance_admin','finance_user','accountant'];
+function contrast(a,b) {
+  const lum = value => (value.match(/[\d.]+/g)||[]).slice(0,3).map(Number).map(n=>n/255).map(n=>n<=.04045?n/12.92:((n+.055)/1.055)**2.4).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
+  const x=lum(a),y=lum(b); return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);
+}
 for (const [i, role] of roles.entries()) fixtures.identities.set(9600 + i, {
   id:9600+i, name:'Synthetic '+role, username:'shell.'+role, email:role+'@example.invalid', role,
   active:1, account_status:'ACTIVE', session_version:1, mfa_enabled:adminRoles.includes(role)?1:0,
@@ -39,6 +43,14 @@ const companionPages = { '/client':'client-portal.html', '/account':'workspace.h
       await page.goto(fixture.origin+(client?'/client':admin?'/admin':'/portal/staff'));
       await page.waitForFunction(() => document.body.dataset.vvShell === 'business-hub' && Number(JSON.parse(localStorage.getItem('user') || '{}').id)>0);
       await page.waitForFunction(() => !document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible'));
+      if (client) {
+        for (const theme of ['light','dark']) {
+          await page.evaluate(value=>VoxelTheme.set(value),theme);
+          const style=await page.locator('.client-hero h2').evaluate(node=>({color:getComputedStyle(node).color,background:getComputedStyle(node.closest('.client-hero')).backgroundColor}));
+          assert(contrast(style.color,style.background)>=4.5,role+' client title is readable in '+theme);
+        }
+        await page.evaluate(()=>VoxelTheme.set('light'));
+      }
       if (!client) {
         const links = await page.locator('.sidebar .nav-btn').count();
         assert.equal(await page.locator('.sidebar .nav-btn > .hub-nav-icon').count(), links);

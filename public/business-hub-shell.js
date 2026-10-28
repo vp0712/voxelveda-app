@@ -61,7 +61,7 @@
   function companion() {
     if (document.querySelector('.app-shell > .sidebar,.hub-companion-sidebar')) return;
     const allowed = ['/client', '/account', '/profile', '/security', '/quality', '/shop-floor', '/careers-admin', '/employee-id', '/invoice/view'];
-    if (!allowed.includes(location.pathname)) return;
+    if (!allowed.includes(location.pathname) || document.querySelector('.status-code')?.textContent.trim() === '403') return;
     const main = document.querySelector('main');
     if (!main) return;
     const aside = document.createElement('aside');
@@ -82,13 +82,26 @@
       const label = original.textContent.trim();
       if (!href || !label || seen.has(href) || label.includes('VOXEL VEDA')) continue;
       const url = new URL(href, location.href);
-      if (!['http:', 'https:'].includes(url.protocol) || url.origin !== location.origin || original.matches('[hidden],.hidden-section,[aria-hidden="true"]')) continue;
+      if (!['http:', 'https:'].includes(url.protocol) || url.origin !== location.origin || url.username || url.password || original.matches('[hidden],.hidden-section,[aria-hidden="true"]')) continue;
       seen.add(href); nav.append(link(label.replace(/^←\s*/, ''), href));
+    }
+    const titles = {'/account':'Account', '/profile':'My profile', '/security':'Account security', '/quality':'Quality & Manufacturing', '/shop-floor':'Shop Floor', '/careers-admin':'Recruitment', '/employee-id':'Employee identity', '/invoice/view':'Invoice viewer'};
+    if (titles[location.pathname] && !seen.has(location.pathname)) {
+      nav.append(link(titles[location.pathname], location.pathname + location.search)); seen.add(location.pathname);
     }
     for (const [label, href] of [['My profile', '/profile'], ['Account security', '/security'], ['Support', '/support']]) {
       if (!seen.has(href)) nav.append(link(label, href));
     }
-    for (const item of nav.querySelectorAll('a')) if (item.getAttribute('href') === location.pathname) item.classList.add('active');
+    const markActive = () => {
+      const selectedHash = location.pathname === '/client' && [...nav.querySelectorAll('a')].some(item => item.getAttribute('href') === location.hash);
+      for (const item of nav.querySelectorAll('a')) {
+        const url = new URL(item.href, location.href);
+        const selected = url.pathname === location.pathname && (!url.hash || url.hash === location.hash) || location.pathname === '/client' && (selectedHash ? item.getAttribute('href') === location.hash : item.getAttribute('href') === '/dashboard');
+        item.classList.toggle('active', selected);
+        if (selected) item.setAttribute('aria-current', url.hash ? 'location' : 'page'); else item.removeAttribute('aria-current');
+      }
+    };
+    markActive(); window.addEventListener('hashchange', markActive);
     const footer = document.createElement('div'); footer.className = 'sidebar-footer'; footer.append(link('Return to workspace', '/dashboard'));
     aside.append(close, brand, nav, footer);
     const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'hub-companion-toggle'; toggle.textContent = '☰';
