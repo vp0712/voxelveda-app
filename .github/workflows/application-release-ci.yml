@@ -54,6 +54,24 @@ jobs:
           composer install --working-dir=deployment/wordpress --classmap-authoritative --no-interaction
           PDF_FIXTURE_PATH=/tmp/voxel-pdf-evidence/invoice.pdf php scripts/wordpress-pdf-relay-test.php
           VV_RELAY_HTML_ONLY_WITHOUT_PDF_PARSER=1 PDF_FIXTURE_PATH=/does-not-exist php scripts/wordpress-pdf-relay-test.php
+      - name: Package the tested receiver for authorised hosting installation
+        run: |
+          composer install --working-dir=deployment/wordpress --no-dev --classmap-authoritative --no-interaction
+          mkdir -p "$RUNNER_TEMP/receiver-package/voxel-veda-pdf-relay"
+          cp deployment/wordpress/voxel-veda-pdf-relay.php deployment/wordpress/README.md deployment/wordpress/HOSTING-INSTALL.md deployment/wordpress/composer.json deployment/wordpress/composer.lock "$RUNNER_TEMP/receiver-package/voxel-veda-pdf-relay/"
+          cp -R deployment/wordpress/vendor "$RUNNER_TEMP/receiver-package/voxel-veda-pdf-relay/"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/receiver-package/voxel-veda-pdf-relay/SOURCE_COMMIT"
+          cd "$RUNNER_TEMP/receiver-package"
+          zip -qr voxel-veda-pdf-relay.zip voxel-veda-pdf-relay
+          sha256sum voxel-veda-pdf-relay.zip > SHA256SUMS
+      - name: Preserve the installable receiver and checksum
+        uses: actions/upload-artifact@v4
+        with:
+          name: wordpress-receiver-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/receiver-package/voxel-veda-pdf-relay.zip
+            ${{ runner.temp }}/receiver-package/SHA256SUMS
+          retention-days: 30
       - name: Install isolated browser verification tooling
         id: browser-tools
         run: |
