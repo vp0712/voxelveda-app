@@ -86,6 +86,10 @@ const companionPages = { '/client':'client-portal.html', '/account':'workspace.h
     await context.addCookies([{name:'vv_session',value:token(9606),url:fixture.origin,httpOnly:true,sameSite:'Lax'}]);
     const page = await context.newPage();
     for (const route of [...Object.keys(companionPages),'/profile']) {
+      // Client pages intentionally redirect administrative identities. Exercise
+      // the real authorised client identity there, then restore the admin actor
+      // for the existing protected operational/account pages.
+      await context.addCookies([{name:'vv_session',value:token(route==='/client'?9613:9606),url:fixture.origin,httpOnly:true,sameSite:'Lax'}]);
       await page.goto(fixture.origin+route);
       await page.locator('.hub-companion-sidebar').waitFor({state:'attached'});
       assert.equal(await page.locator('.hub-companion-sidebar').count(),1);
