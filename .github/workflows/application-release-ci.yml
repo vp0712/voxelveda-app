@@ -68,6 +68,19 @@ jobs:
           mkdir -p "$RUNNER_TEMP/chart-baseline"
           git archive 63709fbd3c24fbe6f4c7ea1eefd6ec61e1d4c8f9 public services/globalBrandRenderer.js controllers/dashboardController.js controllers/expenseController.js | tar -x -C "$RUNNER_TEMP/chart-baseline"
           timeout --signal=TERM --kill-after=10s 240s node scripts/chart-preservation-browser-test.js
+      - name: Verify the shared Business Hub shell across all retained portals
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/business-hub-shell-proof
+        run: timeout --signal=TERM --kill-after=10s 180s node scripts/business-hub-shell-browser-test.js
+      - name: Preserve Business Hub portal screenshots and navigation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: business-hub-shell-${{ github.sha }}
+          path: ${{ runner.temp }}/business-hub-shell-proof
+          retention-days: 30
       - name: Preserve chart before and after screenshots and interaction evidence
         if: always()
         uses: actions/upload-artifact@v4
