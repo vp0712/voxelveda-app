@@ -1582,10 +1582,9 @@ function configureRestrictedWorkspaceView() {
     'hidden-section',
     !hasCurrentPermission('invoices_input')
   );
-  document.querySelector('.profile-chip')?.classList.toggle(
-    'hidden-section',
-    !hasCurrentPermission('staff')
-  );
+  // Own-account access is independent of permission to manage the staff
+  // directory. The menu only links to the authenticated user's profile/security.
+  document.querySelector('.profile-chip')?.classList.remove('hidden-section');
 
   const allowedSections = Object.keys(ADMIN_SECTION_ACCESS).filter(canAccessAdminSection);
   const requested = requestedAdminSection();
