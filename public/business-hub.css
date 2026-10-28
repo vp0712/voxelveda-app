@@ -235,7 +235,7 @@ body[data-vv-theme="navy-blue"] .mobile-bottom-nav button { border-radius:6px!im
 /* Existing client and dedicated operational/account pages use the same shell. */
 .hub-companion-sidebar { position:fixed!important;inset:0 auto 0 0;width:260px;height:100dvh;display:flex;flex-direction:column;gap:12px;padding:18px 14px;z-index:60;overflow:hidden; }
 .hub-companion-sidebar .sidebar-nav { flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column; }
-.hub-companion-sidebar .sidebar-footer { flex-shrink:0;padding-top:12px;border-top:1px solid #2B3D53; }
+.hub-companion-sidebar .sidebar-footer { flex-shrink:0;padding-top:12px;border-top:1px solid #2B3D53;color:var(--hub-sidebar-muted); }
 .hub-companion-sidebar .sidebar-close { display:none; }
 body.hub-companion-shell .hub-companion-content { margin-left:260px!important;margin-right:0!important;width:calc(100% - 260px)!important;max-width:none!important;min-width:0;box-sizing:border-box;padding:24px; }
 body.hub-companion-shell>header { margin-left:260px;max-width:calc(100% - 260px);box-sizing:border-box; }

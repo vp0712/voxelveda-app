@@ -102,7 +102,7 @@
       }
     };
     markActive(); window.addEventListener('hashchange', markActive);
-    const footer = document.createElement('div'); footer.className = 'sidebar-footer'; footer.append(link('Return to workspace', '/dashboard'));
+    const footer = document.createElement('div'); footer.className = 'sidebar-footer'; footer.textContent = 'Voxel Veda Pty Ltd';
     aside.append(close, brand, nav, footer);
     const toggle = document.createElement('button'); toggle.type = 'button'; toggle.className = 'hub-companion-toggle'; toggle.textContent = '☰';
     toggle.setAttribute('aria-label', 'Open workspace menu'); toggle.setAttribute('aria-controls', aside.id); toggle.setAttribute('aria-expanded', 'false');
