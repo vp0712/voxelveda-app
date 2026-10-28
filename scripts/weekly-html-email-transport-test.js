@@ -30,6 +30,25 @@ async function smtpMimeFixture(mail){
   const output='/tmp/voxel-weekly-html-evidence';fs.mkdirSync(output,{recursive:true});fs.writeFileSync(path.join(output,'message.eml'),mime);fs.writeFileSync(path.join(output,'transport-mime-verification.json'),JSON.stringify({fixtureOnly:true,recipientReceiptVerified:false,toCount:1,ccCount:0,bccCount:0,attachmentCount:0,contentHash,plainTextMatches:true,htmlMatches:true},null,2));
  }finally{nodemailer.createTransport=create;stream.close();}
 }
+async function relayFailureDiagnosticFixtures(mail){
+ const fetchBefore=global.fetch,warnBefore=console.warn,urlBefore=process.env.WORDPRESS_MAIL_RELAY_URL,websiteBefore=process.env.PUBLIC_WEBSITE_URL;
+ const sensitive={username:'fixture-private-user',password:crypto.randomBytes(24).toString('hex'),query:crypto.randomBytes(24).toString('hex')},warnings=[];
+ try{
+  process.env.PUBLIC_WEBSITE_URL='https://fixture.invalid';console.warn=value=>warnings.push(String(value));
+  global.fetch=async()=>({ok:true,status:200,json:async()=>{throw new Error('Synthetic non-JSON response');}});
+  const cases=[
+   [`https://${sensitive.username}:${sensitive.password}@fixture.invalid/?rest_route=%2Fvoxel-veda%2Fv1%2Fmail-relay&access_token=${sensitive.query}`,'WORDPRESS_QUERY','yes','yes'],
+   [`https://fixture.invalid/wp-json/voxel-veda/v1/mail-relay?access_token=${sensitive.query}`,'WORDPRESS_PRETTY','yes','yes'],
+   ['https://another-fixture.invalid/private-mail-receiver','OTHER','no','no']
+  ];
+  for(const [url,form,sameHost,queryPresent] of cases){
+   process.env.WORDPRESS_MAIL_RELAY_URL=url;
+   await assert.rejects(()=>mail.verifyConnection(),error=>error.code==='EMAIL_HTTPS_RELAY_FAILED'&&error.relayReason==='RELAY_HEALTH_JSON_NOT_READY');
+   const logged=warnings.at(-1);assert.match(logged,new RegExp(`url_form=${form} host_matches_company=${sameHost} query_present=${queryPresent}$`));assert.match(logged,/http_status=200 reason=RELAY_HEALTH_JSON_NOT_READY/);
+   for(const value of [url,...Object.values(sensitive),'access_token','rest_route','voxel-veda','private-mail-receiver'])assert(!logged.includes(value),'Failure diagnostics never disclose raw URL, credentials, paths or query names/values');
+  }
+ }finally{global.fetch=fetchBefore;console.warn=warnBefore;process.env.WORDPRESS_MAIL_RELAY_URL=urlBefore;if(websiteBefore===undefined)delete process.env.PUBLIC_WEBSITE_URL;else process.env.PUBLIC_WEBSITE_URL=websiteBefore;}
+}
 async function transportFixtures(){
  const oldEnv={...process.env},oldFetch=global.fetch;
  const pdf=require('../services/documentPdfService'),originalValidate=pdf.validatePdf;
@@ -72,6 +91,7 @@ async function transportFixtures(){
   mode='REJECTED';await assert.rejects(()=>mail.sendMail(message),error=>error.code==='WEEKLY_HTML_RELAY_VALIDATION_FAILED'&&error.deliveryOutcome==='NOT_ACCEPTED'&&error.retryable===false);
   // Legacy weekly reports are not silently converted to HTML to bypass their PDF.
   await assert.rejects(()=>mail.sendMail({...message,deliveryPolicy:{...policy,format:undefined}}),error=>error.reasonCode==='WEEKLY_ATTACHMENT_COUNT_INVALID');
+  await relayFailureDiagnosticFixtures(mail);
   await smtpMimeFixture(mail);
   assert.equal(pdfCalls,0);
  }finally{pdf.validatePdf=originalValidate;global.fetch=oldFetch;for(const name of Object.keys(process.env))if(!(name in oldEnv))delete process.env[name];Object.assign(process.env,oldEnv);delete require.cache[require.resolve('../services/emailService')];}

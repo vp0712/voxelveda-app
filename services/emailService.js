@@ -398,7 +398,15 @@ async function verifyConnection() {
       }
     } catch (error) {
       if (!error.code || error.name === 'AbortError') error.code = 'EMAIL_HTTPS_RELAY_FAILED';
-      console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code} http_status=${Number(error.relayHttpStatus)||'unknown'} reason=${error.relayReason||error.cause?.code||error.name||'unknown'}`);
+      let urlForm='OTHER', hostMatchesCompany=false, queryPresent=false;
+      try {
+        const configuredUrl=new URL(config.url);
+        queryPresent=configuredUrl.search.length>0;
+        urlForm=configuredUrl.searchParams.has('rest_route') ? 'WORDPRESS_QUERY' : /(?:^|\/)wp-json(?:\/|$)/.test(configuredUrl.pathname) ? 'WORDPRESS_PRETTY' : 'OTHER';
+        hostMatchesCompany=configuredUrl.hostname.toLowerCase().replace(/^www\./,'')===new URL(companyProfile().website).hostname.toLowerCase().replace(/^www\./,'');
+      } catch {}
+      // Log only bounded classifications, never URL, credentials, route or query values.
+      console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code} http_status=${Number(error.relayHttpStatus)||'unknown'} reason=${error.relayReason||error.cause?.code||error.name||'unknown'} url_form=${urlForm} host_matches_company=${hostMatchesCompany?'yes':'no'} query_present=${queryPresent?'yes':'no'}`);
       if (missingSmtpKeys().length || primaryTransport === 'https_relay') throw error;
     } finally {
       clearTimeout(timeout);
