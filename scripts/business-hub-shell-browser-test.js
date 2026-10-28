@@ -68,6 +68,12 @@ const companionPages = { '/client':'client-portal.html', '/account':'workspace.h
         await page.setViewportSize({width,height:900});
         const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1);
         assert.equal(overflow, false, role+' page fits width '+width);
+        const avatar = page.locator('.profile-chip [data-avatar-self]');
+        if (await avatar.count()) {
+          assert(await avatar.first().isVisible(),role+' header avatar is visible at '+width);
+          const fallback=avatar.first().locator('.vv-avatar-initials:not([hidden])');
+          if(await fallback.count())assert(await fallback.isVisible(),role+' missing-photo initials stay visible at '+width);
+        }
         if (width<1024) {
           const toggle = client ? page.getByRole('button',{name:'Open workspace menu',exact:true}) : page.locator('.topbar-menu-btn');
           await toggle.click();
