@@ -1,1 +1,74 @@
-<!doctype html><html lang="en-AU"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow,noarchive"><title>Account Security | Voxel Veda</title><link rel="stylesheet" href="/public-pages.css"><link rel="stylesheet" href="/step-up.css?v=20260905"><link rel="icon" href="/favicon.ico"></head><body><main class="public-shell"><section class="public-panel"><p class="eyebrow">ACCOUNT SECURITY</p><h1>Security and sessions</h1><h2>Authenticator MFA</h2><p id="mfaStatus">Loading MFA status…</p><form id="mfaStartForm"><label>Current password<input id="mfaPassword" type="password" required autocomplete="current-password"></label><button class="button" type="submit">Set up authenticator</button></form><section id="mfaSetup" hidden><img id="mfaQr" width="280" height="280" alt="Authenticator QR code"><label>Manual key<input id="mfaManual" readonly></label><form id="mfaConfirmForm"><label>Six-digit code<input id="mfaConfirmCode" inputmode="numeric" maxlength="6" required></label><button class="button" type="submit">Confirm MFA</button></form></section><section id="newRecovery" hidden><h3>Save these one-time recovery codes</h3><pre id="newRecoveryCodes"></pre></section><h2>Change password</h2><form id="changePasswordForm"><label>Current password<input id="currentPassword" type="password" required autocomplete="current-password"></label><label>New password<input id="newPassword" type="password" required minlength="14" autocomplete="new-password"></label><button class="button" type="submit">Change password</button></form><p id="status" role="status"></p><h2>Active sessions</h2><div id="sessions">Loading…</div><div class="hero-actions"><button class="button button-secondary" id="revokeOthers" type="button">Sign out other sessions</button><a class="button button-secondary" href="/dashboard">Return to workspace</a></div></section></main><script src="/step-up.js?v=20260905"></script><script src="/security-page.js"></script></body></html>
+<!doctype html>
+<html lang="en-AU">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <title>Account Security | Voxel Veda</title>
+  <link rel="stylesheet" href="/public-pages.css">
+  <link rel="stylesheet" href="/step-up.css?v=20260905">
+  <link rel="icon" href="/favicon.ico">
+</head>
+<body>
+<main class="public-shell hub-security-page">
+  <section class="public-panel">
+    <header class="hub-content-page-heading">
+      <p class="eyebrow">ACCOUNT SECURITY</p>
+      <h1>Security and sessions</h1>
+      <p>Manage your authenticator, password and signed-in devices. These controls apply only to your own account.</p>
+      <button class="button button-secondary" id="refreshSecurityBtn" type="button">Refresh security status</button>
+    </header>
+    <p id="status" class="hub-security-status" role="status" aria-live="polite"></p>
+    <div class="hub-security-grid">
+      <section class="hub-security-card" aria-labelledby="mfaHeading">
+        <h2 id="mfaHeading">Authenticator MFA</h2>
+        <p id="mfaStatus" role="status" aria-live="polite">Loading MFA status…</p>
+        <button class="button button-secondary" id="retryMfaBtn" type="button" hidden>Retry MFA status</button>
+        <form id="mfaStartForm">
+          <label for="mfaPassword">Current password<input id="mfaPassword" type="password" required autocomplete="current-password"></label>
+          <button class="button" type="submit">Set up authenticator</button>
+        </form>
+        <section id="mfaSetup" hidden aria-labelledby="mfaSetupHeading">
+          <h3 id="mfaSetupHeading">Connect your authenticator</h3>
+          <p>Keep this setup key private. Scan the code, then confirm the six-digit code from your authenticator.</p>
+          <img id="mfaQr" width="280" height="280" alt="Authenticator QR code">
+          <label for="mfaManual">Manual key<input id="mfaManual" readonly autocomplete="off" spellcheck="false"></label>
+          <form id="mfaConfirmForm">
+            <label for="mfaConfirmCode">Six-digit code<input id="mfaConfirmCode" inputmode="numeric" maxlength="6" pattern="[0-9]{6}" required autocomplete="one-time-code"></label>
+            <button class="button" type="submit">Confirm MFA</button>
+          </form>
+        </section>
+        <section id="newRecovery" hidden aria-labelledby="recoveryHeading">
+          <h3 id="recoveryHeading">Save these one-time recovery codes</h3>
+          <p>Store them privately before leaving this page. They are shown only for this confirmed setup.</p>
+          <pre id="newRecoveryCodes"></pre>
+          <a class="button button-secondary" id="recoveryContinue" href="/login?returnTo=%2Fsecurity">Continue to sign in after saving codes</a>
+        </section>
+      </section>
+      <section class="hub-security-card" aria-labelledby="passwordHeading">
+        <h2 id="passwordHeading">Change password</h2>
+        <p>Use a unique password of at least 14 characters. After a confirmed change you will sign in again.</p>
+        <form id="changePasswordForm">
+          <label for="currentPassword">Current password<input id="currentPassword" type="password" required autocomplete="current-password"></label>
+          <label for="newPassword">New password<input id="newPassword" type="password" required minlength="14" autocomplete="new-password"></label>
+          <button class="button" type="submit">Change password</button>
+        </form>
+      </section>
+    </div>
+    <section class="hub-security-card" aria-labelledby="sessionsHeading">
+      <h2 id="sessionsHeading">Active sessions</h2>
+      <p>Review the devices using your account. Signing out another session does not change your current device.</p>
+      <p id="sessionsStatus" role="status" aria-live="polite">Loading sessions…</p>
+      <button class="button button-secondary" id="retrySessionsBtn" type="button" hidden>Retry active sessions</button>
+      <div id="sessions" aria-busy="true"></div>
+      <div class="hero-actions">
+        <button class="button button-secondary" id="revokeOthers" type="button">Sign out other sessions</button>
+        <a class="button button-secondary" href="/dashboard">Return to workspace</a>
+      </div>
+    </section>
+  </section>
+</main>
+<script src="/step-up.js?v=20260905"></script>
+<script src="/security-page.js?v=20261029-account-actions"></script>
+</body>
+</html>

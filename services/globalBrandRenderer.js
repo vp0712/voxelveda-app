@@ -4,6 +4,7 @@ const BRAND_CSS = '/global-brand.css?v=20261009-navy-blue';
 const BRAND_JS = '/global-brand.js?v=20261009-navy-blue';
 const WORKSPACE_CSS = '/workspace-theme.css?v=20261009-navy-blue';
 const BUSINESS_HUB_CSS = '/business-hub.css?v=20261028-weekly-html';
+const BUSINESS_HUB_CONTENT_CSS = '/business-hub-content.css?v=20261029-content';
 const BUSINESS_HUB_JS = '/business-hub-shell.js?v=20261028-shell';
 const CANONICAL_LOGO = '/logo.png';
 
@@ -55,6 +56,8 @@ function injectGlobalBrand(html) {
   if(!rendered.includes('/android-app.js'))rendered=rendered.replace(/<\/head>/i,'<script src="/android-app.js" defer></script>\n</head>');
   // Keep the shared presentation last, after retained role/module styles. It
   // never rewrites permissions, chart configuration or business navigation.
+  if (!rendered.includes(BUSINESS_HUB_CONTENT_CSS)) rendered = rendered.replace(/<\/head>/i,
+    `<link rel="stylesheet" href="${BUSINESS_HUB_CONTENT_CSS}">\n</head>`);
   if (!rendered.includes(BUSINESS_HUB_CSS)) rendered = rendered.replace(/<\/head>/i,
     `<link rel="stylesheet" href="${BUSINESS_HUB_CSS}">\n</head>`);
   if (!rendered.includes('/business-hub-shell.js')) rendered = rendered.replace(/<\/body>/i,
@@ -62,4 +65,4 @@ function injectGlobalBrand(html) {
   return rendered;
 }
 
-module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, BUSINESS_HUB_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };
+module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, BUSINESS_HUB_CONTENT_CSS, BUSINESS_HUB_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };

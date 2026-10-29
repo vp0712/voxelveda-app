@@ -347,12 +347,12 @@
         <div class="card">
           <h3>Create RFQ</h3>
           <div class="form-grid">
-            <input id="rfqCustomerName" required placeholder="Customer Name">
-            <input id="rfqEmail" type="email" required placeholder="Email">
-            <input id="rfqPhone" placeholder="Phone">
-            <input id="rfqMaterial" placeholder="Material">
-            <input id="rfqQuantity" type="number" min="0.001" step="0.001" required value="1" placeholder="Quantity">
-            <input id="rfqApplication" placeholder="Application">
+            <label class="form-field" for="rfqCustomerName"><span>Customer name</span><input id="rfqCustomerName" required placeholder="Customer Name"></label>
+            <label class="form-field" for="rfqEmail"><span>Customer email</span><input id="rfqEmail" type="email" required placeholder="Email"></label>
+            <label class="form-field" for="rfqPhone"><span>Phone</span><input id="rfqPhone" placeholder="Phone"></label>
+            <label class="form-field" for="rfqMaterial"><span>Material</span><input id="rfqMaterial" placeholder="Material"></label>
+            <label class="form-field" for="rfqQuantity"><span>Quantity</span><input id="rfqQuantity" type="number" min="0.001" step="0.001" required value="1" placeholder="Quantity"></label>
+            <label class="form-field" for="rfqApplication"><span>Application</span><input id="rfqApplication" placeholder="Application"></label>
           </div>
         </div>
 
@@ -468,7 +468,7 @@
 
         <div class="card">
           <div class="form-grid">
-            <input id="supplierSearch" placeholder="Search supplier, contact, phone, email, category or notes" oninput="renderSuppliers()" />
+            <label class="form-field" for="supplierSearch"><span>Search suppliers</span><input id="supplierSearch" placeholder="Search supplier, contact, phone, email, category or notes" oninput="renderSuppliers()" /></label>
           </div>
         </div>
 
@@ -642,18 +642,18 @@
 
         <div class="card">
           <div class="form-grid">
-            <input id="taskTitle" placeholder="Task Title">
-            <input id="taskDueDate" type="date">
-            <select id="taskAssignedTo">
+            <label class="form-field" for="taskTitle"><span>Task title</span><input id="taskTitle" placeholder="Task Title"></label>
+            <label class="form-field" for="taskDueDate"><span>Due date</span><input id="taskDueDate" type="date"></label>
+            <label class="form-field" for="taskAssignedTo"><span>Assigned staff</span><select id="taskAssignedTo">
               <option value="">Select Staff</option>
-            </select>
-            <select id="taskPriority">
+            </select></label>
+            <label class="form-field" for="taskPriority"><span>Priority</span><select id="taskPriority">
               <option value="low">Low</option>
               <option value="medium" selected>Medium</option>
               <option value="high">High</option>
               <option value="urgent">Urgent</option>
-            </select>
-            <textarea id="taskDescription" placeholder="Task Instructions"></textarea>
+            </select></label>
+            <label class="form-field full-width" for="taskDescription"><span>Task instructions</span><textarea id="taskDescription" placeholder="Task Instructions"></textarea></label>
           </div>
         </div>
 
@@ -831,13 +831,13 @@
           </div>
 
           <div class="form-grid">
-            <select id="timesheetStaffSelect">
+            <label class="form-field" for="timesheetStaffSelect"><span>Timesheet staff</span><select id="timesheetStaffSelect">
               <option value="">Select staff</option>
-            </select>
-            <select id="timesheetPeriodSelect">
+            </select></label>
+            <label class="form-field" for="timesheetPeriodSelect"><span>Reporting period</span><select id="timesheetPeriodSelect">
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
-            </select>
+            </select></label>
           </div>
 
           <h3 id="selectedTimesheetTitle">Selected Staff Attendance History</h3>
@@ -1063,13 +1063,13 @@
 
         <div class="card">
           <div class="form-grid">
-            <select id="competitorCategoryFilter" onchange="renderCompetitors()">
+            <label class="form-field" for="competitorCategoryFilter"><span>Competitor category</span><select id="competitorCategoryFilter" onchange="renderCompetitors()">
               <option value="">All categories</option>
-            </select>
-            <select id="competitorCountryFilter" onchange="renderCompetitors()">
+            </select></label>
+            <label class="form-field" for="competitorCountryFilter"><span>Competitor country</span><select id="competitorCountryFilter" onchange="renderCompetitors()">
               <option value="">All countries / regions</option>
-            </select>
-            <input id="competitorSearch" placeholder="Search company, capability, material, country, website..." oninput="renderCompetitors()" />
+            </select></label>
+            <label class="form-field" for="competitorSearch"><span>Search competitors</span><input id="competitorSearch" placeholder="Search company, capability, material, country, website..." oninput="renderCompetitors()" /></label>
           </div>
           <p class="status-note">Live automatic web discovery needs a search provider API key later. This directory stores researched and manual records safely in your database.</p>
         </div>
@@ -1128,17 +1128,17 @@
 
         <div class="card">
           <div class="form-grid">
-            <select id="expenseFinancialYear" onchange="loadExpenses(1)">
+            <label class="form-field" for="expenseFinancialYear"><span>Financial year</span><select id="expenseFinancialYear" onchange="loadExpenses(1)">
               <option value="">All years</option>
-            </select>
-            <select id="expensePageSize" onchange="setExpensePageSize()">
+            </select></label>
+            <label class="form-field" for="expensePageSize"><span>Rows per page</span><select id="expensePageSize" onchange="setExpensePageSize()">
               <option value="10">Show 10 entries</option>
               <option value="25" selected>Show 25 entries</option>
               <option value="50">Show 50 entries</option>
               <option value="100">Show 100 entries</option>
               <option value="200">Show 200 entries</option>
-            </select>
-            <input id="expenseSearch" placeholder="Search supplier, invoice, category, description..." oninput="loadExpenses(1)" />
+            </select></label>
+            <label class="form-field" for="expenseSearch"><span>Search expenses</span><input id="expenseSearch" placeholder="Search supplier, invoice, category, description..." oninput="loadExpenses(1)" /></label>
           </div>
         </div>
 
@@ -1214,7 +1214,7 @@
 
         <div class="card">
           <div class="form-grid">
-            <select id="complianceCategoryFilter" onchange="renderComplianceEntries()">
+            <label class="form-field" for="complianceCategoryFilter"><span>Compliance category</span><select id="complianceCategoryFilter" onchange="renderComplianceEntries()">
               <option value="">All categories</option>
               <option>Business Licences</option>
               <option>Manufacturing</option>
@@ -1224,8 +1224,8 @@
               <option>Quality / Process Sheet</option>
               <option>Insurance / Finance</option>
               <option>Staff / WHS</option>
-            </select>
-            <input id="complianceSearch" placeholder="Search form, licence, authority, notes or status" oninput="renderComplianceEntries()" />
+            </select></label>
+            <label class="form-field" for="complianceSearch"><span>Search compliance records</span><input id="complianceSearch" placeholder="Search form, licence, authority, notes or status" oninput="renderComplianceEntries()" /></label>
           </div>
         </div>
 
@@ -1246,7 +1246,7 @@
 
         <div class="card">
           <div class="form-grid">
-            <select id="companyFormCategory" onchange="renderCompanyForms()">
+            <label class="form-field" for="companyFormCategory"><span>Form category</span><select id="companyFormCategory" onchange="renderCompanyForms()">
               <option value="">All form categories</option>
               <option>Policy</option>
               <option>Operations</option>
@@ -1262,8 +1262,8 @@
               <option>Charts</option>
               <option>Import / Export</option>
               <option>Environment</option>
-            </select>
-            <input id="companyFormSearch" placeholder="Search delivery, staff, quality, supplier, import, export, safety..." oninput="renderCompanyForms()" />
+            </select></label>
+            <label class="form-field" for="companyFormSearch"><span>Search company forms</span><input id="companyFormSearch" placeholder="Search delivery, staff, quality, supplier, import, export, safety..." oninput="renderCompanyForms()" /></label>
           </div>
         </div>
 
@@ -1398,12 +1398,12 @@
           <div class="card">
             <h3>Company & Invoice Data</h3>
             <div class="form-grid">
-              <input id="settingEmail" type="email" value="info@voxelveda.com" placeholder="Company Email">
-              <input id="settingAbn" placeholder="ABN">
-              <input id="settingTerms" placeholder="Payment Terms">
-              <input id="settingBank" placeholder="Bank Name">
-              <input id="settingWebsite" placeholder="Website">
-              <input id="settingSupportPhone" placeholder="Support Phone">
+              <label class="form-field" for="settingEmail"><span>Company email</span><input id="settingEmail" type="email" value="info@voxelveda.com" placeholder="Company Email"></label>
+              <label class="form-field" for="settingAbn"><span>ABN</span><input id="settingAbn" placeholder="ABN"></label>
+              <label class="form-field" for="settingTerms"><span>Payment terms</span><input id="settingTerms" placeholder="Payment Terms"></label>
+              <label class="form-field" for="settingBank"><span>Bank name</span><input id="settingBank" placeholder="Bank Name"></label>
+              <label class="form-field" for="settingWebsite"><span>Website</span><input id="settingWebsite" placeholder="Website"></label>
+              <label class="form-field" for="settingSupportPhone"><span>Support phone</span><input id="settingSupportPhone" placeholder="Support Phone"></label>
             </div>
           </div>
 
@@ -1449,13 +1449,13 @@
             <h3>QR Code Generator</h3>
             <p class="status-note">Create a QR code for the company website, customer RFQ form, privacy policy, or any custom link.</p>
             <div class="form-grid">
-              <select id="qrTargetType" onchange="updateQrTargetFromType()">
+              <label class="form-field" for="qrTargetType"><span>QR destination type</span><select id="qrTargetType" onchange="updateQrTargetFromType()">
                 <option value="rfq">Customer RFQ Form</option>
                 <option value="website">Company Website</option>
                 <option value="privacy">Privacy Policy</option>
                 <option value="custom">Custom Link</option>
-              </select>
-              <input id="qrTargetUrl" placeholder="QR redirect URL" oninput="renderQrCode()" />
+              </select></label>
+              <label class="form-field" for="qrTargetUrl"><span>QR redirect URL</span><input id="qrTargetUrl" placeholder="QR redirect URL" oninput="renderQrCode()" /></label>
             </div>
             <div class="qr-preview-panel">
               <div class="branded-qr-frame settings-qr-frame">

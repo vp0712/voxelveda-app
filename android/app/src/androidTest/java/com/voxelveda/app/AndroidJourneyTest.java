@@ -142,12 +142,20 @@ public class AndroidJourneyTest {
   AtomicReference<WebView> popup=new AtomicReference<>();
   InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
    WebView web=main.getBridge().getWebView();original.set(web.getWebChromeClient());
-   web.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(main.getBridge()){
+   // Capture the actual installed client's transport. Constructing a second
+   // BridgeWebChromeClient here would re-register ActivityResult launchers after
+   // the activity has resumed, which Android correctly rejects.
+   web.setWebChromeClient(new WebChromeClient(){
     @Override public boolean onCreateWindow(WebView source,boolean dialog,boolean gesture,android.os.Message message){
      boolean accepted=original.get().onCreateWindow(source,dialog,gesture,message);
      if(accepted)popup.set(((WebView.WebViewTransport)message.obj).getWebView());
      return accepted;
     }
+    @Override public void onProgressChanged(WebView view,int progress){original.get().onProgressChanged(view,progress);}
+    @Override public boolean onConsoleMessage(ConsoleMessage message){return original.get().onConsoleMessage(message);}
+    @Override public boolean onJsAlert(WebView view,String url,String message,JsResult result){return original.get().onJsAlert(view,url,message,result);}
+    @Override public boolean onJsConfirm(WebView view,String url,String message,JsResult result){return original.get().onJsConfirm(view,url,message,result);}
+    @Override public boolean onJsBeforeUnload(WebView view,String url,String message,JsResult result){return original.get().onJsBeforeUnload(view,url,message,result);}
    });
   });
   try{

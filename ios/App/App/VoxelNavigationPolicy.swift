@@ -32,8 +32,15 @@ enum VoxelNavigationPolicy {
     }
 
     static func isPopupPlaceholder(_ url: URL?) -> Bool {
-        guard let value = url?.absoluteString else { return true }
-        return value.isEmpty || value == "about:blank" || value.hasPrefix("about:blank#")
+        guard let url = url else { return true }
+        if url.absoluteString.isEmpty { return true }
+        guard let parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return false }
+        // Foundation can canonicalise the opaque about URL differently from a
+        // literal string. Compare parsed URI fields without decoding a new
+        // scheme/path or giving the placeholder any application privilege.
+        return parts.scheme?.lowercased() == "about" && parts.host == nil &&
+            parts.user == nil && parts.password == nil && parts.port == nil &&
+            parts.percentEncodedPath == "blank" && parts.query == nil
     }
 
     static func isSupportedExternal(_ url: URL) -> Bool {
