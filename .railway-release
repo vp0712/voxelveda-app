@@ -1,9 +1,9 @@
-application-release: 20261028-complete-weekly-html-and-retained-portals
-candidate-commit: 1ffe9b2a22919153af5fc2a97a3f554e3ddb536a
-merged-commit: 1e700f482836db7b6a5cf5526ab1cdd106c1dbc8
+application-release: 20261029-retained-native-and-content-preserving-current-sidebar-charts
+candidate-commit: 417fb18bd417fad2af92f1a698d90f4d47a5a7bc
+merged-commit: 3d8b796d8c81c3b50c7aa31059b5f063a67b8aa9
 production-branch: main
-previous-live-commit: 50e9b5933a78693312257193134b57c3d39dc6fd
-scope: existing-retained-portals; shared-Business-Hub-presentation; unchanged-chart-rendering-and-aggregation; authoritative-staff-weekly-history-and-selection; consistent-approval-reasons; immutable-private-S3-timesheet-PDF-snapshots; bounded-worked-only-weekly-email-recovery-and-safe-delivery-visibility
+previous-live-commit: 4c01274945edcf15cf0394076602a8df4c00e884
+scope: existing-application-in-app-native-navigation; retained-page-content-and-account-recovery; current-sidebar-and-home-charts-preserved; original-logo-and-operational-modules-preserved; private-HTML-weekly-reports-and-strict-other-PDF-documents; no-Banking-or-added-ERP
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
 avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
@@ -135,3 +135,15 @@ weekly-html-20261028-evidence: 88-regression-scripts-444-JavaScript-syntax; UTC-
 weekly-html-20261028-mail-limits: eligible-last-week-employee-missing-designated-address; WordPress-authenticated-JSON-health-and-admin-installation-unverified; tested-installable-receiver-provided-to-hosting-administrator; no-test-message-or-historical-resend; provider-acceptance-and-recipient-body-opening-unverified
 weekly-html-20261028-other-limits: active-production-verified-DB-TLS-and-Android-Play-signing-association-distribution-remain-separate; no-physical-device-or-private-production-session-claim; no-provider-billing-DNS-change
 weekly-html-20261028-rollback: previous-live50e9b5933a78693312257193134b57c3d39dc6fd; Railway334dbd3d-bdd6-4a97-8951-9e49f3ca67bc; preserve-additive-schema-content-versions-documents-audit-idempotency-and-encryption-keys
+
+retained-native-content-20261029-source: PR336; candidate417fb18bd417fad2af92f1a698d90f4d47a5a7bc; gated-main3d8b796d8c81c3b50c7aa31059b5f063a67b8aa9
+retained-native-content-20261029-candidate-gates: 40856003323,40856003396,40856003567,40856003351,40856003355,40856003272,40856003390,40856003293,40856003719; all-success
+retained-native-content-20261029-main-gates: 40858115780,40858115811,40858115795,40858115760,40858115850,40858115925,40858115796,40858115825,40858115777,40858115876; all-success
+retained-native-content-20261029-preservation: exact-current4c012749-sidebar-210-role-width-theme-cases-plus36-dedicated-cases; current-chart28-cases84-exact-dimensions-and8-recovery-cases; unchanged-renderer-aggregation-hashes; original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312
+retained-native-content-20261029-web: scoped-Business-Hub-content-forms-registers-security-and-production-record-details; 39-visible-existing-control-labels; real-account-and-request-sequence-guards; one-time-MFA-code-retention; safe-retry-and-committed-outcomes-preserved; schema-correct-exact-shopfloor-reference-lookups-and-active-hold-collation-repair
+retained-native-content-20261029-staff: verified-approval-comment-optional-and-required-real-adjustment-rejection-correction-amendment-reasons-preserved; source-integrity-and-version-guards; current-owner-week-details; legitimate-DST-and-whole-shift-recorded-time-with-separate-approval-policy; HTML-report-independent-of-PDF
+retained-native-content-20261029-native: Android-delayed-firstparty-popups-retained-in-existing-WebView; iOS-firstparty-navigation-policy-and-parser-validated-native-PDF-preview-save-share; managed-Back-pending-write-and-changed-input-protection; official-Capacitor8.5.2-pins-and-locked-Xcode-Cloud-resource-preparation; existing-com.voxelveda.app-identity
+retained-native-content-20261029-evidence: 452-JavaScript-syntax-and92-regression-scripts; UTC-and-Australia-Melbourne-builds; actual-MySQL-fresh-upgrade-concurrency-and-TLS-fixtures; Chromium-WebKit-role-staff-approval-procurement-invoice-HTML-email-MIME; installed-Android-nine-journeys-and-upgrade-fixture; actual-macOS-unsigned-iOS-simulator-and-PDFKit-build; no-physical-device-or-store-rollout-claim
+retained-native-content-20261029-mail-limits: Monday0700-Australia-Sydney-unchanged; latest-completed-week-only; one-saved-designated-To-no-CC-BCC-fallback; live19-25October-employee557minutes-NO_RECIPIENT-no-queue-or-provider-acceptance; WordPress-authenticated-health-contract-and-host-installation-unverified; no-test-mail-or-blind-resend; recipient-receipt-unverified
+retained-native-content-20261029-other-limits: affected-physical-OS-version-source-unknown; existing-Android-signing-and-Play-bindings-and-real-AppSigning-version-track-needed; actual-iOS-archive-and-distribution-separate; active-production-verified-DB-TLS-outstanding; no-provider-billing-DNS-or-signing-identity-change
+retained-native-content-20261029-rollback: previous-live4c01274945edcf15cf0394076602a8df4c00e884; Railway46ee0504-484a-4ebf-becf-6bbc50dd7794-retained; no-new-schema-migration; preserve-history-snapshots-audit-idempotency-and-encryption-keys
