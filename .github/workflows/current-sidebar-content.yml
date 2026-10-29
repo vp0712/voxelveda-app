@@ -14,13 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
       SIDEBAR_BASELINE_COMMIT: 4c01274945edcf15cf0394076602a8df4c00e884
-      SIDEBAR_BASELINE_DIR: ${{ runner.temp }}/current-baseline
-      SIDEBAR_PROOF_DIR: ${{ runner.temp }}/current-preservation/sidebar
       CHART_BASELINE_COMMIT: 4c01274945edcf15cf0394076602a8df4c00e884
-      CHART_BASELINE_DIR: ${{ runner.temp }}/current-baseline/public
-      CHART_PROOF_DIR: ${{ runner.temp }}/current-preservation/charts
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,6 +25,13 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Configure isolated proof directories
+        run: |
+          printf 'VV_BROWSER_MODULE_PATH=%s\n' "$RUNNER_TEMP/vv-browser/node_modules/playwright" >> "$GITHUB_ENV"
+          printf 'SIDEBAR_BASELINE_DIR=%s\n' "$RUNNER_TEMP/current-baseline" >> "$GITHUB_ENV"
+          printf 'SIDEBAR_PROOF_DIR=%s\n' "$RUNNER_TEMP/current-preservation/sidebar" >> "$GITHUB_ENV"
+          printf 'CHART_BASELINE_DIR=%s\n' "$RUNNER_TEMP/current-baseline/public" >> "$GITHUB_ENV"
+          printf 'CHART_PROOF_DIR=%s\n' "$RUNNER_TEMP/current-preservation/charts" >> "$GITHUB_ENV"
       - name: Capture the explicitly approved current sidebar and charts
         run: |
           mkdir -p "$SIDEBAR_BASELINE_DIR"

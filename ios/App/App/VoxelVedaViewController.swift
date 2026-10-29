@@ -14,6 +14,7 @@ import Capacitor
         windowDelegate = forwarding
         web.uiDelegate = forwarding
         bridge?.registerPluginInstance(VoxelNavigationPlugin(controller: self))
+        bridge?.registerPluginInstance(VoxelAppPlugin(controller: self))
     }
 
     override func viewDidAppear(_ animated: Bool) {
@@ -58,6 +59,10 @@ import Capacitor
         }
         if VoxelNavigationPolicy.isPopupPlaceholder(url), action.targetFrame == nil || fromPopup {
             return NSNumber(value: false)
+        }
+        if VoxelPdfPolicy.isApplicationBlob(url) {
+            showBlockedLink("Use this record’s Preview or Download PDF action inside Voxel Veda. No file was opened.")
+            return NSNumber(value: true)
         }
         if action.navigationType == .linkActivated, VoxelNavigationPolicy.isSupportedExternal(url) {
             confirmExternal(url)

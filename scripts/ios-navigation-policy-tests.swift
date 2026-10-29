@@ -67,14 +67,14 @@ struct VoxelNavigationPolicyTests {
         }
 
         try require(VoxelNavigationPolicy.isPopupPlaceholder(nil), "An initially empty popup can await its actual destination")
-        for value in ["about:blank", "about:blank#pending"] {
+        for value in ["about:blank", "about:blank#pending", "about:blank%23pending"] {
             let input = try url(value)
             try require(VoxelNavigationPolicy.isPopupPlaceholder(input), "Only an inert popup placeholder receives placeholder treatment: fixture \(value), Foundation URL \(input.absoluteString), components \(URLComponents(url: input, resolvingAgainstBaseURL: false)?.string ?? "nil")")
             try require(!VoxelNavigationPolicy.isApplication(input), "A blank popup has no application privilege")
             try require(VoxelNavigationPolicy.canonical(input) == nil, "A blank popup cannot become a canonical application destination")
             try require(!VoxelNavigationPolicy.isSupportedExternal(input), "A blank popup cannot launch an external application")
         }
-        for value in ["about:blank?redirect=fixture", "about:srcdoc", "https://example.invalid/about:blank"] {
+        for value in ["about:blank?redirect=fixture", "about:blank%3Fredirect=fixture", "about:srcdoc", "about:blank/fixture", "about://fixture/blank", "https://example.invalid/about:blank"] {
             try require(!VoxelNavigationPolicy.isPopupPlaceholder(try url(value)), "A real or unrelated destination is not an inert blank popup")
         }
 

@@ -1,4 +1,4 @@
-name: Prepare existing-identity signed Android bundle
+name: Prepare or explicitly publish existing-identity Android bundle
 on:
   workflow_dispatch:
     inputs:
@@ -22,9 +22,28 @@ on:
         description: Actual Play App Signing certificate SHA256, not the upload key
         required: true
         type: string
+      play_intent:
+        description: Artifact only by default; other choices explicitly submit a Play edit
+        required: true
+        type: choice
+        default: artifact-only
+        options: [artifact-only, draft, internal, production]
+      play_track:
+        description: Exact existing Play track, required only for a Play submission
+        required: false
+        type: string
+      play_release_status:
+        description: Draft preserves availability; completed submits the selected internal/production release
+        required: true
+        type: choice
+        default: draft
+        options: [draft, completed]
 permissions:
   contents: read
   checks: read
+concurrency:
+  group: existing-identity-android-release
+  cancel-in-progress: false
 jobs:
   signed-bundle:
     runs-on: ubuntu-latest
@@ -36,6 +55,9 @@ jobs:
       ANDROID_UPLOAD_CERT_SHA256: ${{ inputs.upload_certificate_sha256 }}
       ANDROID_APP_SIGNING_SHA256: ${{ inputs.app_signing_sha256 }}
       ANDROID_SOURCE_COMMIT: ${{ github.sha }}
+      PLAY_RELEASE_INTENT: ${{ inputs.play_intent }}
+      PLAY_TRACK: ${{ inputs.play_track }}
+      PLAY_RELEASE_STATUS: ${{ inputs.play_release_status }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -60,6 +82,14 @@ jobs:
           printf 'ANDROID_SOURCE_COMMIT=%s\n' "$ANDROID_CHECKED_SOURCE" >> "$GITHUB_ENV"
           gh api "repos/$GITHUB_REPOSITORY/commits/$ANDROID_CHECKED_SOURCE/check-runs?per_page=100" > "$RUNNER_TEMP/android-source-checks.json"
           node -e 'const c=require(process.env.RUNNER_TEMP+"/android-source-checks.json").check_runs;for(const n of ["application-release","mysql-regression","android-installed","Security checks and tests"]){if(!c.some(r=>r.name===n&&r.status==="completed"&&r.conclusion==="success"))throw Error("Required checked source missing: "+n)}'
+      - name: Validate explicit publishing intent and existing publisher capability
+        if: inputs.play_intent != 'artifact-only'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: |
+          test "$GITHUB_EVENT_NAME" = workflow_dispatch
+          test "$GITHUB_RUN_ATTEMPT" = 1
+          node -e 'const {configuration}=require("./scripts/android-play-publish");configuration({intent:process.env.PLAY_RELEASE_INTENT,track:process.env.PLAY_TRACK,status:process.env.PLAY_RELEASE_STATUS,versionCode:process.env.ANDROID_VERSION_CODE,versionName:process.env.ANDROID_VERSION_NAME,verifiedMax:process.env.ANDROID_PLAY_MAX_VERSION_CODE,sourceCommit:process.env.ANDROID_SOURCE_COMMIT,event:process.env.GITHUB_EVENT_NAME,ref:process.env.GITHUB_REF});let a;try{a=JSON.parse(process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON||"")}catch(_){throw Error("The existing secure Google Play service account is not configured")}if(a.type!=="service_account"||!a.client_email||!a.private_key)throw Error("The existing secure publisher binding is incomplete");console.log("Explicit Play intent and secure service-account shape verified; credentials are not printed.")'
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -97,5 +127,31 @@ jobs:
           name: existing-app-signed-bundle-${{ inputs.version_code }}-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 14
-# This workflow prepares a verified bundle. It does not upload to or publish on Play.
-# Publisher access, the existing track and uploaded version must be verified separately.
+      - name: Obtain short-lived access for the existing Google Play publisher
+        if: inputs.play_intent != 'artifact-only'
+        id: play-auth
+        uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Query existing Play state, upload and submit one transactional edit
+        if: inputs.play_intent != 'artifact-only'
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.play-auth.outputs.access_token }}
+        run: node scripts/android-play-publish.js --bundle android/app/build/outputs/bundle/release/app-release.aab --evidence "$RUNNER_TEMP/android-play-result.json"
+      - name: Retain provider outcome without claiming store availability or installed delivery
+        if: always() && inputs.play_intent != 'artifact-only'
+        uses: actions/upload-artifact@v4
+        with:
+          name: existing-app-play-result-${{ inputs.version_code }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/android-play-result.json
+          if-no-files-found: warn
+          retention-days: 30
+# Artifact-only is the default and never authenticates to Play. Publishing is an
+# explicit manual action after checked-source/signing/live-association gates.
+# A provider commit can still require review or other Play processing. Neither
+# completed status nor an accepted commit establishes users received an update.
+# Never rerun a failed publisher attempt: inspect the result/edit/track first.

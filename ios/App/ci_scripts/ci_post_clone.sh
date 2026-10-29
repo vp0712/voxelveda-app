@@ -15,5 +15,5 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 node -e 'const v=process.versions.node.split(".").map(Number);if(v[0]<22||(v[0]===22&&v[1]<13))throw Error("Node 22.13 or later is required for the locked Capacitor toolchain")'
 npm ci --include=dev --ignore-scripts
-npx cap sync ios
+npx --no-install cap sync ios
 node scripts/ios-native-contract-test.js --prepared

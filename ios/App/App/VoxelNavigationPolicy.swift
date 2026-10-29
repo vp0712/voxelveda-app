@@ -40,7 +40,7 @@ enum VoxelNavigationPolicy {
         // scheme/path or giving the placeholder any application privilege.
         return parts.scheme?.lowercased() == "about" && parts.host == nil &&
             parts.user == nil && parts.password == nil && parts.port == nil &&
-            parts.percentEncodedPath == "blank" && parts.query == nil
+            (parts.path == "blank" || parts.path.hasPrefix("blank#")) && parts.query == nil
     }
 
     static func isSupportedExternal(_ url: URL) -> Bool {

@@ -45,6 +45,7 @@ async function machineContext(req, res, next) {
       const [[machine]]=await pool.query('SELECT id FROM equipment_assets WHERE equipment_code=? LIMIT 1',[reference.reference]);
       if (!machine) return res.status(404).json({allowed:false,code:'MACHINE_NOT_FOUND',reasons:['Machine not found.']});
       machineId=Number(machine.id);
+      if (!Number.isSafeInteger(machineId) || machineId<1) return res.status(409).json({code:'SHOP_FLOOR_IDENTITY_REVIEW_REQUIRED',message:'The saved machine identity requires administrator review before it can be opened safely.'});
     }
     const gate = await machineReadiness(machineId);
     if (!gate.machine) return res.status(404).json(gate);
