@@ -22,6 +22,11 @@ public final class NavigationPolicy {
         return ORIGIN + path + (uri.getRawQuery() == null ? "" : "?" + uri.getRawQuery()) + (uri.getRawFragment() == null ? "" : "#" + uri.getRawFragment());
     }
 
+    /** A newly created window may start blank before its first real destination. */
+    public static boolean isPopupPlaceholder(String value) {
+        return value == null || value.isEmpty() || "about:blank".equals(value) || value.startsWith("about:blank#");
+    }
+
     private static URI parse(String value) {
         try {
             if (value == null || value.chars().anyMatch(c -> c <= 32 || c == '\\')) return null;

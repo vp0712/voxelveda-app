@@ -136,6 +136,45 @@ public class AndroidJourneyTest {
  private void staffSession()throws Exception{
   CountDownLatch latch=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->latch.countDown()));assertTrue(latch.await(10,TimeUnit.SECONDS));go("/login");login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&window.VoxelNativeApp&&window.VoxelOperations&&window.VoxelStaffHome?.state");
  }
+ @Test public void delayedBlankPopupKeepsFirstPartyNavigationInApp()throws Exception{
+  staffSession();
+  AtomicReference<WebChromeClient> original=new AtomicReference<>();
+  AtomicReference<WebView> popup=new AtomicReference<>();
+  InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+   WebView web=main.getBridge().getWebView();original.set(web.getWebChromeClient());
+   web.setWebChromeClient(new com.getcapacitor.BridgeWebChromeClient(main.getBridge()){
+    @Override public boolean onCreateWindow(WebView source,boolean dialog,boolean gesture,android.os.Message message){
+     boolean accepted=original.get().onCreateWindow(source,dialog,gesture,message);
+     if(accepted)popup.set(((WebView.WebViewTransport)message.obj).getWebView());
+     return accepted;
+    }
+   });
+  });
+  try{
+   for(String destination:new String[]{NavigationPolicy.ORIGIN+"/profile","https://voxelveda-app-production.up.railway.app/portal/staff"}){
+    waitJs("!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible')");
+    assertTrue("The confirmed usable app has dismissed its native startup layer",nativeText("Opening your secure account",true).waitUntilGone(10000));
+    String previous=(String)new JSONTokener(js("location.pathname")).nextValue();
+    popup.set(null);
+    js("(()=>{document.getElementById('nativePopupFixture')?.remove();const button=document.createElement('button');button.id='nativePopupFixture';button.textContent='Open authorised record';button.style.cssText='position:fixed;top:96px;left:24px;z-index:2147483647;min-width:180px;min-height:52px';button.onclick=()=>{window.__nativePopup=window.open('about:blank')};document.body.append(button)})()");
+    tapDomControl("nativePopupFixture");
+    waitJs("window.__nativePopup!==null&&window.__nativePopup!==undefined");
+    long end=System.currentTimeMillis()+10000;while(popup.get()==null&&System.currentTimeMillis()<end)Thread.sleep(100);
+    assertNotNull("Actual Chromium window creation reaches the production popup client",popup.get());
+    Thread.sleep(500);
+    assertFalse("A transient blank popup is not reported as an invalid external link",nativeText("Link could not be opened",false).exists());
+    assertEquals("The blank placeholder does not replace the current application page",previous,(String)new JSONTokener(js("location.pathname")).nextValue());
+    js("window.__nativePopup.location.href="+JSONObject.quote(destination));
+    String target=NavigationPolicy.canonical(destination);
+    waitJs("location.href==="+JSONObject.quote(target)+"&&window.VoxelNativeApp");
+   }
+   assertEquals("Delayed first-party popup links do not launch a browser",0,Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getComponent()==null).count());
+   facts.add("Real installed Chromium window.open creates a blank popup before a delayed canonical or legacy route; the placeholder stays non-privileged, the saved session remains in the same WebView and no external browser intent is emitted");
+   screenshot("delayed-popup-stays-in-app");
+  }finally{
+   InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().setWebChromeClient(original.get()));
+  }
+ }
  private void waitKeyboard(boolean expected)throws Exception{
   long end=System.currentTimeMillis()+15000;
   while(System.currentTimeMillis()<end){AtomicBoolean visible=new AtomicBoolean();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{androidx.core.view.WindowInsetsCompat insets=androidx.core.view.ViewCompat.getRootWindowInsets(main.getWindow().getDecorView());visible.set(insets!=null&&insets.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()));});if(visible.get()==expected)return;Thread.sleep(150);}fail("Android keyboard visibility did not become "+expected);
