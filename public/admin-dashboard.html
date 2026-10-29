@@ -346,7 +346,7 @@
 
         <div class="card">
           <h3>Create RFQ</h3>
-          <div class="form-grid">
+          <div class="form-grid" data-native-dirty-scope="rfq-create">
             <label class="form-field" for="rfqCustomerName"><span>Customer name</span><input id="rfqCustomerName" required placeholder="Customer Name"></label>
             <label class="form-field" for="rfqEmail"><span>Customer email</span><input id="rfqEmail" type="email" required placeholder="Email"></label>
             <label class="form-field" for="rfqPhone"><span>Phone</span><input id="rfqPhone" placeholder="Phone"></label>
@@ -641,7 +641,7 @@
         </div>
 
         <div class="card">
-          <div class="form-grid">
+          <div class="form-grid" data-native-dirty-scope="task-create">
             <label class="form-field" for="taskTitle"><span>Task title</span><input id="taskTitle" placeholder="Task Title"></label>
             <label class="form-field" for="taskDueDate"><span>Due date</span><input id="taskDueDate" type="date"></label>
             <label class="form-field" for="taskAssignedTo"><span>Assigned staff</span><select id="taskAssignedTo">
@@ -1397,7 +1397,7 @@
           <div class="card"><h3>Attendance work categories</h3><p>Configure the optional work categories staff can select after checkout. Historical summaries keep their recorded labels.</p><button type="button" class="secondary-btn" onclick="openWorkCategorySettings()">Manage work categories</button></div>
           <div class="card">
             <h3>Company & Invoice Data</h3>
-            <div class="form-grid">
+            <div class="form-grid" data-native-dirty-scope="company-settings">
               <label class="form-field" for="settingEmail"><span>Company email</span><input id="settingEmail" type="email" value="info@voxelveda.com" placeholder="Company Email"></label>
               <label class="form-field" for="settingAbn"><span>ABN</span><input id="settingAbn" placeholder="ABN"></label>
               <label class="form-field" for="settingTerms"><span>Payment terms</span><input id="settingTerms" placeholder="Payment Terms"></label>

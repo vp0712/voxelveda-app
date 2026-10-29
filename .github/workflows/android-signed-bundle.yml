@@ -81,7 +81,7 @@ jobs:
           fi
           printf 'ANDROID_SOURCE_COMMIT=%s\n' "$ANDROID_CHECKED_SOURCE" >> "$GITHUB_ENV"
           gh api "repos/$GITHUB_REPOSITORY/commits/$ANDROID_CHECKED_SOURCE/check-runs?per_page=100" > "$RUNNER_TEMP/android-source-checks.json"
-          node -e 'const c=require(process.env.RUNNER_TEMP+"/android-source-checks.json").check_runs;for(const n of ["application-release","mysql-regression","android-installed","Security checks and tests"]){if(!c.some(r=>r.name===n&&r.status==="completed"&&r.conclusion==="success"))throw Error("Required checked source missing: "+n)}'
+          node -e 'const c=require(process.env.RUNNER_TEMP+"/android-source-checks.json").check_runs;for(const n of ["application-release","mysql-regression","android-installed","current-preservation","Security checks and tests"]){if(!c.some(r=>r.name===n&&r.status==="completed"&&r.conclusion==="success"))throw Error("Required checked source missing: "+n)}'
       - name: Validate explicit publishing intent and existing publisher capability
         if: inputs.play_intent != 'artifact-only'
         env:
@@ -105,7 +105,7 @@ jobs:
       - name: Verify the published association uses the actual App Signing identity
         run: |
           curl --fail --silent --show-error https://app.voxelveda.com/.well-known/assetlinks.json --output "$RUNNER_TEMP/android-live-association.json"
-          node -e 'const rows=require(process.env.RUNNER_TEMP+"/android-live-association.json");if(!rows.some(r=>r.target?.package_name==="com.voxelveda.app"&&r.target.sha256_cert_fingerprints?.includes(process.env.ANDROID_APP_SIGNING_SHA256.toUpperCase())))throw Error("Live App Signing association is not verified")'
+          node -e 'const rows=require(process.env.RUNNER_TEMP+"/android-live-association.json");if(!Array.isArray(rows)||!rows.some(r=>r.relation?.includes("delegate_permission/common.handle_all_urls")&&r.target?.namespace==="android_app"&&r.target.package_name==="com.voxelveda.app"&&r.target.sha256_cert_fingerprints?.includes(process.env.ANDROID_APP_SIGNING_SHA256.toUpperCase())))throw Error("Live App Signing association is not verified")'
       - name: Synchronise and sign using the existing upload key without exporting credentials
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
@@ -127,6 +127,13 @@ jobs:
           name: existing-app-signed-bundle-${{ inputs.version_code }}-${{ github.sha }}
           path: android/app/build/outputs/bundle/release/app-release.aab
           retention-days: 14
+      - name: Refuse a publishing dispatch superseded by newer main work
+        if: inputs.play_intent != 'artifact-only'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          CURRENT_MAIN_SHA=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          test "$CURRENT_MAIN_SHA" = "$GITHUB_SHA"
       - name: Obtain short-lived access for the existing Google Play publisher
         if: inputs.play_intent != 'artifact-only'
         id: play-auth

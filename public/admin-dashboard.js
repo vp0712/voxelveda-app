@@ -2084,6 +2084,7 @@ async function submitRFQ() {
   Object.values(fields).forEach(id => document.getElementById(id)?.setCustomValidity(''));
   const serialized = JSON.stringify(body);
   if (window.__rfqSubmission?.body !== serialized) window.__rfqSubmission = { body:serialized, key:crypto.randomUUID() };
+  const nativeWrite = window.VoxelNativeApp?.captureWrite?.(document.querySelector('[data-native-dirty-scope="rfq-create"]'));
 
   const res = await fetch('/api/rfq', {
     method: 'POST',
@@ -2100,7 +2101,8 @@ async function submitRFQ() {
 
   showToast(data.message || 'RFQ created', {kind:'success',httpStatus:res.status});
   window.__rfqSubmission = null;
-  ['rfqCustomerName', 'rfqEmail', 'rfqPhone', 'rfqMaterial', 'rfqQuantity', 'rfqApplication']
+  const unchangedNativeWrite = !nativeWrite || window.VoxelNativeApp?.markSaved?.(nativeWrite);
+  if (unchangedNativeWrite) ['rfqCustomerName', 'rfqEmail', 'rfqPhone', 'rfqMaterial', 'rfqQuantity', 'rfqApplication']
     .forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.value = '';
@@ -4604,6 +4606,7 @@ async function deleteComplianceFile(id) {
 }
 
 async function submitTask() {
+  const nativeWrite = window.VoxelNativeApp?.captureWrite?.(document.querySelector('[data-native-dirty-scope="task-create"]'));
   const body = {
     title: document.getElementById('taskTitle')?.value.trim(),
     description: document.getElementById('taskDescription')?.value.trim(),
@@ -4626,6 +4629,7 @@ async function submitTask() {
   }
 
   showToast('Task assigned', {kind:'success',httpStatus:res.status});
+  window.VoxelNativeApp?.markSaved?.(nativeWrite);
   await loadTasks();
   await loadDashboardStats();
 }
@@ -5948,6 +5952,7 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  const nativeWrite = window.VoxelNativeApp?.captureWrite?.(document.querySelector('[data-native-dirty-scope="company-settings"]'));
   const body = {
     company_email: document.getElementById('settingEmail')?.value.trim(),
     abn: document.getElementById('settingAbn')?.value.trim(),
@@ -5965,6 +5970,7 @@ async function saveSettings() {
 
   const data = await safeJson(res);
   showToast(data.message || (res.ok ? 'Settings saved' : 'Settings save failed'), {kind:res.ok?'success':'error',httpStatus:res.status});
+  if (res.ok) window.VoxelNativeApp?.markSaved?.(nativeWrite);
   updateQrTargetFromType();
 }
 

@@ -31,7 +31,9 @@ async function jobContext(req, res, next) {
     const [operations]=await pool.query('SELECT * FROM job_operations WHERE job_id=? ORDER BY operation_no',[job.id]);
     const [materials]=await pool.query(`SELECT ml.id,ml.lot_no,ml.material_code,ml.grade,ml.release_status,a.quantity_allocated,a.quantity_consumed FROM job_material_allocations a JOIN material_lots ml ON ml.id=a.material_lot_id WHERE a.job_id=?`,[job.id]);
     const [builds]=await pool.query('SELECT id,build_no,machine_id,operator_user_id,status,started_at,completed_at FROM job_builds WHERE job_id=? ORDER BY id DESC',[job.id]);
-    const [holds]=await pool.query("SELECT * FROM quality_holds WHERE active=1 AND ((entity_type='JOB' AND entity_id=?) OR (entity_type='BUILD' AND entity_id IN (SELECT CAST(id AS CHAR) FROM job_builds WHERE job_id=?)))",[String(job.id),job.id]);
+    // CAST inherits the connection collation, which may differ from legacy hold tables.
+    // Keep the existing string/PADSPACE matching while comparing both sides explicitly.
+    const [holds]=await pool.query("SELECT * FROM quality_holds WHERE active=1 AND ((entity_type='JOB' AND entity_id=?) OR (entity_type='BUILD' AND CONVERT(entity_id USING utf8mb4) COLLATE utf8mb4_unicode_ci IN (SELECT CONVERT(CAST(id AS CHAR) USING utf8mb4) COLLATE utf8mb4_unicode_ci FROM job_builds WHERE job_id=?)))",[String(job.id),job.id]);
     return res.json({job,operations,materials,builds,holds});
   } catch (error) { return next(error); }
 }

@@ -7,8 +7,9 @@
  if(location.origin!==canonical)return;
  let backDecision=null,discardConsent=null,legacyBackConsent=null;
  const owner=()=>{try{return window.VoxelActions?.account?.()||String(JSON.parse(localStorage.getItem('user')||'{}').id||'')+'|'+(localStorage.getItem('token')||'');}catch{return '';}};
- const formValues=form=>JSON.stringify([...form.elements].map(field=>[field.name||field.id||field.type,field.type==='checkbox'||field.type==='radio'?field.checked:field.value,field.type==='file'?[...field.files].map(file=>[file.name,file.size,file.lastModified]):null]));
- const unchanged=decision=>decision.form.isConnected&&decision.owner===owner()&&decision.values===formValues(decision.form);
+ const fields=form=>[...(form.elements||form.querySelectorAll('input,select,textarea'))];
+ const formValues=form=>JSON.stringify(fields(form).map(field=>[field.name||field.id||field.type,field.type==='checkbox'||field.type==='radio'?field.checked:field.value,field.type==='file'?[...field.files].map(file=>[file.name,file.size,file.lastModified]):null]));
+ const unchanged=decision=>decision.form.isConnected&&decision.form.dataset.nativeRequestState!=='pending'&&decision.owner===owner()&&decision.values===formValues(decision.form);
  function allowDiscardOnUnload(form){const consent=discardConsent;discardConsent=null;return Boolean(consent&&consent.form===form&&unchanged(consent));}
  function takeBackDecision(requestId){
   const decision=backDecision;if(!decision||decision.requestId!==requestId)return null;
@@ -34,6 +35,10 @@
    else {legacyBackConsent=decision;window.VoxelFeedback.notify?.('Press Back again to close this screen without saving. New edits will require confirmation again.',{kind:'info',background:true});}
   }).catch(()=>{if(backDecision===decision)backDecision=null;});
  }
+ // Explicit write scopes cover operational editors that are not HTML forms.
+ // Registers, search, filters and the sidebar are deliberately not inferred.
+ function captureWrite(scope){return scope?{form:scope,values:formValues(scope),owner:owner()}:null;}
+ function markSaved(snapshot){if(snapshot&&unchanged(snapshot)){delete snapshot.form.dataset.nativeDirty;return true;}return false;}
  const base64=bytes=>{const input=new Uint8Array(bytes);let value='';for(let n=0;n<input.length;n+=16384)value+=String.fromCharCode(...input.subarray(n,n+16384));return btoa(value);};
  async function documentAction(bytes,filename,download=false){
   if(!/^[A-Za-z0-9][A-Za-z0-9._ -]{0,179}\.pdf$/.test(filename)||bytes.byteLength<100||new TextDecoder('ascii').decode(bytes.slice(0,5))!=='%PDF-')throw new Error('The document is not a valid PDF. No file was saved.');
@@ -55,15 +60,22 @@
   if(window.VoxelOverlay?.active){window.VoxelOverlay.close();return true;}
   const menu=document.querySelector('.record-action-menu[open]');if(menu){menu.open=false;return true;}
   if(document.body.classList.contains('mobile-menu-open')){window.toggleMobileMenu?.(false);window.toggleStaffMobileMenu?.(false);return true;}
+  const scopes=[...document.forms,...document.querySelectorAll('[data-native-dirty-scope]')];
+  if(scopes.some(form=>form.dataset.nativeRequestState==='pending')){
+   window.VoxelFeedback?.notify?.('This action is still being saved. Wait for its confirmed result before leaving this screen.',{kind:'info',foreground:true,title:'Action in progress'});
+   return true;
+  }
   if(legacyBackConsent){const consent=legacyBackConsent;legacyBackConsent=null;if(unchanged(consent)){discardConsent=consent;return false;}}
-  const dirty=[...document.forms].find(form=>{if(typeof form.nativeHasUnsavedChanges==='function'){try{return form.nativeHasUnsavedChanges()===true;}catch{}}return form.dataset.nativeDirty==='true';});
+  const dirty=scopes.find(form=>{if(typeof form.nativeHasUnsavedChanges==='function'){try{return form.nativeHasUnsavedChanges()===true;}catch{}}return form.dataset.nativeDirty==='true';});
   if(dirty){confirmDiscard(dirty,options);return true;}
   if(backDecision)return true;
   return false;
  }
- window.VoxelNativeApp={handleBack,takeBackDecision,allowDiscardOnUnload,documentAction,openDocument,openCameraSettings:()=>plugin.openCameraSettings()};
+ window.VoxelNativeApp={handleBack,takeBackDecision,allowDiscardOnUnload,captureWrite,markSaved,documentAction,openDocument,openCameraSettings:()=>plugin.openCameraSettings()};
  window.addEventListener('pagehide',()=>{backDecision=null;discardConsent=null;legacyBackConsent=null;});
- document.addEventListener('input',event=>{const form=event.target.closest?.('form');if(form)form.dataset.nativeDirty='true';},true);
+ const markDirty=event=>{const form=event.target.closest?.('form,[data-native-dirty-scope]');if(form)form.dataset.nativeDirty='true';};
+ document.addEventListener('input',markDirty,true);
+ document.addEventListener('change',markDirty,true);
  document.addEventListener('submit',event=>{if(event.target.matches?.('form'))delete event.target.dataset.nativeDirty;},true);
  function appearance(){plugin.setAppearance({dark:document.documentElement.dataset.colorMode==='dark'}).catch(()=>{});}
  new MutationObserver(appearance).observe(document.documentElement,{attributes:true,attributeFilter:['data-color-mode']});
