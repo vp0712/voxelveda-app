@@ -366,19 +366,24 @@ async function verifyConnection() {
     const config = relayConfig();
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), config.timeoutMs);
+    let responseType='UNKNOWN', jsonParsed=false, redirected=false, endpointUnchanged='unknown';
     try {
       const response = await fetch(`${config.url.replace(/\/+$/, '')}/health`, {
         method: 'GET',
-        headers: { 'X-Voxel-Veda-Relay-Token': config.token },
+        headers: { Accept: 'application/json', 'X-Voxel-Veda-Relay-Token': config.token },
         signal: controller.signal
       });
+      const media=String(response.headers?.get?.('content-type') || '').split(';')[0].trim().toLowerCase();
+      responseType=media==='application/json'||/^application\/[a-z0-9.+-]+\+json$/.test(media)?'JSON':media==='text/html'?'HTML':media?'OTHER':'UNKNOWN';
+      redirected=response.redirected===true;
+      try { if(response.url)endpointUnchanged=new URL(response.url).href===new URL(`${config.url.replace(/\/+$/, '')}/health`).href?'yes':'no'; } catch {}
+      let health;
+      try { health=await response.json();jsonParsed=true; } catch {}
       if (!response.ok) {
         const error = new Error(`WordPress mail relay health check returned ${response.status}`);
         error.code = 'EMAIL_HTTPS_RELAY_FAILED';error.relayHttpStatus=response.status;error.relayReason='RELAY_HEALTH_HTTP_ERROR';
         throw error;
       }
-      let health = {};
-      try { health = await response.json(); } catch {}
       if (!health || typeof health !== 'object' || Array.isArray(health) || health.ok !== true) {
         throw Object.assign(new Error('The company relay did not return a valid successful JSON health response. Connectivity and PDF capability remain unverified.'), {code:'EMAIL_HTTPS_RELAY_FAILED',relayHttpStatus:response.status,relayReason:'RELAY_HEALTH_JSON_NOT_READY'});
       }
@@ -406,7 +411,7 @@ async function verifyConnection() {
         hostMatchesCompany=configuredUrl.hostname.toLowerCase().replace(/^www\./,'')===new URL(companyProfile().website).hostname.toLowerCase().replace(/^www\./,'');
       } catch {}
       // Log only bounded classifications, never URL, credentials, route or query values.
-      console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code} http_status=${Number(error.relayHttpStatus)||'unknown'} reason=${error.relayReason||error.cause?.code||error.name||'unknown'} url_form=${urlForm} host_matches_company=${hostMatchesCompany?'yes':'no'} query_present=${queryPresent?'yes':'no'}`);
+      console.warn(`Email HTTPS relay evidence: ok=no provider=wordpress_wp_mail code=${error.code} http_status=${Number(error.relayHttpStatus)||'unknown'} reason=${error.relayReason||error.cause?.code||error.name||'unknown'} response_type=${responseType} json_parsed=${jsonParsed?'yes':'no'} redirected=${redirected?'yes':'no'} endpoint_unchanged=${endpointUnchanged} url_form=${urlForm} host_matches_company=${hostMatchesCompany?'yes':'no'} query_present=${queryPresent?'yes':'no'}`);
       if (missingSmtpKeys().length || primaryTransport === 'https_relay') throw error;
     } finally {
       clearTimeout(timeout);

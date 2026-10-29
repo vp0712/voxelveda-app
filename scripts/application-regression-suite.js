@@ -6,6 +6,10 @@ const { spawnSync } = require('node:child_process');
 // all remain mandatory. Retired Banking/ERP boundaries have separate checks.
 const checks = [
   'security-foundation-test.js',
+  'security-page-state-test.js',
+  'shop-floor-record-view-test.js',
+  'ios-native-contract-test.js',
+  'android-play-publish-test.js',
   'android-canonical-test.js',
   'android-back-test.js',
   'attendance-live-regression-test.js',

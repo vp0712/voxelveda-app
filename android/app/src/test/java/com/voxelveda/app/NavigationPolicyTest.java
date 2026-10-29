@@ -12,4 +12,12 @@ public class NavigationPolicyTest {
   assertNull(NavigationPolicy.canonical("https://app.voxelveda.com//evil.invalid"));
   assertNull(NavigationPolicy.canonical("https://untrusted.invalid/reset-password"));
  }
+ @Test public void blankPopupIsOnlyAPlaceholderAndNeverAnApplicationOrigin(){
+  for(String url:new String[]{null,"","about:blank","about:blank#initial"}){
+   assertTrue(NavigationPolicy.isPopupPlaceholder(url));
+   assertFalse(NavigationPolicy.isApplication(url));
+   assertNull(NavigationPolicy.canonical(url));
+  }
+  for(String url:new String[]{"https://app.voxelveda.com/profile","https://voxelveda-app-production.up.railway.app/profile","https://untrusted.invalid/","about:srcdoc","about:blank?redirect=https://untrusted.invalid","javascript:location='https://app.voxelveda.com'"})assertFalse(url,NavigationPolicy.isPopupPlaceholder(url));
+ }
 }

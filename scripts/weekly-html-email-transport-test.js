@@ -35,7 +35,7 @@ async function relayFailureDiagnosticFixtures(mail){
  const sensitive={username:'fixture-private-user',password:crypto.randomBytes(24).toString('hex'),query:crypto.randomBytes(24).toString('hex')},warnings=[];
  try{
   process.env.PUBLIC_WEBSITE_URL='https://fixture.invalid';console.warn=value=>warnings.push(String(value));
-  global.fetch=async()=>({ok:true,status:200,json:async()=>{throw new Error('Synthetic non-JSON response');}});
+  global.fetch=async(_url,options)=>{assert.equal(options.headers.Accept,'application/json');return {ok:true,status:200,headers:{get:()=> 'text/html; charset=UTF-8'},json:async()=>{throw new Error('Synthetic non-JSON response');}};};
   const cases=[
    [`https://${sensitive.username}:${sensitive.password}@fixture.invalid/?rest_route=%2Fvoxel-veda%2Fv1%2Fmail-relay&access_token=${sensitive.query}`,'WORDPRESS_QUERY','yes','yes'],
    [`https://fixture.invalid/wp-json/voxel-veda/v1/mail-relay?access_token=${sensitive.query}`,'WORDPRESS_PRETTY','yes','yes'],
@@ -45,8 +45,16 @@ async function relayFailureDiagnosticFixtures(mail){
    process.env.WORDPRESS_MAIL_RELAY_URL=url;
    await assert.rejects(()=>mail.verifyConnection(),error=>error.code==='EMAIL_HTTPS_RELAY_FAILED'&&error.relayReason==='RELAY_HEALTH_JSON_NOT_READY');
    const logged=warnings.at(-1);assert.match(logged,new RegExp(`url_form=${form} host_matches_company=${sameHost} query_present=${queryPresent}$`));assert.match(logged,/http_status=200 reason=RELAY_HEALTH_JSON_NOT_READY/);
+   assert.match(logged,/response_type=HTML json_parsed=no redirected=no endpoint_unchanged=unknown/);
    for(const value of [url,...Object.values(sensitive),'access_token','rest_route','voxel-veda','private-mail-receiver'])assert(!logged.includes(value),'Failure diagnostics never disclose raw URL, credentials, paths or query names/values');
   }
+  process.env.WORDPRESS_MAIL_RELAY_URL='https://fixture.invalid/wp-json/voxel-veda/v1/mail-relay';
+  global.fetch=async()=>({ok:true,status:200,url:'https://fixture.invalid/',redirected:true,headers:{get:()=> 'text/html'},json:async()=>{throw new Error('Synthetic redirected homepage');}});
+  await assert.rejects(()=>mail.verifyConnection(),{code:'EMAIL_HTTPS_RELAY_FAILED'});
+  assert.match(warnings.at(-1),/response_type=HTML json_parsed=no redirected=yes endpoint_unchanged=no/);
+  global.fetch=async()=>({ok:true,status:200,url:process.env.WORDPRESS_MAIL_RELAY_URL+'/health',headers:{get:()=> 'application/json'},json:async()=>({status:'ready'})});
+  await assert.rejects(()=>mail.verifyConnection(),{code:'EMAIL_HTTPS_RELAY_FAILED'});
+  assert.match(warnings.at(-1),/response_type=JSON json_parsed=yes redirected=no endpoint_unchanged=yes/,'A wrong JSON contract is distinguished from HTML or a redirect without disclosing its body');
  }finally{global.fetch=fetchBefore;console.warn=warnBefore;process.env.WORDPRESS_MAIL_RELAY_URL=urlBefore;if(websiteBefore===undefined)delete process.env.PUBLIC_WEBSITE_URL;else process.env.PUBLIC_WEBSITE_URL=websiteBefore;}
 }
 async function transportFixtures(){

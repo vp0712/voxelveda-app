@@ -72,20 +72,34 @@ public class MainActivity extends BridgeActivity {
             }
             @Override public boolean onCreateWindow(WebView source, boolean dialog, boolean gesture, Message message) {
                 WebView popup = new WebView(MainActivity.this);
-                popup.setWebViewClient(new WebViewClient() {
+                class ApplicationPopupClient extends WebViewClient {
                     private boolean handled;
+                    private final Runnable expire = () -> { handled = true; popup.destroy(); };
                     private void navigate(String url) {
-                        if (handled) return;
+                        // window.open() can synchronously create about:blank and
+                        // assign a first-party route after an async operation.
+                        // The placeholder is neither an external destination nor
+                        // a privileged application document.
+                        if (handled || NavigationPolicy.isPopupPlaceholder(url)) return;
                         handled = true;
                         popup.stopLoading();
                         String canonical = NavigationPolicy.canonical(url);
                         if (canonical != null) web.loadUrl(canonical);
                         else handleExternalNavigation(Uri.parse(url), gesture);
+                        timer.removeCallbacks(expire);
                         timer.post(popup::destroy);
                     }
-                    @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) { navigate(request.getUrl().toString()); return true; }
+                    @Override public boolean shouldOverrideUrlLoading(WebView v, WebResourceRequest request) {
+                        if (request.isForMainFrame()) navigate(request.getUrl().toString());
+                        return true;
+                    }
                     @Override public void onPageStarted(WebView v, String url, android.graphics.Bitmap icon) { navigate(url); }
-                });
+                }
+                ApplicationPopupClient client = new ApplicationPopupClient();
+                popup.setWebViewClient(client);
+                // A placeholder which is never assigned must not retain a
+                // detached WebView indefinitely.
+                timer.postDelayed(client.expire, 25000);
                 ((WebView.WebViewTransport) message.obj).setWebView(popup);
                 message.sendToTarget();
                 return true;

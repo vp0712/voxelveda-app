@@ -2084,6 +2084,7 @@ async function submitRFQ() {
   Object.values(fields).forEach(id => document.getElementById(id)?.setCustomValidity(''));
   const serialized = JSON.stringify(body);
   if (window.__rfqSubmission?.body !== serialized) window.__rfqSubmission = { body:serialized, key:crypto.randomUUID() };
+  const nativeWrite = window.VoxelNativeApp?.captureWrite?.(document.querySelector('[data-native-dirty-scope="rfq-create"]'));
 
   const res = await fetch('/api/rfq', {
     method: 'POST',
@@ -2100,7 +2101,8 @@ async function submitRFQ() {
 
   showToast(data.message || 'RFQ created', {kind:'success',httpStatus:res.status});
   window.__rfqSubmission = null;
-  ['rfqCustomerName', 'rfqEmail', 'rfqPhone', 'rfqMaterial', 'rfqQuantity', 'rfqApplication']
+  const unchangedNativeWrite = !nativeWrite || window.VoxelNativeApp?.markSaved?.(nativeWrite);
+  if (unchangedNativeWrite) ['rfqCustomerName', 'rfqEmail', 'rfqPhone', 'rfqMaterial', 'rfqQuantity', 'rfqApplication']
     .forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.value = '';
@@ -4604,6 +4606,7 @@ async function deleteComplianceFile(id) {
 }
 
 async function submitTask() {
+  const nativeWrite = window.VoxelNativeApp?.captureWrite?.(document.querySelector('[data-native-dirty-scope="task-create"]'));
   const body = {
     title: document.getElementById('taskTitle')?.value.trim(),
     description: document.getElementById('taskDescription')?.value.trim(),
@@ -4626,6 +4629,7 @@ async function submitTask() {
   }
 
   showToast('Task assigned', {kind:'success',httpStatus:res.status});
+  window.VoxelNativeApp?.markSaved?.(nativeWrite);
   await loadTasks();
   await loadDashboardStats();
 }
@@ -5948,6 +5952,7 @@ async function loadSettings() {
 }
 
 async function saveSettings() {
+  const nativeWrite = window.VoxelNativeApp?.captureWrite?.(document.querySelector('[data-native-dirty-scope="company-settings"]'));
   const body = {
     company_email: document.getElementById('settingEmail')?.value.trim(),
     abn: document.getElementById('settingAbn')?.value.trim(),
@@ -5965,6 +5970,7 @@ async function saveSettings() {
 
   const data = await safeJson(res);
   showToast(data.message || (res.ok ? 'Settings saved' : 'Settings save failed'), {kind:res.ok?'success':'error',httpStatus:res.status});
+  if (res.ok) window.VoxelNativeApp?.markSaved?.(nativeWrite);
   updateQrTargetFromType();
 }
 
@@ -7879,25 +7885,36 @@ function setTimesheetTab(status) {
 }
 
 async function openTimesheetDetail(id) {
+  const owner=VoxelActions.account(),sequence=openTimesheetDetail.sequence=(openTimesheetDetail.sequence||0)+1;
+  const current=()=>owner===VoxelActions.account()&&sequence===openTimesheetDetail.sequence;
+  try {
   const res = await fetch(`/api/attendance/timesheets/${Number(id)}`, { headers: authHeaders() });
+  if(!current())return;
   const data = await safeJson(res);
+  if(!current())return;
   if (!res.ok) return showToast(data.message || 'Unable to load timesheet detail', {kind:'error'});
   const timesheet = data.timesheet || {};
+  const summary = data.summary || {};
+  const detailHours = (value, missing = 'Not recorded') => ((typeof value==='number'||typeof value==='string'&&value.trim()!=='')&&Number.isFinite(Number(value))&&Number(value)>=0) ? Number(value).toFixed(2)+' hrs' : missing;
   const records = data.summary?.records || [];
   const rows = records.map((row) => `
-    <tr><td>${escapeHtml(String(row.work_date || '').slice(0, 10))}</td><td>${escapeHtml(formatDateTime(row.clock_in))}</td><td>${escapeHtml(formatDateTime(row.clock_out))}</td><td>${Number(row.total_hours || 0).toFixed(2)}</td><td>${renderTimesheetNote(row.notes)}</td></tr>
+    <tr><td>${escapeHtml(String(row.work_date || '').slice(0, 10))}</td><td>${escapeHtml(formatDateTime(row.clock_in))}</td><td>${escapeHtml(formatDateTime(row.clock_out))}</td><td>${escapeHtml(detailHours(row.total_hours))}</td><td>${renderTimesheetNote(row.notes)}</td></tr>
   `).join('') || '<tr><td colspan="5">No attendance records.</td></tr>';
   showDialog('Timesheet Review', `
     <div class="timesheet-detail-summary">
       <article><small>Employee</small><strong>${escapeHtml(timesheet.name || timesheet.email || '-')}</strong></article>
       <article><small>Period</small><strong>${escapeHtml(String(timesheet.week_start || '').slice(0, 10))} to ${escapeHtml(String(timesheet.week_end || '').slice(0, 10))}</strong></article>
-      <article><small>Submitted</small><strong>${Number(timesheet.total_hours || 0).toFixed(2)} hrs</strong></article>
+      <article><small>Verified completed source</small><strong>${escapeHtml(detailHours(summary.actualHours))}</strong></article>
+      <article><small>Saved / submitted</small><strong>${escapeHtml(detailHours(timesheet.total_hours))}</strong></article>
+      <article><small>Approved hours</small><strong>${String(timesheet.status).toUpperCase()==='APPROVED'?escapeHtml(detailHours(timesheet.approved_hours)):'Not approved'}</strong></article>
       <article><small>Status</small><strong>${renderTimesheetStatusChip(timesheet.status)}</strong></article>
     </div>
+    ${summary.reviewRequired||summary.review_required?'<p class="status-note" role="status">Some source attendance needs authorised review. Verified completed source excludes open or unverified work; entering approved hours cannot resolve it.</p>':''}
     <div class="table-wrap"><table><thead><tr><th>Date</th><th>Clock In</th><th>Clock Out</th><th>Hours</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table></div>
     ${timesheet.manager_comments ? `<div class="status-note"><strong>Manager note:</strong> ${escapeHtml(timesheet.manager_comments)}</div>` : ''}
   `, hideDialog, 'Close');
   document.querySelector('.dialog-panel')?.classList.add('wide-dialog');
+  } catch(error) { if(current())return showToast(error.message || 'Unable to load timesheet detail', {kind:'error'}); }
 }
 
 async function approveTimesheetRecord(id, approvedHours, comments = '', source = {}) {
@@ -7918,7 +7935,7 @@ async function reviewTimesheetAttendance(detail) {
 
 async function openTimesheetDecision(id, action, submittedHours, draft = {}) {
   const owner=VoxelActions.account();let detail;
-  try{detail=await VoxelActions.request(`/api/attendance/timesheets/${Number(id)}`,{headers:authHeaders()});}catch(error){return showToast(error.message,{kind:'error'});}
+  try{detail=await VoxelActions.request(`/api/attendance/timesheets/${Number(id)}`,{headers:authHeaders()});}catch(error){if(owner!==VoxelActions.account())return;return showToast(error.message,{kind:'error'});}
   if(owner!==VoxelActions.account())return;
   const source=detail.summary,record=detail.timesheet;
   if(!source||!record||source.actualHours==null||!Number.isFinite(Number(source.actualHours)))return showToast('Verified source hours are unavailable. Refresh before deciding.',{kind:'error'});
@@ -7988,6 +8005,7 @@ async function loadTimesheets(options={}) {
   if (!tbody) return;
   populateTimesheetFilterStaffSelects();
   await loadWeeklyTimesheetDeliveries();
+  if(owner!==VoxelActions.account()||sequence!==loadTimesheets.sequence)return;
   tbody.innerHTML = '<tr><td colspan="8">Loading timesheets...</td></tr>';
   const res = await fetch('/api/attendance/timesheets?status=ALL', { headers: { Authorization: 'Bearer ' + token } });
   const data = await safeJson(res);
@@ -8044,9 +8062,14 @@ function canManageWeeklyDelivery() {
   return hasCurrentPermission('SEND_COMPANY_EMAIL') && (hasCurrentPermission('MANAGE_COMPANY_EMAIL') || hasCurrentPermission('APPROVE_ALL_TIMESHEETS') || hasCurrentPermission('APPROVE_TEAM_TIMESHEET'));
 }
 async function loadWeeklyTimesheetDeliveries(page = 1) {
+  const owner=VoxelActions.account(),sequence=loadWeeklyTimesheetDeliveries.sequence=(loadWeeklyTimesheetDeliveries.sequence||0)+1;
+  const current=()=>owner===VoxelActions.account()&&sequence===loadWeeklyTimesheetDeliveries.sequence;
   const body = document.getElementById('weeklyDeliveryBody');
   if (!body) return;
+  if(loadWeeklyTimesheetDeliveries.owner!==owner){weeklyDeliveryState.page=1;weeklyDeliveryState.pages=1;weeklyDeliveryState.deliveries=[];loadWeeklyTimesheetDeliveries.owner=owner;}
   body.innerHTML = '<tr><td colspan="6">Loading weekly delivery diagnostics…</td></tr>';
+  const oldSummary=document.getElementById('weeklyDeliveryPageSummary');if(oldSummary)oldSummary.textContent='Loading weekly delivery records…';
+  const oldSchedule=document.getElementById('weeklyDeliverySchedule');if(oldSchedule)oldSchedule.textContent='Loading the company weekly delivery schedule…';
   const params = new URLSearchParams({ page:String(Math.max(1, Number(page) || 1)), page_size:'25' });
   for (const [key,id] of [['user_id','weeklyDeliveryStaffSelect'], ['from_date','weeklyDeliveryFrom'], ['to_date','weeklyDeliveryTo'], ['status','weeklyDeliveryStatus']]) {
     const value = document.getElementById(id)?.value;
@@ -8054,7 +8077,9 @@ async function loadWeeklyTimesheetDeliveries(page = 1) {
   }
   try {
     const response = await fetch(`/api/attendance/timesheets/weekly-deliveries?${params}`, { headers:authHeaders() });
+    if(!current())return;
     const data = await safeJson(response);
+    if(!current())return;
     if (!response.ok) throw new Error(data.message || 'Weekly deliveries could not be loaded');
     weeklyDeliveryState.page = Number(data.page || 1);
     weeklyDeliveryState.pages = Math.max(1, Math.ceil(Number(data.total || 0) / Number(data.page_size || 25)));
@@ -8073,7 +8098,7 @@ async function loadWeeklyTimesheetDeliveries(page = 1) {
     const summary = document.getElementById('weeklyDeliveryPageSummary');
     if (summary) summary.textContent = `${Number(data.total || 0)} deliveries · Page ${weeklyDeliveryState.page} of ${weeklyDeliveryState.pages}`;
     enhanceResponsiveTables();
-  } catch (error) { body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')} <button type="button" class="secondary-btn" onclick="loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page)">Retry</button></td></tr>`; }
+  } catch (error) { if(current())body.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message || 'Weekly delivery diagnostics are unavailable')} <button type="button" class="secondary-btn" onclick="loadWeeklyTimesheetDeliveries(weeklyDeliveryState.page)">Retry</button></td></tr>`; }
 }
 async function openWeeklyDeliveryPdf(requestId) {
   const id = Number(requestId);
@@ -8084,13 +8109,17 @@ async function openWeeklyDeliveryPdf(requestId) {
 async function openWeeklyDeliveryDetail(deliveryId) {
   const id = Number(deliveryId);
   if (!Number.isSafeInteger(id) || id < 1) return;
+  const owner=VoxelActions.account(),sequence=openWeeklyDeliveryDetail.sequence=(openWeeklyDeliveryDetail.sequence||0)+1;
+  const current=()=>owner===VoxelActions.account()&&sequence===openWeeklyDeliveryDetail.sequence;
   try {
     const response = await fetch(`/api/attendance/timesheets/weekly-deliveries/${id}`, { headers:authHeaders() });
+    if(!current())return;
     const data = await safeJson(response);
+    if(!current())return;
     if (!response.ok) throw new Error(data.message || 'Delivery details could not be loaded');
     const row = data.delivery || {};
     showDialog('Individual weekly delivery history', `<p>Staff #${Number(row.user_id)} · ${escapeHtml(String(row.period_start || '').slice(0,10))} to ${escapeHtml(String(row.period_end || '').slice(0,10))} · ${escapeHtml(row.timezone)}</p><p>Version ${Number(row.version)} · ${escapeHtml(row.status)} · ${escapeHtml(weeklyDeliveryHours(row))} snapshot hours · ${row.delivery_format === 'HTML' ? 'Complete HTML email' : 'PDF document email'}</p><p>${escapeHtml(weeklyDeliveryReasons(row) || 'No review issue recorded')}</p><p class="status-note">Each version contains only this staff member’s worked attendance. Provider acceptance and recipient receipt are separate states; recipient receipt remains unverified.</p><h4>Retained versions</h4>${(data.versions || []).map(version => `<p>Version ${Number(version.version)} · ${escapeHtml(version.status)} · ${escapeHtml(version.reason || 'Scheduled delivery')} · ${escapeHtml(formatDateTime(version.created_at))}${Number(version.document_request_id) > 0 ? ` <button class="secondary-btn" onclick="return openWeeklyDeliveryPdf(${Number(version.document_request_id)})">Individual PDF</button>` : ''}</p>`).join('') || '<p>No previous revision recorded.</p>'}`, hideDialog, 'Close');
-  } catch (error) { showToast(error.message || 'Delivery details are unavailable', {kind:'error'}); }
+  } catch (error) { if(current())showToast(error.message || 'Delivery details are unavailable', {kind:'error'}); }
 }
 function openWeeklyDeliveryRevision(deliveryId, retryGeneration = false, previousReason = '', requireUncertainConfirmation = false) {
   const row = weeklyDeliveryState.deliveries.find(delivery => Number(delivery.id) === Number(deliveryId));

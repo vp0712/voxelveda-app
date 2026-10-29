@@ -6,9 +6,71 @@ const { hasPermission, hasAnyPermission, isManagerOf } = require('../services/au
 function actor(req){return Number(req.user?.id||req.user?.user_id||0)||null}
 function clean(v,max=500){return String(v??'').trim().slice(0,max)}
 function audit(req){return{actorId:actor(req),ipAddress:req.ip,userAgent:req.get('user-agent'),requestId:req.id||req.get('x-request-id')||null,sessionId:req.session?.id||null}}
-async function jobContext(req,res,next){try{await ensureQmsAdvancedSchema();const [[job]]=await pool.query('SELECT * FROM manufacturing_jobs WHERE id=? OR job_no=? LIMIT 1',[req.params.id,req.params.id]);if(!job)return res.status(404).json({message:'Job not found.'});const [operations]=await pool.query('SELECT * FROM job_operations WHERE job_id=? ORDER BY operation_no',[job.id]);const [materials]=await pool.query(`SELECT ml.id,ml.lot_no,ml.material_code,ml.grade,ml.release_status,a.quantity_allocated,a.quantity_consumed FROM job_material_allocations a JOIN material_lots ml ON ml.id=a.material_lot_id WHERE a.job_id=?`,[job.id]);const [builds]=await pool.query('SELECT id,build_no,machine_id,operator_user_id,status,started_at,completed_at FROM job_builds WHERE job_id=? ORDER BY id DESC',[job.id]);const [holds]=await pool.query("SELECT * FROM quality_holds WHERE active=1 AND ((entity_type='JOB' AND entity_id=?) OR (entity_type='BUILD' AND entity_id IN (SELECT CAST(id AS CHAR) FROM job_builds WHERE job_id=?)))",[String(job.id),job.id]);return res.json({job,operations,materials,builds,holds})}catch(e){return next(e)}}
-async function machineContext(req,res,next){try{await ensureQmsAdvancedSchema();const gate=await machineReadiness(req.params.id);if(!gate.machine)return res.status(404).json(gate);const [plans]=await pool.query('SELECT id,maintenance_type,next_due_date,blocking_when_overdue,active FROM maintenance_plans WHERE equipment_id=? ORDER BY next_due_date',[gate.machine.id]);const [faults]=await pool.query("SELECT * FROM equipment_faults WHERE equipment_id=? AND status<>'RESOLVED' ORDER BY created_at DESC",[gate.machine.id]);const [loto]=await pool.query('SELECT * FROM loto_permits WHERE equipment_id=? AND active=1',[gate.machine.id]);return res.json({...gate,maintenance:plans,faults,loto})}catch(e){return next(e)}}
-async function materialContext(req,res,next){try{await ensureQmsAdvancedSchema();const [[lot]]=await pool.query('SELECT * FROM material_lots WHERE id=? OR lot_no=? LIMIT 1',[req.params.id,req.params.id]);if(!lot)return res.status(404).json({message:'Material lot not found.'});const [genealogy]=await pool.query(`SELECT g.*,j.job_no,b.build_no,s.serial_no FROM material_genealogy g LEFT JOIN manufacturing_jobs j ON j.id=g.job_id LEFT JOIN job_builds b ON b.id=g.build_id LEFT JOIN job_serials s ON s.id=g.serial_id WHERE g.material_lot_id=? ORDER BY g.created_at DESC`,[lot.id]);const [holds]=await pool.query("SELECT * FROM quality_holds WHERE active=1 AND entity_type='MATERIAL_LOT' AND entity_id=?",[String(lot.id)]);return res.json({lot,genealogy,holds,usable:lot.release_status==='RELEASED'&&!holds.length})}catch(e){return next(e)}}
+function lookupReference(value, maximum) {
+  if (!['string','number'].includes(typeof value)) return null;
+  const text=String(value).trim();
+  if (!text || text.length>maximum || /[\u0000-\u001f\u007f]/.test(text)) return null;
+  if (/^\d+$/.test(text)) {
+    const id=Number(text);
+    return Number.isSafeInteger(id)&&id>0 ? {id} : null;
+  }
+  return {reference:text};
+}
+function invalidReference(res, label, maximum) {
+  return res.status(400).json({code:'SHOP_FLOOR_REFERENCE_INVALID',message:`Enter a positive numeric ID or an exact saved ${label} of up to ${maximum} characters.`});
+}
+async function jobContext(req, res, next) {
+  try {
+    const reference=lookupReference(req.params.id,50);
+    if (!reference) return invalidReference(res,'job number',50);
+    await ensureQmsAdvancedSchema();
+    const [[job]]=reference.id
+      ? await pool.query('SELECT * FROM manufacturing_jobs WHERE id=? LIMIT 1',[reference.id])
+      : await pool.query('SELECT * FROM manufacturing_jobs WHERE job_no=? LIMIT 1',[reference.reference]);
+    if (!job) return res.status(404).json({message:'Job not found.'});
+    const [operations]=await pool.query('SELECT * FROM job_operations WHERE job_id=? ORDER BY operation_no',[job.id]);
+    const [materials]=await pool.query(`SELECT ml.id,ml.lot_no,ml.material_code,ml.grade,ml.release_status,a.quantity_allocated,a.quantity_consumed FROM job_material_allocations a JOIN material_lots ml ON ml.id=a.material_lot_id WHERE a.job_id=?`,[job.id]);
+    const [builds]=await pool.query('SELECT id,build_no,machine_id,operator_user_id,status,started_at,completed_at FROM job_builds WHERE job_id=? ORDER BY id DESC',[job.id]);
+    // CAST inherits the connection collation, which may differ from legacy hold tables.
+    // Keep the existing string/PADSPACE matching while comparing both sides explicitly.
+    const [holds]=await pool.query("SELECT * FROM quality_holds WHERE active=1 AND ((entity_type='JOB' AND entity_id=?) OR (entity_type='BUILD' AND CONVERT(entity_id USING utf8mb4) COLLATE utf8mb4_unicode_ci IN (SELECT CONVERT(CAST(id AS CHAR) USING utf8mb4) COLLATE utf8mb4_unicode_ci FROM job_builds WHERE job_id=?)))",[String(job.id),job.id]);
+    return res.json({job,operations,materials,builds,holds});
+  } catch (error) { return next(error); }
+}
+async function machineContext(req, res, next) {
+  try {
+    const reference=lookupReference(req.params.id,80);
+    if (!reference) return invalidReference(res,'equipment code',80);
+    await ensureQmsAdvancedSchema();
+    let machineId=reference.id;
+    if (!machineId) {
+      const [[machine]]=await pool.query('SELECT id FROM equipment_assets WHERE equipment_code=? LIMIT 1',[reference.reference]);
+      if (!machine) return res.status(404).json({allowed:false,code:'MACHINE_NOT_FOUND',reasons:['Machine not found.']});
+      machineId=Number(machine.id);
+      if (!Number.isSafeInteger(machineId) || machineId<1) return res.status(409).json({code:'SHOP_FLOOR_IDENTITY_REVIEW_REQUIRED',message:'The saved machine identity requires administrator review before it can be opened safely.'});
+    }
+    const gate = await machineReadiness(machineId);
+    if (!gate.machine) return res.status(404).json(gate);
+    const [plans] = await pool.query('SELECT id,plan_name,next_due_date,blocking_when_overdue,active FROM maintenance_plans WHERE equipment_id=? ORDER BY next_due_date,id', [gate.machine.id]);
+    const [faults] = await pool.query("SELECT * FROM equipment_faults WHERE equipment_id=? AND status<>'RESOLVED' ORDER BY reported_at DESC,id DESC", [gate.machine.id]);
+    const [loto] = await pool.query('SELECT * FROM loto_permits WHERE equipment_id=? AND active=1', [gate.machine.id]);
+    return res.json({ ...gate, maintenance: plans, faults, loto });
+  } catch (error) { return next(error); }
+}
+async function materialContext(req, res, next) {
+  try {
+    const reference=lookupReference(req.params.id,80);
+    if (!reference) return invalidReference(res,'material lot number',80);
+    await ensureQmsAdvancedSchema();
+    const [[lot]]=reference.id
+      ? await pool.query('SELECT * FROM material_lots WHERE id=? LIMIT 1',[reference.id])
+      : await pool.query('SELECT * FROM material_lots WHERE lot_no=? LIMIT 1',[reference.reference]);
+    if (!lot) return res.status(404).json({message:'Material lot not found.'});
+    const [genealogy]=await pool.query(`SELECT g.*,j.job_no,b.build_no,s.serial_no FROM material_genealogy g LEFT JOIN manufacturing_jobs j ON j.id=g.job_id LEFT JOIN job_builds b ON b.id=g.build_id LEFT JOIN job_serials s ON s.id=g.serial_id WHERE g.material_lot_id=? ORDER BY g.created_at DESC`,[lot.id]);
+    const [holds]=await pool.query("SELECT * FROM quality_holds WHERE active=1 AND entity_type='MATERIAL_LOT' AND entity_id=?",[String(lot.id)]);
+    return res.json({lot,genealogy,holds,usable:lot.release_status==='RELEASED'&&!holds.length});
+  } catch (error) { return next(error); }
+}
 async function transitionOperation(req, res, next) {
   let connection;
   try {

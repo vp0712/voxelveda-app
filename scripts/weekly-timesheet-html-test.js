@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DateTime } = require('luxon');
 const renderer = require('../services/weeklyTimesheetEmailService');
+const eligibility = require('../services/weeklyTimesheetEligibility');
 
 function fixtureSnapshot(kind = 'single') {
   const common = { staff_id: 31, staff_name: 'Fixture Staff A', employee_reference: 'FIXTURE-A', period_start: '2026-09-28', period_end: '2026-10-04',
@@ -19,6 +20,27 @@ function fixtureSnapshot(kind = 'single') {
     return { ...common, staff_name: 'Fixture Staff A with a long employee name', employee_reference: 'FIXTURE-A-LONG-REFERENCE', total_minutes: 2400, rows: rows.map(entry => ({ ...entry, name: 'Fixture Staff A with a long employee name' })) };
   }
   return { ...common, total_minutes: 960, rows: [row, { ...row, id: 902, work_date: '2026-10-02', clock_in: '2026-10-02T22:00:00+10:00', clock_out: '2026-10-03T06:00:00+10:00', break_minutes: null, project: '' }] };
+}
+function eligibleCalendarWeek(periodStart, finalShiftExtraMinutes = 0) {
+  // Synthetic stress fixtures verify the source convention rather than impose
+  // an undocumented 168-hour cap on recorded work. Approved hours have their
+  // separate existing policy. No real attendance or recipient is changed.
+  const timezone = 'Australia/Sydney', start = DateTime.fromISO(periodStart, { zone: timezone });
+  const now = start.plus({ weeks: 1, hours: 7 }).toJSDate();
+  const config = eligibility.configuration({ TIMESHEET_TIMEZONE: timezone });
+  const period = eligibility.latestCompletedWeek(now, timezone);
+  const staff = { id: 31, name: 'Fixture calendar-week staff', employee_number: 'FIXTURE-CALENDAR', role: 'staff', active: 1, account_status: 'ACTIVE' };
+  const rows = Array.from({ length: 7 }, (_, index) => {
+    const from = start.plus({ days: index });
+    const to = from.plus({ days: 1, minutes: index === 6 ? finalShiftExtraMinutes : 0 });
+    const minutes = Math.floor(to.diff(from, 'minutes').minutes);
+    return { id: 1101 + index, user_id: staff.id, work_date: from.toISODate(), clock_in: from.toUTC().toISO(), clock_out: to.toUTC().toISO(),
+      timestamp_basis: 'UTC', clock_out_timestamp_basis: 'UTC', recorded_timezone: timezone, entry_source: 'CLOCK', attendance_status: 'COMPLETED',
+      total_minutes: minutes, total_hours: minutes / 60, break_minutes: 0, project: 'Fixture calendar site' };
+  });
+  const assessment = eligibility.assessWorkedAttendance(staff, rows, period, config, now);
+  assert.equal(assessment.status, 'ELIGIBLE'); assert.deepEqual(assessment.issues, []);
+  return { ...eligibility.canonicalSnapshot(staff, assessment, period, 1, 'DRAFT'), generated_at: now.toISOString(), approval_verified: false };
 }
 function main() {
   const source = fixtureSnapshot(), immutable = JSON.stringify(source);
@@ -46,6 +68,21 @@ function main() {
   assert.match(routinelyApproved.text, /Approved hours: 16.00 \(16h 00m\)/, 'Routine verified approval is distinct from recorded hours');
   const long = renderer.renderWeeklyTimesheetEmail(fixtureSnapshot('long'));
   assert.match(long.text, /Fixture job 40/); assert.match(long.text, /40.00 \(40h 00m\)/);
+  for (const [periodStart, extension, expectedHours] of [['2026-03-30', 0, 169], ['2026-09-28', 0, 167], ['2026-10-19', 60, 169]]) {
+    const calendar = eligibleCalendarWeek(periodStart, extension);
+    assert.equal(calendar.total_minutes, expectedHours * 60);
+    const value = renderer.renderWeeklyTimesheetEmail(calendar);
+    assert(value.text.includes(`Weekly recorded hours: ${expectedHours.toFixed(2)} (${expectedHours}h 00m)`));
+    assert.equal((value.text.match(/Shift date:/g) || []).length, 7, 'Every authoritative source shift remains in the report');
+    assert.match(value.text, /Timesheet status: Provisional — Draft/);
+    assert.doesNotMatch(value.text, /Approved hours:/, 'Recorded calendar duration never fabricates payroll approval');
+  }
+  const fallBack = eligibleCalendarWeek('2026-03-30');
+  assert.throws(() => renderer.renderWeeklyTimesheetEmail({ ...fallBack, review_status: 'APPROVED', approval_verified: true }),
+    { code: 'WEEKLY_HTML_APPROVAL_INVALID' }, 'The existing 168-hour approval policy is separate from recorded DST duration');
+  const reviewedFallBack = renderer.renderWeeklyTimesheetEmail({ ...fallBack, review_status: 'APPROVED', approval_verified: true, approved_hours: 168 });
+  assert.match(reviewedFallBack.text, /Weekly recorded hours: 169\.00 \(169h 00m\)/);
+  assert.match(reviewedFallBack.text, /Approved hours: 168\.00 \(168h 00m\)/);
   const escaped = renderer.renderWeeklyTimesheetEmail({ ...source, rows: source.rows.map((row, index) => ({ ...row, project: index ? row.project : 'Inspect <script>alert("bad")</script> & retain "trace"' })) });
   assert.match(escaped.html, /&lt;script&gt;alert\(&quot;bad&quot;\)&lt;\/script&gt; &amp;/); assert.doesNotMatch(escaped.html, /<script>/); assert.match(escaped.text, /<script>alert\("bad"\)<\/script>/);
   const invalid = transform => assert.throws(() => renderer.renderWeeklyTimesheetEmail(transform(fixtureSnapshot())), error => /^(?:WEEKLY_HTML_|PDF_)/.test(error.code));
@@ -80,7 +117,7 @@ function main() {
     artifacts.push({ kind, contentHash: value.contentHash, layoutVersion: value.layoutVersion, htmlBytes: Buffer.byteLength(value.html), textBytes: Buffer.byteLength(value.text) });
   }
   fs.writeFileSync(path.join(output, 'verification.json'), JSON.stringify({ result: 'passed', scope: 'Synthetic individual worked-time fixtures; no email sent', pdfGenerationRequired: false, artifacts }, null, 2));
-  console.log('Weekly HTML timesheet tests passed: immutable deterministic body/text, worked-only identity, all rows/totals, overnight/DST, recorded/zero/missing breaks, actual review/adjustment status, escaped inputs, tamper/size checks and PDF-independent rendering. No real email sent.');
+  console.log('Weekly HTML timesheet tests passed: immutable deterministic body/text, worked-only identity, all rows/totals, overnight/DST including authoritative 167/169-hour weeks and whole-shift boundary allocation, recorded/zero/missing breaks, separate approval policy, actual review/adjustment status, escaped inputs, tamper/size checks and PDF-independent rendering. No real email sent.');
 }
 if (require.main === module) { try { main(); } catch (error) { console.error(error); process.exitCode = 1; } }
 module.exports = { fixtureSnapshot };

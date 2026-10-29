@@ -1,0 +1,62 @@
+name: Current sidebar, charts and internal content
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: current-preservation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  current-preservation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SIDEBAR_BASELINE_COMMIT: 4c01274945edcf15cf0394076602a8df4c00e884
+      CHART_BASELINE_COMMIT: 4c01274945edcf15cf0394076602a8df4c00e884
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Configure isolated proof directories
+        run: |
+          printf 'VV_BROWSER_MODULE_PATH=%s\n' "$RUNNER_TEMP/vv-browser/node_modules/playwright" >> "$GITHUB_ENV"
+          printf 'SIDEBAR_BASELINE_DIR=%s\n' "$RUNNER_TEMP/current-baseline" >> "$GITHUB_ENV"
+          printf 'SIDEBAR_PROOF_DIR=%s\n' "$RUNNER_TEMP/current-preservation/sidebar" >> "$GITHUB_ENV"
+          printf 'CHART_BASELINE_DIR=%s\n' "$RUNNER_TEMP/current-baseline/public" >> "$GITHUB_ENV"
+          printf 'CHART_PROOF_DIR=%s\n' "$RUNNER_TEMP/current-preservation/charts" >> "$GITHUB_ENV"
+      - name: Capture the explicitly approved current sidebar and charts
+        run: |
+          mkdir -p "$SIDEBAR_BASELINE_DIR"
+          git archive "$SIDEBAR_BASELINE_COMMIT" public services/globalBrandRenderer.js controllers/dashboardController.js controllers/expenseController.js | tar -x -C "$SIDEBAR_BASELINE_DIR"
+      - name: Install browser engines
+        run: |
+          npm install --prefix "$RUNNER_TEMP/vv-browser" --no-package-lock --ignore-scripts playwright@1.64.0
+          "$RUNNER_TEMP/vv-browser/node_modules/.bin/playwright" install --with-deps chromium webkit
+      - name: Preserve current sidebar appearance, states, permissions and drawers
+        run: timeout --signal=TERM --kill-after=10s 720s node scripts/sidebar-preservation-browser-test.js
+      - name: Preserve current charts and navigation, drawer, rotation and refresh recovery
+        if: ${{ !cancelled() }}
+        run: timeout --signal=TERM --kill-after=10s 240s node scripts/chart-preservation-browser-test.js
+      - name: Verify upgraded internal content and account security
+        if: ${{ !cancelled() }}
+        env:
+          UI_PROOF_DIR: ${{ runner.temp }}/current-preservation/content-chromium
+          CONTENT_BASELINE_DIR: ${{ runner.temp }}/current-baseline/public
+        run: |
+          timeout --signal=TERM --kill-after=10s 240s node scripts/business-hub-content-browser-test.js
+          VV_CONTENT_BROWSER_ENGINE=webkit UI_PROOF_DIR="$RUNNER_TEMP/current-preservation/content-webkit" timeout --signal=TERM --kill-after=10s 240s node scripts/business-hub-content-browser-test.js
+      - name: Preserve exact-baseline screenshots and interaction evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: current-sidebar-content-${{ github.sha }}
+          path: ${{ runner.temp }}/current-preservation
+          retention-days: 30

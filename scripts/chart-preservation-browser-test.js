@@ -5,13 +5,16 @@ const {chromium}=require(process.env.VV_BROWSER_MODULE_PATH || 'playwright');
 const root=path.resolve(__dirname,'..');
 const output=process.env.CHART_PROOF_DIR || '/tmp/voxelveda-chart-proof';
 const baseline=process.env.CHART_BASELINE_DIR;
-assert(baseline && fs.existsSync(path.join(baseline,'admin-dashboard.html')),'CHART_BASELINE_DIR must contain the archived 63709fbd production public assets');
+const baselineCommit=process.env.CHART_BASELINE_COMMIT || '63709fbd3c24fbe6f4c7ea1eefd6ec61e1d4c8f9';
+const exactCurrentFrames=process.env.CHART_REQUIRE_EXACT_FRAMES==='true'||baselineCommit==='4c01274945edcf15cf0394076602a8df4c00e884';
+assert.match(baselineCommit,/^[a-f0-9]{40}$/,'Chart proof must identify the exact archived baseline commit');
+assert(baseline && fs.existsSync(path.join(baseline,'admin-dashboard.html')),'CHART_BASELINE_DIR must contain the exact archived production public assets');
 const current=path.join(root,'public');
 fs.mkdirSync(output,{recursive:true});
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 function functions(dir){
  const source=fs.readFileSync(path.join(dir,'admin-dashboard.js'),'utf8');
- const names=['renderCharts','renderSupplierPayables','renderSupplierCategoryFlows','renderExpenseCharts','formatMoney','escapeHtml'];
+ const names=['renderCharts','renderSupplierPayables','renderSupplierCategoryFlows','renderExpenseCharts','formatMoney','escapeHtml','isMobileShellViewport','toggleMobileMenu'];
  return names.map(name=>{const start=source.indexOf('function '+name+'(');assert(start>=0);const end=source.indexOf('\nfunction ',start+1);return source.slice(start,end<0?source.length:end);}).join('\n');
 }
 const fixture={
@@ -22,7 +25,7 @@ const fixture={
 function document(dir,phase){
  let html=fs.readFileSync(path.join(dir,'admin-dashboard.html'),'utf8');
  html=require(path.join(dir,'..','services','globalBrandRenderer.js')).injectGlobalBrand(html);
- html=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,tag=>/src="\/(?:vendor\/chart\.umd|workspace-charts|workspace-theme)\.js/.test(tag)?tag:'');
+ html=html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,tag=>/src="\/(?:vendor\/chart\.umd|workspace-charts|workspace-theme|workspace-overlays|business-hub-shell)\.js/.test(tag)?tag:'');
  html=html.replace(/((?:src|href)=")\//g,'$1/'+phase+'/');
  const init=`<script src="/${phase}/fixture-functions.js"></script><script>
  document.querySelectorAll('.page-section').forEach(el=>{if(el.id!=='dashboardSection'&&el.id!=='expenseSection')el.remove();});
@@ -30,7 +33,7 @@ function document(dir,phase){
  const chartGrid=home.querySelector('.chart-grid'),supplier=home.querySelector('.supplier-intelligence-card'),expenseGrid=expense.querySelector('.expense-chart-grid');
  home.replaceChildren();const intro=document.createElement('div');intro.className='admin-home-heading';intro.innerHTML='<p class="panel-kicker">Voxel Veda</p><h1>Operations charts</h1><p>Deterministic isolated chart-preservation fixture; no production business records.</p>';home.append(intro,chartGrid,supplier,expenseGrid);expense.remove();
  document.getElementById('adminInfo').textContent='Chart verification fixture';document.getElementById('profileNameLabel').textContent='Fixture';
- window.__chartOpens=[];window.openRecordRegister=(kind,filters)=>window.__chartOpens.push({kind,filters});window.openFinancialResult=month=>window.__chartOpens.push({kind:'financial-result',month});window.setText=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value};window.renderSupplierUpcoming=window.renderSupplierExposure=()=>{};window.dashboardStatsCache={finance:{financial_year:'2026–27'}};window.registerFilters={expenses:{fy:'2026',search:'fixture'}};
+ window.__chartOpens=[];window.openRecordRegister=(kind,filters)=>window.__chartOpens.push({kind,filters});window.openFinancialResult=month=>window.__chartOpens.push({kind:'financial-result',month});window.setText=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value};window.renderSupplierUpcoming=window.renderSupplierExposure=window.closeNotificationPanel=()=>{};window.dashboardStatsCache={finance:{financial_year:'2026–27'}};window.registerFilters={expenses:{fy:'2026',search:'fixture'}};
  const fixture=${JSON.stringify(fixture)};renderCharts(fixture.dashboard);renderSupplierPayables(fixture.payables);renderExpenseCharts(fixture.expenses);window.__chartProofReady=true;
  </script>`;
  return html.replace('</body>',init+'</body>');
@@ -49,6 +52,47 @@ async function collect(page){return page.evaluate(()=>[...document.querySelector
  const c=Chart.getChart(canvas),rect=canvas.getBoundingClientRect();
  return {id:canvas.id,type:c.config.type,indexAxis:c.options.indexAxis,labels:c.data.labels,datasets:c.data.datasets.map(d=>({label:d.label,type:d.type||c.config.type,data:d.data})),legend:{display:c.options.plugins.legend.display,position:c.options.plugins.legend.position},tooltip:c.data.datasets.map(d=>c.options.plugins.tooltip.callbacks.label({dataset:d,raw:d.data[0]})),scales:Object.fromEntries(Object.entries(c.scales).map(([k,s])=>[k,{type:s.type,min:s.min,max:s.max,beginAtZero:s.options.beginAtZero,labels:s.ticks.map(t=>t.label)}])),size:{width:rect.width,height:rect.height},accessibleRows:[...canvas.closest('.card').querySelectorAll('.vv-chart-data button')].map(b=>b.textContent)};
 }));}
+async function recovery(page,width,height){
+ const original=await collect(page),events=[];
+ const assertRestored=(actual,message)=>{
+  assert.deepEqual(actual.map(({size,...chart})=>chart),original.map(({size,...chart})=>chart),message+' data, labels, scales and actions');
+  // Browser transforms may report 269.999969 instead of 270 CSS pixels after
+  // restoration. Permit only measurement noise, not a changed chart frame.
+  for(let i=0;i<original.length;i++)for(const dimension of ['width','height'])assert(Math.abs(actual[i].size[dimension]-original[i].size[dimension])<0.001,message+' exact settled frame '+original[i].id+' '+dimension);
+ };
+ const ready=async()=>{
+  await settle(page);
+  await page.waitForFunction(()=>[...document.querySelectorAll('canvas')].filter(c=>Chart.getChart(c)).every(canvas=>{
+   const chart=Chart.getChart(canvas),rect=canvas.getBoundingClientRect();return rect.width>0&&rect.height>0&&chart.height>0&&Math.abs(chart.width-rect.width)<=1;
+  }));
+ };
+ await page.setViewportSize({width:height,height:width});await ready();
+ assert.equal((await collect(page)).length,6,'Rotation retains all six current charts');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'Rotated chart layout fits');
+ await page.setViewportSize({width,height});await ready();
+ assertRestored(await collect(page),'Returning from rotation restores charts');events.push('rotation-and-return');
+ if(width<1024){
+  await page.evaluate(()=>toggleMobileMenu(true));
+  await page.waitForFunction(()=>Boolean(document.activeElement?.closest('.sidebar')));
+  await ready();
+  assert.equal(await page.evaluate(()=>document.body.classList.contains('mobile-menu-open')),true,'Actual retained menu function opens the overlay');
+  assertRestored(await collect(page),'Opening the existing drawer preserves chart frames');
+  await page.evaluate(()=>toggleMobileMenu(false));await ready();
+  assert.equal(await page.evaluate(()=>document.body.classList.contains('mobile-menu-open')),false);
+  assertRestored(await collect(page),'Closing the existing drawer preserves charts');events.push('retained-drawer-open-and-close');
+ }
+ // Internal navigation hides the same panel; it must not change the selection
+ // or reconstruct different report data on restoration.
+ await page.evaluate(()=>document.getElementById('dashboardSection').hidden=true);
+ assert.equal(await page.locator('#rfqChart').isVisible(),false,'Navigation-away hides the chart panel');
+ await page.evaluate(()=>{document.getElementById('dashboardSection').hidden=false;requestAnimationFrame(()=>VoxelCharts.resize());});await ready();
+ assertRestored(await collect(page),'Hidden-panel restoration retains charts');events.push('hidden-panel-and-return');
+ await page.evaluate(()=>window.dispatchEvent(new PageTransitionEvent('pageshow',{persisted:true})));await ready();
+ assertRestored(await collect(page),'Retained page-restoration handler preserves charts');events.push('persisted-page-restore-handler');
+ await page.reload();await page.waitForFunction(()=>window.__chartProofReady);await ready();
+ assertRestored(await collect(page),'A real refresh restores the same fixture selection');events.push('refresh');
+ return events;
+}
 async function interactions(page){
  const out=[];
  for(const id of await page.locator('canvas').evaluateAll(nodes=>nodes.filter(c=>Chart.getChart(c)).map(c=>c.id))){
@@ -91,17 +135,18 @@ async function interactions(page){
   await page.evaluate(()=>scrollTo(0,0));await settle(page);
   const viewportScreenshot=[390,1440].includes(width)?`${phase}-${width}-${mode}-viewport.png`:null;if(viewportScreenshot)await page.screenshot({path:path.join(output,viewportScreenshot),animations:'disabled'});
   const filename=`${phase}-${width}-${mode}.png`;await page.screenshot({path:path.join(output,filename),fullPage:true,animations:'disabled'});
-  results.push({phase,width,mode,layout,charts,supplierFlows,actions,screenshot:filename,viewport_screenshot:viewportScreenshot});await context.close();
+  const recoveryEvents=[390,1440].includes(width)?await recovery(page,width,width>=768?1000:844):[];
+  results.push({phase,width,mode,layout,charts,supplierFlows,actions,recovery:recoveryEvents,screenshot:filename,viewport_screenshot:viewportScreenshot});await context.close();
  }
  if(phases.length===2)for(const before of results.filter(r=>r.phase==='before')){
-  const after=results.find(r=>r.phase==='after'&&r.width===before.width&&r.mode===before.mode);assert.deepEqual(after.actions,before.actions,'Preserve chart and accessible-row click targets');assert.deepEqual(after.supplierFlows,before.supplierFlows,'Preserve supplier flow grouping, values and settled proportions');
+  const after=results.find(r=>r.phase==='after'&&r.width===before.width&&r.mode===before.mode);assert.deepEqual(after.actions,before.actions,'Preserve chart and accessible-row click targets');assert.deepEqual(after.supplierFlows,before.supplierFlows,'Preserve supplier flow grouping, values and settled proportions');assert.deepEqual(after.recovery,before.recovery,'Preserve chart recovery after rotation, drawer changes, hidden-panel/page restoration and refresh');
   assert.deepEqual(after.charts.map(({size,...c})=>c),before.charts.map(({size,...c})=>c),'Preserve all chart data, order, scales, units, legend, tooltip and rows');
-  for(let i=0;i<before.charts.length;i++){assert.equal(after.charts[i].size.height,before.charts[i].size.height,'Preserve chart frame height '+before.charts[i].id);const ratio=after.charts[i].size.width/before.charts[i].size.width;assert(ratio>0.75&&ratio<1.25,'Only modest responsive width change '+before.charts[i].id);}
+  for(let i=0;i<before.charts.length;i++){assert.equal(after.charts[i].size.height,before.charts[i].size.height,'Preserve chart frame height '+before.charts[i].id);const ratio=after.charts[i].size.width/before.charts[i].size.width;assert(ratio>0.75&&ratio<1.25,'Only modest responsive width change '+before.charts[i].id);if(exactCurrentFrames)assert(Math.abs(after.charts[i].size.width-before.charts[i].size.width)<0.001,'Preserve current approved chart frame width '+before.charts[i].id);}
  }
  const sourceFiles=['controllers/dashboardController.js','controllers/expenseController.js'];
  const calculation_sources=Object.fromEntries(sourceFiles.map(file=>[file,{before:hash(fs.readFileSync(path.join(baseline,'..',file))),after:hash(fs.readFileSync(path.join(root,file)))}]));
  for(const [file,pair] of Object.entries(calculation_sources))assert.equal(pair.before,pair.after,'Server chart source and aggregation unchanged '+file);
- const proof={calculation_sources,scope:'Isolated current production chart functions, markup and shared browser assets; deterministic synthetic records; no private live account data',baseline:'63709fbd3c24fbe6f4c7ea1eefd6ec61e1d4c8f9',fixture_sha256:hash(JSON.stringify(fixture)),function_source:{before:hash(functions(baseline)),after:hash(functions(current))},renderer:{before:hash(fs.readFileSync(path.join(baseline,'workspace-charts.js'))),after:hash(fs.readFileSync(path.join(current,'workspace-charts.js')))},results};
+ const proof={calculation_sources,scope:'Isolated current production chart functions, markup and shared browser assets; deterministic synthetic records; no private live account data; rotation, actual retained drawer function, hidden-panel navigation, persisted pageshow handler and real refresh. Physical-device or actual background-tab restoration is not established by these browser fixtures.',baseline:baselineCommit,exact_current_frames:exactCurrentFrames,fixture_sha256:hash(JSON.stringify(fixture)),function_source:{before:hash(functions(baseline)),after:hash(functions(current))},renderer:{before:hash(fs.readFileSync(path.join(baseline,'workspace-charts.js'))),after:hash(fs.readFileSync(path.join(current,'workspace-charts.js')))},results};
  assert.equal(proof.function_source.after,proof.function_source.before,'Original chart calculations and actions unchanged');assert.equal(proof.renderer.after,proof.renderer.before,'Original shared chart renderer unchanged');
  fs.writeFileSync(path.join(output,phases.length===1?'before-verification.json':'verification.json'),JSON.stringify(proof,null,2));console.log(JSON.stringify({pass:true,phase:process.env.CHART_PHASE||'comparison',cases:results.length,charts:6,output}));
  }catch(error){if(activePage&&!activePage.isClosed()){await activePage.screenshot({path:path.join(output,'failure.png'),fullPage:true,animations:'disabled'}).catch(()=>{});fs.writeFileSync(path.join(output,'failure.json'),JSON.stringify({case:activeCase,error:error.message,completed_cases:results.length},null,2));}throw error;}finally{await browser?.close();await new Promise(r=>server.close(r));}

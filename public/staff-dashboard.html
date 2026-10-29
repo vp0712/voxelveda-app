@@ -467,13 +467,13 @@
 
         <div class="card staff-expense-control">
           <div class="form-grid">
-            <input id="staffExpenseSearch" placeholder="Search supplier, category, invoice or description" oninput="loadStaffExpenses(1)" />
-            <select id="staffExpensePageSize" onchange="loadStaffExpenses(1)">
+            <label class="form-field" for="staffExpenseSearch"><span>Search expenses</span><input id="staffExpenseSearch" placeholder="Search supplier, category, invoice or description" oninput="loadStaffExpenses(1)" /></label>
+            <label class="form-field" for="staffExpensePageSize"><span>Rows per page</span><select id="staffExpensePageSize" onchange="loadStaffExpenses(1)">
               <option value="10">Show 10 entries</option>
               <option value="25" selected>Show 25 entries</option>
               <option value="50">Show 50 entries</option>
               <option value="100">Show 100 entries</option>
-            </select>
+            </select></label>
           </div>
         </div>
 
@@ -524,7 +524,7 @@
 
         <div class="card staff-expense-control">
           <div class="form-grid">
-            <input id="staffRfqSearch" placeholder="Search RFQ, customer, email, material or status" oninput="loadStaffRfqs()" />
+            <label class="form-field" for="staffRfqSearch"><span>Search RFQs</span><input id="staffRfqSearch" placeholder="Search RFQ, customer, email, material or status" oninput="loadStaffRfqs()" /></label>
           </div>
         </div>
 
@@ -566,7 +566,7 @@
 
         <div class="card staff-expense-control">
           <div class="form-grid">
-            <input id="staffInvoiceSearch" placeholder="Search invoice, customer, email, RFQ or status" oninput="loadStaffInvoices()" />
+            <label class="form-field" for="staffInvoiceSearch"><span>Search invoices</span><input id="staffInvoiceSearch" placeholder="Search invoice, customer, email, RFQ or status" oninput="loadStaffInvoices()" /></label>
           </div>
         </div>
 
@@ -603,7 +603,7 @@
 
         <div class="card staff-expense-control">
           <div class="form-grid">
-            <input id="staffCustomerSearch" placeholder="Search customer, contact, email, phone or notes" oninput="loadStaffCustomers()" />
+            <label class="form-field" for="staffCustomerSearch"><span>Search customers</span><input id="staffCustomerSearch" placeholder="Search customer, contact, email, phone or notes" oninput="loadStaffCustomers()" /></label>
           </div>
         </div>
 
@@ -639,7 +639,7 @@
 
         <div class="card staff-expense-control">
           <div class="form-grid">
-            <input id="staffSupplierSearch" placeholder="Search supplier, contact, category, phone or email" oninput="loadStaffSuppliers()" />
+            <label class="form-field" for="staffSupplierSearch"><span>Search suppliers</span><input id="staffSupplierSearch" placeholder="Search supplier, contact, category, phone or email" oninput="loadStaffSuppliers()" /></label>
           </div>
         </div>
 
@@ -764,7 +764,7 @@
 
         <div class="card staff-expense-control">
           <div class="form-grid">
-            <input id="staffCompetitorSearch" placeholder="Search company, country, capability, material or category" oninput="loadStaffCompetitors()" />
+            <label class="form-field" for="staffCompetitorSearch"><span>Search competitors</span><input id="staffCompetitorSearch" placeholder="Search company, country, capability, material or category" oninput="loadStaffCompetitors()" /></label>
           </div>
         </div>
 

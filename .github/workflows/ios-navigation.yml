@@ -1,0 +1,54 @@
+name: iOS native navigation and source build
+on:
+  pull_request:
+    branches: [main]
+    paths: ['ios/**', 'native-shell/**', 'capacitor.config.json', 'package.json', 'package-lock.json', 'scripts/ios-*', '.github/workflows/ios-navigation.yml']
+  push:
+    branches: [main]
+    paths: ['ios/**', 'native-shell/**', 'capacitor.config.json', 'package.json', 'package-lock.json', 'scripts/ios-*', '.github/workflows/ios-navigation.yml']
+permissions:
+  contents: read
+concurrency:
+  group: ios-navigation-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ios-native-source:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --include=dev --ignore-scripts
+        id: install
+      - name: Verify existing identity, canonical configuration and pinned source
+        run: node scripts/ios-native-contract-test.js
+      - name: Exercise the actual Foundation navigation boundary
+        run: |
+          swiftc ios/App/App/VoxelNavigationPolicy.swift scripts/ios-navigation-policy-tests.swift -o "$RUNNER_TEMP/voxel-ios-policy"
+          "$RUNNER_TEMP/voxel-ios-policy"
+      - name: Parse genuine PDF fixtures and enforce native filename/byte boundaries
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          swiftc ios/App/App/VoxelPdfPolicy.swift scripts/ios-pdf-policy-tests.swift -o "$RUNNER_TEMP/voxel-ios-pdf"
+          "$RUNNER_TEMP/voxel-ios-pdf"
+      - name: Synchronise the canonical shell and verify actual bundled resources
+        id: native-sync
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          npx --no-install cap sync ios
+          node scripts/ios-native-contract-test.js --prepared
+      - name: Build the actual application for an unsigned simulator
+        if: ${{ !cancelled() && steps.native-sync.outcome == 'success' }}
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/voxel-ios-build" -disableAutomaticPackageResolution CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/voxel-ios-build.log" 2>&1 || { tail -120 "$RUNNER_TEMP/voxel-ios-build.log"; exit 1; }
+          node scripts/ios-native-contract-test.js --bundle "$RUNNER_TEMP/voxel-ios-build/Build/Products/Debug-iphonesimulator/App.app"
+      - name: Preserve compile evidence without implying distribution
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-source-build-${{ github.sha }}
+          path: ${{ runner.temp }}/voxel-ios-build.log
+          retention-days: 30

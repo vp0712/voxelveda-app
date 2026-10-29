@@ -55,9 +55,11 @@ function instant(value, label) {
   return parsed;
 }
 function validateSource(snapshot) {
+  // Recorded work follows the validated source and whole-shift allocation, not
+  // the approval-hours ceiling: a fall-back calendar week alone spans 169 hours.
   if (!snapshot || !Number.isSafeInteger(snapshot.staff_id) || snapshot.staff_id < 1 ||
       !Number.isSafeInteger(snapshot.version) || snapshot.version < 1 || snapshot.version > 2147483647 ||
-      !Number.isSafeInteger(snapshot.total_minutes) || snapshot.total_minutes <= 0 || snapshot.total_minutes > 10080 ||
+      !Number.isSafeInteger(snapshot.total_minutes) || snapshot.total_minutes <= 0 ||
       !Array.isArray(snapshot.rows) || !snapshot.rows.length || snapshot.rows.length > 2000 ||
       typeof snapshot.timezone !== 'string' || !snapshot.timezone.startsWith('Australia/') || !IANAZone.isValidZone(snapshot.timezone)) {
     throw contentError('An individual weekly email requires verified worked time, identity and reporting configuration.', 'WEEKLY_HTML_SOURCE_INVALID');
@@ -71,8 +73,10 @@ function validateSource(snapshot) {
   const issued = instant(snapshot.generated_at, 'Report issue time');
   if (issued < start.plus({ days: 7 })) throw contentError('A weekly report cannot be issued before its reporting week is completed.', 'WEEKLY_HTML_PERIOD_INVALID');
   const status = sourceText(snapshot.review_status, 'Review status', 40, true).toUpperCase();
+  const approvedHours = snapshot.approved_hours ?? snapshot.total_minutes / 60;
   if (!/^[A-Z_ ]+$/.test(status) || (status === 'APPROVED' && snapshot.approval_verified !== true) ||
-      (snapshot.approved_hours !== undefined && (status !== 'APPROVED' || snapshot.approval_verified !== true))) {
+      (snapshot.approved_hours !== undefined && (status !== 'APPROVED' || snapshot.approval_verified !== true)) ||
+      (status === 'APPROVED' && (!Number.isFinite(Number(approvedHours)) || Number(approvedHours) < 0 || Number(approvedHours) > 168))) {
     throw contentError('Approval status requires verified saved review evidence.', 'WEEKLY_HTML_APPROVAL_INVALID');
   }
   const ids = new Set(), intervals = [];

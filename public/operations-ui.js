@@ -4,29 +4,30 @@
   // Failed writes are never automatically repeated because they may already have been saved.
   const originalFetch = window.fetch.bind(window);
   const inFlight = new Map();
+  const account = () => { try { return String(JSON.parse(localStorage.getItem('user') || '{}').id || '') + '|' + (localStorage.getItem('token') || ''); } catch { return ''; } };
   window.fetch = async (input, options = {}) => {
     const method = String(options.method || (input instanceof Request ? input.method : 'GET')).toUpperCase();
-    let owner='';try{owner=String(JSON.parse(localStorage.getItem('user')||'{}').id||'')+'|'+(localStorage.getItem('token')||'');}catch{}
+    const owner=account(),current=()=>owner===account();
     const requestUrl=input instanceof Request?input.url:String(input);
     const key = typeof options.body === 'string' && ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)
       ? owner + ' ' + method + ' ' + requestUrl + ' ' + options.body : null;
     if (key && inFlight.has(key)) return (await inFlight.get(key)).clone();
     const request = originalFetch(input, options).then(async response=>{
-      if(['POST','PUT','PATCH','DELETE'].includes(method)&&response.status>=500)window.VoxelDialog?.markUncertain?.();
+      if(current()&&['POST','PUT','PATCH','DELETE'].includes(method)&&response.status>=500)window.VoxelDialog?.markUncertain?.();
       if(!['POST','PUT','PATCH','DELETE'].includes(method)||!response.ok||response.status===204)return response;
       const type=(response.headers.get('content-type')||'').split(';')[0].trim().toLowerCase();
       if(type==='application/pdf')return response;
       const validJson=type==='application/json'&&await response.clone().json().then(value=>value!==null&&typeof value==='object').catch(()=>false);
       if(validJson)return response;
-      window.VoxelDialog?.markUncertain?.();
+      if(current())window.VoxelDialog?.markUncertain?.();
       return new Response(JSON.stringify({message:'The action response could not be confirmed. Refresh the record before retrying.',code:'ACTION_RESPONSE_UNCERTAIN'}),{status:502,headers:{'Content-Type':'application/json'}});
-    }).catch(error=>{if(['POST','PUT','PATCH','DELETE'].includes(method))window.VoxelDialog?.markUncertain?.();throw error;});
+    }).catch(error=>{if(current()&&['POST','PUT','PATCH','DELETE'].includes(method))window.VoxelDialog?.markUncertain?.();throw error;});
     if (key) inFlight.set(key, request);
     try {
       const response = await request;
       if (!response.ok && response.headers.get('content-type')?.includes('application/json')) {
         const data = await response.clone().json().catch(() => null);
-        if (data?.errors || data?.fields || data?.field_errors || data?.validation_errors) showFieldErrors(data.errors || data.fields || data.field_errors || data.validation_errors);
+        if (current() && (data?.errors || data?.fields || data?.field_errors || data?.validation_errors)) showFieldErrors(data.errors || data.fields || data.field_errors || data.validation_errors);
       }
       return response;
     } finally { if (key) inFlight.delete(key); }
