@@ -41,6 +41,9 @@ public class AndroidJourneyTest {
  private File evidence;
  private UiDevice device;
  private volatile boolean blankStartup;
+ private ForegroundEvidence foregroundEvidence;
+ private JSONObject lastSafeUrl=new JSONObject();
+ private boolean diagnosticExternalIntentsStubbed;
 
  private String js(String source)throws Exception{
   CountDownLatch latch=new CountDownLatch(1);AtomicReference<String> result=new AtomicReference<>();
@@ -66,9 +69,19 @@ public class AndroidJourneyTest {
  private void screenshot(String name)throws Exception{waitJs("[...document.images].every(image=>!image.getAttribute('src')||image.hidden||!image.getClientRects().length||(image.complete&&image.naturalWidth>0))&&!document.getElementById('vvGlobalBrandLoader')?.classList.contains('is-visible')");Thread.sleep(400);device.waitForIdle(1000);assertTrue(device.takeScreenshot(new File(evidence,name+".png")));}
  private void login(String email,String password)throws Exception{waitJs("document.getElementById('loginButton')?.disabled===false");js("document.getElementById('email').value="+JSONObject.quote(email)+";document.getElementById('password').value="+JSONObject.quote(password)+";document.getElementById('loginForm').requestSubmit();");}
  private FixtureTransport.Reply control(String route)throws Exception{return transport.relay(NavigationPolicy.ORIGIN+route,route.endsWith("expire")?"POST":"GET","",Collections.emptyMap());}
+ private String proofVariant(){return InstrumentationRegistry.getArguments().getString("upgrade_only","false")+("true".equals(InstrumentationRegistry.getArguments().getString("restart_only"))?"-restart":"");}
+ private long externalViewCount(){String own=InstrumentationRegistry.getInstrumentation().getTargetContext().getPackageName();return Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&!own.equals(intent.getPackage())&&(intent.getComponent()==null||!own.equals(intent.getComponent().getPackageName()))).count();}
+ private void checkpoint(String stage)throws Exception{checkpoint(stage,"MainActivity");}
+ private void checkpoint(String stage,String activity)throws Exception{
+  String safe=(String)new JSONTokener(js("JSON.stringify({origin:location.origin,path:location.pathname})")).nextValue();
+  lastSafeUrl=new JSONObject(safe);
+  foregroundEvidence.capture(stage,lastSafeUrl,externalViewCount(),activity,null);
+ }
+ private void osAction(String stage,String reason)throws Exception{foregroundEvidence.capture(stage,lastSafeUrl,externalViewCount(),"OS_ACTION",reason);}
 
  @Before public void start()throws Exception{
-  Intents.init();intending(org.hamcrest.CoreMatchers.allOf(IntentMatchers.hasAction(Intent.ACTION_VIEW),org.hamcrest.CoreMatchers.not(IntentMatchers.hasComponent(MainActivity.class.getName())))).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED,null));
+  // Observe normal intents without replacing their result or suppressing a browser.
+  Intents.init();
   int port=Integer.parseInt(InstrumentationRegistry.getArguments().getString("fixture_port"));transport=new FixtureTransport(port);device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
   scenario=ActivityScenario.launch(MainActivity.class);scenario.onActivity(activity->{main=activity;originalLaunchIntent=new Intent(activity.getIntent());activity.getBridge().getWebView().stopLoading();activity.getBridge().getWebView().addJavascriptInterface(transport,"VVAndroidTestFixture");activity.getBridge().setWebViewClient(new ApplicationWebViewClient(activity.getBridge(),activity){
    @Override public WebResourceResponse shouldInterceptRequest(WebView view,WebResourceRequest request){
@@ -85,6 +98,7 @@ public class AndroidJourneyTest {
    }
   });});
   evidence=new File(main.getExternalFilesDir(null),"android-proof");assertTrue(evidence.mkdirs()||evidence.isDirectory());
+  foregroundEvidence=new ForegroundEvidence(device,evidence,InstrumentationRegistry.getInstrumentation().getTargetContext(),testName.getMethodName(),proofVariant());
  }
 
  @Test public void blankCompletedPageRequiresVisibleRecovery()throws Exception{
@@ -105,36 +119,63 @@ public class AndroidJourneyTest {
 
  @Test public void installedJourney()throws Exception{
   boolean upgrade="true".equals(InstrumentationRegistry.getArguments().getString("upgrade_only"));
-  if(upgrade){go("/dashboard");waitJs("location.pathname==='/portal/staff'&&document.body.textContent.includes('Synthetic Staff Fixture')");facts.add("APK upgrade preserves the real secure HttpOnly fixture cookie and server session; no login or browser relaunch");screenshot("upgrade-preserved-session");return;}
+  boolean restart="true".equals(InstrumentationRegistry.getArguments().getString("restart_only"));
+  if(upgrade||restart){
+   go("/dashboard");waitJs("location.pathname==='/portal/staff'&&document.body.textContent.includes('Synthetic Staff Fixture')&&window.VoxelStaffHome?.state");
+   String stage=upgrade?"upgrade-preserved-session":"force-close-relaunch";
+   facts.add(upgrade?"APK fixture upgrade preserves the real secure HttpOnly cookie and server session; no login or browser relaunch":"Actual adb force-stop and same-candidate relaunch preserve the real secure HttpOnly fixture cookie/server session without another login");
+   screenshot(stage);checkpoint(stage);return;
+  }
   CountDownLatch cleared=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->cleared.countDown()));assertTrue(cleared.await(10,TimeUnit.SECONDS));
-  go("/");waitJs("document.querySelector('a[href=\"/login\"]')&&document.querySelector('a[href=\"/register\"]')");screenshot("cold-entry");facts.add("Cold launch presents the real branded Login/Sign up entry inside installed WebView");
-  js("document.querySelector('a[href=\"/login\"]').click()");waitJs("document.getElementById('loginForm')&&document.getElementById('loginButton')?.disabled===false&&location.pathname==='/login'");
-  login("synthetic-staff@example.invalid","IncorrectSyntheticPassword123!");waitJs("document.getElementById('loginStatus').textContent.includes('Invalid email or password')");facts.add("Failed login stays in app with an actual credential rejection");
-  login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&document.body.textContent.includes('Synthetic Staff Fixture')");waitJs("window.VoxelNativeApp&&window.VoxelStaffHome?.state");screenshot("staff-home");facts.add("Real login handler, bcrypt, JWT, secure HttpOnly cookie, page authentication and permitted staff home complete in app");
-  int identity=System.identityHashCode(main);scenario.moveToState(Lifecycle.State.CREATED);scenario.moveToState(Lifecycle.State.RESUMED);waitJs("location.pathname==='/portal/staff'");assertEquals(identity,System.identityHashCode(main));facts.add("Background/resume preserves the same activity and session");
-  go("/profile");waitJs("document.getElementById('androidAppInfo')?.textContent.includes('com.voxelveda.app')");screenshot("profile-version");facts.add("Native package/version/source information is accessible in account settings");
+  go("/");waitJs("document.querySelector('a[href=\"/login\"]')&&document.querySelector('a[href=\"/register\"]')");screenshot("cold-entry");checkpoint("cold-entry");facts.add("Cold launch presents the real branded Login/Sign up entry inside installed WebView");
+  js("document.querySelector('a[href=\"/login\"]').click()");waitJs("document.getElementById('loginForm')&&document.getElementById('loginButton')?.disabled===false&&location.pathname==='/login'");checkpoint("login-screen");
+  login("synthetic-staff@example.invalid","IncorrectSyntheticPassword123!");waitJs("document.getElementById('loginStatus').textContent.includes('Invalid email or password')");checkpoint("login-rejected");facts.add("Failed login stays in app with an actual credential rejection");
+  login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&document.body.textContent.includes('Synthetic Staff Fixture')");waitJs("window.VoxelNativeApp&&window.VoxelStaffHome?.state");screenshot("staff-home");checkpoint("staff-login");facts.add("Real login handler, bcrypt, JWT, secure HttpOnly cookie, page authentication and permitted staff home complete in app");
+  int identity=System.identityHashCode(main);scenario.moveToState(Lifecycle.State.CREATED);scenario.moveToState(Lifecycle.State.RESUMED);waitJs("location.pathname==='/portal/staff'");assertEquals(identity,System.identityHashCode(main));checkpoint("background-resume");facts.add("Background/resume preserves the same activity and session");
+  go("/profile");waitJs("document.getElementById('androidAppInfo')?.textContent.includes('com.voxelveda.app')");screenshot("profile-version");checkpoint("profile");facts.add("Native package/version/source information is accessible in account settings");
   js("window.__nativeInfo=null;Capacitor.Plugins.VoxelVedaApp.getAppInfo().then(value=>window.__nativeInfo=value)");waitJs("window.__nativeInfo?.packageId==='com.voxelveda.app'");
   js("VoxelTheme.set('dark')");waitJs("document.documentElement.dataset.colorMode==='dark'");screenshot("dark-profile");device.setOrientationLeft();Thread.sleep(400);screenshot("landscape-profile");device.setOrientationNatural();
   Intent link=new Intent(Intent.ACTION_VIEW,Uri.parse(NavigationPolicy.ORIGIN+"/profile")).setClass(main,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK|Intent.FLAG_ACTIVITY_SINGLE_TOP);
-  InstrumentationRegistry.getInstrumentation().getTargetContext().startActivity(link);waitJs("location.pathname==='/profile'");assertEquals(identity,System.identityHashCode(main));facts.add("Warm explicit HTTPS app-link dispatch preserves a single activity; OS domain verification is reported separately");
-  InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl("https://voxelveda-app-production.up.railway.app/profile"));waitJs("location.origin==='https://app.voxelveda.com'&&location.pathname==='/profile'");facts.add("Legacy-host navigation is rewritten inside the app without an external VIEW intent");
-  for(String route:new String[]{"/register","/forgot-password","/reset-password","/accept-invite"}){go(route);waitJs("document.querySelector('h1')");}facts.add("Signup, recovery and invitation screens remain canonical in the installed app; no accounts or email are created");
-  control("/__fixture/expire");go("/dashboard");waitJs("location.pathname==='/login'&&location.search.includes('returnTo')");facts.add("Expired server session returns to login with a safe intent");
+  InstrumentationRegistry.getInstrumentation().getTargetContext().startActivity(link);waitJs("location.pathname==='/profile'");assertEquals(identity,System.identityHashCode(main));checkpoint("warm-deep-link");facts.add("Warm explicit HTTPS app-link dispatch preserves a single activity; OS domain verification is reported separately");
+  InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl("https://voxelveda-app-production.up.railway.app/profile"));waitJs("location.origin==='https://app.voxelveda.com'&&location.pathname==='/profile'");checkpoint("legacy-deep-link");facts.add("Legacy-host navigation is rewritten inside the app without an external VIEW intent");
+  for(String route:new String[]{"/register","/forgot-password","/reset-password","/accept-invite"}){go(route);waitJs("document.querySelector('h1')");checkpoint("recovery-screen-"+route.substring(1));}facts.add("Signup, recovery and invitation screens remain canonical in the installed app; no accounts or email are created");
+  control("/__fixture/expire");go("/dashboard");waitJs("location.pathname==='/login'&&location.search.includes('returnTo')");checkpoint("session-expired");facts.add("Expired server session returns to login with a safe intent");
   login("android-admin@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/mfa'&&document.getElementById('mfaVerify')?.disabled===false");
-  js("document.getElementById('mfaCode').value='000000';document.getElementById('mfaForm').requestSubmit()");waitJs("document.getElementById('status').textContent.includes('Invalid')");
-  JSONObject otp=new JSONObject(new String(control("/__fixture/totp").bytes,StandardCharsets.UTF_8));js("document.getElementById('mfaCode').value="+JSONObject.quote(otp.getString("code"))+";document.getElementById('mfaForm').requestSubmit()");waitJs("location.pathname==='/admin'&&document.body.textContent.includes('Synthetic Android Admin')");screenshot("admin-home");facts.add("Admin login requires an actual encrypted TOTP challenge and reaches only its permitted portal after verification");
-  js("fetch('/api/auth/logout',{method:'POST'}).then(()=>location.assign('/dashboard'))");waitJs("location.pathname==='/login'");facts.add("Logout revokes the fixture server session and clears the correct cookie");
+  // Keep even the disposable TOTP out of video/UI evidence; auth handlers are unchanged.
+  js("document.getElementById('mfaCode').setAttribute('type','password')");checkpoint("mfa-screen");
+  js("document.getElementById('mfaCode').value='000000';document.getElementById('mfaForm').requestSubmit()");waitJs("document.getElementById('status').textContent.includes('Invalid')");checkpoint("mfa-rejected");
+  JSONObject otp=new JSONObject(new String(control("/__fixture/totp").bytes,StandardCharsets.UTF_8));js("document.getElementById('mfaCode').value="+JSONObject.quote(otp.getString("code"))+";document.getElementById('mfaForm').requestSubmit()");waitJs("location.pathname==='/admin'&&document.body.textContent.includes('Synthetic Android Admin')");screenshot("admin-home");checkpoint("admin-mfa");facts.add("Admin login requires an actual encrypted TOTP challenge and reaches only its permitted portal after verification");
+  // These existing register sections exercise real in-app navigation only.
+  // Their business APIs intentionally return controlled unsupported-fixture errors;
+  // this is no claim of live records, approvals or CRUD verification.
+  String[][] modules={{"rfqSection","internal-rfq"},{"invoiceSection","internal-invoice"},{"procurementSection","internal-procurement"},{"stockSection","internal-stock"},{"taskSection","internal-tasks"},{"attendanceSection","internal-attendance"}};
+  for(String[] module:modules){
+   js("goSection("+JSONObject.quote(module[0])+")");
+   waitJs("(()=>{const n=document.getElementById("+JSONObject.quote(module[0])+");return n&&!n.classList.contains('hidden-section')&&n.getBoundingClientRect().width>0})()");
+   checkpoint(module[1]);
+  }
+  facts.add("Actual permitted admin RFQ, invoice, procurement, stock, task and attendance section navigation remains inside MainActivity; isolated register APIs are not business-workflow evidence");
+  js("fetch('/api/auth/logout',{method:'POST'}).then(()=>location.assign('/dashboard'))");waitJs("location.pathname==='/login'");checkpoint("logout");facts.add("Logout revokes the fixture server session and clears the correct cookie");
   login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'");
-  transport.offline=true;InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+"/profile"));waitNativeText("Retry connection",false);screenshot("connection-error");transport.offline=false;nativeText("Retry connection",false).click();waitJs("location.pathname==='/profile'&&document.getElementById('androidAppInfo')");go("/portal/staff");waitJs("window.VoxelStaffHome?.state");facts.add("A controlled intercepted transport failure invokes the WebView HTTP-error callback and branded explicit GET retry without replaying writes");
-  CookieManager.getInstance().flush();
+  transport.offline=true;InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().loadUrl(NavigationPolicy.ORIGIN+"/profile"));waitNativeText("Retry connection",false);screenshot("connection-error");checkpoint("network-error");transport.offline=false;nativeText("Retry connection",false).click();waitJs("location.pathname==='/profile'&&document.getElementById('androidAppInfo')");go("/portal/staff");waitJs("window.VoxelStaffHome?.state");checkpoint("network-recovery");facts.add("A controlled intercepted transport failure invokes the WebView HTTP-error callback and branded explicit GET retry without replaying writes");
+  CookieManager.getInstance().flush();checkpoint("session-restored");
   long external=Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&!main.getPackageName().equals(intent.getPackage())&&(intent.getComponent()==null||!main.getPackageName().equals(intent.getComponent().getPackageName()))).count();assertEquals("No ordinary flow asks Android to open a browser",0,external);
   facts.add("Normal launch/auth/navigation/resume/legacy-link flows create zero external browser ACTION_VIEW intents");
-  InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().launchIntent(Uri.parse("https://voxelveda-app-production.up.railway.app/login")));
-  assertEquals(1,Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getComponent()==null).count());facts.add("Actual unmodified Capacitor cross-host fallback emits ACTION_VIEW for the legacy Railway URL; intercepted only for this diagnostic baseline assertion");
+ }
+
+ @Test public void stockFrameworkExternalFallbackDiagnostic()throws Exception{
+  String legacy="https://voxelveda-app-production.up.railway.app/login";
+  assertEquals("The diagnostic starts with no external browser requests",0,externalViewCount());
+  // Only this deliberate framework baseline is stubbed, never normal journeys.
+  diagnosticExternalIntentsStubbed=true;
+  intending(org.hamcrest.CoreMatchers.allOf(IntentMatchers.hasAction(Intent.ACTION_VIEW),IntentMatchers.hasData(Uri.parse(legacy)),org.hamcrest.CoreMatchers.not(IntentMatchers.hasComponent(MainActivity.class.getName())))).respondWith(new Instrumentation.ActivityResult(Activity.RESULT_CANCELED,null));
+  InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().launchIntent(Uri.parse(legacy)));
+  assertEquals("The stock framework has the expected cross-host browser fallback",1,externalViewCount());
+  facts.add("DIAGNOSTIC ONLY: actual stock Capacitor cross-host fallback emits one deliberately stubbed external VIEW. This is not a normal-flow or affected Play-binary reproduction.");
  }
 
  private void staffSession()throws Exception{
-  CountDownLatch latch=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->latch.countDown()));assertTrue(latch.await(10,TimeUnit.SECONDS));go("/login");login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&window.VoxelNativeApp&&window.VoxelOperations&&window.VoxelStaffHome?.state");
+  CountDownLatch latch=new CountDownLatch(1);InstrumentationRegistry.getInstrumentation().runOnMainSync(()->CookieManager.getInstance().removeAllCookies(done->latch.countDown()));assertTrue(latch.await(10,TimeUnit.SECONDS));go("/login");login("synthetic-staff@example.invalid","SyntheticDevicePass123!");waitJs("location.pathname==='/portal/staff'&&window.VoxelNativeApp&&window.VoxelOperations&&window.VoxelStaffHome?.state");checkpoint("staff-session");
  }
  @Test public void delayedBlankPopupKeepsFirstPartyNavigationInApp()throws Exception{
   staffSession();
@@ -178,7 +219,7 @@ public class AndroidJourneyTest {
    }
    assertEquals("Delayed first-party popup links do not launch a browser",0,Intents.getIntents().stream().filter(intent->Intent.ACTION_VIEW.equals(intent.getAction())&&intent.getComponent()==null).count());
    facts.add("Real installed Chromium window.open creates a blank popup before a delayed canonical or legacy route; the placeholder stays non-privileged, the saved session remains in the same WebView and no external browser intent is emitted");
-   screenshot("delayed-popup-stays-in-app");
+   screenshot("delayed-popup-stays-in-app");checkpoint("delayed-popup-stays-in-app");
   }finally{
    InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.getBridge().getWebView().setWebChromeClient(original.get()));
   }
@@ -244,26 +285,28 @@ public class AndroidJourneyTest {
   staffSession();
   go("/portal/staff");waitJs("window.VoxelStaffHome?.state");
   js("window.__cameraOpen='pending';window.VoxelStaffHome.openAction('CHECK_IN').then(()=>window.__cameraOpen='done').catch(error=>window.__cameraOpen=error.message)");waitJs("document.getElementById('staffAttendanceVideo')");
-  UiObject deny=device.findObject(new UiSelector().resourceId("com.android.permissioncontroller:id/permission_deny_button"));assertTrue("Android camera permission prompt displayed",deny.waitForExists(15000));device.waitForIdle(3000);deny.click();assertTrue("Camera permission dialog dismissed before checking recovery",deny.waitUntilGone(15000));
+  UiObject deny=device.findObject(new UiSelector().resourceId("com.android.permissioncontroller:id/permission_deny_button"));assertTrue("Android camera permission prompt displayed",deny.waitForExists(15000));device.waitForIdle(3000);osAction("camera-permission-prompt","CAMERA_PERMISSION");deny.click();assertTrue("Camera permission dialog dismissed before checking recovery",deny.waitUntilGone(15000));
   waitJs("document.getElementById('staffAttendanceScanStatus')?.textContent.includes('permission')||document.getElementById('staffAttendanceScanStatus')?.textContent.includes('Position')");
-  assertEquals("true",js("!![...document.querySelectorAll('button')].find(b=>b.textContent==='App camera settings')"));screenshot("camera-recovery");js("VoxelStaffHome.close()");facts.add("Actual WebView camera permission/recovery UI is reachable; physical QR camera focus is not asserted");
+  assertEquals("true",js("!![...document.querySelectorAll('button')].find(b=>b.textContent==='App camera settings')"));screenshot("camera-recovery");checkpoint("camera-return");js("VoxelStaffHome.close()");facts.add("Actual WebView camera permission/recovery UI is reachable; physical QR camera focus is not asserted");
   js("window.__qrDecoded=false;window.__qrError=null;window.loadExternalScript('/vendor/jsQR.js').then(async()=>{for(let n=0;n<5;n++){const image=new Image();image.src='/__fixture/gate.png?n='+n+'&time='+Date.now();await image.decode();const canvas=document.createElement('canvas');canvas.width=image.naturalWidth;canvas.height=image.naturalHeight;const context=canvas.getContext('2d',{willReadFrequently:true});context.drawImage(image,0,0);const pixels=context.getImageData(0,0,canvas.width,canvas.height);const result=jsQR(pixels.data,canvas.width,canvas.height);if(!result?.data.startsWith('https://app.voxelveda.com/a?t='))throw new Error('decode');}window.__qrDecoded=true;}).catch(error=>{window.__qrError=error.message;window.__qrDecoded='failed'})");waitJs("window.__qrDecoded===true");facts.add("Installed Android WebView decodes five actual signed branded gate payload images with original centre logo");
  }
  @Test public void nativePdfViewAndSave()throws Exception{
   staffSession();
   js("window.__pdfPreview=false;VoxelOperations.openPdf('/api/invoice/91/pdf').then(()=>window.__pdfPreview=true).catch(error=>window.__pdfPreview=error.message)");
-  waitNativeText("ANDROID-FIXTURE-1.pdf",true);screenshot("pdf-viewer");device.pressBack();waitJs("window.__pdfPreview===true");facts.add("Authorised genuine PDF opens in the internal native viewer, with reachable Back/zoom/page/save controls");
+  waitNativeText("ANDROID-FIXTURE-1.pdf",true);screenshot("pdf-viewer");checkpoint("pdf-preview","PdfActivity");device.pressBack();waitJs("window.__pdfPreview===true");checkpoint("pdf-preview-return");facts.add("Authorised genuine PDF opens in the internal native viewer, with reachable Back/zoom/page/save controls");
   js("window.__savedPdf=null;VoxelNativeApp.openDocument('/api/invoice/91/pdf',true).then(value=>window.__savedPdf=value).catch(error=>window.__savedPdf={error:error.message})");
-  UiObject savePdf=nativeText("Save",false);assertTrue("Android PDF destination picker opened",savePdf.waitForExists(15000));screenshot("pdf-save-picker");savePdf.click();waitJs("window.__savedPdf?.saved===true");facts.add("Android destination picker saves the parser-validated fixture PDF and confirms the completed output stream");
+  UiObject savePdf=nativeText("Save",false);assertTrue("Android PDF destination picker opened",savePdf.waitForExists(15000));screenshot("pdf-save-picker");osAction("pdf-save-picker","PDF_SAVE_PICKER");savePdf.click();waitJs("window.__savedPdf?.saved===true");checkpoint("pdf-save-return");facts.add("Android destination picker saves the parser-validated fixture PDF and confirms the completed output stream");
   js("window.__invalidPdf='pending';VoxelNativeApp.documentAction(new TextEncoder().encode('<html>Not a PDF</html>').buffer,'fixture.pdf',true).then(()=>window.__invalidPdf='unexpected').catch(()=>window.__invalidPdf='rejected')");waitJs("window.__invalidPdf==='rejected'");facts.add("HTML/error bytes cannot be saved as PDF");
  }
 
  @After public void finish()throws Exception{
-  if(evidence!=null){try{device.dumpWindowHierarchy(new File(evidence,"ui-"+testName.getMethodName()+".xml"));}catch(Exception ignored){}try{device.takeScreenshot(new File(evidence,"last-app-screen-"+testName.getMethodName()+".png"));}catch(Exception ignored){}JSONObject result=new JSONObject();result.put("fixtureOnly",true);result.put("realProductionAccountUsed",false);result.put("physicalDevice",false);result.put("packageId","com.voxelveda.app");result.put("appSigningVerification","NOT_TESTED: real Play certificate/access unavailable");result.put("facts",new JSONArray(facts));try(FileOutputStream output=new FileOutputStream(new File(evidence,"result-"+testName.getMethodName()+"-"+InstrumentationRegistry.getArguments().getString("upgrade_only","false")+".json"))){output.write(result.toString(2).getBytes(StandardCharsets.UTF_8));}}
   try{
+  if(evidence!=null){try{device.dumpWindowHierarchy(new File(evidence,"ui-"+testName.getMethodName()+".xml"));}catch(Exception ignored){}try{device.takeScreenshot(new File(evidence,"last-app-screen-"+testName.getMethodName()+".png"));}catch(Exception ignored){}JSONObject result=new JSONObject();result.put("fixtureOnly",true);result.put("realProductionAccountUsed",false);result.put("physicalDevice",false);result.put("packageId","com.voxelveda.app");result.put("appSigningVerification","NOT_TESTED: real Play certificate/access unavailable");result.put("externalViewIntentsStubbed",diagnosticExternalIntentsStubbed);result.put("externalViewIntentCount",externalViewCount());result.put("facts",new JSONArray(facts));try(FileOutputStream output=new FileOutputStream(new File(evidence,"result-"+testName.getMethodName()+"-"+proofVariant()+".json"))){output.write(result.toString(2).getBytes(StandardCharsets.UTF_8));}}
+  if(!diagnosticExternalIntentsStubbed)assertEquals("Unstubbed normal tests emit no external browser VIEW",0,externalViewCount());
+  }finally{try{
    // ActivityScenario keys lifecycle events by the original launch intent.
    if(main!=null&&originalLaunchIntent!=null)InstrumentationRegistry.getInstrumentation().runOnMainSync(()->main.setIntent(originalLaunchIntent));
    if(scenario!=null)scenario.close();
-  }finally{if(device!=null)device.unfreezeRotation();Intents.release();}
+  }finally{if(device!=null)device.unfreezeRotation();Intents.release();}}
  }
 }

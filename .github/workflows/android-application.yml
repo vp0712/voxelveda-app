@@ -67,6 +67,11 @@ jobs:
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
       - run: npm ci --ignore-scripts
+      - name: Verify independent foreground and recording evidence validation
+        run: |
+          command -v ffmpeg
+          command -v ffprobe
+          node scripts/android-handoff-proof-test.js
       - name: Synchronise the actual native project and canonical bundled configuration
         run: npx cap sync android
       - name: Build installed verification artifacts and native policy tests
@@ -85,6 +90,8 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back emulated -camera-front emulated
           script: bash scripts/android-emulator-ci.sh
+      - name: Validate actual foreground, APK identity and readable recording evidence
+        run: node scripts/android-handoff-proof.js "$VV_ANDROID_PROOF_DIR"
       - name: Preserve test artifacts and explicit signing/domain limitations
         if: always()
         uses: actions/upload-artifact@v4
