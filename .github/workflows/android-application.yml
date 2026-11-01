@@ -69,6 +69,10 @@ jobs:
       - run: npm ci --ignore-scripts
       - name: Verify independent foreground and recording evidence validation
         run: |
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install --no-install-recommends -y ffmpeg
+          fi
           command -v ffmpeg
           command -v ffprobe
           node scripts/android-handoff-proof-test.js
