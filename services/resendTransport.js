@@ -108,7 +108,11 @@ async function verifyResendConnection(sender) {
   const base = { transport: 'resend', provider: 'resend', configured: true, connectivity_verified: true, credentials_verified: false, sender_domain_verified: false, recipient_receipt_verified: false, recipient_verified: false, verification: 'CONFIGURED' };
   // Sending-only keys are deliberately valid for delivery without /domains
   // access. A restricted read cannot establish sender verification or receipt.
-  if (response.status === 403 && body?.name === 'restricted_api_key') return { ...base, reason_code: 'RESEND_SENDING_KEY_DOMAIN_READ_UNAVAILABLE' };
+  // Resend documents restricted_api_key as HTTP 401. Retain 403 compatibility
+  // only for that exact scope error; invalid keys and
+  // other authorization errors must still fail closed.
+  // https://resend.com/docs/api-reference/errors
+  if ([401, 403].includes(response.status) && body?.name === 'restricted_api_key') return { ...base, reason_code: 'RESEND_SENDING_KEY_DOMAIN_READ_UNAVAILABLE' };
   if (!response.ok) throw failure([401,403].includes(response.status) ? 'RESEND_AUTHENTICATION_FAILED' : 'RESEND_CONNECTION_UNAVAILABLE', 'The Resend API health check could not verify company email configuration.', { retryable: response.status === 429 || response.status >= 500 });
   if (!body || !Array.isArray(body.data)) throw failure('RESEND_CONNECTION_UNAVAILABLE', 'The Resend API health response was invalid.');
   const verified = body.data.some(domain => domain?.name === 'voxelveda.com' && domain?.status === 'verified');

@@ -19,6 +19,8 @@ Resend uses HTTPS, so direct outbound SMTP restrictions are not a reason to upgr
 
 A restricted sending key may be unable to list domains. That restriction is not proof of broken sending credentials and must not force a full-access key. Configuration, an authenticated API response, sender-domain verification, accepted mail and recipient receipt are distinct observations. Startup readiness must not claim sender or recipient verification merely because a key exists.
 
+The [official Resend API error reference](https://resend.com/docs/api-reference/errors) documents `restricted_api_key` as HTTP 401 for keys restricted to sending. The domain-read probe recognises only that exact error name with HTTP 401 or 403 as a scope limitation and reports `CONFIGURED`, without asserting domain or recipient verification. Invalid keys and unrelated authorization failures remain blocking errors. This probe distinction does not change email sending or queue outcomes.
+
 ## Weekly delivery contract
 
 The explicit recipient policy is `REGISTERED_EMAIL`, version `2`, using the employee's saved account address (`users.email`). This supersedes the older designated-address policy for newly prepared versions. The legacy `timesheet_delivery_email` value is preserved, but is not a fallback. Missing or invalid registered addresses produce a visible setup blocker.
@@ -66,3 +68,20 @@ Use the existing separate marker-only `.railway-release` process after the final
 Record the actual candidate/main/marker SHA, workflow run URLs, Railway deployment ID, live verification, controlled fixture queue IDs, provider message IDs and inbox evidence here when available. None is implied by this preparation document.
 
 Production active database TLS with trusted certificate/hostname validation and Android signing/App Links/store distribution are separate integrations. This email/UI release does not prove they are repaired, nor that an installed user received a new native binary. Report their present evidence and exact missing bindings separately.
+
+## First production Resend result
+
+The first release marker `48789b7495bfd4df6e6840432e08281ed3cee26a` deployed application source `e4175eafbe17d6b6810429bc8c481cbe950f5c88` through Railway deployment `2066c2aa-b70b-497b-bb39-36ef46317df7`, which reached `SUCCESS`. The backend completed startup and registered the Monday worker on 12 November at 05:14 UTC. Production retained all 17 original base tables and applied only the additive report metadata migration.
+
+The explicitly authorised fictional release fixtures were each accepted once by Resend at 05:14:31 UTC:
+
+| Format | Queue | Provider message ID | Evidence |
+| --- | --- | --- | --- |
+| Complete HTML/plain-text timesheet | 158 | `01a1ce2d-cbf7-7836-895b-17baa77f21d3` | One To, no CC/BCC, no attachments; `SENT`, one attempt |
+| Parser-validated PDF report | 159 | `01a1ce2d-ce56-793c-81eb-8b5407c1418c` | One To, no CC/BCC; one `application/pdf` attachment with a `.pdf` filename, one valid page, 1,649,444 bytes |
+
+The PDF bytes retained SHA-256 `44b56841e95b2f3bec0102897d37ccedc1fb1d74ae402af039eacd466b25e50f`. These are provider acceptance and retained-byte validation, not recipient receipt or received-MIME proof. Inbox observation remains pending. No employee, customer or supplier data was used for these tests. The fixture configuration was disabled after acceptance without resetting either queue entry or changing its stable identity.
+
+The startup domain-read probe had reported degraded transport despite these accepted sends. Separately, the official API reference confirms the supported sending-only scope error is HTTP 401 `restricted_api_key`; the old check recognised only 403. The follow-up handles exactly that error for both statuses while rejecting invalid keys and unrelated authentication failures. It does not grant domain-listing permission, weaken sending checks or claim recipient verification.
+
+The new runtime reconciliation again found 16 `NO_WORK` and 3 `INELIGIBLE_ACCOUNT` outcomes for 2–8 November: no zero-hour emails or historical reports were sent. The next configured run is 16 November 07:00 Australia/Sydney, covering 9–15 November. Final follow-up release SHA, readiness, matching assets and any recipient evidence are recorded in the PR handoff and external release evidence.
