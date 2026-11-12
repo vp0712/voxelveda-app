@@ -76,9 +76,17 @@ async function main() {
   await assert.rejects(() => mail.sendMail(message), error => error.code === 'DELIVERY_REVIEW_REQUIRED' && error.reasonCode === 'RESEND_NETWORK_OUTCOME_UNKNOWN');
   assert(Date.now() - started < 2500, 'Response body parsing must remain inside the transport timeout');
 
-  global.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/domains'); assert.equal(options.method, 'GET'); return response(403, { name: 'restricted_api_key' }); };
-  let health = await mail.verifyConnection();
-  assert.equal(health.verification, 'CONFIGURED'); assert.equal(health.credentials_verified, false); assert.equal(health.sender_domain_verified, false); assert.equal(health.recipient_receipt_verified, false);
+  let health;
+  for (const status of [401, 403]) {
+    global.fetch = async (url, options) => { assert.equal(url, 'https://api.resend.com/domains'); assert.equal(options.method, 'GET'); return response(status, { name: 'restricted_api_key' }); };
+    health = await mail.verifyConnection();
+    assert.equal(health.verification, 'CONFIGURED'); assert.equal(health.credentials_verified, false); assert.equal(health.sender_domain_verified, false); assert.equal(health.recipient_receipt_verified, false);
+    assert.equal(health.reason_code, 'RESEND_SENDING_KEY_DOMAIN_READ_UNAVAILABLE');
+  }
+  for (const [status, name] of [[401, 'invalid_api_key'], [403, 'validation_error']]) {
+    global.fetch = async () => response(status, { name });
+    await assert.rejects(() => mail.verifyConnection(), error => error.code === 'RESEND_AUTHENTICATION_FAILED' && error.deliveryOutcome === 'NOT_DISPATCHED' && error.retryable === false, 'An invalid key or unrelated authorization failure must not be treated as a restricted sending key');
+  }
   global.fetch = async () => response(200, { data: [{ name: 'voxelveda.com', status: 'verified' }] });
   health = await mail.verifyConnection(); assert.equal(health.verification, 'SENDER_VERIFIED'); assert.equal(health.credentials_verified, true);
   global.fetch = async () => response(200, { data: [{ name: 'other.invalid', status: 'verified' }] });
