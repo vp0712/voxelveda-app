@@ -9,6 +9,14 @@ async function processEmailQueueCycle() {
       `Email queue delivery evidence: queue_id=${outcome.id} status=${outcome.status} provider_message_id=${outcome.status === 'SENT' ? 'yes' : 'no'} error_category=${outcome.errorCategory || 'none'} error_code=${outcome.errorCode || 'none'} response_code=${outcome.responseCode || 'none'}`
     );
   }
+  if (outcomes.length && process.env.VV_RESEND_RELEASE_VERIFY === 'true') {
+    try {
+      const evidence=await require('./releaseResendVerificationService').readResendVerificationEvidence(process.env.VV_RESEND_RELEASE_TEST_ID);
+      console.log('Release Resend retained queue evidence',JSON.stringify(evidence));
+    } catch(error) {
+      console.warn('Release Resend evidence unavailable: '+(error.code||'RELEASE_VERIFICATION_FAILED'));
+    }
+  }
   return {
     outcomes,
     processed: outcomes.length,

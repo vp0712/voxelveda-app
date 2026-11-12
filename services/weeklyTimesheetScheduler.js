@@ -31,7 +31,7 @@ function attendanceCandidateParameters(period) {
     DateTime.fromISO(period.endExclusiveUtc).plus({ hours: 14 }).toUTC().toFormat('yyyy-MM-dd HH:mm:ss'), period.start, period.end];
 }
 async function staffById(db, id, lock = false) {
-  const [[staff]] = await db.query(`SELECT id,name,role,active,account_status,deleted_at,employee_number,timesheet_delivery_email
+  const [[staff]] = await db.query(`SELECT id,name,role,active,account_status,deleted_at,employee_number,email
     FROM users WHERE id=?${lock ? ' FOR UPDATE' : ''}`, [id]);
   return staff;
 }
@@ -142,6 +142,14 @@ async function reserveDelivery(staffId, period, config, now) {
     if (delivery.status === 'PREPARING' && generationClaimActive(delivery)) {
       await conn.commit(); return { staff_id: staffId, status: 'PREPARING', existing: true, version: delivery.version };
     }
+    if (delivery.snapshot_json && !policy.currentRecipientPolicy(frozenSnapshot(delivery))) {
+      await conn.query("UPDATE weekly_timesheet_deliveries SET status='REVIEW_REQUIRED',last_error_code='RECIPIENT_POLICY_CHANGED',claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
+      await conn.commit(); return { staff_id: staffId, status: 'REVIEW_REQUIRED', reason: 'RECIPIENT_POLICY_CHANGED', version: delivery.version };
+    }
+    if (delivery.snapshot_json && delivery.recipient !== policy.registeredRecipient(staff)) {
+      await conn.query("UPDATE weekly_timesheet_deliveries SET status='REVIEW_REQUIRED',last_error_code='STAFF_OR_RECIPIENT_CHANGED',claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
+      await conn.commit(); return { staff_id: staffId, status: 'REVIEW_REQUIRED', reason: 'STAFF_OR_RECIPIENT_CHANGED', version: delivery.version };
+    }
     if (Number(delivery.generation_attempts || 0) >= 5 || delivery.next_generation_attempt_at && policy.utcInstant(delivery.next_generation_attempt_at,'UTC')?.toMillis() > now.getTime()) {
       await conn.commit(); return { staff_id:staffId,status:delivery.status,existing:true,reason:Number(delivery.generation_attempts || 0)>=5?'GENERATION_RETRY_LIMIT':'GENERATION_RETRY_DELAY' };
     }
@@ -158,7 +166,7 @@ async function reserveDelivery(staffId, period, config, now) {
         [assessment.status, JSON.stringify(assessment.issues), delivery.id]);
       await conn.commit(); return { staff_id: staffId, status: assessment.status, duplicates: assessment.duplicates, review_reasons: assessment.issues };
     }
-    const recipient = policy.emailAddress(staff.timesheet_delivery_email);
+    const recipient = policy.registeredRecipient(staff);
     if (!recipient) {
       await conn.query("UPDATE weekly_timesheet_deliveries SET status='NO_RECIPIENT',review_reasons_json=NULL,last_error_code=NULL,claim_token=NULL,claim_expires_at=NULL WHERE id=?", [delivery.id]);
       await conn.commit(); return { staff_id: staffId, status: 'NO_RECIPIENT', duplicates: assessment.duplicates };
@@ -200,7 +208,8 @@ async function checkReservedDelivery(conn, reservation, config, now) {
   const staff = await staffById(conn, reservation.staff_id, true);
   const [[delivery]] = await conn.query('SELECT * FROM weekly_timesheet_deliveries WHERE id=? FOR UPDATE', [reservation.delivery_id]);
   if (!delivery || delivery.claim_token !== reservation.claim_token || delivery.status !== 'PREPARING' || delivery.email_queue_id) throw safetyError('DELIVERY_CLAIM_CHANGED');
-  if (!policy.activeEmployee(staff) || policy.emailAddress(staff.timesheet_delivery_email) !== reservation.recipient) throw safetyError('STAFF_OR_RECIPIENT_CHANGED');
+  if (!policy.currentRecipientPolicy(frozenSnapshot(delivery)) || !policy.currentRecipientPolicy(reservation.snapshot)) throw safetyError('RECIPIENT_POLICY_CHANGED');
+  if (!policy.activeEmployee(staff) || policy.registeredRecipient(staff) !== reservation.recipient) throw safetyError('STAFF_OR_RECIPIENT_CHANGED');
   const current = await currentSnapshot(conn, staff, delivery, config, now, true);
   if (current.sourceHash !== reservation.source_sha256 || policy.snapshotHash(JSON.parse(delivery.snapshot_json)) !== reservation.source_sha256) throw safetyError('SOURCE_CHANGED');
   if (deliveryFormat(delivery) !== (reservation.format || 'PDF')) throw safetyError('DELIVERY_FORMAT_CHANGED');
@@ -235,7 +244,8 @@ async function queueReservedHtmlDelivery(reservation, config, now) {
     const deliveryPolicy = { type: 'WEEKLY_TIMESHEET', format: 'HTML', layoutVersion: content.layoutVersion,
       contentHash: delivery.content_sha256, deliveryId: reservation.delivery_id, staffId: reservation.staff_id,
       fromDate: content.fromDate, toDate: content.toDate, revision: reservation.version,
-      sourceHash: reservation.source_sha256, recipient: reservation.recipient };
+      sourceHash: reservation.source_sha256, recipient: reservation.recipient,
+      recipientSource: policy.RECIPIENT_SOURCE, recipientPolicyVersion: policy.RECIPIENT_POLICY_VERSION };
     const key = `weekly-timesheet:${reservation.staff_id}:${content.fromDate}:${content.toDate}:v${reservation.version}`;
     const queueId = await queueEmail({ templateKey: 'weekly_timesheet_html', relatedModule: 'timesheets', relatedRecordId: reservation.timesheet_id,
       to: [reservation.recipient], cc: [], bcc: [], subject: content.subject, html: content.html, text: content.text,
@@ -245,11 +255,14 @@ async function queueReservedHtmlDelivery(reservation, config, now) {
     let queuedPolicy, queuedAttachments;
     try { queuedPolicy = JSON.parse(queued.delivery_policy_json || 'null'); queuedAttachments = JSON.parse(queued.attachments_json || '[]'); }
     catch { throw safetyError('DELIVERY_QUEUE_CONTENT_MISMATCH'); }
+    // Queue admission adds its own immutable transport binding. Compare every
+    // source-policy field unchanged; only that queue-owned envelope is separate.
+    const { queueTransport: _queueTransport, ...queuedSourcePolicy } = queuedPolicy && typeof queuedPolicy === 'object' && !Array.isArray(queuedPolicy) ? queuedPolicy : {};
     if (!['PENDING','RETRY'].includes(queued.status) || queued.related_module !== 'timesheets' || String(queued.related_record_id) !== String(reservation.timesheet_id) ||
       queued.idempotency_key !== key || JSON.stringify(parsedAddresses(queued.to_json)) !== JSON.stringify([reservation.recipient]) ||
       parsedAddresses(queued.cc_json).length || parsedAddresses(queued.bcc_json).length ||
       queued.subject !== content.subject || queued.html_body !== content.html || queued.text_body !== content.text ||
-      JSON.stringify(queuedPolicy) !== JSON.stringify(deliveryPolicy) ||
+      JSON.stringify(queuedSourcePolicy) !== JSON.stringify(deliveryPolicy) ||
       !Array.isArray(queuedAttachments) || queuedAttachments.length) throw safetyError('DELIVERY_QUEUE_CONTENT_MISMATCH');
     const [saved] = await conn.query(`UPDATE weekly_timesheet_deliveries SET status='QUEUED',email_queue_id=?,document_request_id=?,claim_token=NULL,claim_expires_at=NULL
       WHERE id=? AND claim_token=? AND status='PREPARING' AND email_queue_id IS NULL`, [queueId, null, reservation.delivery_id, reservation.claim_token]);
@@ -258,7 +271,8 @@ async function queueReservedHtmlDelivery(reservation, config, now) {
     await retainDeliveryVersion(conn, delivery);
     await logAudit(conn, { actorId: reservation.created_by || null, action: 'WEEKLY_TIMESHEET_HTML_QUEUED', module: 'timesheets', recordType: 'weekly_delivery', recordId: delivery.id,
       newValue: { staff_id: reservation.staff_id, period_start: content.fromDate, period_end: content.toDate, version: reservation.version,
-        format: 'HTML', source_sha256: reservation.source_sha256, content_sha256: delivery.content_sha256, queue_id: queueId, automated: !reservation.created_by } });
+        format: 'HTML', source_sha256: reservation.source_sha256, content_sha256: delivery.content_sha256, queue_id: queueId, automated: !reservation.created_by,
+        recipient_source: policy.RECIPIENT_SOURCE, recipient_policy_version: policy.RECIPIENT_POLICY_VERSION } });
     if (reservation.recovery) await logAudit(conn, { actorId: null, action: 'WEEKLY_TIMESHEET_RECOVERY_QUEUED', module: 'timesheets', recordType: 'weekly_delivery', recordId: delivery.id,
       newValue: { staff_id: reservation.staff_id, period_start: content.fromDate, period_end: content.toDate, version: reservation.version, format: 'HTML', content_sha256: delivery.content_sha256,
         reason: 'Bounded recovery of the latest completed week; no accepted or uncertain delivery was resent.' } });
@@ -282,7 +296,8 @@ async function queueReservedDelivery(reservation, config, now) {
     validatedArtifact: artifact,
     deliveryPolicy: { type: 'WEEKLY_TIMESHEET', deliveryId: reservation.delivery_id, staffId: snapshot.staff_id,
       fromDate: snapshot.period_start, toDate: snapshot.period_end, revision: snapshot.version,
-      sourceHash: reservation.source_sha256, recipient: reservation.recipient },
+      sourceHash: reservation.source_sha256, recipient: reservation.recipient,
+      recipientSource: policy.RECIPIENT_SOURCE, recipientPolicyVersion: policy.RECIPIENT_POLICY_VERSION },
     subject: `Voxel Veda weekly timesheet${snapshot.version > 1 ? ` | Correction v${snapshot.version}` : ''} | ${snapshot.period_start} to ${snapshot.period_end}`,
     text: 'Your validated weekly timesheet PDF is attached. Review status is shown in the document and application.',
     html: '<p>Your validated weekly timesheet PDF is attached.</p><p>Review status is shown in the document and application.</p>',
@@ -394,7 +409,9 @@ async function validateQueuedWeeklyDelivery(queueRow, db = pool, options = {}) {
     Number(transportPolicy.staffId) !== Number(delivery.user_id) || transportPolicy.fromDate !== delivery.period_start ||
     transportPolicy.toDate !== delivery.period_end || Number(transportPolicy.revision) !== Number(delivery.version) ||
     transportPolicy.sourceHash !== delivery.source_sha256 || transportPolicy.recipient !== delivery.recipient) throw safetyError('DELIVERY_POLICY_INVALID');
-  if (!policy.activeEmployee(staff) || policy.emailAddress(staff.timesheet_delivery_email) !== delivery.recipient) throw safetyError('STAFF_OR_RECIPIENT_CHANGED');
+  if (transportPolicy.recipientSource !== policy.RECIPIENT_SOURCE || transportPolicy.recipientPolicyVersion !== policy.RECIPIENT_POLICY_VERSION ||
+    !policy.currentRecipientPolicy(frozenSnapshot(delivery))) throw safetyError('RECIPIENT_POLICY_CHANGED');
+  if (!policy.activeEmployee(staff) || policy.registeredRecipient(staff) !== delivery.recipient) throw safetyError('STAFF_OR_RECIPIENT_CHANGED');
   const config = policy.configuration(options.env || process.env);
   const mostRecent = policy.latestCompletedWeek(options.now || new Date(), config.timezone);
   const explicitRevision = Number(delivery.version) > 1 && Number(delivery.revision_authorised_by) > 0 && Boolean(delivery.revision_authorised_at);
@@ -446,8 +463,8 @@ async function queueWeeklyTimesheetRevision(options = {}) {
     if (!delivery || delivery.user_id !== identity.user_id || Number(delivery.version) !== expectedVersion) throw safetyError('REVISION_VERSION_CHANGED');
     if (delivery.status === 'PREPARING' && generationClaimActive(delivery)) throw safetyError('DELIVERY_GENERATION_ACTIVE');
     if (!policy.activeEmployee(staff)) throw safetyError('STAFF_INACTIVE');
-    const recipient = policy.emailAddress(staff.timesheet_delivery_email);
-    if (!recipient) throw safetyError('NO_DESIGNATED_RECIPIENT');
+    const recipient = policy.registeredRecipient(staff);
+    if (!recipient) throw safetyError('NO_REGISTERED_RECIPIENT');
     const period = periodBounds(delivery.period_start, delivery.period_end, config.timezone);
     const latest = policy.latestCompletedWeek(now, config.timezone);
     if (period.end > latest.end) throw safetyError('PERIOD_NOT_COMPLETED');
@@ -460,6 +477,7 @@ async function queueWeeklyTimesheetRevision(options = {}) {
     }
     const retry = options.retryGeneration === true;
     if (retry && (delivery.status !== 'GENERATION_FAILED' || delivery.email_queue_id || !delivery.snapshot_json)) throw safetyError('GENERATION_RETRY_NOT_AVAILABLE');
+    if (retry && !policy.currentRecipientPolicy(frozenSnapshot(delivery))) throw safetyError('RECIPIENT_POLICY_CHANGED');
     const version = retry ? expectedVersion : expectedVersion + 1;
     const format = retry ? deliveryFormat(delivery) : 'HTML';
     if (!Number.isSafeInteger(version) || version > 2147483647) throw safetyError('REVISION_VERSION_INVALID');
@@ -482,7 +500,8 @@ async function queueWeeklyTimesheetRevision(options = {}) {
       [version, config.timezone, recipient, hash, JSON.stringify(snapshot), assessment.totalMinutes, review.id, actor.id, reason, token,
         format, retry ? delivery.content_sha256 || null : null, retry ? delivery.content_snapshot_json || null : null, id]);
     await logAudit(conn, { actorId: actor.id, action: retry ? 'WEEKLY_TIMESHEET_GENERATION_RETRY' : 'WEEKLY_TIMESHEET_REVISION_AUTHORISED', module: 'timesheets', recordType: 'weekly_delivery', recordId: id,
-      oldValue: { version: expectedVersion, source_sha256: delivery.source_sha256, status: delivery.status }, newValue: { version, source_sha256: hash, staff_id: staff.id, period_start: period.start, period_end: period.end, reason } });
+      oldValue: { version: expectedVersion, source_sha256: delivery.source_sha256, status: delivery.status }, newValue: { version, source_sha256: hash, staff_id: staff.id, period_start: period.start, period_end: period.end, reason,
+        recipient_source: policy.RECIPIENT_SOURCE, recipient_policy_version: policy.RECIPIENT_POLICY_VERSION } });
     await conn.commit();
     reservation = { staff_id: staff.id, delivery_id: id, timesheet_id: review.id, recipient, snapshot, claim_token: token, version, source_sha256: hash, duplicates: assessment.duplicates, format, created_by: actor.id };
   } catch (error) { await conn.rollback().catch(() => {}); throw error; }

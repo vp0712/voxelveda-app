@@ -1,6 +1,6 @@
 'use strict';
 function privacyError(reason) {
-  return Object.assign(new Error('Weekly timesheet delivery requires one designated staff recipient and a verified delivery policy. No message was sent.'), { code: 'DELIVERY_REVIEW_REQUIRED', reasonCode: reason });
+  return Object.assign(new Error('Weekly timesheet delivery requires one registered staff recipient and a verified delivery policy. No message was sent.'), { code: 'DELIVERY_REVIEW_REQUIRED', reasonCode: reason });
 }
 function weeklyMessage(message) {
   const module = String(message.relatedModule || message.related_module || '').toLowerCase();
@@ -19,6 +19,8 @@ function assertWeeklyDeliveryPolicy(message, addresses) {
       !/^\d{4}-\d{2}-\d{2}$/.test(String(p.fromDate)) || !/^\d{4}-\d{2}-\d{2}$/.test(String(p.toDate)) ||
       !/^[a-f0-9]{64}$/.test(String(p.sourceHash)) || typeof p.recipient !== 'string' || /[\s,;<>\r\n]/.test(p.recipient) || !/^[^@]+@[^@]+\.[^@]+$/.test(p.recipient)) throw privacyError('WEEKLY_POLICY_INVALID');
   if (p.format !== undefined && !['PDF', 'HTML'].includes(p.format)) throw privacyError('WEEKLY_FORMAT_INVALID');
+  const recipientPolicy = require('./weeklyTimesheetEligibility');
+  if (p.recipientSource !== recipientPolicy.RECIPIENT_SOURCE || p.recipientPolicyVersion !== recipientPolicy.RECIPIENT_POLICY_VERSION) throw privacyError('RECIPIENT_POLICY_CHANGED');
   if (weeklyFormat(p) === 'HTML' && (!/^[a-f0-9]{64}$/.test(String(p.contentHash)) || p.layoutVersion !== 'weekly-html-v1')) throw privacyError('WEEKLY_HTML_POLICY_INVALID');
   const key = String(message.deliveryKey || message.idempotencyKey || message.idempotency_key || '');
   if (key !== `weekly-timesheet:${p.staffId}:${p.fromDate}:${p.toDate}:v${p.revision}`) throw privacyError('WEEKLY_POLICY_IDENTITY_MISMATCH');

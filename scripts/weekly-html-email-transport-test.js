@@ -6,13 +6,14 @@ const contentService=require('../services/weeklyTimesheetEmailService');
 const policyService=require('../services/weeklyDeliveryPolicy');
 const content={subject:'Voxel Veda weekly timesheet | 2026-10-19 to 2026-10-25',html:'<!doctype html><html><body><h1>TIMESHEET</h1><p>Fixture Staff A · 19–25 October 2026</p><p>Recorded hours: 8.00 (8h 00m)</p></body></html>',text:'TIMESHEET\nFixture Staff A · 19–25 October 2026\nRecorded hours: 8.00 (8h 00m)',layoutVersion:'weekly-html-v1'};
 const contentHash=contentService.contentHashFor(content);
-const policy={type:'WEEKLY_TIMESHEET',staffId:31,deliveryId:81,revision:1,fromDate:'2026-10-19',toDate:'2026-10-25',sourceHash:crypto.createHash('sha256').update('synthetic verified attendance').digest('hex'),recipient:'fixture-a@example.invalid',format:'HTML',layoutVersion:content.layoutVersion,contentHash};
+const policy={type:'WEEKLY_TIMESHEET',recipientSource:'REGISTERED_EMAIL',recipientPolicyVersion:2,staffId:31,deliveryId:81,revision:1,fromDate:'2026-10-19',toDate:'2026-10-25',sourceHash:crypto.createHash('sha256').update('synthetic verified attendance').digest('hex'),recipient:'fixture-a@example.invalid',format:'HTML',layoutVersion:content.layoutVersion,contentHash};
 const key='weekly-timesheet:31:2026-10-19:2026-10-25:v1';
 const message={to:[policy.recipient],cc:[],bcc:[],...content,attachments:[],deliveryKey:key,deliveryPolicy:policy};
 async function smtpMimeFixture(mail){
  const nodemailer=require('nodemailer'),create=nodemailer.createTransport;
  const stream=create({streamTransport:true,buffer:true,newline:'unix'});let mime;
  try{
+  delete process.env.PDF_EMAIL_TRANSPORT;
   process.env.SMTP_PASSWORD=crypto.randomBytes(32).toString('hex');
   nodemailer.createTransport=()=>({async sendMail(input){assert.deepEqual(input.to,[policy.recipient]);assert.equal(input.cc,undefined);assert.equal(input.bcc,undefined);assert.deepEqual(input.attachments,[]);assert.equal(input.html,content.html);assert.equal(input.text,content.text);mime=(await stream.sendMail(input)).message;return {response:'250 2.0.0 Synthetic accepted',accepted:input.to,rejected:[],messageId:'synthetic-html-smtp'};},close(){}});
   const result=await mail.sendViaSmtp(message);assert.equal(result.messageId,'synthetic-html-smtp');assert.equal(result.receivedVerified,false);
@@ -64,6 +65,7 @@ async function transportFixtures(){
  const health={ok:true,weekly_html_contract_version:1,weekly_html_content_preserved:true,weekly_recipient_privacy_enforced:true,
    attachment_contract_version:0,pdf_bytes_validated:false,attachment_filename_preserved:false};
  try{
+  delete process.env.PDF_EMAIL_TRANSPORT;
   process.env.EMAIL_PRIMARY_TRANSPORT='https_relay';process.env.WORDPRESS_MAIL_RELAY_URL='https://fixture.invalid/relay';process.env.WORDPRESS_MAIL_RELAY_TOKEN='synthetic-fixture-only';
   // The new HTML route must continue when the actual PDF parser is unavailable.
   pdf.validatePdf=async()=>{pdfCalls++;throw new Error('Synthetic PDF generation/parser failure');};
@@ -123,7 +125,7 @@ async function queueFixtures(){
  const scheduler={async validateQueuedWeeklyDelivery(row,connection){assert(active&&connection);return {delivery_id:policy.deliveryId,staff_id:policy.staffId,version:policy.revision,source_sha256:policy.sourceHash,format:'HTML',contentHash,contentSnapshot:content};},async markWeeklyDeliveryResult(_db,row,status,metadata){weekly.set(row.id,{status,accepted:metadata.providerAccepted===true});}};
  const queueRequire=Module.createRequire(require.resolve('../services/emailQueue'));
  const queueModule={exports:{}};
- vm.runInNewContext(fs.readFileSync(require.resolve('../services/emailQueue'),'utf8'),{module:queueModule,exports:queueModule.exports,Buffer,console,process,require:name=>name==='../config/db'?db:name==='./emailQueueSchema'?{async ensureEmailQueueSchema(){}}:name==='./weeklyTimesheetScheduler'?scheduler:name==='./emailService'?{...actual,async sendMail(input){assert(active,'Final HTML dispatch holds source/recipient locks');policyService.assertWeeklyDeliveryContent(input,input.deliveryPolicy);assert.deepEqual(Array.from(input.to),[policy.recipient]);assert.deepEqual(Array.from(input.cc),[]);assert.deepEqual(Array.from(input.bcc),[]);assert.deepEqual(Array.from(input.attachments),[]);assert.equal(input.html,content.html);assert.equal(input.text,content.text);if(current.id===7)throw Object.assign(new Error('Synthetic connection failure before dispatch'),{code:'ECONNECTION',deliveryOutcome:'NOT_DISPATCHED'});delivered.push(current.id);return {messageId:'synthetic-'+current.id};}}:queueRequire(name)},{filename:require.resolve('../services/emailQueue')});
+ vm.runInNewContext(fs.readFileSync(require.resolve('../services/emailQueue'),'utf8'),{module:queueModule,exports:queueModule.exports,Buffer,console,process,require:name=>name==='../config/db'?db:name==='./emailQueueSchema'?{async ensureEmailQueueSchema(){}}:name==='./weeklyTimesheetScheduler'?scheduler:name==='./emailService'?{...actual,selectedEmailTransport:()=> 'smtp',async sendMail(input){assert(active,'Final HTML dispatch holds source/recipient locks');policyService.assertWeeklyDeliveryContent(input,input.deliveryPolicy);assert.deepEqual(Array.from(input.to),[policy.recipient]);assert.deepEqual(Array.from(input.cc),[]);assert.deepEqual(Array.from(input.bcc),[]);assert.deepEqual(Array.from(input.attachments),[]);assert.equal(input.html,content.html);assert.equal(input.text,content.text);if(current.id===7)throw Object.assign(new Error('Synthetic connection failure before dispatch'),{code:'ECONNECTION',deliveryOutcome:'NOT_DISPATCHED'});delivered.push(current.id);return {messageId:'synthetic-'+current.id};}}:queueRequire(name)},{filename:require.resolve('../services/emailQueue')});
  const queue=queueModule.exports;
  // Valid HTML exemption is deliberately narrower than arbitrary document mail.
  assert.throws(()=>queue._test.assertExpectedDocumentAttachment({relatedModule:'invoices',templateKey:'invoice',subject:'Invoice'},[]),{code:'PDF_ATTACHMENT_MISSING'});
@@ -140,4 +142,4 @@ async function queueFixtures(){
  assert.equal(weekly.get(6).accepted,true,'Accepted uncertain bookkeeping is held, not blindly resent');
  assert.equal((await queue.processEmailQueue()).length,0,'Restart cannot repeat accepted, uncertain or repaired-only records');assert.deepEqual(delivered,[1,6]);
 }
-(async()=>{await transportFixtures();await queueFixtures();console.log('Weekly HTML transport tests passed: no PDF dependency; exact frozen body and single designated recipient; strict legacy document/PDF validation; HTML-only relay capability and immutable receipt; bounded retries, uncertainty and restart holds. Synthetic fixtures only; no recipient receipt claimed.');})().catch(error=>{console.error(error);process.exitCode=1;});
+(async()=>{await transportFixtures();await queueFixtures();console.log('Weekly HTML transport tests passed: no PDF dependency; exact frozen body and single registered recipient; strict legacy document/PDF validation; HTML-only relay capability and immutable receipt; bounded retries, uncertainty and restart holds. Synthetic fixtures only; no recipient receipt claimed.');})().catch(error=>{console.error(error);process.exitCode=1;});

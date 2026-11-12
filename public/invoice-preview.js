@@ -27,6 +27,7 @@
       const bytes = await response.arrayBuffer();
       const reader=await import('/pdf-reader.mjs');await reader.load(bytes,name);
       filename=name;download.disabled=false;
+      window.VoxelDocumentEmail?.mountPreview({type:'invoice',record_id:Number(invoiceId),...(version?{filters:{version}}:{}),...(/^[a-f0-9]{64}$/i.test(response.headers.get('x-document-source-sha256')||'')?{expected_source_hash:response.headers.get('x-document-source-sha256')}:{})});
 
     } catch (error) { status.textContent = error.message; status.className = 'error'; retry.hidden = false; frame.hidden = true; }
     finally { loading = false; }

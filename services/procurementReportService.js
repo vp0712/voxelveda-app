@@ -252,6 +252,6 @@ async function snapshotArtifact(row) {
   if(source.request.source!==row.source_kind || source.request.type!==row.report_type || sourceRecordCount(source)!==Number(row.record_count))throw pdfError('The procurement snapshot identity does not match its retained report.','PDF_SNAPSHOT_MISMATCH');
   const checked=await validateDocumentPdf(row.pdf_bytes,data);
   if(checked.sha256!==row.pdf_sha256 || checked.pages!==Number(row.pdf_pages))throw pdfError('The retained procurement PDF failed integrity validation.','PDF_SNAPSHOT_MISMATCH');
-  return {buffer:row.pdf_bytes,filename:safePdfFilename(data.filename||row.reference),sha256:checked.sha256,validation:checked};
+  return {buffer:row.pdf_bytes,filename:safePdfFilename(data.filename||row.reference),sha256:checked.sha256,validation:checked,documentData:data};
 }
 module.exports={createSnapshot,getSnapshot,snapshotAccess,snapshotArtifact,metadata,ensureProcurementReportSchema,_test:{parseRequest,totalsFor,documentData,loadSource,nativeRows,sourceHash,value,quantity}};

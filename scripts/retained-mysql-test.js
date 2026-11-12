@@ -517,7 +517,7 @@ async function testWeeklyDelivery() {
     (30,'Worked fixture employee','worked-fixture','login-only-30@example.invalid','not-a-login-hash','staff',JSON_ARRAY(),1,'FIXTURE-STAFF-30','weekly-30@example.invalid'),
     (31,'No-work fixture employee','no-work-fixture','login-only-31@example.invalid','not-a-login-hash','staff',JSON_ARRAY(),1,'FIXTURE-STAFF-31','weekly-31@example.invalid'),
     (32,'Planned fixture employee','planned-fixture','login-only-32@example.invalid','not-a-login-hash','staff',JSON_ARRAY(),1,'FIXTURE-STAFF-32','weekly-32@example.invalid'),
-    (33,'Missing designation fixture','missing-delivery-fixture','login-only-33@example.invalid','not-a-login-hash','staff',JSON_ARRAY(),1,'FIXTURE-STAFF-33',NULL)`);
+    (33,'Missing registered email fixture','missing-delivery-fixture','invalid-registered-33','not-a-login-hash','staff',JSON_ARRAY(),1,'FIXTURE-STAFF-33','weekly-33@example.invalid')`);
   const start = DateTime.fromISO(period.start, { zone: 'Australia/Sydney' }).set({ hour: 8 });
   for (const staffId of [30, 32, 33]) {
     await pool.query(`INSERT INTO staff_attendance(user_id,clock_in,clock_out,work_date,total_minutes,total_hours,notes,
@@ -534,18 +534,22 @@ async function testWeeklyDelivery() {
   assert.deepEqual(deliveries.map((row) => [row.user_id, row.status]), [[30, 'QUEUED'], [32, 'NO_WORK'], [33, 'NO_RECIPIENT']]);
   const worked = deliveries[0];
   assert.equal(worked.total_minutes, 480);
-  assert.equal(worked.recipient, 'weekly-30@example.invalid');
+  assert.equal(worked.recipient, 'login-only-30@example.invalid', 'The explicit registered-account policy ignores the distinct legacy designation.');
   assert.equal(worked.delivery_format, 'HTML');
   assert.equal(worked.document_request_id, null, 'HTML-only delivery never creates a PDF email request.');
   assert.match(worked.content_sha256, /^[a-f0-9]{64}$/);
   assert.equal(worked.claim_token, null);
   assert.equal(worked.claim_expires_at, null);
   const [[savedQueue]] = await pool.query('SELECT * FROM email_queue WHERE id=?', [worked.email_queue_id]);
-  assert.deepEqual(JSON.parse(savedQueue.to_json), ['weekly-30@example.invalid']);
+  assert.deepEqual(JSON.parse(savedQueue.to_json), ['login-only-30@example.invalid']);
   assert.deepEqual(JSON.parse(savedQueue.cc_json), []);
   assert.deepEqual(JSON.parse(savedQueue.bcc_json), []);
   assert.equal(JSON.parse(savedQueue.delivery_policy_json).sourceHash, worked.source_sha256);
   assert.equal(JSON.parse(savedQueue.delivery_policy_json).format, 'HTML');
+  assert.equal(JSON.parse(savedQueue.delivery_policy_json).recipientSource, 'REGISTERED_EMAIL');
+  assert.equal(JSON.parse(savedQueue.delivery_policy_json).recipientPolicyVersion, 2);
+  assert.equal(JSON.parse(worked.snapshot_json).recipient_source, 'REGISTERED_EMAIL');
+  assert.equal(JSON.parse(worked.snapshot_json).recipient_policy_version, 2);
   assert.equal(JSON.parse(savedQueue.delivery_policy_json).contentHash, worked.content_sha256);
   const attachments = queue.restoreAttachments(JSON.parse(savedQueue.attachments_json));
   assert.equal(attachments.length, 0, 'The complete weekly report is in HTML/text, without a PDF dependency.');
@@ -555,7 +559,7 @@ async function testWeeklyDelivery() {
   assert.equal(savedQueue.text_body, content.text);
   for (const expected of ['Worked fixture employee', DateTime.fromISO(period.start).toFormat('d LLL yyyy'), DateTime.fromISO(period.end).toFormat('d LLL yyyy'), '8.00 (8h 00m)']) assert(content.text.includes(expected), `The human-readable report contains ${expected}`);
   assert.equal(content.fromDate, period.start); assert.equal(content.toDate, period.end, 'Immutable content metadata retains exact calendar boundaries.');
-  assert.doesNotMatch(content.text, /No-work fixture|Planned fixture|Missing designation|login-only/);
+  assert.doesNotMatch(content.text, /No-work fixture|Planned fixture|Missing registered email|login-only/);
   assert.equal(objects.size, 0, 'HTML scheduling has not generated or stored any PDF.');
   const pdfs = require('../services/timesheetPdfService');
   const snapshot = JSON.parse(worked.snapshot_json);
@@ -569,7 +573,7 @@ async function testWeeklyDelivery() {
   } finally { pdfs.snapshotArtifact = savedArtifact; }
   const artifact = await pdfs.snapshotArtifact(pool, snapshot);
   const parsed = await validatePdf(artifact.buffer, { expectedText: ['Worked fixture employee', period.start, period.end, '8.00'] });
-  assert.doesNotMatch(parsed.text, /No-work fixture|Planned fixture|Missing designation|login-only/);
+  assert.doesNotMatch(parsed.text, /No-work fixture|Planned fixture|Missing registered email|login-only/);
   const [[cachedPdf]] = await pool.query('SELECT pdf_object_key,pdf_sha256,pdf_bytes_count,pdf_filename,generation_status FROM timesheet_pdf_snapshots WHERE source_key=?', [require('../services/timesheetPdfService').sourceKey(JSON.parse(worked.snapshot_json))]);
   assert.equal(cachedPdf.generation_status, 'VALIDATED');
   assert.equal(cachedPdf.pdf_sha256, digest(artifact.buffer));
@@ -607,23 +611,23 @@ async function testWeeklyDelivery() {
   assert.match(revisionQueue.html_body, /REVISION/);
   assert.deepEqual(JSON.parse(revisionQueue.attachments_json), []);
   await makeWeeklyFixtureDue(revision.queue_id);
-  await pool.query("UPDATE users SET timesheet_delivery_email='changed-30@example.invalid' WHERE id=30");
+  await pool.query("UPDATE users SET email='changed-30@example.invalid' WHERE id=30");
   const held = await queue.processEmailQueue(50);
   assert.equal(held.length, 1);
   assert.equal(held[0].id, revision.queue_id);
-  assert.equal(held[0].status, 'REVIEW_REQUIRED', 'Final locked eligibility recheck blocks a changed designated recipient.');
+  assert.equal(held[0].status, 'REVIEW_REQUIRED', 'Final locked eligibility recheck blocks a changed registered recipient.');
   assert.equal(capturedMessages.length, sentBefore + 1);
   const [[heldDelivery]] = await pool.query('SELECT status FROM weekly_timesheet_deliveries WHERE id=?', [worked.id]);
   assert.equal(heldDelivery.status, 'REVIEW_REQUIRED');
   // Resolve only the synthetic missing-recipient fixture after the normal window.
-  await pool.query("UPDATE users SET timesheet_delivery_email='weekly-33@example.invalid' WHERE id=33");
+  await pool.query("UPDATE users SET email='registered-33@example.invalid' WHERE id=33");
   const recoveryNow=DateTime.fromJSDate(scheduledNow).plus({hours:3}).toJSDate();
   assert.equal(policy.scheduleWindow(recoveryNow,policy.configuration(process.env)).eligible,false);
   const recovered=await Promise.all([scheduler.queueClosedWeekTimesheets({...options,now:recoveryNow}),scheduler.queueClosedWeekTimesheets({...options,now:recoveryNow})]);
   assert.equal(recovered.reduce((sum,result)=>sum+result.queued,0),1);
   const [[recoveredDelivery]]=await pool.query('SELECT * FROM weekly_timesheet_deliveries WHERE user_id=33 AND period_start=?',[period.start]);
   assert.equal(recoveredDelivery.generation_attempts,1,'Generation budget is persisted under the actual employee/delivery lock.');
-  assert.equal(recoveredDelivery.recipient,'weekly-33@example.invalid');
+  assert.equal(recoveredDelivery.recipient,'registered-33@example.invalid');
   const [[recoveryAudit]]=await pool.query("SELECT COUNT(*) total FROM audit_logs WHERE action='WEEKLY_TIMESHEET_RECOVERY_QUEUED' AND record_id=?",[String(recoveredDelivery.id)]);
   assert.equal(Number(recoveryAudit.total),1);
   await makeWeeklyFixtureDue(recoveredDelivery.email_queue_id);
@@ -631,7 +635,7 @@ async function testWeeklyDelivery() {
   const reconciled=await require('../services/weeklyTimesheetReconciliation').reconcileWeek({db:pool,now:recoveryNow,env:process.env,actor:{id:20,role:'admin'}});
   const reconciledStaff=reconciled.outcomes.find(entry=>entry.user_id===33);
   assert.equal(reconciledStaff.status,'PROVIDER_ACCEPTED');assert.equal(reconciledStaff.recipient_verified,false);assert.equal(reconciledStaff.delivery_format,'HTML');assert.equal(reconciledStaff.report.status,'PREPARED');
-  facts.push('real InnoDB bounded missed-window recovery after designated-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
+  facts.push('real InnoDB bounded missed-window recovery after registered-account-address correction; concurrent workers queue once; persisted generation budget and one audit; reconciled PDF/queue/provider states without claiming receipt');
   facts.push('real worked-only HTML scheduling/source-content locks, zero-attachment immutable bodies, independent optional PDF failure/storage, staff-period/version uniqueness, restart deduplication, accepted history preservation, explicit revision and final recipient-change hold');
   } finally {
     Object.assign(storage, originalStorage);

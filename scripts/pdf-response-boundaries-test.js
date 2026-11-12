@@ -9,11 +9,12 @@ const { createDocumentPdf } = require('../services/documentPdfService');
 
 async function relayChecks(artifact) {
   const savedFetch = global.fetch;
-  const keys = ['WORDPRESS_MAIL_RELAY_URL','WORDPRESS_MAIL_RELAY_TOKEN','EMAIL_PRIMARY_TRANSPORT'];
+  const keys = ['WORDPRESS_MAIL_RELAY_URL','WORDPRESS_MAIL_RELAY_TOKEN','EMAIL_PRIMARY_TRANSPORT','PDF_EMAIL_TRANSPORT'];
   const savedEnv = keys.map(key=>process.env[key]);
   process.env.WORDPRESS_MAIL_RELAY_URL='https://fixture.invalid/mail-relay';
   process.env.WORDPRESS_MAIL_RELAY_TOKEN='disposable-fixture-only';
   process.env.EMAIL_PRIMARY_TRANSPORT='https_relay';
+  delete process.env.PDF_EMAIL_TRANSPORT;
   const health={ok:true,attachment_contract_version:3,pdf_bytes_validated:true,attachment_filename_preserved:true};
   const message={to:'fixture@example.invalid',subject:'Isolated PDF boundary fixture',deliveryKey:'isolated:response-boundary',attachments:[{filename:artifact.filename,content:artifact.buffer}]};
   let posts=0;

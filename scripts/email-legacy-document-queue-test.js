@@ -29,7 +29,7 @@ const db={async query(sql,values=[]){
 }};
 require.cache[dbPath]={id:dbPath,filename:dbPath,loaded:true,exports:db};
 require.cache[schemaPath]={id:schemaPath,filename:schemaPath,loaded:true,exports:{async ensureEmailQueueSchema(){}}};
-require.cache[servicePath]={id:servicePath,filename:servicePath,loaded:true,exports:{...actualService,async sendMail(message){sent.push(message);return {messageId:`fixture-${sent.length}`};}}};
+require.cache[servicePath]={id:servicePath,filename:servicePath,loaded:true,exports:{...actualService,selectedEmailTransport:()=> 'smtp',async sendMail(message){sent.push(message);return {messageId:`fixture-${sent.length}`};}}};
 async function main(){
   const queue = require('../services/emailQueue');
   const outcomes=await queue.processEmailQueue();

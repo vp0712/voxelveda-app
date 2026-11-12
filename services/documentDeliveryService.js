@@ -19,15 +19,19 @@ function ensureDocumentDeliverySchema() {
   ) ENGINE=InnoDB`).catch(error => { schemaPromise = null; throw error; });
   return schemaPromise;
 }
-async function queueDocumentEmail({ module, recordId, data, to, subject, html, text, createdBy, beforeQueue, afterQueue, idempotencyKey, deliveryPolicy, validatedArtifact }) {
+async function queueDocumentEmail({ module, recordId, data, to, subject, html, text, createdBy, beforeQueue, afterQueue, idempotencyKey, deliveryPolicy, validatedArtifact, requestIdentity }) {
   await ensureDocumentDeliverySchema();
   await ensureEmailQueueSchema();
   const source = JSON.stringify(data);
   const recipients = JSON.stringify(to);
-  const requestKey = crypto.createHash('sha256').update([module, recordId, source, recipients].join('\n')).digest('hex');
+  // A manual Send intent binds its stable request ID to the first immutable
+  // document/recipient pair. Retrying that ID cannot change either identity.
+  if (requestIdentity !== undefined && !/^[a-zA-Z0-9:_-]{16,160}$/.test(String(requestIdentity))) throw Object.assign(new Error('Use a valid document send request ID.'), {status:422,code:'DOCUMENT_SEND_ID_INVALID'});
+  const requestKey = crypto.createHash('sha256').update((requestIdentity === undefined ? [module, recordId, source, recipients] : [module, 'send-intent', requestIdentity]).join('\n')).digest('hex');
   await pool.query(`INSERT INTO document_delivery_requests(request_key,related_module,related_record_id,source_json,recipients_json,created_by)
     VALUES(?,?,?,?,?,?) ON DUPLICATE KEY UPDATE request_key=VALUES(request_key)`, [requestKey, module, String(recordId), source, recipients, createdBy || null]);
   const [[request]] = await pool.query('SELECT * FROM document_delivery_requests WHERE request_key=?', [requestKey]);
+  if (requestIdentity !== undefined && (request.related_module !== module || String(request.related_record_id)!==String(recordId) || request.source_json !== source || request.recipients_json !== recipients || Number(request.created_by) !== Number(createdBy))) throw Object.assign(new Error('This Send request already belongs to a different document or recipient. Review the existing delivery before starting another Send action.'), {status:409,code:'DOCUMENT_SEND_ID_CONFLICT'});
   if (request.email_queue_id) {
     const [[queue]] = await pool.query('SELECT id,status,message_id,last_error,provider_accepted_at FROM email_queue WHERE id=?', [request.email_queue_id]);
     return { document_pdf_url: `/api/email/documents/${request.id}/pdf`, delivery_status_url: `/api/email/documents/${request.id}`, request_id: request.id, generation_status: request.generation_status, email_queue_id: request.email_queue_id, email_status: queue?.status || 'UNKNOWN', email_queued: Boolean(queue && ['PENDING','RETRY','SENDING'].includes(queue.status)), last_error: queue?.last_error || null, provider_accepted: Boolean(queue?.provider_accepted_at || queue?.status === 'SENT'), recipient_verified: false, existing: true };

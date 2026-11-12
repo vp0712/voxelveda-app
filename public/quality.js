@@ -69,6 +69,9 @@
   const tbody=node('tbody');for(const row of rows){const tr=node('tr');for(const column of meta.columns){const td=node('td');td.dataset.label=column.label;const value=row[column.key];td.append(node('span',column.type==='date'?dateLabel(value):value??'—'));tr.append(td);}tbody.append(tr);}
   table.append(thead,tbody);$('registerTable').replaceChildren(rows.length?table:node('p','No saved records match this selection. Change the filters or choose another register.'));
   $('registerPreview').disabled=false;$('registerDownload').disabled=false;
+  const emailTarget=$('registerDownload').parentElement;
+  emailTarget.querySelector('[data-quality-email]')?.remove();
+  if(window.VoxelDocumentEmail){const mail=window.VoxelDocumentEmail.button(()=>({type:'qms-register',register:current.name,filters:Object.fromEntries(selection()),...(current.artifact?.sourceHash?{expected_source_hash:current.artifact.sourceHash}:{})}),{label:'Email register'});mail.dataset.qualityEmail='';emailTarget.append(mail);}
   // The original output region remains a concise accessible feed for existing portal links.
   show(rows.length?'Loaded '+rows.length+' of '+total+' '+meta.title.toLowerCase()+'. '+String(rows[0][meta.columns[0].key]||''):'No records match this selection.');
  }
@@ -110,6 +113,7 @@
    const a=await artifact();let page=1,zoom=1,renderEpoch=0;
    const html='<div class="quality-pdf-controls"><button id="qualityPdfPrevious" type="button">Previous page</button><span id="qualityPdfPage"></span><button id="qualityPdfNext" type="button">Next page</button><button id="qualityPdfSmaller" type="button" aria-label="Zoom out">−</button><button id="qualityPdfLarger" type="button" aria-label="Zoom in">+</button><button id="qualityPdfFit" type="button">Fit width</button><button id="qualityPdfDownload" type="button">Download PDF</button></div><p id="qualityPdfStatus" role="status"></p><div id="qualityPdfStage" tabindex="0" aria-label="PDF document page"><canvas id="qualityPdfCanvas" aria-label="Rendered PDF page"></canvas></div>';
    if(!window.VoxelDialog?.open({id:'quality-report',backdrop:'qualityPdfBackdrop',title:'qualityPdfTitle',body:'qualityPdfBody',primary:'qualityPdfClose',secondary:'qualityPdfCancel',heading:current.metadata.title,mode:'readonly',html,onClosed:()=>{renderEpoch++;current.pdfRender?.cancel?.();current.pdfRender=null;current.onPdfResize=null;}}))throw new Error('Close the current dialog before opening the report.');
+   if(window.VoxelDocumentEmail)document.querySelector('.quality-pdf-controls').append(window.VoxelDocumentEmail.button({type:'qms-register',register:current.name,filters:Object.fromEntries(selection()),...(a.sourceHash?{expected_source_hash:a.sourceHash}:{})}));
    async function render(){
     const epoch=++renderEpoch;current.pdfRender?.cancel?.();try{
      const source=await a.pdf.getPage(page);if(epoch!==renderEpoch||current.artifact!==a)return;const stage=$('qualityPdfStage'),canvas=$('qualityPdfCanvas');if(!stage||!canvas)return;

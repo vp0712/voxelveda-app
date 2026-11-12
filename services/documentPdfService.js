@@ -4,6 +4,9 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { companyProfile } = require('../config/companyProfile');
 const DOCUMENT_LAYOUT_VERSION = '2026-10-25.2';
+// Server-side adapters may retain a generated document's authoritative model
+// and bytes. This symbol is never read from a request or sent in a response.
+const PDF_ARTIFACT_CAPTURE = Symbol('voxel-veda-pdf-artifact');
 function exactLine(value) { return String(value ?? '').normalize('NFKC').replace(/\s+/gu,' ').trim(); }
 
 function pdfError(message, code = 'PDF_DOCUMENT_INVALID') {
@@ -278,7 +281,10 @@ async function buildDocumentPdf(data, proofOnly = false) {
   const validation = await validatePdf(buffer, { documentProof:contentProof });
   return { buffer, filename: safePdfFilename(data.filename || data.reference || data.title), contentType: 'application/pdf', contentDisposition: 'attachment', validation, contentProof };
 }
-async function createDocumentPdf(data) { return buildDocumentPdf(data); }
+async function createDocumentPdf(data) {
+  const documentData = JSON.parse(JSON.stringify(data));
+  return { ...await buildDocumentPdf(documentData), documentData };
+}
 // Re-derive complete content identity from the trusted model using the exact
 // layout/font metrics, without drawing a second business document. A retained
 // PDF caller cannot supply, omit or forge the expected fragments.
@@ -286,6 +292,7 @@ async function deriveDocumentContentProof(data) { return buildDocumentPdf(data, 
 async function validateDocumentPdf(buffer,data) { const proof=await deriveDocumentContentProof(data);return validatePdf(buffer,{documentProof:proof}); }
 async function sendPdfResponse(res, artifact, download = false) {
   await validatePdf(artifact.buffer);
+  if (typeof res[PDF_ARTIFACT_CAPTURE] === 'function') res[PDF_ARTIFACT_CAPTURE](artifact);
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', `${download ? 'attachment' : 'inline'}; filename="${safePdfFilename(artifact.filename)}"`);
   res.setHeader('Content-Length', artifact.buffer.length);
@@ -314,4 +321,4 @@ async function storedDocumentArtifact(body, filename) {
     return { buffer, filename: safePdfFilename(filename), validation: await validatePdf(buffer), converted_from: jpeg ? 'image/jpeg' : 'image/png' };
   } catch (error) { doc.destroy(); throw error; }
 }
-module.exports = { createDocumentPdf, deriveDocumentContentProof, validateDocumentPdf, DOCUMENT_LAYOUT_VERSION, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact, money, dateLabel, pdfError };
+module.exports = { createDocumentPdf, deriveDocumentContentProof, validateDocumentPdf, DOCUMENT_LAYOUT_VERSION, PDF_ARTIFACT_CAPTURE, validatePdf, safePdfFilename, sendPdfResponse, storedDocumentArtifact, money, dateLabel, pdfError };

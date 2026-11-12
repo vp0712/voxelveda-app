@@ -2685,7 +2685,7 @@ function invoiceActions(invoice){
   const pendingKey='voxelveda:invoice-payment:'+currentUser?.id+':'+id;let pendingReceipt=false;try{pendingReceipt=Boolean(sessionStorage.getItem(pendingKey));}catch{};
   if(archived)return hasCurrentPermission('VOID_TRANSACTION')?`<button type="button" class="secondary-btn" onclick="invoiceAction(${id},'restore')">Restore</button>`:'';
   return `${pendingReceipt?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Check payment request</button>`:''}${hasCurrentPermission('POST_TRANSACTION')&&['draft','rejected'].includes(status)?`<button class="secondary-btn" onclick="invoiceAction(${id},'approve')">Approve</button>`:''}
-  ${hasCurrentPermission('EDIT_FINANCE')&&['approved','sent'].includes(status)?`<button class="secondary-btn" onclick="openSendInvoiceDialog(${id})">Send</button>`:''}
+  ${hasCurrentPermission('EDIT_FINANCE')&&hasCurrentPermission('SEND_COMPANY_EMAIL')&&['approved','sent','paid'].includes(status)?`<button type="button" class="secondary-btn vv-document-email-button" aria-label="Email this invoice" onclick="return openSendInvoiceDialog(${id})">${window.VoxelDocumentEmail?.icon || ''}<span>Email</span></button>`:''}
   ${!invoice.payment_review_required&&hasCurrentPermission('POST_TRANSACTION')&&['approved','sent'].includes(status)&&Number(invoice.balance_due)>0?`<button class="secondary-btn" onclick="openInvoicePaymentDialog(${id})">Record payment</button>`:''}
   ${hasCurrentPermission('EDIT_FINANCE')&&['draft','rejected','approved'].includes(status)?`<button class="secondary-btn" onclick="openEditInvoiceDialog(${id})">Edit</button>`:''}
   <button class="secondary-btn" onclick="openInvoiceQrDialog(${id})">Invoice link QR</button>
@@ -3168,79 +3168,8 @@ async function openEditInvoiceDialog(invoiceId) {
 }
 
 function openSendInvoiceDialog(invoiceId) {
-  const invoice = invoiceCache.find((item) => Number(item.id) === Number(invoiceId));
-  const invoiceReference = invoice?.invoice_no || `INV-${invoiceId}`;
-  showDialog(
-    'Send Invoice',
-    `
-      <p class="status-note">Send the PDF by email. Mobile number is saved on the send record for follow-up/SMS setup.</p>
-      <input id="sendInvoiceEmail" required type="email" placeholder="Customer email address" />
-      <input id="sendInvoiceMobile" placeholder="Customer mobile number" />
-      <div id="sendInvoiceDeliveryStatus" class="email-delivery-status" hidden></div>
-      <div class="document-recovery-actions">
-        <button type="button" class="secondary-btn" onclick="return openInvoicePdf(${Number(invoiceId)})">Preview PDF</button>
-
-      </div>
-    `,
-    async () => {
-      const sendButton = document.getElementById('dialogPrimaryBtn');
-
-      const email = document.getElementById('sendInvoiceEmail')?.value.trim();
-      const mobile = document.getElementById('sendInvoiceMobile')?.value.trim();
-
-      if (!isValidEmail(email)) {
-        showToast('Enter a valid authorised recipient email address', {kind:'error'});
-        return;
-      }
-
-      if (sendButton) {
-        sendButton.disabled = true;
-        sendButton.textContent = 'Sending...';
-      }
-
-      try {
-        const res = await fetch('/api/invoice/send', {
-          method: 'POST',
-          headers: authHeaders(),
-          body: JSON.stringify({ invoice_id: invoiceId, email, mobile })
-        });
-
-        const data = await safeJson(res);
-
-        if (!res.ok) {
-          const status = document.getElementById('sendInvoiceDeliveryStatus');
-          if (status && /^EMAIL_|^SMTP_/.test(String(data.code || ''))) {
-            status.hidden = false;
-            status.setAttribute('role', 'status');
-            status.innerHTML = `<strong>Delivery options for ${escapeHtml(invoiceReference)}</strong><span>${escapeHtml(data.message || 'Direct delivery is unavailable. The request remains available. Review Email Control before a controlled retry.')}</span>`;
-            if (sendButton) sendButton.dataset.deliveryUnavailable = 'true';
-          } else {
-            showToast(data.message || 'Invoice send failed', {kind:'error'});
-          }
-          return;
-        }
-
-        hideDialog();
-        showToast(data.message || 'Invoice PDF validated and email request queued. Provider acceptance is pending.', {kind:'info',title:'Queued',foreground:true,httpStatus:res.status});
-        await loadInvoices();
-        await loadDashboardStats();
-      } catch (error) {
-        const status = document.getElementById('sendInvoiceDeliveryStatus');
-        if (status) {
-          status.hidden = false;
-          status.setAttribute('role', 'status');
-          status.innerHTML = `<strong>Delivery options for ${escapeHtml(invoiceReference)}</strong><span>The email service could not be reached. The request remains available. Review Email Control before a controlled retry.</span>`;
-        }
-        if (sendButton) sendButton.dataset.deliveryUnavailable = 'true';
-      } finally {
-        if (sendButton && document.body.contains(sendButton)) {
-          sendButton.disabled = false;
-          sendButton.textContent = sendButton.dataset.deliveryUnavailable === 'true' ? 'Retry Email' : 'Send Invoice';
-        }
-      }
-    },
-    'Send Invoice'
-  );
+  if(!window.VoxelDocumentEmail)return showToast('The document email controls are still loading. Retry shortly.', {kind:'error'});
+  return window.VoxelDocumentEmail.open({type:'invoice',record_id:Number(invoiceId)});
 }
 
 async function loadCustomers() {
@@ -5401,9 +5330,9 @@ async function openAddStaff() {
           <input id="dialogStaffEmail" type="email" placeholder="name@company.com" autocomplete="email" />
         </label>
         <label class="form-field">
-          <span>Designated weekly timesheet email (optional)</span>
+          <span>Legacy delivery address (not used for automatic weekly reports)</span>
           <input id="dialogTimesheetDeliveryEmail" type="email" maxlength="254" placeholder="Staff-approved delivery address" />
-          <small>Weekly PDFs use only this saved address. Leave blank to hold delivery; the login email is never substituted.</small>
+          <small>Automatic Monday reports go only to the registered login email above when eligible worked time is recorded. No copies are sent. This older address is retained for history.</small>
         </label>
         <label class="form-field">
           <span>Login username</span>
@@ -5545,9 +5474,9 @@ async function openEditStaffDialog(userId) {
           <input id="editStaffEmail" type="email" value="${escapeHtml(user.email || '')}" />
         </label>
         <label class="form-field">
-          <span>Designated weekly timesheet email (optional)</span>
+          <span>Legacy delivery address (not used for automatic weekly reports)</span>
           <input id="editTimesheetDeliveryEmail" type="email" maxlength="254" value="${escapeHtml(user.timesheet_delivery_email || '')}" />
-          <small>One saved recipient receives this staff member’s complete weekly timesheet report. Leave blank to hold delivery; no login-email fallback or copies are sent.</small>
+          <small>Automatic Monday reports use this staff member’s registered login email. No CC/BCC or manager copies are added. Earlier delivery versions retain their original recipient.</small>
         </label>
         <label class="form-field">
           <span>Role</span>
@@ -6023,7 +5952,7 @@ async function loadEmailControl() {
     const lastDelivery = document.getElementById('emailLastDelivery');
     if (sender) sender.textContent = config.from_address || 'info@voxelveda.com';
     if (transport) {
-      transport.textContent = config.configured ? `${config.provider} : ${config.port}` : 'Not connected';
+      transport.textContent = config.configured ? `${config.provider}${config.transport==='smtp'&&config.port?' : '+config.port:''} · Configured` : 'Not configured';
     }
     if (pendingEl) pendingEl.textContent = String(pending);
     if (failureEl) failureEl.textContent = `${failed} failed`;
@@ -6229,6 +6158,22 @@ async function downloadOriginalReport(type, query = {}, download = true) {
   const params = new URLSearchParams(Object.entries({ ...query, download:download ? '1' : '' }).filter(([,value]) => value !== '' && value != null));
   try { await window.VoxelOperations.openPdf(`/api/documents/reports/${encodeURIComponent(report)}.pdf?${params}`, { download }); }
   catch (error) { showToast(error.message || 'Report generation failed. No alternative file was downloaded.', {kind:'error'}); }
+}
+function getOriginalReportEmailSource(report) {
+  const sourceReport=['raw-materials','packaging'].includes(report)?'materials':report;
+  const key=report==='raw-materials'?'raw_material':report;
+  const state=registerPagerState[key]||{},saved=registerFilters[key]||{};
+  const filters={...saved};
+  const allowed={rfqs:['q','status','archived'],invoices:['search','status','payment_state','from','to','archived'],customers:['search'],suppliers:['search'],stock:['search','category','availability'],materials:['type','inventory_type','search','stock_status'],staff:['search','department','role','active'],competitors:['search','category','country'],expenses:['search','supplier','category','status','fy','from','to','id']}[sourceReport]||[];
+  if(state.search)filters[sourceReport==='rfqs'?'q':'search']=state.search;
+  if(state.status)filters.status=state.status;
+  if(sourceReport==='rfqs'&&document.getElementById('rfqArchivedFilter')?.checked)filters.archived='true';
+  if(sourceReport==='invoices'&&state.archived)filters.archived='true';
+  if(sourceReport==='suppliers')filters.search=document.getElementById('supplierSearch')?.value||filters.search;
+  if(sourceReport==='stock')filters.search=document.getElementById('stockSearch')?.value||filters.search;
+  if(sourceReport==='materials')filters.type=report==='packaging'?'packaging':'raw_material';
+  if(sourceReport==='expenses'){filters.search=document.getElementById('expenseSearch')?.value||filters.search;filters.fy=document.getElementById('expenseFinancialYear')?.value||'';}
+  return{type:'register',report:sourceReport,filters:Object.fromEntries(Object.entries(filters).filter(([name,value])=>allowed.includes(name)&&value!==''&&value!=null))};
 }
 function downloadCsv(type) { return downloadOriginalReport(type); }
 
@@ -6554,8 +6499,9 @@ function collectProcessSheet() {
   };
 }
 
-function openProcessSheetPdf(id) {
-  window.open(`/api/materials/${id}/process-sheet.pdf`, '_blank');
+async function openProcessSheetPdf(id) {
+  try{return await window.VoxelOperations.openPdf(`/api/materials/${Number(id)}/process-sheet.pdf`);}
+  catch(error){showToast(error.message,{kind:'error'});}
 }
 
 async function deleteMaterial(type, id) {

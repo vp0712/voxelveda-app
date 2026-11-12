@@ -6,6 +6,8 @@ const WORKSPACE_CSS = '/workspace-theme.css?v=20261009-navy-blue';
 const BUSINESS_HUB_CSS = '/business-hub.css?v=20261028-weekly-html';
 const BUSINESS_HUB_CONTENT_CSS = '/business-hub-content.css?v=20261029-content';
 const BUSINESS_HUB_JS = '/business-hub-shell.js?v=20261028-shell';
+const DOCUMENT_EMAIL_CSS = '/document-email.css?v=20261112';
+const DOCUMENT_EMAIL_JS = '/document-email.js?v=20261112';
 const CANONICAL_LOGO = '/logo.png';
 
 function canonicalizeLogoPaths(html) {
@@ -54,6 +56,10 @@ function injectGlobalBrand(html) {
   if(!rendered.includes('/workspace-dialog.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/workspace-dialog.css"><script src="/workspace-dialog.js" defer></script>\n</head>');
   if(!rendered.includes('/invoice-detail.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/invoice-detail.css"><script src="/invoice-detail.js" defer></script>\n</head>');
   if(!rendered.includes('/android-app.js'))rendered=rendered.replace(/<\/head>/i,'<script src="/android-app.js" defer></script>\n</head>');
+  if(!rendered.includes('/operations-ui.js'))rendered=rendered.replace(/<\/head>/i,
+    '<script src="/operations-ui.js" defer></script>\n</head>');
+  if(!rendered.includes('/document-email.js'))rendered=rendered.replace(/<\/head>/i,
+    `<link rel="stylesheet" href="${DOCUMENT_EMAIL_CSS}"><script src="${DOCUMENT_EMAIL_JS}" defer></script>\n</head>`);
   // Keep the shared presentation last, after retained role/module styles. It
   // never rewrites permissions, chart configuration or business navigation.
   if (!rendered.includes(BUSINESS_HUB_CONTENT_CSS)) rendered = rendered.replace(/<\/head>/i,
@@ -65,4 +71,4 @@ function injectGlobalBrand(html) {
   return rendered;
 }
 
-module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, BUSINESS_HUB_CONTENT_CSS, BUSINESS_HUB_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };
+module.exports = { BRAND_CSS, BRAND_JS, WORKSPACE_CSS, BUSINESS_HUB_CSS, BUSINESS_HUB_CONTENT_CSS, BUSINESS_HUB_JS, DOCUMENT_EMAIL_CSS, DOCUMENT_EMAIL_JS, CANONICAL_LOGO, canonicalizeLogoPaths, injectGlobalBrand };

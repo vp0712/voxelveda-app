@@ -3,6 +3,13 @@ const controller = require('../controllers/emailController');
 const { requireAnyPermission } = require('../middleware/authorizationMiddleware');
 
 const router = express.Router();
+// These report actions have per-source permissions and explicit recipient
+// controls. They do not grant company-email administration to ordinary senders.
+router.get('/reports/catalog', controller.reportCatalog);
+router.post('/reports/prepare', controller.prepareReport);
+router.get('/reports/:id/pdf', controller.reportPdf);
+router.get('/reports/:id', controller.reportStatus);
+router.post('/reports/:id/send', controller.sendReport);
 router.get('/documents/:id/pdf', controller.documentPdf);
 router.get('/documents/:id', controller.documentStatus);
 router.use(requireAnyPermission('MANAGE_COMPANY_EMAIL'));
