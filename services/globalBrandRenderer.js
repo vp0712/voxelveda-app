@@ -56,7 +56,9 @@ function injectGlobalBrand(html) {
   if(!rendered.includes('/workspace-dialog.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/workspace-dialog.css"><script src="/workspace-dialog.js" defer></script>\n</head>');
   if(!rendered.includes('/invoice-detail.js'))rendered=rendered.replace(/<\/head>/i,'<link rel="stylesheet" href="/invoice-detail.css"><script src="/invoice-detail.js" defer></script>\n</head>');
   if(!rendered.includes('/android-app.js'))rendered=rendered.replace(/<\/head>/i,'<script src="/android-app.js" defer></script>\n</head>');
-  if(!rendered.includes('/operations-ui.js'))rendered=rendered.replace(/<\/head>/i,
+  // Report readers need the shared PDF helper. Public authentication/profile
+  // pages keep their existing form lifecycle and must not gain its interceptors.
+  if(!rendered.includes('/operations-ui.js')&&/\bclass=["'][^"']*\bdocument-reader\b/.test(rendered))rendered=rendered.replace(/<\/head>/i,
     '<script src="/operations-ui.js" defer></script>\n</head>');
   if(!rendered.includes('/document-email.js'))rendered=rendered.replace(/<\/head>/i,
     `<link rel="stylesheet" href="${DOCUMENT_EMAIL_CSS}"><script src="${DOCUMENT_EMAIL_JS}" defer></script>\n</head>`);
