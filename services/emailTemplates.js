@@ -1,4 +1,4 @@
-const { companyProfile } = require('../config/companyProfile');
+const { companyProfile, DEFAULT_COMPANY_EMAIL } = require('../config/companyProfile');
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -31,6 +31,44 @@ function brandedLayout(content, previewText = '') {
       </td></tr>
     </table>
   </body></html>`;
+}
+
+function renderInvoiceEmail(message) {
+  const company = companyProfile();
+  const email = /^[^\s@<>"?,;&]+@[^\s@<>"?,;&]+\.[^\s@<>"?,;&]+$/.test(company.supportEmail)
+    ? company.supportEmail : DEFAULT_COMPANY_EMAIL;
+  const phone = company.phone || '+61 426 766 393';
+  const dialNumber = phone.replace(/[^\d+]/g, '');
+  const website = /^https:\/\/[^\s<>"']+$/i.test(company.website) ? company.website : 'https://voxelveda.com';
+  const services = '3D Scanning · Product Design · Industrial 3D Printing';
+  const body = String(message || 'Please find your invoice attached.').trim();
+  const contacts = [
+    [email, 'mailto:' + email],
+    [phone, /^\+?\d{7,15}$/.test(dialNumber) ? 'tel:' + dialNumber : ''],
+    [website.replace(/^https:\/\//i, '').replace(/\/$/, ''), website]
+  ];
+  const contactHtml = contacts.map(([label, href]) =>
+    href ? `<a href="${escapeHtml(href)}" style="color:#174f9e;text-decoration:underline;">${escapeHtml(label)}</a>` : escapeHtml(label)
+  ).join('<br>');
+  const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#172b44;">
+  <p style="margin:0 0 18px;">${escapeHtml(body).replace(/\r?\n/g, '<br>')}</p>
+  <p style="margin:0 0 8px;">Kind regards,</p>
+  <table role="presentation" cellspacing="0" cellpadding="0" width="100%" style="max-width:400px;border-collapse:separate;border-spacing:0;border:1px solid #d8e3f0;border-left:3px solid #2857df;background-color:#f4f7fc;">
+    <tr>
+      <td width="58" valign="top" style="padding:14px 0 14px 12px;">
+        <img src="https://app.voxelveda.com/logo.png" width="56" height="56" alt="Voxel Veda" style="display:block;width:56px;height:56px;border:0;">
+      </td>
+      <td valign="top" style="padding:12px 14px 12px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:1.55;color:#172b44;overflow-wrap:anywhere;">
+        <strong style="font-size:16px;color:#132d4c;">${escapeHtml(company.legalName)}</strong>
+        <div style="margin:2px 0 7px;color:#405871;">${services}</div>
+        ${contactHtml}
+      </td>
+    </tr>
+  </table>
+</body></html>`;
+  return { html, text: [body, '', 'Kind regards,', company.legalName, services, email, phone, website].join('\n') };
 }
 
 const templates = {
@@ -69,4 +107,4 @@ function renderEmailTemplate(templateKey, variables = {}) {
   return { subject, html: brandedLayout(body, preview), text };
 }
 
-module.exports = { renderEmailTemplate, brandedLayout, templates };
+module.exports = { renderEmailTemplate, renderInvoiceEmail, brandedLayout, templates };

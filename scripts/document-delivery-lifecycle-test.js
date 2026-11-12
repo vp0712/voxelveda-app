@@ -29,7 +29,7 @@ require.cache[queuePath]={id:queuePath,filename:queuePath,loaded:true,exports:{r
 require.cache[pdfPath]={id:pdfPath,filename:pdfPath,loaded:true,exports:{...actualPdf,async createDocumentPdf(data){if(failRender)throw Object.assign(new Error('Fixture renderer failed.'),{code:'PDF_GENERATION_FAILED'});return actualPdf.createDocumentPdf(data);}}};
 const {queueDocumentEmail,deliveryMessage}=require('../services/documentDeliveryService');
 async function main(){
- const data={title:'DELIVERY FIXTURE',reference:'FIXTURE-RETRY-1',issueDate:'2026-10-11',columns:[{label:'Expected field',width:1},{label:'Value',width:1}],rows:[['Identity','FIXTURE-RETRY-1']],notes:['Authorised automated fixture; no business records.']};
+ const data={title:'INVOICE',reference:'FIXTURE-RETRY-1',issueDate:'2026-10-11',columns:[{label:'Expected field',width:1},{label:'Value',width:1}],rows:[['Identity','FIXTURE-RETRY-1']],notes:['Authorised automated fixture; no business records.']};
  const message={module:'invoices',recordId:'fixture',data,to:['fixture@example.invalid'],subject:'Fixture only',text:'Validated fixture PDF is attached.',createdBy:4};
  failRender=true;await assert.rejects(()=>queueDocumentEmail(message),{code:'PDF_GENERATION_FAILED'});
  assert.equal(sendCount,0);assert.equal(requests.size,1);assert.equal([...requests.values()][0].generation_status,'GENERATION_FAILED');assert.equal([...requests.values()][0].source_json,JSON.stringify(data));
@@ -39,6 +39,9 @@ async function main(){
  queueStatus='FAILED';const failed=await queueDocumentEmail(message);assert.equal(sendCount,1);assert.equal(failed.email_queued,false);assert.equal(failed.provider_accepted,false);assert.equal(failed.last_error,'Fixture transport failure');assert.match(deliveryMessage(failed),/failed/);assert.doesNotMatch(deliveryMessage(failed),/validated and queued/);
  queueStatus='REVIEW_REQUIRED';const uncertain=await queueDocumentEmail(message);assert.equal(sendCount,1);assert.equal(uncertain.email_queued,false);assert.equal(uncertain.provider_accepted,false);assert.match(deliveryMessage(uncertain),/requires review/);assert.match(deliveryMessage(uncertain),/No automatic resend/);
  queueStatus='SENT';
+ assert.match(messages[0].html, /<img src="https:\/\/app\.voxelveda\.com\/logo\.png"/);
+ assert.match(messages[0].html, /href="mailto:/);
+ assert.match(messages[0].text, /Validated fixture PDF is attached\.\n\nKind regards,/);
  await actualPdf.validatePdf(messages[0].attachments[0].content,{expectedText:['FIXTURE-RETRY-1']});
  assert.equal(messages[0].attachments.length,1);assert.equal(messages[0].attachments[0].contentType,'application/pdf');assert.match(messages[0].attachments[0].filename,/\.pdf$/);assert.equal(messages[0].attachments[0].path,undefined);
  const changed={...message,data:{...data,reference:'FIXTURE-RETRY-2',rows:[['Identity','FIXTURE-RETRY-2']]}};
