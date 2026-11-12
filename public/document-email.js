@@ -8,10 +8,15 @@
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const validTo = value => typeof value === 'string' && value.length <= 254 && /^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(value);
   const requestId = () => crypto.randomUUID();
+  function requestHeaders() {
+    const headers=new Headers(typeof window.authHeaders==='function'?window.authHeaders():{});
+    try{const token=localStorage.getItem('token');if(token&&!headers.has('Authorization'))headers.set('Authorization','Bearer '+token);}catch{}
+    return Object.fromEntries(headers.entries());
+  }
   async function allowed(source) {
     const owner=account();if(!owner.split('|')[0])return false;
     if(catalogOwner!==owner){catalogOwner=owner;catalogPromise=null;}
-    if(!catalogPromise)catalogPromise=fetch('/api/email/reports/catalog',{credentials:'same-origin',cache:'no-store'}).then(async response=>{if(!response.ok)throw new Error('Report email permissions unavailable.');return response.json();}).catch(()=>{if(catalogOwner===owner)catalogPromise=null;return null;});
+    if(!catalogPromise)catalogPromise=fetch('/api/email/reports/catalog',{credentials:'same-origin',cache:'no-store',headers:requestHeaders()}).then(async response=>{if(!response.ok)throw new Error('Report email permissions unavailable.');return response.json();}).catch(()=>{if(catalogOwner===owner)catalogPromise=null;return null;});
     const data=await catalogPromise;if(owner!==account()||!data)return false;
     return (data.reports||[]).some(item=>item.can_email===true&&item.type===source.type&&(!item.report||item.report===source.report)) && (source.type!=='qms-register'||(data.qms_registers||[]).some(item=>item.name===source.register));
   }
@@ -43,7 +48,8 @@
       onClosed:() => { if (active === state) active = null; }, ...options };
   }
   async function api(path, options, state) {
-    const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options, headers:{'Content-Type':'application/json', ...options?.headers} });
+    const headers=new Headers(requestHeaders());headers.set('Content-Type','application/json');new Headers(options?.headers).forEach((value,key)=>headers.set(key,value));
+    const response = await fetch(path, { credentials:'same-origin', cache:'no-store', ...options, headers });
     if (!live(state)) throw Object.assign(new Error('The signed-in account changed. Reopen this report from your current account.'), { stale:true });
     const data = await response.json().catch(() => null);
     if (!data || !response.ok) throw Object.assign(new Error(data?.message || 'The report service could not confirm the request.'), { status:response.status, code:data?.code, data, uncertain:response.status >= 500 || !data });
@@ -111,7 +117,7 @@
   }
   async function documentAction(state, download) {
     if (!live(state)) return;
-    try { await window.VoxelOperations.openPdf(state.report.pdf_url, {download}); }
+    try { await window.VoxelOperations.openPdf(state.report.pdf_url, {download,headers:requestHeaders()}); }
     catch (error) { if (live(state)) void window.VoxelFeedback?.show({kind:'error',title:'PDF unavailable',message:error.message}); }
   }
   function addStatusCheck(state) {

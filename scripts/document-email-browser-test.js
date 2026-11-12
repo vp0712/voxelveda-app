@@ -14,6 +14,8 @@ const fixture=`<!doctype html><html><head><meta name="viewport" content="width=d
 function json(response,status,data){response.writeHead(status,{'Content-Type':'application/json'}).end(JSON.stringify(data));}
 const server=http.createServer(async(request,response)=>{
  const url=new URL(request.url,'http://fixture.invalid');
+ if(url.pathname.startsWith('/api/email/')&&request.headers.authorization!=='Bearer synthetic-fixture')return json(response,401,{message:'Synthetic report APIs require the existing bearer-session contract.'});
+ if(url.pathname.startsWith('/api/email/')&&request.method==='POST'&&request.headers['content-type']!=='application/json')return json(response,415,{message:'The real auth helper and JSON headers must not create duplicate Content-Type values.'});
  if(url.pathname==='/fixture')return response.writeHead(200,{'Content-Type':'text/html'}).end(fixture);
  if(url.pathname==='/document/view')return response.writeHead(200,{'Content-Type':'text/html; charset=utf-8'}).end(injectGlobalBrand(fs.readFileSync(path.join(root,'public/document-view.html'),'utf8')));
  if(url.pathname==='/api/email/reports/catalog')return json(response,200,{reports:capability?[{type:'invoice',can_email:true}]:[],qms_registers:[]});
@@ -54,7 +56,7 @@ async function cancel(page){await page.locator('#vv-document-email-cancel').clic
   browser=await browsers[engine].launch({headless:true,...(engine==='chromium'?{args:['--no-sandbox'],...(process.env.VV_CHROMIUM_EXECUTABLE?{executablePath:process.env.VV_CHROMIUM_EXECUTABLE}:{})}:{})});
   const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));page.setDefaultTimeout(15000);
   await page.goto(origin+'/fixture');await page.locator('#actions .vv-document-email-button').waitFor();
-  assert.equal(prepared,0,'Opening a page/capability check does not generate or email a report');assert.equal(sends.length,0);
+  assert.equal(prepared,0,'Opening a page/capability check does not generate or email a report');assert.equal(sends.length,0);await page.evaluate(()=>{window.authHeaders=()=>({'Content-Type':'application/json',Authorization:'Bearer '+localStorage.getItem('token')});});
   await open(page);assert.equal(prepared,1);assert.equal(sends.length,0,'Opening the envelope prepares only, without sending');
   await page.locator('#vv-document-email-send').click();await feedback(page);assert.equal(sends.length,0,'Missing To blocked');
   await page.locator('#vvDocumentEmailTo').fill('wrong-address');await page.locator('#vv-document-email-send').click();await feedback(page);assert.equal(sends.length,0,'Invalid To blocked');
