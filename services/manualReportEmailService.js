@@ -88,7 +88,7 @@ async function capture(handler,req) {
   return {data,artifact:{...artifact,buffer:body,filename:safePdfFilename(artifact.filename),sha256:validation.sha256,validation,...(HASH.test(String(res.headers['x-document-source-sha256']||''))?{sourceHash:res.headers['x-document-source-sha256']}:{})}};
 }
 function sourceRequest(req,d) { return {...req,user:req.user,params:{id:d.record_id,type:d.report,register:d.register},query:{...(d.filters||{}),download:'0'},body:{}}; }
-async function render(req,d) {
+async function render(req,d,{currentScope=false}={}) {
   authorised(req.user,d);
   if(d.type==='procurement') {
     const service=require('./procurementReportService');let snapshotId=d.snapshot_id;
@@ -97,6 +97,10 @@ async function render(req,d) {
     return {data:JSON.parse(row.document_json),artifact:{...artifact,sourceHash:row.source_sha256},descriptor:{type:'procurement',snapshot_id:snapshotId}};
   }
   const source=sourceRequest(req,d);
+  // The version parameter protects preparation from an outdated invoice view.
+  // Later reads still check current ownership and every document field; a
+  // provider-driven approved→sent transition alone must not revoke its PDF.
+  if(currentScope&&d.type==='invoice')delete source.query.version;
   const handlers={register:()=>require('../controllers/originalReportController').download,invoice:()=>require('../controllers/invoiceController').viewInvoicePdf,'customer-statement':()=>require('../controllers/invoiceController').viewCustomerStatementPdf,'purchase-order':()=>require('../controllers/procurementDocumentController').pdf,'qms-register':()=>require('../controllers/qmsRegisterController').pdf,'qms-record':()=>require('../controllers/qmsDocumentController').recordPdf,coc:()=>require('../controllers/qms/qualityReleaseController').cocPdf,'material-process-sheet':()=>require('../controllers/materialController').viewProcessSheetPdf};
   const result=await capture(handlers[d.type](),source);
   if(d.type==='invoice'&&result.data.title!=='INVOICE')throw fail('Approve the invoice before emailing it.',409,'REPORT_EMAIL_APPROVAL_REQUIRED');
@@ -142,21 +146,25 @@ async function prepare(req,input) {
   }catch(error){await conn.rollback().catch(()=>{});throw error;}finally{conn.release();}
   return metadata(row);
 }
-async function getSnapshot(req,id,{recheck=true,db=pool}={}) {
+async function getSnapshot(req,id,{db=pool}={}) {
   id=uuid(id);const [[row]]=await db.query('SELECT * FROM manual_report_snapshots WHERE id=?',[id]);
   if(!row||Number(row.created_by)!==Number(req.user?.id))throw fail('Report snapshot not found.',404,'REPORT_EMAIL_NOT_FOUND');
   const d=descriptor(JSON.parse(row.descriptor_json));authorised(req.user,d);
   const data=JSON.parse(row.document_json);
   if(hash({descriptor:d,document:data})!==row.source_sha256||authorityHash(d,data)!==row.authority_sha256)throw fail('The saved report source failed integrity validation.',422,'PDF_SNAPSHOT_MISMATCH');
+  // A saved snapshot never freezes access rights. Re-run the original source
+  // scope before reading private bytes, even for status/retry callers. A team
+  // change or customer reassignment cannot be bypassed with an old snapshot ID.
+  const current=await render(req,d,{currentScope:true});
+  if(authorityHash(current.descriptor,current.data)!==row.authority_sha256)throw fail('The report source or your authorised selection changed. Prepare and review a current report before sending.',409,'REPORT_EMAIL_SOURCE_CHANGED');
   if(row.pdf_storage_key!==`manual-report-pdf/${Number(row.created_by)}/${row.pdf_sha256}.pdf`)throw fail('The saved report storage identity is invalid.',422,'PDF_SNAPSHOT_MISMATCH');
   const bytes=await objectStorage.getObject(row.pdf_storage_key);
   const checked=await validateDocumentPdf(bytes,data);
   if(checked.sha256!==row.pdf_sha256||checked.pages!==Number(row.pdf_pages)||safePdfFilename(row.filename)!==row.filename)throw fail('The saved report PDF failed integrity validation.',422,'PDF_SNAPSHOT_MISMATCH');
-  if(recheck){const current=await render(req,d);if(authorityHash(current.descriptor,current.data)!==row.authority_sha256)throw fail('The report source or your authorised selection changed. Prepare and review a current report before sending.',409,'REPORT_EMAIL_SOURCE_CHANGED');}
   return {row,data,descriptor:d,artifact:{buffer:bytes,filename:row.filename,sha256:checked.sha256,validation:checked}};
 }
 async function status(req,id) {
-  const {row,descriptor:d}=await getSnapshot(req,id,{recheck:false});
+  const {row,descriptor:d}=await getSnapshot(req,id);
   await ensureDocumentDeliverySchema();
   fields(req.query||{},['request_id']);
   const clientId=req.query?.request_id?uuid(req.query.request_id):null;
@@ -170,7 +178,7 @@ async function send(req,id,input) {
   if(!HASH.test(String(input.expected_sha256||'')))throw fail('Review the report PDF before sending.',422,'PDF_SNAPSHOT_REQUIRED');
   if(typeof input.to!=='string'||input.to.trim().length>254||!/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(input.to.trim()))throw fail('Enter exactly one recipient email address.',422,'REPORT_EMAIL_RECIPIENT_INVALID',{to:'Enter one email address.'});
   const to=validateRecipients(input.to.trim(),'to');if(to.length!==1)throw fail('Enter exactly one recipient email address.',422,'REPORT_EMAIL_RECIPIENT_INVALID');
-  const {row,data,artifact,descriptor:d}=await getSnapshot(req,id,{recheck:false});
+  const {row,data,artifact,descriptor:d}=await getSnapshot(req,id);
   if(input.expected_sha256!==row.pdf_sha256)throw fail('The reviewed PDF does not match this saved document.',409,'PDF_DOCUMENT_CHANGED');
   if(customerScoped(req.user)&&to[0].toLowerCase()!==customerEmail(req.user))throw fail('Use your authorised customer email for this document.',403,'REPORT_EMAIL_RECIPIENT_FORBIDDEN');
   const requestIdentity=`manual:${req.user.id}:${input.request_id.toLowerCase()}`;

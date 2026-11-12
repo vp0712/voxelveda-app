@@ -18,9 +18,9 @@ function load(relative, dependencies) {
 }
 function permissions(...values) { return { id: 71, role: 'fixture', email: 'owner@example.invalid', permissions: values }; }
 function fixture() {
-  const snapshots = new Map(), storage = new Map(), queued = [], audits = [], reads = [], invoiceLocks = [], invoiceActivity = [];
+  const snapshots = new Map(), storage = new Map(), queued = [], audits = [], reads = [], invoiceLocks = [], invoiceActivity = [], invoiceReads = [], storageReads = [];
   const heldLocks = new Map();
-  const state = { sourceChanged: false, corrupt: false, invoiceDraft: false, invoiceStatus: 'approved', invoiceDeleted: false };
+  const state = { sourceChanged: false, corrupt: false, invoiceDraft: false, invoiceStatus: 'approved', invoiceDeleted: false, teamManagerId: 71 };
   const staff = permissions('SEND_COMPANY_EMAIL', 'VIEW_RFQS', 'VIEW_FINANCE', 'EDIT_FINANCE');
   const records = Array.from({ length: 205 }, (_, index) => ({ id: index + 1, customer_name: 'Fixture customer ' + (index + 1), email: 'customer@example.invalid', material: 'Fixture nylon', quantity: index + 1, status: 'pending', created_at: '2026-11-01' }));
   const db = { pool: { config: { connectionLimit: 10 } }, async query(sql, values = []) {
@@ -39,6 +39,21 @@ function fixture() {
       snapshots.set(values[0], { ...Object.fromEntries(columns.map((key, index) => [key, values[index]])), created_at: new Date('2026-11-12T00:00:00Z') });
       return [{ affectedRows: 1 }];
     }
+    if (sql.startsWith('SELECT id FROM users WHERE')) return [[...(Number(values[0]) === 73 && Number(values[1]) === Number(state.teamManagerId) ? [{ id: 73 }] : [])]];
+    if (sql.includes('FROM staff_attendance a JOIN users u')) {
+      const attendance = [
+        { id: 1, user_id: 71, name: 'Fixture manager', work_date: '2026-11-02', clock_in: '2026-11-02T00:00:00Z', clock_out: '2026-11-02T02:00:00Z', total_hours: 2, total_minutes: 120, timestamp_basis: 'UTC' },
+        { id: 2, user_id: 73, name: 'Fixture team employee', work_date: '2026-11-03', clock_in: '2026-11-03T00:00:00Z', clock_out: '2026-11-03T08:00:00Z', total_hours: 8, total_minutes: 480, timestamp_basis: 'UTC' },
+        { id: 3, user_id: 74, name: 'Fixture outside employee', work_date: '2026-11-04', clock_in: '2026-11-04T00:00:00Z', clock_out: '2026-11-04T04:00:00Z', total_hours: 4, total_minutes: 240, timestamp_basis: 'UTC' }
+      ];
+      let rows = attendance, offset = 0;
+      if (sql.includes('u.manager_id=?')) { const manager = Number(values[offset++]), own = sql.includes('OR a.user_id=?') ? Number(values[offset++]) : null; rows = rows.filter(row => row.user_id === own || (row.user_id === 73 && Number(state.teamManagerId) === manager)); }
+      else if (sql.includes('AND a.user_id=?')) { const userId = Number(values[offset++]); rows = rows.filter(row => row.user_id === userId); }
+      if (sql.includes('a.work_date>=?')) { const from = values[offset++]; rows = rows.filter(row => row.work_date >= from); }
+      if (sql.includes('a.work_date<=?')) { const to = values[offset++]; rows = rows.filter(row => row.work_date <= to); }
+      assert.equal(offset, values.length); return [rows];
+    }
+    if (sql.startsWith('SELECT customer_email FROM invoices')) return [[{ customer_email: 'owner@example.invalid' }]];
     if (sql.startsWith('SELECT * FROM manual_report_snapshots')) return [[snapshots.get(values[0])].filter(Boolean)];
     if (sql.startsWith('SELECT q.id email_queue_id')) {
       assert.match(sql, /JOIN manual_report_snapshots m/); assert.match(sql, /m.authority_sha256=\?/); assert.match(sql, /LOWER\(q.to_json\)=LOWER\(\?\)/);
@@ -70,6 +85,7 @@ function fixture() {
     '../services/documentPdfService': pdf, './rfqController': rfqSource
   });
   const invoiceController = { async viewInvoicePdf(req, res) {
+    invoiceReads.push({ id: req.params.id, query: { ...req.query }, user: req.user });
     customerScope.assertCustomerRecord(req.user, 'owner@example.invalid');
     const data = { title: state.invoiceDraft ? 'DRAFT INVOICE' : 'INVOICE', reference: 'FIXTURE-INV-' + req.params.id, filename: 'FIXTURE-INV-' + req.params.id, customerEmail: 'owner@example.invalid', issueDate: '2026-11-01', party: 'Fixture customer | owner@example.invalid', columns: [{ label: 'Description' }, { label: 'Amount' }], rows: [['Fixture approved item', 'AUD 12.34']], totals: [{ label: 'Total', value: 'AUD 12.34' }] };
     return pdf.sendPdfResponse(res, await pdf.createDocumentPdf(data));
@@ -79,7 +95,7 @@ function fixture() {
     './auditService': { stableJsonText, async logAudit(_db, entry) { audits.push(entry); } },
     './documentPdfService': pdf,
     './emailQueueSchema': { async ensureEmailQueueSchema() {} },
-    './objectStorageService': { isConfigured() { return true; }, async putObject(key, bytes, contentType) { assert.equal(contentType, 'application/pdf'); storage.set(key, Buffer.from(bytes)); }, async getObject(key) { assert(storage.has(key), 'Private storage object must exist'); return Buffer.from(storage.get(key)); } },
+    './objectStorageService': { isConfigured() { return true; }, async putObject(key, bytes, contentType) { assert.equal(contentType, 'application/pdf'); storage.set(key, Buffer.from(bytes)); }, async getObject(key) { storageReads.push(key); assert(storage.has(key), 'Private storage object must exist'); return Buffer.from(storage.get(key)); } },
     './emailService': { validateRecipients(value) { if (typeof value !== 'string' || !/^[^\s@,;<>]+@[^\s@,;<>]+\.[^\s@,;<>]+$/.test(value)) throw Object.assign(new Error('Invalid recipient'), { status: 422, code: 'REPORT_EMAIL_RECIPIENT_INVALID' }); return [value.toLowerCase()]; } },
     './documentDeliveryService': {
       async ensureDocumentDeliverySchema() {},
@@ -101,8 +117,11 @@ function fixture() {
     './qmsRegisterService': { catalog() { return []; } }
   };
   const service = load('services/manualReportEmailService.js', dependencies);
+  const emailController = load('controllers/emailController.js', {
+    '../config/db': db, '../services/emailService': {}, '../services/emailQueue': { RETAINED_EMAIL_MODULES: ['workflow','invoices'] }, '../services/emailQueueSchema': { async ensureEmailQueueSchema() {} }, '../services/emailTemplates': { templates: {} }, '../services/workforceSchema': {}, '../config/companyProfile': { companyProfile() { return {}; } }, '../services/manualReportEmailService': service, '../services/documentSecurityService': require('../services/documentSecurityService'), '../services/customerRecordScope': customerScope, '../services/authorizationService': authorization
+  });
   const request = user => ({ user: user || staff, ip: '127.0.0.1', get() { return 'Synthetic fixture'; } });
-  return { service, reload: () => load('services/manualReportEmailService.js', dependencies), request, staff, state, snapshots, storage, queued, audits, reads, invoiceLocks, invoiceActivity, heldLocks };
+  return { service, reload: () => load('services/manualReportEmailService.js', dependencies), request, staff, state, snapshots, storage, queued, audits, reads, invoiceLocks, invoiceActivity, invoiceReads, storageReads, heldLocks, mayViewDelivery: (user, request) => emailController._test.mayViewDelivery(user, request, db) };
 }
 async function main() {
   const f = fixture(), { service } = f;
@@ -154,7 +173,10 @@ async function main() {
   await service.send(f.request(), prepared.snapshot_id, input); assert.equal(f.queued.length, 1, 'A repeated Send intent must reuse its queued message');
   const status = await service.status(f.request(), prepared.snapshot_id); assert.equal(status.sends.length, 1); assert.equal(status.sends[0].provider_accepted, false); assert.equal(status.sends[0].recipient_verified, false);
   f.state.sourceChanged = true;
-  await assert.rejects(() => service.getSnapshot(f.request(), prepared.snapshot_id), { code: 'REPORT_EMAIL_SOURCE_CHANGED' });
+  const readsBeforeSourceChange = f.storageReads.length;
+  await assert.rejects(() => service.getSnapshot(f.request(), prepared.snapshot_id, { recheck: false }), { code: 'REPORT_EMAIL_SOURCE_CHANGED' });
+  await assert.rejects(() => service.status(f.request(), prepared.snapshot_id), { code: 'REPORT_EMAIL_SOURCE_CHANGED' });
+  assert.equal(f.storageReads.length, readsBeforeSourceChange, 'Changed current authority must fail before private storage retrieval');
   await assert.rejects(() => service.send(f.request(), prepared.snapshot_id, { ...input, to: 'source-change@example.invalid', request_id: crypto.randomUUID() }), { code: 'REPORT_EMAIL_SOURCE_CHANGED' });
   assert.equal(f.queued.length, 1, 'Changed authorised rows cannot enqueue an unreviewed report');
   f.state.sourceChanged = false;
@@ -165,11 +187,40 @@ async function main() {
   f.storage.set(row.pdf_storage_key, Buffer.concat([originalBytes, Buffer.from('\n% fixture changed bytes\n')]));
   await assert.rejects(() => service.getSnapshot(f.request(), prepared.snapshot_id), { code: 'PDF_SNAPSHOT_MISMATCH' }); f.storage.set(row.pdf_storage_key, originalBytes);
   await assert.rejects(() => service.prepare(f.request(), { type: 'register', report: 'rfqs', filters: {}, expected_sha256: '0'.repeat(64) }), { code: 'PDF_DOCUMENT_CHANGED' });
+  const manager = permissions('SEND_COMPANY_EMAIL','VIEW_TEAM_TIMESHEET','VIEW_OWN_TIMESHEET');
+  const teamPrepared = await service.prepare(f.request(manager), { type: 'register', report: 'timesheets', filters: { user_id: '73', from_date: '2026-11-02', to_date: '2026-11-08' } });
+  const teamArtifact = await service.getSnapshot(f.request(manager), teamPrepared.snapshot_id);
+  const teamText = (await pdf.validatePdf(teamArtifact.artifact.buffer)).text;
+  assert.match(teamText, /Fixture team employee/); assert.doesNotMatch(teamText, /Fixture outside employee|Fixture manager/);
+  const legacyTeam = { related_module: 'workflow', related_record_id: 'manual:' + teamPrepared.snapshot_id, created_by: manager.id };
+  assert.equal(await f.mayViewDelivery(manager, legacyTeam), true);
+  const ownOnlyManager = permissions('SEND_COMPANY_EMAIL','VIEW_OWN_TIMESHEET');
+  const deniedTeam = error => error.status === 403;
+  const assertTeamRevoked = async actor => {
+    const storageReadsBefore = f.storageReads.length, queuedBefore = f.queued.length;
+    await assert.rejects(() => service.getSnapshot(f.request(actor), teamPrepared.snapshot_id, { recheck: false }), deniedTeam);
+    await assert.rejects(() => service.status(f.request(actor), teamPrepared.snapshot_id), deniedTeam);
+    await assert.rejects(() => service.send(f.request(actor), teamPrepared.snapshot_id, { to: 'reviewer@example.invalid', expected_sha256: teamPrepared.sha256, request_id: crypto.randomUUID() }), deniedTeam);
+    assert.equal(await f.mayViewDelivery(actor, legacyTeam), false);
+    assert.equal(f.storageReads.length, storageReadsBefore, 'Team access must be checked before reading private snapshot bytes');
+    assert.equal(f.queued.length, queuedBefore, 'Revoked team access must not queue any email');
+  };
+  await assertTeamRevoked(ownOnlyManager);
+  f.state.teamManagerId = 99; await assertTeamRevoked(manager); f.state.teamManagerId = manager.id;
+  const version = 'a'.repeat(64), versionedInvoice = await service.prepare(f.request(), { type: 'invoice', record_id: 11, filters: { version } });
+  assert.equal(f.invoiceReads.at(-1).query.version, version, 'Prepare must preserve the reviewed invoice version contract');
+  await service.getSnapshot(f.request(), versionedInvoice.snapshot_id);
+  assert.equal(f.invoiceReads.at(-1).query.version, undefined, 'Current ownership/model scope recheck must not bind harmless delivery-state version changes');
   const customer = { ...f.staff, role: 'customer' }, customerReq = f.request(customer);
   const ownInvoice = await service.prepare(customerReq, { type: 'invoice', record_id: 9 });
   await assert.rejects(() => service.send(customerReq, ownInvoice.snapshot_id, { ...input, expected_sha256: ownInvoice.sha256, request_id: crypto.randomUUID(), to: 'other@example.invalid' }), { code: 'REPORT_EMAIL_RECIPIENT_FORBIDDEN' });
   await assert.rejects(() => service.prepare(f.request({ ...customer, email: 'other@example.invalid' }), { type: 'invoice', record_id: 9 }), { code: 'CUSTOMER_RECORD_NOT_FOUND' });
-  await assert.rejects(() => service.getSnapshot(f.request({ ...customer, email: 'other@example.invalid' }), ownInvoice.snapshot_id), { code: 'CUSTOMER_RECORD_NOT_FOUND' });
+  const changedCustomer = { ...customer, email: 'other@example.invalid' }, customerReadsBefore = f.storageReads.length;
+  await assert.rejects(() => service.getSnapshot(f.request(changedCustomer), ownInvoice.snapshot_id, { recheck: false }), { code: 'CUSTOMER_RECORD_NOT_FOUND' });
+  await assert.rejects(() => service.status(f.request(changedCustomer), ownInvoice.snapshot_id), { code: 'CUSTOMER_RECORD_NOT_FOUND' });
+  await assert.rejects(() => service.send(f.request(changedCustomer), ownInvoice.snapshot_id, { to: changedCustomer.email, expected_sha256: ownInvoice.sha256, request_id: crypto.randomUUID() }), { code: 'CUSTOMER_RECORD_NOT_FOUND' });
+  assert.equal(await f.mayViewDelivery(changedCustomer, { related_module: 'invoices', related_record_id: '9', created_by: customer.id }), false);
+  assert.equal(f.storageReads.length, customerReadsBefore, 'Customer ownership changes must fail before private snapshot retrieval despite broad grants');
   await assert.rejects(() => service._test.capture(async(_req, res) => res.status(422).json({ message: 'Fixture PDF generation failed', code: 'PDF_GENERATION_FAILED' }), f.request()), { code: 'PDF_GENERATION_FAILED' });
   await assert.rejects(() => service._test.capture(async(_req, res) => res.send(Buffer.from('<html>Unexpected page</html>')), f.request()), { code: 'REPORT_EMAIL_SOURCE_FAILED' });
   const priorInvoiceSends = f.queued.length;
@@ -219,6 +270,6 @@ async function main() {
   f.state.invoiceDraft = true;
   await assert.rejects(() => service.prepare(f.request(), { type: 'invoice', record_id: 9 }), { code: 'REPORT_EMAIL_APPROVAL_REQUIRED' });
   assert(f.audits.some(entry => entry.action === 'REPORT_EMAIL_SNAPSHOT_PREPARED')); assert(f.audits.some(entry => entry.action === 'REPORT_EMAIL_QUEUED'));
-  console.log('Manual report email passed: strict typed source allowlist; current permissions and ownership; complete 205-row multipage source; durable immutable preview/download/email bytes; explicit one-recipient privacy; no weekly override; changed-source and tamper rejection; no email on prepare; safe request/status/audit outcomes; invoice source permissions, locked approved/sent/paid lifecycle and original activity; cross-intent/source/recipient concurrency and prior-outcome protection.');
+  console.log('Manual report email passed: strict typed source allowlist; current permissions and ownership; complete 205-row multipage source; durable immutable preview/download/email bytes; explicit one-recipient privacy; no weekly override; changed-source and tamper rejection; no email on prepare; safe request/status/audit outcomes; invoice source permissions, locked approved/sent/paid lifecycle and original activity; cross-intent/source/recipient concurrency and prior-outcome protection; actual team/customer scope revocation before storage across read/status/send/legacy paths.');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
