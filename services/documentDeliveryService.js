@@ -4,6 +4,7 @@ const pool = require('../config/db');
 const { createDocumentPdf,deriveDocumentContentProof,DOCUMENT_LAYOUT_VERSION,validatePdf,safePdfFilename } = require('./documentPdfService');
 const { queueEmail,restoreAttachments } = require('./emailQueue');
 const { ensureEmailQueueSchema } = require('./emailQueueSchema');
+const { renderInvoiceEmail } = require('./emailTemplates');
 let schemaPromise;
 function ensureDocumentDeliverySchema() {
   if (!schemaPromise) schemaPromise = pool.query(`CREATE TABLE IF NOT EXISTS document_delivery_requests (
@@ -77,7 +78,8 @@ async function queueDocumentEmail({ module, recordId, data, to, subject, html, t
     // Workers cannot claim a message whose document bookkeeping did not commit.
     conn=await pool.getConnection();await conn.beginTransaction();
     if(beforeQueue)await beforeQueue(conn);
-    const queueId = await queueEmail({ templateKey:'document_pdf', to, subject, html, text, deliveryPolicy, attachments: [{ filename: artifact.filename, content: artifact.buffer, contentType: 'application/pdf', contentDisposition: 'attachment' }], relatedModule: module, relatedRecordId: recordId, createdBy, idempotencyKey: idempotencyKey || `document:${requestKey}` },conn);
+    const body = module === 'invoices' && sourceData.title === 'INVOICE' && !html ? renderInvoiceEmail(text) : { html, text };
+    const queueId = await queueEmail({ templateKey:'document_pdf', to, subject, ...body, deliveryPolicy, attachments: [{ filename: artifact.filename, content: artifact.buffer, contentType: 'application/pdf', contentDisposition: 'attachment' }], relatedModule: module, relatedRecordId: recordId, createdBy, idempotencyKey: idempotencyKey || `document:${requestKey}` },conn);
     const [[queued]] = await conn.query('SELECT attachments_json FROM email_queue WHERE id=?',[queueId]);
     const savedAttachments=restoreAttachments(JSON.parse(queued.attachments_json));
     if(savedAttachments.length!==1)throw Object.assign(new Error('The queued document must contain exactly one PDF.'),{code:'PDF_ATTACHMENT_INVALID'});
