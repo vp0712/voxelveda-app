@@ -126,7 +126,8 @@ async function main() {
   const headers = {}; let downloaded;
   await sendPdfResponse({setHeader:(k,v)=>{headers[k]=v;},send:b=>{downloaded=b;}},invoice,true);
   assert.equal(headers['Content-Type'],'application/pdf'); assert.equal(headers['Content-Disposition'],'attachment; filename="FIXTURE-INV-042.pdf"'); assert.deepEqual(downloaded,invoice.buffer);
-  const oldFetch=global.fetch, oldUrl=process.env.WORDPRESS_MAIL_RELAY_URL,oldToken=process.env.WORDPRESS_MAIL_RELAY_TOKEN,oldTransport=process.env.EMAIL_PRIMARY_TRANSPORT;
+  const oldFetch=global.fetch, oldUrl=process.env.WORDPRESS_MAIL_RELAY_URL,oldToken=process.env.WORDPRESS_MAIL_RELAY_TOKEN,oldTransport=process.env.EMAIL_PRIMARY_TRANSPORT,oldPdfTransport=process.env.PDF_EMAIL_TRANSPORT;
+  delete process.env.PDF_EMAIL_TRANSPORT;
   process.env.EMAIL_PRIMARY_TRANSPORT='https_relay';process.env.WORDPRESS_MAIL_RELAY_URL='https://fixture.invalid/mail';process.env.WORDPRESS_MAIL_RELAY_TOKEN='fixture-only-token';let sent=0;
   global.fetch=async(_url,options)=>{if(options.method==='POST')sent+=1;return {ok:true,json:async()=>({attachment_contract_version:2}),text:async()=>JSON.stringify({sent:true})};};
   try {
@@ -144,10 +145,11 @@ async function main() {
     outcome='REVIEW';await assert.rejects(()=>mail.sendMail({to:'fixture@example.invalid',subject:'Preserved review fixture',attachments:normalized}),{code:'DELIVERY_REVIEW_REQUIRED'});
     outcome='TIMEOUT';await assert.rejects(()=>mail.sendMail({to:'fixture@example.invalid',subject:'Uncertain response fixture',attachments:normalized}),{code:'DELIVERY_REVIEW_REQUIRED'});
   }
-  finally {global.fetch=oldFetch;if(oldTransport===undefined)delete process.env.EMAIL_PRIMARY_TRANSPORT;else process.env.EMAIL_PRIMARY_TRANSPORT=oldTransport;if(oldUrl===undefined)delete process.env.WORDPRESS_MAIL_RELAY_URL;else process.env.WORDPRESS_MAIL_RELAY_URL=oldUrl;if(oldToken===undefined)delete process.env.WORDPRESS_MAIL_RELAY_TOKEN;else process.env.WORDPRESS_MAIL_RELAY_TOKEN=oldToken;}
-  const apiEnvironment=['EMAIL_PRIMARY_TRANSPORT','HOSTINGER_MAIL_API_BASE_URL','HOSTINGER_MAIL_API_TOKEN','HOSTINGER_MAILBOX_RESOURCE_ID'],savedApiEnv=new Map(apiEnvironment.map(name=>[name,process.env[name]]));
+  finally {global.fetch=oldFetch;if(oldTransport===undefined)delete process.env.EMAIL_PRIMARY_TRANSPORT;else process.env.EMAIL_PRIMARY_TRANSPORT=oldTransport;if(oldPdfTransport===undefined)delete process.env.PDF_EMAIL_TRANSPORT;else process.env.PDF_EMAIL_TRANSPORT=oldPdfTransport;if(oldUrl===undefined)delete process.env.WORDPRESS_MAIL_RELAY_URL;else process.env.WORDPRESS_MAIL_RELAY_URL=oldUrl;if(oldToken===undefined)delete process.env.WORDPRESS_MAIL_RELAY_TOKEN;else process.env.WORDPRESS_MAIL_RELAY_TOKEN=oldToken;}
+  const apiEnvironment=['EMAIL_PRIMARY_TRANSPORT','PDF_EMAIL_TRANSPORT','HOSTINGER_MAIL_API_BASE_URL','HOSTINGER_MAIL_API_TOKEN','HOSTINGER_MAILBOX_RESOURCE_ID'],savedApiEnv=new Map(apiEnvironment.map(name=>[name,process.env[name]]));
   let apiPosts=0,apiMode='TIMEOUT',fixtureProviderAccepted=false;
   try{
+    delete process.env.PDF_EMAIL_TRANSPORT;
     Object.assign(process.env,{EMAIL_PRIMARY_TRANSPORT:'hostinger_mail_api',HOSTINGER_MAIL_API_BASE_URL:'https://fixture.invalid',HOSTINGER_MAIL_API_TOKEN:'fixture-only-token',HOSTINGER_MAILBOX_RESOURCE_ID:'fixture-mailbox'});
     global.fetch=async(url,options)=>{
       assert.match(url,/^https:\/\/fixture\.invalid\/api\/v1\/mailboxes\/fixture-mailbox\/send$/);assert.equal(options.method,'POST');apiPosts++;
@@ -174,7 +176,7 @@ async function main() {
     const beforeBlocked=apiPosts;
     delete process.env.HOSTINGER_MAIL_API_TOKEN;await assert.rejects(()=>mail.sendMail({to:'fixture@example.invalid',subject:'Synthetic missing connection',attachments:normalized}),{code:'HOSTINGER_MAIL_API_CONFIG_MISSING'});process.env.HOSTINGER_MAIL_API_TOKEN='fixture-only-token';
     await assert.rejects(()=>mail.sendMail({to:'fixture@example.invalid',subject:'Synthetic invalid PDF',attachments:[{filename:'fixture.pdf',content:Buffer.from('<html>not a PDF</html>')}]}),{code:'PDF_DOCUMENT_INVALID'});
-    const privatePolicy={type:'WEEKLY_TIMESHEET',staffId:31,deliveryId:81,revision:1,fromDate:'2026-10-19',toDate:'2026-10-25',sourceHash:'1'.repeat(64),recipient:'fixture@example.invalid'};
+    const privatePolicy={type:'WEEKLY_TIMESHEET',staffId:31,deliveryId:81,revision:1,fromDate:'2026-10-19',toDate:'2026-10-25',sourceHash:'1'.repeat(64),recipient:'fixture@example.invalid',recipientSource:'REGISTERED_EMAIL',recipientPolicyVersion:2};
     await assert.rejects(()=>mail.sendMail({to:privatePolicy.recipient,subject:'Synthetic private weekly policy',attachments:normalized,deliveryKey:'weekly-timesheet:31:2026-10-19:2026-10-25:v1',deliveryPolicy:privatePolicy}),error=>error.code==='DELIVERY_REVIEW_REQUIRED'&&error.reasonCode==='WEEKLY_TRANSPORT_PRIVACY_UNVERIFIED');
     assert.equal(apiPosts,beforeBlocked,'Missing connection, invalid PDF and unverified weekly privacy must block before POST');
     const smtpNames=['SMTP_HOST','SMTP_USERNAME','SMTP_PASSWORD'],savedSmtp=new Map(smtpNames.map(name=>[name,process.env[name]])),createTransport=nodemailer.createTransport;

@@ -17,7 +17,7 @@ const db={async query(sql,values=[]){
 }};
 require.cache[dbPath]={id:dbPath,filename:dbPath,loaded:true,exports:db};
 require.cache[schemaPath]={id:schemaPath,filename:schemaPath,loaded:true,exports:{async ensureEmailQueueSchema(){}}};
-require.cache[servicePath]={id:servicePath,filename:servicePath,loaded:true,exports:{...actualService,async sendMail(message){throw Object.assign(new Error('Fixture uncertain transaction; review before retry.'),{code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:message.subject==='fixture-1'});}}};
+require.cache[servicePath]={id:servicePath,filename:servicePath,loaded:true,exports:{...actualService,selectedEmailTransport:()=> 'https_relay',async sendMail(message){throw Object.assign(new Error('Fixture uncertain transaction; review before retry.'),{code:'DELIVERY_REVIEW_REQUIRED',providerAccepted:message.subject==='fixture-1'});}}};
 async function main(){
  const outcomes=await require('../services/emailQueue').processEmailQueue();
  assert.deepEqual(outcomes.map(row=>row.status),['REVIEW_REQUIRED','REVIEW_REQUIRED']);

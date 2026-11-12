@@ -197,10 +197,10 @@ async function saveProfile(event) {
   $('timesheetDeliveryEmail').removeAttribute('aria-invalid');
   if (!name) return setStatus('Full name is required.', 'error');
   if (timesheetDeliveryEmail && (!$('timesheetDeliveryEmail').checkValidity() || /[,;<>\r\n]/.test(timesheetDeliveryEmail))) {
-    $('timesheetDeliveryError').textContent = 'Enter one valid email address, or leave blank to disable delivery.';
+    $('timesheetDeliveryError').textContent = 'Enter one valid legacy address, or leave this historical field blank. Automatic reports use your registered account email.';
     $('timesheetDeliveryEmail').setAttribute('aria-invalid', 'true');
     $('timesheetDeliveryEmail').focus();
-    return setStatus('Check the timesheet delivery email.', 'error');
+    return setStatus('Check the legacy delivery address.', 'error');
   }
 
   profileSaving = true;

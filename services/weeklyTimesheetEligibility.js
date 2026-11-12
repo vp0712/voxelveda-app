@@ -1,6 +1,11 @@
 'use strict';
 const crypto = require('node:crypto');
 const { DateTime, IANAZone } = require('luxon');
+// Explicit company delivery policy, not a fallback to a different profile field.
+// Persisted versions retain their original policy; pending legacy versions need
+// an authorised revision before adopting the registered-account address.
+const RECIPIENT_SOURCE = 'REGISTERED_EMAIL';
+const RECIPIENT_POLICY_VERSION = 2;
 
 function policyError(message, code = 'WEEKLY_TIMESHEET_POLICY_INVALID') { return Object.assign(new Error(message), { code, statusCode: 422 }); }
 function integerSetting(value, fallback, min, max, key) {
@@ -57,6 +62,7 @@ function scheduleDetails(now = new Date(), env = process.env) {
   let due = local.startOf('week').plus({ days: config.weekday - 1 }).set({ hour: config.hour, minute: config.minute });
   if (!window.eligible && due.toMillis() <= local.toMillis()) due = due.plus({ weeks: 1 });
   return { enabled: config.enabled, timezone: config.timezone, timezone_source: env.TIMESHEET_TIMEZONE ? 'TIMESHEET_TIMEZONE' : env.WEEKLY_TIMESHEET_EMAIL_TIMEZONE ? 'WEEKLY_TIMESHEET_EMAIL_TIMEZONE' : 'default',
+    recipient_source: RECIPIENT_SOURCE, recipient_policy_version: RECIPIENT_POLICY_VERSION,
     storage_timezone_verified: config.storageTimezone === 'UTC', timestamp_policy: config.storageTimezone === 'UTC' ? 'VERIFIED_LEGACY_AND_EXPLICIT_UTC' : 'EXPLICIT_ROW_UTC_ONLY', weekday: config.weekday, hour: config.hour, minute: config.minute,
     window_minutes: config.windowMinutes, recovery_hours:config.recoveryHours, recovery_end_utc:recoveryWindow(now,config).end_utc, next_due_utc: due.toUTC().toISO(), next_due_local: due.toISO(),
     window_end_utc: due.plus({ minutes: config.windowMinutes }).toUTC().toISO(), current_period: window.period, waiting_reason: window.reason };
@@ -188,7 +194,13 @@ function assessWorkedAttendance(staff, records, period, config, now = new Date()
 function canonicalSnapshot(staff, assessment, period, version = 1, reviewStatus = 'DRAFT') {
   return { staff_id: Number(staff.id), staff_name: String(staff.name || ''), employee_reference: String(staff.employee_number || ''),
     period_start: period.start, period_end: period.end, timezone: period.timezone, version,
+    recipient_source: RECIPIENT_SOURCE, recipient_policy_version: RECIPIENT_POLICY_VERSION,
     review_status: reviewStatus, total_minutes: assessment.totalMinutes, rows: assessment.rows,
     shift_allocation: 'WHOLE_SHIFT_LOCAL_START_DATE' };
 }
-module.exports = { configuration, latestCompletedWeek, scheduleWindow, recoveryWindow, scheduleDetails, reportingDispatch, emailAddress, isEmployee, activeEmployee, assessWorkedAttendance, canonicalSnapshot, snapshotHash, stableJson, utcInstant, policyError };
+function registeredRecipient(staff) { return emailAddress(staff?.email); }
+function currentRecipientPolicy(snapshot) {
+  return snapshot?.recipient_source === RECIPIENT_SOURCE && snapshot?.recipient_policy_version === RECIPIENT_POLICY_VERSION;
+}
+module.exports = { configuration, latestCompletedWeek, scheduleWindow, recoveryWindow, scheduleDetails, reportingDispatch, emailAddress, isEmployee, activeEmployee, assessWorkedAttendance, canonicalSnapshot, snapshotHash, stableJson, utcInstant, policyError,
+  RECIPIENT_SOURCE, RECIPIENT_POLICY_VERSION, registeredRecipient, currentRecipientPolicy };

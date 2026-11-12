@@ -8,7 +8,7 @@ const { DateTime } = require('luxon');
 const attendanceTime=require('../services/attendanceTimeService');
 const ENV = { WEEKLY_TIMESHEET_EMAIL_ENABLED: 'true', WEEKLY_TIMESHEET_EMAIL_TIMEZONE: 'Australia/Sydney', ATTENDANCE_STORAGE_TIMEZONE: 'UTC' };
 const CONFIG = policy.configuration(ENV), NOW = new Date('2026-10-11T20:00:00Z'), PERIOD = policy.latestCompletedWeek(NOW, CONFIG.timezone);
-const staff = (id, extra = {}) => ({ id, name: `Fixture employee ${id}`, employee_number: `FIXTURE-${id}`, role: 'staff', manager_id: 10, active: 1, account_status: 'ACTIVE', deleted_at: null, email: 'login-only@example.invalid', timesheet_delivery_email: `delivery-${id}@example.invalid`, ...extra });
+const staff = (id, extra = {}) => ({ id, name: `Fixture employee ${id}`, employee_number: `FIXTURE-${id}`, role: 'staff', manager_id: 10, active: 1, account_status: 'ACTIVE', deleted_at: null, email: `registered-${id}@example.invalid`, timesheet_delivery_email: `delivery-${id}@example.invalid`, ...extra });
 const worked = (id, userId, start = '2026-10-05T22:00:00Z', end = '2026-10-06T06:00:00Z', minutes = 480, extra = {}) => ({ id, user_id: userId, clock_in: start, clock_out: end, total_minutes: minutes, total_hours: Math.round(minutes / 60 * 100) / 100, work_date: '2026-10-06', deleted: 0, notes: '', break_minutes: null, ...extra });
 function plain(value) { return JSON.parse(JSON.stringify(value)); }
 function assess(rows, employee = staff(1), period = PERIOD, config = CONFIG, now = NOW) { return policy.assessWorkedAttendance(employee, rows, period, config, now); }
@@ -60,6 +60,11 @@ function pureEligibility() {
   assert.equal(assess([worked(1, 1)], staff(1), PERIOD, { ...CONFIG, storageTimezone: '' }).status, 'REVIEW_REQUIRED');
   for (const recipient of ['', 'bad', 'one@example.invalid,two@example.invalid', 'Name <one@example.invalid>', 'one@example.invalid\r\nBcc:x@example.invalid']) assert.equal(policy.emailAddress(recipient), '');
   const canonical = policy.canonicalSnapshot(staff(1), overnight, PERIOD); assert.equal(policy.snapshotHash(canonical), policy.snapshotHash(plain(canonical))); assert.equal(canonical.total_minutes, 480);
+  assert.equal(canonical.recipient_source, 'REGISTERED_EMAIL'); assert.equal(canonical.recipient_policy_version, 2);
+  assert(policy.currentRecipientPolicy(canonical));
+  assert.equal(policy.registeredRecipient(staff(1)), 'registered-1@example.invalid');
+  assert.equal(policy.registeredRecipient(staff(1, {email:null})), '', 'Legacy designated email never substitutes for a missing registered address');
+  assert(!policy.currentRecipientPolicy({...canonical,recipient_source:'DESIGNATED_EMAIL'}));
   assert(!JSON.stringify(canonical).includes('login-only@example.invalid'));
 }
 
@@ -76,13 +81,14 @@ function manualTimeAndSchedule() {
   assert.throws(()=>policy.configuration({...ENV,WEEKLY_TIMESHEET_EMAIL_TIMEZONE:'UTC'}),(error)=>error.code==='WEEKLY_TIMESHEET_POLICY_INVALID');
   assert.throws(()=>policy.configuration({...ENV,TIMESHEET_TIMEZONE:'Australia/Perth'}),(error)=>error.code==='WEEKLY_TIMESHEET_POLICY_INVALID');
   const schedule=policy.scheduleDetails(new Date('2026-10-12T00:00:00Z'),ENV);assert.equal(schedule.next_due_local,'2026-10-19T07:00:00.000+11:00');assert.equal(schedule.timezone,'Australia/Sydney');assert.equal(schedule.weekday,1);
+  assert.equal(schedule.recipient_source,'REGISTERED_EMAIL');assert.equal(schedule.recipient_policy_version,2);
   const wednesday=policy.configuration({...ENV,WEEKLY_TIMESHEET_EMAIL_WEEKDAY:'3'});assert(policy.scheduleWindow(new Date('2026-10-13T20:00:00Z'),wednesday).eligible);assert(!policy.scheduleWindow(NOW,wednesday).eligible);
   const withoutGlobal={...CONFIG,storageTimezone:''};assert.equal(assess([worked(1,1)],staff(1),PERIOD,withoutGlobal).status,'REVIEW_REQUIRED');assert.equal(assess([worked(1,1,undefined,undefined,undefined,{timestamp_basis:'UTC',recorded_timezone:'Australia/Sydney',entry_source:'CLOCK'})],staff(1),PERIOD,withoutGlobal).status,'ELIGIBLE');
 }
 
 function schedulerFixture(initial = {}) {
-  const state = { staff: [staff(1), staff(2), staff(3), staff(4, { timesheet_delivery_email: null }), staff(5), staff(6, { role: 'manager' })],
-    attendance: [worked(1, 1), worked(3, 3, undefined, undefined, undefined, { attendance_status: 'PLANNED' }), worked(4, 4), worked(5, 5, undefined, null), worked(6, 6)],
+  const state = { staff: [staff(1), staff(2), staff(3), staff(4, { email: null }), staff(5), staff(6, { role: 'manager' })],
+    attendance: [worked(1, 1), worked(3, 3, undefined, undefined, undefined, { attendance_status: 'PLANNED' }), worked(33, 3, undefined, undefined, undefined, { attendance_status: 'CANCELLED' }), worked(4, 4), worked(5, 5, undefined, null), worked(6, 6)],
     deliveries: [], history: [], audits: [], timesheets: [], queues: [], sources: [], htmlSources: [], logs: [], failPdf: false, failRender: false, pdfCalls: 0, beforeQueueMutation: null, ...initial };
   let pending = Promise.resolve();
   async function query(sql, params = [], conn = null) {
@@ -119,7 +125,8 @@ function schedulerFixture(initial = {}) {
     if (/UPDATE weekly_timesheet_deliveries SET status='QUEUED'/.test(normalized)) { const row = state.deliveries.find((row) => row.id === params[2] && row.claim_token === params[3] && !row.email_queue_id); if (row) Object.assign(row, { status: 'QUEUED', email_queue_id: params[0],document_request_id:params[1], claim_token: null }); return [{ affectedRows: row ? 1 : 0 }]; }
     if (/UPDATE weekly_timesheet_deliveries SET status='NO_RECIPIENT'/.test(normalized)) { state.deliveries.find((row) => row.id === params[0]).status = 'NO_RECIPIENT'; return [{ affectedRows: 1 }]; }
     if (/UPDATE weekly_timesheet_deliveries SET status=\?,review_reasons_json=/.test(normalized)) { Object.assign(state.deliveries.find((row) => row.id === params[2]), { status: params[0], review_reasons_json: params[1], claim_token: null }); return [{ affectedRows: 1 }]; }
-    if (/UPDATE weekly_timesheet_deliveries SET status='REVIEW_REQUIRED'/.test(normalized)) { Object.assign(state.deliveries.find((row) => row.id === params[0]), { status: 'REVIEW_REQUIRED', claim_token: null }); return [{ affectedRows: 1 }]; }
+    if (/UPDATE weekly_timesheet_deliveries SET status='REVIEW_REQUIRED'/.test(normalized)) { Object.assign(state.deliveries.find((row) => row.id === params[0]), { status: 'REVIEW_REQUIRED', claim_token: null,
+      ...(/last_error_code='RECIPIENT_POLICY_CHANGED'/.test(normalized)?{last_error_code:'RECIPIENT_POLICY_CHANGED'}:/last_error_code='STAFF_OR_RECIPIENT_CHANGED'/.test(normalized)?{last_error_code:'STAFF_OR_RECIPIENT_CHANGED'}:{}) }); return [{ affectedRows: 1 }]; }
     if (/UPDATE weekly_timesheet_deliveries SET status=\?,last_error_code=\?,claim_token=NULL/.test(normalized)) { const row = state.deliveries.find((row) => row.id === params[2] && row.claim_token === params[3] && !row.email_queue_id); if (row) Object.assign(row, { status: params[0], last_error_code: params[1], claim_token: null }); return [{ affectedRows: row ? 1 : 0 }]; }
     if (/UPDATE weekly_timesheet_deliveries SET status=\?,last_error_code=\?, provider_accepted_at/.test(normalized)) { const row = state.deliveries.find((row) => row.email_queue_id === params[4]); Object.assign(row, { status: params[0], provider_accepted_at: params[2] ? NOW.toISOString() : null }); return [{ affectedRows: 1 }]; }
     throw new Error('Unexpected weekly fixture query: ' + normalized + ' params=' + JSON.stringify(params));
@@ -132,7 +139,7 @@ function schedulerFixture(initial = {}) {
   const dependencies = { '../config/db': db, luxon: require('luxon'), 'node:crypto': require('node:crypto'),
     './timesheetPdfService': { freezeSnapshot: async (_db,snapshot) => {state.pdfCalls++;return snapshot;}, snapshotArtifact: async () => {state.pdfCalls++;return {fixture:true};} },
     './weeklyTimesheetEmailService':{contentHashFor:require('../services/weeklyTimesheetEmailService').contentHashFor,renderWeeklyTimesheetEmail(snapshot){state.htmlSources.push(plain(snapshot));if(state.beforeQueueMutation){state.beforeQueueMutation(state);state.beforeQueueMutation=null;}if(state.failRender)throw Object.assign(new Error('Fixture report rendering failed'),{code:'TIMESHEET_REPORT_RENDER_FAILED'});return require('../services/weeklyTimesheetEmailService').renderWeeklyTimesheetEmail(snapshot);}},
-    './emailQueue':{async queueEmail(message){const existing=state.queues.find(row=>row.idempotency_key===message.idempotencyKey);if(existing)return existing.id;const row={id:state.queues.length+1,idempotency_key:message.idempotencyKey,to_json:JSON.stringify(message.to),cc_json:JSON.stringify(message.cc||[]),bcc_json:JSON.stringify(message.bcc||[]),related_module:message.relatedModule,related_record_id:String(message.relatedRecordId),delivery_policy_json:JSON.stringify(message.deliveryPolicy),subject:message.subject,html_body:message.html,text_body:message.text,attachments_json:JSON.stringify(message.attachments),status:'PENDING'};state.queues.push(row);return row.id;}},
+    './emailQueue':{async queueEmail(message){const existing=state.queues.find(row=>row.idempotency_key===message.idempotencyKey);if(existing)return existing.id;const row={id:state.queues.length+1,idempotency_key:message.idempotencyKey,to_json:JSON.stringify(message.to),cc_json:JSON.stringify(message.cc||[]),bcc_json:JSON.stringify(message.bcc||[]),related_module:message.relatedModule,related_record_id:String(message.relatedRecordId),delivery_policy_json:JSON.stringify({...message.deliveryPolicy,...(state.withQueueTransport?{queueTransport:{provider:'resend',contractVersion:1,payloadSha256:'a'.repeat(64)}}:{}),...(state.corruptQueuePolicy?{recipientSource:'DESIGNATED_EMAIL'}:{})}),subject:message.subject,html_body:message.html,text_body:message.text,attachments_json:JSON.stringify(message.attachments),status:'PENDING'};state.queues.push(row);return row.id;}},
     './weeklyTimesheetEligibility': policy, './weeklyTimesheetDeliverySchema': { ensureWeeklyTimesheetDeliverySchema: async () => {} },
     './authorizationService':require('../services/authorizationService'),'./auditService':{logAudit:async(_db,entry)=>state.audits.push(plain(entry))},
     './timesheetDocumentService': { timesheetDocumentData: (data) => ({ title: 'Fixture timesheet', reference: `${data.fromDate}-${data.toDate}`, party: data.staffName, fixture_data: data }) },
@@ -161,12 +168,16 @@ function schedulerFixture(initial = {}) {
 async function schedulerSafety() {
   const fixture = schedulerFixture(), { state, service, db } = fixture;
   const options = { now: NOW, env: ENV };
+  const bound=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],withQueueTransport:true});assert.equal((await bound.service.queueClosedWeekTimesheets(options)).queued,1,'The queue transport envelope is separate from an unchanged immutable weekly policy');
+  assert(JSON.parse(bound.state.queues[0].delivery_policy_json).queueTransport);
+  const altered=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],withQueueTransport:true,corruptQueuePolicy:true});assert.equal((await altered.service.queueClosedWeekTimesheets(options)).review,1,'Ignoring queue transport metadata must still reject a changed recipient source');assert.equal(altered.state.queues.length,0);
   const runs = await Promise.all([service.queueClosedWeekTimesheets(options), service.queueClosedWeekTimesheets(options)]);
   assert(state.deliveries.filter(row=>row.status==='QUEUED').every(row=>row.document_request_id==null&&row.delivery_format==='HTML'&&row.content_sha256),'HTML reports freeze content and do not require a PDF document request');
   assert.equal(state.pdfCalls,0,'Routine HTML delivery must not invoke PDF generation or storage');
   assert(state.queues.every(row=>row.attachments_json==='[]'&&row.html_body&&row.text_body),'Every new weekly email has a complete body and no required attachment');
   assert.equal(state.queues.length, 2, 'concurrent workers must queue one individual HTML report only for worked staff A and worked manager own record');
-  assert.deepEqual(state.queues.map((row) => JSON.parse(row.to_json)[0]).sort(), ['delivery-1@example.invalid', 'delivery-6@example.invalid']);
+  assert.deepEqual(state.queues.map((row) => JSON.parse(row.to_json)[0]).sort(), ['registered-1@example.invalid', 'registered-6@example.invalid']);
+  for (const row of state.queues) { const savedPolicy=JSON.parse(row.delivery_policy_json);assert.equal(savedPolicy.recipientSource,'REGISTERED_EMAIL');assert.equal(savedPolicy.recipientPolicyVersion,2);assert(!row.to_json.includes('delivery-'),'A distinct legacy designated email is not the selected policy'); }
   assert(!state.timesheets.some((row) => [2,3,4,5].includes(row.user_id)), 'zero/no-work/missing-recipient/incomplete staff cannot receive a fabricated draft report');
   assert(state.deliveries.some((row) => row.user_id === 3 && row.status === 'NO_WORK')); assert(state.deliveries.some((row) => row.user_id === 4 && row.status === 'NO_RECIPIENT')); assert(state.deliveries.some((row) => row.user_id === 5 && row.status === 'REVIEW_REQUIRED'));
   assert(!state.deliveries.some((row) => row.user_id === 2), 'no-work staff are not enumerated from all active users');
@@ -182,9 +193,13 @@ async function schedulerSafety() {
   await assert.rejects(()=>restarted.validateQueuedWeeklyDelivery({...queue,delivery_policy_json:JSON.stringify({...JSON.parse(queue.delivery_policy_json),staffId:2})},db,options),(error)=>error.reasonCode==='DELIVERY_POLICY_INVALID');
   await assert.rejects(() => restarted.validateQueuedWeeklyDelivery({ ...queue, cc_json: '["copy@example.invalid"]' }, db, options), (error) => error.reasonCode === 'RECIPIENT_METADATA_INVALID');
   await assert.rejects(() => restarted.validateQueuedWeeklyDelivery({ ...queue, to_json: '["delivery-1@example.invalid","other@example.invalid"]' }, db, options), (error) => error.reasonCode === 'RECIPIENT_METADATA_INVALID');
-  state.staff[0].timesheet_delivery_email = 'new-designated@example.invalid';
+  state.staff[0].email = 'new-registered@example.invalid';
   await assert.rejects(() => restarted.validateQueuedWeeklyDelivery(queue, db, options), (error) => error.reasonCode === 'STAFF_OR_RECIPIENT_CHANGED');
-  state.staff[0].timesheet_delivery_email = 'delivery-1@example.invalid';
+  state.staff[0].email = 'registered-1@example.invalid';
+  state.staff[0].timesheet_delivery_email = 'changed-legacy@example.invalid';
+  assert.equal((await restarted.validateQueuedWeeklyDelivery(queue, db, options)).staff_id,1,'Changing an inactive legacy designated field cannot redirect or block a registered-policy delivery');
+  const legacyQueuePolicy=JSON.parse(queue.delivery_policy_json);delete legacyQueuePolicy.recipientSource;delete legacyQueuePolicy.recipientPolicyVersion;
+  await assert.rejects(()=>restarted.validateQueuedWeeklyDelivery({...queue,delivery_policy_json:JSON.stringify(legacyQueuePolicy)},db,options),error=>error.reasonCode==='RECIPIENT_POLICY_CHANGED');
   state.staff[0].active=0;await assert.rejects(()=>restarted.validateQueuedWeeklyDelivery(queue,db,options),(error)=>error.reasonCode==='STAFF_OR_RECIPIENT_CHANGED');state.staff[0].active=1;
   state.attendance[0].deleted=1;await assert.rejects(()=>restarted.validateQueuedWeeklyDelivery(queue,db,options),(error)=>error.reasonCode==='NO_ELIGIBLE_WORK');state.attendance[0].deleted=0;
   state.attendance[0].notes = 'Explicit corrected note';
@@ -194,6 +209,11 @@ async function schedulerSafety() {
   await restarted.markWeeklyDeliveryResult(db, queue, 'SENT', { providerAccepted: true });
   await assert.rejects(() => restarted.validateQueuedWeeklyDelivery(queue, db, options), (error) => error.reasonCode === 'WEEKLY_DELIVERY_ALREADY_ACCEPTED' && error.providerAccepted);
   await restarted.queueClosedWeekTimesheets(options); assert.equal(state.queues.length, 2, 'SENT periods must never automatically resend');
+  const acceptedBefore=plain({delivery:state.deliveries[0],queue:state.queues[0],history:state.history});
+  state.staff[0].email='updated-after-acceptance@example.invalid';
+  await restarted.queueClosedWeekTimesheets(options);
+  assert.deepEqual(plain({delivery:state.deliveries[0],queue:state.queues[0],history:state.history}),acceptedBefore,'A registered email change never rewrites accepted recipients or retained snapshots');
+  state.staff[0].email='registered-1@example.invalid';
   const originalSnapshot=state.deliveries[0].snapshot_json;state.queues[0].status='SENT';
   state.attendance[0].notes='Authorised corrected actual-work description';
   await assert.rejects(()=>restarted.queueWeeklyTimesheetRevision({deliveryId:1,expectedVersion:1,reason:'Correct recorded work',actor:{id:20,role:'viewer',permissions:['SEND_COMPANY_EMAIL']},...options}),(error)=>error.code==='PERMISSION_DENIED');
@@ -210,7 +230,7 @@ async function schedulerSafety() {
   const outside = await service.queueClosedWeekTimesheets({ ...options, now: new Date('2026-10-10T20:00:00Z'), force: true }); assert.equal(outside.skipped, true); assert.equal(state.queues.length, 3, 'force must not backfill old weeks or bypass the weekly window');
   const missingStorage=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)]});const uncertain=await missingStorage.service.queueClosedWeekTimesheets({...options,env:{...ENV,ATTENDANCE_STORAGE_TIMEZONE:''}});assert.equal(uncertain.review,1);assert.equal(missingStorage.state.queues.length,0,'legacy unzoned records never receive guessed UTC eligibility');const explicit=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1,undefined,undefined,undefined,{timestamp_basis:'UTC',recorded_timezone:'Australia/Sydney',entry_source:'CLOCK'})]});assert.equal((await explicit.service.queueClosedWeekTimesheets({...options,env:{...ENV,ATTENDANCE_STORAGE_TIMEZONE:''}})).queued,1,'new per-row auditable UTC writes work without asserting legacy timestamps');
   const endedLater=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1,'2026-10-11T12:00:00Z',null,0)]});assert.equal((await endedLater.service.queueClosedWeekTimesheets(options)).review,1);Object.assign(endedLater.state.attendance[0],{clock_out:'2026-10-11T21:00:00Z',total_minutes:540,total_hours:9});assert.equal((await endedLater.service.queueClosedWeekTimesheets({...options,now:new Date('2026-10-11T21:30:00Z')})).queued,1,'an actual staff clock-out within the window can resolve an initial unsnapshotted incomplete diagnostic without payroll approval');assert.equal(endedLater.state.queues.length,1);assert.equal(endedLater.state.deliveries[0].version,1);
-  const invalidRecipient=schedulerFixture({staff:[staff(1,{timesheet_delivery_email:'not-an-address'})],attendance:[worked(1,1)]});assert.equal((await invalidRecipient.service.queueClosedWeekTimesheets(options)).invalid,1);assert.equal(invalidRecipient.state.queues.length,0,'invalid designation never falls back to the saved login address');
+  const invalidRecipient=schedulerFixture({staff:[staff(1,{email:'not-an-address'})],attendance:[worked(1,1)]});assert.equal((await invalidRecipient.service.queueClosedWeekTimesheets(options)).invalid,1);assert.equal(invalidRecipient.state.queues.length,0,'invalid registered email never falls back to the legacy designated address');
   const pdfFailure = schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],failPdf:true});
   assert.equal((await pdfFailure.service.queueClosedWeekTimesheets(options)).queued,1,'PDF failure cannot block the complete HTML send path');assert.equal(pdfFailure.state.pdfCalls,0);
   const frozenRetry=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)]});
@@ -226,6 +246,10 @@ async function schedulerSafety() {
   assert.equal(frozenQueued.contentHash,frozenRendered.contentHash,'A restart preserves the exact immutable body/hash even when new rendering fails');
   const frozenLegacy = { ...plain(pdfFailure.state.deliveries[0]), delivery_format:'PDF',content_sha256:null,content_snapshot_json:null,
     status:'GENERATION_FAILED',email_queue_id:null,document_request_id:null,claim_token:null,claim_expires_at:null,generation_attempts:0,next_generation_attempt_at:null };
+  const oldPolicyBase=plain(frozenLegacy);
+  const changedFrozen=schedulerFixture({staff:[staff(1,{email:'changed-registered@example.invalid'})],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),deliveries:[plain(frozenLegacy)]});
+  const changedFrozenResult=await changedFrozen.service.queueClosedWeekTimesheets(options);assert.equal(changedFrozenResult.review,1);assert.equal(changedFrozenResult.outcomes[0].reason,'STAFF_OR_RECIPIENT_CHANGED');
+  assert.equal(changedFrozen.state.queues.length,0);assert.equal(changedFrozen.state.deliveries[0].recipient,'registered-1@example.invalid','Restart retries never rewrite a frozen recipient after account email change');
   const legacy = schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),deliveries:[frozenLegacy],failPdf:true});
   assert.equal((await legacy.service.queueClosedWeekTimesheets(options)).failed,1,'An existing frozen PDF report keeps its original format and parser failure');
   assert.equal(legacy.state.deliveries[0].delivery_format,'PDF');assert.equal(legacy.state.queues.length,0);
@@ -233,11 +257,21 @@ async function schedulerSafety() {
   const htmlRecovery=await legacy.service.queueWeeklyTimesheetRevision({...options,deliveryId:1,expectedVersion:1,reason:'Authorise complete HTML recovery after reviewing the unsent legacy PDF failure',actor:{id:99,role:'admin'}});
   assert.equal(htmlRecovery.format,'HTML');assert.equal(htmlRecovery.version,2);assert.equal(legacy.state.queues.length,1,'An authorised new HTML revision is independent of the old PDF failure');
   const originalLegacy=legacy.state.history.find(row=>row.delivery_id===1&&row.version===1);assert.equal(originalLegacy.delivery_format,'PDF');assert.equal(originalLegacy.snapshot_json,legacySnapshot,'The original PDF snapshot/version is retained intact');
+  const legacyRecipientSnapshot=JSON.parse(oldPolicyBase.snapshot_json);delete legacyRecipientSnapshot.recipient_source;delete legacyRecipientSnapshot.recipient_policy_version;
+  const legacyRecipientRecord={...oldPolicyBase,recipient:'delivery-1@example.invalid',snapshot_json:JSON.stringify(legacyRecipientSnapshot),source_sha256:policy.snapshotHash(legacyRecipientSnapshot)};
+  const oldPolicy=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)],timesheets:plain(pdfFailure.state.timesheets),deliveries:[legacyRecipientRecord]});
+  await assert.rejects(()=>oldPolicy.service.queueWeeklyTimesheetRevision({...options,deliveryId:1,expectedVersion:1,reason:'Retry rendering only',retryGeneration:true,actor:{id:99,role:'admin'}}),error=>{assert.equal(error.reasonCode,'RECIPIENT_POLICY_CHANGED',error.stack);return true;},'A retry cannot rewrite an old recipient policy');
+  const policyHold=await oldPolicy.service.queueClosedWeekTimesheets(options);
+  assert.equal(policyHold.review,1);assert.equal(policyHold.outcomes[0].reason,'RECIPIENT_POLICY_CHANGED');assert.equal(oldPolicy.state.queues.length,0);
+  assert.equal(oldPolicy.state.deliveries[0].recipient,'delivery-1@example.invalid');assert.equal(oldPolicy.state.deliveries[0].snapshot_json,legacyRecipientRecord.snapshot_json,'Routine scheduling preserves old recipient and snapshot');
+  await oldPolicy.service.queueWeeklyTimesheetRevision({...options,deliveryId:1,expectedVersion:1,reason:'Reviewed unsent legacy report and authorised registered-address policy revision',actor:{id:99,role:'admin'}});
+  assert.equal(JSON.parse(oldPolicy.state.queues[0].to_json)[0],'registered-1@example.invalid');assert.equal(oldPolicy.state.deliveries[0].version,2);
+  assert.equal(oldPolicy.state.history.find(row=>row.version===1).recipient,'delivery-1@example.invalid');assert.equal(oldPolicy.state.history.find(row=>row.version===1).snapshot_json,legacyRecipientRecord.snapshot_json,'Authorised policy revision retains original version');
   const failure = schedulerFixture({ staff: [staff(1)], attendance: [worked(1, 1)], failRender: true });
   const failed = await failure.service.queueClosedWeekTimesheets(options); assert.equal(failed.failed, 1); assert.equal(failure.state.queues.length, 0); assert.equal(failure.state.deliveries[0].status, 'GENERATION_FAILED');
   failure.state.failRender = false;assert.equal((await failure.reload().queueClosedWeekTimesheets(options)).queued,0,'Report retry respects persisted backoff');await failure.reload().queueClosedWeekTimesheets({...options,now:new Date(NOW.getTime()+16*60000)}); assert.equal(failure.state.queues.length, 1, 'same immutable report source may retry safely after rendering repair');
   const revisionFailure=schedulerFixture({staff:[staff(1)],attendance:[worked(1,1)]});await revisionFailure.service.queueClosedWeekTimesheets(options);await revisionFailure.service.markWeeklyDeliveryResult(revisionFailure.db,revisionFailure.state.queues[0],'SENT',{providerAccepted:true});revisionFailure.state.queues[0].status='SENT';revisionFailure.state.attendance[0].notes='An authorised corrected shift description';revisionFailure.state.failRender=true;await assert.rejects(()=>revisionFailure.service.queueWeeklyTimesheetRevision({...options,deliveryId:1,expectedVersion:1,reason:'Correct actual attendance',actor:{id:99,role:'admin'}}),{code:'TIMESHEET_REPORT_RENDER_FAILED'});assert.equal(revisionFailure.state.deliveries[0].version,2);assert.equal(revisionFailure.state.deliveries[0].status,'GENERATION_FAILED');revisionFailure.state.failRender=false;const controlled=await revisionFailure.service.queueWeeklyTimesheetRevision({...options,deliveryId:1,expectedVersion:2,reason:'Retry rendering repair without changing the snapshot',retryGeneration:true,actor:{id:99,role:'admin'}});assert.equal(controlled.version,2);assert.equal(controlled.format,'HTML');assert.equal(revisionFailure.state.queues.length,2);const retainedRetry=revisionFailure.state.history.find(row=>row.delivery_id===1&&row.version===2);assert.equal(retainedRetry.status,'QUEUED');assert.equal(retainedRetry.email_queue_id,2);assert.equal(retainedRetry.document_request_id,null,'HTML retries do not manufacture PDF metadata');assert(retainedRetry.content_sha256&&retainedRetry.content_snapshot_json,'Immutable history retains the actual rendered version');
-  const changed = schedulerFixture({ staff: [staff(1)], attendance: [worked(1, 1)], beforeQueueMutation: (state) => { state.staff[0].timesheet_delivery_email = 'changed@example.invalid'; } });
+  const changed = schedulerFixture({ staff: [staff(1)], attendance: [worked(1, 1)], beforeQueueMutation: (state) => { state.staff[0].email = 'changed@example.invalid'; } });
   const stale = await changed.service.queueClosedWeekTimesheets(options); assert.equal(stale.review, 1); assert.equal(changed.state.queues.length, 0, 'actual staff recipient must be rechecked under locks immediately before queue insertion');
   const incomplete = schedulerFixture({ staff: [staff(1)], attendance: [worked(1,1)], beforeQueueMutation: (state) => { state.attendance[0].clock_out = null; } });
   assert.equal((await incomplete.service.queueClosedWeekTimesheets(options)).review,1); assert.equal(incomplete.state.queues.length,0,'eligibility change during rendering cannot queue a stale report');
@@ -259,7 +293,7 @@ async function boundedRecovery() {
   assert.equal(policy.recoveryWindow(outside,{...CONFIG,enabled:false}).eligible,false);
   assert.equal(policy.recoveryWindow(outside,{...CONFIG,recoveryHours:0}).eligible,false);
   assert.throws(()=>policy.configuration({...ENV,WEEKLY_TIMESHEET_RECOVERY_HOURS:1000}),/integer/);
-  const fixture=schedulerFixture({staff:[staff(1),staff(4,{timesheet_delivery_email:null}),staff(5)],attendance:[worked(1,1),worked(4,4),worked(5,5,undefined,null)]});
+  const fixture=schedulerFixture({staff:[staff(1),staff(4,{email:null}),staff(5)],attendance:[worked(1,1),worked(4,4),worked(5,5,undefined,null)]});
   const options={env:ENV,now:outside};
   const result=await fixture.service.queueClosedWeekTimesheets(options);assert.equal(result.queued,1);assert.equal(result.review,1);assert.equal(result.invalid,1);assert.equal(fixture.state.queues.length,1);
   await Promise.all([fixture.reload().queueClosedWeekTimesheets(options),fixture.service.queueClosedWeekTimesheets(options)]);assert.equal(fixture.state.queues.length,1,'Concurrent recovery/restart cannot enqueue a second version');
@@ -294,6 +328,6 @@ async function genuinePdfAndSchema() {
 }
 async function main() {
   pureEligibility();manualTimeAndSchedule(); await schedulerSafety(); await boundedRecovery(); await genuinePdfAndSchema();
-  console.log('Weekly timesheet eligibility tests passed: worked-only A/no-work B/planned C; explicit designated recipient only; incomplete/invalid/manual/break review; positive finite minutes and exact saved-hour consistency; no fabricated closures; whole overnight shift/local week boundaries; 167/169-hour DST weeks; duplicate/overlap isolation; Monday bounded latest-week scheduling; staff-period unique claim/atomic queue; concurrent and restarted workers; complete HTML without a PDF; PDF failure cannot block HTML; immutable content and rendering-failure safe retry; stale recipients/data blocked before queue and send; SENT/corrections never auto-resend; genuine PDF/parser identity validation and additive history-preserving schema. Fixtures only; no real staff or transport messages.');
+  console.log('Weekly timesheet eligibility tests passed: worked-only A/no-work B/planned C; explicit registered-account recipient only; incomplete/invalid/manual/break review; positive finite minutes and exact saved-hour consistency; no fabricated closures; whole overnight shift/local week boundaries; 167/169-hour DST weeks; duplicate/overlap isolation; Monday bounded latest-week scheduling; staff-period unique claim/atomic queue; concurrent and restarted workers; complete HTML without a PDF; PDF failure cannot block HTML; immutable content and rendering-failure safe retry; stale recipients/data blocked before queue and send; SENT/corrections never auto-resend; genuine PDF/parser identity validation and additive history-preserving schema. Fixtures only; no real staff or transport messages.');
 }
 main().catch((error) => { console.error(error); process.exitCode = 1; });

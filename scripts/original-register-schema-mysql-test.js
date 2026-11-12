@@ -122,9 +122,14 @@ async function main() {
   assert.equal(digest((await pool.query('SELECT * FROM bank_accounts'))[0]), archived, 'No retired table or historical record is changed');
   const [tables] = await pool.query('SELECT table_name AS table_name FROM information_schema.tables WHERE table_schema=DATABASE()');
   const weeklyTables = ['weekly_timesheet_deliveries','weekly_timesheet_delivery_versions'];
-  const expectedTables = [...Object.keys(TABLES), 'timesheet_pdf_snapshots', 'schema_migrations', 'bank_accounts', ...weeklyTables].sort();
+  const expectedTables = [...Object.keys(TABLES), 'timesheet_pdf_snapshots', 'manual_report_snapshots', 'schema_migrations', 'bank_accounts', ...weeklyTables].sort();
   assert.deepEqual(tables.map(table => table.table_name).sort(), expectedTables,
-    'Only the exact original registers, PDF cache, immutable weekly delivery tables, migration ledger and protected retired fixture exist.');
+    'Only the exact original registers, PDF cache, private manual-report metadata, immutable weekly delivery tables, migration ledger and protected retired fixture exist.');
+  const [manualColumns]=await pool.query("SELECT column_name AS column_name,data_type AS data_type,is_nullable AS is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='manual_report_snapshots' ORDER BY ordinal_position");
+  assert.deepEqual(manualColumns.map(column=>column.column_name),['id','created_by','source_type','descriptor_json','document_json','authority_sha256','source_sha256','pdf_storage_key','pdf_sha256','pdf_pages','filename','created_at']);
+  assert(manualColumns.every(column=>column.is_nullable==='NO'&&!/blob|binary/.test(column.data_type)),'Manual PDFs stay in existing private object storage; SQL stores required immutable metadata only.');
+  const [manualIndex]=await pool.query("SELECT column_name AS column_name FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='manual_report_snapshots' AND index_name='idx_manual_report_authority' ORDER BY seq_in_index");
+  assert.deepEqual(manualIndex.map(column=>column.column_name),['created_by','authority_sha256'],'Cross-intent delivery reconciliation uses an indexed actor/source lookup.');
   const [htmlColumns] = await pool.query(`SELECT table_name AS table_name,column_name AS column_name,data_type AS data_type,
     is_nullable AS is_nullable,column_default AS column_default,character_maximum_length AS max_length
     FROM information_schema.columns WHERE table_schema=DATABASE()

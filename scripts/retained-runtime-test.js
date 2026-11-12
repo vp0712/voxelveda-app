@@ -51,6 +51,7 @@ async function testStartup() {
       } },
       './config/db': { end: async () => calls.push('pool.close') },
       './services/emailService': { isEmailConfigured: () => false },
+      './services/emailTransportReadiness': require('../services/emailTransportReadiness'),
       './services/emailQueueWorker': {
         startEmailQueueWorker: () => { calls.push('email.start'); return false; },
         stopEmailQueueWorker: () => calls.push('email.stop')
@@ -101,6 +102,7 @@ async function testStartup() {
     dependencies['./services/workflowEscalationService']={startWorkflowSlaScheduler:()=>{calls.push('workflow.start');return false},stopWorkflowSlaScheduler:()=>calls.push('workflow.stop')};
     dependencies['./services/procurementImportService']={startProcurementImportWorker:()=>{calls.push('import.start');return true},stopProcurementImportWorker:()=>calls.push('import.stop')};
     dependencies['./services/releasePdfVerificationService']={queueAuthorisedReleasePdf:async()=>({enabled:false})};
+    dependencies['./services/releaseResendVerificationService']={queueAuthorisedResendVerification:async()=>({enabled:false})};
     const server = load(path.join(root, 'server.js'), dependencies, { NODE_ENV: 'production' });
     if (databaseFails || retainedFails) {
       await assert.rejects(server.bootstrap(), { code: databaseFails ? 'DB_TEST_DENIED' : 'CURRENT_SCHEMA_FIXTURE_FAILED' });
@@ -192,6 +194,7 @@ async function testEmailRetirement() {
     './documentPdfService': require('../services/documentPdfService'),
     './emailService': {
       sendMail: async (message) => { sent.push(message); return { messageId: 'fixture-provider-accepted' }; },
+      selectedEmailTransport: () => 'smtp',
       normalizeAddressList: (items) => Array.isArray(items) ? items : items ? [items] : [],
       attachmentBuffer: (item) => Buffer.isBuffer(item.content) ? item.content : null,
       assertAttachmentIntegrity:require('../services/emailService').assertAttachmentIntegrity,

@@ -110,7 +110,7 @@
     });
   });
   async function openPdf(url, options = {}) {
-    const { download = false, ...request } = options;
+    const { download = false, emailSource, ...request } = options;
     const accountKey=()=>{try{return String(JSON.parse(localStorage.getItem('user')||'{}').id||'')+'|'+(localStorage.getItem('token')||'');}catch{return 'storage-unavailable';}};
     const owner=accountKey();
     const assertAccount=()=>{if(accountKey()!==owner)throw Object.assign(new Error('The signed-in account changed. Open the document again from your current account.'),{code:'PDF_ACCOUNT_CHANGED'});};
@@ -136,7 +136,7 @@
       if (download) {
         const link = document.createElement('a'); link.href = objectUrl; link.download = filename;
         document.body.append(link); link.click(); link.remove();
-      } else if (preview) { await ready;assertAccount();preview.postMessage({type:'VV_VERIFIED_PDF',filename,bytes},location.origin); }
+      } else if (preview) { await ready;assertAccount();const source=emailSource||window.VoxelDocumentEmail?.sourceForPdf(url);const sourceHash=response.headers.get('x-document-source-sha256');const emailDescriptor=source?{...source}:null;if(emailDescriptor){if(['register','customer-statement'].includes(emailDescriptor.type))delete emailDescriptor.expected_source_hash;else if(/^[a-f0-9]{64}$/i.test(sourceHash||''))emailDescriptor.expected_source_hash=sourceHash;}preview.postMessage({type:'VV_VERIFIED_PDF',filename,bytes,emailSource:emailDescriptor},location.origin); }
       else { const link = document.createElement('a'); link.href = objectUrl; link.target = '_blank'; link.rel = 'noopener'; document.body.append(link); link.click(); link.remove(); }
       // Keep the bytes available for the browser PDF viewer's own download control.
       window.addEventListener('pagehide', () => URL.revokeObjectURL(objectUrl), { once:true });

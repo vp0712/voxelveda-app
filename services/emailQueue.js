@@ -2,7 +2,7 @@ const pool = require('../config/db');
 const fs = require('node:fs');
 const crypto = require('node:crypto');
 const { ensureEmailQueueSchema } = require('./emailQueueSchema');
-const { sendMail, normalizeAddressList, isEmailTransportError, explicitNegativeSmtpReply, classifySmtpFailure, attachmentBuffer, assertAttachmentIntegrity } = require('./emailService');
+const { sendMail, selectedEmailTransport, normalizeAddressList, isEmailTransportError, explicitNegativeSmtpReply, classifySmtpFailure, attachmentBuffer, assertAttachmentIntegrity } = require('./emailService');
 const { assertWeeklyDeliveryPolicy, assertWeeklyDeliveryContent, weeklyFormat, weeklyMessage, privacyError } = require('./weeklyDeliveryPolicy');
 const { validatePdf } = require('./documentPdfService');
 
@@ -25,6 +25,75 @@ function parseJson(value, fallback) {
     return value ? JSON.parse(value) : fallback;
   } catch {
     return fallback;
+  }
+}
+
+function withoutTransportBinding(policy) {
+  if (!policy || typeof policy !== 'object' || Array.isArray(policy)) return null;
+  const { queueTransport, ...sourcePolicy } = policy;
+  return sourcePolicy.type === 'QUEUE_TRANSPORT' ? null : sourcePolicy;
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, canonicalJson(value[key])]));
+  return value;
+}
+
+// This hash covers the immutable recipient/content envelope, not queue status,
+// attempts, provider results or the transport admission metadata itself.
+function envelopeHash(message, attachments, policy) {
+  if (!Array.isArray(attachments)) throw queueReviewError('The queued attachment envelope is invalid. Repair or revise the saved request before delivery.', 'QUEUE_CONTENT_CHANGED');
+  const persisted = Object.prototype.hasOwnProperty.call(message, 'to_json');
+  const value = {
+    template: (persisted ? message.template_key : message.templateKey) || null,
+    to: normalizeAddressList(persisted ? parseJson(message.to_json, []) : message.to),
+    cc: normalizeAddressList(persisted ? parseJson(message.cc_json, []) : message.cc),
+    bcc: normalizeAddressList(persisted ? parseJson(message.bcc_json, []) : message.bcc),
+    replyTo: (persisted ? message.reply_to : message.replyTo) || null,
+    subject: message.subject,
+    html: (persisted ? message.html_body : message.html) || null,
+    text: (persisted ? message.text_body : message.text) || null,
+    module: (persisted ? message.related_module : message.relatedModule) || null,
+    record: String((persisted ? message.related_record_id : message.relatedRecordId) || '') || null,
+    deliveryKey: (persisted ? message.idempotency_key : message.idempotencyKey) || null,
+    policy: withoutTransportBinding(policy),
+    attachments: attachments.map(item => ({ filename: item.filename, contentType: item.contentType,
+      contentDisposition: item.contentDisposition || 'attachment', byteLength: Number(item.byteLength), sha256: item.sha256 }))
+  };
+  return crypto.createHash('sha256').update(JSON.stringify(canonicalJson(value))).digest('hex');
+}
+
+function bindQueueTransport(message, attachments, deliveryPolicy, transport) {
+  // Explicit selection is essential: merely adding a Resend key must not move
+  // the existing company's messages away from its current provider.
+  if (transport !== 'resend') return deliveryPolicy;
+  return { ...(deliveryPolicy || { type: 'QUEUE_TRANSPORT' }), queueTransport: {
+    version: 1, provider: transport, enqueuedAt: new Date().toISOString(),
+    payloadSha256: envelopeHash(message, attachments, deliveryPolicy)
+  } };
+}
+
+function queueReviewError(message, reasonCode) {
+  return Object.assign(new Error(message), { code: 'DELIVERY_REVIEW_REQUIRED', reasonCode, deliveryOutcome: 'NOT_DISPATCHED', retryable: false });
+}
+
+function assertQueueTransport(row, transport) {
+  const policy = parseJson(row.delivery_policy_json, null);
+  const binding = policy?.queueTransport;
+  if (row.provider_accepted_at || row.message_id || row.recipient_verified_at) {
+    throw queueReviewError('This queue row already records provider acceptance or receipt. Review its existing outcome before any further send.', 'QUEUE_PROVIDER_OUTCOME_EXISTS');
+  }
+  if (transport === 'resend' && !binding) {
+    throw queueReviewError('This message was queued before the Resend release and has no approved transport binding. Review the original provider outcome and current source before requesting a new delivery; no historical message was sent.', 'QUEUE_TRANSPORT_ADMISSION_REQUIRED');
+  }
+  if (!binding) return;
+  if (binding.version !== 1 || binding.provider !== transport || !/^[a-f0-9]{64}$/.test(String(binding.payloadSha256)) || !Number.isFinite(Date.parse(binding.enqueuedAt))) {
+    throw queueReviewError('The queue transport changed or its admission metadata is invalid. Review the existing message before requesting delivery through another provider.', 'QUEUE_TRANSPORT_CHANGED');
+  }
+  const savedAttachments = parseJson(row.attachments_json, []);
+  if (!Array.isArray(savedAttachments) || envelopeHash(row, savedAttachments, policy) !== binding.payloadSha256) {
+    throw queueReviewError('The queued recipient or document content differs from its saved version. Review the source and create an authorised revision; the original message was not sent.', 'QUEUE_CONTENT_CHANGED');
   }
 }
 
@@ -91,6 +160,7 @@ async function queueEmail(message, db = pool) {
   const deliveryPolicy = assertWeeklyDeliveryPolicy(message, { to: normalizeAddressList(message.to), cc: normalizeAddressList(message.cc), bcc: normalizeAddressList(message.bcc) });
   assertWeeklyDeliveryContent({ ...message, attachments }, deliveryPolicy);
   if (deliveryPolicy && weeklyFormat(deliveryPolicy) === 'HTML' && message.idempotencyKey !== `weekly-timesheet:${deliveryPolicy.staffId}:${deliveryPolicy.fromDate}:${deliveryPolicy.toDate}:v${deliveryPolicy.revision}`) throw privacyError('WEEKLY_POLICY_IDENTITY_MISMATCH');
+  const storedPolicy = bindQueueTransport(message, attachments, deliveryPolicy, selectedEmailTransport());
   await ensureEmailQueueSchema();
   const payload = [
     message.templateKey || null,
@@ -102,7 +172,7 @@ async function queueEmail(message, db = pool) {
     message.html || null,
     message.text || null,
     JSON.stringify(attachments),
-    deliveryPolicy ? JSON.stringify(deliveryPolicy) : null,
+    storedPolicy ? JSON.stringify(storedPolicy) : null,
     message.relatedModule || null,
     message.relatedRecordId ? String(message.relatedRecordId) : null,
     message.scheduledAt || new Date(),
@@ -139,9 +209,16 @@ async function queueEmail(message, db = pool) {
       return existing.id;
     }
     const [[existing]] = await db.query(
-      'SELECT id FROM email_queue WHERE idempotency_key = ? LIMIT 1',
+      storedPolicy?.queueTransport ? 'SELECT * FROM email_queue WHERE idempotency_key = ? LIMIT 1' : 'SELECT id FROM email_queue WHERE idempotency_key = ? LIMIT 1',
       [message.idempotencyKey]
     );
+    if (existing && storedPolicy?.queueTransport) {
+      const existingPolicy = parseJson(existing.delivery_policy_json, null);
+      if (existingPolicy?.queueTransport?.payloadSha256 !== storedPolicy.queueTransport.payloadSha256 ||
+          envelopeHash(existing, parseJson(existing.attachments_json, []), existingPolicy) !== storedPolicy.queueTransport.payloadSha256) {
+        throw queueReviewError('This delivery key already belongs to another saved envelope or transport history. Review that delivery and create an authorised new request or revision instead of changing its recipient or content.', 'QUEUE_IDEMPOTENCY_CONFLICT');
+      }
+    }
     return existing?.id || null;
   }
 }
@@ -170,6 +247,7 @@ async function writeEmailLog(row, status, result, error, db = pool) {
 
 async function processEmailQueue(limit = 10) {
   await ensureEmailQueueSchema();
+  const transport = selectedEmailTransport();
   // One atomic multi-table update preserves the same review state in the queue,
   // current staff/week delivery and immutable version history after a crash.
   await pool.query(`UPDATE email_queue q
@@ -195,28 +273,31 @@ async function processEmailQueue(limit = 10) {
   const outcomes = [];
   for (const row of rows) {
     const isWeekly = weeklyMessage(row);
+    const resendBound = transport === 'resend' && parseJson(row.delivery_policy_json, null)?.queueTransport?.provider === 'resend';
     // The SELECT may be stale after another replica safely failed and scheduled
-    // a retry. Recheck due time and the weekly attempt budget atomically when
+    // a retry. Recheck due time and the bounded delivery budget atomically when
     // claiming, so that replica cannot bypass backoff or consume another send.
     const [claim] = await pool.query(
       `UPDATE email_queue SET status = 'SENDING', claimed_at=NOW(), attempts = attempts + 1 WHERE id = ? AND status IN ('PENDING', 'RETRY') AND related_module IN (${modulePlaceholders})
-        AND scheduled_at <= NOW() AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())${isWeekly ? ' AND attempts < max_attempts' : ''}`,
+        AND scheduled_at <= NOW() AND (next_attempt_at IS NULL OR next_attempt_at <= NOW())${isWeekly || resendBound ? ' AND attempts < max_attempts' : ''}`,
       [row.id, ...RETAINED_EMAIL_MODULES]
     );
     if (!claim.affectedRows) continue;
 
     let providerAccepted = false;
+    let acceptedMessageId = null;
     let transportInvoked = false;
     let weeklyDb = null;
     const markWeekly = async (status, metadata = {}, db = pool) => {
       if (isWeekly && row.delivery_policy_json) await require('./weeklyTimesheetScheduler').markWeeklyDeliveryResult(db, row, status, metadata);
     };
     try {
+      assertQueueTransport(row, transport);
       const attachments = restoreAttachments(parseJson(row.attachments_json, []));
       assertExpectedDocumentAttachment(row, attachments);
       let deliveryPolicy = null;
       if (isWeekly) {
-        deliveryPolicy = assertWeeklyDeliveryPolicy({ ...row, deliveryPolicy: parseJson(row.delivery_policy_json, null) }, { to: parseJson(row.to_json, []), cc: parseJson(row.cc_json, []), bcc: parseJson(row.bcc_json, []) });
+        deliveryPolicy = assertWeeklyDeliveryPolicy({ ...row, deliveryPolicy: withoutTransportBinding(parseJson(row.delivery_policy_json, null)) }, { to: parseJson(row.to_json, []), cc: parseJson(row.cc_json, []), bcc: parseJson(row.bcc_json, []) });
         weeklyDb = await pool.getConnection();
         await weeklyDb.beginTransaction();
         const checked = await require('./weeklyTimesheetScheduler').validateQueuedWeeklyDelivery(row, weeklyDb);
@@ -246,11 +327,13 @@ async function processEmailQueue(limit = 10) {
         attachments
       });
       providerAccepted = true;
+      acceptedMessageId = result.messageId || null;
       const db = weeklyDb || pool;
-      await db.query(
+      const [completed] = await db.query(
         `UPDATE email_queue SET status = 'SENT', sent_at = NOW(), provider_accepted_at=NOW(), message_id = ?, last_error = NULL WHERE id = ?`,
         [result.messageId || null, row.id]
       );
+      if (completed.affectedRows !== 1) throw queueReviewError('The provider accepted this message but its queue result could not be saved. Review before retry; recipient receipt remains unverified.', 'QUEUE_ACCEPTANCE_BOOKKEEPING_FAILED');
       await writeEmailLog(row, 'SENT', result, null, db);
       await markWeekly('SENT', { providerAccepted: true }, db);
       if (weeklyDb) { await weeklyDb.commit(); weeklyDb.release(); weeklyDb = null; }
@@ -265,8 +348,8 @@ async function processEmailQueue(limit = 10) {
       const uncertainTransport=transportInvoked&&!provedBeforeDispatch&&!explicitNegative;
       if(providerAccepted || error.code==='DELIVERY_REVIEW_REQUIRED' || uncertainTransport) {
         providerAccepted=providerAccepted || error.providerAccepted===true;
-        await pool.query("UPDATE email_queue SET status='REVIEW_REQUIRED',provider_accepted_at=CASE WHEN ?=1 THEN COALESCE(provider_accepted_at,NOW()) ELSE provider_accepted_at END,last_error=?,next_attempt_at=NULL WHERE id=?",[providerAccepted?1:0,providerAccepted ? 'The provider accepted this message, but content confirmation or delivery bookkeeping could not finish. Review before retry; recipient receipt is unverified.' : (error.message || 'The transport transaction outcome is uncertain. Review provider logs before retry to avoid duplicate delivery.'),row.id]);
-        await writeEmailLog(row,'REVIEW_REQUIRED',null,error);
+        await pool.query("UPDATE email_queue SET status='REVIEW_REQUIRED',provider_accepted_at=CASE WHEN ?=1 THEN COALESCE(provider_accepted_at,NOW()) ELSE provider_accepted_at END,last_error=?,message_id=COALESCE(message_id,?),next_attempt_at=NULL WHERE id=?",[providerAccepted?1:0,providerAccepted ? 'The provider accepted this message, but content confirmation or delivery bookkeeping could not finish. Review before retry; recipient receipt is unverified.' : (error.message || 'The transport transaction outcome is uncertain. Review provider logs before retry to avoid duplicate delivery.'),acceptedMessageId,row.id]);
+        await writeEmailLog(row,'REVIEW_REQUIRED',acceptedMessageId ? { messageId: acceptedMessageId } : null,error);
         await markWeekly('REVIEW_REQUIRED', { code: error.code, reasonCode: error.reasonCode, providerAccepted });
         outcomes.push({id:row.id,status:'REVIEW_REQUIRED',provider_accepted:providerAccepted,recipient_verified:false});
         continue;
@@ -276,14 +359,18 @@ async function processEmailQueue(limit = 10) {
       const persistentTransportRetry = isEmailTransportError(error)
         && !['EAUTH', 'SMTP_CONFIG_MISSING'].includes(code);
       const requiresRepair = code.startsWith('PDF_');
-      // Weekly reports have a bounded recovery policy. Repeated known-safe
+      // Weekly reports and Resend have a bounded recovery policy. Known-safe
       // connectivity failures must not bypass the durable attempt budget.
       // Accepted/uncertain attempts are already held above, never retried here.
       const withinBudget = attempts < Number(row.max_attempts || 5);
-      const retry = error.retryable!==false && !requiresRepair && (isWeekly ? withinBudget : persistentTransportRetry || withinBudget);
-      const retryMinutes = persistentTransportRetry
+      const retry = error.retryable!==false && !requiresRepair && (isWeekly || resendBound ? withinBudget : persistentTransportRetry || withinBudget);
+      const backoffMinutes = persistentTransportRetry
         ? Math.min(360, 2 ** Math.min(9, Math.max(0, attempts - 1)))
         : Math.min(60, 2 ** Math.max(0, attempts - 1));
+      const retryAfterMs = Number(error.retryAfterMs);
+      const retryMinutes = resendBound && Number.isFinite(retryAfterMs) && retryAfterMs > 0
+        ? Math.max(backoffMinutes, Math.ceil(retryAfterMs / 60000))
+        : backoffMinutes;
       await pool.query(
         `
         UPDATE email_queue
@@ -308,4 +395,4 @@ async function processEmailQueue(limit = 10) {
   return outcomes;
 }
 
-module.exports = { queueEmail, processEmailQueue, RETAINED_EMAIL_MODULES, restoreAttachments, _test:{serializableAttachments,restoreAttachments,assertExpectedDocumentAttachment} };
+module.exports = { queueEmail, processEmailQueue, RETAINED_EMAIL_MODULES, restoreAttachments, _test:{serializableAttachments,restoreAttachments,assertExpectedDocumentAttachment,envelopeHash,bindQueueTransport,assertQueueTransport} };

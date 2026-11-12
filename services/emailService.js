@@ -4,6 +4,8 @@ const crypto = require('node:crypto');
 const { companyProfile } = require('../config/companyProfile');
 const { validatePdf, safePdfFilename } = require('./documentPdfService');
 const { assertWeeklyDeliveryPolicy, assertWeeklyDeliveryContent, weeklyFormat } = require('./weeklyDeliveryPolicy');
+const resendTransport = require('./resendTransport');
+const { resendConfig, missingResendKeys, isResendConfigured } = resendTransport;
 
 const SMTP_FIELDS = {
   host: ['SMTP_HOST', 'EMAIL_HOST', 'MAIL_HOST'],
@@ -82,7 +84,11 @@ function isHostingerMailApiConfigured() {
 }
 
 function isEmailConfigured() {
-  return isHostingerMailApiConfigured() || isRelayConfigured() || missingSmtpKeys().length === 0;
+  const selected = selectedEmailTransport();
+  if (selected === 'resend') return isResendConfigured();
+  if (selected === 'https_relay') return isRelayConfigured();
+  if (selected === 'hostinger_mail_api') return isHostingerMailApiConfigured();
+  return missingSmtpKeys().length === 0;
 }
 
 const EMAIL_TRANSPORT_CODES = new Set([
@@ -101,6 +107,7 @@ const EMAIL_TRANSPORT_CODES = new Set([
   'PDF_ATTACHMENT_RELAY_FILENAME_UNSAFE',
   'PDF_RELAY_CONTRACT_REQUIRED',
   'WEEKLY_HTML_RELAY_CONTRACT_REQUIRED'
+  ,'RESEND_CONFIG_MISSING','RESEND_AUTHENTICATION_FAILED','RESEND_CONNECTION_UNAVAILABLE','RESEND_MESSAGE_REJECTED','RESEND_RATE_LIMITED','RESEND_SENDER_INVALID'
 ]);
 
 function isEmailTransportError(error) {
@@ -129,6 +136,9 @@ function classifySmtpFailure(error) {
 }
 
 function smtpReadinessSummary(error = null) {
+  if (selectedEmailTransport() === 'resend') {
+    return { configured: isResendConfigured(), transport: 'resend', host: 'api.resend.com', secure: true, from_domain: 'voxelveda.com', missing: missingResendKeys(), ok: !error, failure: error ? { category: 'HTTPS_PROVIDER', code: error.code || 'RESEND_CONNECTION_UNAVAILABLE', retryable: error.retryable === true } : null };
+  }
   const config = smtpConfig();
   const base = {
     configured: isEmailConfigured(),
@@ -146,6 +156,7 @@ function emailFailureDetails(error) {
   const code = String(error?.code || 'EMAIL_DELIVERY_FAILED').toUpperCase();
 
   if(code==='DELIVERY_REVIEW_REQUIRED')return {status:409,code,message:error.message,retryable:false,provider_accepted:error.providerAccepted===true,recipient_verified:false};
+  if(code.startsWith('RESEND_'))return {status:503,code,message:error.message,retryable:error.retryable===true,...(code==='RESEND_CONFIG_MISSING'?{missing:missingResendKeys()}:{}),provider_accepted:false,recipient_verified:false};
 
   if (['PDF_RELAY_CONTRACT_REQUIRED','WEEKLY_HTML_RELAY_CONTRACT_REQUIRED'].includes(code)) return { status: 503, code, message: error.message, retryable: false };
   if (code.startsWith('PDF_')) return { status: 422, code, message: error.message, retryable: false };
@@ -359,6 +370,7 @@ async function sendViaSmtp({ to, cc, bcc, subject, html, text, replyTo, attachme
 async function verifyConnection() {
   let relayResult = null;
   const primaryTransport = selectedEmailTransport();
+  if (primaryTransport === 'resend') return resendTransport.verifyResendConnection(smtpConfig());
   if(primaryTransport==='smtp' && missingSmtpKeys().length)throw Object.assign(new Error('The selected SMTP transport is incomplete.'),{code:'SMTP_CONFIG_MISSING'});
   if(primaryTransport==='hostinger_mail_api')throw Object.assign(new Error('The selected HTTPS mail API requires an authorised provider health check. Configuration alone does not verify connectivity or recipient delivery.'),{code:'EMAIL_TRANSPORT_VERIFICATION_UNSUPPORTED'});
   if(primaryTransport==='https_relay' && !isRelayConfigured())throw Object.assign(new Error('The configured HTTPS company relay is incomplete.'),{code:'EMAIL_HTTPS_RELAY_FAILED'});
@@ -659,8 +671,26 @@ async function sendViaHttpsRelay({ to, cc, bcc, subject, html, text, replyTo, at
 
 function selectedEmailTransport() {
   const configured=String(process.env.EMAIL_PRIMARY_TRANSPORT || '').trim().toLowerCase();
-  if(configured && !['smtp','https_relay','hostinger_mail_api'].includes(configured))throw Object.assign(new Error('The configured company email transport is unsupported. Administrator review is required.'),{code:'EMAIL_TRANSPORT_CONFIG_INVALID'});
+  if(configured && !['smtp','https_relay','hostinger_mail_api','resend'].includes(configured))throw Object.assign(new Error('The configured company email transport is unsupported. Administrator review is required.'),{code:'EMAIL_TRANSPORT_CONFIG_INVALID'});
   return configured || (isRelayConfigured()?'https_relay':isHostingerMailApiConfigured()?'hostinger_mail_api':'smtp');
+}
+function selectedPdfTransport() {
+  const configured = String(process.env.PDF_EMAIL_TRANSPORT || '').trim().toLowerCase();
+  const primary = selectedEmailTransport();
+  if (configured && !['smtp','https_relay','hostinger_mail_api','resend'].includes(configured)) throw Object.assign(new Error('The configured document email transport is unsupported.'), { code: 'EMAIL_TRANSPORT_CONFIG_INVALID' });
+  // Durable queue admission is pinned to the company transport. Divergent
+  // selectors require an explicit migration rather than changing providers.
+  if (configured && configured !== primary) throw Object.assign(new Error('Document and company email transports differ. Administrator review is required before dispatch.'), { code: 'EMAIL_TRANSPORT_CONFIG_INVALID' });
+  return configured || primary;
+}
+async function sendViaResend(args) {
+  let prepared;
+  try {
+    prepared = { ...args, to: validateRecipients(args.to, 'to'), cc: validateRecipients(args.cc, 'cc'), bcc: validateRecipients(args.bcc, 'bcc'), attachments: await assertAttachmentIntegrity(args.attachments || []) };
+    const checked = assertWeeklyDeliveryPolicy(prepared, prepared);
+    assertWeeklyDeliveryContent(prepared, checked);
+  } catch (error) { throw beforeDispatch(error); }
+  return resendTransport.sendViaResend(prepared, smtpConfig());
 }
 async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments = [], deliveryKey, deliveryPolicy }) {
   let args,selected;
@@ -674,9 +704,10 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
   const checkedPolicy = assertWeeklyDeliveryPolicy(args, args);
   assertWeeklyDeliveryContent(args, checkedPolicy);
   // Explicit transport selection is honoured; no provider change is inferred from PDF failures.
-  selected = selectedEmailTransport();
+  selected = args.attachments.length ? selectedPdfTransport() : selectedEmailTransport();
   if (selected === 'https_relay' && !isRelayConfigured()) throw Object.assign(new Error('The configured HTTPS company relay is incomplete.'), {code:'EMAIL_HTTPS_RELAY_FAILED'});
   }catch(error){throw beforeDispatch(error);}
+  if (selected === 'resend') return sendViaResend(args);
   if (selected === 'smtp') return sendViaSmtp(args);
   if (selected === 'hostinger_mail_api') return sendViaHostingerMailApi(args);
   if (isRelayConfigured()) return { ...await sendViaHttpsRelay(args), transport: 'https_relay' };
@@ -687,6 +718,11 @@ async function sendMail({ to, cc, bcc, subject, html, text, replyTo, attachments
 module.exports = {
   sendMail,
   selectedEmailTransport,
+  selectedPdfTransport,
+  resendConfig,
+  missingResendKeys,
+  isResendConfigured,
+  sendViaResend,
   verifyConnection,
   createTransporter,
   isEmailConfigured,

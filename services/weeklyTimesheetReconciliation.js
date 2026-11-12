@@ -18,7 +18,10 @@ const REASONS = Object.freeze({
   RECORDED_BREAK_INVALID: 'The recorded unpaid break is invalid. Confirm its actual duration.',
   RECORDED_TIMEZONE_INVALID: 'The recorded workplace timezone needs correction.',
   ATTENDANCE_SOURCE_UNVERIFIED: 'The source of this attendance entry needs authorised review.',
-  NO_RECIPIENT: 'Save a valid designated timesheet-delivery email in the employee profile. Login email is not used as a fallback.',
+  NO_RECIPIENT: 'A valid registered account email is required. Update the employee account email through the authorised profile or staff workflow; no other address is substituted.',
+  NO_REGISTERED_RECIPIENT: 'A valid registered account email is required. No other address is substituted.',
+  RECIPIENT_POLICY_CHANGED: 'This retained report uses an earlier recipient policy. Reconcile its previous provider outcome, then authorise a labelled revision; it will not be redirected or resent automatically.',
+  STAFF_OR_RECIPIENT_CHANGED: 'The employee account or registered email changed after this report was prepared. Review the retained recipient and authorise a revision; pending messages are not redirected automatically.',
   SOURCE_CHANGED: 'Attendance changed after this report snapshot. Review and authorise a labelled correction.',
   LEGACY_WEEKLY_DELIVERY_REVIEW: 'A previous delivery exists. Reconcile its provider outcome before authorising another version.',
   WORKER_TRANSPORT_UNCERTAIN: 'The worker stopped during transport. Check the provider result before considering another delivery.',
@@ -79,7 +82,7 @@ function nextAction(row, dispatch) {
   if (row.eligibility === 'INELIGIBLE_ACCOUNT') return { code: 'NONE', message: 'No automatic email is sent to an ineligible account.' };
   if (row.eligibility === 'NO_WORK') return { code: 'NONE', message: 'No weekly email is sent without eligible actual worked time.' };
   if (row.eligibility === 'REVIEW_REQUIRED') return { code: 'REVIEW_SOURCE', message: 'Resolve the identified attendance issues through the authorised correction workflow.' };
-  if (!row.recipient_configured) return { code: 'SET_DELIVERY_EMAIL', message: REASONS.NO_RECIPIENT };
+  if (!row.recipient_configured) return { code: 'SET_REGISTERED_EMAIL', message: REASONS.NO_RECIPIENT };
   if (row.status === 'REVIEW_REQUIRED' || ['INVALID','UNSUPPORTED'].includes(row.report?.status)) return { code: 'REVIEW_SNAPSHOT', message: 'Review this retained report snapshot and its recorded blocker before an authorised correction or retry.' };
   if (row.status === 'GENERATION_FAILED' || (row.delivery_format === 'PDF' && row.pdf.status === 'GENERATION_FAILED')) return { code: 'RETRY_GENERATION', message: row.delivery_format === 'HTML' ? 'Review the email report preparation failure, then request an authorised controlled retry. Optional PDF generation is separate.' : 'Review the PDF generation failure, then request an authorised controlled retry. No substitute attachment will be sent.' };
   if (row.status === 'FAILED') return { code: 'REVIEW_FAILURE', message: 'Review the recorded transport failure and attempt budget before an authorised recovery. Failed delivery is not approval failure.' };
@@ -103,7 +106,7 @@ async function reconcileWeek(options = {}) {
     else if(hasPermission(options.actor,'VIEW_OWN_TIMESHEET')){clauses.push('id=?');params.push(options.actor.id);}
     else return {period:{start:period.start,end:period.end,timezone:period.timezone},outcomes:[],counts:{},recipient_verified:false};
   }
-  const [employees] = await db.query(`SELECT id,name,role,active,account_status,deleted_at,employee_number,timesheet_delivery_email FROM users ${clauses.length?'WHERE '+clauses.join(' AND '):''} ORDER BY id LIMIT 10001`,params);
+  const [employees] = await db.query(`SELECT id,name,role,active,account_status,deleted_at,employee_number,email FROM users ${clauses.length?'WHERE '+clauses.join(' AND '):''} ORDER BY id LIMIT 10001`,params);
   if (employees.length > 10000) throw Object.assign(new Error('Narrow this reconciliation before processing more than 10,000 accounts.'), { statusCode: 422 });
   const outcomes = [];
   for (const staff of employees) {
@@ -124,12 +127,21 @@ async function reconcileWeek(options = {}) {
     const stored = reasons(delivery?.review_reasons_json), current = reasons(assessment.issues);
     const distinct = new Map(current.map(issue => [issue.code+':'+(issue.attendance_id||''),issue]));
     if (delivery?.last_error_code && ['REVIEW_REQUIRED','GENERATION_FAILED','FAILED','RETRY'].includes(delivery.status)) for (const issue of reasons([delivery.last_error_code])) distinct.set(issue.code,issue);
-    const recipientValid = Boolean(policy.emailAddress(staff.timesheet_delivery_email));
+    const recipientValid = Boolean(policy.registeredRecipient(staff));
+    let recipientHold;
+    if (!['PROVIDER_ACCEPTED', 'DELIVERY_UNKNOWN', 'SENDING'].includes(queueOutcome(delivery, queue)) && delivery?.snapshot_json) {
+      let snapshot;
+      try { snapshot = JSON.parse(delivery.snapshot_json); } catch { /* Snapshot integrity is reported separately. */ }
+      if (snapshot && !policy.currentRecipientPolicy(snapshot)) recipientHold = 'RECIPIENT_POLICY_CHANGED';
+      else if (delivery.recipient && delivery.recipient !== policy.registeredRecipient(staff)) recipientHold = 'STAFF_OR_RECIPIENT_CHANGED';
+      if (recipientHold) distinct.set(recipientHold, reasons([recipientHold])[0]);
+    }
     if ((assessment.totalMinutes>0||assessment.issues.length>0) && !recipientValid) distinct.set('NO_RECIPIENT',reasons(['NO_RECIPIENT'])[0]);
     const row = { user_id:Number(staff.id), staff_name:staff.name, period_start:period.start,period_end:period.end,
       eligibility:assessment.status, account_evidence:{active:Number(staff.active)===1,status:String(staff.account_status||'ACTIVE'),archived:Boolean(staff.deleted_at),employee:policy.isEmployee(staff)}, verified_minutes:assessment.totalMinutes, eligible_record_ids:assessment.rows.map(entry=>entry.id),
       candidate_record_count:attendance.length, duplicate_records:assessment.duplicates,
       attendance_review_evidence:assessment.issues.map(issue=>{const record=attendance.find(item=>Number(item.id)===Number(issue.attendance_id));return record?{attendance_id:Number(record.id),clock_in_present:Boolean(record.clock_in),clock_out_present:Boolean(record.clock_out),timestamp_basis:record.timestamp_basis,clock_out_timestamp_basis:record.clock_out_timestamp_basis,entry_source:record.entry_source,recorded_timezone:record.recorded_timezone,total_minutes:record.total_minutes,total_hours:record.total_hours,break_minutes:record.break_minutes,review_required:Boolean(Number(record.review_required)),review_reason:record.review_reason}:null;}).filter(Boolean), recipient_configured:recipientValid,
+      recipient_source:policy.RECIPIENT_SOURCE,recipient_policy_version:policy.RECIPIENT_POLICY_VERSION,
       timesheet_id:sheet?.id || delivery?.timesheet_id || null, timesheet_status:sheet?.status || 'NOT_CREATED',
       previous_queue_outcomes:priorQueues.filter(item=>Number(item.id)!==Number(delivery?.email_queue_id)).map(item=>({id:item.id,status:queueOutcome(null,item),recipient_verified:Boolean(item.recipient_verified_at)})),
       generation_attempts:documents.map(item=>({id:item.id,status:item.generation_status,pages:item.pdf_pages,queue_id:item.email_queue_id})),
@@ -142,6 +154,7 @@ async function reconcileWeek(options = {}) {
       queue:queue ? { id:queue.id,status:queue.status,attempts:queue.attempts,max_attempts:queue.max_attempts,next_attempt_at:queue.next_attempt_at } : null,
       document_request_id:document?.id || null, provider_accepted:queueOutcome(delivery,queue)==='PROVIDER_ACCEPTED',recipient_verified:Boolean(queue?.recipient_verified_at) };
     if(!delivery?.email_queue_id&&priorQueues.length){row.status='LEGACY_WEEKLY_DELIVERY_REVIEW';row.review_reasons.push(reasons(['LEGACY_WEEKLY_DELIVERY_REVIEW'])[0]);}
+    else if (recipientHold) row.status = 'REVIEW_REQUIRED';
     if(!document&&documents[0]?.generation_status==='GENERATION_FAILED')row.pdf={status:'GENERATION_FAILED',required_for_email:report.format==='PDF'};
     // A resolved, unsnapshotted eligibility blocker must not remain the
     // current diagnosis solely because the scheduler has not run again yet.

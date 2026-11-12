@@ -6,7 +6,10 @@ const {
   verifyConnection,
   sendMail,
   emailFailureDetails,
-  isEmailTransportError
+  isEmailTransportError,
+  selectedEmailTransport,
+  isResendConfigured,
+  missingResendKeys
 } = require('../services/emailService');
 const { processEmailQueue, RETAINED_EMAIL_MODULES } = require('../services/emailQueue');
 const { ensureEmailQueueSchema } = require('../services/emailQueueSchema');
@@ -30,28 +33,31 @@ function masked(value) {
 exports.config = async (_req, res) => {
   const config = smtpConfig();
   const company = companyProfile();
-  const selected=String(process.env.EMAIL_PRIMARY_TRANSPORT || '').trim().toLowerCase() || (isRelayConfigured()?'https_relay':isHostingerMailApiConfigured()?'hostinger_mail_api':'smtp');
+  const selected=selectedEmailTransport();
   return res.json({
     transport: selected,
-    provider: selected==='https_relay' ? 'WordPress HTTPS company relay' : selected==='hostinger_mail_api' ? 'Configured Hostinger mail API' : selected==='smtp' ? 'Company SMTP' : 'Unknown configured transport; administrator review required',
-    configured: selected==='https_relay'?isRelayConfigured():selected==='hostinger_mail_api'?isHostingerMailApiConfigured():selected==='smtp'?missingSmtpKeys().length===0:false,
-    missing: missingSmtpKeys(),
-    host: config.host,
-    port: config.port,
-    secure: config.secure,
-    username: masked(config.user),
+    provider: selected==='resend' ? 'Resend HTTPS company email' : selected==='https_relay' ? 'WordPress HTTPS company relay' : selected==='hostinger_mail_api' ? 'Configured Hostinger mail API' : selected==='smtp' ? 'Company SMTP' : 'Unknown configured transport; administrator review required',
+    configured: selected==='resend'?isResendConfigured():selected==='https_relay'?isRelayConfigured():selected==='hostinger_mail_api'?isHostingerMailApiConfigured():selected==='smtp'?missingSmtpKeys().length===0:false,
+    missing: selected==='resend'?missingResendKeys():selected==='smtp'?missingSmtpKeys():[],
+    host: selected==='smtp'?config.host:null,
+    port: selected==='smtp'?config.port:null,
+    secure: selected==='smtp'?config.secure:null,
+    username: selected==='smtp'?masked(config.user):'',
     from_name: config.fromName,
     from_address: config.fromEmail,
     reply_to: config.replyTo,
     support_address: company.supportEmail,
-    password_configured: Boolean(config.pass)
+    password_configured: selected==='smtp'&&Boolean(config.pass),
+    api_key_configured: selected==='resend'&&isResendConfigured(),
+    recipient_verified: false
   });
 };
 
 exports.verify = async (_req, res) => {
   try {
     const result = await verifyConnection();
-    return res.json({ message: 'Company email transport connection verified. Recipient delivery remains unverified.', ...result });
+    const readiness=require('../services/emailTransportReadiness').emailTransportReadiness(result,selectedEmailTransport());
+    return res.json({message:result.transport==='resend'?readiness.detail:'Company email transport connection verified. Recipient delivery remains unverified.',...result,readiness,recipient_verified:false});
   } catch (error) {
     console.error('SMTP VERIFY ERROR:', error.message);
     const details = emailFailureDetails(error);
@@ -154,14 +160,14 @@ exports.retry = async (req, res) => {
     if(!Number.isSafeInteger(id)||id<1)return res.status(400).json({message:'Select a valid email delivery.'});
     connection=await pool.getConnection();
     await connection.beginTransaction();
-    const [[previous]]=await connection.query('SELECT id,status,attempts,related_module FROM email_queue WHERE id=? FOR UPDATE',[id]);
-    if(!previous||!['FAILED','RETRY'].includes(previous.status)||!RETAINED_EMAIL_MODULES.includes(previous.related_module)){
+    const [[previous]]=await connection.query('SELECT id,status,attempts,related_module,provider_accepted_at,message_id FROM email_queue WHERE id=? FOR UPDATE',[id]);
+    if(!previous||previous.provider_accepted_at||previous.message_id||!['FAILED','RETRY'].includes(previous.status)||!RETAINED_EMAIL_MODULES.includes(previous.related_module)){
       await connection.rollback();
       return res.status(409).json({message:'Only confirmed failed emails can be retried. Accepted or uncertain deliveries require review.'});
     }
     const [result] = await connection.query(
       `UPDATE email_queue SET status = 'RETRY', attempts = 0, next_attempt_at = NOW(), last_error = NULL
-       WHERE id = ? AND status IN ('FAILED', 'RETRY') AND related_module IN (${RETAINED_EMAIL_MODULES.map(() => '?').join(',')})`,
+       WHERE id = ? AND status IN ('FAILED', 'RETRY') AND provider_accepted_at IS NULL AND message_id IS NULL AND related_module IN (${RETAINED_EMAIL_MODULES.map(() => '?').join(',')})`,
       [id,...RETAINED_EMAIL_MODULES]
     );
     if (!result.affectedRows){await connection.rollback();return res.status(409).json({ message: 'This delivery changed. Refresh before retrying.' });}
@@ -186,6 +192,10 @@ exports.templates = async (_req, res) => res.json({
 
 async function mayViewDelivery(user,request,db=pool){
  if(!user || !Number.isSafeInteger(Number(user.id)) || Number(user.id)<1)return false;
+ if(request.related_module==='workflow' && String(request.related_record_id).startsWith('manual:')) {
+  try { await require('../services/manualReportEmailService').getSnapshot({user},String(request.related_record_id).slice(7),{db}); return true; }
+  catch { return false; }
+ }
  if(request.related_module==='procurement' && String(request.related_record_id).startsWith('report:')) {
   try { await require('../services/procurementReportService').getSnapshot({user,snapshotId:String(request.related_record_id).slice(7),db}); return true; }
   catch { return false; }
@@ -240,3 +250,27 @@ exports.documentPdf=async(req,res)=>{
  }catch(error){return res.status(error.status || 500).json({message:error.message,code:error.code || 'PDF_DOCUMENT_INVALID'});}
 };
 exports._test={mayViewDelivery};
+
+function reportFailure(res,error) {
+  const status=Number(error.status || error.statusCode) || 500;
+  return res.status(status).json({message:status<500?error.message:'The report could not be processed. Retry or ask an administrator to review its recorded failure.',code:error.code || 'REPORT_EMAIL_FAILED',errors:error.errors,email_sent:false,document_request_id:error.document_request_id || null,...(error.existing_delivery?{existing_delivery:error.existing_delivery}:{})});
+}
+exports.reportCatalog=(req,res)=>{
+  try{return res.json(require('../services/manualReportEmailService').catalog(req.user));}catch(error){return reportFailure(res,error);}
+};
+exports.prepareReport=async(req,res)=>{
+  try{return res.status(201).json(await require('../services/manualReportEmailService').prepare(req,req.body));}catch(error){return reportFailure(res,error);}
+};
+exports.reportStatus=async(req,res)=>{
+  try{return res.json(await require('../services/manualReportEmailService').status(req,req.params.id));}catch(error){return reportFailure(res,error);}
+};
+exports.reportPdf=async(req,res)=>{
+  try{
+    if(req.query.download!==undefined&&!['0','1'].includes(String(req.query.download)))throw Object.assign(new Error('Download must be 0 or 1.'),{status:422});
+    const {artifact}=await require('../services/manualReportEmailService').getSnapshot(req,req.params.id);
+    return await require('../services/documentPdfService').sendPdfResponse(res,artifact,String(req.query.download)==='1');
+  }catch(error){return reportFailure(res,error);}
+};
+exports.sendReport=async(req,res)=>{
+  try{return res.json(await require('../services/manualReportEmailService').send(req,req.params.id,req.body));}catch(error){return reportFailure(res,error);}
+};

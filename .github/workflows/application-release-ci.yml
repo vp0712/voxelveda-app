@@ -38,6 +38,9 @@ jobs:
           NODE_ENV: production
           MALWARE_SCANNER_REQUIRED: 'true'
           OBJECT_STORAGE_PROVIDER: s3
+          EMAIL_PRIMARY_TRANSPORT: resend
+          PDF_EMAIL_TRANSPORT: resend
+          RESEND_API_KEY: synthetic-ci-no-provider-access
         run: npm run build
       - name: Build the packaged source without Git metadata
         env:
@@ -91,6 +94,21 @@ jobs:
         with:
           name: weekly-timesheet-email-${{ github.sha }}
           path: ${{ runner.temp }}/weekly-email-proof
+          retention-days: 30
+      - name: Verify reviewed report PDF email controls and recovery in Chromium and WebKit
+        if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}
+        env:
+          VV_BROWSER_MODULE_PATH: ${{ runner.temp }}/vv-browser/node_modules/playwright
+          UI_PROOF_DIR: ${{ runner.temp }}/document-email-proof/chromium
+        run: |
+          timeout --signal=TERM --kill-after=10s 240s node scripts/document-email-browser-test.js
+          VV_REPORT_BROWSER_ENGINE=webkit UI_PROOF_DIR="$RUNNER_TEMP/document-email-proof/webkit" timeout --signal=TERM --kill-after=10s 240s node scripts/document-email-browser-test.js
+      - name: Preserve report email recipient, snapshot and recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: document-email-${{ github.sha }}
+          path: ${{ runner.temp }}/document-email-proof
           retention-days: 30
       - name: Verify retained internal registers and managed actions in the Business Hub layout
         if: ${{ !cancelled() && steps.browser-tools.outcome == 'success' }}

@@ -82,7 +82,7 @@ exports.detail = async (req, res) => {
 function requestedRecipients(body) { return ['recipient','to','cc','bcc','include_employee'].some((key) => Object.hasOwn(body || {}, key)); }
 async function revise(req, res, retryGeneration) {
   try {
-    if (requestedRecipients(req.body)) return res.status(422).json({ message: 'Weekly delivery uses only the staff member’s saved timesheet-delivery address. Copies and recipient overrides are not allowed.', code: 'WEEKLY_RECIPIENT_OVERRIDE_DENIED' });
+    if (requestedRecipients(req.body)) return res.status(422).json({ message: 'Weekly delivery uses only the staff member’s registered account email. Copies and recipient overrides are not allowed.', code: 'WEEKLY_RECIPIENT_OVERRIDE_DENIED' });
     const result = await weekly.queueWeeklyTimesheetRevision({ actor: req.user, deliveryId: req.params.id || req.body.delivery_id,
       expectedVersion: req.body.expected_version, reason: req.body.reason, retryGeneration,
       confirmPossiblePreviousDelivery: req.body.confirm_possible_previous_delivery === true });
