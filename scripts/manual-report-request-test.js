@@ -35,6 +35,7 @@ function load() {
     'node:crypto': crypto, '../config/db': db,
     './documentPdfService': { ...pdf, async createDocumentPdf(data) { if (failRenderer) throw Object.assign(new Error('Fixture generation failed'), { code: 'PDF_GENERATION_FAILED' }); return pdf.createDocumentPdf(data); } },
     './emailQueueSchema': { async ensureEmailQueueSchema() {} },
+    './emailTemplates': require('../services/emailTemplates'),
     './emailQueue': { async queueEmail(message) { messages.push(message); return messages.length; }, restoreAttachments(parts) { return parts.map(item => ({ ...item, content: Buffer.from(item.content, 'base64') })); } }
   };
   const wrapper = new vm.Script('(function(require,module,exports){\n' + fs.readFileSync(filename, 'utf8') + '\n})', { filename }).runInThisContext();
