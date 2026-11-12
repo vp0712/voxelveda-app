@@ -11,7 +11,8 @@ const { validateSecurityEnvironment } = require('./config/security');
 const startupEnvironmentReadiness = validateSecurityEnvironment();
 const app = require('./app');
 const pool = require('./config/db');
-const { isEmailConfigured, verifyConnection } = require('./services/emailService');
+const { isEmailConfigured, verifyConnection, selectedEmailTransport } = require('./services/emailService');
+const { emailTransportReadiness } = require('./services/emailTransportReadiness');
 const { startEmailQueueWorker, stopEmailQueueWorker } = require('./services/emailQueueWorker');
 const { verifyDatabaseConnection, refreshDatabaseAttestation } = require('./services/databaseRuntimeService');
 const { recoverDatabaseCapacity } = require('./services/databaseCapacityRecoveryService');
@@ -215,9 +216,9 @@ async function initializeServices() {
   setControl('smtp', CONTROL_STATES.INITIALIZING, 'Verifying configured company email transport');
   try {
     const result=await verifyConnection();
-    const transport=result?.transport||(require('./services/emailService').isRelayConfigured()?'https_relay':'smtp');
-    setControl('smtp', CONTROL_STATES.EXTERNALLY_VERIFIED, `Company email transport health verified: ${transport}; recipient delivery is not confirmed`);
-    console.log(`Company email transport health verified: ${transport}; no recipient receipt claim.`);
+    const evidence=emailTransportReadiness(result,selectedEmailTransport());
+    setControl('smtp', evidence.state, evidence.detail);
+    console.log(`Company email transport evidence: state=${evidence.state}; ${evidence.detail}`);
   } catch (error) {
     setControl('smtp', CONTROL_STATES.DEGRADED, error.code || 'SMTP_CONNECTION_FAILED');
     addWarning('Company email delivery is degraded; queued email remains available for controlled retry');
@@ -235,7 +236,7 @@ async function initializeWorkers() {
     'Durable source extraction registered with bounded parsers and fenced per-file leases; no automatic business-record confirmation');
   const started = [emailStarted,weeklyStarted,workflowStarted,importStarted].filter(Boolean).length;
   setCriticalService('weekly_timesheet_worker',weeklyStarted?CONTROL_STATES.OPERATIONAL:CONTROL_STATES.DEGRADED,
-    `Worked-only weekly PDF job ${weeklyStarted?'registered and scheduled':'disabled'}; ${weeklySchedule.timezone}; next due ${weeklySchedule.next_due_utc || 'none'}`);
+    `Worked-only weekly timesheet email job ${weeklyStarted?'registered and scheduled':'disabled'}; registered recipient; ${weeklySchedule.timezone}; next due ${weeklySchedule.next_due_utc || 'none'}`);
   console.log('Weekly timesheet runtime configuration',JSON.stringify(weeklySchedule));
   setCriticalService('background_workers', CONTROL_STATES.OPERATIONAL,
     `${framework.registered_jobs} original application jobs registered with durable MySQL leases; ${started} schedulers enabled`);
@@ -310,6 +311,13 @@ async function bootstrap() {
     } catch(error) {
       addWarning('Authorised release PDF verification is pending controlled retry: '+(error.code||'PDF_VERIFICATION_FAILED'));
       console.warn('Release PDF verification pending: '+(error.code||'PDF_VERIFICATION_FAILED'));
+    }
+    try {
+      const verification=await require('./services/releaseResendVerificationService').queueAuthorisedResendVerification();
+      if(verification.enabled)console.log('Release Resend retained queue evidence',JSON.stringify(verification));
+    } catch(error) {
+      addWarning('Authorised Resend release verification requires review: '+(error.code||'RELEASE_VERIFICATION_FAILED'));
+      console.warn('Release Resend verification pending: '+(error.code||'RELEASE_VERIFICATION_FAILED'));
     }
 
     if (process.env.ENABLE_ADMIN_BOOTSTRAP === 'true') {
