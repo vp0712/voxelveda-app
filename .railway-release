@@ -1,9 +1,9 @@
-application-release: 20261112-resend-sending-key-health-verification
-candidate-commit: 91d23973b725cfc1400b9795185c4b5490f2346b
-merged-commit: d6a5759635ee9c640c757fc88efcdb6d8522ba3f
+application-release: 20261112-invoice-email-company-signature
+candidate-commit: 6bdfe755ca5c47888907ca16863dcd01fd02c659
+merged-commit: ab89afada4a4331405f4d920ca99225fc4a8cdab
 production-branch: main
-previous-live-commit: 48789b7495bfd4df6e6840432e08281ed3cee26a
-scope: existing-original-application; explicit-Resend-HTTPS; registered-email-weekly-HTML-and-plain-text; private-immutable-manual-report-PDF-email; current-sidebar-home-charts-logo-and-security-preserved; no-Banking-or-added-ERP
+previous-live-commit: fa9bbf7281c57bf635f9b30e915fb33b42ffd609
+scope: invoice-email company signature in HTML and plain text; original logo and company contact links; one reviewed PDF attachment
 preserved: unchanged-original-logo-ea69c23f603a79ae6e077798e7ceea6186f139ad2433e364591b1f4054b68312; navy-light-dark-theme; existing-records-IDs-attachments-audit-encryption-keys-security-domain-and-startup-guards
 notifications: single-focused-responsive-centre; authorised-unread-count-and-specific-record-links; durable-per-recipient-read-state-and-event-version-deduplication; retained-original-invoice-expense-events; retired-links-blocked; mixed-schema-collations-compatible; profile-preferences-only
 avatars: one-authenticated-byte-and-Blob-renderer; genuine-image-decode-EXIF-orientation-square-crop-size-pixel-scan-validation; private-S3-first-or-retained-database-storage; audited-references; immediate-refresh-and-account-isolation; settled-failure-cache-and-controlled-retry
@@ -161,3 +161,7 @@ resend-health-20261112-existing-evidence: first-Resend-release48789b7495bfd4df6e
 resend-health-20261112-verification: fresh-UTC-and-production-style-Melbourne-98-script-builds; exact401403-restricted-and-invalid-key-fixtures; all-applicable-candidate-and-merged-main-gates-success; unchanged-UI-brand-and-native-inputs-retain-initial-release-nine-successful-gates; no-replacement-store-distribution-claim
 resend-health-20261112-fixtures: disabled-in-service-configuration; stable-test-ID-snapshots-and-SENT-provider-history-preserved; no-second-test-send-or-historical-backfill
 resend-health-20261112-schedule: next-Monday20261116-0700-Australia-Sydney-for20261109-through20261115; actual-positive-work-only-to-saved-registered-account-address; zero-manager-CC-or-BCC; source-review-and-idempotency-preserved
+
+invoice-email-signature-20261112-source: PR340; company signature on newly queued invoice email; original company logo and profile contact links; one validated PDF
+invoice-email-signature-20261112-verification: candidate workflows 43187924041:success, 43187924236:success, 43187924069:success, 43187924151:success, 43187924100:success; merged tree c945b0d7e5d405d29bdd363e6a45657a3dc465be matches candidate exactly; synthetic invoice body and attachment verified
+invoice-email-signature-20261112-rollback: fa9bbf7281c57bf635f9b30e915fb33b42ffd609; Railway fd0a7cd1-b621-48fe-b63c-b014824cdb4c
